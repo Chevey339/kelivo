@@ -2355,5 +2355,33 @@
         "type": "int"
       }
     }
-  }
+  },
+  "syncTitle": "Sync",
+  "syncEnable": "Enable Sync",
+  "syncBackendLabel": "Backend",
+  "syncBackendWebdav": "WebDAV",
+  "syncBackendS3": "S3",
+  "syncBackendHint": "Configure WebDAV or S3 in Backup settings first",
+  "syncStatusIdle": "Synced",
+  "syncStatusPushing": "Uploading changes...",
+  "syncStatusPulling": "Downloading changes...",
+  "syncStatusError": "Sync error",
+  "syncStatusDisabled": "Sync disabled",
+  "syncLastSyncAt": "Last synced: {time}",
+  "@syncLastSyncAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncManualSync": "Sync now",
+  "syncCleanHistory": "Clear remote sync history",
+  "syncDeviceName": "Device name",
+  "syncPullInterval": "Pull interval (minutes)",
+  "syncNeedBackend": "Configure WebDAV or S3 first",
+  "syncInitialTitle": "Initialize Sync",
+  "syncInitialPickBackup": "Restore from backup",
+  "syncInitialSkip": "Local is already up to date",
+  "syncInitialCancel": "Cancel — upload backup from other device first"
 }

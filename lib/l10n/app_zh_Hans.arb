@@ -1932,5 +1932,33 @@
         "type": "int"
       }
     }
-  }
+  },
+  "syncTitle": "同步",
+  "syncEnable": "启用同步",
+  "syncBackendLabel": "后端",
+  "syncBackendWebdav": "WebDAV",
+  "syncBackendS3": "S3",
+  "syncBackendHint": "请先在备份设置中配置 WebDAV 或 S3",
+  "syncStatusIdle": "已同步",
+  "syncStatusPushing": "正在上传变更...",
+  "syncStatusPulling": "正在下载变更...",
+  "syncStatusError": "同步出错",
+  "syncStatusDisabled": "同步已关闭",
+  "syncLastSyncAt": "上次同步：{time}",
+  "@syncLastSyncAt": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "syncManualSync": "立即同步",
+  "syncCleanHistory": "清理远端同步历史",
+  "syncDeviceName": "设备名称",
+  "syncPullInterval": "拉取间隔（分钟）",
+  "syncNeedBackend": "请先配置 WebDAV 或 S3",
+  "syncInitialTitle": "初始化同步",
+  "syncInitialPickBackup": "从备份恢复",
+  "syncInitialSkip": "本地已是最新",
+  "syncInitialCancel": "取消——先去另一端上传备份"
 }

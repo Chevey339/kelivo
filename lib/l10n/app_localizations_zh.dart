@@ -5269,6 +5269,71 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get syncTitle => '同步';
+
+  @override
+  String get syncEnable => '启用同步';
+
+  @override
+  String get syncBackendLabel => '后端';
+
+  @override
+  String get syncBackendWebdav => 'WebDAV';
+
+  @override
+  String get syncBackendS3 => 'S3';
+
+  @override
+  String get syncBackendHint => '请先在备份设置中配置 WebDAV 或 S3';
+
+  @override
+  String get syncStatusIdle => '已同步';
+
+  @override
+  String get syncStatusPushing => '正在上传变更...';
+
+  @override
+  String get syncStatusPulling => '正在下载变更...';
+
+  @override
+  String get syncStatusError => '同步出错';
+
+  @override
+  String get syncStatusDisabled => '同步已关闭';
+
+  @override
+  String syncLastSyncAt(String time) {
+    return '上次同步：$time';
+  }
+
+  @override
+  String get syncManualSync => '立即同步';
+
+  @override
+  String get syncCleanHistory => '清理远端同步历史';
+
+  @override
+  String get syncDeviceName => '设备名称';
+
+  @override
+  String get syncPullInterval => '拉取间隔（分钟）';
+
+  @override
+  String get syncNeedBackend => '请先配置 WebDAV 或 S3';
+
+  @override
+  String get syncInitialTitle => '初始化同步';
+
+  @override
+  String get syncInitialPickBackup => '从备份恢复';
+
+  @override
+  String get syncInitialSkip => '本地已是最新';
+
+  @override
+  String get syncInitialCancel => '取消——先去另一端上传备份';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10536,6 +10601,71 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get syncTitle => '同步';
+
+  @override
+  String get syncEnable => '启用同步';
+
+  @override
+  String get syncBackendLabel => '后端';
+
+  @override
+  String get syncBackendWebdav => 'WebDAV';
+
+  @override
+  String get syncBackendS3 => 'S3';
+
+  @override
+  String get syncBackendHint => '请先在备份设置中配置 WebDAV 或 S3';
+
+  @override
+  String get syncStatusIdle => '已同步';
+
+  @override
+  String get syncStatusPushing => '正在上传变更...';
+
+  @override
+  String get syncStatusPulling => '正在下载变更...';
+
+  @override
+  String get syncStatusError => '同步出错';
+
+  @override
+  String get syncStatusDisabled => '同步已关闭';
+
+  @override
+  String syncLastSyncAt(String time) {
+    return '上次同步：$time';
+  }
+
+  @override
+  String get syncManualSync => '立即同步';
+
+  @override
+  String get syncCleanHistory => '清理远端同步历史';
+
+  @override
+  String get syncDeviceName => '设备名称';
+
+  @override
+  String get syncPullInterval => '拉取间隔（分钟）';
+
+  @override
+  String get syncNeedBackend => '请先配置 WebDAV 或 S3';
+
+  @override
+  String get syncInitialTitle => '初始化同步';
+
+  @override
+  String get syncInitialPickBackup => '从备份恢复';
+
+  @override
+  String get syncInitialSkip => '本地已是最新';
+
+  @override
+  String get syncInitialCancel => '取消——先去另一端上传备份';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15803,4 +15933,69 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get syncTitle => '同步';
+
+  @override
+  String get syncEnable => '啟用同步';
+
+  @override
+  String get syncBackendLabel => '後端';
+
+  @override
+  String get syncBackendWebdav => 'WebDAV';
+
+  @override
+  String get syncBackendS3 => 'S3';
+
+  @override
+  String get syncBackendHint => '請先在備份設定中配置 WebDAV 或 S3';
+
+  @override
+  String get syncStatusIdle => '已同步';
+
+  @override
+  String get syncStatusPushing => '正在上傳變更...';
+
+  @override
+  String get syncStatusPulling => '正在下載變更...';
+
+  @override
+  String get syncStatusError => '同步出錯';
+
+  @override
+  String get syncStatusDisabled => '同步已關閉';
+
+  @override
+  String syncLastSyncAt(String time) {
+    return '上次同步：$time';
+  }
+
+  @override
+  String get syncManualSync => '立即同步';
+
+  @override
+  String get syncCleanHistory => '清理遠端同步歷史';
+
+  @override
+  String get syncDeviceName => '設備名稱';
+
+  @override
+  String get syncPullInterval => '拉取間隔（分鐘）';
+
+  @override
+  String get syncNeedBackend => '請先配置 WebDAV 或 S3';
+
+  @override
+  String get syncInitialTitle => '初始化同步';
+
+  @override
+  String get syncInitialPickBackup => '從備份恢復';
+
+  @override
+  String get syncInitialSkip => '本地已是最新';
+
+  @override
+  String get syncInitialCancel => '取消——先去另一端上傳備份';
 }

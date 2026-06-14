@@ -141,6 +141,7 @@ flutter test
 | Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly |
 | `dependencies/**` path dependencies | Run analysis/tests in the dependency's own directory, not just the root repo |
 | `lib/desktop/**`, desktop hotkeys/tray/window logic | At least one desktop-targeted verification (e.g. `flutter run -d macos`, `flutter build macos`, or the corresponding Windows/Linux target); if only the current machine's platform was verified, state the uncovered platform boundary |
+| `lib/core/services/sync/**` **/** `lib/core/providers/sync*.dart` **/** `lib/core/services/sync/**` | Run `flutter test test/core/services/sync/` after implementation; verify `SyncChangeLog` append/read/mark/cleanup, `SyncEngine` push/pull/error-handling, and `SyncProvider` state transitions |
 
 - If local environment limitations prevent completing any verification, the final delivery notes must explicitly state "what was not run, why, and where the risk lies".
 
@@ -172,7 +173,16 @@ flutter test
 - Do not expand scope just because you spotted something that "could be unified". Finish the current task first, then decide whether to open a separate refactoring task.
 - When touching a path dependency, treat it as an independent module. Do not only patch the surface at the root repo level.
 
-### 3.8 Desktop Tasks: Determine Entry Layer First
+### 3.8 Sync Implementation Rules
+
+- SyncChangeLog writes must be O(1) appends to Hive — never scan the full Hive box to determine what changed.
+- Push must mark changelog entries with a `batchId` before uploading; delete only entries with that `batchId` after a successful upload.
+- Streaming messages (`isStreaming == true`) must never trigger a changelog write. Only write when `isStreaming` transitions from `true` to `false`.
+- Pull must process remote batch files in chronological order. If a file fails download after 2 retries, stop the entire pull and record an error state.
+- Initial sync must present a list of remote backup ZIPs for the user to choose from. Never auto-detect or auto-restore.
+- SyncTransport is an abstract interface — SyncEngine must never reference WebDavConfig or S3Config directly.
+
+### 3.9 Desktop Tasks: Determine Entry Layer First
 
 - When the task mentions desktop, Windows, macOS, Linux, tray, hotkeys, window, context menu, or desktop settings, first determine which layer the issue belongs to:
   - Top-level desktop app shell: `lib/desktop/**`
@@ -302,6 +312,24 @@ flutter test
   - Only record issues that actually occurred in this repo and have reuse value for future development.
   - Do not write "heard this might happen" hearsay entries.
   - When adding entries, prefer "symptom -> root cause -> fix/constraint". Avoid recording conclusions without context.
+
+### Sync: Initial sync must use user-selected backup ZIP, not auto-detected
+
+- **Symptom**: New device auto-detects the latest backup ZIP and restores it → accidentally recovers its own backup (uploaded from the same device) → data appears unchanged but baseline timestamp is wrong.
+- **Root cause**: Without distinguishing device identity in backup files, the sync engine has no way to tell whether a backup originated from itself or another device.
+- **Constraint**: Initial sync must present a list of remote backup ZIPs to the user and let them choose explicitly. Three choices: (1) select a backup and restore, (2) skip (local is already the newest), (3) cancel (go upload a backup on the other device first).
+
+### Sync: Push must lock changelog entries with batchId
+
+- **Symptom**: While push is in progress (reading changelog → uploading → deleting synced entries), a user action creates a new changelog entry. The deletion step removes the new entry because it was un-synced.
+- **Root cause**: Push reads `synced == false` entries, uploads them, then deletes `synced == false`. Any entry written during the upload window is caught by the same deletion.
+- **Constraint**: Push must mark entries with a `batchId` before uploading, then delete only entries with that `batchId`. New concurrent entries get a different or null `batchId` and are protected.
+
+### Sync: Streaming messages must not trigger changelog writes
+
+- **Symptom**: Token-by-token streaming updates call `updateMessageSilent` 100+ times per message → each writes a changelog entry → 100 dead entries for a single message.
+- **Root cause**: Streaming updates write partial content that is meaningless for sync—only the completed message should propagate.
+- **Constraint**: Only write changelog for messages where `isStreaming` transitions from `true` to `false`. Never write changelog from `updateMessageSilent`.
 
 ## Appendix: Skills Usage Rules
 

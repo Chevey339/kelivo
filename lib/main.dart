@@ -32,6 +32,11 @@ import 'core/providers/backup_provider.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
+import 'core/providers/sync_provider.dart';
+import 'core/services/sync/sync_change_log.dart';
+import 'core/services/sync/sync_engine.dart';
+import 'core/services/sync/sync_metadata.dart';
+import 'core/services/sync/sync_transport.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
@@ -159,6 +164,7 @@ class MyApp extends StatelessWidget {
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),
+        ChangeNotifierProvider(create: (_) => SyncProvider()),
       ],
       child: Builder(
         builder: (context) {
@@ -245,6 +251,59 @@ class MyApp extends StatelessWidget {
                           defaultTargetPlatform == TargetPlatform.linux);
                   if (isDesktop) {
                     await context.read<HotkeyProvider>().initialize();
+                  }
+                } catch (_) {}
+              });
+
+              // Initialize sync engine on all platforms
+              WidgetsBinding.instance.addPostFrameCallback((_) async {
+                try {
+                  final chatService = context.read<ChatService>();
+                  final syncProvider = context.read<SyncProvider>();
+
+                  final changeLog = SyncChangeLog();
+                  await changeLog.init();
+
+                  final metadata = SyncMetadata();
+                  await metadata.init();
+
+                  chatService.attachSyncChangeLog(
+                    changeLog,
+                    deviceId: metadata.deviceId,
+                  );
+
+                  final engine = SyncEngine(
+                    changeLog: changeLog,
+                    metadata: metadata,
+                    chatService: chatService,
+                    provider: syncProvider,
+                  );
+
+                  syncProvider.onTriggerSync = () {
+                    engine.triggerImmediate();
+                  };
+                  syncProvider.onResetError = () {
+                    engine.triggerImmediate();
+                  };
+
+                  if (metadata.enabled) {
+                    final backend = metadata.backendChoice;
+                    if (backend == 'webdav') {
+                      final wdConfig = settings.webDavConfig;
+                      if (wdConfig.url.trim().isNotEmpty) {
+                        engine.setTransport(
+                          WebDavSyncTransport(
+                            baseUrl: wdConfig.url,
+                            username: wdConfig.username,
+                            password: wdConfig.password,
+                            userAgent: wdConfig.userAgent,
+                          ),
+                        );
+                        syncProvider.setStatus(SyncStatus.idle);
+                        await engine.startPeriodicPull();
+                        await engine.pull();
+                      }
+                    }
                   }
                 } catch (_) {}
               });

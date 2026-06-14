@@ -5483,4 +5483,71 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get syncTitle => 'Sync';
+
+  @override
+  String get syncEnable => 'Enable Sync';
+
+  @override
+  String get syncBackendLabel => 'Backend';
+
+  @override
+  String get syncBackendWebdav => 'WebDAV';
+
+  @override
+  String get syncBackendS3 => 'S3';
+
+  @override
+  String get syncBackendHint =>
+      'Configure WebDAV or S3 in Backup settings first';
+
+  @override
+  String get syncStatusIdle => 'Synced';
+
+  @override
+  String get syncStatusPushing => 'Uploading changes...';
+
+  @override
+  String get syncStatusPulling => 'Downloading changes...';
+
+  @override
+  String get syncStatusError => 'Sync error';
+
+  @override
+  String get syncStatusDisabled => 'Sync disabled';
+
+  @override
+  String syncLastSyncAt(String time) {
+    return 'Last synced: $time';
+  }
+
+  @override
+  String get syncManualSync => 'Sync now';
+
+  @override
+  String get syncCleanHistory => 'Clear remote sync history';
+
+  @override
+  String get syncDeviceName => 'Device name';
+
+  @override
+  String get syncPullInterval => 'Pull interval (minutes)';
+
+  @override
+  String get syncNeedBackend => 'Configure WebDAV or S3 first';
+
+  @override
+  String get syncInitialTitle => 'Initialize Sync';
+
+  @override
+  String get syncInitialPickBackup => 'Restore from backup';
+
+  @override
+  String get syncInitialSkip => 'Local is already up to date';
+
+  @override
+  String get syncInitialCancel =>
+      'Cancel — upload backup from other device first';
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
@@ -6,6 +7,7 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
+import '../sync/sync_change_log.dart';
 
 class ChatService extends ChangeNotifier {
   static const String _conversationsBoxName = 'conversations';
@@ -34,6 +36,15 @@ class ChatService extends ChangeNotifier {
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
+
+  SyncChangeLog? _syncChangeLog;
+  String _syncDeviceId = '';
+
+  void attachSyncChangeLog(SyncChangeLog log, {required String deviceId}) {
+    _syncChangeLog = log;
+    _syncDeviceId = deviceId;
+  }
+
   void setDefaultConversationTitle(String title) {
     if (title.trim().isEmpty) return;
     _defaultConversationTitle = title.trim();
@@ -78,6 +89,44 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  // SyncEngine calls this to ensure a remote conversation exists locally.
+  Future<void> ensureConversation(
+    String conversationId, {
+    required String title,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) async {
+    if (_conversationsBox.containsKey(conversationId)) return;
+    final conv = Conversation(
+      id: conversationId,
+      title: title,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+    await _conversationsBox.put(conversationId, conv);
+  }
+
+  void notifyDataChange() {
+    notifyListeners();
+  }
+
+  void _recordChange({
+    required String domain,
+    required String action,
+    required String recordId,
+    int? timestampMillis,
+    String? data,
+  }) {
+    _syncChangeLog?.append(
+      domain: domain,
+      action: action,
+      recordId: recordId,
+      timestampMillis: timestampMillis,
+      data: data,
+      deviceId: _syncDeviceId,
+    );
+  }
+
   List<Conversation> getAllConversations() {
     if (!_initialized) return [];
     final conversations = _conversationsBox.values.toList();
@@ -92,6 +141,13 @@ class ChatService extends ChangeNotifier {
   Conversation? getConversation(String id) {
     if (!_initialized) return null;
     return _conversationsBox.get(id) ?? _draftConversations[id];
+  }
+
+  ChatMessage? getMessage(String messageId) {
+    if (!_initialized) return null;
+    final cached = _cachedTemporaryMessage(messageId);
+    if (cached != null) return cached;
+    return _messagesBox.get(messageId);
   }
 
   Conversation? _conversationForMessages(String conversationId) {
@@ -298,6 +354,12 @@ class ChatService extends ChangeNotifier {
 
     await _conversationsBox.put(conversation.id, conversation);
     _currentConversationId = conversation.id;
+    _recordChange(
+      domain: 'conversation',
+      action: 'create',
+      recordId: conversation.id,
+      data: jsonEncode(conversation.toJson()),
+    );
     notifyListeners();
     return conversation;
   }
@@ -349,6 +411,7 @@ class ChatService extends ChangeNotifier {
     // Delete orphaned files (not referenced by any remaining conversation)
     await _cleanupOrphanUploads();
 
+    _recordChange(domain: 'conversation', action: 'delete', recordId: id);
     notifyListeners();
   }
 
@@ -911,6 +974,15 @@ class ChatService extends ChangeNotifier {
       _messagesCache[conversationId]!.add(message);
     }
 
+    if (!isStreaming && !temporary) {
+      _recordChange(
+        domain: 'chatMessage',
+        action: 'create',
+        recordId: message.id,
+        data: jsonEncode(message.toJson()),
+      );
+    }
+
     notifyListeners();
     return message;
   }
@@ -996,6 +1068,16 @@ class ChatService extends ChangeNotifier {
       if (index != -1) {
         messages[index] = updatedMessage;
       }
+    }
+
+    if (!updatedMessage.isStreaming) {
+      _recordChange(
+        domain: 'chatMessage',
+        action: 'update',
+        recordId: messageId,
+        timestampMillis: updatedMessage.timestamp.millisecondsSinceEpoch,
+        data: jsonEncode(updatedMessage.toJson()),
+      );
     }
 
     notifyListeners();
@@ -1460,6 +1542,7 @@ class ChatService extends ChangeNotifier {
     // Clean up orphaned upload files that are no longer referenced by any message
     await _cleanupOrphanUploads();
 
+    _recordChange(domain: 'chatMessage', action: 'delete', recordId: messageId);
     notifyListeners();
   }
 

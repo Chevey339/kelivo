@@ -10093,6 +10093,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @syncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get syncTitle;
+
+  /// No description provided for @syncEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Sync'**
+  String get syncEnable;
+
+  /// No description provided for @syncBackendLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend'**
+  String get syncBackendLabel;
+
+  /// No description provided for @syncBackendWebdav.
+  ///
+  /// In en, this message translates to:
+  /// **'WebDAV'**
+  String get syncBackendWebdav;
+
+  /// No description provided for @syncBackendS3.
+  ///
+  /// In en, this message translates to:
+  /// **'S3'**
+  String get syncBackendS3;
+
+  /// No description provided for @syncBackendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure WebDAV or S3 in Backup settings first'**
+  String get syncBackendHint;
+
+  /// No description provided for @syncStatusIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get syncStatusIdle;
+
+  /// No description provided for @syncStatusPushing.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploading changes...'**
+  String get syncStatusPushing;
+
+  /// No description provided for @syncStatusPulling.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading changes...'**
+  String get syncStatusPulling;
+
+  /// No description provided for @syncStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync error'**
+  String get syncStatusError;
+
+  /// No description provided for @syncStatusDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync disabled'**
+  String get syncStatusDisabled;
+
+  /// No description provided for @syncLastSyncAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced: {time}'**
+  String syncLastSyncAt(String time);
+
+  /// No description provided for @syncManualSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get syncManualSync;
+
+  /// No description provided for @syncCleanHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear remote sync history'**
+  String get syncCleanHistory;
+
+  /// No description provided for @syncDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get syncDeviceName;
+
+  /// No description provided for @syncPullInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull interval (minutes)'**
+  String get syncPullInterval;
+
+  /// No description provided for @syncNeedBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure WebDAV or S3 first'**
+  String get syncNeedBackend;
+
+  /// No description provided for @syncInitialTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Initialize Sync'**
+  String get syncInitialTitle;
+
+  /// No description provided for @syncInitialPickBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup'**
+  String get syncInitialPickBackup;
+
+  /// No description provided for @syncInitialSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Local is already up to date'**
+  String get syncInitialSkip;
+
+  /// No description provided for @syncInitialCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel — upload backup from other device first'**
+  String get syncInitialCancel;
 }
 
 class _AppLocalizationsDelegate
