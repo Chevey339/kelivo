@@ -280,7 +280,37 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
         ),
         data: normalized,
-        styleSheet: fmp.MarkdownStyleSheet.fromTheme(Theme.of(context)),
+        styleSheet: fmp.MarkdownStyleSheet.fromTheme(Theme.of(context))
+            .copyWith(
+              h1Padding: const EdgeInsets.only(top: 10, bottom: 2),
+              h2Padding: const EdgeInsets.only(top: 9, bottom: 2),
+              h3Padding: const EdgeInsets.only(top: 8, bottom: 2),
+              h4Padding: const EdgeInsets.only(top: 6, bottom: 2),
+              h5Padding: const EdgeInsets.only(top: 6, bottom: 2),
+              h6Padding: const EdgeInsets.only(top: 6, bottom: 2),
+              horizontalRuleDecoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: cs.outlineVariant.withValues(alpha: 0.4),
+                    width: 1,
+                  ),
+                ),
+              ),
+              blockquoteDecoration: BoxDecoration(
+                border: Border(
+                  start: BorderSide(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.42),
+                    width: 3,
+                  ),
+                ),
+              ),
+              blockquotePadding: const EdgeInsetsDirectional.only(
+                start: 13,
+                top: 2,
+                bottom: 2,
+              ),
+              blockSpacing: 6,
+            ),
         selectable: true,
         extensionSet: md.ExtensionSet(
           [LatexBlockSyntax()],
