@@ -288,6 +288,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           LatexInlineSyntax(),
           ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
         ]),
+        imageBuilder: (uri, title, alt) {
+          final url = uri.toString();
+          final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
+          return _buildFlutterMarkdownPlusImage(ctx: context, url: url, imgs: imgs);
+        },
         builders: {'latex': LatexElementBuilder()},
         onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
       );
@@ -541,6 +546,64 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             child: markdownWidget,
           );
     return result;
+  }
+
+  Widget _buildFlutterMarkdownPlusImage({
+    required BuildContext ctx,
+    required String url,
+    required List<String> imgs,
+  }) {
+    final idx = imgs.indexOf(url);
+    final initial = idx >= 0 ? idx : 0;
+    final provider = _imageProviderFor(url);
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(ctx).push(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) =>
+                ImageViewerPage(images: imgs, initialIndex: initial),
+            transitionDuration: const Duration(milliseconds: 360),
+            reverseTransitionDuration: const Duration(milliseconds: 280),
+            transitionsBuilder: (context, anim, sec, child) {
+              final curved = CurvedAnimation(
+                parent: anim,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              return FadeTransition(
+                opacity: curved,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.02),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: child,
+                ),
+              );
+            },
+          ),
+        );
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: () {
+              if (provider == null) {
+                return const Icon(Icons.broken_image);
+              }
+              return Image(
+                image: provider,
+                width: constraints.maxWidth,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stack) =>
+                    const Icon(Icons.broken_image),
+              );
+            }(),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _handleLinkTap(BuildContext context, String url) async {
