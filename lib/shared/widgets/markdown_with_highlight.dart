@@ -10,6 +10,8 @@ import 'markdown_plus_extensions/latex_block_syntax.dart';
 import 'markdown_plus_extensions/latex_inline_syntax.dart';
 import 'markdown_plus_extensions/latex_element_builder.dart';
 import 'markdown_plus_extensions/cjk_friendly_syntax.dart';
+import 'markdown_plus_extensions/fenced_code_element_builder.dart';
+import 'markdown_plus_extensions/codespan_syntax.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -280,20 +282,50 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         data: normalized,
         styleSheet: fmp.MarkdownStyleSheet.fromTheme(Theme.of(context)),
         selectable: true,
-        extensionSet: md.ExtensionSet([
-          LatexBlockSyntax(),
-        ], [
-          CjkFriendlyBoldSyntax(),
-          CjkFriendlyItalicSyntax(),
-          LatexInlineSyntax(),
-          ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
-        ]),
+        extensionSet: md.ExtensionSet(
+          [LatexBlockSyntax()],
+          [
+            CjkFriendlyBoldSyntax(),
+            CjkFriendlyItalicSyntax(),
+            LatexInlineSyntax(),
+            CodespanSyntax(),
+            ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
+          ],
+        ),
         imageBuilder: (uri, title, alt) {
           final url = uri.toString();
           final imgs = imageUrls.isNotEmpty ? imageUrls : <String>[url];
-          return _buildFlutterMarkdownPlusImage(ctx: context, url: url, imgs: imgs);
+          return _buildFlutterMarkdownPlusImage(
+            ctx: context,
+            url: url,
+            imgs: imgs,
+          );
         },
-        builders: {'latex': LatexElementBuilder()},
+        builders: {
+          'latex': LatexElementBuilder(),
+          'pre': FencedCodeElementBuilder(
+            streaming: widget.streaming,
+            codeWidgetBuilder: (ctx, lang, code, closed) {
+              final restoredCode = _unmaskHtmlTagStartsInsideFencedCode(code);
+              final langLower = lang.toLowerCase();
+              if (langLower == 'mermaid') {
+                return _MermaidBlock(
+                  code: restoredCode,
+                  streaming: widget.streaming && !closed,
+                );
+              } else if (langLower == 'plantuml') {
+                return PlantUMLBlock(code: restoredCode);
+              }
+              return _CollapsibleCodeBlock(
+                language: lang,
+                code: restoredCode,
+                streaming: widget.streaming,
+                closed: closed,
+              );
+            },
+          ),
+          'codespan': _buildCodespan(codeFontFamily: codeFontFamily),
+        },
         onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
       );
       // ignore: dead_code
@@ -546,6 +578,13 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             child: markdownWidget,
           );
     return result;
+  }
+
+  fmp.MarkdownElementBuilder _buildCodespan({String? codeFontFamily}) {
+    return _CodespanBuilder(
+      codeFontFamily: codeFontFamily ?? 'monospace',
+      codeDollarMask: _codeDollarMask,
+    );
   }
 
   Widget _buildFlutterMarkdownPlusImage({
@@ -2016,6 +2055,49 @@ ImageProvider? _imageProviderFor(String src) {
   }
   // Missing local file or unsupported scheme
   return null;
+}
+
+class _CodespanBuilder extends fmp.MarkdownElementBuilder {
+  _CodespanBuilder({
+    required this.codeFontFamily,
+    required this.codeDollarMask,
+  });
+
+  final String codeFontFamily;
+  final String codeDollarMask;
+
+  @override
+  Widget visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    final inline = element.textContent;
+    String unmasked = inline.replaceAll(codeDollarMask, r'$');
+    String softened = _softBreakInline(unmasked);
+    final bool isDarkCtx = Theme.of(context).brightness == Brightness.dark;
+    final csCtx = Theme.of(context).colorScheme;
+    final bg = isDarkCtx ? Colors.white12 : const Color(0xFFF1F3F5);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: csCtx.outlineVariant.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        softened,
+        style: TextStyle(
+          fontFamily: codeFontFamily,
+          fontSize: 13,
+          height: 1.4,
+        ).copyWith(color: csCtx.onSurface),
+        softWrap: true,
+        overflow: TextOverflow.visible,
+      ),
+    );
+  }
 }
 
 class _CollapsibleCodeBlock extends StatefulWidget {
