@@ -7,13 +7,28 @@ import '../../../icons/lucide_adapter.dart';
 
 /// Holds the state of image generation options.
 class ImageGenerationOptionsController {
-  String quality = 'high';
-  String sizeTier = 'auto';
-  String aspectRatio = 'auto';
-  String customAspectRatio = '16:9';
-  String outputFormat = 'png';
-  int? outputCompression;
-  int count = 1;
+  String _quality = 'high';
+  String _sizeTier = 'auto';
+  String _aspectRatio = 'auto';
+  String _customAspectRatio = '16:9';
+  String _outputFormat = 'png';
+  int? _outputCompression;
+  int _count = 1;
+
+  String get quality => _quality;
+  set quality(String v) { _quality = v; _explicitlySetByUser.add('quality'); }
+  String get sizeTier => _sizeTier;
+  set sizeTier(String v) { _sizeTier = v; _explicitlySetByUser.add('sizeTier'); }
+  String get aspectRatio => _aspectRatio;
+  set aspectRatio(String v) { _aspectRatio = v; _explicitlySetByUser.add('aspectRatio'); }
+  String get customAspectRatio => _customAspectRatio;
+  set customAspectRatio(String v) { _customAspectRatio = v; _explicitlySetByUser.add('customAspectRatio'); }
+  String get outputFormat => _outputFormat;
+  set outputFormat(String v) { _outputFormat = v; _explicitlySetByUser.add('outputFormat'); }
+  int? get outputCompression => _outputCompression;
+  set outputCompression(int? v) { _outputCompression = v; _explicitlySetByUser.add('outputCompression'); }
+  int get count => _count;
+  set count(int v) { _count = v; _explicitlySetByUser.add('count'); }
 
   String _defaultQuality = 'high';
   String _defaultSizeTier = 'auto';
@@ -22,6 +37,8 @@ class ImageGenerationOptionsController {
   String _defaultOutputFormat = 'png';
   int? _defaultOutputCompression;
   int _defaultCount = 1;
+  /// Tracks which fields the user has explicitly set (vs inherited from defaults).
+  final Set<String> _explicitlySetByUser = {};
 
   static const Map<String, Map<String, String>> sizePresets = {
     '1K': {
@@ -84,13 +101,13 @@ class ImageGenerationOptionsController {
   };
 
   bool get customized {
-    return quality != _defaultQuality ||
-        sizeTier != _defaultSizeTier ||
-        aspectRatio != _defaultAspectRatio ||
-        customAspectRatio.trim() != _defaultCustomAspectRatio.trim() ||
-        outputFormat != _defaultOutputFormat ||
-        outputCompression != _defaultOutputCompression ||
-        count != _defaultCount;
+    return _quality != _defaultQuality ||
+        _sizeTier != _defaultSizeTier ||
+        _aspectRatio != _defaultAspectRatio ||
+        _customAspectRatio.trim() != _defaultCustomAspectRatio.trim() ||
+        _outputFormat != _defaultOutputFormat ||
+        _outputCompression != _defaultOutputCompression ||
+        _count != _defaultCount;
   }
 
   String get resolvedSize => _resolveSize(
@@ -113,41 +130,53 @@ class ImageGenerationOptionsController {
   Map<String, dynamic> toExtraBody() {
     final size = resolvedSize;
     return <String, dynamic>{
-      if (quality != _defaultQuality) 'quality': quality,
-      if (size != _defaultResolvedSize)
+      if (_explicitlySetByUser.contains('quality')) 'quality': _quality,
+      if (_explicitlySetByUser.contains('sizeTier'))
         'size': size == 'auto' ? null : size,
-      if (outputFormat != _defaultOutputFormat) 'output_format': outputFormat,
-      if (outputFormat != 'png')
-        if (outputCompression != _defaultOutputCompression)
-          'output_compression': outputCompression,
-      if (outputFormat == 'png' && _defaultOutputCompression != null)
+      if (_explicitlySetByUser.contains('outputFormat')) 'output_format': _outputFormat,
+      if (_explicitlySetByUser.contains('outputCompression') && _outputCompression != null)
+        'output_compression': _outputCompression,
+      if (_outputFormat == 'png' && _explicitlySetByUser.contains('outputCompression'))
         'output_compression': null,
-      if (count != _defaultCount) 'n': count,
+      if (_explicitlySetByUser.contains('count')) 'n': _count,
     };
   }
 
   void applyDefaultsFromBody(Map<String, dynamic> body) {
     final wasCustomized = customized;
+    // Snapshot which fields the user had explicitly set BEFORE we change anything.
+    final preCustomizedFields = Set<String>.from(_explicitlySetByUser);
+    _explicitlySetByUser.clear();
     _resetDefaultState();
     _applyBodyToDefaults(body);
-    if (!wasCustomized) {
-      reset();
+    // Fields coming from body defaults are NOT user customizations.
+    // (we do NOT add them to _explicitlySetByUser here)
+    if (wasCustomized) {
+      // Restore: fields the user set before are still their responsibility.
+      _explicitlySetByUser.addAll(preCustomizedFields);
     }
   }
 
   void restoreFromBody(Map<String, dynamic> body) {
     reset();
+    _explicitlySetByUser.clear();
     _applyBodyToCurrent(body);
+    // Fields restored from body are "explicitly customized".
+    if (body['quality'] != null) _explicitlySetByUser.add('quality');
+    if (body['size'] != null) _explicitlySetByUser.add('sizeTier');
+    if (body['output_format'] != null) _explicitlySetByUser.add('outputFormat');
+    if (body['output_compression'] != null) _explicitlySetByUser.add('outputCompression');
+    if (body['n'] != null) _explicitlySetByUser.add('count');
   }
 
   void reset() {
-    quality = _defaultQuality;
-    sizeTier = _defaultSizeTier;
-    aspectRatio = _defaultAspectRatio;
-    customAspectRatio = _defaultCustomAspectRatio;
-    outputFormat = _defaultOutputFormat;
-    outputCompression = _defaultOutputCompression;
-    count = _defaultCount;
+    _quality = _defaultQuality;
+    _sizeTier = _defaultSizeTier;
+    _aspectRatio = _defaultAspectRatio;
+    _customAspectRatio = _defaultCustomAspectRatio;
+    _outputFormat = _defaultOutputFormat;
+    _outputCompression = _defaultOutputCompression;
+    _count = _defaultCount;
   }
 
   void _resetDefaultState() {
@@ -167,18 +196,18 @@ class ImageGenerationOptionsController {
     final compression = body['output_compression'];
     final n = body['n'];
     if (q == 'auto' || q == 'low' || q == 'medium' || q == 'high') {
-      quality = q!;
+      _quality = q!;
     }
     _restoreSize(size);
     if (format == 'png' || format == 'jpeg' || format == 'webp') {
-      outputFormat = format!;
+      _outputFormat = format!;
     }
-    outputCompression = compression is int
+    _outputCompression = compression is int
         ? compression
         : int.tryParse(compression?.toString() ?? '');
     final parsedN = n is int ? n : int.tryParse(n?.toString() ?? '');
     if (parsedN != null && parsedN >= 1 && parsedN <= 4) {
-      count = parsedN;
+      _count = parsedN;
     }
   }
 
