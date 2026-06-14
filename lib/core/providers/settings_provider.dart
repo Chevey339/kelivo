@@ -192,6 +192,10 @@ class SettingsProvider extends ChangeNotifier {
   static const String _displayShowChatListDateKey =
       'display_show_chat_list_date_v1';
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
+  static const String _imageCompressionEnabledKey =
+      'image_compression_enabled_v1';
+  static const String _imageCompressionStrengthKey =
+      'image_compression_strength_v1';
   static const String _displayMobileCodeBlockWrapKey =
       'display_mobile_code_block_wrap_v1';
   static const String _displayAutoCollapseCodeBlockKey =
@@ -1042,6 +1046,10 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
+    _imageCompressionEnabled =
+        prefs.getBool(_imageCompressionEnabledKey) ?? false;
+    _imageCompressionStrength =
+        prefs.getInt(_imageCompressionStrengthKey) ?? 60;
     _mobileCodeBlockWrap =
         prefs.getBool(_displayMobileCodeBlockWrapKey) ?? false;
     _autoCollapseCodeBlock =
@@ -3814,6 +3822,28 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_imageCropperEnabledKey, v);
+  }
+
+  // Image compression for picked images (toggle lives in the chat input bar)
+  bool _imageCompressionEnabled = false;
+  bool get imageCompressionEnabled => _imageCompressionEnabled;
+  Future<void> setImageCompressionEnabled(bool v) async {
+    if (_imageCompressionEnabled == v) return;
+    _imageCompressionEnabled = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_imageCompressionEnabledKey, v);
+  }
+
+  int _imageCompressionStrength = 60;
+  int get imageCompressionStrength => _imageCompressionStrength;
+  Future<void> setImageCompressionStrength(int v) async {
+    final nv = v.clamp(0, 100);
+    if (_imageCompressionStrength == nv) return;
+    _imageCompressionStrength = nv;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_imageCompressionStrengthKey, nv);
   }
 
   // Display: mobile code block word wrap

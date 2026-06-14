@@ -54,6 +54,7 @@ class ChatInputSection extends StatelessWidget {
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
     this.onToggleOcr,
+    this.onToggleImageCompress,
     this.onOpenMiniMap,
     this.onPickCamera,
     this.onPickPhotos,
@@ -96,6 +97,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
   final VoidCallback? onToggleOcr;
+  final VoidCallback? onToggleImageCompress;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
@@ -183,6 +185,10 @@ class ChatInputSection extends StatelessWidget {
                 settings.ocrModelId != null),
       ocrActive: settings.ocrEnabled,
       onToggleOcr: onToggleOcr,
+      // Image compression toggle: available on all layouts (phone/tablet/desktop)
+      showImageCompressButton: true,
+      imageCompressActive: settings.imageCompressionEnabled,
+      onToggleImageCompress: onToggleImageCompress,
       // Tablet-specific parameters
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,

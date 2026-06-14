@@ -3902,6 +3902,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Crop images after selecting from gallery or camera';
 
   @override
+  String get displaySettingsPageImageCompressionStrengthTitle =>
+      'Image compression strength';
+
+  @override
+  String get displaySettingsPageImageCompressionStrengthSubtitle =>
+      'Higher means smaller files; applies when compression is enabled in the chat input bar';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       'Keep sidebar open when selecting assistant';
 
@@ -4979,6 +4987,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarOcrTooltip => 'Image OCR';
+
+  @override
+  String get chatInputBarImageCompressTooltip => 'Compress images';
 
   @override
   String get providerDetailPageMultiSelectButton => 'Multi-select';

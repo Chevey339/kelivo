@@ -3752,6 +3752,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageImageCompressionStrengthTitle => '图片压缩强度';
+
+  @override
+  String get displaySettingsPageImageCompressionStrengthSubtitle =>
+      '数值越高体积越小；在聊天输入框开启压缩后生效';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -4782,6 +4789,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
+
+  @override
+  String get chatInputBarImageCompressTooltip => '压缩图片';
 
   @override
   String get providerDetailPageMultiSelectButton => '多选';
@@ -9031,6 +9041,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageImageCompressionStrengthTitle => '图片压缩强度';
+
+  @override
+  String get displaySettingsPageImageCompressionStrengthSubtitle =>
+      '数值越高体积越小；在聊天输入框开启压缩后生效';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -10061,6 +10078,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字识别';
+
+  @override
+  String get chatInputBarImageCompressTooltip => '压缩图片';
 
   @override
   String get providerDetailPageMultiSelectButton => '多选';
@@ -14308,6 +14328,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '從相簿或相機選擇圖片後，允許裁剪圖片';
 
   @override
+  String get displaySettingsPageImageCompressionStrengthTitle => '圖片壓縮強度';
+
+  @override
+  String get displaySettingsPageImageCompressionStrengthSubtitle =>
+      '數值越高體積越小；在聊天輸入框開啟壓縮後生效';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '點選助手時不自動關閉側邊欄';
 
@@ -15340,6 +15367,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarOcrTooltip => 'OCR 文字辨識';
+
+  @override
+  String get chatInputBarImageCompressTooltip => '壓縮圖片';
 
   @override
   String get providerDetailPageMultiSelectButton => '多選';

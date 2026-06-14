@@ -1265,6 +1265,113 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
   }
 }
 
+Widget _imageCompressionStrengthRow(
+  BuildContext context,
+  SettingsProvider sp,
+  AppLocalizations l10n,
+) {
+  final theme = Theme.of(context);
+  final cs = theme.colorScheme;
+  final isDark = theme.brightness == Brightness.dark;
+  final strength = sp.imageCompressionStrength;
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Lucide.ImageDown, size: 20, color: cs.onSurface),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.displaySettingsPageImageCompressionStrengthTitle,
+                    style: TextStyle(
+                      color: cs.onSurface,
+                      fontSize: 15,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    l10n.displaySettingsPageImageCompressionStrengthSubtitle,
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$strength%',
+              style: TextStyle(
+                color: cs.primary,
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        SfSliderTheme(
+          data: SfSliderThemeData(
+            activeTrackHeight: 8,
+            inactiveTrackHeight: 8,
+            overlayRadius: 14,
+            activeTrackColor: cs.primary,
+            inactiveTrackColor: cs.onSurface.withValues(
+              alpha: isDark ? 0.25 : 0.20,
+            ),
+            tooltipBackgroundColor: cs.primary,
+            tooltipTextStyle: TextStyle(
+              color: cs.onPrimary,
+              fontWeight: AppFontWeights.semibold,
+            ),
+          ),
+          child: SfSlider(
+            value: strength.toDouble(),
+            min: 0.0,
+            max: 100.0,
+            stepSize: 5.0,
+            showTicks: false,
+            showLabels: false,
+            enableTooltip: true,
+            shouldAlwaysShowTooltip: false,
+            tooltipShape: const SfPaddleTooltipShape(),
+            tooltipTextFormatterCallback: (value, text) =>
+                '${(value as double).round()}%',
+            thumbIcon: Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                color: cs.primary,
+                shape: BoxShape.circle,
+                boxShadow: isDark
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+              ),
+            ),
+            onChanged: (v) => context
+                .read<SettingsProvider>()
+                .setImageCompressionStrength((v as double).round()),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 // --- iOS-style helpers ---
 
 Widget _iosSectionCard({required List<Widget> children}) {
@@ -2209,6 +2316,8 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setImageCropperEnabled(v),
               ),
+              _iosDivider(context),
+              _imageCompressionStrengthRow(context, sp, l10n),
               _iosDivider(context),
               _iosSwitchRow(
                 context,

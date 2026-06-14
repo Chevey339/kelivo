@@ -1281,6 +1281,10 @@ class _HomePageState extends State<HomePage>
         final sp = context.read<SettingsProvider>();
         await sp.setOcrEnabled(!sp.ocrEnabled);
       },
+      onToggleImageCompress: () async {
+        final sp = context.read<SettingsProvider>();
+        await sp.setImageCompressionEnabled(!sp.imageCompressionEnabled);
+      },
       onOpenMiniMap: _openMiniMap,
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,

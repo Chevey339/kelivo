@@ -94,6 +94,9 @@ class ChatInputBar extends StatefulWidget {
     this.showOcrButton = false,
     this.ocrActive = false,
     this.onToggleOcr,
+    this.showImageCompressButton = false,
+    this.imageCompressActive = false,
+    this.onToggleImageCompress,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
@@ -145,6 +148,9 @@ class ChatInputBar extends StatefulWidget {
   final bool showOcrButton;
   final bool ocrActive;
   final VoidCallback? onToggleOcr;
+  final bool showImageCompressButton;
+  final bool imageCompressActive;
+  final VoidCallback? onToggleImageCompress;
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
@@ -1306,6 +1312,26 @@ class _ChatInputBarState extends State<ChatInputBar>
                 icon: Lucide.Eye,
                 label: l10n.chatInputBarOcrTooltip,
                 onTap: lockTap(widget.onToggleOcr),
+              ),
+            ),
+          );
+        }
+
+        if (widget.showImageCompressButton &&
+            widget.onToggleImageCompress != null) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.chatInputBarImageCompressTooltip,
+                icon: Lucide.ImageDown,
+                active: widget.imageCompressActive,
+                onTap: lockTap(widget.onToggleImageCompress),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.ImageDown,
+                label: l10n.chatInputBarImageCompressTooltip,
+                onTap: lockTap(widget.onToggleImageCompress),
               ),
             ),
           );

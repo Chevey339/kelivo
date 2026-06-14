@@ -7262,6 +7262,18 @@ abstract class AppLocalizations {
   /// **'Crop images after selecting from gallery or camera'**
   String get displaySettingsPageEnableImageCropperSubtitle;
 
+  /// No description provided for @displaySettingsPageImageCompressionStrengthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image compression strength'**
+  String get displaySettingsPageImageCompressionStrengthTitle;
+
+  /// No description provided for @displaySettingsPageImageCompressionStrengthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Higher means smaller files; applies when compression is enabled in the chat input bar'**
+  String get displaySettingsPageImageCompressionStrengthSubtitle;
+
   /// No description provided for @displaySettingsPageKeepSidebarOpenOnAssistantTapTitle.
   ///
   /// In en, this message translates to:
@@ -9235,6 +9247,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Image OCR'**
   String get chatInputBarOcrTooltip;
+
+  /// No description provided for @chatInputBarImageCompressTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Compress images'**
+  String get chatInputBarImageCompressTooltip;
 
   /// No description provided for @providerDetailPageMultiSelectButton.
   ///

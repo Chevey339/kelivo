@@ -6,10 +6,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/file_import_helper.dart';
+import '../../../utils/image_compressor.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/models/chat_input_data.dart';
@@ -52,6 +55,22 @@ class FileUploadService {
     return out;
   }
 
+  /// 若开启了图片压缩，则按设置强度压缩图片并删除原始源文件
+  Future<List<String>> _maybeCompressImages(List<String> paths) async {
+    if (paths.isEmpty) return paths;
+    final context = getContext();
+    if (!context.mounted) return paths;
+    final settings = context.read<SettingsProvider>();
+    if (!settings.imageCompressionEnabled) return paths;
+    final strength = settings.imageCompressionStrength;
+    if (strength <= 0) return paths;
+    final out = <String>[];
+    for (final path in paths) {
+      out.add(await ImageCompressor.compressInPlace(path, strength));
+    }
+    return out;
+  }
+
   /// 从相册选取图片
   Future<void> onPickPhotos() async {
     try {
@@ -81,7 +100,9 @@ class FileUploadService {
         if (toCopy.isEmpty) return;
         final croppedFiles = await _maybeCropImages(toCopy);
         if (croppedFiles.isEmpty) return;
-        final paths = await copyPickedFiles(croppedFiles);
+        final paths = await _maybeCompressImages(
+          await copyPickedFiles(croppedFiles),
+        );
         if (paths.isNotEmpty) {
           mediaController.addImages(paths);
         }
@@ -93,7 +114,9 @@ class FileUploadService {
       if (files.isEmpty) return;
       final croppedFiles = await _maybeCropImages(files);
       if (croppedFiles.isEmpty) return;
-      final paths = await copyPickedFiles(croppedFiles);
+      final paths = await _maybeCompressImages(
+        await copyPickedFiles(croppedFiles),
+      );
       if (paths.isNotEmpty) {
         mediaController.addImages(paths);
       }
@@ -135,7 +158,9 @@ class FileUploadService {
       if (file == null) return;
       final croppedFiles = await _maybeCropImages([file]);
       if (croppedFiles.isEmpty) return;
-      final paths = await copyPickedFiles(croppedFiles);
+      final paths = await _maybeCompressImages(
+        await copyPickedFiles(croppedFiles),
+      );
       if (paths.isNotEmpty) {
         if (!context.mounted) return;
         mediaController.addImages(paths);
@@ -305,8 +330,9 @@ class FileUploadService {
           );
         }
       }
-      if (images.isNotEmpty) {
-        mediaController.addImages(images);
+      final compressedImages = await _maybeCompressImages(images);
+      if (compressedImages.isNotEmpty) {
+        mediaController.addImages(compressedImages);
       }
       if (docs.isNotEmpty) {
         mediaController.addFiles(docs);
@@ -351,7 +377,10 @@ class FileUploadService {
           );
         }
       }
-      if (images.isNotEmpty) mediaController.addImages(images);
+      final compressedImages = await _maybeCompressImages(images);
+      if (compressedImages.isNotEmpty) {
+        mediaController.addImages(compressedImages);
+      }
       if (docs.isNotEmpty) mediaController.addFiles(docs);
     } catch (_) {}
   }
