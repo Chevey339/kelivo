@@ -620,7 +620,7 @@ Map<String, dynamic> _decodeOpenAIImagesStreamResponse(String body) {
     }
   }
 
-  if (resultPayload != null) return resultPayload!;
+  if (resultPayload != null) return resultPayload;
   if (completedItems.isNotEmpty) {
     return <String, dynamic>{'data': completedItems};
   }
