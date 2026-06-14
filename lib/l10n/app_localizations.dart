@@ -7262,6 +7262,18 @@ abstract class AppLocalizations {
   /// **'Crop images after selecting from gallery or camera'**
   String get displaySettingsPageEnableImageCropperSubtitle;
 
+  /// No description provided for @displaySettingsPageImageCompressionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Image compression'**
+  String get displaySettingsPageImageCompressionTitle;
+
+  /// No description provided for @displaySettingsPageImageCompressionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When on, added images are compressed by the strength below and the originals are deleted'**
+  String get displaySettingsPageImageCompressionSubtitle;
+
   /// No description provided for @displaySettingsPageImageCompressionStrengthTitle.
   ///
   /// In en, this message translates to:
@@ -9253,6 +9265,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compress images'**
   String get chatInputBarImageCompressTooltip;
+
+  /// No description provided for @imageCompressionProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressing {current}/{total}'**
+  String imageCompressionProgress(int current, int total);
+
+  /// No description provided for @imageCompressionDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed {count} image(s) · {from} → {to} (-{percent}%)'**
+  String imageCompressionDone(int count, String from, String to, int percent);
 
   /// No description provided for @providerDetailPageMultiSelectButton.
   ///

@@ -3902,6 +3902,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Crop images after selecting from gallery or camera';
 
   @override
+  String get displaySettingsPageImageCompressionTitle => 'Image compression';
+
+  @override
+  String get displaySettingsPageImageCompressionSubtitle =>
+      'When on, added images are compressed by the strength below and the originals are deleted';
+
+  @override
   String get displaySettingsPageImageCompressionStrengthTitle =>
       'Image compression strength';
 
@@ -4990,6 +4997,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInputBarImageCompressTooltip => 'Compress images';
+
+  @override
+  String imageCompressionProgress(int current, int total) {
+    return 'Compressing $current/$total';
+  }
+
+  @override
+  String imageCompressionDone(int count, String from, String to, int percent) {
+    return 'Compressed $count image(s) · $from → $to (-$percent%)';
+  }
 
   @override
   String get providerDetailPageMultiSelectButton => 'Multi-select';

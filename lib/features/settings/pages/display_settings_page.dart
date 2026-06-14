@@ -2317,6 +2317,17 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     context.read<SettingsProvider>().setImageCropperEnabled(v),
               ),
               _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.ImageDown,
+                label: l10n.displaySettingsPageImageCompressionTitle,
+                subtitle: l10n.displaySettingsPageImageCompressionSubtitle,
+                value: sp.imageCompressionEnabled,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setImageCompressionEnabled(v),
+              ),
+              _iosDivider(context),
               _imageCompressionStrengthRow(context, sp, l10n),
               _iosDivider(context),
               _iosSwitchRow(

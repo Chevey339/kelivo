@@ -55,7 +55,8 @@ class FileUploadService {
     return out;
   }
 
-  /// 若开启了图片压缩，则按设置强度压缩图片并删除原始源文件
+  /// 若开启了图片压缩，则按设置强度压缩图片并删除原始源文件。
+  /// 压缩期间显示进度提示，结束后仅汇总一次体积变化。
   Future<List<String>> _maybeCompressImages(List<String> paths) async {
     if (paths.isEmpty) return paths;
     final context = getContext();
@@ -64,9 +65,53 @@ class FileUploadService {
     if (!settings.imageCompressionEnabled) return paths;
     final strength = settings.imageCompressionStrength;
     if (strength <= 0) return paths;
+
+    final l10n = AppLocalizations.of(context)!;
+    final manager = AppSnackBarManager();
+    final progress = manager.showLoading(
+      context,
+      l10n.imageCompressionProgress(1, paths.length),
+    );
+
     final out = <String>[];
-    for (final path in paths) {
-      out.add(await ImageCompressor.compressInPlace(path, strength));
+    int originalTotal = 0;
+    int newTotal = 0;
+    int changedCount = 0;
+    try {
+      for (var i = 0; i < paths.length; i++) {
+        manager.updateLoading(
+          progress,
+          l10n.imageCompressionProgress(i + 1, paths.length),
+        );
+        final r = await ImageCompressor.compressInPlace(paths[i], strength);
+        out.add(r.path);
+        if (r.changed) {
+          originalTotal += r.originalBytes;
+          newTotal += r.newBytes;
+          changedCount++;
+        }
+      }
+    } finally {
+      manager.finishLoading(progress);
+    }
+
+    // 仅在确有压缩时，汇总显示一次体积变化
+    if (changedCount > 0 && originalTotal > 0) {
+      final ctx = getContext();
+      if (ctx.mounted) {
+        final percent = (((originalTotal - newTotal) / originalTotal) * 100)
+            .round();
+        showAppSnackBar(
+          ctx,
+          message: l10n.imageCompressionDone(
+            changedCount,
+            ImageCompressor.formatBytes(originalTotal),
+            ImageCompressor.formatBytes(newTotal),
+            percent,
+          ),
+          type: NotificationType.success,
+        );
+      }
     }
     return out;
   }

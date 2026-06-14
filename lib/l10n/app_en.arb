@@ -1641,6 +1641,10 @@
   "@displaySettingsPageEnableImageCropperTitle": {},
   "displaySettingsPageEnableImageCropperSubtitle": "Crop images after selecting from gallery or camera",
   "@displaySettingsPageEnableImageCropperSubtitle": {},
+  "displaySettingsPageImageCompressionTitle": "Image compression",
+  "@displaySettingsPageImageCompressionTitle": {},
+  "displaySettingsPageImageCompressionSubtitle": "When on, added images are compressed by the strength below and the originals are deleted",
+  "@displaySettingsPageImageCompressionSubtitle": {},
   "displaySettingsPageImageCompressionStrengthTitle": "Image compression strength",
   "@displaySettingsPageImageCompressionStrengthTitle": {},
   "displaySettingsPageImageCompressionStrengthSubtitle": "Higher means smaller files; applies when compression is enabled in the chat input bar",
@@ -2052,6 +2056,22 @@
   "chatInputBarOcrTooltip": "Image OCR",
   "chatInputBarImageCompressTooltip": "Compress images",
   "@chatInputBarImageCompressTooltip": {},
+  "imageCompressionProgress": "Compressing {current}/{total}",
+  "@imageCompressionProgress": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "imageCompressionDone": "Compressed {count} image(s) · {from} → {to} (-{percent}%)",
+  "@imageCompressionDone": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "from": { "type": "String" },
+      "to": { "type": "String" },
+      "percent": { "type": "int" }
+    }
+  },
   "providerDetailPageMultiSelectButton": "Multi-select",
   "providerDetailPageBatchDetectButton": "Detect",
   "providerDetailPageBatchDetecting": "Detecting...",

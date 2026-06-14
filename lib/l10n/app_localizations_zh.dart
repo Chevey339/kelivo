@@ -3752,6 +3752,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageImageCompressionTitle => '图片压缩';
+
+  @override
+  String get displaySettingsPageImageCompressionSubtitle =>
+      '开启后，添加的图片会按下方强度压缩，并删除原始文件';
+
+  @override
   String get displaySettingsPageImageCompressionStrengthTitle => '图片压缩强度';
 
   @override
@@ -4792,6 +4799,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get chatInputBarImageCompressTooltip => '压缩图片';
+
+  @override
+  String imageCompressionProgress(int current, int total) {
+    return '压缩中 $current/$total';
+  }
+
+  @override
+  String imageCompressionDone(int count, String from, String to, int percent) {
+    return '已压缩 $count 张 · $from → $to（省 $percent%）';
+  }
 
   @override
   String get providerDetailPageMultiSelectButton => '多选';
@@ -9041,6 +9058,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageImageCompressionTitle => '图片压缩';
+
+  @override
+  String get displaySettingsPageImageCompressionSubtitle =>
+      '开启后，添加的图片会按下方强度压缩，并删除原始文件';
+
+  @override
   String get displaySettingsPageImageCompressionStrengthTitle => '图片压缩强度';
 
   @override
@@ -10081,6 +10105,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get chatInputBarImageCompressTooltip => '压缩图片';
+
+  @override
+  String imageCompressionProgress(int current, int total) {
+    return '压缩中 $current/$total';
+  }
+
+  @override
+  String imageCompressionDone(int count, String from, String to, int percent) {
+    return '已压缩 $count 张 · $from → $to（省 $percent%）';
+  }
 
   @override
   String get providerDetailPageMultiSelectButton => '多选';
@@ -14328,6 +14362,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '從相簿或相機選擇圖片後，允許裁剪圖片';
 
   @override
+  String get displaySettingsPageImageCompressionTitle => '圖片壓縮';
+
+  @override
+  String get displaySettingsPageImageCompressionSubtitle =>
+      '開啟後，新增的圖片會按下方強度壓縮，並刪除原始檔案';
+
+  @override
   String get displaySettingsPageImageCompressionStrengthTitle => '圖片壓縮強度';
 
   @override
@@ -15370,6 +15411,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarImageCompressTooltip => '壓縮圖片';
+
+  @override
+  String imageCompressionProgress(int current, int total) {
+    return '壓縮中 $current/$total';
+  }
+
+  @override
+  String imageCompressionDone(int count, String from, String to, int percent) {
+    return '已壓縮 $count 張 · $from → $to（省 $percent%）';
+  }
 
   @override
   String get providerDetailPageMultiSelectButton => '多選';

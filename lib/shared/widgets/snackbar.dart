@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -13,6 +14,7 @@ class AppNotification {
   final VoidCallback? onTap;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final bool loading;
 
   AppNotification({
     required this.message,
@@ -21,6 +23,7 @@ class AppNotification {
     this.onTap,
     this.actionLabel,
     this.onAction,
+    this.loading = false,
   });
 }
 
@@ -64,10 +67,60 @@ class AppSnackBarManager extends ChangeNotifier {
 
     entry.animationController.forward();
 
-    // Auto dismiss
-    Timer(notification.duration, () {
-      _dismiss(entry);
-    });
+    // Auto dismiss (loading toasts persist until finishLoading is called)
+    if (!notification.loading) {
+      Timer(notification.duration, () {
+        _dismiss(entry);
+      });
+    }
+  }
+
+  /// 显示一个持续的加载提示（带转圈、不自动消失），返回句柄供更新/关闭。
+  NotificationEntry showLoading(BuildContext context, String message) {
+    final entry = NotificationEntry(
+      key: UniqueKey(),
+      notification: AppNotification(
+        message: message,
+        type: NotificationType.info,
+        loading: true,
+      ),
+      animationController: AnimationController(
+        duration: const Duration(milliseconds: 300),
+        vsync: Navigator.of(context),
+      ),
+      slideAnimation: null,
+      fadeAnimation: null,
+    );
+    entry.slideAnimation =
+        Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: entry.animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
+    entry.fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: entry.animationController, curve: Curves.easeOut),
+    );
+    _activeToasts.insert(0, entry);
+    notifyListeners();
+    entry.animationController.forward();
+    return entry;
+  }
+
+  /// 更新加载提示文案（如进度 x/N）。
+  void updateLoading(NotificationEntry entry, String message) {
+    if (!_activeToasts.contains(entry)) return;
+    entry.notification = AppNotification(
+      message: message,
+      type: entry.notification.type,
+      loading: true,
+    );
+    notifyListeners();
+  }
+
+  /// 关闭加载提示。
+  void finishLoading(NotificationEntry entry) {
+    _dismiss(entry);
   }
 
   void _dismiss(NotificationEntry entry) async {
@@ -96,7 +149,7 @@ class AppSnackBarManager extends ChangeNotifier {
 
 class NotificationEntry {
   final Key key;
-  final AppNotification notification;
+  AppNotification notification;
   final AnimationController animationController;
   Animation<Offset>? slideAnimation;
   Animation<double>? fadeAnimation;
@@ -387,7 +440,19 @@ class _NotificationWidgetState extends State<NotificationWidget>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Icon(_getIcon(), size: 22, color: _getIconColor(cs)),
+                  if (widget.notification.loading)
+                    SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: Center(
+                        child: CupertinoActivityIndicator(
+                          radius: 9,
+                          color: cs.primary,
+                        ),
+                      ),
+                    )
+                  else
+                    Icon(_getIcon(), size: 22, color: _getIconColor(cs)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
