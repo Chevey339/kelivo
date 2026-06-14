@@ -8,8 +8,10 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
 class ChatService extends ChangeNotifier {
-  static const String _conversationsBoxName = 'conversations';
-  static const String _messagesBoxName = 'messages';
+  /// Hive box names. Public so the proactive care background isolate (which
+  /// runs while the app process is dead) opens the same boxes.
+  static const String conversationsBoxName = 'conversations';
+  static const String messagesBoxName = 'messages';
   static const String _toolEventsBoxName = 'tool_events_v1';
   static const String _activeStreamingKey = '_active_streaming_ids';
   static const int defaultInitialMessageMin = 2;
@@ -63,8 +65,8 @@ class ChatService extends ChangeNotifier {
       Hive.registerAdapter(ConversationAdapter());
     }
 
-    _conversationsBox = await Hive.openBox<Conversation>(_conversationsBoxName);
-    _messagesBox = await Hive.openBox<ChatMessage>(_messagesBoxName);
+    _conversationsBox = await Hive.openBox<Conversation>(conversationsBoxName);
+    _messagesBox = await Hive.openBox<ChatMessage>(messagesBoxName);
     _toolEventsBox = await Hive.openBox(_toolEventsBoxName);
 
     // Migrate any persisted message content that references old iOS sandbox paths
