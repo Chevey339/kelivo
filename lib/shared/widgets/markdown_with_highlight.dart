@@ -36,6 +36,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/html_preview_dialog.dart';
+import '../../utils/markdown_block_scanner.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
@@ -635,42 +636,12 @@ String _preprocessFences(
   out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
 
   // STEP 1: MASKING - Protect code blocks from LaTeX processing
-  // This prevents $...$ inside code from being converted to LaTeX
-  final Map<String, String> codeMap = {};
-  int codeCount = 0;
-
-  // Match fenced code blocks and inline code (`...`)
-  // Fenced: CommonMark-style variable-length fences (>= 3 backticks or tildes)
-  // Group 1: entire fenced block, Group 2: opening fence, Group 3: fence char
-  // Closing fence must use same char and be >= opening length
-  final codeRegex = RegExp(
-    r'(^[ \t]*(([`~])\3{2,})[ \t]*[^\n]*\n(?:[\s\S]*?^[ \t]*\2\3*[ \t]*$|[\s\S]*))'
-    r'|(`[^`\n]+`)',
-    multiLine: true,
+  final blockScan = MarkdownBlockScanner.scan(out);
+  final (masked, Map<String, String> codeMap) = MarkdownBlockScanner.applyMask(
+    out,
+    blockScan.spans,
   );
-
-  out = out.replaceAllMapped(codeRegex, (match) {
-    final key = '__CODE_MASK_${codeCount++}__';
-    var codeContent = match.group(0)!;
-
-    // For inline code (`...`), escape dollar signs to prevent LaTeX interpretation
-    // Inline code is single-line and delimited by single backticks (not fenced)
-    final isInlineCode =
-        !codeContent.contains('\n') &&
-        codeContent.startsWith('`') &&
-        codeContent.endsWith('`');
-    if (isInlineCode) {
-      codeContent = codeContent.replaceAllMapped(
-        RegExp(r'\$'),
-        (m) => _codeDollarMask,
-      );
-    } else {
-      codeContent = _maskHtmlTagStartsInsideFencedCode(codeContent);
-    }
-
-    codeMap[key] = codeContent;
-    return key;
-  });
+  out = masked;
 
   // STEP 2: PROCESSING (on masked string, code is now protected)
   if (streaming) {
@@ -804,13 +775,6 @@ String _preprocessFences(
   });
 
   return out;
-}
-
-String _maskHtmlTagStartsInsideFencedCode(String input) {
-  return input.replaceAllMapped(
-    RegExp(r'</?(?:details|summary)\b', caseSensitive: false),
-    (match) => '$_fencedHtmlTagStartMask${match[0]!.substring(1)}',
-  );
 }
 
 String _unmaskHtmlTagStartsInsideFencedCode(String input) {
