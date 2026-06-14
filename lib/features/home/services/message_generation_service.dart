@@ -235,6 +235,8 @@ class MessageGenerationService {
         input,
         assistant: assistant,
       ),
+      requestAllowImagesApiRouting: input.allowImagesApiRouting,
+      requestExtraBody: input.extraBody,
     );
   }
 
