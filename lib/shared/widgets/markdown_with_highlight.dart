@@ -139,12 +139,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final cs = Theme.of(context).colorScheme;
     final sanitizedText = _sanitizeImageLinks(_renderText);
     final imageUrls = _extractImageUrls(sanitizedText);
-    final normalized = _preprocessFences(
-      sanitizedText,
-      enableMath: settings.enableMathRendering,
-      enableDollarLatex: settings.enableDollarLatex,
-      streaming: widget.streaming,
-    );
     // Base text style (can be overridden by caller)
     final baseTextStyle =
         (widget.baseStyle ?? Theme.of(context).textTheme.bodyMedium)?.copyWith(
@@ -278,11 +272,18 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     // ignore: dead_code
     if (useNewMarkdown) {
       // NEW: flutter_markdown_plus backend
-      // Unmask blockquote fence markers so the markdown parser can handle
-      // fenced code blocks inside blockquotes (the mask is for gpt_markdown).
-      final unmasked = _unmaskBlockquoteFenceMarkers(normalized);
+      // Lightweight preprocessing: only essential conversions that the
+      // CommonMark parser cannot handle natively. The old _preprocessFences
+      // (full of gpt_markdown workarounds) is skipped here — it caused
+      // regressions by corrupting input before the spec-compliant parser.
+      final preprocessed = _preprocessNewBackend(
+        sanitizedText,
+        enableMath: settings.enableMathRendering,
+        enableDollarLatex: settings.enableDollarLatex,
+        streaming: widget.streaming,
+      );
       // Convert citation links into custom syntax
-      final newBackendText = convertCitationLinks(unmasked);
+      final newBackendText = convertCitationLinks(preprocessed);
       markdownWidget = fmp.MarkdownBody(
         key: ValueKey(
           '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
@@ -400,7 +401,13 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
       );
       // ignore: dead_code
     } else {
-      // LEGACY: gpt_markdown backend
+      // LEGACY: gpt_markdown backend — keep the old _preprocessFences unchanged.
+      final normalized = _preprocessFences(
+        sanitizedText,
+        enableMath: settings.enableMathRendering,
+        enableDollarLatex: settings.enableDollarLatex,
+        streaming: widget.streaming,
+      );
       // Force rebuild of the markdown when key theme colors change to avoid stale styles
       markdownWidget = GptMarkdown(
         key: ValueKey(
@@ -825,6 +832,67 @@ String? _normalizeLanguage(String? lang) {
     default:
       return l; // try as-is
   }
+}
+
+String _preprocessNewBackend(
+  String input, {
+  required bool enableMath,
+  required bool enableDollarLatex,
+  bool streaming = false,
+}) {
+  var out = input.replaceAll('\r\n', '\n');
+
+  // Convert <details> blocks to custom markers (not CommonMark).
+  out = convertDetailsBlocks(out);
+
+  // Normalize citation metadata: [citation:1:id] → [citation](1:id).
+  out = _normalizeRawCitationMetadata(out);
+
+  // Normalize double-bracket LLM citations: [[1]](url) → [1](url).
+  out = out.replaceAllMapped(
+    RegExp(r'\[\[([^\]]+)\]\]\(([^\s)]+)\)'),
+    (m) => '[${m[1]}](${m[2]})',
+  );
+
+  // Mask code blocks so dollar signs inside code survive math conversion.
+  // First, move fenced code from list lines to the next line so list fences
+  // are recognized by the scanner.
+  final bulletFence = RegExp(
+    r"^(\s*(?:[*+-]|\d+\.)\s+)```([^\s`]*)\s*$",
+    multiLine: true,
+  );
+  out = out.replaceAllMapped(bulletFence, (m) => "${m[1]}\n```${m[2]}");
+  final blockScan = MarkdownBlockScanner.scan(out);
+  final (masked, Map<String, String> codeMap) = MarkdownBlockScanner.applyMask(
+    out,
+    blockScan.spans,
+  );
+  out = masked;
+
+  // Streaming stabilization (only active during streaming).
+  if (streaming) {
+    out = _stabilizeStreamingTables(out);
+    if (enableMath && enableDollarLatex) {
+      out = _stabilizeStreamingDollarMath(out);
+    }
+  }
+
+  // Convert $...$ to \(...\) so LatexInlineSyntax can handle it.
+  // Code blocks are masked so $variables in code won't be converted.
+  if (enableMath && enableDollarLatex) {
+    out = _replaceInlineDollarMath(out);
+  }
+
+  // Protect | inside \(...\) on table rows (markdown TableSyntax splits on |).
+  out = _protectTableRowMathPipes(out);
+
+  // Unmask code blocks.
+  out = out.replaceAllMapped(RegExp(r'__CODE_MASK_\d+__'), (match) {
+    final key = match.group(0)!;
+    return codeMap[key] ?? key;
+  });
+
+  return out;
 }
 
 String _preprocessFences(

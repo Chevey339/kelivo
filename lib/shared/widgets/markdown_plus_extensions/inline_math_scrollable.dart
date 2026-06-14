@@ -271,25 +271,175 @@ bool _isTexColorArgumentGroup(String tex, int open) {
 }
 
 String _escapeLikelyLiteralMathBraces(String tex) {
-  final buf = StringBuffer();
-  var i = 0;
-  while (i < tex.length) {
-    if (tex[i] == '{' && _isLikelyLiteralBraceOpen(tex, i)) {
-      buf.write(r'\{');
+  final escapeOpens = <int>{};
+  final escapeCloses = <int>{};
+  final stack = <int>[];
+
+  for (var i = 0; i < tex.length; i++) {
+    final ch = tex.codeUnitAt(i);
+    if (ch == 0x5C) {
       i++;
       continue;
     }
-    buf.writeCharCode(tex.codeUnitAt(i));
-    i++;
+    if (ch == 0x7B) {
+      stack.add(i);
+      continue;
+    }
+    if (ch != 0x7D || stack.isEmpty) continue;
+
+    final open = stack.removeLast();
+    if (stack.isNotEmpty) continue;
+    if (_looksLikeLiteralMathBraceGroup(tex, open, i)) {
+      escapeOpens.add(open);
+      escapeCloses.add(i);
+    }
+  }
+
+  if (escapeOpens.isEmpty) return tex;
+  final buf = StringBuffer();
+  for (var i = 0; i < tex.length; i++) {
+    if (escapeOpens.contains(i)) {
+      buf.write(r'\{');
+    } else if (escapeCloses.contains(i)) {
+      buf.write(r'\}');
+    } else {
+      buf.writeCharCode(tex.codeUnitAt(i));
+    }
   }
   return buf.toString();
 }
 
-bool _isLikelyLiteralBraceOpen(String tex, int index) {
-  if (index == 0) return false;
-  final prev = tex[index - 1];
-  if (prev == '{' || prev == ' ') return false;
-  if (_isEscaped(tex, index)) return false;
-  if (prev == '_' || prev == '^') return false;
-  return true;
+bool _looksLikeLiteralMathBraceGroup(String tex, int open, int close) {
+  if (_isCommandArgumentBrace(tex, open) || _isScriptArgumentBrace(tex, open)) {
+    return false;
+  }
+  if (!_hasLiteralBraceBoundaryBefore(tex, open)) return false;
+
+  final body = tex.substring(open + 1, close).trim();
+  if (body.isEmpty) return true;
+  if (body.startsWith(r'\')) return false;
+  if (_nextNonWhitespaceCodeUnit(tex, close + 1) == 0x5F &&
+      body.contains('_')) {
+    return true;
+  }
+  return body.contains(',') ||
+      body.contains(':') ||
+      body.contains(';') ||
+      body.contains(r'\in') ||
+      body.contains(r'\notin') ||
+      body.contains(r'\mid') ||
+      body.contains('|');
 }
+
+bool _isCommandArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+
+  if (tex.codeUnitAt(prev) == 0x5D) {
+    final optionalOpen = _findMatchingOpenBracket(tex, prev);
+    if (optionalOpen != -1) {
+      final beforeOptional = _previousNonWhitespaceIndex(tex, optionalOpen - 1);
+      if (beforeOptional != -1 && _endsControlWordAt(tex, beforeOptional)) {
+        return true;
+      }
+    }
+  }
+
+  return _endsControlWordAt(tex, prev);
+}
+
+bool _endsControlWordAt(String tex, int index) {
+  if (index < 0 || index >= tex.length) return false;
+  final ch = tex.codeUnitAt(index);
+  if (ch == 0x5C) return false;
+  if (!_isAsciiLetter(ch)) return false;
+
+  var i = index;
+  while (i >= 0 && tex.codeUnitAt(i) != 0x5C) {
+    if (!_isAsciiLetter(tex.codeUnitAt(i))) return false;
+    i--;
+  }
+  return i >= 0 && tex.codeUnitAt(i) == 0x5C;
+}
+
+bool _isAsciiLetter(int codeUnit) {
+  return (codeUnit >= 0x41 && codeUnit <= 0x5A) ||
+      (codeUnit >= 0x61 && codeUnit <= 0x7A);
+}
+
+bool _isScriptArgumentBrace(String tex, int open) {
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return false;
+  final ch = tex.codeUnitAt(prev);
+  return ch == 0x5F || ch == 0x5E;
+}
+
+bool _hasLiteralBraceBoundaryBefore(String tex, int open) {
+  if (open == 0) return true;
+  final prev = _previousNonWhitespaceIndex(tex, open - 1);
+  if (prev == -1) return true;
+
+  final ch = tex.codeUnitAt(prev);
+  if (ch == 0x5C) return false;
+  if (ch == 0x3D || ch == 0x28 || ch == 0x5B || ch == 0x7B) return true;
+  if (ch == 0x2C || ch == 0x3A || ch == 0x3B) return true;
+  if (_isOperator(ch)) return true;
+  return _isDollarMathBoundary(ch);
+}
+
+bool _isOperator(int codeUnit) {
+  return codeUnit == 0x2B ||
+      codeUnit == 0x2D ||
+      codeUnit == 0x2A ||
+      codeUnit == 0x2F ||
+      codeUnit == 0x3C ||
+      codeUnit == 0x3E ||
+      codeUnit == 0x3D ||
+      codeUnit == 0x5E;
+}
+
+int _nextNonWhitespaceCodeUnit(String tex, int start) {
+  for (var i = start; i < tex.length; i++) {
+    if (!_isWhitespaceCodeUnit(tex.codeUnitAt(i))) return tex.codeUnitAt(i);
+  }
+  return -1;
+}
+
+int _previousNonWhitespaceIndex(String tex, int start) {
+  for (var i = start; i >= 0; i--) {
+    if (!_isWhitespaceCodeUnit(tex.codeUnitAt(i))) return i;
+  }
+  return -1;
+}
+
+int _findMatchingOpenBracket(String tex, int close) {
+  var depth = 0;
+  for (var i = close; i >= 0; i--) {
+    if (tex[i] == ']') {
+      depth++;
+    } else if (tex[i] == '[') {
+      if (depth == 0) return i;
+      depth--;
+    }
+  }
+  return -1;
+}
+
+bool _isDollarMathBoundary(int codeUnit) {
+  if (_isWhitespaceCodeUnit(codeUnit)) return true;
+  return codeUnit == 0x28 ||
+      codeUnit == 0x29 ||
+      codeUnit == 0x5B ||
+      codeUnit == 0x5D ||
+      codeUnit == 0x2C ||
+      codeUnit == 0x2E ||
+      codeUnit == 0x3A ||
+      codeUnit == 0x3B ||
+      codeUnit == 0x21 ||
+      codeUnit == 0x3F ||
+      codeUnit == 0x22 ||
+      codeUnit == 0x27;
+}
+
+bool _isWhitespaceCodeUnit(int cu) =>
+    cu == 0x20 || cu == 0x09 || cu == 0x0A || cu == 0x0D;
