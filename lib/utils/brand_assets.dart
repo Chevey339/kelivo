@@ -338,6 +338,18 @@ class BrandAssets {
     }
     return null;
   }
+
+  static bool assetNeedsDarkInvert(String asset) {
+    return asset.contains('openai') ||
+        asset.contains('anthropic') ||
+        asset.contains('grok') ||
+        asset.contains('xai') ||
+        asset.contains('openrouter') ||
+        asset.contains('ollama') ||
+        asset.contains('github') ||
+        asset.contains('codex') ||
+        asset.contains('mimo');
+  }
 }
 
 class BrandIconOption {

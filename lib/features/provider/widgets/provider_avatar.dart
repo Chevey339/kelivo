@@ -160,12 +160,7 @@ class ProviderAvatar extends StatelessWidget {
         ),
       );
     }
-    final lower = name.toLowerCase();
-    final mono =
-        isDark &&
-        (RegExp(r'openai|gpt|o\\d').hasMatch(lower) ||
-            RegExp(r'grok|xai').hasMatch(lower) ||
-            RegExp(r'openrouter').hasMatch(lower));
+    final mono = isDark && BrandAssets.assetNeedsDarkInvert(asset);
     return CircleAvatar(
       backgroundColor: isDark
           ? Colors.white10
@@ -191,33 +186,31 @@ class ProviderAvatar extends StatelessWidget {
   }
 
   Widget _assetAvatar(BuildContext context, String asset) {
+    final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isSvg = asset.endsWith('.svg');
-    // 暗色模式下某些单色图标需要白色 colorFilter
-    final needsMono =
-        isDark &&
-        (asset.contains('openai') ||
-            asset.contains('grok') ||
-            asset.contains('xai') ||
-            asset.contains('openrouter'));
-    if (isSvg) {
-      return SvgPicture.asset(
-        asset,
-        width: size * 0.7,
-        height: size * 0.7,
-        colorFilter: needsMono
-            ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
-            : null,
-      );
-    } else {
-      return Image.asset(
-        asset,
-        width: size * 0.7,
-        height: size * 0.7,
-        fit: BoxFit.contain,
-        color: needsMono ? Colors.white : null,
-        colorBlendMode: needsMono ? BlendMode.srcIn : null,
-      );
-    }
+    final needsMono = isDark && BrandAssets.assetNeedsDarkInvert(asset);
+    return CircleAvatar(
+      backgroundColor: isDark
+          ? Colors.white10
+          : cs.primary.withValues(alpha: 0.1),
+      child: isSvg
+          ? SvgPicture.asset(
+              asset,
+              width: size * 0.7,
+              height: size * 0.7,
+              colorFilter: needsMono
+                  ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                  : null,
+            )
+          : Image.asset(
+              asset,
+              width: size * 0.7,
+              height: size * 0.7,
+              fit: BoxFit.contain,
+              color: needsMono ? Colors.white : null,
+              colorBlendMode: needsMono ? BlendMode.srcIn : null,
+            ),
+    );
   }
 }

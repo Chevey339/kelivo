@@ -545,11 +545,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                     _cfg.avatarType == 'icon' && _cfg.avatarValue == opt.asset;
                 final isSvg = opt.asset.endsWith('.svg');
                 final needsMono =
-                    isDark &&
-                    (opt.asset.contains('openai') ||
-                        opt.asset.contains('grok') ||
-                        opt.asset.contains('xai') ||
-                        opt.asset.contains('openrouter'));
+                    isDark && BrandAssets.assetNeedsDarkInvert(opt.asset);
                 return Semantics(
                   label: opt.label,
                   child: Tooltip(
@@ -599,9 +595,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   : Image.asset(
                                       opt.asset,
                                       fit: BoxFit.contain,
-                                      color: needsMono
-                                          ? Colors.white
-                                          : null,
+                                      color: needsMono ? Colors.white : null,
                                       colorBlendMode: needsMono
                                           ? BlendMode.srcIn
                                           : null,

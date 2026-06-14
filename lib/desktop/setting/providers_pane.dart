@@ -3526,6 +3526,7 @@ class _DesktopProviderDetailPaneState
     final settings = context.read<SettingsProvider>();
     final icons = BrandAssets.selectableIcons;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cfg = settings.getProviderConfig(providerKey);
 
     await showDialog<void>(
       context: context,
@@ -3546,13 +3547,11 @@ class _DesktopProviderDetailPaneState
               ),
               itemBuilder: (ctx, i) {
                 final opt = icons[i];
+                final selected =
+                    cfg.avatarType == 'icon' && cfg.avatarValue == opt.asset;
                 final isSvg = opt.asset.endsWith('.svg');
                 final needsMono =
-                    isDark &&
-                    (opt.asset.contains('openai') ||
-                        opt.asset.contains('grok') ||
-                        opt.asset.contains('xai') ||
-                        opt.asset.contains('openrouter'));
+                    isDark && BrandAssets.assetNeedsDarkInvert(opt.asset);
                 return Semantics(
                   label: opt.label,
                   child: Tooltip(
@@ -3567,19 +3566,50 @@ class _DesktopProviderDetailPaneState
                           );
                         });
                       },
-                      child: Container(
-                        margin: const EdgeInsets.all(4),
-                        child: isSvg
-                            ? SvgPicture.asset(
-                                opt.asset,
-                                colorFilter: needsMono
-                                    ? const ColorFilter.mode(
-                                        Colors.white,
-                                        BlendMode.srcIn,
-                                      )
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: 1,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white10
+                                    : cs.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                                border: selected
+                                    ? Border.all(color: cs.primary, width: 2)
                                     : null,
-                              )
-                            : Image.asset(opt.asset, fit: BoxFit.contain),
+                              ),
+                              alignment: Alignment.center,
+                              child: FractionallySizedBox(
+                                widthFactor: 0.65,
+                                heightFactor: 0.65,
+                                child: isSvg
+                                    ? SvgPicture.asset(
+                                        opt.asset,
+                                        fit: BoxFit.contain,
+                                        colorFilter: needsMono
+                                            ? const ColorFilter.mode(
+                                                Colors.white,
+                                                BlendMode.srcIn,
+                                              )
+                                            : null,
+                                      )
+                                    : Image.asset(
+                                        opt.asset,
+                                        fit: BoxFit.contain,
+                                        color: needsMono
+                                            ? Colors.white
+                                            : null,
+                                        colorBlendMode: needsMono
+                                            ? BlendMode.srcIn
+                                            : null,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
