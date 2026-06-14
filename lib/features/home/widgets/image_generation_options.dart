@@ -123,9 +123,14 @@ class ImageGenerationOptionsController {
 
   Map<String, dynamic> toExtraBody() {
     final size = resolvedSize;
+    final defaultSize = _resolveSize(
+      sizeTier: _defaultSizeTier,
+      aspectRatio: _defaultAspectRatio,
+      customAspectRatio: _defaultCustomAspectRatio,
+    );
     return <String, dynamic>{
       if (_explicitlySetByUser.contains('quality')) 'quality': _quality,
-      if (_explicitlySetByUser.contains('sizeTier'))
+      if (_explicitlySetByUser.contains('sizeTier') && size != defaultSize)
         'size': size == 'auto' ? null : size,
       if (_explicitlySetByUser.contains('outputFormat')) 'output_format': _outputFormat,
       if (_explicitlySetByUser.contains('outputCompression') && _outputCompression != null)
