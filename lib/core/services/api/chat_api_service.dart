@@ -23,6 +23,7 @@ import '../model_override_resolver.dart';
 import '../model_override_payload_parser.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
+import '../../../utils/markdown_block_scanner.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
@@ -239,72 +240,21 @@ class ChatApiService {
     // Match custom inline image markers like: [image:/absolute/path.png]
     // Use a single backslash in a raw string to escape '[' and ']' in regex.
     final customImg = RegExp(r"\[image:(.+?)\]");
+    final blockScan = MarkdownBlockScanner.scan(raw);
     final images = <_ImageRef>[];
     final buf = StringBuffer();
     int i = 0;
     while (i < raw.length) {
-      // Skip fenced code blocks (``` or ~~~): content inside is never an image.
-      if ((raw.startsWith('```', i) || raw.startsWith('~~~', i)) &&
-          (i == 0 || raw[i - 1] == '\n')) {
-        final fence = raw.substring(i, i + 3);
-        buf.write(fence);
-        i += 3;
-        // Skip the rest of the opening fence line (language tag, etc.)
-        while (i < raw.length && raw[i] != '\n') {
+      // Skip protected zones (fenced code blocks, inline code spans):
+      // content inside is never an image.
+      if (blockScan.isProtected(i)) {
+        final span = blockScan.spanAt(i);
+        if (span != null) {
+          buf.write(raw.substring(span.start, span.end));
+          i = span.end;
+        } else {
           buf.write(raw[i]);
           i++;
-        }
-        // Advance until the matching closing fence at the start of a line.
-        bool closed = false;
-        while (i < raw.length) {
-          if (raw[i] == '\n') {
-            buf.write(raw[i]);
-            i++;
-            if (raw.startsWith(fence, i)) {
-              buf.write(fence);
-              i += 3;
-              // Skip trailing content on the closing fence line.
-              while (i < raw.length && raw[i] != '\n') {
-                buf.write(raw[i]);
-                i++;
-              }
-              closed = true;
-              break;
-            }
-          } else {
-            buf.write(raw[i]);
-            i++;
-          }
-        }
-        if (!closed) {
-          // Unclosed fence: rest of text was written as-is already.
-        }
-        continue;
-      }
-      // Skip inline code spans (backtick sequences).
-      if (raw[i] == '`') {
-        // Determine the length of the opening backtick sequence.
-        int tickLen = 0;
-        while (i + tickLen < raw.length && raw[i + tickLen] == '`') {
-          tickLen++;
-        }
-        final openTicks = raw.substring(i, i + tickLen);
-        buf.write(openTicks);
-        i += tickLen;
-        // Advance until the matching closing backtick sequence.
-        bool closedTick = false;
-        while (i < raw.length) {
-          if (raw.startsWith(openTicks, i)) {
-            buf.write(openTicks);
-            i += tickLen;
-            closedTick = true;
-            break;
-          }
-          buf.write(raw[i]);
-          i++;
-        }
-        if (!closedTick) {
-          // Unclosed inline code: content was already written.
         }
         continue;
       }
