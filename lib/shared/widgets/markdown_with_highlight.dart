@@ -12,6 +12,9 @@ import 'markdown_plus_extensions/latex_element_builder.dart';
 import 'markdown_plus_extensions/cjk_friendly_syntax.dart';
 import 'markdown_plus_extensions/fenced_code_element_builder.dart';
 import 'markdown_plus_extensions/codespan_syntax.dart';
+import 'markdown_plus_extensions/citation_syntax.dart';
+import 'markdown_plus_extensions/details_block_syntax.dart';
+import 'markdown_plus_extensions/details_element_builder.dart';
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -51,6 +54,7 @@ import '../../utils/markdown_block_scanner.dart';
 const int _maxInlineMathBodyLength = 512;
 const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
 const String _fencedHtmlTagStartMask = '\uE002';
+const String _pipeMathMask = '\uE004';
 
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
@@ -273,13 +277,17 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     // ignore: dead_code
     if (useNewMarkdown) {
-      // NEW: flutter_markdown_plus backend (Phase 1 — minimal demo)
-      // TODO: Replace with full builder set in later phases
+      // NEW: flutter_markdown_plus backend
+      // Unmask blockquote fence markers so the markdown parser can handle
+      // fenced code blocks inside blockquotes (the mask is for gpt_markdown).
+      final unmasked = _unmaskBlockquoteFenceMarkers(normalized);
+      // Convert citation links into custom syntax
+      final newBackendText = convertCitationLinks(unmasked);
       markdownWidget = fmp.MarkdownBody(
         key: ValueKey(
           '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
         ),
-        data: normalized,
+        data: newBackendText,
         styleSheet: fmp.MarkdownStyleSheet.fromTheme(Theme.of(context))
             .copyWith(
               h1Padding: const EdgeInsets.only(top: 10, bottom: 2),
@@ -313,15 +321,36 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 color: cs.onSurfaceVariant.withValues(alpha: 0.75),
               ),
               blockSpacing: 6,
+              tableHead: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 13.0,
+                color: cs.onSurface,
+              ),
+              tableBody: TextStyle(
+                fontSize: 13.5,
+                color: cs.onSurface.withValues(alpha: 0.90),
+              ),
+              tableBorder: TableBorder.all(
+                color: cs.outlineVariant.withValues(alpha: 0.5),
+              ),
+              tableCellsPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 9,
+              ),
             ),
         selectable: true,
         extensionSet: md.ExtensionSet(
-          [...md.ExtensionSet.gitHubFlavored.blockSyntaxes, LatexBlockSyntax()],
+          [
+            ...md.ExtensionSet.gitHubFlavored.blockSyntaxes,
+            DetailsBlockSyntax(),
+            if (settings.enableMathRendering) LatexBlockSyntax(),
+          ],
           [
             CjkFriendlyBoldSyntax(),
             CjkFriendlyItalicSyntax(),
-            LatexInlineSyntax(),
+            if (settings.enableMathRendering) LatexInlineSyntax(),
             CodespanSyntax(),
+            CitationInlineSyntax(),
             ...md.ExtensionSet.gitHubFlavored.inlineSyntaxes,
           ],
         ),
@@ -358,6 +387,14 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
             },
           ),
           'codespan': _buildCodespan(codeFontFamily: codeFontFamily),
+          'table': TableElementBuilder(
+            appFontFamily: appFontFamily.isEmpty ? null : appFontFamily,
+            streaming: widget.streaming,
+          ),
+          'citation': CitationElementBuilder(
+            onCitationTap: widget.onCitationTap,
+          ),
+          'details': DetailsElementBuilder(),
         },
         onTapLink: (text, href, title) => _handleLinkTap(context, href ?? ''),
       );
@@ -816,6 +853,9 @@ String _preprocessFences(
   );
   out = masked;
 
+  // STEP 1b: Convert <details><summary>...</summary>...</details> to custom markers
+  out = convertDetailsBlocks(out);
+
   // STEP 2: PROCESSING (on masked string, code is now protected)
   if (streaming) {
     out = _stabilizeStreamingTables(out);
@@ -936,6 +976,10 @@ String _preprocessFences(
     }
     out = buf.toString();
   }
+
+  // STEP 2b: Protect | inside \(...\) on table rows so the markdown parser's
+  // TableSyntax doesn't split cells on pipes that belong to inline math.
+  out = _protectTableRowMathPipes(out);
 
   // STEP 3: UNMASKING - Restore code blocks
   // Replace all mask placeholders with their original content
@@ -1067,6 +1111,46 @@ String _maskBlockquoteFenceMarkers(String input) {
 
 String _unmaskBlockquoteFenceMarkers(String input) {
   return input.replaceAll('\uE000', '`').replaceAll('\uE001', '~');
+}
+
+// Protect | inside \(...\) on table rows so the markdown TableSyntax doesn't
+// split cells on pipes that belong to inline math (e.g. \(a|b\)).
+String _protectTableRowMathPipes(String input) {
+  final lines = input.split('\n');
+  final result = <String>[];
+  for (final line in lines) {
+    if (_looksLikeTableRowStart(line)) {
+      result.add(_protectPipeInParenthesizedMath(line));
+    } else {
+      result.add(line);
+    }
+  }
+  return result.join('\n');
+}
+
+String _protectPipeInParenthesizedMath(String line) {
+  final buf = StringBuffer();
+  var i = 0;
+  while (i < line.length) {
+    if (i + 1 < line.length && line[i] == r'\' && line[i + 1] == '(') {
+      final close = _findClosingParen(line, i + 2);
+      if (close != -1) {
+        buf.write(line.substring(i, close + 1).replaceAll('|', _pipeMathMask));
+        i = close + 1;
+        continue;
+      }
+    }
+    buf.write(line[i]);
+    i++;
+  }
+  return buf.toString();
+}
+
+int _findClosingParen(String input, int start) {
+  for (var i = start; i < input.length - 1; i++) {
+    if (input[i] == r'\' && input[i + 1] == ')') return i + 1;
+  }
+  return -1;
 }
 
 String _stabilizeStreamingTables(String input) {
@@ -5782,4 +5866,169 @@ bool _highlightThemeEquals(Map<String, TextStyle> a, Map<String, TextStyle> b) {
     if (b[entry.key] != entry.value) return false;
   }
   return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New backend builders (flutter_markdown_plus)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class TableElementBuilder extends fmp.MarkdownElementBuilder {
+  TableElementBuilder({this.appFontFamily, this.streaming = false});
+
+  final String? appFontFamily;
+  final bool streaming;
+
+  @override
+  bool isBlockElement() => true;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    if (element.tag != 'table') return null;
+
+    final extracted = _extractTableRows(element);
+    if (extracted == null || extracted.isEmpty) return null;
+
+    final columnCount = extracted.fold<int>(
+      0,
+      (max, row) => row.length > max ? row.length : max,
+    );
+    if (columnCount == 0) return null;
+
+    final rows = <CustomTableRow>[];
+    for (var rowIdx = 0; rowIdx < extracted.length; rowIdx++) {
+      final rowCells = extracted[rowIdx];
+      final fields = <CustomTableField>[];
+      for (var colIdx = 0; colIdx < columnCount; colIdx++) {
+        final cell = colIdx < rowCells.length ? rowCells[colIdx] : null;
+        final text = (cell?.text ?? '').replaceAll(_pipeMathMask, '|');
+        fields.add(
+          CustomTableField(
+            data: text,
+            alignment: cell?.alignment ?? TextAlign.left,
+          ),
+        );
+      }
+      rows.add(CustomTableRow(isHeader: rowIdx == 0, fields: fields));
+    }
+
+    final data = _MarkdownTableData.fromRows(
+      rows,
+      maxBodyRows: streaming
+          ? MarkdownWithCodeHighlight._streamingTableMaxRows
+          : null,
+    );
+    final style = preferredStyle ?? const TextStyle();
+    final config = GptMarkdownConfig(style: style);
+    return _MarkdownTableBlock(
+      rows: data,
+      style: style,
+      config: config,
+      appFontFamily: appFontFamily,
+    );
+  }
+}
+
+_ExtractedCell _extractTableCell(md.Element cell) {
+  final align = switch (cell.attributes['align']) {
+    'left' => TextAlign.left,
+    'center' => TextAlign.center,
+    'right' => TextAlign.right,
+    _ => TextAlign.left,
+  };
+  return _ExtractedCell(text: _extractPlainText(cell), alignment: align);
+}
+
+String _extractPlainText(md.Node node) {
+  if (node is md.Text) return node.text;
+  if (node is md.Element) {
+    return (node.children ?? []).map(_extractPlainText).join();
+  }
+  return '';
+}
+
+List<List<_ExtractedCell>>? _extractTableRows(md.Element table) {
+  final rows = <List<_ExtractedCell>>[];
+  final children = table.children;
+  if (children == null) return null;
+  for (final section in children) {
+    if (section is! md.Element ||
+        (section.tag != 'thead' && section.tag != 'tbody')) {
+      continue;
+    }
+    final sChildren = section.children;
+    if (sChildren == null) continue;
+    for (final tr in sChildren) {
+      if (tr is! md.Element || tr.tag != 'tr') continue;
+      final tChildren = tr.children;
+      if (tChildren == null) continue;
+      final cells = <_ExtractedCell>[];
+      for (final cell in tChildren) {
+        if (cell is! md.Element || (cell.tag != 'th' && cell.tag != 'td')) {
+          continue;
+        }
+        cells.add(_extractTableCell(cell));
+      }
+      if (cells.isNotEmpty) rows.add(cells);
+    }
+  }
+  return rows.isEmpty ? null : rows;
+}
+
+class CitationElementBuilder extends fmp.MarkdownElementBuilder {
+  CitationElementBuilder({this.onCitationTap});
+
+  final void Function(String id)? onCitationTap;
+
+  @override
+  bool isBlockElement() => false;
+
+  @override
+  Widget? visitElementAfterWithContext(
+    BuildContext context,
+    md.Element element,
+    TextStyle? preferredStyle,
+    TextStyle? parentStyle,
+  ) {
+    if (element.tag != 'citation') return null;
+    final children = element.children;
+    final indexText =
+        children != null && children.isNotEmpty && children[0] is md.Text
+        ? (children[0] as md.Text).text
+        : '';
+    final id = children != null && children.length > 1 && children[1] is md.Text
+        ? (children[1] as md.Text).text
+        : '';
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: () {
+        if (onCitationTap != null && id.isNotEmpty) {
+          onCitationTap!(id);
+        }
+      },
+      child: Container(
+        width: 20,
+        height: 20,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: cs.primary.withValues(alpha: 0.20),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          indexText,
+          style: const TextStyle(fontSize: 12, height: 1.0),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExtractedCell {
+  final String text;
+  final TextAlign alignment;
+  _ExtractedCell({required this.text, required this.alignment});
 }

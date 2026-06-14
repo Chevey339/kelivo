@@ -439,7 +439,10 @@ class MarkdownBuilder implements md.NodeVisitor {
           );
         }
       } else if (tag == 'table') {
-        if (styleSheet.tableColumnWidth is FixedColumnWidth || styleSheet.tableColumnWidth is IntrinsicColumnWidth) {
+        if (builders.containsKey('table')) {
+          // Custom table builder handles rendering; discard default table state.
+          _tables.removeLast();
+        } else if (styleSheet.tableColumnWidth is FixedColumnWidth || styleSheet.tableColumnWidth is IntrinsicColumnWidth) {
           child = _ScrollControllerBuilder(
             builder: (BuildContext context, ScrollController tableScrollController, Widget? child) {
               return Scrollbar(
