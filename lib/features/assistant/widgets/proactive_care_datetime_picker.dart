@@ -1,12 +1,8 @@
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'
-    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
-import '../../../icons/lucide_adapter.dart' as lucide;
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
 
 String proactiveCareNextMessageLabel(BuildContext context, DateTime? value) {
@@ -20,17 +16,21 @@ String proactiveCareNextMessageLabel(BuildContext context, DateTime? value) {
 Future<DateTime?> showProactiveCareDateTimePicker(
   BuildContext context, {
   DateTime? initial,
-}) async {
-  if (_isDesktopPlatform) {
-    return _showProactiveCareDesktopDateTimeDialog(context, initial: initial);
-  }
-  return _showProactiveCareMobileDateTimePicker(context, initial: initial);
+}) {
+  final resolved = _resolveInitialDateTime(initial);
+  return showModalBottomSheet<DateTime>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (ctx) {
+      return _ProactiveCareDateTimePanel(
+        initial: resolved,
+        onCancel: () => Navigator.of(ctx).pop(),
+        onSave: (value) => Navigator.of(ctx).pop(value),
+      );
+    },
+  );
 }
-
-bool get _isDesktopPlatform =>
-    defaultTargetPlatform == TargetPlatform.macOS ||
-    defaultTargetPlatform == TargetPlatform.windows ||
-    defaultTargetPlatform == TargetPlatform.linux;
 
 DateTime _resolveInitialDateTime(DateTime? initial) {
   final now = DateTime.now();
@@ -41,63 +41,14 @@ DateTime _resolveInitialDateTime(DateTime? initial) {
   return candidate;
 }
 
-Future<DateTime?> _showProactiveCareMobileDateTimePicker(
-  BuildContext context, {
-  DateTime? initial,
-}) {
-  final resolved = _resolveInitialDateTime(initial);
-  return showModalBottomSheet<DateTime>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      return _ProactiveCareDateTimePanel(
-        initial: resolved,
-        isDesktop: false,
-        onCancel: () => Navigator.of(ctx).pop(),
-        onSave: (value) => Navigator.of(ctx).pop(value),
-      );
-    },
-  );
-}
-
-Future<DateTime?> _showProactiveCareDesktopDateTimeDialog(
-  BuildContext context, {
-  DateTime? initial,
-}) {
-  final resolved = _resolveInitialDateTime(initial);
-  return showDialog<DateTime>(
-    context: context,
-    builder: (ctx) {
-      return Dialog(
-        elevation: 0,
-        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: _ProactiveCareDateTimePanel(
-            initial: resolved,
-            isDesktop: true,
-            onCancel: () => Navigator.of(ctx).pop(),
-            onSave: (value) => Navigator.of(ctx).pop(value),
-          ),
-        ),
-      );
-    },
-  );
-}
-
 class _ProactiveCareDateTimePanel extends StatefulWidget {
   const _ProactiveCareDateTimePanel({
     required this.initial,
-    required this.isDesktop,
     required this.onCancel,
     required this.onSave,
   });
 
   final DateTime initial;
-  final bool isDesktop;
   final VoidCallback onCancel;
   final ValueChanged<DateTime> onSave;
 
@@ -163,148 +114,101 @@ class _ProactiveCareDateTimePanelState
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final radius = widget.isDesktop
-        ? BorderRadius.circular(18)
-        : BorderRadius.circular(22);
-    final borderColor = cs.outlineVariant.withValues(
-      alpha: widget.isDesktop ? 0.24 : 0.12,
-    );
-    final panelColor = widget.isDesktop
-        ? cs.surface
-        : (isDark ? const Color(0xFF1F2023) : const Color(0xFFF8F9FA));
+    const radius = BorderRadius.all(Radius.circular(22));
+    final panelColor = isDark
+        ? const Color(0xFF1F2023)
+        : const Color(0xFFF8F9FA);
     final preview = proactiveCareNextMessageLabel(context, _selectedDateTime);
 
-    final panel = Material(
-      color: Colors.transparent,
-      child: Container(
-        width: widget.isDesktop ? null : double.infinity,
-        margin: widget.isDesktop
-            ? EdgeInsets.zero
-            : EdgeInsets.only(left: 12, right: 12, bottom: 12 + bottomInset),
-        decoration: BoxDecoration(
-          color: panelColor,
-          borderRadius: radius,
-          border: widget.isDesktop ? Border.all(color: borderColor) : null,
-          boxShadow: widget.isDesktop
-              ? [
-                  BoxShadow(
-                    color: cs.shadow.withValues(alpha: isDark ? 0.32 : 0.12),
-                    blurRadius: 28,
-                    offset: const Offset(0, 16),
-                  ),
-                ]
-              : null,
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildHeader(context, l10n, cs),
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  widget.isDesktop ? 22 : 18,
-                  widget.isDesktop ? 12 : 8,
-                  widget.isDesktop ? 22 : 18,
-                  widget.isDesktop ? 8 : 10,
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      preview,
+    return SafeArea(
+      top: false,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: double.infinity,
+          margin: EdgeInsets.only(
+            left: 12,
+            right: 12,
+            bottom: 12 + bottomInset,
+          ),
+          decoration: BoxDecoration(color: panelColor, borderRadius: radius),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                  child: Center(
+                    child: Text(
+                      l10n.assistantEditProactiveCareDateTimePickerTitle,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: widget.isDesktop ? 18 : 16,
+                        fontSize: 17,
                         fontWeight: AppFontWeights.emphasis,
-                        color: cs.primary,
+                        color: cs.onSurface.withValues(alpha: 0.92),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: _datePickerHeight,
-                      child: CupertinoTheme(
-                        data: CupertinoTheme.of(context).copyWith(
-                          textTheme: CupertinoTheme.of(context).textTheme
-                              .copyWith(
-                                dateTimePickerTextStyle: TextStyle(
-                                  color: cs.onSurface,
-                                  fontSize: 18,
-                                  fontWeight: AppFontWeights.semibold,
-                                ),
-                              ),
-                        ),
-                        child: CupertinoDatePicker(
-                          mode: CupertinoDatePickerMode.date,
-                          initialDateTime: _selectedDate,
-                          minimumDate: DateTime(
-                            DateTime.now().year,
-                            DateTime.now().month,
-                            DateTime.now().day,
-                          ),
-                          maximumDate: DateTime.now().add(
-                            const Duration(days: 365 * 2),
-                          ),
-                          onDateTimeChanged: (value) {
-                            setState(() {
-                              _selectedDate = DateTime(
-                                value.year,
-                                value.month,
-                                value.day,
-                              );
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildTimeWheels(context, cs, isDark),
-                  ],
+                  ),
                 ),
-              ),
-              if (widget.isDesktop) _buildDesktopActions(context, l10n, cs),
-              if (!widget.isDesktop) _buildMobileActions(context, l10n, cs),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (widget.isDesktop) return panel;
-    return SafeArea(top: false, child: panel);
-  }
-
-  Widget _buildHeader(
-    BuildContext context,
-    AppLocalizations l10n,
-    ColorScheme cs,
-  ) {
-    if (widget.isDesktop) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(22, 20, 22, 14),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            l10n.assistantEditProactiveCareDateTimePickerTitle,
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: AppFontWeights.emphasis,
-              color: cs.onSurface,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+                  child: Column(
+                    children: [
+                      Text(
+                        preview,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: AppFontWeights.emphasis,
+                          color: cs.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: _datePickerHeight,
+                        child: CupertinoTheme(
+                          data: CupertinoTheme.of(context).copyWith(
+                            textTheme: CupertinoTheme.of(context).textTheme
+                                .copyWith(
+                                  dateTimePickerTextStyle: TextStyle(
+                                    color: cs.onSurface,
+                                    fontSize: 18,
+                                    fontWeight: AppFontWeights.semibold,
+                                  ),
+                                ),
+                          ),
+                          child: CupertinoDatePicker(
+                            mode: CupertinoDatePickerMode.date,
+                            initialDateTime: _selectedDate,
+                            minimumDate: DateTime(
+                              DateTime.now().year,
+                              DateTime.now().month,
+                              DateTime.now().day,
+                            ),
+                            maximumDate: DateTime.now().add(
+                              const Duration(days: 365 * 2),
+                            ),
+                            onDateTimeChanged: (value) {
+                              setState(() {
+                                _selectedDate = DateTime(
+                                  value.year,
+                                  value.month,
+                                  value.day,
+                                );
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTimeWheels(context, cs, isDark),
+                    ],
+                  ),
+                ),
+                _buildActions(context, l10n, cs, isDark),
+              ],
             ),
-          ),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      child: Center(
-        child: Text(
-          l10n.assistantEditProactiveCareDateTimePickerTitle,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: AppFontWeights.emphasis,
-            color: cs.onSurface.withValues(alpha: 0.92),
           ),
         ),
       ),
@@ -428,44 +332,12 @@ class _ProactiveCareDateTimePanelState
     );
   }
 
-  Widget _buildDesktopActions(
+  Widget _buildActions(
     BuildContext context,
     AppLocalizations l10n,
     ColorScheme cs,
+    bool isDark,
   ) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 4, 22, 20),
-      child: Row(
-        children: [
-          Expanded(
-            child: IosTileButton(
-              label: l10n.backupPageCancel,
-              icon: lucide.Lucide.X,
-              onTap: widget.onCancel,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: IosTileButton(
-              label: l10n.backupPageSave,
-              icon: lucide.Lucide.Check,
-              backgroundColor: cs.primary,
-              foregroundColor: cs.primary,
-              onTap: _save,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMobileActions(
-    BuildContext context,
-    AppLocalizations l10n,
-    ColorScheme cs,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Row(
