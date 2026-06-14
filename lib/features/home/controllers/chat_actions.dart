@@ -101,6 +101,9 @@ class ChatActions {
   /// Called when chat suggestions may need to be generated.
   void Function(String conversationId)? onMaybeGenerateSuggestions;
 
+  /// Called when the proactive care next-message time may need updating.
+  void Function(String conversationId)? onMaybeUpdateProactiveCare;
+
   /// Called to schedule inline image sanitization.
   void Function(String messageId, String content, {bool immediate})?
   onScheduleImageSanitize;
@@ -1535,6 +1538,9 @@ class ChatActions {
 
     // Trigger follow-up suggestions after the final assistant reply is stored.
     onMaybeGenerateSuggestions?.call(conversationId);
+
+    // Trigger proactive care decision check (actual logic in HomeViewModel)
+    onMaybeUpdateProactiveCare?.call(conversationId);
 
     await _finishIosBackgroundGeneration(success: true);
   }
