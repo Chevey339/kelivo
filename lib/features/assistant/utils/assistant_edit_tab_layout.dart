@@ -1,13 +1,15 @@
 const String assistantEditTabBasic = 'basic';
 const String assistantEditTabPrompts = 'prompts';
 const String assistantEditTabMemory = 'memory';
+const String assistantEditTabProactiveLetter = 'proactiveLetter';
 const String assistantEditTabMcp = 'mcp';
 const String assistantEditTabLocalTools = 'localTools';
 const String assistantEditTabQuickPhrase = 'quickPhrase';
 const String assistantEditTabCustom = 'custom';
 const String assistantEditTabRegex = 'regex';
 
-const List<String> defaultAssistantEditTabIds = [
+/// Default assistant edit tabs without proactive care (non-Android).
+const List<String> defaultAssistantEditTabIdsBase = [
   assistantEditTabBasic,
   assistantEditTabPrompts,
   assistantEditTabMemory,
@@ -17,6 +19,28 @@ const List<String> defaultAssistantEditTabIds = [
   assistantEditTabLocalTools,
   assistantEditTabMcp,
 ];
+
+/// Default assistant edit tabs when proactive care is supported (Android).
+const List<String> defaultAssistantEditTabIdsWithProactiveCare = [
+  assistantEditTabBasic,
+  assistantEditTabPrompts,
+  assistantEditTabMemory,
+  assistantEditTabProactiveLetter,
+  assistantEditTabQuickPhrase,
+  assistantEditTabCustom,
+  assistantEditTabRegex,
+  assistantEditTabLocalTools,
+  assistantEditTabMcp,
+];
+
+List<String> defaultAssistantEditTabIdsFor({
+  required bool includeProactiveCare,
+}) => includeProactiveCare
+    ? defaultAssistantEditTabIdsWithProactiveCare
+    : defaultAssistantEditTabIdsBase;
+
+/// Back-compat alias for callers/tests that expect the base tab set.
+const List<String> defaultAssistantEditTabIds = defaultAssistantEditTabIdsBase;
 
 List<String> orderAssistantEditTabIds({
   required List<String> savedOrder,
