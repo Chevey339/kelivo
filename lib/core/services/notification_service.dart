@@ -12,6 +12,14 @@ class NotificationService {
     importance: Importance.high,
     playSound: true,
   );
+  static const AndroidNotificationChannel _proactiveCareChannel =
+      AndroidNotificationChannel(
+        'kelivo_proactive_care',
+        'Proactive Care',
+        description: 'Proactive care messages from assistants',
+        importance: Importance.high,
+        playSound: true,
+      );
 
   static Future<void> ensureInitialized() async {
     if (!Platform.isAndroid) return;
@@ -32,6 +40,7 @@ class NotificationService {
         >();
     if (android != null) {
       await android.createNotificationChannel(_channel);
+      await android.createNotificationChannel(_proactiveCareChannel);
       // Runtime notification permission (Android 13+) should be requested by app UI if needed
     }
     _inited = true;
@@ -55,6 +64,46 @@ class NotificationService {
     } catch (_) {
       return false;
     }
+  }
+
+  /// Shows a proactive care notification on behalf of an assistant.
+  ///
+  /// [id] should be stable per assistant (e.g. derived from the assistant id)
+  /// so a newer notification replaces the previous one instead of piling up.
+  /// [title] is the assistant name, [body] the message text (later the LLM
+  /// reply), and [largeIconPath] an optional local image file shown as the
+  /// notification's large icon.
+  static Future<void> showProactiveCare({
+    required int id,
+    required String title,
+    required String body,
+    String? largeIconPath,
+  }) async {
+    if (!Platform.isAndroid) return;
+    await ensureInitialized();
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _proactiveCareChannel.id,
+          _proactiveCareChannel.name,
+          channelDescription: _proactiveCareChannel.description,
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          enableVibration: true,
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.public,
+          ticker: 'Kelivo',
+          largeIcon: largeIconPath == null
+              ? null
+              : FilePathAndroidBitmap(largeIconPath),
+          styleInformation: BigTextStyleInformation(body),
+        ),
+      ),
+    );
   }
 
   static Future<void> showChatCompleted({String? title, String? body}) async {
