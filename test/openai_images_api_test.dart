@@ -136,9 +136,9 @@ void main() {
         ],
       ).toList();
 
-      expect(requestBody['quality'], 'high');
+      expect(requestBody.containsKey('quality'), isFalse);
       expect(requestBody.containsKey('size'), isFalse);
-      expect(requestBody['output_format'], 'png');
+      expect(requestBody.containsKey('output_format'), isFalse);
     });
 
     test('allows image quality and format to be configured', () async {
