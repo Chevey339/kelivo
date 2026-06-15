@@ -191,6 +191,20 @@ class ProviderAvatar extends StatelessWidget {
     );
   }
 
+  // 优先彩色版本（{name}-color.svg），不存在则回退单色（{name}.svg）。
+  // 用户已显式指定 -color/-text 变体时按原样请求。
+  Future<String?> _resolveLobehubPath(String iconName) async {
+    final n = iconName.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    if (!n.endsWith('-color') && !n.endsWith('-text')) {
+      final colored = await AvatarCache.getPath(
+        BrandAssets.lobehubIconUrl('$n-color'),
+      );
+      if (colored != null) return colored;
+    }
+    return AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
+  }
+
   Widget _lobehubAvatar(
     BuildContext context,
     String iconName,
@@ -198,11 +212,10 @@ class ProviderAvatar extends StatelessWidget {
   ) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final url = BrandAssets.lobehubIconUrl(iconName);
     final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
     return FutureBuilder<String?>(
-      // 复用头像缓存：下载并缓存 SVG，失败返回 null
-      future: AvatarCache.getPath(url),
+      // 优先彩色版本，回退单色；复用头像缓存（下载并缓存 SVG，失败返回 null）
+      future: _resolveLobehubPath(iconName),
       builder: (ctx, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return CircleAvatar(backgroundColor: bg);

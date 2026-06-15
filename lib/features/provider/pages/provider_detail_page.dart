@@ -536,34 +536,37 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               ),
               backgroundColor: cs.surface,
               title: Text(l10n.providerAvatarLobehubDialogTitle),
-              content: TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: l10n.providerAvatarLobehubDialogHint,
-                  filled: true,
-                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                      ? Colors.white10
-                      : const Color(0xFFF2F3F5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(color: Colors.transparent),
-                  ),
-                  enabledBorder: const OutlineInputBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(12)),
-                    borderSide: BorderSide(color: Colors.transparent),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                      color: cs.primary.withValues(alpha: 0.4),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: l10n.providerAvatarLobehubDialogHint,
+                    filled: true,
+                    fillColor: Theme.of(ctx2).brightness == Brightness.dark
+                        ? Colors.white10
+                        : const Color(0xFFF2F3F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.transparent),
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderSide: BorderSide(color: Colors.transparent),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.4),
+                      ),
                     ),
                   ),
+                  onChanged: (v) => setLocal(() => value = v),
+                  onSubmitted: (_) {
+                    if (valid(value)) Navigator.of(ctx2).pop(true);
+                  },
                 ),
-                onChanged: (v) => setLocal(() => value = v),
-                onSubmitted: (_) {
-                  if (valid(value)) Navigator.of(ctx2).pop(true);
-                },
               ),
               actions: [
                 TextButton(
