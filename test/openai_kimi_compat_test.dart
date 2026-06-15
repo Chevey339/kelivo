@@ -84,6 +84,69 @@ void main() {
     );
 
     test(
+      'kimi-k2.7-code omits unsupported thinking and sampling params',
+      () async {
+        final requestBodyCompleter = Completer<Map<String, dynamic>>();
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          if (!requestBodyCompleter.isCompleted) {
+            requestBodyCompleter.complete(body);
+          }
+
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'id': 'cmpl-k27',
+              'object': 'chat.completion.chunk',
+              'created': 0,
+              'model': 'kimi-k2.7-code',
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            })}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _moonshotConfig(baseUrl),
+          modelId: 'kimi-k2.7-code',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          thinkingBudget: 0,
+          temperature: 0.7,
+          topP: 0.8,
+        ).toList();
+
+        final body = await requestBodyCompleter.future;
+        expect(chunks.last.isDone, isTrue);
+        expect(body.containsKey('thinking'), isFalse);
+        expect(body.containsKey('reasoning_effort'), isFalse);
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+      },
+    );
+
+    test(
       'kimi thinking tool continuation preserves reasoning_content and assistant content',
       () async {
         final secondRequestCompleter = Completer<Map<String, dynamic>>();

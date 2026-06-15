@@ -17,7 +17,7 @@ class ModelRegistry {
   // Vision-capable models (text + image input)
   static final RegExp vision = RegExp(
     // GPT family incl. 4o, 4.1, 5 (exclude gpt-5-chat), and OpenAI o* series
-    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|qwen-?3([-.])5|kimi-k2([-.])(?:5|6)|doubao.+1([-.])(?:6|8)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
+    r'(gpt-4o|gpt-4\.1|gpt-5(?!-chat)|o\d|gemini|claude|qwen-?3([-.])5|kimi-k2([-.])(?:5|6|7)|doubao.+1([-.])(?:6|8)|grok-4|step-3|intern-s1|minimax-m3(?:$|[/_:@])|mimo-v2(?:-omni(?:$|[/_:@])|\.5(?:$|[/_:@]))|sensenova-6\.7-flash-lite)',
     caseSensitive: false,
   );
   // Tool-using models

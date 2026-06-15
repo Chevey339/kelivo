@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/providers/model_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 
 Future<void> _waitForSettingsLoad() async {
@@ -21,6 +22,56 @@ void main() {
       expect(claude.modelOverrides, isEmpty);
       expect(openRouter.models, isEmpty);
       expect(openRouter.modelOverrides, isEmpty);
+    });
+
+    test('default Zhipu preset stays user-configured only', () {
+      final zhipu = ProviderConfig.defaultsFor('Zhipu AI');
+
+      expect(zhipu.baseUrl, 'https://open.bigmodel.cn/api/paas/v4');
+      expect(zhipu.models, isEmpty);
+      expect(zhipu.modelOverrides, isEmpty);
+    });
+
+    test('default Moonshot preset stays user-configured only', () {
+      final moonshot = ProviderConfig.defaultsFor('Moonshot');
+
+      expect(moonshot.baseUrl, 'https://api.moonshot.cn/v1');
+      expect(moonshot.models, isEmpty);
+      expect(moonshot.modelOverrides, isEmpty);
+    });
+
+    test('built-in provider order does not add Kimi preset', () async {
+      SharedPreferences.setMockInitialValues({
+        'providers_order_v1': <String>['OpenAI', 'Zhipu AI', 'Grok'],
+      });
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+
+      expect(settings.providersOrder, isNot(contains('Kimi')));
+      expect(settings.providersOrder.take(3), ['OpenAI', 'Zhipu AI', 'Grok']);
+    });
+
+    test('latest GLM and Kimi model ids infer expected capabilities', () {
+      final glm = ModelRegistry.infer(
+        ModelInfo(id: 'glm-5.2', displayName: 'glm-5.2'),
+      );
+      final kimi = ModelRegistry.infer(
+        ModelInfo(id: 'kimi-k2.7-code', displayName: 'kimi-k2.7-code'),
+      );
+
+      expect(glm.input, const [Modality.text]);
+      expect(glm.output, const [Modality.text]);
+      expect(
+        glm.abilities,
+        containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+      );
+      expect(kimi.input, contains(Modality.image));
+      expect(kimi.output, const [Modality.text]);
+      expect(
+        kimi.abilities,
+        containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+      );
     });
 
     test('OpenRouter can be routed through Anthropic format explicitly', () {
