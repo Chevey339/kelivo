@@ -4741,6 +4741,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Let the assistant ask short questions and continue after you answer.';
 
   @override
+  String get assistantEditLocalToolCalculateTitle => 'Calculator';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      'Evaluate mathematical expressions with high precision, supports + - * / power sqrt sin cos etc.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override

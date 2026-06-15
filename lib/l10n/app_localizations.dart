@@ -8786,6 +8786,18 @@ abstract class AppLocalizations {
   /// **'Let the assistant ask short questions and continue after you answer.'**
   String get assistantEditLocalToolAskUserSubtitle;
 
+  /// No description provided for @assistantEditLocalToolCalculateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculator'**
+  String get assistantEditLocalToolCalculateTitle;
+
+  /// No description provided for @assistantEditLocalToolCalculateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluate mathematical expressions with high precision, supports + - * / power sqrt sin cos etc.'**
+  String get assistantEditLocalToolCalculateSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:
