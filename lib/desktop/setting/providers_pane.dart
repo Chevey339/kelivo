@@ -2481,6 +2481,17 @@ class _DesktopProviderDetailPaneState
                                     },
                                   ),
                                   DesktopContextMenuItem(
+                                    icon: lucide.Lucide.ImageDown,
+                                    label:
+                                        l10n2.providerAvatarChooseLobehubIcon,
+                                    onTap: () async {
+                                      await _inputLobehubIcon(
+                                        context,
+                                        widget.providerKey,
+                                      );
+                                    },
+                                  ),
+                                  DesktopContextMenuItem(
                                     icon: lucide.Lucide.Link,
                                     label: l10n2.sideDrawerEnterLink,
                                     onTap: () async {
@@ -3517,6 +3528,89 @@ class _DesktopProviderDetailPaneState
     }
   }
 
+  Future<void> _inputLobehubIcon(
+    BuildContext context,
+    String providerKey,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        bool valid(String s) => s.trim().isNotEmpty;
+        String value = '';
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              backgroundColor: cs.surface,
+              title: Text(l10n.providerAvatarLobehubDialogTitle),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: l10n.providerAvatarLobehubDialogHint,
+                  filled: true,
+                  fillColor: Theme.of(ctx2).brightness == Brightness.dark
+                      ? Colors.white10
+                      : const Color(0xFFF2F3F5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.transparent),
+                  ),
+                  enabledBorder: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(12)),
+                    borderSide: BorderSide(color: Colors.transparent),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: cs.primary.withValues(alpha: 0.4),
+                    ),
+                  ),
+                ),
+                onChanged: (v) => setLocal(() => value = v),
+                onSubmitted: (_) {
+                  if (valid(value)) Navigator.of(ctx2).pop(true);
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+                TextButton(
+                  onPressed: valid(value)
+                      ? () => Navigator.of(ctx).pop(true)
+                      : null,
+                  child: Text(
+                    l10n.sideDrawerSave,
+                    style: TextStyle(
+                      color: valid(value)
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.38),
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (ok == true) {
+      final name = controller.text.trim();
+      if (name.isNotEmpty) {
+        await settings.setProviderAvatarLobehub(providerKey, name);
+      }
+    }
+  }
+
   Future<void> _pickProviderBuiltinIcon(
     BuildContext context,
     String providerKey,
@@ -3599,9 +3693,7 @@ class _DesktopProviderDetailPaneState
                                     : Image.asset(
                                         opt.asset,
                                         fit: BoxFit.contain,
-                                        color: needsMono
-                                            ? Colors.white
-                                            : null,
+                                        color: needsMono ? Colors.white : null,
                                         colorBlendMode: needsMono
                                             ? BlendMode.srcIn
                                             : null,

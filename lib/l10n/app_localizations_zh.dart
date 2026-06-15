@@ -2387,6 +2387,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
 
   @override
+  String get providerAvatarChooseLobehubIcon => '输入 LobeHub 图标';
+
+  @override
   String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
 
   @override
@@ -7675,6 +7678,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
 
   @override
+  String get providerAvatarChooseLobehubIcon => '输入 LobeHub 图标';
+
+  @override
   String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
 
   @override
@@ -12960,6 +12966,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerAvatarInputLobehubIcon => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarChooseLobehubIcon => '輸入 LobeHub 圖示';
 
   @override
   String get providerAvatarLobehubDialogTitle => '輸入 LobeHub 圖示';

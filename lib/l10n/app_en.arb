@@ -1071,6 +1071,7 @@
   "providerAvatarIconSearchHint": "Search icons",
   "providerAvatarIconNoResults": "No icons found",
   "providerAvatarInputLobehubIcon": "Enter LobeHub Icon",
+  "providerAvatarChooseLobehubIcon": "Enter LobeHub Icon",
   "providerAvatarLobehubDialogTitle": "Enter LobeHub Icon",
   "providerAvatarLobehubDialogHint": "Enter a LobeHub icon name, e.g. openai",
   "sideDrawerEmojiDialogTitle": "Choose Emoji",

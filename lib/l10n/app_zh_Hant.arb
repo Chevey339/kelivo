@@ -806,6 +806,7 @@
   "providerAvatarIconSearchHint": "搜尋圖示",
   "providerAvatarIconNoResults": "找不到圖示",
   "providerAvatarInputLobehubIcon": "輸入 LobeHub 圖示",
+  "providerAvatarChooseLobehubIcon": "輸入 LobeHub 圖示",
   "providerAvatarLobehubDialogTitle": "輸入 LobeHub 圖示",
   "providerAvatarLobehubDialogHint": "輸入 LobeHub 圖示名稱，如 openai",
   "sideDrawerEmojiDialogTitle": "選擇表情",

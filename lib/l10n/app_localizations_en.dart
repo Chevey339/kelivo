@@ -2475,6 +2475,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get providerAvatarInputLobehubIcon => 'Enter LobeHub Icon';
 
   @override
+  String get providerAvatarChooseLobehubIcon => 'Enter LobeHub Icon';
+
+  @override
   String get providerAvatarLobehubDialogTitle => 'Enter LobeHub Icon';
 
   @override

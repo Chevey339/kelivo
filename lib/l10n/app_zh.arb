@@ -813,6 +813,7 @@
   "providerAvatarIconSearchHint": "搜索图标",
   "providerAvatarIconNoResults": "未找到图标",
   "providerAvatarInputLobehubIcon": "输入 LobeHub 图标",
+  "providerAvatarChooseLobehubIcon": "输入 LobeHub 图标",
   "providerAvatarLobehubDialogTitle": "输入 LobeHub 图标",
   "providerAvatarLobehubDialogHint": "输入 LobeHub 图标名，如 openai",
   "sideDrawerEmojiDialogTitle": "选择表情",

@@ -4655,6 +4655,12 @@ abstract class AppLocalizations {
   /// **'Enter LobeHub Icon'**
   String get providerAvatarInputLobehubIcon;
 
+  /// No description provided for @providerAvatarChooseLobehubIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarChooseLobehubIcon;
+
   /// No description provided for @providerAvatarLobehubDialogTitle.
   ///
   /// In en, this message translates to:
