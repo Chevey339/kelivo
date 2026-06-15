@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform, Process;
-
 import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
+import '../services/mcp/stdio_command_resolver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -49,6 +48,7 @@ class McpToolConfig {
   final List<McpParamSpec> params;
   // Raw JSON schema for parameters, if provided by the server
   final Map<String, dynamic>? schema;
+
   /// Whether this tool requires user approval before execution.
   final bool needsApproval;
 
@@ -254,7 +254,8 @@ class McpProvider extends ChangeNotifier {
   // Heartbeat timers for live-connection health checks
   final Map<String, Timer> _heartbeats = <String, Timer>{};
   Duration _requestTimeout = const Duration(seconds: 30);
-  String? _cachedSystemPath;
+  final McpStdioCommandResolver _stdioCommandResolver =
+      McpStdioCommandResolver();
 
   McpProvider() {
     _load();
@@ -712,8 +713,10 @@ class McpProvider extends ChangeNotifier {
     if (idx < 0) return;
     final server = _servers[idx];
     final tools = server.tools
-        .map((t) =>
-            t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t)
+        .map(
+          (t) =>
+              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
+        )
         .toList();
     _servers[idx] = server.copyWith(tools: tools);
     await _persist();
@@ -809,8 +812,12 @@ class McpProvider extends ChangeNotifier {
           if (cmd == null || cmd.isEmpty) {
             throw StateError('STDIO command is empty');
           }
-          final mergedEnv = await _resolveEnvironmentWithPath(server.env);
-          final commandExists = await _validateCommand(cmd, mergedEnv);
+          final mergedEnv = await _stdioCommandResolver
+              .resolveEnvironmentWithPath(server.env);
+          final commandExists = await _stdioCommandResolver.commandExists(
+            cmd,
+            mergedEnv,
+          );
           if (!commandExists) {
             throw StateError(
               'Command "$cmd" not found in PATH. '
@@ -1390,50 +1397,6 @@ class McpProvider extends ChangeNotifier {
     }
     _heartbeats.clear();
     super.dispose();
-  }
-
-  Future<String?> _getSystemPath() async {
-    if (_cachedSystemPath != null) return _cachedSystemPath;
-    if (!Platform.isMacOS) return null;
-    try {
-      final result = await Process.run('launchctl', ['getenv', 'PATH']);
-      if (result.exitCode == 0) {
-        _cachedSystemPath = (result.stdout as String).trim();
-        return _cachedSystemPath;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  Future<Map<String, String>> _resolveEnvironmentWithPath(
-    Map<String, String> userEnv,
-  ) async {
-    final merged = Map<String, String>.from(userEnv);
-    if (!merged.containsKey('PATH')) {
-      final systemPath = await _getSystemPath();
-      if (systemPath != null && systemPath.isNotEmpty) {
-        merged['PATH'] = systemPath;
-      }
-    }
-    return merged;
-  }
-
-  Future<bool> _validateCommand(
-    String command,
-    Map<String, String> environment,
-  ) async {
-    try {
-      final whichCmd = Platform.isWindows ? 'where' : 'which';
-      final result = await Process.run(
-        whichCmd,
-        [command],
-        environment: environment,
-        runInShell: true,
-      );
-      return result.exitCode == 0;
-    } catch (_) {
-      return false;
-    }
   }
 
   bool _isDesktopPlatform() {
