@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
@@ -73,9 +74,8 @@ class CustomBottomSheet extends StatefulWidget {
 
 class _CustomBottomSheetState extends State<CustomBottomSheet>
     with SingleTickerProviderStateMixin {
-  static const double _flingVelocityThreshold = 400;
-  static const double _dismissDistanceThreshold = 150;
-  static const double _dismissExtentGapPx = 10;
+  static const double _minFlingVelocity = 700;
+  static const double _closeProgressThreshold = 0.7;
 
   late final AnimationController _sheetAnimationController;
   final ScrollController _scrollController = ScrollController();
@@ -87,6 +87,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   double _contentDragStartTop = 0;
   int? _contentPointer;
   double? _lastContentPointerY;
+  VelocityTracker? _contentVelocityTracker;
   bool _contentDragChangedSheetTop = false;
   bool _dismissScheduled = false;
 
@@ -194,6 +195,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                                 velocityY: details.primaryVelocity ?? 0,
                                 expandedTop: expandedTop,
                                 partialTop: partialTop,
+                                hiddenTop: hiddenTop,
                               );
                             },
                             onVerticalDragCancel: () {
@@ -210,21 +212,20 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                           Expanded(
                             child: Listener(
                               onPointerDown: (event) => _startContentDrag(
-                                event.pointer,
-                                event.position.dy,
+                                event,
                                 partialTop: partialTop,
                               ),
                               onPointerMove: (event) => _updateContentDrag(
-                                event.pointer,
-                                event.position.dy,
+                                event,
                                 expandedTop: expandedTop,
                                 partialTop: partialTop,
                                 hiddenTop: hiddenTop,
                               ),
                               onPointerUp: (event) => _endContentDrag(
-                                event.pointer,
+                                event,
                                 expandedTop: expandedTop,
                                 partialTop: partialTop,
+                                hiddenTop: hiddenTop,
                               ),
                               onPointerCancel: (event) => _cancelContentDrag(
                                 event.pointer,
@@ -286,28 +287,27 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
 
   double _currentTop(double fallback) => _sheetTop ?? fallback;
 
-  void _startContentDrag(
-    int pointer,
-    double positionY, {
-    required double partialTop,
-  }) {
+  void _startContentDrag(PointerDownEvent event, {required double partialTop}) {
     if (_contentPointer != null) return;
-    _contentPointer = pointer;
-    _lastContentPointerY = positionY;
+    _contentPointer = event.pointer;
+    _lastContentPointerY = event.position.dy;
+    _contentVelocityTracker = VelocityTracker.withKind(event.kind)
+      ..addPosition(event.timeStamp, event.position);
     _contentDragStartTop = _currentTop(partialTop);
     _contentDragChangedSheetTop = false;
   }
 
   void _updateContentDrag(
-    int pointer,
-    double positionY, {
+    PointerMoveEvent event, {
     required double expandedTop,
     required double partialTop,
     required double hiddenTop,
   }) {
-    if (_contentPointer != pointer) return;
+    if (_contentPointer != event.pointer) return;
+    _contentVelocityTracker?.addPosition(event.timeStamp, event.position);
     final lastY = _lastContentPointerY;
     if (lastY == null) return;
+    final positionY = event.position.dy;
     final deltaY = positionY - lastY;
     _lastContentPointerY = positionY;
     if (deltaY == 0) return;
@@ -324,21 +324,26 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   }
 
   void _endContentDrag(
-    int pointer, {
+    PointerUpEvent event, {
     required double expandedTop,
     required double partialTop,
+    required double hiddenTop,
   }) {
-    if (_contentPointer != pointer) return;
+    if (_contentPointer != event.pointer) return;
+    final velocityY =
+        _contentVelocityTracker?.getVelocity().pixelsPerSecond.dy ?? 0;
     _contentPointer = null;
     _lastContentPointerY = null;
+    _contentVelocityTracker = null;
     if (!_contentDragChangedSheetTop) return;
     _contentDragChangedSheetTop = false;
     _settleDrag(
       startTop: _contentDragStartTop,
       currentTop: _currentTop(partialTop),
-      velocityY: 0,
+      velocityY: velocityY,
       expandedTop: expandedTop,
       partialTop: partialTop,
+      hiddenTop: hiddenTop,
     );
   }
 
@@ -346,6 +351,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     if (_contentPointer != pointer) return;
     _contentPointer = null;
     _lastContentPointerY = null;
+    _contentVelocityTracker = null;
     _contentDragChangedSheetTop = false;
     _animateToTop(partialTop);
   }
@@ -391,19 +397,21 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
     required double velocityY,
     required double expandedTop,
     required double partialTop,
+    required double hiddenTop,
   }) {
     final dragged = currentTop - startTop;
 
-    if (velocityY <= -_flingVelocityThreshold || dragged < -0.5) {
+    if (velocityY <= -_minFlingVelocity || dragged < -0.5) {
       _animateToTop(expandedTop);
       return;
     }
 
-    if (velocityY >= _flingVelocityThreshold || dragged > 0.5) {
+    if (velocityY > _minFlingVelocity || dragged > 0.5) {
       if (_shouldDismissAfterDownDrag(
-        startTop: startTop,
         currentTop: currentTop,
+        velocityY: velocityY,
         partialTop: partialTop,
+        hiddenTop: hiddenTop,
       )) {
         _dismiss();
         return;
@@ -416,14 +424,20 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
   }
 
   bool _shouldDismissAfterDownDrag({
-    required double startTop,
     required double currentTop,
+    required double velocityY,
     required double partialTop,
+    required double hiddenTop,
   }) {
-    final draggedDownPx = currentTop - startTop;
-    final belowPartialPx = currentTop - partialTop;
-    return draggedDownPx >= _dismissDistanceThreshold &&
-        belowPartialPx > _dismissExtentGapPx;
+    if (currentTop <= partialTop) return false;
+    if (velocityY > _minFlingVelocity) return true;
+
+    final dismissRange = hiddenTop - partialTop;
+    if (dismissRange <= 0) return false;
+    final progress = ((hiddenTop - currentTop) / dismissRange)
+        .clamp(0.0, 1.0)
+        .toDouble();
+    return progress < _closeProgressThreshold;
   }
 
   double _nearestVisibleTop(
