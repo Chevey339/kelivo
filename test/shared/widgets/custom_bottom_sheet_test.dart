@@ -244,7 +244,7 @@ void main() {
     },
   );
 
-  testWidgets('short list fling settles to partial instead of dismissing', (
+  testWidgets('short list fling from expanded settles to partial', (
     tester,
   ) async {
     setTallTestWindow(tester);
@@ -286,8 +286,40 @@ void main() {
     expect(dismissed, isFalse);
   });
 
+  testWidgets('short downward fling from partial dismisses', (tester) async {
+    setTallTestWindow(tester);
+    var dismissed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: CustomBottomSheet(
+            title: '搜索结果',
+            count: 12,
+            closeSemanticLabel: '关闭',
+            onDismiss: () => dismissed = true,
+            builder: (context, controller) {
+              return ListView.builder(
+                controller: controller,
+                itemCount: 40,
+                itemBuilder: (context, index) =>
+                    SizedBox(height: 44, child: Text('Source $index')),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.fling(find.text('Source 0'), const Offset(0, 80), 1600);
+    await tester.pumpAndSettle();
+
+    expect(dismissed, isTrue);
+  });
+
   testWidgets(
-    'handle drag follows below partial and dismisses after a moderate pull',
+    'handle drag follows below partial and dismisses after halfway pull',
     (tester) async {
       setTallTestWindow(tester);
       var dismissed = false;
@@ -314,7 +346,10 @@ void main() {
       final shortDrag = await tester.startGesture(
         tester.getCenter(find.byKey(CustomBottomSheet.dragHandleKey)),
       );
-      await shortDrag.moveBy(const Offset(0, 120));
+      for (var i = 0; i < 6; i += 1) {
+        await shortDrag.moveBy(const Offset(0, 20));
+        await tester.pump(const Duration(milliseconds: 80));
+      }
       await tester.pump();
       expect(tester.getTopLeft(panel).dy, greaterThan(partialTop));
       await shortDrag.up();
@@ -325,7 +360,10 @@ void main() {
       final moderateDrag = await tester.startGesture(
         tester.getCenter(find.byKey(CustomBottomSheet.dragHandleKey)),
       );
-      await moderateDrag.moveBy(const Offset(0, 160));
+      for (var i = 0; i < 25; i += 1) {
+        await moderateDrag.moveBy(const Offset(0, 10));
+        await tester.pump(const Duration(milliseconds: 30));
+      }
       await tester.pump();
       expect(tester.getTopLeft(panel).dy, greaterThan(partialTop));
       await moderateDrag.up();

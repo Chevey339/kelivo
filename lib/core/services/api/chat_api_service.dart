@@ -754,11 +754,17 @@ class ChatApiService {
         );
         final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
         final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
+        final providerId = config.id.toLowerCase();
         final modelLower = upstreamModelId.toLowerCase();
         final bool isMimo =
             host.contains('xiaomimimo') ||
             modelLower.startsWith('mimo-') ||
             modelLower.contains('/mimo-');
+        final bool isZhipu = _isZhipuLikeProvider(
+          providerId: providerId,
+          host: host,
+          upstreamModelId: upstreamModelId,
+        );
         if (config.useResponseApi == true) {
           // Inject built-in web_search tool when enabled and supported
           final toolsList = <Map<String, dynamic>>[];
@@ -876,9 +882,7 @@ class ChatApiService {
         // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
         if (config.useResponseApi != true) {
           final off = _isOff(thinkingBudget);
-          if (host.contains('open.bigmodel.cn') ||
-              host.contains('bigmodel') ||
-              isMimo) {
+          if (isZhipu || isMimo) {
             // Zhipu BigModel / Xiaomi MiMo: thinking: { type: enabled|disabled }
             if (isReasoning) {
               body['thinking'] = {'type': off ? 'disabled' : 'enabled'};

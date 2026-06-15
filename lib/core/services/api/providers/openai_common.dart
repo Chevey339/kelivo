@@ -120,11 +120,39 @@ bool _isKimiK25Model(String upstreamModelId) {
   return upstreamModelId.toLowerCase().contains('kimi-k2.5');
 }
 
+bool _isKimiOmitsSamplingParamsModel(String upstreamModelId) {
+  final lower = upstreamModelId.toLowerCase();
+  return lower.contains('kimi-k2.5') || lower.contains('kimi-k2.7');
+}
+
 bool _isKimiThinkingModel(String upstreamModelId) {
   final lower = upstreamModelId.toLowerCase();
   return lower.contains('kimi-k2-thinking') ||
       lower.contains('kimi-k2.5') ||
-      lower.contains('kimi-k2.6');
+      lower.contains('kimi-k2.6') ||
+      lower.contains('kimi-k2.7');
+}
+
+void _removeMoonshotKimiUnsupportedSamplingParams(Map<String, dynamic> body) {
+  body.remove('temperature');
+  body.remove('top_p');
+  body.remove('n');
+  body.remove('presence_penalty');
+  body.remove('frequency_penalty');
+}
+
+bool _isZhipuLikeProvider({
+  required String providerId,
+  required String host,
+  required String upstreamModelId,
+}) {
+  final modelLower = upstreamModelId.toLowerCase();
+  return providerId.contains('zhipu') ||
+      providerId.contains('智谱') ||
+      host.contains('open.bigmodel.cn') ||
+      host.contains('bigmodel') ||
+      host == 'api.z.ai' ||
+      modelLower.startsWith('glm-');
 }
 
 void _normalizeMoonshotKimiChatBody(
@@ -145,15 +173,14 @@ void _normalizeMoonshotKimiChatBody(
     body['thinking'] = {
       'type': _isOff(thinkingBudget) ? 'disabled' : 'enabled',
     };
-    body.remove('temperature');
-    body.remove('top_p');
-    body.remove('n');
-    body.remove('presence_penalty');
-    body.remove('frequency_penalty');
+    _removeMoonshotKimiUnsupportedSamplingParams(body);
     return;
   }
 
   body.remove('thinking');
+  if (_isKimiOmitsSamplingParamsModel(upstreamModelId)) {
+    _removeMoonshotKimiUnsupportedSamplingParams(body);
+  }
 }
 
 Map<String, dynamic> _buildAssistantToolCallMessage({
@@ -739,6 +766,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final bool isMimoModel =
       modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
   final bool isMimo = isMimoHost || isMimoModel;
+  final bool isZhipu = _isZhipuLikeProvider(
+    providerId: providerId,
+    host: host,
+    upstreamModelId: upstreamModelId,
+  );
   final bool isSiliconFlow =
       providerId.contains('siliconflow') || host.contains('siliconflow');
   final bool useLongCatOmniPayload = _shouldUseLongCatOmniPayload(
@@ -749,6 +781,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       (host.contains('deepseek') ||
           modelLower.contains('deepseek') ||
           isMimo ||
+          isZhipu ||
           _isKimiThinkingModel(upstreamModelId)) &&
       isReasoning;
   // OpenRouter reasoning models require preserving `reasoning_details` across tool-calling turns.
@@ -1185,9 +1218,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         body.remove('thinking_budget');
       }
       body.remove('reasoning_effort');
-    } else if (host.contains('open.bigmodel.cn') ||
-        host.contains('bigmodel') ||
-        isMimo) {
+    } else if (isZhipu || isMimo) {
       // Zhipu (BigModel) / Xiaomi MiMo: thinking.type enabled/disabled
       if (isReasoning) {
         body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
@@ -1814,9 +1845,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 body2.remove('thinking_budget');
               }
               body2.remove('reasoning_effort');
-            } else if (host.contains('open.bigmodel.cn') ||
-                host.contains('bigmodel') ||
-                isMimo) {
+            } else if (isZhipu || isMimo) {
               if (isReasoning) {
                 body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
               } else {
@@ -3290,9 +3319,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 body2.remove('thinking_budget');
               }
               body2.remove('reasoning_effort');
-            } else if (host.contains('open.bigmodel.cn') ||
-                host.contains('bigmodel') ||
-                isMimo) {
+            } else if (isZhipu || isMimo) {
               if (isReasoning) {
                 body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
               } else {
@@ -3885,6 +3912,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 } else if (host.contains('ark.cn-beijing.volces.com') ||
                     host.contains('volc') ||
                     host.contains('ark') ||
+                    isZhipu ||
                     isMimo) {
                   if (isReasoning) {
                     body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
