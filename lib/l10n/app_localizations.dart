@@ -4649,6 +4649,24 @@ abstract class AppLocalizations {
   /// **'No icons found'**
   String get providerAvatarIconNoResults;
 
+  /// No description provided for @providerAvatarInputLobehubIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarInputLobehubIcon;
+
+  /// No description provided for @providerAvatarLobehubDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarLobehubDialogTitle;
+
+  /// No description provided for @providerAvatarLobehubDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a LobeHub icon name, e.g. openai'**
+  String get providerAvatarLobehubDialogHint;
+
   /// No description provided for @sideDrawerEmojiDialogTitle.
   ///
   /// In en, this message translates to:

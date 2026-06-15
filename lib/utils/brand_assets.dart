@@ -350,6 +350,12 @@ class BrandAssets {
         asset.contains('codex') ||
         asset.contains('mimo');
   }
+
+  // Build the LobeHub static SVG CDN URL from an icon name (e.g. 'openai').
+  static String lobehubIconUrl(String name) {
+    final n = name.trim().toLowerCase();
+    return 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/$n.svg';
+  }
 }
 
 class BrandIconOption {

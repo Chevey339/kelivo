@@ -110,6 +110,12 @@ class ProviderAvatar extends StatelessWidget {
       } else {
         avatar = _assetAvatar(context, asset);
       }
+    } else if (type == 'lobehub' && value != null && value.isNotEmpty) {
+      avatar = _lobehubAvatar(
+        context,
+        value,
+        cfg.name.isNotEmpty ? cfg.name : displayName,
+      );
     } else {
       avatar = _brandOrInitial(
         context,
@@ -182,6 +188,43 @@ class ProviderAvatar extends StatelessWidget {
               color: mono ? Colors.white : null,
               colorBlendMode: mono ? BlendMode.srcIn : null,
             ),
+    );
+  }
+
+  Widget _lobehubAvatar(
+    BuildContext context,
+    String iconName,
+    String fallbackName,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final url = BrandAssets.lobehubIconUrl(iconName);
+    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
+    return FutureBuilder<String?>(
+      // 复用头像缓存：下载并缓存 SVG，失败返回 null
+      future: AvatarCache.getPath(url),
+      builder: (ctx, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return CircleAvatar(backgroundColor: bg);
+        }
+        final p = snap.data;
+        if (p == null || !File(p).existsSync()) {
+          return _brandOrInitial(context, fallbackName);
+        }
+        return CircleAvatar(
+          backgroundColor: bg,
+          child: SvgPicture.file(
+            File(p),
+            width: size * 0.7,
+            height: size * 0.7,
+            fit: BoxFit.contain,
+            // LobeHub 单色图标用 fill="currentColor"，注入前景色以适配明暗；
+            // 带 -color 的彩色图标有固定填充，不受影响
+            theme: SvgTheme(currentColor: cs.onSurface),
+            placeholderBuilder: (_) => const SizedBox.shrink(),
+          ),
+        );
+      },
     );
   }
 

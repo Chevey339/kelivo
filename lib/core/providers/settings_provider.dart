@@ -2586,6 +2586,17 @@ class SettingsProvider extends ChangeNotifier {
     );
   }
 
+  // Store a LobeHub icon name (not the full URL); URL is built at render time.
+  Future<void> setProviderAvatarLobehub(String key, String name) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return;
+    final old = getProviderConfig(key);
+    await setProviderConfig(
+      key,
+      old.copyWith(avatarType: 'lobehub', avatarValue: trimmed),
+    );
+  }
+
   Future<void> resetProviderAvatar(String key) async {
     final old = getProviderConfig(key);
     // Attempt to remove old local file if we managed it
@@ -4502,8 +4513,8 @@ class ProviderConfig {
   final String? proxyPort;
   final String? proxyUsername;
   final String? proxyPassword;
-  // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon)
-  final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon'
+  // Custom provider avatar (same scheme as user plus built-in icon: emoji | url | file | icon | lobehub)
+  final String? avatarType; // 'emoji' | 'url' | 'file' | 'icon' | 'lobehub'
   final String? avatarValue;
   // Multi-key mode
   final bool? multiKeyEnabled; // default false

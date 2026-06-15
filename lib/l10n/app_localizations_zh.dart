@@ -2384,6 +2384,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get providerAvatarIconNoResults => '未找到图标';
 
   @override
+  String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '输入 LobeHub 图标名，如 openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => '选择表情';
 
   @override
@@ -7663,6 +7672,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get providerAvatarIconNoResults => '未找到图标';
 
   @override
+  String get providerAvatarInputLobehubIcon => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '输入 LobeHub 图标';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '输入 LobeHub 图标名，如 openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => '选择表情';
 
   @override
@@ -12939,6 +12957,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get providerAvatarIconNoResults => '找不到圖示';
+
+  @override
+  String get providerAvatarInputLobehubIcon => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => '輸入 LobeHub 圖示';
+
+  @override
+  String get providerAvatarLobehubDialogHint => '輸入 LobeHub 圖示名稱，如 openai';
 
   @override
   String get sideDrawerEmojiDialogTitle => '選擇表情';
