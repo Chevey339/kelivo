@@ -4550,6 +4550,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
 
   @override
+  String get assistantEditLocalToolCalculateTitle => '计算器';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '高精度计算数学表达式，支持加减乘除幂运算sqrt sin cos等。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -9817,6 +9824,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditLocalToolAskUserSubtitle => '允许助手提出简短问题，并在你回答后继续生成。';
 
   @override
+  String get assistantEditLocalToolCalculateTitle => '计算器';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '高精度计算数学表达式，支持加减乘除幂运算sqrt sin cos等。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -15082,6 +15096,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolAskUserSubtitle => '允許助手提出簡短問題，並在你回答後繼續生成。';
+
+  @override
+  String get assistantEditLocalToolCalculateTitle => '計算機';
+
+  @override
+  String get assistantEditLocalToolCalculateSubtitle =>
+      '高精度計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

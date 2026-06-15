@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
 
@@ -13,6 +14,7 @@ class LocalToolNames {
   static const String clipboard = 'clipboard_tool';
   static const String textToSpeech = 'text_to_speech';
   static const String askUser = 'ask_user_input_v0';
+  static const String calculate = 'calculate';
 }
 
 class LocalToolsService {
@@ -132,6 +134,27 @@ class LocalToolsService {
         },
       });
     }
+    if (assistant.localToolIds.contains(LocalToolNames.calculate)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.calculate,
+          'description':
+              'Evaluate a mathematical expression and return the result. Use this when you need precise arithmetic, especially with large numbers, decimals, or complex formulas. Supports: + - * / ( ) ^ (power), % (modulo), sin(), cos(), tan(), sqrt(), log(), ln(), pi, e, abs(). Write the expression in standard mathematical notation. Example expressions: "(15 + 3) * 2", "2^10", "sqrt(144) + 100 * 0.08", "sin(pi/4)"',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'expression': {
+                'type': 'string',
+                'description':
+                    'The mathematical expression to evaluate in standard math notation. Example: "(15 + 3) * 2", "2^10", "sqrt(144)"',
+              },
+            },
+            'required': ['expression'],
+          },
+        },
+      });
+    }
     return tools;
   }
 
@@ -152,6 +175,9 @@ class LocalToolsService {
     }
     if (name == LocalToolNames.textToSpeech) {
       return _handleTextToSpeechTool(args, onSpeakText);
+    }
+    if (name == LocalToolNames.calculate) {
+      return _handleCalculateTool(args);
     }
     return null;
   }
@@ -231,5 +257,36 @@ class LocalToolsService {
       DateTime.sunday => 'Sunday',
       _ => 'Unknown',
     };
+  }
+
+  static String _handleCalculateTool(Map<String, dynamic> args) {
+    final expression = (args['expression'] ?? '').toString().trim();
+    if (expression.isEmpty) {
+      return jsonEncode({
+        'error': 'empty_expression',
+        'message': 'Expression is empty. Please provide a mathematical expression in standard notation, e.g. "(15 + 3) * 2".',
+      });
+    }
+
+    try {
+      final parsed = Parser().parse(expression);
+      final result = parsed.evaluate(EvaluationType.REAL, ContextModel());
+      if (!result.isFinite) {
+        return jsonEncode({
+          'error': 'math_error',
+          'message': 'The result is not a finite number. Please check your expression (e.g. division by zero).',
+        });
+      }
+      return jsonEncode({
+        'expression': expression,
+        'result': result.toString(),
+      });
+    } catch (e) {
+      return jsonEncode({
+        'error': 'parse_error',
+        'message': 'Could not parse the expression. Please use standard mathematical notation. Supported: + - * / ( ) ^ (power), % (modulo), sin(), cos(), tan(), sqrt(), log(), ln(), pi, e, abs(). Example: "(15 + 3) * 2".',
+        'detail': e.toString(),
+      });
+    }
   }
 }
