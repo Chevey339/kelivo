@@ -32,6 +32,8 @@ Future<SettingsProvider> _createSettings(WidgetTester tester) async {
 Widget _buildHarness({
   required SettingsProvider settings,
   required Widget child,
+  Locale? locale,
+  TextScaler? textScaler,
 }) {
   return MultiProvider(
     providers: [
@@ -43,45 +45,89 @@ Widget _buildHarness({
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      locale: locale,
+      builder: (context, child) {
+        final scaler = textScaler;
+        if (scaler == null || child == null) return child ?? const SizedBox();
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: scaler),
+          child: child,
+        );
+      },
       home: child,
     ),
   );
+}
+
+Future<void> _pumpSelectedToolbar(
+  WidgetTester tester, {
+  required double width,
+  TextScaler? textScaler,
+}) async {
+  tester.view.physicalSize = Size(width, 720);
+  tester.view.devicePixelRatio = 1;
+
+  final settings = await _createSettings(tester);
+  await tester.pumpWidget(
+    _buildHarness(
+      settings: settings,
+      locale: const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hans'),
+      textScaler: textScaler,
+      child: const ProviderDetailPage(
+        keyName: 'TestProvider',
+        displayName: 'Test Provider',
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+
+  await tester.tap(find.text('模型'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Lucide.CheckSquare).first);
+  await tester.pumpAndSettle();
+  await tester.tap(find.byIcon(Lucide.CheckSquare).first);
+  await tester.pumpAndSettle();
 }
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'model selection toolbar hides all action labels on narrow phones',
+    'model selection toolbar keeps detect label before delete label on narrow phones',
     (tester) async {
-      tester.view.physicalSize = const Size(320, 720);
+      tester.view.physicalSize = const Size(400, 720);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final settings = await _createSettings(tester);
-      await tester.pumpWidget(
-        _buildHarness(
-          settings: settings,
-          child: const ProviderDetailPage(
-            keyName: 'TestProvider',
-            displayName: 'Test Provider',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
+      await _pumpSelectedToolbar(tester, width: 400);
 
-      await tester.tap(find.text('Models'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Lucide.CheckSquare).first);
-      await tester.pumpAndSettle();
-
-      expect(find.text('Detect'), findsNothing);
-      expect(find.text('Delete'), findsNothing);
-      expect(find.text('Select All'), findsNothing);
+      final detectText = find.text('检测');
+      expect(find.text('全不选'), findsOneWidget);
+      expect(detectText, findsOneWidget);
+      expect(tester.getSize(detectText).width, greaterThan(20));
+      expect(find.text('删除'), findsNothing);
       expect(find.byIcon(Lucide.HeartPulse), findsOneWidget);
       expect(find.byIcon(Lucide.Trash2), findsWidgets);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('model selection toolbar does not overflow on narrow phones', (
+    tester,
+  ) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    for (final width in const <double>[320, 360, 375, 390, 400]) {
+      await _pumpSelectedToolbar(tester, width: width);
+
+      expect(find.byIcon(Lucide.HeartPulse), findsOneWidget);
+      expect(find.byIcon(Lucide.Trash2), findsWidgets);
+      expect(tester.takeException(), isNull, reason: 'width $width');
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    }
+  });
 }
