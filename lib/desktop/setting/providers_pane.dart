@@ -3549,7 +3549,9 @@ class _DesktopProviderDetailPaneState
               ),
               backgroundColor: cs.surface,
               title: Text(l10n.providerAvatarLobehubDialogTitle),
-              content: TextField(
+              content: SizedBox(
+                width: double.maxFinite,
+                child: TextField(
                 controller: controller,
                 autofocus: true,
                 decoration: InputDecoration(
@@ -3577,6 +3579,7 @@ class _DesktopProviderDetailPaneState
                 onSubmitted: (_) {
                   if (valid(value)) Navigator.of(ctx2).pop(true);
                 },
+              ),
               ),
               actions: [
                 TextButton(
