@@ -8795,7 +8795,7 @@ abstract class AppLocalizations {
   /// No description provided for @assistantEditLocalToolCalculateSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Evaluate mathematical expressions with high precision, supports + - * / power sqrt sin cos etc.'**
+  /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
 
   /// No description provided for @assistantEditMemorySwitchTitle.

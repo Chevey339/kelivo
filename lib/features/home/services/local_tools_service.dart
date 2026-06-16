@@ -140,14 +140,14 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.calculate,
           'description':
-              'Evaluate a mathematical expression and return the result. Use this when you need precise arithmetic, especially with large numbers, decimals, or complex formulas. Supports: + - * / ( ) ^ (power), % (modulo), sin(), cos(), tan(), sqrt(), log(), ln(), pi, e, abs(). Write the expression in standard mathematical notation. Example expressions: "(15 + 3) * 2", "2^10", "sqrt(144) + 100 * 0.08", "sin(pi/4)"',
+              'Evaluate a mathematical expression. Supports: + - * / ^ % !, sin() cos() tan() sqrt() ln() abs() floor() ceil() sgn(), log(base, value), constants pi e. Example: "5!", "sin(pi/4)", "log(2, 8)", "floor(3.7)"',
           'parameters': {
             'type': 'object',
             'properties': {
               'expression': {
                 'type': 'string',
                 'description':
-                    'The mathematical expression to evaluate in standard math notation. Example: "(15 + 3) * 2", "2^10", "sqrt(144)"',
+                    'A mathematical expression in standard notation, e.g. "(15 + 3) * 2", "2^10", "sqrt(144)"',
               },
             },
             'required': ['expression'],
@@ -269,7 +269,7 @@ class LocalToolsService {
     }
 
     try {
-      final parsed = Parser().parse(expression);
+      final parsed = GrammarParser().parse(expression);
       final result = parsed.evaluate(EvaluationType.REAL, ContextModel());
       if (!result.isFinite) {
         return jsonEncode({
@@ -284,7 +284,7 @@ class LocalToolsService {
     } catch (e) {
       return jsonEncode({
         'error': 'parse_error',
-        'message': 'Could not parse the expression. Please use standard mathematical notation. Supported: + - * / ( ) ^ (power), % (modulo), sin(), cos(), tan(), sqrt(), log(), ln(), pi, e, abs(). Example: "(15 + 3) * 2".',
+        'message': 'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
         'detail': e.toString(),
       });
     }

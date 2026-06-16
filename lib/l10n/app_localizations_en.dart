@@ -4745,7 +4745,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
-      'Evaluate mathematical expressions with high precision, supports + - * / power sqrt sin cos etc.';
+      'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.';
 
   @override
   String get assistantEditMemorySwitchTitle => 'Memory';

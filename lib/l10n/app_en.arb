@@ -1951,7 +1951,7 @@
   "assistantEditLocalToolAskUserTitle": "Ask User",
   "assistantEditLocalToolAskUserSubtitle": "Let the assistant ask short questions and continue after you answer.",
   "assistantEditLocalToolCalculateTitle": "Calculator",
-  "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions with high precision, supports + - * / power sqrt sin cos etc.",
+  "assistantEditLocalToolCalculateSubtitle": "Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.",
   "assistantEditMemorySwitchTitle": "Memory",
   "assistantEditMemorySwitchDescription": "Allow the assistant to create and use memories across chats.",
   "assistantEditRecentChatsSwitchTitle": "Recent Chats Reference",
