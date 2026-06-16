@@ -142,6 +142,45 @@ void main() {
       },
     );
 
+    test('routes Agnes image models to generations', () async {
+      late Uri requestUri;
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestUri = request.uri;
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {'url': 'https://example.com/agnes-generated.png'},
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+        modelId: 'agnes-image-2.1-flash',
+        messages: const [
+          {'role': 'user', 'content': 'draw a clean app icon'},
+        ],
+      ).toList();
+
+      expect(requestUri.path, '/v1/images/generations');
+      expect(requestBody['model'], 'agnes-image-2.1-flash');
+      expect(requestBody['prompt'], 'draw a clean app icon');
+      expect(chunks.single.content, contains('agnes-generated.png'));
+    });
+
     test('can disable Images API routing for image models', () async {
       late Uri requestUri;
       late Map<String, dynamic> requestBody;
