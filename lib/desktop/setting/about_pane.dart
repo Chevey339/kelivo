@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../features/settings/pages/debug_page.dart';
+import '../../shared/widgets/qq_group_join_sheet.dart';
 import '../../theme/app_font_weights.dart';
 
 class DesktopAboutPane extends StatefulWidget {
@@ -186,7 +187,7 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                   _DeskNavRowSvg(
                     svgAsset: 'assets/icons/tencent-qq.svg',
                     label: l10n.aboutPageJoinQQGroup,
-                    onTap: () => _openUrl('https://qm.qq.com/q/OQaXetKssC'),
+                    onTap: () => showQQGroupJoinSheet(context: context),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRowSvg(

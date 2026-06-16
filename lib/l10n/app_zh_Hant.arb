@@ -1235,6 +1235,8 @@
   "aboutPageGithub": "GitHub",
   "aboutPageLicense": "授權",
   "aboutPageJoinQQGroup": "加入 QQ 群",
+  "aboutPageQQGroupOne": "Kelivo 一群",
+  "aboutPageQQGroupTwo": "Kelivo 二群",
   "aboutPageJoinDiscord": "加入我們的 Discord",
   "displaySettingsPageShowUserAvatarTitle": "顯示使用者頭像",
   "displaySettingsPageShowUserAvatarSubtitle": "是否在聊天訊息中顯示使用者頭像",
