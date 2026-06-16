@@ -59,25 +59,46 @@ String buildConversationTextForCompression(List<ChatMessage> messages) {
 List<ChatMessage> selectForkConversationMessages({
   required List<ChatMessage> messages,
   required ChatMessage targetMessage,
+  Map<String, int> versionSelections = const <String, int>{},
 }) {
-  final Map<String, int> groupFirstIndex = <String, int>{};
+  final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
   final List<String> groupOrder = <String>[];
-  for (int i = 0; i < messages.length; i++) {
-    final gid0 = (messages[i].groupId ?? messages[i].id);
-    if (!groupFirstIndex.containsKey(gid0)) {
-      groupFirstIndex[gid0] = i;
-      groupOrder.add(gid0);
-    }
+  for (final message in messages) {
+    final groupId = message.groupId ?? message.id;
+    byGroup
+        .putIfAbsent(groupId, () {
+          groupOrder.add(groupId);
+          return <ChatMessage>[];
+        })
+        .add(message);
   }
+
   final targetGroup = (targetMessage.groupId ?? targetMessage.id);
   final targetOrderIndex = groupOrder.indexOf(targetGroup);
   if (targetOrderIndex < 0) return const <ChatMessage>[];
 
-  final includeGroups = groupOrder.take(targetOrderIndex + 1).toSet();
-  return [
-    for (final m in messages)
-      if (includeGroups.contains(m.groupId ?? m.id)) m,
-  ];
+  final selected = <ChatMessage>[];
+  for (final groupId in groupOrder.take(targetOrderIndex + 1)) {
+    final versions = byGroup[groupId]!
+      ..sort((a, b) => a.version.compareTo(b.version));
+    final targetVersionIndex = versions.indexWhere(
+      (message) => message.id == targetMessage.id,
+    );
+    if (targetVersionIndex >= 0) {
+      selected.add(versions[targetVersionIndex]);
+      continue;
+    }
+
+    final selectedVersion = versionSelections[groupId];
+    final selectedIndex =
+        selectedVersion != null &&
+            selectedVersion >= 0 &&
+            selectedVersion < versions.length
+        ? selectedVersion
+        : versions.length - 1;
+    selected.add(versions[selectedIndex]);
+  }
+  return selected;
 }
 
 class BatchDeleteGroupPlan {
@@ -873,21 +894,14 @@ class HomeViewModel extends ChangeNotifier {
     final selected = selectForkConversationMessages(
       messages: allMessages,
       targetMessage: message,
+      versionSelections: versionSelections,
     );
     if (selected.isEmpty) return;
 
-    // Filter version selections to included groups
-    final includeGroups = selected.map((m) => m.groupId ?? m.id).toSet();
-    final sel = <String, int>{};
-    for (final gid in includeGroups) {
-      final v = versionSelections[gid];
-      if (v != null) sel[gid] = v;
-    }
     final newConvo = await _chatService.forkConversation(
       title: getTitleForLocale(_contextProvider),
       assistantId: currentConversation?.assistantId,
       sourceMessages: selected,
-      versionSelections: sel,
     );
 
     // Switch to the new conversation

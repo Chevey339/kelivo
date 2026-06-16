@@ -170,4 +170,43 @@ void main() {
       expect(service.getConversation(conversation.id)?.messageIds, isEmpty);
     });
   });
+
+  group('ChatService fork conversations', () {
+    test(
+      'fork copies selected path as plain single-version messages',
+      () async {
+        final service = ChatService();
+        await service.init();
+
+        final source = await service.createConversation(title: 'Source');
+        final original = await service.addMessage(
+          conversationId: source.id,
+          role: 'assistant',
+          content: 'original answer',
+        );
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'edited answer',
+        );
+        expect(edited, isNotNull);
+
+        final fork = await service.forkConversation(
+          title: 'Fork',
+          assistantId: null,
+          sourceMessages: [edited!],
+        );
+
+        final forkMessages = service.getMessages(fork.id);
+        expect(forkMessages, hasLength(1));
+        expect(forkMessages.single.conversationId, fork.id);
+        expect(forkMessages.single.content, 'edited answer');
+        expect(
+          forkMessages.single.groupId ?? forkMessages.single.id,
+          forkMessages.single.id,
+        );
+        expect(forkMessages.single.version, 0);
+        expect(service.getVersionSelections(fork.id), isEmpty);
+      },
+    );
+  });
 }

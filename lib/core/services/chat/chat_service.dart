@@ -1190,7 +1190,6 @@ class ChatService extends ChangeNotifier {
     required String title,
     required String? assistantId,
     required List<ChatMessage> sourceMessages,
-    Map<String, int>? versionSelections,
   }) async {
     if (!_initialized) await init();
     // Create new conversation first
@@ -1214,8 +1213,6 @@ class ChatService extends ChangeNotifier {
         reasoningFinishedAt: src.reasoningFinishedAt,
         translation: src.translation,
         reasoningSegmentsJson: src.reasoningSegmentsJson,
-        groupId: src.groupId,
-        version: src.version,
       );
       await _messagesBox.put(clone.id, clone);
       ids.add(clone.id);
@@ -1226,9 +1223,7 @@ class ChatService extends ChangeNotifier {
       c.messageIds
         ..clear()
         ..addAll(ids);
-      c.versionSelections = Map<String, int>.from(
-        versionSelections ?? const <String, int>{},
-      );
+      c.versionSelections = <String, int>{};
       c.updatedAt = DateTime.now();
       await c.save();
     }
