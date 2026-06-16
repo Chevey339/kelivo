@@ -589,6 +589,11 @@ class HomePageController extends ChangeNotifier {
         _restoreMessageUiState();
         notifyListeners();
         _scrollToBottomSoon(animate: false);
+      } else {
+        // No conversations exist — create a new empty one so the UI
+        // correctly shows the temporary-chat toggle button instead of
+        // falling back to "new conversation" button.
+        await _createNewConversation();
       }
     }
   }
