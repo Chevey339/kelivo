@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../utils/avatar_cache.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
@@ -602,12 +603,34 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     }
   }
 
+  // 后台预热 LobeHub 图标缓存（彩色优先，失败回退单色），不阻塞 UI。
+  // 顺序需与 ProviderAvatar._resolveLobehubPath 保持一致，避免缓存键不一致。
+  void _prewarmLobehubIcon(String n) {
+    if (n.isEmpty) return;
+    Future.microtask(() async {
+      if (!n.endsWith('-color') && !n.endsWith('-text')) {
+        final colored = await AvatarCache.getPath(
+          BrandAssets.lobehubIconUrl('$n-color'),
+        );
+        if (colored != null) return;
+      }
+      await AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
+    });
+  }
+
   Future<void> _pickProviderIcon() async {
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final icons = BrandAssets.selectableIcons;
+
+    // 若当前头像为 LobeHub 自定义图标，预热缓存，使弹窗与详情页头像无需等待下载。
+    final current = settings.getProviderConfig(widget.keyName);
+    if (current.avatarType == 'lobehub' &&
+        (current.avatarValue ?? '').isNotEmpty) {
+      _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
+    }
 
     await showDialog<void>(
       context: context,
