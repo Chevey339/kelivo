@@ -2295,7 +2295,11 @@ class _DesktopAssistantBasicPaneState
                       onTap: () async {
                         final assistantProvider = context
                             .read<AssistantProvider>();
-                        final sel = await showModelSelector(context);
+                        final sel = await showModelSelector(
+                          context,
+                          initialProviderKey: a.chatModelProvider,
+                          initialModelId: a.chatModelId,
+                        );
                         if (sel != null) {
                           await assistantProvider.updateAssistant(
                             a.copyWith(

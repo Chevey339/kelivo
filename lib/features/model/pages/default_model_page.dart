@@ -20,6 +20,16 @@ class DefaultModelPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
     final l10n = AppLocalizations.of(context)!;
+    Future<ModelSelection?> pickConfiguredModel(
+      String? providerKey,
+      String? modelId,
+    ) {
+      return showModelSelector(
+        context,
+        initialProviderKey: providerKey,
+        initialModelId: modelId,
+      );
+    }
 
     return Scaffold(
       backgroundColor: cs.surface,
@@ -49,7 +59,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetCurrentModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.currentModelProvider,
+                settings.currentModelId,
+              );
               if (sel != null) {
                 await settings.setCurrentModel(sel.providerKey, sel.modelId);
               }
@@ -68,7 +81,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetTitleModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.titleModelProvider,
+                settings.titleModelId,
+              );
               if (sel != null) {
                 await settings.setTitleModel(sel.providerKey, sel.modelId);
               }
@@ -89,7 +105,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetSummaryModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.summaryModelProvider,
+                settings.summaryModelId,
+              );
               if (sel != null) {
                 await settings.setSummaryModel(sel.providerKey, sel.modelId);
               }
@@ -108,7 +127,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetSuggestionModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.suggestionModelProvider,
+                settings.suggestionModelId,
+              );
               if (sel != null) {
                 await settings.setSuggestionModel(sel.providerKey, sel.modelId);
               }
@@ -134,7 +156,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetCompressModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.compressModelProvider,
+                settings.compressModelId,
+              );
               if (sel != null) {
                 await settings.setCompressModel(sel.providerKey, sel.modelId);
               }
@@ -154,7 +179,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetTranslateModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.translateModelProvider,
+                settings.translateModelId,
+              );
               if (sel != null) {
                 await settings.setTranslateModel(sel.providerKey, sel.modelId);
               }
@@ -173,7 +201,10 @@ class DefaultModelPage extends StatelessWidget {
               await settings.resetOcrModel();
             },
             onPick: () async {
-              final sel = await showModelSelector(context);
+              final sel = await pickConfiguredModel(
+                settings.ocrModelProvider,
+                settings.ocrModelId,
+              );
               if (sel != null) {
                 if (!modelSupportsOcrImageInput(
                   settings,

@@ -3556,6 +3556,10 @@ class _DesktopProviderDetailPaneState
           final sel = await showModelSelector(
             dctx,
             limitProviderKey: widget.providerKey,
+            initialProviderKey: detectModelId == null
+                ? null
+                : widget.providerKey,
+            initialModelId: detectModelId,
           );
           if (sel != null) {
             detectModelId = sel.modelId;
@@ -4232,6 +4236,10 @@ class _DesktopProviderDetailPaneState
           final sel = await showModelSelector(
             ctx,
             limitProviderKey: widget.providerKey,
+            initialProviderKey: selectedModelId == null
+                ? null
+                : widget.providerKey,
+            initialModelId: selectedModelId,
           );
           if (sel != null) {
             selectedModelId = sel.modelId;

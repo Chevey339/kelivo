@@ -3945,6 +3945,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
       context,
       widget.providerKey,
       widget.providerDisplayName,
+      initialModelId: _selectedModelId,
     );
     if (selected != null) {
       setState(() {
@@ -3986,9 +3987,15 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
 Future<String?> showModelPickerForTest(
   BuildContext context,
   String providerKey,
-  String providerDisplayName,
-) async {
-  final sel = await showModelSelector(context, limitProviderKey: providerKey);
+  String providerDisplayName, {
+  String? initialModelId,
+}) async {
+  final sel = await showModelSelector(
+    context,
+    limitProviderKey: providerKey,
+    initialProviderKey: initialModelId == null ? null : providerKey,
+    initialModelId: initialModelId,
+  );
   return sel?.modelId;
 }
 

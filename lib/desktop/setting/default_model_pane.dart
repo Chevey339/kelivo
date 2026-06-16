@@ -18,6 +18,17 @@ class DesktopDefaultModelPane extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = context.watch<SettingsProvider>();
+    Future<ModelSelection?> pickConfiguredModel(
+      String? providerKey,
+      String? modelId,
+    ) {
+      return showModelSelector(
+        context,
+        initialProviderKey: providerKey,
+        initialModelId: modelId,
+      );
+    }
+
     return Container(
       alignment: Alignment.topCenter,
       child: SingleChildScrollView(
@@ -58,7 +69,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.currentModelProvider,
+                        settings.currentModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setCurrentModel(
                           sel.providerKey,
@@ -82,7 +96,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.titleModelProvider,
+                        settings.titleModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setTitleModel(
                           sel.providerKey,
@@ -112,7 +129,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.summaryModelProvider,
+                        settings.summaryModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setSummaryModel(
                           sel.providerKey,
@@ -138,7 +158,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.suggestionModelProvider,
+                        settings.suggestionModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setSuggestionModel(
                           sel.providerKey,
@@ -171,7 +194,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.compressModelProvider,
+                        settings.compressModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setCompressModel(
                           sel.providerKey,
@@ -198,7 +224,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.translateModelProvider,
+                        settings.translateModelId,
+                      );
                       if (sel != null) {
                         await settingsProvider.setTranslateModel(
                           sel.providerKey,
@@ -221,7 +250,10 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     },
                     onPick: () async {
                       final settingsProvider = context.read<SettingsProvider>();
-                      final sel = await showModelSelector(context);
+                      final sel = await pickConfiguredModel(
+                        settings.ocrModelProvider,
+                        settings.ocrModelId,
+                      );
                       if (sel != null) {
                         if (!modelSupportsOcrImageInput(
                           settingsProvider,

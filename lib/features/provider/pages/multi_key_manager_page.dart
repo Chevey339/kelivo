@@ -653,6 +653,8 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     final sel = await showModelSelector(
       context,
       limitProviderKey: widget.providerKey,
+      initialProviderKey: _detectModelId == null ? null : widget.providerKey,
+      initialModelId: _detectModelId,
     );
     if (sel != null) {
       setState(() => _detectModelId = sel.modelId);

@@ -86,6 +86,8 @@ Future<void> _pumpModelSelector(
   WidgetTester tester, {
   required SettingsProvider settings,
   String? limitProviderKey,
+  String? initialProviderKey,
+  String? initialModelId,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -107,6 +109,8 @@ Future<void> _pumpModelSelector(
                   showModelSelector(
                     context,
                     limitProviderKey: limitProviderKey,
+                    initialProviderKey: initialProviderKey,
+                    initialModelId: initialModelId,
                   );
                 },
                 child: const Text('open'),
@@ -159,6 +163,55 @@ Future<void> _dismissModelSelector(WidgetTester tester) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'mobile model selector uses explicit initial model over global current model',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await settings.setCurrentModel('provider-0', 'provider-0-model-00');
+        await _pumpModelSelector(
+          tester,
+          settings: settings,
+          initialProviderKey: 'provider-6',
+          initialModelId: 'provider-6-model-02',
+        );
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        final stickyRect = tester.getRect(
+          find.byKey(const ValueKey('model-selector-sticky-provider')),
+        );
+        final modelText = find.text('provider-6-model-02');
+        expect(modelText, findsOneWidget);
+
+        final modelTile = find.ancestor(
+          of: modelText,
+          matching: find.byType(IosCardPress),
+        );
+        expect(modelTile, findsOneWidget);
+        final modelRect = tester.getRect(modelTile);
+
+        expect(
+          modelRect.top,
+          greaterThanOrEqualTo(stickyRect.bottom),
+          reason:
+              'Explicit initial model should drive first-open positioning, '
+              'not the global current model.',
+        );
+        expect(_providerTabSelected(tester, 'provider-6'), isTrue);
+        expect(_providerTabSelected(tester, 'provider-0'), isFalse);
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
 
   testWidgets(
     'mobile model selector keeps active provider sticky and bottom tab visible',

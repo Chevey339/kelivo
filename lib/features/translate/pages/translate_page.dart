@@ -71,7 +71,11 @@ class _TranslatePageState extends State<TranslatePage> {
 
   Future<void> _pickModel() async {
     if (_loading) return;
-    final sel = await showModelSelector(context);
+    final sel = await showModelSelector(
+      context,
+      initialProviderKey: _providerKey,
+      initialModelId: _modelId,
+    );
     if (!mounted) return;
     if (sel != null) {
       setState(() {

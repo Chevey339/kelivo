@@ -121,7 +121,11 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   Future<void> _pickModel() async {
     if (_translating) return; // avoid switching mid-stream
     final settings = context.read<SettingsProvider>();
-    final sel = await showModelSelector(context);
+    final sel = await showModelSelector(
+      context,
+      initialProviderKey: _modelProviderKey,
+      initialModelId: _modelId,
+    );
     if (!mounted) return;
     if (sel == null) return;
 
