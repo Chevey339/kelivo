@@ -683,9 +683,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                                   ),
                               itemBuilder: (ctx, i) {
                                 final opt = filtered[i];
+                                final cfg = settings.getProviderConfig(
+                                  widget.keyName,
+                                );
                                 final selected =
-                                    _cfg.avatarType == 'icon' &&
-                                    _cfg.avatarValue == opt.asset;
+                                    cfg.avatarType == 'icon' &&
+                                    cfg.avatarValue == opt.asset;
                                 final isSvg = opt.asset.endsWith('.svg');
                                 final needsMono =
                                     isDark &&
