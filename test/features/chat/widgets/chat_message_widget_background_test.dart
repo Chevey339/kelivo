@@ -657,6 +657,81 @@ void main() {
       );
     });
 
+    testWidgets('two-line tool timeline keeps connector gap around icon', (
+      tester,
+    ) async {
+      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      const query =
+          'Kelivo Flutter chat message thinking tool timeline connector wraps';
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: SizedBox(
+            width: 320,
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: '',
+                conversationId: 'conversation-tool-timeline-wrap',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              reasoningSegments: const [
+                ReasoningSegment(
+                  text: '先确认问题',
+                  expanded: false,
+                  loading: false,
+                  toolStartIndex: 0,
+                ),
+                ReasoningSegment(
+                  text: '继续分析',
+                  expanded: false,
+                  loading: false,
+                  toolStartIndex: 1,
+                ),
+              ],
+              toolParts: const [
+                ToolUIPart(
+                  id: 'tool-wrap',
+                  toolName: 'search_web',
+                  arguments: {'query': query},
+                  content: '搜索结果',
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final label = find.text('Web Search: $query');
+      expect(label, findsOneWidget);
+      expect(tester.getSize(label).height, greaterThan(20));
+
+      final iconRect = tester.getRect(
+        find.byWidgetPredicate(
+          (widget) => widget is Icon && widget.icon == Lucide.Earth,
+        ),
+      );
+      final topLineRect = tester.getRect(
+        find.byKey(const ValueKey('chatMessageTimelineHeaderTopLine')).first,
+      );
+      final bottomLineRect = tester.getRect(
+        find.byKey(const ValueKey('chatMessageTimelineHeaderBottomLine')).last,
+      );
+
+      final topGap = iconRect.top - topLineRect.bottom;
+      final bottomGap = bottomLineRect.top - iconRect.bottom;
+      expect(topGap, greaterThanOrEqualTo(3));
+      expect(topGap, lessThanOrEqualTo(4));
+      expect(bottomGap, greaterThanOrEqualTo(3));
+      expect(bottomGap, lessThanOrEqualTo(4));
+      expect(topGap, closeTo(bottomGap, 0.1));
+      expect(topLineRect.height, closeTo(bottomLineRect.height, 0.1));
+    });
+
     testWidgets('text to speech replay button speaks the tool text', (
       tester,
     ) async {

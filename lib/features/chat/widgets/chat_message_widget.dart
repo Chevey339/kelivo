@@ -3396,9 +3396,6 @@ const double _timelineIconColumnWidth = 24;
 const double _timelineGap = 8;
 const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
-const double _timelineTopLineEnd = _timelineStepPaddingV - _timelineLineGap;
-const double _timelineBottomLineStart =
-    _timelineStepPaddingV + _timelineIconSize + _timelineLineGap;
 
 class _ChainOfThoughtCard extends StatefulWidget {
   const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
@@ -3549,14 +3546,14 @@ class _TimelineStepShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = _chatSurfaceForegroundPalette(context);
-    final header = Padding(
+    final headerContent = Padding(
       padding: const EdgeInsets.symmetric(vertical: _timelineStepPaddingV),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          SizedBox(
+          const SizedBox(
             width: _timelineIconColumnWidth,
-            child: Center(child: icon),
+            height: _timelineIconSize,
           ),
           const SizedBox(width: _timelineGap),
           Expanded(child: label),
@@ -3566,34 +3563,49 @@ class _TimelineStepShell extends StatelessWidget {
       ),
     );
 
-    return Stack(
-      clipBehavior: Clip.none,
+    final header = Stack(
       children: [
-        if (!isFirst)
-          Positioned(
-            left: _timelineLineX,
-            top: 0,
-            height: _timelineTopLineEnd,
-            child: Container(width: 1, color: fg.divider),
+        headerContent,
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: _timelineIconColumnWidth,
+          child: _TimelineIconColumn(
+            icon: icon,
+            isFirst: isFirst,
+            isLast: isLast,
+            lineColor: fg.divider,
           ),
-        if (!isLast)
-          Positioned(
-            left: _timelineLineX,
-            top: _timelineBottomLineStart,
-            bottom: 0,
-            child: Container(width: 1, color: fg.divider),
-          ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        IosCardPress(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          baseColor: Colors.transparent,
+          pressedScale: 1,
+          padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+          child: header,
+        ),
+        Stack(
+          clipBehavior: Clip.none,
           children: [
-            IosCardPress(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              baseColor: Colors.transparent,
-              pressedScale: 1,
-              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-              child: header,
-            ),
+            if (!isLast)
+              Positioned(
+                left: _timelineLineX,
+                top: 0,
+                bottom: 0,
+                child: SizedBox(
+                  key: const ValueKey('chatMessageTimelineContentLine'),
+                  width: 1,
+                  child: ColoredBox(color: fg.divider),
+                ),
+              ),
             AnimatedSize(
               duration: const Duration(milliseconds: 300),
               curve: const Cubic(0.2, 0.8, 0.2, 1),
@@ -3610,6 +3622,60 @@ class _TimelineStepShell extends StatelessWidget {
                   : const SizedBox.shrink(),
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TimelineIconColumn extends StatelessWidget {
+  const _TimelineIconColumn({
+    required this.icon,
+    required this.isFirst,
+    required this.isLast,
+    required this.lineColor,
+  });
+
+  final Widget icon;
+  final bool isFirst;
+  final bool isLast;
+  final Color lineColor;
+
+  Widget _lineSegment({required bool visible, required Key key}) {
+    if (!visible) return const Expanded(child: SizedBox.expand());
+    return Expanded(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            key: key,
+            width: 1,
+            child: ColoredBox(color: lineColor),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _lineSegment(
+          visible: !isFirst,
+          key: const ValueKey('chatMessageTimelineHeaderTopLine'),
+        ),
+        const SizedBox(height: _timelineLineGap),
+        SizedBox(
+          width: _timelineIconColumnWidth,
+          height: _timelineIconSize,
+          child: Center(child: icon),
+        ),
+        const SizedBox(height: _timelineLineGap),
+        _lineSegment(
+          visible: !isLast,
+          key: const ValueKey('chatMessageTimelineHeaderBottomLine'),
         ),
       ],
     );
