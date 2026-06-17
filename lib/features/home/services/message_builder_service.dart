@@ -505,6 +505,18 @@ class MessageBuilderService {
     return buf.toString();
   }
 
+  /// Placeholders whose value changes within a day (minute/hour precision).
+  ///
+  /// Resolving these into the system prompt makes the cached system prefix
+  /// change every turn, which defeats provider prompt caching (e.g. Anthropic
+  /// applies `cache_control` over the top-level `system` block). The current
+  /// time is instead delivered via the trailing user message so the cached
+  /// prefix stays time-invariant while the model still sees the time.
+  static const List<String> _volatileTimePlaceholders = <String>[
+    '{cur_datetime}',
+    '{cur_time}',
+  ];
+
   /// Inject system prompt into apiMessages.
   void injectSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
@@ -519,11 +531,26 @@ class MessageBuilderService {
         modelName: modelId,
         userNickname: contextProvider.read<UserProvider>().name,
       );
-      final sys = PromptTransformer.replacePlaceholders(
-        assistant.systemPrompt,
-        vars,
+      final template = assistant.systemPrompt;
+      final usesVolatileTime = _volatileTimePlaceholders.any(
+        template.contains,
       );
+      // Resolve minute/hour-precision time to the day-precision date so the
+      // cached system prefix stays stable within a day; the exact time is
+      // delivered separately via the trailing user message below.
+      final stableVars = Map<String, String>.of(vars);
+      final date = vars['{cur_date}'] ?? '';
+      for (final key in _volatileTimePlaceholders) {
+        stableVars[key] = date;
+      }
+      final sys = PromptTransformer.replacePlaceholders(template, stableVars);
       apiMessages.insert(0, {'role': 'system', 'content': sys});
+      if (usesVolatileTime) {
+        final dt = vars['{cur_datetime}'];
+        if (dt != null && dt.isNotEmpty) {
+          _appendToLastUserMessage(apiMessages, 'Current time: $dt');
+        }
+      }
     }
   }
 
@@ -538,7 +565,6 @@ class MessageBuilderService {
         final mp = contextProvider.read<MemoryProvider>();
         await mp.initialize();
         final mems = mp.getForAssistant(assistant!.id);
-        final currentHour = _formatCurrentHour(DateTime.now());
         final buf = StringBuffer();
         buf.writeln('## Memories');
         buf.writeln(
@@ -570,12 +596,16 @@ class MessageBuilderService {
 - 首次聊天时间
 - ...
 请主动调用工具记录，而不是需要用户要求。
-记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是$currentHour。
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，当前时间见对话末尾的用户消息。
 无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
 相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
 你可以在和用户闲聊的时候暗示用户你能记住东西。
 ''');
         _appendToSystemMessage(apiMessages, buf.toString());
+        // The current time is volatile, so keep it out of the cached system
+        // prefix and deliver it after the cache breakpoint instead.
+        final currentHour = _formatCurrentHour(DateTime.now());
+        _appendToLastUserMessage(apiMessages, '当前时间是$currentHour。');
       }
       if (assistant?.enableRecentChatsReference == true) {
         final chats = chatService.getAllConversations();
@@ -924,6 +954,27 @@ class MessageBuilderService {
     } else {
       apiMessages.insert(0, {'role': 'system', 'content': content});
     }
+  }
+
+  /// Append content to the trailing user message (or create one if missing).
+  ///
+  /// Used for volatile, per-turn information (such as the current time) so it
+  /// sits after the cached system prefix and does not invalidate prompt caching.
+  void _appendToLastUserMessage(
+    List<Map<String, dynamic>> apiMessages,
+    String content,
+  ) {
+    if (content.isEmpty) return;
+    for (int i = apiMessages.length - 1; i >= 0; i--) {
+      if ((apiMessages[i]['role'] ?? '').toString() == 'user') {
+        final existing = (apiMessages[i]['content'] ?? '').toString();
+        apiMessages[i]['content'] = existing.isEmpty
+            ? content
+            : '$existing\n\n$content';
+        return;
+      }
+    }
+    apiMessages.add({'role': 'user', 'content': content});
   }
 
   /// Apply context message limit based on assistant settings.
