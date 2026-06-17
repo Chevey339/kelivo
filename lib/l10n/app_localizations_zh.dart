@@ -4814,6 +4814,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '删除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '删除检测失败的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '确定删除检测失败的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return '已删除 $count 个模型';
   }
@@ -10094,6 +10105,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '删除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '删除检测失败的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '确定删除检测失败的 $count 个模型吗？此操作不可撤回。';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return '已删除 $count 个模型';
   }
@@ -15371,6 +15393,17 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String providerDetailPageDeleteSelectedModelsConfirm(int count) {
     return '確定刪除選中的 $count 個模型嗎？此操作不可撤回。';
+  }
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton => '刪除不可用';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip => '刪除檢測失敗的模型';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return '確定刪除檢測失敗的 $count 個模型嗎？此操作不可撤回。';
   }
 
   @override

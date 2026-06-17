@@ -1719,6 +1719,16 @@
       }
     }
   },
+  "providerDetailPageDeleteFailedDetectedModelsButton": "删除不可用",
+  "providerDetailPageDeleteFailedDetectedModelsTooltip": "删除检测失败的模型",
+  "providerDetailPageDeleteFailedDetectedModelsConfirm": "确定删除检测失败的 {count} 个模型吗？此操作不可撤回。",
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageSelectedModelsDeletedSnackbar": "已删除 {count} 个模型",
   "@providerDetailPageSelectedModelsDeletedSnackbar": {
     "placeholders": {

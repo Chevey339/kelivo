@@ -130,4 +130,21 @@ void main() {
       await tester.pumpAndSettle();
     }
   });
+
+  testWidgets('model selection toolbar shows tooltip on long press', (
+    tester,
+  ) async {
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await _pumpSelectedToolbar(tester, width: 320);
+
+    expect(find.text('使用流式'), findsNothing);
+
+    await tester.longPress(find.byIcon(Lucide.SquareEqual));
+    await tester.pumpAndSettle();
+
+    expect(find.text('使用流式'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

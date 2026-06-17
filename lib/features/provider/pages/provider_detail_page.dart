@@ -1028,6 +1028,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final models = cfg.models;
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
+    final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
     return Stack(
       children: [
         if (models.isEmpty)
@@ -1296,6 +1297,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               l10n: l10n,
               cs: cs,
               allSelected: allSelected,
+              hasFailedDetectedModels: hasFailedDetectedModels,
             ),
           )
         else
@@ -2097,6 +2099,17 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     );
   }
 
+  Widget _buildToolbarTooltip({
+    required String message,
+    required Widget child,
+  }) {
+    return Tooltip(
+      message: message,
+      triggerMode: TooltipTriggerMode.longPress,
+      child: child,
+    );
+  }
+
   Widget _buildActionToolbarButton({
     required String label,
     required IconData icon,
@@ -2108,56 +2121,59 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     bool destructive = false,
   }) {
     final fg = destructive ? colorScheme.error : colorScheme.primary;
-    return Semantics(
-      button: true,
-      label: label,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: onTap,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: destructive
-                  ? colorScheme.error.withValues(alpha: 0.1)
-                  : (outlined
-                        ? null
-                        : colorScheme.primary.withValues(alpha: 0.12)),
-              borderRadius: BorderRadius.circular(999),
-              border: outlined
-                  ? Border.all(
-                      color: colorScheme.primary.withValues(alpha: 0.35),
-                    )
-                  : null,
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: destructive ? 18 : 20, color: fg),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: fg,
-                        fontSize: 14,
-                        fontWeight: outlined
-                            ? AppFontWeights.semibold
-                            : AppFontWeights.medium,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: onTap,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: destructive
+                    ? colorScheme.error.withValues(alpha: 0.1)
+                    : (outlined
+                          ? null
+                          : colorScheme.primary.withValues(alpha: 0.12)),
+                borderRadius: BorderRadius.circular(999),
+                border: outlined
+                    ? Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.35),
+                      )
+                    : null,
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: destructive ? 18 : 20, color: fg),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: fg,
+                          fontSize: 14,
+                          fontWeight: outlined
+                              ? AppFontWeights.semibold
+                              : AppFontWeights.medium,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2166,6 +2182,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required AppLocalizations l10n,
     required ColorScheme cs,
     required bool allSelected,
+    required bool hasFailedDetectedModels,
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -2196,7 +2213,10 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         final detectLabel = _isDetecting
             ? l10n.providerDetailPageBatchDetecting
             : l10n.providerDetailPageBatchDetectButton;
+        final deleteFailedLabel =
+            l10n.providerDetailPageDeleteFailedDetectedModelsButton;
         final deleteDisabled = _selectedModels.isEmpty || _isDetecting;
+        final deleteFailedDisabled = !hasFailedDetectedModels || _isDetecting;
         final buttonTextStyle = DefaultTextStyle.of(context).style.merge(
           TextStyle(fontSize: 14, fontWeight: AppFontWeights.semibold),
         );
@@ -2254,6 +2274,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 showLabel: showDetectLabel,
                 padding: showDetectLabel ? textButtonPadding : iconOnlyPadding,
               ) +
+              (hasFailedDetectedModels
+                  ? itemGap +
+                        buttonWidth(
+                          label: deleteFailedLabel,
+                          showLabel: false,
+                          padding: iconOnlyPadding,
+                        )
+                  : 0) +
               itemGap +
               buttonWidth(
                 label: l10n.providerDetailPageDeleteSelectedModelsButton,
@@ -2308,6 +2336,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               ),
               SizedBox(width: itemGap),
               _buildSelectionToolbarStreamButton(
+                label: l10n.providerDetailPageUseStreamingLabel,
                 padding: iconButtonPadding,
                 colorScheme: cs,
               ),
@@ -2318,13 +2347,27 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                 padding: showDetectLabel ? textButtonPadding : iconOnlyPadding,
                 colorScheme: cs,
               ),
+              if (hasFailedDetectedModels) ...[
+                SizedBox(width: itemGap),
+                _buildSelectionToolbarDestructiveButton(
+                  label: deleteFailedLabel,
+                  icon: Lucide.CircleX,
+                  showLabel: false,
+                  padding: iconOnlyPadding,
+                  disabled: deleteFailedDisabled,
+                  colorScheme: cs,
+                  onTap: _confirmDeleteFailedDetectedModels,
+                ),
+              ],
               SizedBox(width: itemGap),
-              _buildSelectionToolbarDeleteButton(
-                l10n: l10n,
+              _buildSelectionToolbarDestructiveButton(
+                label: l10n.providerDetailPageDeleteSelectedModelsButton,
+                icon: Lucide.Trash2,
                 showLabel: showDeleteLabel,
                 padding: iconOnlyPadding,
                 disabled: deleteDisabled,
                 colorScheme: cs,
+                onTap: _confirmDeleteSelectedModels,
               ),
             ],
           ),
@@ -2341,112 +2384,126 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     required ColorScheme colorScheme,
     required bool allSelected,
   }) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: () {
-          if (allSelected) {
-            setState(() {
-              _selectedModels.clear();
-            });
-          } else {
-            _selectAll();
-          }
-        },
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: colorScheme.onSurface.withValues(alpha: 0.2),
-              ),
-              color: pressed
-                  ? colorScheme.onSurface.withValues(alpha: 0.06)
-                  : null,
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  transitionBuilder: (child, anim) =>
-                      ScaleTransition(scale: anim, child: child),
-                  child: Icon(
-                    icon,
-                    key: ValueKey(allSelected),
-                    size: 20,
-                    color: colorScheme.onSurface,
-                  ),
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: () {
+            if (allSelected) {
+              setState(() {
+                _selectedModels.clear();
+              });
+            } else {
+              _selectAll();
+            }
+          },
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.onSurface.withValues(alpha: 0.2),
                 ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
-                      ),
+                color: pressed
+                    ? colorScheme.onSurface.withValues(alpha: 0.06)
+                    : null,
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
+                    child: Icon(
+                      icon,
+                      key: ValueKey(allSelected),
+                      size: 20,
+                      color: colorScheme.onSurface,
                     ),
                   ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildSelectionToolbarStreamButton({
+    required String label,
     required EdgeInsetsGeometry padding,
     required ColorScheme colorScheme,
   }) {
-    return _TactileRow(
-      pressedScale: 0.97,
-      haptics: false,
-      onTap: () => setState(() => _detectUseStream = !_detectUseStream),
-      builder: (pressed) {
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-          padding: padding,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: colorScheme.onSurface.withValues(alpha: 0.2),
-            ),
-            color: pressed
-                ? colorScheme.onSurface.withValues(alpha: 0.06)
-                : (_detectUseStream
-                      ? colorScheme.onSurface.withValues(alpha: 0.08)
-                      : Colors.transparent),
-          ),
-          child: Center(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 160),
-              transitionBuilder: (child, anim) =>
-                  ScaleTransition(scale: anim, child: child),
-              child: Icon(
-                _detectUseStream ? Lucide.AudioWaveform : Lucide.SquareEqual,
-                key: ValueKey(_detectUseStream),
-                size: 18,
-                color: colorScheme.onSurface,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        toggled: _detectUseStream,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: () => setState(() => _detectUseStream = !_detectUseStream),
+          builder: (pressed) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              padding: padding,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.onSurface.withValues(alpha: 0.2),
+                ),
+                color: pressed
+                    ? colorScheme.onSurface.withValues(alpha: 0.06)
+                    : (_detectUseStream
+                          ? colorScheme.onSurface.withValues(alpha: 0.08)
+                          : Colors.transparent),
               ),
-            ),
-          ),
-        );
-      },
+              child: Center(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  transitionBuilder: (child, anim) =>
+                      ScaleTransition(scale: anim, child: child),
+                  child: Icon(
+                    _detectUseStream
+                        ? Lucide.AudioWaveform
+                        : Lucide.SquareEqual,
+                    key: ValueKey(_detectUseStream),
+                    size: 18,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -2460,118 +2517,125 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final label = _isDetecting
         ? l10n.providerDetailPageBatchDetecting
         : l10n.providerDetailPageBatchDetectButton;
-    return Semantics(
-      button: true,
-      label: label,
-      enabled: !disabled,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: disabled ? null : _startDetection,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? colorScheme.onSurface.withValues(alpha: 0.1)
-                  : colorScheme.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
-                  size: 20,
-                  color: disabled
-                      ? colorScheme.onSurface.withValues(alpha: 0.5)
-                      : colorScheme.primary,
-                ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: disabled
-                            ? colorScheme.onSurface.withValues(alpha: 0.5)
-                            : colorScheme.primary,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        enabled: !disabled,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: disabled ? null : _startDetection,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? colorScheme.onSurface.withValues(alpha: 0.1)
+                    : colorScheme.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isDetecting ? Lucide.Loader : Lucide.HeartPulse,
+                    size: 20,
+                    color: disabled
+                        ? colorScheme.onSurface.withValues(alpha: 0.5)
+                        : colorScheme.primary,
+                  ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: disabled
+                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              : colorScheme.primary,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildSelectionToolbarDeleteButton({
-    required AppLocalizations l10n,
+  Widget _buildSelectionToolbarDestructiveButton({
+    required String label,
+    required IconData icon,
     required bool showLabel,
     required EdgeInsetsGeometry padding,
     required bool disabled,
     required ColorScheme colorScheme,
+    required VoidCallback onTap,
   }) {
-    final label = l10n.providerDetailPageDeleteSelectedModelsButton;
-    return Semantics(
-      button: true,
-      label: label,
-      enabled: !disabled,
-      child: _TactileRow(
-        pressedScale: 0.97,
-        haptics: false,
-        onTap: disabled ? null : _confirmDeleteSelectedModels,
-        builder: (pressed) {
-          return Container(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            decoration: BoxDecoration(
-              color: disabled
-                  ? colorScheme.onSurface.withValues(alpha: 0.1)
-                  : colorScheme.error.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            padding: padding,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Lucide.Trash2,
-                  size: 20,
-                  color: disabled
-                      ? colorScheme.onSurface.withValues(alpha: 0.5)
-                      : colorScheme.error,
-                ),
-                if (showLabel) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: disabled
-                            ? colorScheme.onSurface.withValues(alpha: 0.5)
-                            : colorScheme.error,
-                        fontSize: 14,
-                        fontWeight: AppFontWeights.semibold,
+    return _buildToolbarTooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        enabled: !disabled,
+        child: _TactileRow(
+          pressedScale: 0.97,
+          haptics: false,
+          onTap: disabled ? null : onTap,
+          builder: (pressed) {
+            return Container(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? colorScheme.onSurface.withValues(alpha: 0.1)
+                    : colorScheme.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: padding,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: disabled
+                        ? colorScheme.onSurface.withValues(alpha: 0.5)
+                        : colorScheme.error,
+                  ),
+                  if (showLabel) ...[
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: disabled
+                              ? colorScheme.onSurface.withValues(alpha: 0.5)
+                              : colorScheme.error,
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -2599,6 +2663,14 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       _selectedModels.clear();
       _selectedModels.addAll(cfg.models);
     });
+  }
+
+  Set<String> _failedDetectedModels(Iterable<String> models) {
+    final currentModels = models.toSet();
+    return {
+      for (final entry in _detectionResults.entries)
+        if (!entry.value && currentModels.contains(entry.key)) entry.key,
+    };
   }
 
   Future<void> _clearAssistantSelectionsForModels(
@@ -2633,18 +2705,44 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
   Future<void> _confirmDeleteSelectedModels() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final modelsToDelete = Set<String>.from(_selectedModels);
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteSelectedModelsConfirm(modelsToDelete.length),
+    );
+  }
+
+  Future<void> _confirmDeleteFailedDetectedModels() async {
+    if (_isDetecting) return;
+    final settings = context.read<SettingsProvider>();
+    final cfg = settings.getProviderConfig(
+      widget.keyName,
+      defaultName: widget.displayName,
+    );
+    final modelsToDelete = _failedDetectedModels(cfg.models);
+    if (modelsToDelete.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteFailedDetectedModelsConfirm(
+        modelsToDelete.length,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteModels(
+    Set<String> modelsToDelete,
+    String confirmMessage,
+  ) async {
+    if (modelsToDelete.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cs.surface,
         title: Text(l10n.providerDetailPageConfirmDeleteTitle),
-        content: Text(
-          l10n.providerDetailPageDeleteSelectedModelsConfirm(
-            modelsToDelete.length,
-          ),
-        ),
+        content: Text(confirmMessage),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

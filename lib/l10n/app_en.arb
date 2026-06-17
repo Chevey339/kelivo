@@ -2062,6 +2062,16 @@
       }
     }
   },
+  "providerDetailPageDeleteFailedDetectedModelsButton": "Delete unavailable",
+  "providerDetailPageDeleteFailedDetectedModelsTooltip": "Delete models that failed detection",
+  "providerDetailPageDeleteFailedDetectedModelsConfirm": "Delete {count} model(s) that failed detection? This cannot be undone.",
+  "@providerDetailPageDeleteFailedDetectedModelsConfirm": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "providerDetailPageSelectedModelsDeletedSnackbar": "Deleted {count} model(s)",
   "@providerDetailPageSelectedModelsDeletedSnackbar": {
     "placeholders": {

@@ -1143,6 +1143,7 @@ class _DesktopProviderDetailPaneState
     final models = List<String>.from(cfg.models);
     final allSelected =
         _selectedModels.length == models.length && models.isNotEmpty;
+    final hasFailedDetectedModels = _failedDetectedModels(models).isNotEmpty;
     final filtered = _applyFilter(models, _filterCtrl.text.trim());
     final groups = _groupModels(filtered);
 
@@ -2012,6 +2013,18 @@ class _DesktopProviderDetailPaneState
                           if (_selectedModels.isEmpty) return;
                           _startDetection();
                         },
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Tooltip(
+                      message: l10n
+                          .providerDetailPageDeleteFailedDetectedModelsTooltip,
+                      child: _IconBtn(
+                        icon: lucide.Lucide.CircleX,
+                        color: !hasFailedDetectedModels || _isDetecting
+                            ? cs.onSurface.withValues(alpha: 0.4)
+                            : cs.error,
+                        onTap: _confirmDeleteFailedDetectedModels,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -4483,6 +4496,44 @@ class _DesktopProviderDetailPaneState
   Future<void> _confirmDeleteSelectedModels() async {
     if (_selectedModels.isEmpty || _isDetecting) return;
     final modelsToDelete = Set<String>.from(_selectedModels);
+    final l10n = AppLocalizations.of(context)!;
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteSelectedModelsConfirm(modelsToDelete.length),
+    );
+  }
+
+  Set<String> _failedDetectedModels(Iterable<String> models) {
+    final currentModels = models.toSet();
+    return {
+      for (final entry in _detectionResults.entries)
+        if (!entry.value && currentModels.contains(entry.key)) entry.key,
+    };
+  }
+
+  Future<void> _confirmDeleteFailedDetectedModels() async {
+    if (_isDetecting) return;
+    final sp = context.read<SettingsProvider>();
+    final cfg = sp.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.displayName,
+    );
+    final modelsToDelete = _failedDetectedModels(cfg.models);
+    if (modelsToDelete.isEmpty) return;
+    final l10n = AppLocalizations.of(context)!;
+    await _confirmDeleteModels(
+      modelsToDelete,
+      l10n.providerDetailPageDeleteFailedDetectedModelsConfirm(
+        modelsToDelete.length,
+      ),
+    );
+  }
+
+  Future<void> _confirmDeleteModels(
+    Set<String> modelsToDelete,
+    String confirmMessage,
+  ) async {
+    if (modelsToDelete.isEmpty) return;
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final ok = await showDialog<bool>(
@@ -4527,9 +4578,7 @@ class _DesktopProviderDetailPaneState
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    l10n.providerDetailPageDeleteSelectedModelsConfirm(
-                      modelsToDelete.length,
-                    ),
+                    confirmMessage,
                     style: TextStyle(
                       color: cs.onSurface.withValues(alpha: 0.85),
                     ),

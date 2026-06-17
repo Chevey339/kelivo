@@ -5012,6 +5012,19 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get providerDetailPageDeleteFailedDetectedModelsButton =>
+      'Delete unavailable';
+
+  @override
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip =>
+      'Delete models that failed detection';
+
+  @override
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count) {
+    return 'Delete $count model(s) that failed detection? This cannot be undone.';
+  }
+
+  @override
   String providerDetailPageSelectedModelsDeletedSnackbar(int count) {
     return 'Deleted $count model(s)';
   }

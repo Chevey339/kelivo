@@ -9290,6 +9290,24 @@ abstract class AppLocalizations {
   /// **'Delete {count} selected model(s)? This cannot be undone.'**
   String providerDetailPageDeleteSelectedModelsConfirm(int count);
 
+  /// No description provided for @providerDetailPageDeleteFailedDetectedModelsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete unavailable'**
+  String get providerDetailPageDeleteFailedDetectedModelsButton;
+
+  /// No description provided for @providerDetailPageDeleteFailedDetectedModelsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete models that failed detection'**
+  String get providerDetailPageDeleteFailedDetectedModelsTooltip;
+
+  /// No description provided for @providerDetailPageDeleteFailedDetectedModelsConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} model(s) that failed detection? This cannot be undone.'**
+  String providerDetailPageDeleteFailedDetectedModelsConfirm(int count);
+
   /// No description provided for @providerDetailPageSelectedModelsDeletedSnackbar.
   ///
   /// In en, this message translates to:
