@@ -82,6 +82,8 @@ class BrandAssets {
         MapEntry(RegExp(r'inclusionai'), 'ling.png'),
         MapEntry(RegExp(r'mimo|xiaomi|小米'), 'mimo.svg'),
         MapEntry(RegExp(r'codex'), 'codex.svg'),
+        MapEntry(RegExp(r'tokendance|词元跳动|\btd\b'), 'tokendance.svg'),
+        MapEntry(RegExp(r'newapi|new[\s-]?api'), 'newapi-color.svg'),
       ];
 
   static const List<BrandIconOption> selectableIcons = <BrandIconOption>[
@@ -334,6 +336,16 @@ class BrandAssets {
       label: 'Codex',
       asset: 'assets/icons/codex.svg',
     ),
+    BrandIconOption(
+      id: 'tokendance',
+      label: 'TokenDance',
+      asset: 'assets/icons/tokendance.svg',
+    ),
+    BrandIconOption(
+      id: 'newapi',
+      label: 'New API',
+      asset: 'assets/icons/newapi-color.svg',
+    ),
   ];
 
   static String? selectableAssetOrNull(String asset) {
@@ -354,7 +366,8 @@ class BrandAssets {
         asset.contains('ollama') ||
         asset.contains('github') ||
         asset.contains('codex') ||
-        asset.contains('mimo');
+        asset.contains('mimo') ||
+        asset.contains('tokendance');
   }
 
   // Build the LobeHub static SVG CDN URL from an icon name (e.g. 'openai').
