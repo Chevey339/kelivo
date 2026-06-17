@@ -733,6 +733,140 @@ Stream<String> _ensureTrailingNewline(Stream<String> source) async* {
   yield '\n';
 }
 
+class _OpenAIProviderInfo {
+  final String host;
+  final String providerId;
+  final String upstreamModelId;
+
+  const _OpenAIProviderInfo({
+    required this.host,
+    required this.providerId,
+    required this.upstreamModelId,
+  });
+
+  bool get isZhipu => _isZhipuLikeProvider(
+    providerId: providerId,
+    host: host,
+    upstreamModelId: upstreamModelId,
+  );
+  bool get isMimo =>
+      host.contains('xiaomimimo') ||
+      upstreamModelId.toLowerCase().startsWith('mimo-') ||
+      upstreamModelId.toLowerCase().contains('/mimo-');
+  bool get isSiliconFlow =>
+      providerId.contains('siliconflow') || host.contains('siliconflow');
+  bool get isAzureOpenAI => host.contains('openai.azure.com');
+  bool get isOpenRouter => host.contains('openrouter.ai');
+  bool get isDeepSeek =>
+      host.contains('deepseek') ||
+      upstreamModelId.toLowerCase().contains('deepseek');
+  bool get isDashScope => host.contains('dashscope') || host.contains('aliyun');
+  bool get isVolc =>
+      host.contains('ark.cn-beijing.volces.com') ||
+      host.contains('volc') ||
+      host.contains('ark');
+  bool get isIntern =>
+      host.contains('intern-ai') ||
+      host.contains('intern') ||
+      host.contains('chat.intern-ai.org.cn');
+  bool get isKimiThinkingModel =>
+      upstreamModelId.toLowerCase().contains('kimi-k2-thinking') ||
+      upstreamModelId.toLowerCase().contains('kimi-k2.5') ||
+      upstreamModelId.toLowerCase().contains('kimi-k2.6') ||
+      upstreamModelId.toLowerCase().contains('kimi-k2.7');
+
+  bool get needsReasoningEcho =>
+      isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+  bool get preserveReasoningDetails => isOpenRouter;
+  String get completionTokensKey =>
+      (isAzureOpenAI || isMimo) ? 'max_completion_tokens' : 'max_tokens';
+}
+
+void _applyVendorReasoningKnobs(
+  Map<String, dynamic> body, {
+  required _OpenAIProviderInfo info,
+  required bool isReasoning,
+  int? thinkingBudget,
+}) {
+  final off = _isOff(thinkingBudget);
+  if (info.isOpenRouter) {
+    if (isReasoning) {
+      if (off) {
+        body['reasoning'] = {'enabled': false};
+      } else {
+        final obj = <String, dynamic>{'enabled': true};
+        if (thinkingBudget != null && thinkingBudget > 0) {
+          obj['max_tokens'] = thinkingBudget;
+        }
+        body['reasoning'] = obj;
+      }
+      body.remove('reasoning_effort');
+    } else {
+      body.remove('reasoning');
+      body.remove('reasoning_effort');
+    }
+  } else if (info.isDashScope) {
+    if (isReasoning) {
+      body['enable_thinking'] = !off;
+      if (!off && thinkingBudget != null && thinkingBudget > 0) {
+        body['thinking_budget'] = thinkingBudget;
+      } else {
+        body.remove('thinking_budget');
+      }
+    } else {
+      body.remove('enable_thinking');
+      body.remove('thinking_budget');
+    }
+    body.remove('reasoning_effort');
+  } else if (info.isZhipu || info.isMimo) {
+    if (isReasoning) {
+      body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+    } else {
+      body.remove('thinking');
+    }
+    body.remove('reasoning_effort');
+  } else if (info.isVolc) {
+    if (isReasoning) {
+      body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+    } else {
+      body.remove('thinking');
+    }
+    body.remove('reasoning_effort');
+  } else if (info.isIntern) {
+    if (isReasoning) {
+      body['thinking_mode'] = !off;
+    } else {
+      body.remove('thinking_mode');
+    }
+    body.remove('reasoning_effort');
+  } else if (info.isSiliconFlow) {
+    if (isReasoning) {
+      if (off) {
+        body['enable_thinking'] = false;
+        body.remove('thinking_budget');
+      } else {
+        body.remove('enable_thinking');
+        if (thinkingBudget != null && thinkingBudget > 0) {
+          body['thinking_budget'] = thinkingBudget;
+        } else {
+          body.remove('thinking_budget');
+        }
+      }
+    } else {
+      body.remove('enable_thinking');
+      body.remove('thinking_budget');
+    }
+    body.remove('reasoning_effort');
+  } else if (info.isDeepSeek) {
+    if (isReasoning) {
+      body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
+    } else {
+      body.remove('thinking');
+      body.remove('reasoning_effort');
+    }
+  }
+}
+
 Stream<ChatStreamChunk> _sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
@@ -758,40 +892,20 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
 
   final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
-  final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
-  final providerId = config.id.toLowerCase();
-  final modelLower = upstreamModelId.toLowerCase();
-  final bool isAzureOpenAI = host.contains('openai.azure.com');
-  final bool isMimoHost = host.contains('xiaomimimo');
-  final bool isMimoModel =
-      modelLower.startsWith('mimo-') || modelLower.contains('/mimo-');
-  final bool isMimo = isMimoHost || isMimoModel;
-  final bool isZhipu = _isZhipuLikeProvider(
-    providerId: providerId,
-    host: host,
+  final info = _OpenAIProviderInfo(
+    host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+    providerId: config.id.toLowerCase(),
     upstreamModelId: upstreamModelId,
   );
-  final bool isSiliconFlow =
-      providerId.contains('siliconflow') || host.contains('siliconflow');
   final bool useLongCatOmniPayload = _shouldUseLongCatOmniPayload(
     config,
     upstreamModelId,
   );
-  final bool needsReasoningEcho =
-      (host.contains('deepseek') ||
-          modelLower.contains('deepseek') ||
-          isMimo ||
-          isZhipu ||
-          _isKimiThinkingModel(upstreamModelId)) &&
-      isReasoning;
-  // OpenRouter reasoning models require preserving `reasoning_details` across tool-calling turns.
+  final bool needsReasoningEcho = info.needsReasoningEcho && isReasoning;
   final bool preserveReasoningDetails =
-      host.contains('openrouter.ai') && isReasoning;
-  final String completionTokensKey = (isAzureOpenAI || isMimo)
-      ? 'max_completion_tokens'
-      : 'max_tokens';
+      info.preserveReasoningDetails && isReasoning;
   void setMaxTokens(Map<String, dynamic> map) {
-    if (maxTokens != null) map[completionTokensKey] = maxTokens;
+    if (maxTokens != null) map[info.completionTokensKey] = maxTokens;
   }
 
   Map<String, dynamic> body;
@@ -1186,94 +1300,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 
   // Vendor-specific reasoning knobs for chat-completions compatible hosts
   if (config.useResponseApi != true) {
-    final off = _isOff(thinkingBudget);
-    if (host.contains('openrouter.ai')) {
-      if (isReasoning) {
-        // OpenRouter uses `reasoning.enabled/max_tokens`
-        if (off) {
-          body['reasoning'] = {'enabled': false};
-        } else {
-          final obj = <String, dynamic>{'enabled': true};
-          if (thinkingBudget != null && thinkingBudget > 0) {
-            obj['max_tokens'] = thinkingBudget;
-          }
-          body['reasoning'] = obj;
-        }
-        body.remove('reasoning_effort');
-      } else {
-        body.remove('reasoning');
-        body.remove('reasoning_effort');
-      }
-    } else if (host.contains('dashscope') || host.contains('aliyun')) {
-      // Aliyun DashScope: enable_thinking + thinking_budget
-      if (isReasoning) {
-        body['enable_thinking'] = !off;
-        if (!off && thinkingBudget != null && thinkingBudget > 0) {
-          body['thinking_budget'] = thinkingBudget;
-        } else {
-          body.remove('thinking_budget');
-        }
-      } else {
-        body.remove('enable_thinking');
-        body.remove('thinking_budget');
-      }
-      body.remove('reasoning_effort');
-    } else if (isZhipu || isMimo) {
-      // Zhipu (BigModel) / Xiaomi MiMo: thinking.type enabled/disabled
-      if (isReasoning) {
-        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-      } else {
-        body.remove('thinking');
-      }
-      body.remove('reasoning_effort');
-    } else if (host.contains('ark.cn-beijing.volces.com') ||
-        host.contains('volc') ||
-        host.contains('ark')) {
-      // Volc Ark: thinking: { type: enabled|disabled }
-      if (isReasoning) {
-        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-      } else {
-        body.remove('thinking');
-      }
-      body.remove('reasoning_effort');
-    } else if (host.contains('intern-ai') ||
-        host.contains('intern') ||
-        host.contains('chat.intern-ai.org.cn')) {
-      // InternLM (InternAI): thinking_mode boolean switch
-      if (isReasoning) {
-        body['thinking_mode'] = !off;
-      } else {
-        body.remove('thinking_mode');
-      }
-      body.remove('reasoning_effort');
-    } else if (isSiliconFlow) {
-      // SiliconFlow: OFF -> enable_thinking: false; ON -> pass thinking_budget when provided
-      if (isReasoning) {
-        if (off) {
-          body['enable_thinking'] = false;
-          body.remove('thinking_budget');
-        } else {
-          body.remove('enable_thinking');
-          if (thinkingBudget != null && thinkingBudget > 0) {
-            body['thinking_budget'] = thinkingBudget;
-          } else {
-            body.remove('thinking_budget');
-          }
-        }
-      } else {
-        body.remove('enable_thinking');
-        body.remove('thinking_budget');
-      }
-      body.remove('reasoning_effort');
-    } else if (host.contains('deepseek') ||
-        upstreamModelId.toLowerCase().contains('deepseek')) {
-      if (isReasoning) {
-        body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-      } else {
-        body.remove('thinking');
-        body.remove('reasoning_effort');
-      }
-    } else if (_isKimiThinkingModel(upstreamModelId)) {
+    _applyVendorReasoningKnobs(
+      body,
+      info: info,
+      isReasoning: isReasoning,
+      thinkingBudget: thinkingBudget,
+    );
+    if (info.isKimiThinkingModel) {
       _normalizeMoonshotKimiChatBody(
         body,
         upstreamModelId: upstreamModelId,
@@ -1299,7 +1332,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     body,
     stream: stream,
     config: config,
-    host: host,
+    host: info.host,
     upstreamModelId: upstreamModelId,
   );
   _applyCompatibleBuiltInSearch(
@@ -1814,89 +1847,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   };
             setMaxTokens(body2);
 
-            // Apply the same vendor-specific reasoning settings as the original request
-            final off = _isOff(thinkingBudget);
-            if (host.contains('openrouter.ai')) {
-              if (isReasoning) {
-                if (off) {
-                  body2['reasoning'] = {'enabled': false};
-                } else {
-                  final obj = <String, dynamic>{'enabled': true};
-                  if (thinkingBudget != null && thinkingBudget > 0) {
-                    obj['max_tokens'] = thinkingBudget;
-                  }
-                  body2['reasoning'] = obj;
-                }
-                body2.remove('reasoning_effort');
-              } else {
-                body2.remove('reasoning');
-                body2.remove('reasoning_effort');
-              }
-            } else if (host.contains('dashscope') || host.contains('aliyun')) {
-              if (isReasoning) {
-                body2['enable_thinking'] = !off;
-                if (!off && thinkingBudget != null && thinkingBudget > 0) {
-                  body2['thinking_budget'] = thinkingBudget;
-                } else {
-                  body2.remove('thinking_budget');
-                }
-              } else {
-                body2.remove('enable_thinking');
-                body2.remove('thinking_budget');
-              }
-              body2.remove('reasoning_effort');
-            } else if (isZhipu || isMimo) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('ark.cn-beijing.volces.com') ||
-                host.contains('volc') ||
-                host.contains('ark')) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('intern-ai') ||
-                host.contains('intern') ||
-                host.contains('chat.intern-ai.org.cn')) {
-              if (isReasoning) {
-                body2['thinking_mode'] = !off;
-              } else {
-                body2.remove('thinking_mode');
-              }
-              body2.remove('reasoning_effort');
-            } else if (isSiliconFlow) {
-              if (isReasoning) {
-                if (off) {
-                  body2['enable_thinking'] = false;
-                  body2.remove('thinking_budget');
-                } else {
-                  body2.remove('enable_thinking');
-                  if (thinkingBudget != null && thinkingBudget > 0) {
-                    body2['thinking_budget'] = thinkingBudget;
-                  } else {
-                    body2.remove('thinking_budget');
-                  }
-                }
-              } else {
-                body2.remove('enable_thinking');
-                body2.remove('thinking_budget');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('deepseek') ||
-                upstreamModelId.toLowerCase().contains('deepseek')) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-                body2.remove('reasoning_effort');
-              }
-            }
+            _applyVendorReasoningKnobs(
+              body2,
+              info: info,
+              isReasoning: isReasoning,
+              thinkingBudget: thinkingBudget,
+            );
 
             // Ask for usage in streaming (when supported)
             _applyCompatibleBuiltInSearch(
@@ -1909,7 +1865,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               body2,
               stream: true,
               config: config,
-              host: host,
+              host: info.host,
               upstreamModelId: upstreamModelId,
             );
 
@@ -3289,88 +3245,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       'tool_choice': 'auto',
                   };
             setMaxTokens(body2);
-            final off = _isOff(thinkingBudget);
-            if (host.contains('openrouter.ai')) {
-              if (isReasoning) {
-                if (off) {
-                  body2['reasoning'] = {'enabled': false};
-                } else {
-                  final obj = <String, dynamic>{'enabled': true};
-                  if (thinkingBudget != null && thinkingBudget > 0) {
-                    obj['max_tokens'] = thinkingBudget;
-                  }
-                  body2['reasoning'] = obj;
-                }
-                body2.remove('reasoning_effort');
-              } else {
-                body2.remove('reasoning');
-                body2.remove('reasoning_effort');
-              }
-            } else if (host.contains('dashscope') || host.contains('aliyun')) {
-              if (isReasoning) {
-                body2['enable_thinking'] = !off;
-                if (!off && thinkingBudget != null && thinkingBudget > 0) {
-                  body2['thinking_budget'] = thinkingBudget;
-                } else {
-                  body2.remove('thinking_budget');
-                }
-              } else {
-                body2.remove('enable_thinking');
-                body2.remove('thinking_budget');
-              }
-              body2.remove('reasoning_effort');
-            } else if (isZhipu || isMimo) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('ark.cn-beijing.volces.com') ||
-                host.contains('volc') ||
-                host.contains('ark')) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('intern-ai') ||
-                host.contains('intern') ||
-                host.contains('chat.intern-ai.org.cn')) {
-              if (isReasoning) {
-                body2['thinking_mode'] = !off;
-              } else {
-                body2.remove('thinking_mode');
-              }
-              body2.remove('reasoning_effort');
-            } else if (isSiliconFlow) {
-              if (isReasoning) {
-                if (off) {
-                  body2['enable_thinking'] = false;
-                  body2.remove('thinking_budget');
-                } else {
-                  body2.remove('enable_thinking');
-                  if (thinkingBudget != null && thinkingBudget > 0) {
-                    body2['thinking_budget'] = thinkingBudget;
-                  } else {
-                    body2.remove('thinking_budget');
-                  }
-                }
-              } else {
-                body2.remove('enable_thinking');
-                body2.remove('thinking_budget');
-              }
-              body2.remove('reasoning_effort');
-            } else if (host.contains('deepseek') ||
-                upstreamModelId.toLowerCase().contains('deepseek')) {
-              if (isReasoning) {
-                body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-              } else {
-                body2.remove('thinking');
-                body2.remove('reasoning_effort');
-              }
-            }
+            _applyVendorReasoningKnobs(
+              body2,
+              info: info,
+              isReasoning: isReasoning,
+              thinkingBudget: thinkingBudget,
+            );
             _applyCompatibleBuiltInSearch(
               body2,
               config: config,
@@ -3381,7 +3261,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               body2,
               stream: true,
               config: config,
-              host: host,
+              host: info.host,
               upstreamModelId: upstreamModelId,
             );
             if (extraBodyCfg.isNotEmpty) {
@@ -3878,84 +3758,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                           'tool_choice': 'auto',
                       };
                 setMaxTokens(body2);
-                final off = _isOff(thinkingBudget);
-                if (host.contains('openrouter.ai')) {
-                  if (isReasoning) {
-                    if (off) {
-                      body2['reasoning'] = {'enabled': false};
-                    } else {
-                      final obj = <String, dynamic>{'enabled': true};
-                      if (thinkingBudget != null && thinkingBudget > 0) {
-                        obj['max_tokens'] = thinkingBudget;
-                      }
-                      body2['reasoning'] = obj;
-                    }
-                    body2.remove('reasoning_effort');
-                  } else {
-                    body2.remove('reasoning');
-                    body2.remove('reasoning_effort');
-                  }
-                } else if (host.contains('dashscope') ||
-                    host.contains('aliyun')) {
-                  if (isReasoning) {
-                    body2['enable_thinking'] = !off;
-                    if (!off && thinkingBudget != null && thinkingBudget > 0) {
-                      body2['thinking_budget'] = thinkingBudget;
-                    } else {
-                      body2.remove('thinking_budget');
-                    }
-                  } else {
-                    body2.remove('enable_thinking');
-                    body2.remove('thinking_budget');
-                  }
-                  body2.remove('reasoning_effort');
-                } else if (host.contains('ark.cn-beijing.volces.com') ||
-                    host.contains('volc') ||
-                    host.contains('ark') ||
-                    isZhipu ||
-                    isMimo) {
-                  if (isReasoning) {
-                    body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-                  } else {
-                    body2.remove('thinking');
-                  }
-                  body2.remove('reasoning_effort');
-                } else if (host.contains('intern-ai') ||
-                    host.contains('intern') ||
-                    host.contains('chat.intern-ai.org.cn')) {
-                  if (isReasoning) {
-                    body2['thinking_mode'] = !off;
-                  } else {
-                    body2.remove('thinking_mode');
-                  }
-                  body2.remove('reasoning_effort');
-                } else if (isSiliconFlow) {
-                  if (isReasoning) {
-                    if (off) {
-                      body2['enable_thinking'] = false;
-                      body2.remove('thinking_budget');
-                    } else {
-                      body2.remove('enable_thinking');
-                      if (thinkingBudget != null && thinkingBudget > 0) {
-                        body2['thinking_budget'] = thinkingBudget;
-                      } else {
-                        body2.remove('thinking_budget');
-                      }
-                    }
-                  } else {
-                    body2.remove('enable_thinking');
-                    body2.remove('thinking_budget');
-                  }
-                  body2.remove('reasoning_effort');
-                } else if (host.contains('deepseek') ||
-                    upstreamModelId.toLowerCase().contains('deepseek')) {
-                  if (isReasoning) {
-                    body2['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-                  } else {
-                    body2.remove('thinking');
-                    body2.remove('reasoning_effort');
-                  }
-                }
+                _applyVendorReasoningKnobs(
+                  body2,
+                  info: info,
+                  isReasoning: isReasoning,
+                  thinkingBudget: thinkingBudget,
+                );
                 _applyCompatibleBuiltInSearch(
                   body2,
                   config: config,
@@ -3966,7 +3774,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   body2,
                   stream: true,
                   config: config,
-                  host: host,
+                  host: info.host,
                   upstreamModelId: upstreamModelId,
                 );
                 if (extraBodyCfg.isNotEmpty) {
@@ -4301,7 +4109,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
               }
             }
-          } else if (host.contains('openrouter.ai')) {
+          } else if (info.isOpenRouter) {
           } else {
             // final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
             // yield ChatStreamChunk(

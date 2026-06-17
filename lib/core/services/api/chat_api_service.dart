@@ -753,16 +753,9 @@ class ChatApiService {
           ModelAbility.reasoning,
         );
         final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
-        final host = Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '';
-        final providerId = config.id.toLowerCase();
-        final modelLower = upstreamModelId.toLowerCase();
-        final bool isMimo =
-            host.contains('xiaomimimo') ||
-            modelLower.startsWith('mimo-') ||
-            modelLower.contains('/mimo-');
-        final bool isZhipu = _isZhipuLikeProvider(
-          providerId: providerId,
-          host: host,
+        final info = _OpenAIProviderInfo(
+          host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
+          providerId: config.id.toLowerCase(),
           upstreamModelId: upstreamModelId,
         );
         if (config.useResponseApi == true) {
@@ -881,16 +874,13 @@ class ChatApiService {
         }
         // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
         if (config.useResponseApi != true) {
-          final off = _isOff(thinkingBudget);
-          if (isZhipu || isMimo) {
-            // Zhipu BigModel / Xiaomi MiMo: thinking: { type: enabled|disabled }
-            if (isReasoning) {
-              body['thinking'] = {'type': off ? 'disabled' : 'enabled'};
-            } else {
-              body.remove('thinking');
-            }
-            body.remove('reasoning_effort');
-          } else if (_isKimiThinkingModel(upstreamModelId)) {
+          _applyVendorReasoningKnobs(
+            body,
+            info: info,
+            isReasoning: isReasoning,
+            thinkingBudget: thinkingBudget,
+          );
+          if (info.isKimiThinkingModel) {
             _normalizeMoonshotKimiChatBody(
               body,
               upstreamModelId: upstreamModelId,
@@ -912,12 +902,6 @@ class ChatApiService {
           body,
           upstreamModelId,
           fallbackEffort: effort,
-        );
-        _normalizeMoonshotKimiChatBody(
-          body,
-          upstreamModelId: upstreamModelId,
-          isReasoning: isReasoning,
-          thinkingBudget: thinkingBudget,
         );
         final resp = await client.post(
           url,
