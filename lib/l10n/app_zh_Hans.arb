@@ -1626,6 +1626,8 @@
   "assistantEditLocalToolTextToSpeechSubtitle": "允许助手使用已配置的语音播放朗读文本。",
   "assistantEditLocalToolAskUserTitle": "询问用户",
   "assistantEditLocalToolAskUserSubtitle": "允许助手提出简短问题，并在你回答后继续生成。",
+  "assistantEditLocalToolCalculateTitle": "计算器",
+  "assistantEditLocalToolCalculateSubtitle": "计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。",
   "assistantEditMemorySwitchTitle": "记忆",
   "assistantEditMemorySwitchDescription": "允许助手主动存储并在对话间引用用户相关信息",
   "assistantEditOutlineModeTitle": "二级列表样式",
