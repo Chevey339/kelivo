@@ -142,6 +142,11 @@ class BrandAssets {
       asset: 'assets/icons/mistral-color.svg',
     ),
     BrandIconOption(
+      id: 'metaso',
+      label: 'Metaso',
+      asset: 'assets/icons/metaso-color.svg',
+    ),
+    BrandIconOption(
       id: 'meta',
       label: 'Meta',
       asset: 'assets/icons/meta-color.svg',
