@@ -4,8 +4,10 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
+import '../widgets/desktop_select_dropdown.dart';
 import '../../utils/brand_assets.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_font_weights.dart';
@@ -295,6 +297,40 @@ class DesktopDefaultModelPane extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        // Title-gen thinking budget options.
+        // Medium+ reasoning levels (16000, 32000, …) are omitted
+        // intentionally — title generation is a lightweight task that
+        // does not benefit from deep reasoning chains.
+        //
+        //  0     = off
+        // -1     = auto
+        //  1024  = light
+        //   null = follow assistant (default for forward compatibility)
+        // -999   = sentinel: opens the custom-input dialog
+        //
+        // When the current value is not in the preset list, a dynamic
+        // DesktopSelectOption is injected so the trigger label and
+        // overlay highlight both resolve correctly.
+        final tv = sp.titleThinkingBudget;
+        final isCustom =
+            tv != null && tv != 0 && tv != -1 && tv != 1024 && tv != -999;
+        final budgetOptions = <DesktopSelectOption<int?>>[
+          DesktopSelectOption(value: 0, label: l10n.reasoningBudgetSheetOff),
+          DesktopSelectOption(value: -1, label: l10n.reasoningBudgetSheetAuto),
+          DesktopSelectOption(
+            value: 1024,
+            label: l10n.reasoningBudgetSheetLight,
+          ),
+          DesktopSelectOption(
+            value: null,
+            label: l10n.titleModelThinkingBudgetFollowAssistant,
+          ),
+          DesktopSelectOption(
+            value: -999,
+            label: l10n.reasoningBudgetSheetCustomLabel,
+          ),
+          if (isCustom) DesktopSelectOption(value: tv, label: '$tv'),
+        ];
         return Dialog(
           backgroundColor: cs.surface,
           shape: RoundedRectangleBorder(
@@ -316,7 +352,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          l10n.defaultModelPagePromptLabel,
+                          l10n.titleModelThinkingBudgetDialogTitle,
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: AppFontWeights.emphasis,
@@ -329,11 +365,72 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(lucide.Lucide.Brain, size: 16, color: cs.onSurface),
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.titleModelThinkingBudgetLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: AppFontWeights.medium,
+                        ),
+                      ),
+                      const Spacer(),
+                      DesktopSelectDropdown<int?>(
+                        value: sp.titleThinkingBudget,
+                        minWidth: 160,
+                        options: budgetOptions,
+                        onSelected: (v) async {
+                          if (v == -999) {
+                            final custom =
+                                await ReasoningBudgetCustomDialog.show(
+                                  context,
+                                  initialValue: (tv != null && tv >= 1024)
+                                      ? tv
+                                      : 2048,
+                                );
+                            if (!context.mounted || custom == null) return;
+                            sp.setTitleThinkingBudget(custom);
+                          } else {
+                            sp.setTitleThinkingBudget(v);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.titleModelThinkingBudgetHint,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: cs.onSurface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.defaultModelPagePromptLabel,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   _promptEditor(
                     ctx,
                     controller: ctrl,
                     hintText: l10n.defaultModelPageTitlePromptHint,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Row(
@@ -344,6 +441,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         dense: true,
                         onTap: () async {
                           await sp.resetTitlePrompt();
+                          await sp.resetTitleThinkingBudget();
                           ctrl.text = sp.titlePrompt;
                         },
                       ),
@@ -358,14 +456,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         },
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
                   ),
                 ],
               ),

@@ -5111,6 +5111,30 @@ abstract class AppLocalizations {
   /// **'Used for summarizing conversation titles; prefer fast & cheap models'**
   String get defaultModelPageTitleModelSubtitle;
 
+  /// No description provided for @titleModelThinkingBudgetDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title Generation Settings'**
+  String get titleModelThinkingBudgetDialogTitle;
+
+  /// No description provided for @titleModelThinkingBudgetLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking Budget'**
+  String get titleModelThinkingBudgetLabel;
+
+  /// No description provided for @titleModelThinkingBudgetFollowAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow Assistant'**
+  String get titleModelThinkingBudgetFollowAssistant;
+
+  /// No description provided for @titleModelThinkingBudgetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended to turn off for most scenarios to reduce cost. Some models require thinking; if errors occur, try another option.'**
+  String get titleModelThinkingBudgetHint;
+
   /// No description provided for @defaultModelPageSummaryModelTitle.
   ///
   /// In en, this message translates to:

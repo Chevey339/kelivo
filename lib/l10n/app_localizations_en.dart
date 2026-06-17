@@ -2714,6 +2714,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Used for summarizing conversation titles; prefer fast & cheap models';
 
   @override
+  String get titleModelThinkingBudgetDialogTitle => 'Title Generation Settings';
+
+  @override
+  String get titleModelThinkingBudgetLabel => 'Thinking Budget';
+
+  @override
+  String get titleModelThinkingBudgetFollowAssistant => 'Follow Assistant';
+
+  @override
+  String get titleModelThinkingBudgetHint =>
+      'Recommended to turn off for most scenarios to reduce cost. Some models require thinking; if errors occur, try another option.';
+
+  @override
   String get defaultModelPageSummaryModelTitle => 'Summary Model';
 
   @override

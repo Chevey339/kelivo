@@ -2620,6 +2620,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get titleModelThinkingBudgetDialogTitle => '标题生成设置';
+
+  @override
+  String get titleModelThinkingBudgetLabel => '思考强度';
+
+  @override
+  String get titleModelThinkingBudgetFollowAssistant => '跟随当前助手';
+
+  @override
+  String get titleModelThinkingBudgetHint =>
+      '多数场景建议关闭以节省成本。部分模型强制开启思考，若出错换其他选项即可。';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -7911,6 +7924,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
 
   @override
+  String get titleModelThinkingBudgetDialogTitle => '标题生成设置';
+
+  @override
+  String get titleModelThinkingBudgetLabel => '思考强度';
+
+  @override
+  String get titleModelThinkingBudgetFollowAssistant => '跟随当前助手';
+
+  @override
+  String get titleModelThinkingBudgetHint =>
+      '多数场景建议关闭以节省成本。部分模型强制开启思考，若出错换其他选项即可。';
+
+  @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';
 
   @override
@@ -13199,6 +13225,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get defaultModelPageTitleModelSubtitle => '用於總結對話標題的模型，推薦使用快速且便宜的模型';
+
+  @override
+  String get titleModelThinkingBudgetDialogTitle => '標題生成設定';
+
+  @override
+  String get titleModelThinkingBudgetLabel => '思考強度';
+
+  @override
+  String get titleModelThinkingBudgetFollowAssistant => '跟隨當前助手';
+
+  @override
+  String get titleModelThinkingBudgetHint =>
+      '多數場景建議關閉以節省成本。部分模型強制開啟思考，若出錯換其他選項即可。';
 
   @override
   String get defaultModelPageSummaryModelTitle => '摘要模型';

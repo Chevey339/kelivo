@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import '../utils/ocr_model_capability.dart';
@@ -267,16 +268,36 @@ class DefaultModelPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  l10n.defaultModelPagePromptLabel,
+                  l10n.titleModelThinkingBudgetDialogTitle,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: AppFontWeights.semibold,
                   ),
                 ),
                 const SizedBox(height: 8),
+                _TitleBudgetNavRow(settings: settings, l10n: l10n, cs: cs),
+                const SizedBox(height: 4),
+                Text(
+                  l10n.titleModelThinkingBudgetHint,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: cs.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Text(
+                  l10n.defaultModelPagePromptLabel,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: controller,
-                  maxLines: 8,
+                  maxLines: 6,
                   decoration: InputDecoration(
                     hintText: l10n.defaultModelPageTitlePromptHint,
                     filled: true,
@@ -303,12 +324,21 @@ class DefaultModelPage extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.6),
+                    fontSize: 12,
+                  ),
+                ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     TextButton(
                       onPressed: () async {
                         await settings.resetTitlePrompt();
+                        await settings.resetTitleThinkingBudget();
                         controller.text = settings.titlePrompt;
                       },
                       child: Text(l10n.defaultModelPageResetDefault),
@@ -322,14 +352,6 @@ class DefaultModelPage extends StatelessWidget {
                       child: Text(l10n.defaultModelPageSave),
                     ),
                   ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.defaultModelPageTitleVars('{content}', '{locale}'),
-                  style: TextStyle(
-                    color: cs.onSurface.withValues(alpha: 0.6),
-                    fontSize: 12,
-                  ),
                 ),
               ],
             ),
@@ -1117,4 +1139,224 @@ class _TactileRowState extends State<_TactileRow> {
       child: widget.builder(_pressed),
     );
   }
+}
+
+class _TitleBudgetNavRow extends StatelessWidget {
+  const _TitleBudgetNavRow({
+    required this.settings,
+    required this.l10n,
+    required this.cs,
+  });
+
+  final SettingsProvider settings;
+  final AppLocalizations l10n;
+  final ColorScheme cs;
+
+  String _label() {
+    final v = settings.titleThinkingBudget;
+    if (v == null) return l10n.titleModelThinkingBudgetFollowAssistant;
+    switch (v) {
+      case 0:
+        return l10n.reasoningBudgetSheetOff;
+      case -1:
+        return l10n.reasoningBudgetSheetAuto;
+      case 1024:
+        return l10n.reasoningBudgetSheetLight;
+      default:
+        return '$v';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(Lucide.Brain, size: 18, color: cs.onSurface),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              l10n.titleModelThinkingBudgetLabel,
+              style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.medium),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _openPicker(context),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _label(),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.primary,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Lucide.ChevronRight, size: 14, color: cs.primary),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openPicker(BuildContext context) async {
+    final chosen = await _showTitleThinkingBudgetSheet(context);
+    // null = user dismissed the sheet without selecting → do nothing.
+    if (!context.mounted || chosen == null) return;
+    if (chosen == -9998) {
+      // -9998 is a sentinel that maps back to null ("follow assistant")
+      // so it is not conflated with sheet dismissal (also null).
+      settings.setTitleThinkingBudget(null);
+    } else if (chosen == -999) {
+      // -999 is a sentinel that opens the custom-input dialog.
+      final tv = settings.titleThinkingBudget;
+      final custom = await ReasoningBudgetCustomDialog.show(
+        context,
+        initialValue: (tv != null && tv >= 1024) ? tv : 2048,
+      );
+      if (!context.mounted || custom == null) return;
+      settings.setTitleThinkingBudget(custom);
+    } else {
+      settings.setTitleThinkingBudget(chosen);
+    }
+  }
+}
+
+Future<int?> _showTitleThinkingBudgetSheet(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final settings = context.read<SettingsProvider>();
+  final cs = Theme.of(context).colorScheme;
+  // Type parameter is <int>, not <int?>, by design:
+  //   null from showModalBottomSheet always means "dismissed".
+  //   "Follow assistant" is represented by sentinel -9998 instead,
+  //   so sheet dismissal is never conflated with a meaningful selection.
+  return showModalBottomSheet<int>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final current = settings.titleThinkingBudget;
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _titleBudgetOption(
+                ctx,
+                label: l10n.reasoningBudgetSheetOff,
+                value: 0,
+                selected: current == 0,
+                l10n: l10n,
+                cs: cs,
+              ),
+              _titleBudgetOption(
+                ctx,
+                label: l10n.reasoningBudgetSheetAuto,
+                value: -1,
+                selected: current == -1,
+                l10n: l10n,
+                cs: cs,
+              ),
+              // Title-gen thinking budget options.
+              // Medium+ reasoning levels (16000, 32000, …) are omitted —
+              // title generation is a lightweight task that does not
+              // benefit from deep reasoning, and fewer options keep the
+              // list clean.
+              //
+              //  0     = off
+              // -1     = auto
+              //  1024  = light
+              // -9998  = sentinel → maps to null in _openPicker
+              // -999   = sentinel → opens the custom-input dialog
+              _titleBudgetOption(
+                ctx,
+                label: l10n.reasoningBudgetSheetLight,
+                value: 1024,
+                selected: current == 1024,
+                l10n: l10n,
+                cs: cs,
+              ),
+              _titleBudgetOption(
+                ctx,
+                label: l10n.titleModelThinkingBudgetFollowAssistant,
+                value: -9998,
+                selected: current == null,
+                l10n: l10n,
+                cs: cs,
+              ),
+              _titleBudgetOption(
+                ctx,
+                label: l10n.reasoningBudgetSheetCustomLabel,
+                value: -999,
+                selected:
+                    current != null &&
+                    current != 0 &&
+                    current != -1 &&
+                    current != 1024,
+                l10n: l10n,
+                cs: cs,
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Widget _titleBudgetOption(
+  BuildContext context, {
+  required String label,
+  required int? value,
+  required bool selected,
+  required AppLocalizations l10n,
+  required ColorScheme cs,
+}) {
+  return GestureDetector(
+    onTap: () => Navigator.of(context).pop(value),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: selected
+            ? cs.primary.withValues(alpha: 0.12)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                color: selected ? cs.primary : cs.onSurface,
+                fontWeight: selected
+                    ? AppFontWeights.semibold
+                    : AppFontWeights.regular,
+              ),
+            ),
+          ),
+          if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
+        ],
+      ),
+    ),
+  );
 }

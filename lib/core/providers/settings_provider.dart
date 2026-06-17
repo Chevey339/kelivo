@@ -103,6 +103,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
   static const String _thinkingBudgetKey = 'thinking_budget_v1';
+  static const String _titleThinkingBudgetKey = 'title_thinking_budget_v1';
   static const String _displayShowUserAvatarKey = 'display_show_user_avatar_v1';
   static const String _displayShowModelIconKey = 'display_show_model_icon_v1';
   static const String _displayShowModelNameTimestampKey =
@@ -907,6 +908,7 @@ class SettingsProvider extends ChangeNotifier {
         : lmp;
     // load thinking budget (reasoning strength)
     _thinkingBudget = prefs.getInt(_thinkingBudgetKey);
+    _titleThinkingBudget = prefs.getInt(_titleThinkingBudgetKey);
 
     // display settings
     _showUserAvatar = prefs.getBool(_displayShowUserAvatarKey) ?? true;
@@ -3268,6 +3270,23 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     }
   }
 
+  // Title-specific thinking budget (override)
+  int? _titleThinkingBudget;
+  // null = not set, fallback to assistant/global; -1 = auto; 0 = off; >0 = budget tokens
+  int? get titleThinkingBudget => _titleThinkingBudget;
+  Future<void> setTitleThinkingBudget(int? budget) async {
+    _titleThinkingBudget = budget;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    if (budget == null) {
+      await prefs.remove(_titleThinkingBudgetKey);
+    } else {
+      await prefs.setInt(_titleThinkingBudgetKey, budget);
+    }
+  }
+
+  Future<void> resetTitleThinkingBudget() async => setTitleThinkingBudget(null);
+
   // Display settings: user avatar and model icon visibility
   bool _showUserAvatar = true;
   bool get showUserAvatar => _showUserAvatar;
@@ -4179,6 +4198,7 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._ocrPrompt = _ocrPrompt;
     copy._ocrEnabled = _ocrEnabled;
     copy._thinkingBudget = _thinkingBudget;
+    copy._titleThinkingBudget = _titleThinkingBudget;
     copy._showUserAvatar = _showUserAvatar;
     copy._showModelIcon = _showModelIcon;
     copy._showModelNameTimestamp = _showModelNameTimestamp;

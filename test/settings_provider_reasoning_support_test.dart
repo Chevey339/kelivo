@@ -158,6 +158,56 @@ void main() {
       },
     );
 
+    group('titleThinkingBudget', () {
+      test('defaults to null', () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+        await _waitForSettingsLoad();
+
+        expect(settings.titleThinkingBudget, isNull);
+      });
+
+      test('setTitleThinkingBudget persists and reads back', () async {
+        SharedPreferences.setMockInitialValues({});
+        final settings = SettingsProvider();
+        await _waitForSettingsLoad();
+
+        await settings.setTitleThinkingBudget(4096);
+        expect(settings.titleThinkingBudget, 4096);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getInt('title_thinking_budget_v1'), 4096);
+      });
+
+      test('setTitleThinkingBudget(null) resets correctly', () async {
+        SharedPreferences.setMockInitialValues({
+          'title_thinking_budget_v1': 16000,
+        });
+        final settings = SettingsProvider();
+        await _waitForSettingsLoad();
+
+        await settings.setTitleThinkingBudget(null);
+        expect(settings.titleThinkingBudget, isNull);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('title_thinking_budget_v1'), isFalse);
+      });
+
+      test('resetTitleThinkingBudget clears to null', () async {
+        SharedPreferences.setMockInitialValues({
+          'title_thinking_budget_v1': 32000,
+        });
+        final settings = SettingsProvider();
+        await _waitForSettingsLoad();
+
+        await settings.resetTitleThinkingBudget();
+        expect(settings.titleThinkingBudget, isNull);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.containsKey('title_thinking_budget_v1'), isFalse);
+      });
+    });
+
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
       SharedPreferences.setMockInitialValues({});
       final settings = SettingsProvider();

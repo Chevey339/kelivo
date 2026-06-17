@@ -658,7 +658,10 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
 
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final budget =
+        settings.titleThinkingBudget ??
+        assistant?.thinkingBudget ??
+        settings.thinkingBudget;
 
     // Content
     final msgs = chatService.getMessages(conversationId);
