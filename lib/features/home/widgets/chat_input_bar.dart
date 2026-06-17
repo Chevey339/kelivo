@@ -16,6 +16,7 @@ import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
+import '../../../core/services/image_compression_progress.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
@@ -743,6 +744,22 @@ class _ChatInputBarState extends State<ChatInputBar>
               destPath = p.join(dir.path, name);
             }
             await File(destPath).writeAsBytes(bytes, flush: true);
+            // 入库时压缩图片（替换原文件，可能改变扩展名）
+            if (mounted) {
+              final sp = context.read<SettingsProvider>();
+              if (sp.imageCompressionEnabled) {
+                final prog = ImageCompressionProgress.instance;
+                prog.start(1);
+                try {
+                  destPath = await prog.compressAndReport(
+                    destPath,
+                    quality: sp.imageCompressionQuality,
+                  );
+                } finally {
+                  prog.finishBatch();
+                }
+              }
+            }
             return destPath;
           } catch (_) {
             return null;
@@ -904,7 +921,24 @@ class _ChatInputBarState extends State<ChatInputBar>
         if (savedPath != null) {
           final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {
-            images.add(savedPath);
+            // Mirror copyPickedFiles: compress images on ingestion.
+            var finalPath = savedPath;
+            if (mounted) {
+              final sp = context.read<SettingsProvider>();
+              if (sp.imageCompressionEnabled) {
+                final prog = ImageCompressionProgress.instance;
+                prog.start(1);
+                try {
+                  finalPath = await prog.compressAndReport(
+                    savedPath,
+                    quality: sp.imageCompressionQuality,
+                  );
+                } finally {
+                  prog.finishBatch();
+                }
+              }
+            }
+            images.add(finalPath);
           } else {
             final mime = _inferMimeByExtension(savedName);
             docs.add(
@@ -1448,7 +1482,24 @@ class _ChatInputBarState extends State<ChatInputBar>
             try {
               await from.delete();
             } catch (_) {}
-            out.add(destPath);
+            // 入库时压缩图片（与 saveImageBytes 路径保持一致）
+            var finalPath = destPath;
+            if (mounted) {
+              final sp = context.read<SettingsProvider>();
+              if (sp.imageCompressionEnabled) {
+                final prog = ImageCompressionProgress.instance;
+                prog.start(1);
+                try {
+                  finalPath = await prog.compressAndReport(
+                    destPath,
+                    quality: sp.imageCompressionQuality,
+                  );
+                } finally {
+                  prog.finishBatch();
+                }
+              }
+            }
+            out.add(finalPath);
           }
         } catch (_) {
           // skip single file errors
@@ -1947,6 +1998,23 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                                 Row(
                                   children: [
+                                    _CompactIconButton(
+                                      tooltip: AppLocalizations.of(
+                                        context,
+                                      )!.displaySettingsPageEnableImageCompressionTitle,
+                                      icon: Lucide.ImageDown,
+                                      active: context
+                                          .watch<SettingsProvider>()
+                                          .imageCompressionEnabled,
+                                      onTap: () {
+                                        final sp = context
+                                            .read<SettingsProvider>();
+                                        sp.setImageCompressionEnabled(
+                                          !sp.imageCompressionEnabled,
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
                                     if (widget.showMoreButton) ...[
                                       _CompactIconButton(
                                         tooltip: AppLocalizations.of(

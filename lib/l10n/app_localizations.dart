@@ -7298,6 +7298,24 @@ abstract class AppLocalizations {
   /// **'Crop images after selecting from gallery or camera'**
   String get displaySettingsPageEnableImageCropperSubtitle;
 
+  /// Title for the image compression toggle on the display settings page
+  ///
+  /// In en, this message translates to:
+  /// **'Image Compression'**
+  String get displaySettingsPageEnableImageCompressionTitle;
+
+  /// Subtitle for the image compression toggle on the display settings page
+  ///
+  /// In en, this message translates to:
+  /// **'Compress images before saving and sending'**
+  String get displaySettingsPageEnableImageCompressionSubtitle;
+
+  /// Title for the JPEG quality slider in image compression settings
+  ///
+  /// In en, this message translates to:
+  /// **'Image quality'**
+  String get displaySettingsPageImageCompressionQualityTitle;
+
   /// No description provided for @displaySettingsPageKeepSidebarOpenOnAssistantTapTitle.
   ///
   /// In en, this message translates to:
