@@ -2529,6 +2529,9 @@ class _DesktopProviderDetailPaneState
                               );
                             },
                             child: ProviderAvatar(
+                              key: ValueKey(
+                                'desktop-provider-settings-avatar-${widget.providerKey}',
+                              ),
                               providerKey: widget.providerKey,
                               displayName: widget.displayName,
                               size: 64,
@@ -3548,72 +3551,100 @@ class _DesktopProviderDetailPaneState
     final l10n = AppLocalizations.of(context)!;
     final settings = context.read<SettingsProvider>();
     final controller = TextEditingController();
+    String value = '';
     final ok = await showDialog<bool>(
       context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.16),
       builder: (ctx) {
         final cs = Theme.of(ctx).colorScheme;
         bool valid(String s) => s.trim().isNotEmpty;
-        String value = '';
         return StatefulBuilder(
           builder: (ctx2, setLocal) {
-            return AlertDialog(
+            return Dialog(
+              key: const ValueKey('desktop-provider-lobehub-icon-dialog'),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
               ),
               backgroundColor: cs.surface,
-              title: Text(l10n.providerAvatarLobehubDialogTitle),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: TextField(
-                  controller: controller,
-                  autofocus: true,
-                  decoration: InputDecoration(
-                    hintText: l10n.providerAvatarLobehubDialogHint,
-                    filled: true,
-                    fillColor: Theme.of(ctx2).brightness == Brightness.dark
-                        ? Colors.white10
-                        : const Color(0xFFF2F3F5),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.transparent),
-                    ),
-                    enabledBorder: const OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(12)),
-                      borderSide: BorderSide(color: Colors.transparent),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: cs.primary.withValues(alpha: 0.4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: 44,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                l10n.providerAvatarLobehubDialogTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: AppFontWeights.emphasis,
+                                ),
+                              ),
+                            ),
+                            _IconBtn(
+                              icon: lucide.Lucide.X,
+                              onTap: () => Navigator.of(ctx).maybePop(false),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  onChanged: (v) => setLocal(() => value = v),
-                  onSubmitted: (_) {
-                    if (valid(value)) Navigator.of(ctx2).pop(true);
-                  },
+                    Divider(
+                      height: 1,
+                      thickness: 0.5,
+                      color: cs.outlineVariant.withValues(alpha: 0.12),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            key: const ValueKey(
+                              'desktop-provider-lobehub-icon-field',
+                            ),
+                            controller: controller,
+                            autofocus: true,
+                            style: const TextStyle(fontSize: 13),
+                            textInputAction: TextInputAction.done,
+                            decoration: _inputDecoration(ctx2).copyWith(
+                              hintText: l10n.providerAvatarLobehubDialogHint,
+                            ),
+                            onChanged: (v) => setLocal(() => value = v),
+                            onSubmitted: (_) {
+                              if (valid(value)) Navigator.of(ctx2).pop(true);
+                            },
+                          ),
+                          const SizedBox(height: 14),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: _DialogActionButton(
+                              icon: const Icon(lucide.Lucide.Check),
+                              label: l10n.sideDrawerSave,
+                              filled: true,
+                              onTap: valid(value)
+                                  ? () => Navigator.of(ctx2).pop(true)
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text(l10n.sideDrawerCancel),
-                ),
-                TextButton(
-                  onPressed: valid(value)
-                      ? () => Navigator.of(ctx).pop(true)
-                      : null,
-                  child: Text(
-                    l10n.sideDrawerSave,
-                    style: TextStyle(
-                      color: valid(value)
-                          ? cs.primary
-                          : cs.onSurface.withValues(alpha: 0.38),
-                      fontWeight: AppFontWeights.semibold,
-                    ),
-                  ),
-                ),
-              ],
             );
           },
         );

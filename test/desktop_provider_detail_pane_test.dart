@@ -144,4 +144,48 @@ void main() {
     fieldWidget = tester.widget<TextField>(portField);
     expect(fieldWidget.controller?.text, '12345');
   });
+
+  testWidgets('desktop LobeHub icon dialog uses provider settings flow', (
+    tester,
+  ) async {
+    final settings = await _buildSettings(tester);
+    addTearDown(settings.dispose);
+
+    await _pumpProviderSettings(tester, settings);
+
+    await tester.tap(
+      find.byKey(const ValueKey('desktop-provider-settings-ProviderA')),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('desktop-provider-settings-dialog')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('desktop-provider-settings-avatar-ProviderA')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Enter LobeHub Icon'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('desktop-provider-lobehub-icon-dialog')),
+      findsOneWidget,
+    );
+
+    final iconField = find.byKey(
+      const ValueKey('desktop-provider-lobehub-icon-field'),
+    );
+    await tester.enterText(iconField, 'openai');
+    await tester.pump();
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    final cfg = settings.getProviderConfig('ProviderA');
+    expect(cfg.avatarType, 'lobehub');
+    expect(cfg.avatarValue, 'openai');
+  });
 }
