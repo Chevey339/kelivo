@@ -99,6 +99,23 @@ class ProviderAvatar extends StatelessWidget {
           cfg.name.isNotEmpty ? cfg.name : displayName,
         );
       }
+    } else if (type == 'icon' && value != null && value.isNotEmpty) {
+      // 校验资源在白名单中，防止非法值
+      final asset = BrandAssets.selectableAssetOrNull(value);
+      if (asset == null) {
+        avatar = _brandOrInitial(
+          context,
+          cfg.name.isNotEmpty ? cfg.name : displayName,
+        );
+      } else {
+        avatar = _assetAvatar(context, asset);
+      }
+    } else if (type == 'lobehub' && value != null && value.isNotEmpty) {
+      avatar = _lobehubAvatar(
+        context,
+        value,
+        cfg.name.isNotEmpty ? cfg.name : displayName,
+      );
     } else {
       avatar = _brandOrInitial(
         context,
@@ -149,12 +166,7 @@ class ProviderAvatar extends StatelessWidget {
         ),
       );
     }
-    final lower = name.toLowerCase();
-    final mono =
-        isDark &&
-        (RegExp(r'openai|gpt|o\\d').hasMatch(lower) ||
-            RegExp(r'grok|xai').hasMatch(lower) ||
-            RegExp(r'openrouter').hasMatch(lower));
+    final mono = isDark && BrandAssets.assetNeedsDarkInvert(asset);
     return CircleAvatar(
       backgroundColor: isDark
           ? Colors.white10
@@ -175,6 +187,107 @@ class ProviderAvatar extends StatelessWidget {
               fit: BoxFit.contain,
               color: mono ? Colors.white : null,
               colorBlendMode: mono ? BlendMode.srcIn : null,
+            ),
+    );
+  }
+
+  // 优先彩色版本（{name}-color.svg），不存在则回退单色（{name}.svg）。
+  // 用户已显式指定 -color/-text 变体时按原样请求。
+  Future<String?> _resolveLobehubPath(String iconName) async {
+    final n = iconName.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    if (!n.endsWith('-color') && !n.endsWith('-text')) {
+      final colored = await AvatarCache.getPath(
+        BrandAssets.lobehubIconUrl('$n-color'),
+      );
+      if (colored != null) return colored;
+    }
+    return AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
+  }
+
+  // 同步命中已缓存的 LobeHub 图标路径，命中则可直接渲染、避免 FutureBuilder 闪烁。
+  // 镜像 _resolveLobehubPath 的彩色优先/单色回退顺序。
+  String? _peekLobehubPath(String iconName) {
+    final n = iconName.trim().toLowerCase();
+    if (n.isEmpty) return null;
+    if (!n.endsWith('-color') && !n.endsWith('-text')) {
+      final colored = AvatarCache.peek(BrandAssets.lobehubIconUrl('$n-color'));
+      if (colored != null) return colored;
+    }
+    return AvatarCache.peek(BrandAssets.lobehubIconUrl(n));
+  }
+
+  Widget _lobehubAvatar(
+    BuildContext context,
+    String iconName,
+    String fallbackName,
+  ) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.white10 : cs.primary.withValues(alpha: 0.1);
+    // 缓存命中时同步渲染，避免每次 rebuild 都经历 FutureBuilder 的 loading 态。
+    final cached = _peekLobehubPath(iconName);
+    if (cached != null) {
+      return _lobehubTile(context, cached, bg);
+    }
+    return FutureBuilder<String?>(
+      // 优先彩色版本，回退单色；复用头像缓存（下载并缓存 SVG，失败返回 null）
+      future: _resolveLobehubPath(iconName),
+      builder: (ctx, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return CircleAvatar(backgroundColor: bg);
+        }
+        final p = snap.data;
+        if (p == null || !File(p).existsSync()) {
+          return _brandOrInitial(context, fallbackName);
+        }
+        return _lobehubTile(context, p, bg);
+      },
+    );
+  }
+
+  Widget _lobehubTile(BuildContext context, String path, Color bg) {
+    final cs = Theme.of(context).colorScheme;
+    return CircleAvatar(
+      backgroundColor: bg,
+      child: SvgPicture.file(
+        File(path),
+        width: size * 0.7,
+        height: size * 0.7,
+        fit: BoxFit.contain,
+        // LobeHub 单色图标用 fill="currentColor"，注入前景色以适配明暗；
+        // 带 -color 的彩色图标有固定填充，不受影响
+        theme: SvgTheme(currentColor: cs.onSurface),
+        placeholderBuilder: (_) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  Widget _assetAvatar(BuildContext context, String asset) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSvg = asset.endsWith('.svg');
+    final needsMono = isDark && BrandAssets.assetNeedsDarkInvert(asset);
+    return CircleAvatar(
+      backgroundColor: isDark
+          ? Colors.white10
+          : cs.primary.withValues(alpha: 0.1),
+      child: isSvg
+          ? SvgPicture.asset(
+              asset,
+              width: size * 0.7,
+              height: size * 0.7,
+              colorFilter: needsMono
+                  ? const ColorFilter.mode(Colors.white, BlendMode.srcIn)
+                  : null,
+            )
+          : Image.asset(
+              asset,
+              width: size * 0.7,
+              height: size * 0.7,
+              fit: BoxFit.contain,
+              color: needsMono ? Colors.white : null,
+              colorBlendMode: needsMono ? BlendMode.srcIn : null,
             ),
     );
   }

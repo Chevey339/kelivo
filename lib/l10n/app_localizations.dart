@@ -4625,6 +4625,54 @@ abstract class AppLocalizations {
   /// **'Reset'**
   String get sideDrawerReset;
 
+  /// No description provided for @providerAvatarChooseBuiltInIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Built-in Icon'**
+  String get providerAvatarChooseBuiltInIcon;
+
+  /// No description provided for @providerAvatarIconDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Built-in Icon'**
+  String get providerAvatarIconDialogTitle;
+
+  /// No description provided for @providerAvatarIconSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search icons'**
+  String get providerAvatarIconSearchHint;
+
+  /// No description provided for @providerAvatarIconNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No icons found'**
+  String get providerAvatarIconNoResults;
+
+  /// No description provided for @providerAvatarInputLobehubIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarInputLobehubIcon;
+
+  /// No description provided for @providerAvatarChooseLobehubIcon.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarChooseLobehubIcon;
+
+  /// No description provided for @providerAvatarLobehubDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter LobeHub Icon'**
+  String get providerAvatarLobehubDialogTitle;
+
+  /// No description provided for @providerAvatarLobehubDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a LobeHub icon name, e.g. openai'**
+  String get providerAvatarLobehubDialogHint;
+
   /// No description provided for @sideDrawerEmojiDialogTitle.
   ///
   /// In en, this message translates to:

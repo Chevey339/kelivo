@@ -31,10 +31,25 @@ class AvatarCache {
       final seg = uri.pathSegments.isNotEmpty
           ? uri.pathSegments.last.toLowerCase()
           : '';
-      final m = RegExp(r"\.(png|jpg|jpeg|webp|gif|bmp|ico)").firstMatch(seg);
+      final m = RegExp(
+        r"\.(png|jpg|jpeg|webp|gif|bmp|ico|svg)",
+      ).firstMatch(seg);
       if (m != null) ext = m.group(1)!;
     }
     return 'av_$hex.$ext';
+  }
+
+  /// Synchronous cache peek: returns the locally cached file path for [url]
+  /// only if it is already memoized and the file still exists on disk.
+  /// Returns null when not yet resolved (caller should fall back to [getPath]).
+  static String? peek(String url) {
+    if (url.isEmpty) return null;
+    final cached = _memo[url];
+    if (cached == null) return null;
+    try {
+      if (File(cached).existsSync()) return cached;
+    } catch (_) {}
+    return null;
   }
 
   /// Ensures avatar at [url] is cached locally and returns the file path.

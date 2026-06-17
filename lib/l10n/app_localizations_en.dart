@@ -2460,6 +2460,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sideDrawerReset => 'Reset';
 
   @override
+  String get providerAvatarChooseBuiltInIcon => 'Choose Built-in Icon';
+
+  @override
+  String get providerAvatarIconDialogTitle => 'Choose Built-in Icon';
+
+  @override
+  String get providerAvatarIconSearchHint => 'Search icons';
+
+  @override
+  String get providerAvatarIconNoResults => 'No icons found';
+
+  @override
+  String get providerAvatarInputLobehubIcon => 'Enter LobeHub Icon';
+
+  @override
+  String get providerAvatarChooseLobehubIcon => 'Enter LobeHub Icon';
+
+  @override
+  String get providerAvatarLobehubDialogTitle => 'Enter LobeHub Icon';
+
+  @override
+  String get providerAvatarLobehubDialogHint =>
+      'Enter a LobeHub icon name, e.g. openai';
+
+  @override
   String get sideDrawerEmojiDialogTitle => 'Choose Emoji';
 
   @override

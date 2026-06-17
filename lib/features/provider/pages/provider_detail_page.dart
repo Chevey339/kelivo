@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../../utils/brand_assets.dart';
+import '../../../utils/avatar_cache.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/gestures.dart';
 import 'package:provider/provider.dart';
@@ -396,6 +397,12 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
+                    row(l10n.providerAvatarChooseBuiltInIcon, () async {
+                      await _pickProviderIcon();
+                    }),
+                    row(l10n.providerAvatarInputLobehubIcon, () async {
+                      await _inputLobehubIcon();
+                    }),
                     row(l10n.sideDrawerChooseImage, () async {
                       try {
                         final settings = context.read<SettingsProvider>();
@@ -510,6 +517,290 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         await settings.setProviderAvatarUrl(widget.keyName, url);
       }
     }
+  }
+
+  Future<void> _inputLobehubIcon() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final controller = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        bool valid(String s) => s.trim().isNotEmpty;
+        String value = '';
+        return StatefulBuilder(
+          builder: (ctx2, setLocal) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              backgroundColor: cs.surface,
+              title: Text(l10n.providerAvatarLobehubDialogTitle),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: l10n.providerAvatarLobehubDialogHint,
+                    filled: true,
+                    fillColor: Theme.of(ctx2).brightness == Brightness.dark
+                        ? Colors.white10
+                        : const Color(0xFFF2F3F5),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.transparent),
+                    ),
+                    enabledBorder: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
+                      borderSide: BorderSide(color: Colors.transparent),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                  onChanged: (v) => setLocal(() => value = v),
+                  onSubmitted: (_) {
+                    if (valid(value)) Navigator.of(ctx2).pop(true);
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+                TextButton(
+                  onPressed: valid(value)
+                      ? () => Navigator.of(ctx).pop(true)
+                      : null,
+                  child: Text(
+                    l10n.sideDrawerSave,
+                    style: TextStyle(
+                      color: valid(value)
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.38),
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (ok == true) {
+      final name = controller.text.trim();
+      if (name.isNotEmpty) {
+        await settings.setProviderAvatarLobehub(widget.keyName, name);
+        if (mounted) setState(() {});
+      }
+    }
+  }
+
+  // 后台预热 LobeHub 图标缓存（彩色优先，失败回退单色），不阻塞 UI。
+  // 顺序需与 ProviderAvatar._resolveLobehubPath 保持一致，避免缓存键不一致。
+  void _prewarmLobehubIcon(String n) {
+    if (n.isEmpty) return;
+    Future.microtask(() async {
+      if (!n.endsWith('-color') && !n.endsWith('-text')) {
+        final colored = await AvatarCache.getPath(
+          BrandAssets.lobehubIconUrl('$n-color'),
+        );
+        if (colored != null) return;
+      }
+      await AvatarCache.getPath(BrandAssets.lobehubIconUrl(n));
+    });
+  }
+
+  Future<void> _pickProviderIcon() async {
+    final l10n = AppLocalizations.of(context)!;
+    final settings = context.read<SettingsProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final icons = BrandAssets.selectableIcons;
+
+    // 若当前头像为 LobeHub 自定义图标，预热缓存，使弹窗与详情页头像无需等待下载。
+    final current = settings.getProviderConfig(widget.keyName);
+    if (current.avatarType == 'lobehub' &&
+        (current.avatarValue ?? '').isNotEmpty) {
+      _prewarmLobehubIcon(current.avatarValue!.trim().toLowerCase());
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        String query = '';
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            final q = query.trim().toLowerCase();
+            final filtered = q.isEmpty
+                ? icons
+                : icons
+                      .where(
+                        (o) =>
+                            o.label.toLowerCase().contains(q) ||
+                            o.id.toLowerCase().contains(q),
+                      )
+                      .toList();
+            return AlertDialog(
+              backgroundColor: cs.surface,
+              title: Text(l10n.providerAvatarIconDialogTitle),
+              content: SizedBox(
+                width: MediaQuery.of(ctx).size.width * 0.8,
+                height: MediaQuery.of(ctx).size.height * 0.5,
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: l10n.providerAvatarIconSearchHint,
+                        prefixIcon: const Icon(Lucide.Search, size: 18),
+                        isDense: true,
+                        filled: true,
+                        fillColor: isDark
+                            ? Colors.white10
+                            : const Color(0xFFF2F3F5),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(
+                            color: Colors.transparent,
+                          ),
+                        ),
+                        enabledBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(color: Colors.transparent),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: cs.primary.withValues(alpha: 0.4),
+                          ),
+                        ),
+                      ),
+                      onChanged: (v) => setLocal(() => query = v),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Text(
+                                l10n.providerAvatarIconNoResults,
+                                style: TextStyle(
+                                  color: cs.onSurface.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            )
+                          : GridView.builder(
+                              itemCount: filtered.length,
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 4,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                    childAspectRatio: 1,
+                                  ),
+                              itemBuilder: (ctx, i) {
+                                final opt = filtered[i];
+                                final cfg = settings.getProviderConfig(
+                                  widget.keyName,
+                                );
+                                final selected =
+                                    cfg.avatarType == 'icon' &&
+                                    cfg.avatarValue == opt.asset;
+                                final isSvg = opt.asset.endsWith('.svg');
+                                final needsMono =
+                                    isDark &&
+                                    BrandAssets.assetNeedsDarkInvert(opt.asset);
+                                return Semantics(
+                                  label: opt.label,
+                                  child: Tooltip(
+                                    message: opt.label,
+                                    child: IosCardPress(
+                                      borderRadius: BorderRadius.circular(12),
+                                      baseColor: cs.surface,
+                                      onTap: () {
+                                        Navigator.of(ctx).pop();
+                                        Future.microtask(() async {
+                                          await settings.setProviderAvatarIcon(
+                                            widget.keyName,
+                                            opt.asset,
+                                          );
+                                          if (mounted) setState(() {});
+                                        });
+                                      },
+                                      padding: const EdgeInsets.all(8),
+                                      child: Center(
+                                        child: AspectRatio(
+                                          aspectRatio: 1,
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              color: isDark
+                                                  ? Colors.white10
+                                                  : cs.primary.withValues(
+                                                      alpha: 0.1,
+                                                    ),
+                                              shape: BoxShape.circle,
+                                              border: selected
+                                                  ? Border.all(
+                                                      color: cs.primary,
+                                                      width: 2,
+                                                    )
+                                                  : null,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: FractionallySizedBox(
+                                              widthFactor: 0.65,
+                                              heightFactor: 0.65,
+                                              child: isSvg
+                                                  ? SvgPicture.asset(
+                                                      opt.asset,
+                                                      fit: BoxFit.contain,
+                                                      colorFilter: needsMono
+                                                          ? const ColorFilter.mode(
+                                                              Colors.white,
+                                                              BlendMode.srcIn,
+                                                            )
+                                                          : null,
+                                                    )
+                                                  : Image.asset(
+                                                      opt.asset,
+                                                      fit: BoxFit.contain,
+                                                      color: needsMono
+                                                          ? Colors.white
+                                                          : null,
+                                                      colorBlendMode: needsMono
+                                                          ? BlendMode.srcIn
+                                                          : null,
+                                                    ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(l10n.sideDrawerCancel),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildConfigTab(
