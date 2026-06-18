@@ -127,6 +127,73 @@ void main() {
       },
     );
 
+    group('title generation thinking', () {
+      test(
+        'defaults to enabled and preserves existing budget fallback',
+        () async {
+          SharedPreferences.setMockInitialValues({'thinking_budget_v1': 16000});
+          final settings = SettingsProvider();
+
+          await _waitForSettingsLoad();
+
+          expect(settings.titleGenerationThinkingEnabled, isTrue);
+          expect(settings.titleGenerationThinkingBudgetFor(null), 16000);
+          expect(settings.titleGenerationThinkingBudgetFor(1024), 1024);
+        },
+      );
+
+      test(
+        'disabled title generation thinking resolves to off budget',
+        () async {
+          SharedPreferences.setMockInitialValues({});
+          final settings = SettingsProvider();
+
+          await _waitForSettingsLoad();
+          await settings.setThinkingBudget(16000);
+          await settings.setTitleGenerationThinkingEnabled(false);
+
+          expect(settings.titleGenerationThinkingEnabled, isFalse);
+          expect(settings.titleGenerationThinkingBudgetFor(null), 0);
+          expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
+
+          final prefs = await SharedPreferences.getInstance();
+          expect(
+            prefs.getBool('title_generation_thinking_enabled_v1'),
+            isFalse,
+          );
+        },
+      );
+
+      test('loads persisted disabled state', () async {
+        SharedPreferences.setMockInitialValues({
+          'title_generation_thinking_enabled_v1': false,
+        });
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+
+        expect(settings.titleGenerationThinkingEnabled, isFalse);
+        expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
+      });
+
+      test('reset restores enabled fallback behavior', () async {
+        SharedPreferences.setMockInitialValues({
+          'title_generation_thinking_enabled_v1': false,
+          'thinking_budget_v1': 64000,
+        });
+        final settings = SettingsProvider();
+
+        await _waitForSettingsLoad();
+        await settings.resetTitleGenerationThinkingEnabled();
+
+        expect(settings.titleGenerationThinkingEnabled, isTrue);
+        expect(settings.titleGenerationThinkingBudgetFor(null), 64000);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('title_generation_thinking_enabled_v1'), isTrue);
+      });
+    });
+
     test(
       'Claude latest models expose xhigh and max reasoning without presets',
       () async {

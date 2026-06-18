@@ -5159,6 +5159,12 @@ abstract class AppLocalizations {
   /// **'Used for summarizing conversation titles; prefer fast & cheap models'**
   String get defaultModelPageTitleModelSubtitle;
 
+  /// No description provided for @titleModelThinkingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Thinking'**
+  String get titleModelThinkingTitle;
+
   /// No description provided for @defaultModelPageSummaryModelTitle.
   ///
   /// In en, this message translates to:

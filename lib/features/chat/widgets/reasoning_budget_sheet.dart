@@ -45,11 +45,11 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     _selected = s.thinkingBudget ?? -1;
   }
 
-  void _select(int value) {
+  Future<void> _select(int value) async {
     setState(() {
       _selected = value;
     });
-    context.read<SettingsProvider>().setThinkingBudget(value);
+    await context.read<SettingsProvider>().setThinkingBudget(value);
   }
 
   bool _isCustomSelected({required bool showXhigh, required bool showMax}) {
@@ -67,13 +67,18 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
 
   Future<void> _openCustomBudget() async {
     Haptics.light();
-    final initialValue = _selected >= 1024 ? _selected : 2048;
+    final settings = context.read<SettingsProvider>();
+    final isCurrentCustom = _isCustomSelected(
+      showXhigh: _showXhighOption(settings),
+      showMax: _showMaxOption(settings),
+    );
+    final initialValue = isCurrentCustom ? _selected : 2048;
     final chosen = await ReasoningBudgetCustomDialog.show(
       context,
       initialValue: initialValue,
     );
     if (!mounted || chosen == null) return;
-    _select(chosen);
+    await _select(chosen);
     if (!mounted) return;
     Navigator.of(context).maybePop();
   }
@@ -84,7 +89,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
     IconData? icon,
     Widget? leading,
     required bool active,
-    VoidCallback? onTap,
+    Future<void> Function()? onTap,
     Widget? trailing,
   }) {
     final cs = Theme.of(context).colorScheme;
@@ -100,13 +105,14 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
           borderRadius: BorderRadius.circular(14),
           baseColor: cs.surface,
           duration: const Duration(milliseconds: 260),
-          onTap: () {
+          onTap: () async {
             if (onTap != null) {
-              onTap();
+              await onTap();
               return;
             }
             Haptics.light();
-            _select(value);
+            await _select(value);
+            if (!mounted) return;
             Navigator.of(context).maybePop();
           },
           padding: const EdgeInsets.symmetric(horizontal: 12),

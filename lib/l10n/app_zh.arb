@@ -897,6 +897,7 @@
   "defaultModelPageChatModelSubtitle": "全局默认的聊天模型",
   "defaultModelPageTitleModelTitle": "标题总结模型",
   "defaultModelPageTitleModelSubtitle": "用于总结对话标题的模型，推荐使用快速且便宜的模型",
+  "titleModelThinkingTitle": "是否开启思考",
   "defaultModelPageSummaryModelTitle": "摘要模型",
   "defaultModelPageSummaryModelSubtitle": "用于生成对话摘要的模型，推荐使用快速且便宜的模型",
   "defaultModelPageSuggestionModelTitle": "聊天建议模型",

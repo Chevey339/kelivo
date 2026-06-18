@@ -2739,6 +2739,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'Used for summarizing conversation titles; prefer fast & cheap models';
 
   @override
+  String get titleModelThinkingTitle => 'Enable Thinking';
+
+  @override
   String get defaultModelPageSummaryModelTitle => 'Summary Model';
 
   @override

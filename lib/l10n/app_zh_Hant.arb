@@ -890,6 +890,7 @@
   "defaultModelPageChatModelSubtitle": "全域預設的聊天模型",
   "defaultModelPageTitleModelTitle": "標題總結模型",
   "defaultModelPageTitleModelSubtitle": "用於總結對話標題的模型，推薦使用快速且便宜的模型",
+  "titleModelThinkingTitle": "是否開啟思考",
   "defaultModelPageSummaryModelTitle": "摘要模型",
   "defaultModelPageSummaryModelSubtitle": "用於生成對話摘要的模型，推薦使用快速且便宜的模型",
   "defaultModelPageSuggestionModelTitle": "聊天建議模型",

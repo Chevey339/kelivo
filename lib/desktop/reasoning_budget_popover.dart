@@ -423,7 +423,7 @@ class _ReasoningContent extends StatelessWidget {
                       ).colorScheme.onSurface.withValues(alpha: 0.45),
                     ),
               onTap: () async {
-                final initialValue = selected >= 1024 ? selected : 2048;
+                final initialValue = customActive ? selected : 2048;
                 onSuspendedChanged(true);
                 var restore = true;
                 try {

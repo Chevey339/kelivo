@@ -4,6 +4,7 @@ import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../shared/widgets/ios_switch.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
 import '../../utils/brand_assets.dart';
@@ -295,82 +296,87 @@ class DesktopDefaultModelPane extends StatelessWidget {
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
-        return Dialog(
-          backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+        return Consumer<SettingsProvider>(
+          builder: (context, sp, _) {
+            return Dialog(
+              backgroundColor: cs.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 24,
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: Text(
-                          l10n.defaultModelPagePromptLabel,
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: AppFontWeights.emphasis,
-                          ),
+                      _TitleThinkingSwitchRow(
+                        settings: sp,
+                        l10n: l10n,
+                        cs: cs,
+                        trailing: _SmallIconBtn(
+                          icon: lucide.Lucide.X,
+                          onTap: () => Navigator.of(ctx).maybePop(),
                         ),
                       ),
-                      _SmallIconBtn(
-                        icon: lucide.Lucide.X,
-                        onTap: () => Navigator.of(ctx).maybePop(),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.defaultModelPagePromptLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: AppFontWeights.semibold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _promptEditor(
+                        ctx,
+                        controller: ctrl,
+                        hintText: l10n.defaultModelPageTitlePromptHint,
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _DeskIosButton(
+                            label: l10n.defaultModelPageResetDefault,
+                            filled: false,
+                            dense: true,
+                            onTap: () async {
+                              await sp.resetTitlePrompt();
+                              await sp.resetTitleGenerationThinkingEnabled();
+                              ctrl.text = sp.titlePrompt;
+                            },
+                          ),
+                          const Spacer(),
+                          _DeskIosButton(
+                            label: l10n.defaultModelPageSave,
+                            filled: true,
+                            dense: true,
+                            onTap: () async {
+                              await sp.setTitlePrompt(ctrl.text.trim());
+                              if (ctx.mounted) Navigator.of(ctx).maybePop();
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  _promptEditor(
-                    ctx,
-                    controller: ctrl,
-                    hintText: l10n.defaultModelPageTitlePromptHint,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageResetDefault,
-                        filled: false,
-                        dense: true,
-                        onTap: () async {
-                          await sp.resetTitlePrompt();
-                          ctrl.text = sp.titlePrompt;
-                        },
-                      ),
-                      const Spacer(),
-                      _DeskIosButton(
-                        label: l10n.defaultModelPageSave,
-                        filled: true,
-                        dense: true,
-                        onTap: () async {
-                          await sp.setTitlePrompt(ctrl.text.trim());
-                          if (ctx.mounted) Navigator.of(ctx).maybePop();
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    l10n.defaultModelPageTitleVars('{content}', '{locale}'),
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -1008,6 +1014,69 @@ class _ModelCardState extends State<_ModelCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TitleThinkingSwitchRow extends StatelessWidget {
+  const _TitleThinkingSwitchRow({
+    required this.settings,
+    required this.l10n,
+    required this.cs,
+    required this.trailing,
+  });
+
+  final SettingsProvider settings;
+  final AppLocalizations l10n;
+  final ColorScheme cs;
+  final Widget trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = settings.titleGenerationThinkingEnabled;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => settings.setTitleGenerationThinkingEnabled(!value),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.titleModelThinkingTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: AppFontWeights.semibold,
+                          color: cs.onSurface.withValues(alpha: 0.92),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    IosSwitch(
+                      value: value,
+                      hitTestSize: 36,
+                      semanticLabel: l10n.titleModelThinkingTitle,
+                      onChanged: settings.setTitleGenerationThinkingEnabled,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        trailing,
+      ],
     );
   }
 }

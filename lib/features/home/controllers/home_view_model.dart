@@ -1210,7 +1210,9 @@ class HomeViewModel extends ChangeNotifier {
         settings.currentModelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
-    final budget = assistant?.thinkingBudget ?? settings.thinkingBudget;
+    final budget = settings.titleGenerationThinkingBudgetFor(
+      assistant?.thinkingBudget,
+    );
 
     // Build content from messages (truncate to reasonable length)
     final msgs = _chatService.getMessages(convo.id);
