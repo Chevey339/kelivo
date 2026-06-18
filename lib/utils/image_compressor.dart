@@ -8,7 +8,7 @@ import 'package:path/path.dart' as p;
 ///
 /// When an image is copied into the upload directory we run it through
 /// [ImageCompressor.compressIfNeeded], which decodes the image, applies any EXIF
-/// orientation, caps the longest edge to a configurable size, and re-encodes it.
+/// orientation, and re-encodes it (JPEG, or PNG when genuinely transparent).
 /// The original file is REPLACED in place (no original is kept). Doing the work
 /// here shrinks both on-disk storage AND the base64 payload sent to the model in
 /// a single place.
@@ -39,7 +39,6 @@ class ImageCompressor {
   static Future<String> compressIfNeeded(
     String srcPath, {
     required bool enabled,
-    required int maxDimension, // longest-edge cap in px; <=0 means do not resize
     required int quality, // JPEG quality 1..100
     int minBytes = 60 * 1024, // skip files smaller than this (not worth it)
   }) async {
@@ -69,7 +68,6 @@ class ImageCompressor {
         _runCompression,
         _CompressRequest(
           bytes: original,
-          maxDimension: maxDimension,
           quality: q,
         ),
       );
@@ -121,12 +119,10 @@ class ImageCompressor {
 /// Primitive-only payload sent into the isolate. All fields are sendable.
 class _CompressRequest {
   final Uint8List bytes;
-  final int maxDimension;
   final int quality;
 
   const _CompressRequest({
     required this.bytes,
-    required this.maxDimension,
     required this.quality,
   });
 }
@@ -153,20 +149,6 @@ _CompressResult? _runCompression(_CompressRequest req) {
 
     // Apply EXIF orientation before we strip metadata via re-encoding.
     decoded = img.bakeOrientation(decoded);
-
-    // Cap the longest edge while preserving aspect ratio.
-    if (req.maxDimension > 0) {
-      final int w = decoded.width;
-      final int h = decoded.height;
-      final int longest = w >= h ? w : h;
-      if (longest > req.maxDimension) {
-        if (w >= h) {
-          decoded = img.copyResize(decoded, width: req.maxDimension);
-        } else {
-          decoded = img.copyResize(decoded, height: req.maxDimension);
-        }
-      }
-    }
 
     // Only keep PNG when the image actually has transparent pixels. `hasAlpha`
     // merely reports the presence of an alpha CHANNEL (numChannels == 2 || 4),

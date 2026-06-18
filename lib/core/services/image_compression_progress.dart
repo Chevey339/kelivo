@@ -46,8 +46,8 @@ class ImageCompressionProgress extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 每张图片压缩完成后调用。
-  void step({required int original, required int compressed}) {
+  /// 每张图片压缩完成后调用（仅内部使用）。
+  void _step({required int original, required int compressed}) {
     done += 1;
     originalBytes += original;
     compressedBytes += compressed;
@@ -73,8 +73,7 @@ class ImageCompressionProgress extends ChangeNotifier {
   }
 
   /// 压缩单张并上报进度。压缩开关由调用方判断（仅在开启时调用本方法）。
-  /// 不再限制尺寸（maxDimension: 0），仅按质量压缩。返回最终路径
-  /// （扩展名可能变化，如 png → jpg）。
+  /// 仅按质量压缩、不缩放尺寸。返回最终路径（扩展名可能变化，如 png → jpg）。
   Future<String> compressAndReport(String path, {required int quality}) async {
     int orig = 0;
     try {
@@ -83,14 +82,13 @@ class ImageCompressionProgress extends ChangeNotifier {
     final out = await ImageCompressor.compressIfNeeded(
       path,
       enabled: true,
-      maxDimension: 0,
       quality: quality,
     );
     int comp = orig;
     try {
       comp = await File(out).length();
     } catch (_) {}
-    step(original: orig, compressed: comp);
+    _step(original: orig, compressed: comp);
     return out;
   }
 }

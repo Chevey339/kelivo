@@ -1047,7 +1047,7 @@ class SettingsProvider extends ChangeNotifier {
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
     _imageCompressionEnabled =
-        prefs.getBool(_imageCompressionEnabledKey) ?? true;
+        prefs.getBool(_imageCompressionEnabledKey) ?? false;
     _imageCompressionQuality =
         prefs.getInt(_imageCompressionQualityKey) ?? 80;
     _mobileCodeBlockWrap =
@@ -3835,8 +3835,10 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     await prefs.setBool(_imageCropperEnabledKey, v);
   }
 
-  // Display: auto-compress images when saving to upload dir
-  bool _imageCompressionEnabled = true;
+  // Display: auto-compress images when saving to upload dir.
+  // Default OFF for both fresh installs and upgrades (mirrors OCR): the key is
+  // absent until the user toggles it, so getBool(...) ?? false keeps it off.
+  bool _imageCompressionEnabled = false;
   bool get imageCompressionEnabled => _imageCompressionEnabled;
   Future<void> setImageCompressionEnabled(bool v) async {
     if (_imageCompressionEnabled == v) return;

@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import '../../../core/services/image_compression_progress.dart';
 import '../../../icons/lucide_adapter.dart';
 
-/// 顶部图片压缩提示：压缩进行中显示整体进度条（done/total），
-/// 一批完成后短暂显示一次「原图 → 压缩后」体积。无文案，靠图标+数字，
-/// 避免引入本地化字符串。
+/// 顶部图片压缩提示：压缩进行中显示进度条与「第几张/共几张」，一批完成后
+/// 短暂显示一次「原图 → 压缩后」体积。视觉对齐 App 顶部通知（删除对话等用的
+/// 那种圆角卡片 + 阴影），无文案、靠图标 + 数字，避免引入本地化字符串。
 class ImageCompressionTopBanner extends StatefulWidget {
   const ImageCompressionTopBanner({super.key});
 
@@ -58,16 +58,19 @@ class _ImageCompressionTopBannerState extends State<ImageCompressionTopBanner> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     Widget? content;
 
     if (_p.active) {
+      // 进行中：进度条 + 「正在压第几张/共几张」，让用户知道正在压缩、压到第几张。
+      final shown = (_p.done + 1) <= _p.total ? _p.done + 1 : _p.total;
       content = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Lucide.ImageDown, size: 14, color: cs.primary),
-          const SizedBox(width: 8),
+          Icon(Lucide.ImageDown, size: 20, color: cs.primary),
+          const SizedBox(width: 10),
           SizedBox(
-            width: 120,
+            width: 96,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -78,11 +81,11 @@ class _ImageCompressionTopBannerState extends State<ImageCompressionTopBanner> {
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Text(
-            '${_p.done}/${_p.total}',
+            '$shown/${_p.total}',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               color: cs.onSurface,
               fontWeight: FontWeight.w600,
             ),
@@ -97,22 +100,22 @@ class _ImageCompressionTopBannerState extends State<ImageCompressionTopBanner> {
       content = Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Lucide.ImageDown, size: 14, color: cs.primary),
-          const SizedBox(width: 8),
+          Icon(Lucide.ImageDown, size: 20, color: cs.primary),
+          const SizedBox(width: 10),
           Text(
             '${_fmt(_p.lastSavedFrom)} → ${_fmt(_p.lastSavedTo)}',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 14,
               color: cs.onSurface,
               fontWeight: FontWeight.w600,
             ),
           ),
           if (pct > 0) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Text(
               '-$pct%',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 color: cs.primary,
                 fontWeight: FontWeight.w700,
               ),
@@ -122,6 +125,8 @@ class _ImageCompressionTopBannerState extends State<ImageCompressionTopBanner> {
       );
     }
 
+    // Card styling mirrors NotificationWidget (the 删除对话 / showAppSnackBar
+    // top toast): same surface color, 14 radius, and soft drop shadow.
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 200),
       child: content == null
@@ -129,17 +134,36 @@ class _ImageCompressionTopBannerState extends State<ImageCompressionTopBanner> {
           : Align(
               alignment: Alignment.topCenter,
               child: Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Material(
-                  elevation: 3,
-                  borderRadius: BorderRadius.circular(20),
-                  color: cs.surface,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: Container(
+                  constraints: const BoxConstraints(maxWidth: 400),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1C1C1E).withValues(alpha: 0.98)
+                        : Colors.white.withValues(alpha: 0.98),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.3 : 0.1,
+                        ),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: content,
                     ),
-                    child: content,
                   ),
                 ),
               ),

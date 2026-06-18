@@ -2289,37 +2289,22 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                     context.read<SettingsProvider>().setImageCropperEnabled(v),
               ),
               _iosDivider(context),
-              _iosSwitchRow(
+              _iosSliderRow(
                 context,
-                icon: Lucide.Image,
-                label: l10n.displaySettingsPageEnableImageCompressionTitle,
-                subtitle:
-                    l10n.displaySettingsPageEnableImageCompressionSubtitle,
-                value: sp.imageCompressionEnabled,
+                icon: Lucide.Sparkles,
+                label: l10n.displaySettingsPageImageCompressionQualityTitle,
+                valueLabel: '${sp.imageCompressionQuality}%',
+                value: sp.imageCompressionQuality.toDouble().clamp(
+                  30.0,
+                  100.0,
+                ),
+                min: 30,
+                max: 100,
+                divisions: 70,
                 onChanged: (v) => context
                     .read<SettingsProvider>()
-                    .setImageCompressionEnabled(v),
+                    .setImageCompressionQuality(v.round()),
               ),
-              if (sp.imageCompressionEnabled) ...[
-                _iosDivider(context),
-                _iosSliderRow(
-                  context,
-                  icon: Lucide.Sparkles,
-                  label:
-                      l10n.displaySettingsPageImageCompressionQualityTitle,
-                  valueLabel: '${sp.imageCompressionQuality}%',
-                  value: sp.imageCompressionQuality.toDouble().clamp(
-                    30.0,
-                    100.0,
-                  ),
-                  min: 30,
-                  max: 100,
-                  divisions: 70,
-                  onChanged: (v) => context
-                      .read<SettingsProvider>()
-                      .setImageCompressionQuality(v.round()),
-                ),
-              ],
               _iosDivider(context),
               _iosSwitchRow(
                 context,

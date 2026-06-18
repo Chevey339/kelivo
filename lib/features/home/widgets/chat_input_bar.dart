@@ -745,21 +745,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             }
             await File(destPath).writeAsBytes(bytes, flush: true);
             // 入库时压缩图片（替换原文件，可能改变扩展名）
-            if (mounted) {
-              final sp = context.read<SettingsProvider>();
-              if (sp.imageCompressionEnabled) {
-                final prog = ImageCompressionProgress.instance;
-                prog.start(1);
-                try {
-                  destPath = await prog.compressAndReport(
-                    destPath,
-                    quality: sp.imageCompressionQuality,
-                  );
-                } finally {
-                  prog.finishBatch();
-                }
-              }
-            }
+            destPath = await _compressOnIngestIfEnabled(destPath);
             return destPath;
           } catch (_) {
             return null;
@@ -922,23 +908,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {
             // Mirror copyPickedFiles: compress images on ingestion.
-            var finalPath = savedPath;
-            if (mounted) {
-              final sp = context.read<SettingsProvider>();
-              if (sp.imageCompressionEnabled) {
-                final prog = ImageCompressionProgress.instance;
-                prog.start(1);
-                try {
-                  finalPath = await prog.compressAndReport(
-                    savedPath,
-                    quality: sp.imageCompressionQuality,
-                  );
-                } finally {
-                  prog.finishBatch();
-                }
-              }
-            }
-            images.add(finalPath);
+            images.add(await _compressOnIngestIfEnabled(savedPath));
           } else {
             final mime = _inferMimeByExtension(savedName);
             docs.add(
@@ -1412,6 +1382,25 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
+  /// Compress an image at ingestion time if the user enabled it. Returns the
+  /// path to use afterwards (extension may change, e.g. png → jpg). No-op (and
+  /// returns [path] unchanged) when unmounted or compression is disabled.
+  Future<String> _compressOnIngestIfEnabled(String path) async {
+    if (!mounted) return path;
+    final sp = context.read<SettingsProvider>();
+    if (!sp.imageCompressionEnabled) return path;
+    final prog = ImageCompressionProgress.instance;
+    prog.start(1);
+    try {
+      return await prog.compressAndReport(
+        path,
+        quality: sp.imageCompressionQuality,
+      );
+    } finally {
+      prog.finishBatch();
+    }
+  }
+
   String _inferMimeByExtension(String name) {
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
@@ -1483,23 +1472,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               await from.delete();
             } catch (_) {}
             // 入库时压缩图片（与 saveImageBytes 路径保持一致）
-            var finalPath = destPath;
-            if (mounted) {
-              final sp = context.read<SettingsProvider>();
-              if (sp.imageCompressionEnabled) {
-                final prog = ImageCompressionProgress.instance;
-                prog.start(1);
-                try {
-                  finalPath = await prog.compressAndReport(
-                    destPath,
-                    quality: sp.imageCompressionQuality,
-                  );
-                } finally {
-                  prog.finishBatch();
-                }
-              }
-            }
-            out.add(finalPath);
+            out.add(await _compressOnIngestIfEnabled(destPath));
           }
         } catch (_) {
           // skip single file errors
@@ -1998,23 +1971,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                                 ),
                                 Row(
                                   children: [
-                                    _CompactIconButton(
-                                      tooltip: AppLocalizations.of(
-                                        context,
-                                      )!.displaySettingsPageEnableImageCompressionTitle,
-                                      icon: Lucide.ImageDown,
-                                      active: context
-                                          .watch<SettingsProvider>()
-                                          .imageCompressionEnabled,
-                                      onTap: () {
-                                        final sp = context
-                                            .read<SettingsProvider>();
-                                        sp.setImageCompressionEnabled(
-                                          !sp.imageCompressionEnabled,
-                                        );
-                                      },
-                                    ),
-                                    const SizedBox(width: 8),
                                     if (widget.showMoreButton) ...[
                                       _CompactIconButton(
                                         tooltip: AppLocalizations.of(
