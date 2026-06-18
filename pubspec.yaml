@@ -113,6 +113,9 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   restart_app: ^1.8.3
+  drift: ^2.21.0
+  sqlite3: ^2.9.4
+  sqlite3_flutter_libs: ^0.6.0+eol
 
 dev_dependencies:
   flutter_test:
@@ -128,6 +131,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  drift_dev: ^2.21.2
 
 dependency_overrides:
   # Prevent the location from being accessed continuously on Windows

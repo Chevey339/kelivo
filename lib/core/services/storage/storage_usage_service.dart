@@ -170,7 +170,11 @@ abstract final class StorageUsageService {
           final name = parts.first;
           final lower = name.toLowerCase();
           final isHive = lower.endsWith('.hive') || lower.endsWith('.lock');
-          if (isHive) {
+          final isChatSqlite =
+              lower == 'kelivo_chat.sqlite' ||
+              lower == 'kelivo_chat.sqlite-wal' ||
+              lower == 'kelivo_chat.sqlite-shm';
+          if (isHive || isChatSqlite) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
             final box = _basenameNoExt(name);
             final sub = chatSubs[box];
