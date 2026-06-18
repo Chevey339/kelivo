@@ -218,6 +218,148 @@ void main() {
       },
     );
 
+    test('opening falls back when recent versions have no visible anchors', () {
+      final anchors = List<ChatMessage>.generate(
+        20,
+        (index) => _versionedMessage(
+          id: 'anchor-$index-v0',
+          role: index.isEven ? 'user' : 'assistant',
+          groupId: 'anchor-$index',
+          version: 0,
+        ),
+      );
+      final revisions = List<ChatMessage>.generate(
+        20,
+        (index) => _versionedMessage(
+          id: 'anchor-$index-v1',
+          role: index.isEven ? 'user' : 'assistant',
+          groupId: 'anchor-$index',
+          version: 1,
+        ),
+      );
+      messages = <ChatMessage>[...anchors, ...revisions];
+      conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Long chat with only old revisions in the tail',
+        messageIds: messages.map((message) => message.id).toList(),
+        versionSelections: {
+          for (var index = 0; index < anchors.length; index++)
+            'anchor-$index': 1,
+        },
+      );
+      chatService = _FakeLazyChatService(messages)
+        ..versionSelections = Map<String, int>.from(
+          conversation.versionSelections,
+        );
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+
+      controller.setCurrentConversation(conversation);
+
+      expect(chatService.fullLoadCalls, 0);
+      expect(controller.collapsedMessages, isNotEmpty);
+      expect(controller.collapsedMessages.first.id, 'anchor-0-v1');
+    });
+
+    test(
+      'loading newer history falls back when the tail has no visible anchors',
+      () {
+        final anchors = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v0',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 0,
+          ),
+        );
+        final revisions = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v1',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 1,
+          ),
+        );
+        messages = <ChatMessage>[...anchors, ...revisions];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with old revisions at the tail',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: {
+            for (var index = 0; index < anchors.length; index++)
+              'anchor-$index': 1,
+          },
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = Map<String, int>.from(
+            conversation.versionSelections,
+          );
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+        controller.loadStartWindow();
+
+        final loaded = controller.loadMoreAfter(
+          limit: ChatService.defaultLoadedWindowMax,
+        );
+
+        expect(loaded, isTrue);
+        expect(chatService.fullLoadCalls, 0);
+        expect(controller.collapsedMessages, isNotEmpty);
+        expect(controller.collapsedMessages.last.id, 'anchor-359-v1');
+      },
+    );
+
+    test(
+      'loading the end window falls back when tail versions hide everything',
+      () {
+        final anchors = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v0',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 0,
+          ),
+        );
+        final revisions = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v1',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 1,
+          ),
+        );
+        messages = <ChatMessage>[...anchors, ...revisions];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Long chat with old revisions at the tail',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: {
+            for (var index = 0; index < anchors.length; index++)
+              'anchor-$index': 1,
+          },
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = Map<String, int>.from(
+            conversation.versionSelections,
+          );
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        controller.setCurrentConversation(conversation);
+
+        final loaded = controller.loadEndWindow();
+
+        expect(loaded, isTrue);
+        expect(chatService.fullLoadCalls, 0);
+        expect(controller.collapsedMessages, isNotEmpty);
+        expect(controller.collapsedMessages.last.id, 'anchor-359-v1');
+      },
+    );
+
     test(
       'collapsed tail window keeps a version whose group anchor is visible',
       () {

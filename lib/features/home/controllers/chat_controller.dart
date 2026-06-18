@@ -97,8 +97,8 @@ class ChatController extends ChangeNotifier {
   void setCurrentConversation(Conversation? conversation) {
     _currentConversation = conversation;
     if (conversation != null) {
-      _loadInitialMessageWindow(conversation.id);
       _loadVersionSelections();
+      _loadInitialMessageWindow(conversation.id);
     } else {
       _messages = [];
       _loadedStartIndex = 0;
@@ -160,8 +160,8 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      _loadInitialMessageWindow(id);
       _loadVersionSelections();
+      _loadInitialMessageWindow(id);
       notifyListeners();
     }
   }
@@ -186,6 +186,8 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = (_totalMessageCount - _messages.length)
         .clamp(0, _totalMessageCount)
         .toInt();
+    invalidateCache();
+    _ensureLoadedWindowHasVisibleMessages();
   }
 
   void refreshLoadedMessageCount() {
@@ -247,6 +249,9 @@ class ChatController extends ChangeNotifier {
     } else {
       _messages = merged;
     }
+    invalidateCache();
+    final fallbackLoaded = _ensureLoadedWindowHasVisibleMessages();
+    if (fallbackLoaded) return true;
     notifyListeners();
     return true;
   }
@@ -264,7 +269,11 @@ class ChatController extends ChangeNotifier {
     final start = (_totalMessageCount - ChatService.defaultLoadedWindowMax)
         .clamp(0, _totalMessageCount)
         .toInt();
-    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+    return _loadWindow(
+      start: start,
+      limit: ChatService.defaultLoadedWindowMax,
+      ensureVisible: true,
+    );
   }
 
   bool loadUntilMessageVisible(
@@ -297,6 +306,7 @@ class ChatController extends ChangeNotifier {
   bool _loadWindowAroundIndex(
     int targetIndex, {
     int leadingContext = ChatService.defaultHistoryPageSize,
+    bool ensureVisible = true,
   }) {
     final conversation = _currentConversation;
     if (conversation == null || targetIndex < 0) return false;
@@ -311,7 +321,11 @@ class ChatController extends ChangeNotifier {
         .clamp(0, _totalMessageCount)
         .toInt();
     final start = (targetIndex - safeLeading).clamp(0, maxStart).toInt();
-    return _loadWindow(start: start, limit: ChatService.defaultLoadedWindowMax);
+    return _loadWindow(
+      start: start,
+      limit: ChatService.defaultLoadedWindowMax,
+      ensureVisible: ensureVisible,
+    );
   }
 
   int loadedWindowTruncateIndex() {
@@ -370,7 +384,11 @@ class ChatController extends ChangeNotifier {
     return messages.sublist(0, ChatService.defaultLoadedWindowMax);
   }
 
-  bool _loadWindow({required int start, required int limit}) {
+  bool _loadWindow({
+    required int start,
+    required int limit,
+    bool ensureVisible = false,
+  }) {
     final conversation = _currentConversation;
     if (conversation == null || limit <= 0) return false;
 
@@ -385,8 +403,46 @@ class ChatController extends ChangeNotifier {
 
     _messages = List.of(range);
     _loadedStartIndex = safeStart;
+    invalidateCache();
+    if (ensureVisible && _ensureLoadedWindowHasVisibleMessages()) return true;
     notifyListeners();
     return true;
+  }
+
+  bool _ensureLoadedWindowHasVisibleMessages() {
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty) return false;
+    if (collapsedMessages.isNotEmpty) return false;
+
+    final anchorIndex = _latestGroupAnchorIndexForLoadedWindow(conversation.id);
+    if (anchorIndex == null) return false;
+
+    return _loadWindowAroundIndex(anchorIndex, ensureVisible: false);
+  }
+
+  int? _latestGroupAnchorIndexForLoadedWindow(String conversationId) {
+    if (_loadedStartIndex <= 0) return null;
+
+    final groupIds = <String>{};
+    for (final message in _messages) {
+      if (message.version <= 0) continue;
+      groupIds.add(message.groupId ?? message.id);
+    }
+    if (groupIds.isEmpty) return null;
+
+    final firstIndices = _chatService.getFirstMessageIndicesForGroups(
+      conversationId,
+      groupIds,
+    );
+
+    int? latestAnchorIndex;
+    for (final index in firstIndices.values) {
+      if (index >= _loadedStartIndex) continue;
+      if (latestAnchorIndex == null || index > latestAnchorIndex) {
+        latestAnchorIndex = index;
+      }
+    }
+    return latestAnchorIndex;
   }
 
   // ============================================================================
