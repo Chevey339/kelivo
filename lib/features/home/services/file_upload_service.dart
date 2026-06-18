@@ -57,6 +57,7 @@ class FileUploadService {
     }
     try {
       for (final f in files) {
+        if (!context.mounted) break;
         var savedPath = await FileImportHelper.copyXFile(f, dir, context);
         if (savedPath != null) {
           // 仅对图片在入库时进行压缩（替换原文件），文档不处理
