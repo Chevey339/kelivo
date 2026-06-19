@@ -4,6 +4,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/api_keys.dart';
+import '../../../core/services/provider_balance_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -29,6 +30,10 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   String? _detectModelId;
   bool _detecting = false;
   String? _testingKeyId;
+  bool _queryingBalance = false;
+  // Per-key balance results, keyed by ApiKeyConfig.id.
+  final Map<String, String> _balances = <String, String>{};
+  final Map<String, String> _balanceErrors = <String, String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +74,28 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
               onTap: _onDeleteAllErrorKeys,
             ),
           ),
+          if (_queryingBalance)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: cs.primary,
+                ),
+              ),
+            )
+          else
+            Tooltip(
+              message: l10n.multiKeyPageQueryBalance,
+              child: _TactileIconButton(
+                icon: Lucide.Coins,
+                color: cs.onSurface,
+                semanticLabel: l10n.multiKeyPageQueryBalance,
+                onTap: _onQueryBalances,
+              ),
+            ),
           if (_detecting)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -323,10 +350,23 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    name,
-                    style: TextStyle(fontWeight: AppFontWeights.semibold),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(fontWeight: AppFontWeights.semibold),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                      if (_balances[k.id] != null ||
+                          _balanceErrors[k.id] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: _balanceLine(k),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -379,6 +419,39 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _balanceLine(ApiKeyConfig k) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final err = _balanceErrors[k.id];
+    if (err != null) {
+      return Text(
+        l10n.providerDetailPageBalanceError(err),
+        style: TextStyle(fontSize: 11, color: cs.error),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+    final value = _balances[k.id]!;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Lucide.Coins, size: 12, color: cs.onSurface.withValues(alpha: 0.6)),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            l10n.providerDetailPageBalanceResult(value),
+            style: TextStyle(
+              fontSize: 11,
+              color: cs.onSurface.withValues(alpha: 0.7),
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
     );
   }
 
@@ -646,6 +719,70 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       await _detectAllForModel(_detectModelId!);
     } finally {
       if (mounted) setState(() => _detecting = false);
+    }
+  }
+
+  Future<void> _onQueryBalances() async {
+    if (_queryingBalance) return;
+    final settings = context.read<SettingsProvider>();
+    final cfg = settings.getProviderConfig(
+      widget.providerKey,
+      defaultName: widget.providerDisplayName,
+    );
+    final l10n = AppLocalizations.of(context)!;
+    // Balance query reuses the provider-level balance settings; it must be
+    // enabled and the provider must be OpenAI-compatible.
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind != ProviderKind.openai || cfg.balanceEnabled != true) {
+      showAppSnackBar(
+        context,
+        message: l10n.multiKeyPageBalanceDisabled,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+    final keys = List<ApiKeyConfig>.from(cfg.apiKeys ?? const <ApiKeyConfig>[]);
+    if (keys.isEmpty) return;
+
+    setState(() {
+      _queryingBalance = true;
+      _balances.clear();
+      _balanceErrors.clear();
+    });
+    try {
+      // Query every key's balance concurrently.
+      await Future.wait(
+        keys.map((k) async {
+          try {
+            final value = await ProviderBalanceService.fetchBalanceForKey(
+              cfg,
+              k.key,
+            );
+            if (!mounted) return;
+            setState(() {
+              _balances[k.id] = value;
+              _balanceErrors.remove(k.id);
+            });
+          } catch (e) {
+            if (!mounted) return;
+            setState(() {
+              _balanceErrors[k.id] = e.toString();
+              _balances.remove(k.id);
+            });
+          }
+        }),
+      );
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.multiKeyPageBalanceQueriedSnackbar(keys.length),
+        type: NotificationType.success,
+      );
+    } finally {
+      if (mounted) setState(() => _queryingBalance = false);
     }
   }
 

@@ -313,6 +313,16 @@
   "providerDetailPageManageKeysButton": "多Key管理",
   "multiKeyPageTitle": "多Key管理",
   "multiKeyPageDetect": "检测",
+  "multiKeyPageQueryBalance": "查询余额",
+  "multiKeyPageBalanceDisabled": "请先在余额设置中开启余额查询",
+  "multiKeyPageBalanceQueriedSnackbar": "已查询 {n} 个 key 的余额",
+  "@multiKeyPageBalanceQueriedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "multiKeyPageAdd": "添加",
   "multiKeyPageAddHint": "请输入API Key（多个用逗号或空格分隔）",
   "multiKeyPageImportedSnackbar": "已导入{n}个key",
