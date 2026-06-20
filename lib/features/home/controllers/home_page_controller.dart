@@ -280,6 +280,10 @@ class HomePageController extends ChangeNotifier {
   bool get canToggleTemporaryConversation =>
       currentConversation != null && messages.isEmpty;
 
+  bool get canSaveTemporaryConversation =>
+      _chatService.isTemporaryConversation(currentConversation?.id) &&
+      messages.isNotEmpty;
+
   @override
   void notifyListeners() {
     if (_chatControllerReady) {
@@ -673,6 +677,10 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> toggleTemporaryConversation() async {
     await _viewModel.toggleTemporaryConversation();
+  }
+
+  Future<void> saveTemporaryConversation() async {
+    await _viewModel.saveTemporaryConversation();
   }
 
   void cancelQueuedMessage() {

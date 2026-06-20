@@ -655,6 +655,11 @@ class _HomePageState extends State<HomePage>
       canToggleTemporaryConversation:
           _controller.canToggleTemporaryConversation,
       temporaryConversationEnabled: _controller.isTemporaryConversation,
+      onSaveTemporaryConversation: () async {
+        await _controller.saveTemporaryConversation();
+      },
+      canSaveTemporaryConversation:
+          _controller.canSaveTemporaryConversation,
       onSelectModel: () => showModelSelectSheet(context),
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
@@ -797,6 +802,11 @@ class _HomePageState extends State<HomePage>
       canToggleTemporaryConversation:
           _controller.canToggleTemporaryConversation,
       temporaryConversationEnabled: _controller.isTemporaryConversation,
+      onSaveTemporaryConversation: () async {
+        await _controller.saveTemporaryConversation();
+      },
+      canSaveTemporaryConversation:
+          _controller.canSaveTemporaryConversation,
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,

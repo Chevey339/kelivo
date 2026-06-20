@@ -1531,6 +1531,7 @@
   "temporaryChatTitle": "临时对话",
   "temporaryChatEmptyMessage": "临时对话不显示在历史记录，退出后将被完全删除",
   "temporaryChatToggleTooltip": "切换临时对话",
+  "temporaryChatSave": "保存临时对话",
   "displaySettingsPageEnableDollarLatexTitle": "启用 $...$ 渲染",
   "displaySettingsPageEnableDollarLatexSubtitle": "将 $...$ 之间的内容按行内数学公式渲染",
   "displaySettingsPageEnableMathTitle": "启用数学公式渲染",

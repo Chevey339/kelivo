@@ -48,6 +48,45 @@ class ChatService extends ChangeNotifier {
     return id != null && _temporaryConversationIds.contains(id);
   }
 
+  /// Persist a temporary conversation (messages + metadata) to permanent storage.
+  /// After this call, the conversation behaves like a normal persistent conversation.
+  Future<void> persistTemporaryConversation(String id) async {
+    if (!_initialized) await init();
+    if (!_temporaryConversationIds.contains(id)) return;
+
+    final draft = _draftConversations[id];
+    if (draft == null) return;
+
+    // Persist the conversation itself
+    await _conversationsBox.put(id, draft);
+
+    // Persist all cached messages
+    final messages = _messagesCache[id] ?? <ChatMessage>[];
+    for (final message in messages) {
+      if (!_messagesBox.containsKey(message.id)) {
+        await _messagesBox.put(message.id, message);
+      }
+    }
+
+    // Persist tool events
+    for (final message in messages) {
+      final events = _temporaryToolEvents[message.id];
+      if (events != null) {
+        await _toolEventsBox.put(message.id, events);
+        _temporaryToolEvents.remove(message.id);
+      }
+      final sig = _temporaryGeminiThoughtSigs[message.id];
+      if (sig != null) {
+        await _toolEventsBox.put(_sigKey(message.id), sig);
+        _temporaryGeminiThoughtSigs.remove(message.id);
+      }
+    }
+
+    // Remove from temporary set so it behaves as a normal conversation
+    _temporaryConversationIds.remove(id);
+    notifyListeners();
+  }
+
   Future<void> init() async {
     if (_initialized) return;
 
