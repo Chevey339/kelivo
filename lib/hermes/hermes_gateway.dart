@@ -252,6 +252,7 @@ class HermesGateway {
         return MessageComplete(
           sessionId: sid,
           text: payload['text'] as String?,
+          payload: payload,
         );
 
       case 'reasoning.delta':
@@ -275,6 +276,12 @@ class HermesGateway {
           preview: payload['preview'] as String?,
           args: payload['args'] as Map<String, dynamic>?,
           index: (payload['index'] as num?)?.toInt() ?? 0,
+        );
+      case 'tool.progress':
+        return ToolProgress(
+          sessionId: sid,
+          name: payload['name'] as String? ?? '',
+          content: payload['content'] as String?,
         );
       case 'tool.generating':
         return ToolGenerating(
@@ -307,6 +314,12 @@ class HermesGateway {
         );
       case 'approval.request':
         return ApprovalRequest(sessionId: sid, payload: payload);
+      case 'clarify.request':
+        return ClarifyRequest(sessionId: sid, payload: payload);
+      case 'sudo.request':
+        return SudoRequest(sessionId: sid, payload: payload);
+      case 'secret.request':
+        return SecretRequest(sessionId: sid, payload: payload);
       case 'session.info':
         return SessionInfo(sessionId: sid, info: payload);
       case 'error':

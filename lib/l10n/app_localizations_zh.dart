@@ -5462,6 +5462,45 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get authModeAutoDetect => '自动检测';
+
+  @override
+  String get hermesApprovalTitle => '工具执行请求';
+
+  @override
+  String get hermesApprovalApprove => '允许';
+
+  @override
+  String get hermesApprovalDeny => '拒绝';
+
+  @override
+  String get hermesApprovalReasonLabel => '理由（可选）';
+
+  @override
+  String get hermesClarifyTitle => '需要澄清';
+
+  @override
+  String get hermesClarifySubmit => '提交';
+
+  @override
+  String get hermesClarifyCancel => '取消';
+
+  @override
+  String get hermesSudoTitle => '需要提升权限';
+
+  @override
+  String get hermesSudoApprove => '授权';
+
+  @override
+  String get hermesSudoDeny => '拒绝';
+
+  @override
+  String get hermesSecretTitle => '需要密钥';
+
+  @override
+  String get hermesSecretSubmit => '提交';
+
+  @override
+  String get hermesSecretCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10922,6 +10961,45 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get authModeAutoDetect => '自动检测';
+
+  @override
+  String get hermesApprovalTitle => '工具执行请求';
+
+  @override
+  String get hermesApprovalApprove => '允许';
+
+  @override
+  String get hermesApprovalDeny => '拒绝';
+
+  @override
+  String get hermesApprovalReasonLabel => '理由（可选）';
+
+  @override
+  String get hermesClarifyTitle => '需要澄清';
+
+  @override
+  String get hermesClarifySubmit => '提交';
+
+  @override
+  String get hermesClarifyCancel => '取消';
+
+  @override
+  String get hermesSudoTitle => '需要提升权限';
+
+  @override
+  String get hermesSudoApprove => '授权';
+
+  @override
+  String get hermesSudoDeny => '拒绝';
+
+  @override
+  String get hermesSecretTitle => '需要密钥';
+
+  @override
+  String get hermesSecretSubmit => '提交';
+
+  @override
+  String get hermesSecretCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16382,4 +16460,43 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get authModeAutoDetect => '自動檢測';
+
+  @override
+  String get hermesApprovalTitle => '工具執行請求';
+
+  @override
+  String get hermesApprovalApprove => '允許';
+
+  @override
+  String get hermesApprovalDeny => '拒絕';
+
+  @override
+  String get hermesApprovalReasonLabel => '理由（可選）';
+
+  @override
+  String get hermesClarifyTitle => '需要澄清';
+
+  @override
+  String get hermesClarifySubmit => '提交';
+
+  @override
+  String get hermesClarifyCancel => '取消';
+
+  @override
+  String get hermesSudoTitle => '需要提升權限';
+
+  @override
+  String get hermesSudoApprove => '授權';
+
+  @override
+  String get hermesSudoDeny => '拒絕';
+
+  @override
+  String get hermesSecretTitle => '需要密鑰';
+
+  @override
+  String get hermesSecretSubmit => '提交';
+
+  @override
+  String get hermesSecretCancel => '取消';
 }

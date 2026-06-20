@@ -10465,6 +10465,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Auto Detect'**
   String get authModeAutoDetect;
+
+  /// No description provided for @hermesApprovalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool Approval Request'**
+  String get hermesApprovalTitle;
+
+  /// No description provided for @hermesApprovalApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve'**
+  String get hermesApprovalApprove;
+
+  /// No description provided for @hermesApprovalDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get hermesApprovalDeny;
+
+  /// No description provided for @hermesApprovalReasonLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason (optional)'**
+  String get hermesApprovalReasonLabel;
+
+  /// No description provided for @hermesClarifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clarification Needed'**
+  String get hermesClarifyTitle;
+
+  /// No description provided for @hermesClarifySubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get hermesClarifySubmit;
+
+  /// No description provided for @hermesClarifyCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get hermesClarifyCancel;
+
+  /// No description provided for @hermesSudoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Elevated Permission Required'**
+  String get hermesSudoTitle;
+
+  /// No description provided for @hermesSudoApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Grant'**
+  String get hermesSudoApprove;
+
+  /// No description provided for @hermesSudoDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get hermesSudoDeny;
+
+  /// No description provided for @hermesSecretTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Secret Required'**
+  String get hermesSecretTitle;
+
+  /// No description provided for @hermesSecretSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get hermesSecretSubmit;
+
+  /// No description provided for @hermesSecretCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get hermesSecretCancel;
 }
 
 class _AppLocalizationsDelegate

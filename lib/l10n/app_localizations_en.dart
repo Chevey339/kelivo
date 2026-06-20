@@ -5681,4 +5681,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get authModeAutoDetect => 'Auto Detect';
+
+  @override
+  String get hermesApprovalTitle => 'Tool Approval Request';
+
+  @override
+  String get hermesApprovalApprove => 'Approve';
+
+  @override
+  String get hermesApprovalDeny => 'Deny';
+
+  @override
+  String get hermesApprovalReasonLabel => 'Reason (optional)';
+
+  @override
+  String get hermesClarifyTitle => 'Clarification Needed';
+
+  @override
+  String get hermesClarifySubmit => 'Submit';
+
+  @override
+  String get hermesClarifyCancel => 'Cancel';
+
+  @override
+  String get hermesSudoTitle => 'Elevated Permission Required';
+
+  @override
+  String get hermesSudoApprove => 'Grant';
+
+  @override
+  String get hermesSudoDeny => 'Deny';
+
+  @override
+  String get hermesSecretTitle => 'Secret Required';
+
+  @override
+  String get hermesSecretSubmit => 'Submit';
+
+  @override
+  String get hermesSecretCancel => 'Cancel';
 }

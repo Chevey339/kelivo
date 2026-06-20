@@ -9,7 +9,9 @@ import '../../../core/models/conversation.dart';
 import '../../../core/models/quick_phrase.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/hermes_gateway_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../hermes/hermes_models.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/providers/quick_phrase_provider.dart';
@@ -20,6 +22,7 @@ import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/dialogs/hermes_interactive_sheet.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
@@ -375,6 +378,7 @@ class HomePageController extends ChangeNotifier {
       chatController: _chatController,
       contextProvider: _context,
       getTitleForLocale: _titleForLocale,
+      hermesGatewayProvider: _context.read<HermesGatewayProvider>(),
     );
     _viewModel.addListener(notifyListeners);
   }
@@ -473,6 +477,66 @@ class HomePageController extends ChangeNotifier {
       _mcpProvider = _context.read<McpProvider>();
       _mcpProvider!.addListener(_onMcpChanged);
     } catch (_) {}
+
+    // Hermes interactive request sheets (approval, clarify, sudo, secret)
+    try {
+      final hp = _context.read<HermesGatewayProvider>();
+      hp.addListener(_onHermesPendingRequestsChanged);
+      _hermesGatewayProvider = hp;
+    } catch (_) {}
+  }
+
+  HermesGatewayProvider? _hermesGatewayProvider;
+
+  void _onHermesPendingRequestsChanged() {
+    final hp = _hermesGatewayProvider;
+    if (hp == null) return;
+
+    final requests = hp.pendingRequests;
+    if (requests.isEmpty) return;
+
+    // Take the oldest pending request and show the appropriate sheet.
+    // After the user responds, the provider's pending list is updated,
+    // which fires this listener again for the next request.
+    final request = requests.first;
+    final ctx = _scaffoldKey.currentContext ?? _context;
+    if (ctx.mounted) {
+      _showHermesSheet(ctx, hp, request);
+    }
+  }
+
+  void _showHermesSheet(
+    BuildContext ctx,
+    HermesGatewayProvider hp,
+    HermesPendingRequest request,
+  ) {
+    final event = request.event;
+
+    if (event is ApprovalRequest) {
+      HermesInteractiveSheet.showApproval(
+        context: ctx,
+        gateway: hp.gateway,
+        request: request,
+      );
+    } else if (event is ClarifyRequest) {
+      HermesInteractiveSheet.showClarify(
+        context: ctx,
+        gateway: hp.gateway,
+        request: request,
+      );
+    } else if (event is SudoRequest) {
+      HermesInteractiveSheet.showSudo(
+        context: ctx,
+        gateway: hp.gateway,
+        request: request,
+      );
+    } else if (event is SecretRequest) {
+      HermesInteractiveSheet.showSecret(
+        context: ctx,
+        gateway: hp.gateway,
+        request: request,
+      );
+    }
   }
 
   void _setupKeyboardListeners() {}
@@ -2036,6 +2100,7 @@ class HomePageController extends ChangeNotifier {
   void dispose() {
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
+    _hermesGatewayProvider?.removeListener(_onHermesPendingRequestsChanged);
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();

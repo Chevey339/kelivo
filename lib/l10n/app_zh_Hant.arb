@@ -2001,5 +2001,18 @@
   "qrScanHint": "掃描 Hermes 顯示的二維碼",
   "authModeLoopback": "Token 驗權",
   "authModeGated": "OAuth 驗權",
-  "authModeAutoDetect": "自動檢測"
+  "authModeAutoDetect": "自動檢測",
+  "hermesApprovalTitle": "工具執行請求",
+  "hermesApprovalApprove": "允許",
+  "hermesApprovalDeny": "拒絕",
+  "hermesApprovalReasonLabel": "理由（可選）",
+  "hermesClarifyTitle": "需要澄清",
+  "hermesClarifySubmit": "提交",
+  "hermesClarifyCancel": "取消",
+  "hermesSudoTitle": "需要提升權限",
+  "hermesSudoApprove": "授權",
+  "hermesSudoDeny": "拒絕",
+  "hermesSecretTitle": "需要密鑰",
+  "hermesSecretSubmit": "提交",
+  "hermesSecretCancel": "取消"
 }

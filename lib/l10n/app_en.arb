@@ -2424,5 +2424,18 @@
   "qrScanHint": "Scan the QR code shown on Hermes",
   "authModeLoopback": "Token Auth",
   "authModeGated": "OAuth Auth",
-  "authModeAutoDetect": "Auto Detect"
+  "authModeAutoDetect": "Auto Detect",
+  "hermesApprovalTitle": "Tool Approval Request",
+  "hermesApprovalApprove": "Approve",
+  "hermesApprovalDeny": "Deny",
+  "hermesApprovalReasonLabel": "Reason (optional)",
+  "hermesClarifyTitle": "Clarification Needed",
+  "hermesClarifySubmit": "Submit",
+  "hermesClarifyCancel": "Cancel",
+  "hermesSudoTitle": "Elevated Permission Required",
+  "hermesSudoApprove": "Grant",
+  "hermesSudoDeny": "Deny",
+  "hermesSecretTitle": "Secret Required",
+  "hermesSecretSubmit": "Submit",
+  "hermesSecretCancel": "Cancel"
 }

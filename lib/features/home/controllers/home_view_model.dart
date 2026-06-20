@@ -6,6 +6,7 @@ import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/hermes_gateway_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -161,6 +162,7 @@ class HomeViewModel extends ChangeNotifier {
     required this._chatController,
     required this._contextProvider,
     required this.getTitleForLocale,
+    HermesGatewayProvider? hermesGatewayProvider,
   }) {
     // Initialize ChatActions
     _chatActions = ChatActions(
@@ -171,6 +173,7 @@ class HomeViewModel extends ChangeNotifier {
       messageGenerationService: _messageGenerationService,
       contextProvider: _contextProvider,
       viewModel: this,
+      hermesProvider: hermesGatewayProvider,
     );
 
     // Wire up callbacks

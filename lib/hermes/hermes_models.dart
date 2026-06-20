@@ -33,17 +33,23 @@ class MessageComplete extends HermesStreamEvent {
   final String sessionId;
   final String? text;
 
-  const MessageComplete({required this.sessionId, this.text});
+  /// Raw payload from Hermes (may contain usage, finish_reason, etc.).
+  final Map<String, dynamic>? payload;
+
+  const MessageComplete({required this.sessionId, this.text, this.payload});
 
   factory MessageComplete.fromJson(Map<String, dynamic> json) =>
       MessageComplete(
         sessionId: json['session_id'] as String? ?? '',
         text: json['text'] as String?,
+        payload: (json['payload'] as Map<String, dynamic>?)
+            ?.cast<String, dynamic>(),
       );
 
   Map<String, dynamic> toJson() => {
     'session_id': sessionId,
     if (text != null) 'text': text,
+    if (payload != null) 'payload': payload,
   };
 }
 
@@ -138,7 +144,7 @@ class ToolStart extends HermesStreamEvent {
   };
 }
 
-/// Tool is generating / in progress.
+/// Tool is generating / in progress (tool.use output in flight).
 class ToolGenerating extends HermesStreamEvent {
   final String sessionId;
   final String name;
@@ -151,6 +157,31 @@ class ToolGenerating extends HermesStreamEvent {
   );
 
   Map<String, dynamic> toJson() => {'session_id': sessionId, 'name': name};
+}
+
+/// Tool incremental output (streaming progress).
+class ToolProgress extends HermesStreamEvent {
+  final String sessionId;
+  final String name;
+  final String? content;
+
+  const ToolProgress({
+    required this.sessionId,
+    required this.name,
+    this.content,
+  });
+
+  factory ToolProgress.fromJson(Map<String, dynamic> json) => ToolProgress(
+    sessionId: json['session_id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    content: json['content'] as String?,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'name': name,
+    if (content != null) 'content': content,
+  };
 }
 
 /// Tool invocation finished.
@@ -262,6 +293,66 @@ class SessionInfo extends HermesStreamEvent {
   );
 
   Map<String, dynamic> toJson() => {'session_id': sessionId, 'info': info};
+}
+
+/// Clarify request from the agent (needs user input to proceed).
+class ClarifyRequest extends HermesStreamEvent {
+  final String sessionId;
+  final Map<String, dynamic> payload;
+
+  const ClarifyRequest({required this.sessionId, required this.payload});
+
+  factory ClarifyRequest.fromJson(Map<String, dynamic> json) => ClarifyRequest(
+    sessionId: json['session_id'] as String? ?? '',
+    payload:
+        (json['payload'] as Map<String, dynamic>?)?.cast<String, dynamic>() ??
+        {},
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'payload': payload,
+  };
+}
+
+/// Sudo escalation request (needs user to grant elevated permissions).
+class SudoRequest extends HermesStreamEvent {
+  final String sessionId;
+  final Map<String, dynamic> payload;
+
+  const SudoRequest({required this.sessionId, required this.payload});
+
+  factory SudoRequest.fromJson(Map<String, dynamic> json) => SudoRequest(
+    sessionId: json['session_id'] as String? ?? '',
+    payload:
+        (json['payload'] as Map<String, dynamic>?)?.cast<String, dynamic>() ??
+        {},
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'payload': payload,
+  };
+}
+
+/// Secret reveal request (needs user to provide a secret/API key).
+class SecretRequest extends HermesStreamEvent {
+  final String sessionId;
+  final Map<String, dynamic> payload;
+
+  const SecretRequest({required this.sessionId, required this.payload});
+
+  factory SecretRequest.fromJson(Map<String, dynamic> json) => SecretRequest(
+    sessionId: json['session_id'] as String? ?? '',
+    payload:
+        (json['payload'] as Map<String, dynamic>?)?.cast<String, dynamic>() ??
+        {},
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'payload': payload,
+  };
 }
 
 /// Error from gateway or agent.

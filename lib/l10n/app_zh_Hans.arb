@@ -2001,5 +2001,18 @@
   "qrScanHint": "扫描 Hermes 显示的二维码",
   "authModeLoopback": "Token 鉴权",
   "authModeGated": "OAuth 鉴权",
-  "authModeAutoDetect": "自动检测"
+  "authModeAutoDetect": "自动检测",
+  "hermesApprovalTitle": "工具执行请求",
+  "hermesApprovalApprove": "允许",
+  "hermesApprovalDeny": "拒绝",
+  "hermesApprovalReasonLabel": "理由（可选）",
+  "hermesClarifyTitle": "需要澄清",
+  "hermesClarifySubmit": "提交",
+  "hermesClarifyCancel": "取消",
+  "hermesSudoTitle": "需要提升权限",
+  "hermesSudoApprove": "授权",
+  "hermesSudoDeny": "拒绝",
+  "hermesSecretTitle": "需要密钥",
+  "hermesSecretSubmit": "提交",
+  "hermesSecretCancel": "取消"
 }

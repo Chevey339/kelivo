@@ -6,10 +6,14 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/hermes_gateway_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../hermes/hermes_chat_adapter.dart';
+import '../../../hermes/hermes_gateway.dart';
+import '../../../hermes/hermes_rpc.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -65,6 +69,7 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
+    this.hermesProvider,
   });
 
   final HomeViewModel viewModel;
@@ -74,6 +79,10 @@ class ChatActions {
   final GenerationController generationController;
   final MessageGenerationService messageGenerationService;
   final BuildContext contextProvider;
+
+  /// Optional Hermes gateway provider (non-null when Hermes backend is active).
+  /// When set, generation is routed through Hermes RPC instead of ChatApiService.
+  final HermesGatewayProvider? hermesProvider;
 
   // ============================================================================
   // Callbacks for UI updates (set by HomeViewModel)
@@ -1012,6 +1021,17 @@ class ChatActions {
 
     try {
       await _startIosBackgroundGeneration(ctx);
+
+      // ── Hermes routing ────────────────────────────────────────────────
+      // If HermesGatewayProvider is available and gateway is ready, route
+      // through Hermes JSON-RPC instead of the REST API.
+      final hp = hermesProvider;
+      if (hp != null && hp.state == HermesConnectionState.ready) {
+        await _executeGenerationHermes(hp, ctx, state);
+        return;
+      }
+      // ── REST API routing (existing behaviour) ─────────────────────────
+
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
@@ -1043,6 +1063,94 @@ class ChatActions {
     } catch (e) {
       await _handleStreamError(e, state);
     }
+  }
+
+  // ── Hermes Generation Path ───────────────────────────────────────────
+
+  /// Execute generation via Hermes JSON-RPC.
+  ///
+  /// Creates or resumes a Hermes session, submits the prompt via
+  /// `prompt.submit`, then adapts Hermes events into [ChatStreamChunk]
+  /// via [HermesChatAdapter] so the downstream chunk handlers work unchanged.
+  Future<void> _executeGenerationHermes(
+    HermesGatewayProvider hp,
+    stream_ctrl.GenerationContext ctx,
+    stream_ctrl.StreamingState state,
+  ) async {
+    final conversationId = state.conversationId;
+
+    // Ensure a Hermes session exists
+    var sessionId = hp.activeSessionId;
+    if (sessionId == null || sessionId.isEmpty) {
+      // Try to resume most recent; if none, create new
+      try {
+        sessionId = await hp.resumeMostRecentSession();
+      } catch (_) {
+        sessionId = await hp.createSession();
+      }
+    }
+
+    // Extract the latest user prompt from apiMessages
+    String prompt = '';
+    for (var i = ctx.apiMessages.length - 1; i >= 0; i--) {
+      final msg = ctx.apiMessages[i];
+      final role = msg['role']?.toString();
+      final content = msg['content'];
+      if (role == 'user' && content != null) {
+        if (content is String) {
+          prompt = content;
+        } else if (content is List) {
+          // Extract text from multimodal content
+          for (final part in content) {
+            if (part is Map && part['type'] == 'text') {
+              prompt = part['text']?.toString() ?? '';
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    // Build attachments from userImagePaths (file:// or data:// URIs)
+    final attachments = <Map<String, dynamic>>[];
+    for (final path in ctx.userImagePaths) {
+      if (path.startsWith('http://') || path.startsWith('https://')) {
+        attachments.add({'type': 'image_url', 'url': path});
+      } else {
+        attachments.add({'type': 'file', 'path': path});
+      }
+    }
+
+    // Create adapter and start listening before sending prompt
+    final adapter = HermesChatAdapter(
+      eventBus: hp.eventBus,
+      sessionId: sessionId,
+    );
+
+    await _conversationStreams[conversationId]?.cancel();
+    final sub = listenSequentiallyToStream<ChatStreamChunk>(
+      stream: adapter.chunkStream,
+      onData: (chunk) => _handleStreamChunk(chunk, state),
+      onError: (error, stackTrace) => _handleStreamError(error, state),
+      onDone: () => _handleStreamDone(state),
+    );
+    _conversationStreams[conversationId] = sub;
+
+    // Submit prompt — Hermes starts generating and events flow through adapter
+    await hp.gateway.promptSubmit(
+      sessionId: sessionId,
+      prompt: prompt,
+      attachments: attachments.isEmpty ? null : attachments,
+      options: {
+        if (ctx.toolDefs.isNotEmpty) 'tools': ctx.toolDefs,
+        if (ctx.assistant?.thinkingBudget != null)
+          'thinking_budget': ctx.assistant!.thinkingBudget!,
+        if (ctx.assistant?.temperature != null)
+          'temperature': ctx.assistant!.temperature!,
+        if (ctx.streamOutput) 'stream': true,
+      },
+    );
   }
 
   // ============================================================================

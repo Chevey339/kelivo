@@ -1,10 +1,20 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../hermes/hermes_auth.dart';
 import '../../hermes/hermes_config.dart';
 import '../../hermes/hermes_event_bus.dart';
 import '../../hermes/hermes_gateway.dart';
-import '../../hermes/hermes_rest_client.dart';
+import '../../hermes/hermes_models.dart';
+import '../../hermes/hermes_rpc.dart';
+
+/// Pending interactive request (approval, clarify, sudo, secret).
+class HermesPendingRequest {
+  final String sessionId;
+  final HermesStreamEvent event;
+  final DateTime createdAt = DateTime.now();
+  HermesPendingRequest({required this.sessionId, required this.event});
+}
 
 /// Top-level provider that owns the [HermesGateway] singleton.
 ///
@@ -19,10 +29,48 @@ class HermesGatewayProvider extends ChangeNotifier {
   HermesBackendBox? _currentBackend;
   String? _lastError;
 
+  /// Active Hermes session ID (null when not connected).
+  String? _activeSessionId;
+
+  /// Pending interactive requests (approval, clarify, sudo, secret).
+  final List<HermesPendingRequest> _pendingRequests = [];
+
+  /// Stream subscription for forwarding interactive events to the UI.
+  StreamSubscription<HermesStreamEvent>? _eventSubscription;
+
   HermesGatewayProvider() {
     _config = HermesConfig();
     _eventBus = HermesEventBus();
     _gateway = HermesGateway(eventBus: _eventBus, config: _config);
+    _listenToEvents();
+  }
+
+  void _listenToEvents() {
+    _eventSubscription = _eventBus.allEvents.listen(_onEvent);
+  }
+
+  void _onEvent(HermesStreamEvent event) {
+    if (event is ApprovalRequest) {
+      _pendingRequests.add(
+        HermesPendingRequest(sessionId: event.sessionId, event: event),
+      );
+      notifyListeners();
+    } else if (event is ClarifyRequest) {
+      _pendingRequests.add(
+        HermesPendingRequest(sessionId: event.sessionId, event: event),
+      );
+      notifyListeners();
+    } else if (event is SudoRequest) {
+      _pendingRequests.add(
+        HermesPendingRequest(sessionId: event.sessionId, event: event),
+      );
+      notifyListeners();
+    } else if (event is SecretRequest) {
+      _pendingRequests.add(
+        HermesPendingRequest(sessionId: event.sessionId, event: event),
+      );
+      notifyListeners();
+    }
   }
 
   HermesConnectionState get state => _state;
@@ -124,8 +172,81 @@ class HermesGatewayProvider extends ChangeNotifier {
     return _gateway.sendRpc(method, params);
   }
 
+  // ── Session Management ───────────────────────────────────────────────
+
+  /// The currently active Hermes session ID.
+  String? get activeSessionId => _activeSessionId;
+
+  /// Set the active session ID (called after session.create / session.resume).
+  void setActiveSessionId(String? id) {
+    _activeSessionId = id;
+    notifyListeners();
+  }
+
+  /// Create a new Hermes session and set it as active.
+  Future<String> createSession({String? cwd}) async {
+    final id = await _gateway.sessionCreate(cwd: cwd);
+    _activeSessionId = id;
+    notifyListeners();
+    return id;
+  }
+
+  /// Resume an existing Hermes session and set it as active.
+  Future<String> resumeSession(String id) async {
+    final sessionId = await _gateway.sessionResume(id);
+    _activeSessionId = sessionId;
+    notifyListeners();
+    return sessionId;
+  }
+
+  /// Resume the most recent session and set it as active.
+  Future<String> resumeMostRecentSession() async {
+    final id = await _gateway.sessionMostRecent();
+    _activeSessionId = id;
+    notifyListeners();
+    return id;
+  }
+
+  /// Interrupt the active generation.
+  Future<void> interrupt() async {
+    if (_activeSessionId != null) {
+      await _gateway.sessionInterrupt(_activeSessionId!);
+    }
+  }
+
+  /// Close the active session.
+  Future<void> closeSession() async {
+    if (_activeSessionId != null) {
+      await _gateway.sessionClose(_activeSessionId!);
+      _activeSessionId = null;
+      notifyListeners();
+    }
+  }
+
+  // ── Pending Interactive Requests ────────────────────────────────────
+
+  /// All currently pending interactive requests.
+  List<HermesPendingRequest> get pendingRequests =>
+      List.unmodifiable(_pendingRequests);
+
+  /// Pop and consume a pending request for a session.
+  HermesPendingRequest? takePendingRequest(String sessionId) {
+    final idx = _pendingRequests.indexWhere((r) => r.sessionId == sessionId);
+    if (idx < 0) return null;
+    final req = _pendingRequests.removeAt(idx);
+    notifyListeners();
+    return req;
+  }
+
+  /// Clear all pending requests.
+  void clearPendingRequests() {
+    _pendingRequests.clear();
+    notifyListeners();
+  }
+
   @override
   void dispose() {
+    _eventSubscription?.cancel();
     _gateway.dispose();
     super.dispose();
   }
