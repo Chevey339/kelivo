@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
+import 'package:Kelivo/shared/widgets/mermaid_block.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
 import 'package:Kelivo/shared/widgets/mermaid_image_cache.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -1539,7 +1540,7 @@ $code
       expect(find.byTooltip('Full screen'), findsOneWidget);
       expect(
         tester
-            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .getSize(find.byKey(const ValueKey('preview-body')))
             .height,
         406,
       );
@@ -1616,7 +1617,7 @@ $code
       await tester.pump();
 
       final bodyRight = tester
-          .getTopRight(find.byKey(const ValueKey('mermaid-preview-body')))
+          .getTopRight(find.byKey(const ValueKey('preview-body')))
           .dx;
       final fullScreenRight = tester
           .getTopRight(find.byTooltip('Full screen'))
@@ -1674,7 +1675,7 @@ A-->B
 
       expect(
         tester
-            .getSize(find.byKey(const ValueKey('mermaid-preview-body')))
+            .getSize(find.byKey(const ValueKey('preview-body')))
             .height,
         406,
       );

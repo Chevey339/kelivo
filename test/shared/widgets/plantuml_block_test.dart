@@ -64,7 +64,7 @@ void main() {
       expect(find.byTooltip('Open Preview'), findsOneWidget);
       expect(
         tester
-            .getSize(find.byKey(const ValueKey('plantuml-preview-body')))
+            .getSize(find.byKey(const ValueKey('preview-body')))
             .height,
         406,
       );
@@ -80,7 +80,7 @@ void main() {
       await tester.pump();
 
       final bodyRight = tester
-          .getTopRight(find.byKey(const ValueKey('plantuml-preview-body')))
+          .getTopRight(find.byKey(const ValueKey('preview-body')))
           .dx;
       final openRight = tester.getTopRight(find.byTooltip('Open Preview')).dx;
 
