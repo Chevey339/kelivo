@@ -15,7 +15,7 @@ class HermesGatewayProvider extends ChangeNotifier {
   late final HermesEventBus _eventBus;
   late final HermesGateway _gateway;
 
-  HermesConnectionState _state = HermesConnectionState.disconnected;
+  HermesConnectionState _state = HermesConnectionState.initializing;
   HermesBackendBox? _currentBackend;
   String? _lastError;
 

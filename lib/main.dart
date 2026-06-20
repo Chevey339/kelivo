@@ -32,7 +32,12 @@ import 'core/providers/backup_provider.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
+import 'core/providers/hermes_gateway_provider.dart';
 import 'core/services/chat/chat_service.dart';
+import 'hermes/hermes_config.dart';
+import 'features/backend/add_backend_sheet.dart';
+import 'features/connection/connection_gate.dart';
+import 'shared/widgets/ios_tactile.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
@@ -159,6 +164,8 @@ class MyApp extends StatelessWidget {
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),
+        // Hermes gateway — owns WS connection lifecycle
+        ChangeNotifierProvider(create: (_) => HermesGatewayProvider()),
       ],
       child: Builder(
         builder: (context) {
@@ -365,7 +372,7 @@ class MyApp extends StatelessWidget {
                 darkTheme: themedDark,
                 themeMode: settings.themeMode,
                 navigatorObservers: <NavigatorObserver>[routeObserver],
-                home: _selectHome(),
+                home: ConnectionGate(child: _selectHome()),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
                   final overlay = bright == Brightness.dark

@@ -9,10 +9,22 @@ import 'hermes_models.dart';
 
 /// Connection state of the Hermes WebSocket gateway.
 enum HermesConnectionState {
+  /// App is initializing — Hive config loading, provider setting up.
+  initializing,
+
+  /// Not connected to any backend.
   disconnected,
+
+  /// WebSocket handshake in progress.
   connecting,
+
+  /// Authenticating with the backend.
   authenticating,
+
+  /// Connected and ready to send/receive.
   ready,
+
+  /// Connection failed; an error is stored.
   error,
 }
 

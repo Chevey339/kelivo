@@ -110,13 +110,14 @@ dependencies:
   math_expressions: ^2.6.2
 
   # Hermes client
-  # Note: bonsoir mDNS discovery is TODO (Phase 0.5).
-  # bonsoir_darwin has an unresolvable Swift compilation bug on macOS.
-  # Fixed via local override in packages/bonsoir_darwin_fix/.
-  bonsoir: ^6.0.1
   web_socket_channel: ^3.0.2
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0
+
+  # hermes_mdns provides bonsoir-based mDNS discovery for iOS/Android only.
+  # On web/desktop it is replaced by the stub via conditional import.
+  hermes_mdns:
+    path: ./packages/hermes_mdns
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
