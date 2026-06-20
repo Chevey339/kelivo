@@ -10189,6 +10189,282 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @backendPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backends'**
+  String get backendPageTitle;
+
+  /// No description provided for @backendAddButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Backend'**
+  String get backendAddButton;
+
+  /// No description provided for @backendListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No backends configured'**
+  String get backendListEmpty;
+
+  /// No description provided for @backendListEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Hermes backend to start chatting'**
+  String get backendListEmptyHint;
+
+  /// No description provided for @addBackendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Backend'**
+  String get addBackendTitle;
+
+  /// No description provided for @addBackendTabManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get addBackendTabManual;
+
+  /// No description provided for @addBackendTabQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR'**
+  String get addBackendTabQr;
+
+  /// No description provided for @addBackendTabLan.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Network'**
+  String get addBackendTabLan;
+
+  /// No description provided for @addBackendUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get addBackendUrlLabel;
+
+  /// No description provided for @addBackendUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'ws://192.168.1.100:9119'**
+  String get addBackendUrlHint;
+
+  /// No description provided for @addBackendTokenLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Token'**
+  String get addBackendTokenLabel;
+
+  /// No description provided for @addBackendTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Hermes session token'**
+  String get addBackendTokenHint;
+
+  /// No description provided for @addBackendProfileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile (optional)'**
+  String get addBackendProfileLabel;
+
+  /// No description provided for @addBackendProfileHint.
+  ///
+  /// In en, this message translates to:
+  /// **'default'**
+  String get addBackendProfileHint;
+
+  /// No description provided for @addBackendTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection'**
+  String get addBackendTestConnection;
+
+  /// No description provided for @addBackendAutoDetect.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Detect'**
+  String get addBackendAutoDetect;
+
+  /// No description provided for @addBackendSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get addBackendSave;
+
+  /// No description provided for @addBackendCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get addBackendCancel;
+
+  /// No description provided for @backendDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backend Details'**
+  String get backendDetailTitle;
+
+  /// No description provided for @backendDetailUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'URL'**
+  String get backendDetailUrl;
+
+  /// No description provided for @backendDetailAuthMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Auth Mode'**
+  String get backendDetailAuthMode;
+
+  /// No description provided for @backendDetailAuthModeLoopback.
+  ///
+  /// In en, this message translates to:
+  /// **'Token (insecure)'**
+  String get backendDetailAuthModeLoopback;
+
+  /// No description provided for @backendDetailAuthModeGated.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth (secure)'**
+  String get backendDetailAuthModeGated;
+
+  /// No description provided for @backendDetailLastConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Connected'**
+  String get backendDetailLastConnected;
+
+  /// No description provided for @backendDetailLastError.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Error'**
+  String get backendDetailLastError;
+
+  /// No description provided for @backendDetailReconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnect'**
+  String get backendDetailReconnect;
+
+  /// No description provided for @backendDetailEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get backendDetailEdit;
+
+  /// No description provided for @backendDetailDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get backendDetailDelete;
+
+  /// No description provided for @backendDetailDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this backend?'**
+  String get backendDetailDeleteConfirm;
+
+  /// No description provided for @backendDetailTestConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection'**
+  String get backendDetailTestConnection;
+
+  /// No description provided for @connectionGateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get connectionGateTitle;
+
+  /// No description provided for @connectionGateConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to {url}'**
+  String connectionGateConnecting(Object url);
+
+  /// No description provided for @connectionGateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection Failed'**
+  String get connectionGateFailed;
+
+  /// No description provided for @connectionGateNoBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'No Backend Configured'**
+  String get connectionGateNoBackend;
+
+  /// No description provided for @connectionGateNoBackendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a Hermes backend to start chatting'**
+  String get connectionGateNoBackendHint;
+
+  /// No description provided for @connectionGateRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get connectionGateRetry;
+
+  /// No description provided for @connectionGateViewBackend.
+  ///
+  /// In en, this message translates to:
+  /// **'View Backend'**
+  String get connectionGateViewBackend;
+
+  /// No description provided for @lanDiscoverySearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for local Hermes servers…'**
+  String get lanDiscoverySearching;
+
+  /// No description provided for @lanDiscoveryFound.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} found'**
+  String lanDiscoveryFound(Object count);
+
+  /// No description provided for @lanDiscoveryNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No Hermes servers found on local network'**
+  String get lanDiscoveryNone;
+
+  /// No description provided for @lanDiscoveryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Make sure Hermes is running on your local network'**
+  String get lanDiscoveryHint;
+
+  /// No description provided for @qrScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR Code'**
+  String get qrScanTitle;
+
+  /// No description provided for @qrScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the QR code shown on Hermes'**
+  String get qrScanHint;
+
+  /// No description provided for @authModeLoopback.
+  ///
+  /// In en, this message translates to:
+  /// **'Token Auth'**
+  String get authModeLoopback;
+
+  /// No description provided for @authModeGated.
+  ///
+  /// In en, this message translates to:
+  /// **'OAuth Auth'**
+  String get authModeGated;
+
+  /// No description provided for @authModeAutoDetect.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Detect'**
+  String get authModeAutoDetect;
 }
 
 class _AppLocalizationsDelegate

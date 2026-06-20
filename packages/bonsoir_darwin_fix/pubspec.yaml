@@ -1,0 +1,24 @@
+name: bonsoir_darwin
+description: "Darwin (iOS & macOS) implementation of the Bonsoir plugin. Local fix: added Foundation import."
+publish_to: 'none'
+version: 6.1.0
+
+environment:
+  sdk: ^3.11.0
+  flutter: ">=3.41.0"
+
+flutter:
+  plugin:
+    implements: bonsoir
+    platforms:
+      ios:
+        pluginClass: SwiftBonsoirPlugin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: SwiftBonsoirPlugin
+        sharedDarwinSource: true
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bonsoir_platform_interface: ^6.1.0

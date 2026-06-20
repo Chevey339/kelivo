@@ -5320,6 +5320,148 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get backendPageTitle => '后端';
+
+  @override
+  String get backendAddButton => '添加后端';
+
+  @override
+  String get backendListEmpty => '未配置后端';
+
+  @override
+  String get backendListEmptyHint => '添加 Hermes 后端以开始聊天';
+
+  @override
+  String get addBackendTitle => '添加后端';
+
+  @override
+  String get addBackendTabManual => '手动输入';
+
+  @override
+  String get addBackendTabQr => '扫码';
+
+  @override
+  String get addBackendTabLan => '局域网';
+
+  @override
+  String get addBackendUrlLabel => '服务器地址';
+
+  @override
+  String get addBackendUrlHint => 'ws://192.168.1.100:9119';
+
+  @override
+  String get addBackendTokenLabel => 'Token';
+
+  @override
+  String get addBackendTokenHint => '您的 Hermes 会话令牌';
+
+  @override
+  String get addBackendProfileLabel => 'Profile（可选）';
+
+  @override
+  String get addBackendProfileHint => 'default';
+
+  @override
+  String get addBackendTestConnection => '测试连接';
+
+  @override
+  String get addBackendAutoDetect => '自动检测';
+
+  @override
+  String get addBackendSave => '保存';
+
+  @override
+  String get addBackendCancel => '取消';
+
+  @override
+  String get backendDetailTitle => '后端详情';
+
+  @override
+  String get backendDetailUrl => '地址';
+
+  @override
+  String get backendDetailAuthMode => '鉴权模式';
+
+  @override
+  String get backendDetailAuthModeLoopback => 'Token 鉴权（不安全）';
+
+  @override
+  String get backendDetailAuthModeGated => 'OAuth 鉴权（安全）';
+
+  @override
+  String get backendDetailLastConnected => '上次连接';
+
+  @override
+  String get backendDetailLastError => '上次错误';
+
+  @override
+  String get backendDetailReconnect => '重新连接';
+
+  @override
+  String get backendDetailEdit => '编辑';
+
+  @override
+  String get backendDetailDelete => '删除';
+
+  @override
+  String get backendDetailDeleteConfirm => '确定删除此后端？';
+
+  @override
+  String get backendDetailTestConnection => '测试连接';
+
+  @override
+  String get connectionGateTitle => '连接中…';
+
+  @override
+  String connectionGateConnecting(Object url) {
+    return '正在连接到 $url';
+  }
+
+  @override
+  String get connectionGateFailed => '连接失败';
+
+  @override
+  String get connectionGateNoBackend => '未配置后端';
+
+  @override
+  String get connectionGateNoBackendHint => '添加 Hermes 后端以开始聊天';
+
+  @override
+  String get connectionGateRetry => '重试';
+
+  @override
+  String get connectionGateViewBackend => '查看后端';
+
+  @override
+  String get lanDiscoverySearching => '正在搜索本地 Hermes 服务器…';
+
+  @override
+  String lanDiscoveryFound(Object count) {
+    return '发现 $count 个';
+  }
+
+  @override
+  String get lanDiscoveryNone => '未在局域网内发现 Hermes 服务器';
+
+  @override
+  String get lanDiscoveryHint => '请确保 Hermes 正在本地网络中运行';
+
+  @override
+  String get qrScanTitle => '扫描二维码';
+
+  @override
+  String get qrScanHint => '扫描 Hermes 显示的二维码';
+
+  @override
+  String get authModeLoopback => 'Token 鉴权';
+
+  @override
+  String get authModeGated => 'OAuth 鉴权';
+
+  @override
+  String get authModeAutoDetect => '自动检测';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10638,6 +10780,148 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get backendPageTitle => '后端';
+
+  @override
+  String get backendAddButton => '添加后端';
+
+  @override
+  String get backendListEmpty => '未配置后端';
+
+  @override
+  String get backendListEmptyHint => '添加 Hermes 后端以开始聊天';
+
+  @override
+  String get addBackendTitle => '添加后端';
+
+  @override
+  String get addBackendTabManual => '手动输入';
+
+  @override
+  String get addBackendTabQr => '扫码';
+
+  @override
+  String get addBackendTabLan => '局域网';
+
+  @override
+  String get addBackendUrlLabel => '服务器地址';
+
+  @override
+  String get addBackendUrlHint => 'ws://192.168.1.100:9119';
+
+  @override
+  String get addBackendTokenLabel => 'Token';
+
+  @override
+  String get addBackendTokenHint => '您的 Hermes 会话令牌';
+
+  @override
+  String get addBackendProfileLabel => 'Profile（可选）';
+
+  @override
+  String get addBackendProfileHint => 'default';
+
+  @override
+  String get addBackendTestConnection => '测试连接';
+
+  @override
+  String get addBackendAutoDetect => '自动检测';
+
+  @override
+  String get addBackendSave => '保存';
+
+  @override
+  String get addBackendCancel => '取消';
+
+  @override
+  String get backendDetailTitle => '后端详情';
+
+  @override
+  String get backendDetailUrl => '地址';
+
+  @override
+  String get backendDetailAuthMode => '鉴权模式';
+
+  @override
+  String get backendDetailAuthModeLoopback => 'Token 鉴权（不安全）';
+
+  @override
+  String get backendDetailAuthModeGated => 'OAuth 鉴权（安全）';
+
+  @override
+  String get backendDetailLastConnected => '上次连接';
+
+  @override
+  String get backendDetailLastError => '上次错误';
+
+  @override
+  String get backendDetailReconnect => '重新连接';
+
+  @override
+  String get backendDetailEdit => '编辑';
+
+  @override
+  String get backendDetailDelete => '删除';
+
+  @override
+  String get backendDetailDeleteConfirm => '确定删除此后端？';
+
+  @override
+  String get backendDetailTestConnection => '测试连接';
+
+  @override
+  String get connectionGateTitle => '连接中…';
+
+  @override
+  String connectionGateConnecting(Object url) {
+    return '正在连接到 $url';
+  }
+
+  @override
+  String get connectionGateFailed => '连接失败';
+
+  @override
+  String get connectionGateNoBackend => '未配置后端';
+
+  @override
+  String get connectionGateNoBackendHint => '添加 Hermes 后端以开始聊天';
+
+  @override
+  String get connectionGateRetry => '重试';
+
+  @override
+  String get connectionGateViewBackend => '查看后端';
+
+  @override
+  String get lanDiscoverySearching => '正在搜索本地 Hermes 服务器…';
+
+  @override
+  String lanDiscoveryFound(Object count) {
+    return '发现 $count 个';
+  }
+
+  @override
+  String get lanDiscoveryNone => '未在局域网内发现 Hermes 服务器';
+
+  @override
+  String get lanDiscoveryHint => '请确保 Hermes 正在本地网络中运行';
+
+  @override
+  String get qrScanTitle => '扫描二维码';
+
+  @override
+  String get qrScanHint => '扫描 Hermes 显示的二维码';
+
+  @override
+  String get authModeLoopback => 'Token 鉴权';
+
+  @override
+  String get authModeGated => 'OAuth 鉴权';
+
+  @override
+  String get authModeAutoDetect => '自动检测';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15956,4 +16240,146 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get backendPageTitle => '後端';
+
+  @override
+  String get backendAddButton => '添加後端';
+
+  @override
+  String get backendListEmpty => '未配置後端';
+
+  @override
+  String get backendListEmptyHint => '添加 Hermes 後端以開始聊天';
+
+  @override
+  String get addBackendTitle => '添加後端';
+
+  @override
+  String get addBackendTabManual => '手動輸入';
+
+  @override
+  String get addBackendTabQr => '掃碼';
+
+  @override
+  String get addBackendTabLan => '區域網';
+
+  @override
+  String get addBackendUrlLabel => '伺服器地址';
+
+  @override
+  String get addBackendUrlHint => 'ws://192.168.1.100:9119';
+
+  @override
+  String get addBackendTokenLabel => 'Token';
+
+  @override
+  String get addBackendTokenHint => '您的 Hermes 會話令牌';
+
+  @override
+  String get addBackendProfileLabel => 'Profile（可選）';
+
+  @override
+  String get addBackendProfileHint => 'default';
+
+  @override
+  String get addBackendTestConnection => '測試連線';
+
+  @override
+  String get addBackendAutoDetect => '自動檢測';
+
+  @override
+  String get addBackendSave => '儲存';
+
+  @override
+  String get addBackendCancel => '取消';
+
+  @override
+  String get backendDetailTitle => '後端詳情';
+
+  @override
+  String get backendDetailUrl => '地址';
+
+  @override
+  String get backendDetailAuthMode => '驗權模式';
+
+  @override
+  String get backendDetailAuthModeLoopback => 'Token 驗權（不安全）';
+
+  @override
+  String get backendDetailAuthModeGated => 'OAuth 驗權（安全）';
+
+  @override
+  String get backendDetailLastConnected => '上次連線';
+
+  @override
+  String get backendDetailLastError => '上次錯誤';
+
+  @override
+  String get backendDetailReconnect => '重新連線';
+
+  @override
+  String get backendDetailEdit => '編輯';
+
+  @override
+  String get backendDetailDelete => '刪除';
+
+  @override
+  String get backendDetailDeleteConfirm => '確定刪除此後端？';
+
+  @override
+  String get backendDetailTestConnection => '測試連線';
+
+  @override
+  String get connectionGateTitle => '連線中…';
+
+  @override
+  String connectionGateConnecting(Object url) {
+    return '正在連線到 $url';
+  }
+
+  @override
+  String get connectionGateFailed => '連線失敗';
+
+  @override
+  String get connectionGateNoBackend => '未配置後端';
+
+  @override
+  String get connectionGateNoBackendHint => '添加 Hermes 後端以開始聊天';
+
+  @override
+  String get connectionGateRetry => '重試';
+
+  @override
+  String get connectionGateViewBackend => '查看後端';
+
+  @override
+  String get lanDiscoverySearching => '正在搜索本地 Hermes 伺服器…';
+
+  @override
+  String lanDiscoveryFound(Object count) {
+    return '發現 $count 個';
+  }
+
+  @override
+  String get lanDiscoveryNone => '未在區域網內發現 Hermes 伺服器';
+
+  @override
+  String get lanDiscoveryHint => '請確保 Hermes 正在本地網絡中運行';
+
+  @override
+  String get qrScanTitle => '掃描二維碼';
+
+  @override
+  String get qrScanHint => '掃描 Hermes 顯示的二維碼';
+
+  @override
+  String get authModeLoopback => 'Token 驗權';
+
+  @override
+  String get authModeGated => 'OAuth 驗權';
+
+  @override
+  String get authModeAutoDetect => '自動檢測';
 }

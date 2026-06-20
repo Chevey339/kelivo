@@ -1,0 +1,15 @@
+name: hermes_mdns
+description: "mDNS backend discovery for Hermes using bonsoir (iOS/Android only)."
+publish_to: 'none'
+version: 1.0.0
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bonsoir: ^6.0.1
+
+dev_dependencies:
+  flutter_lints: ^5.0.0

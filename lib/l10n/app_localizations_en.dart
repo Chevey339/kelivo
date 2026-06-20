@@ -5537,4 +5537,148 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get backendPageTitle => 'Backends';
+
+  @override
+  String get backendAddButton => 'Add Backend';
+
+  @override
+  String get backendListEmpty => 'No backends configured';
+
+  @override
+  String get backendListEmptyHint => 'Add a Hermes backend to start chatting';
+
+  @override
+  String get addBackendTitle => 'Add Backend';
+
+  @override
+  String get addBackendTabManual => 'Manual';
+
+  @override
+  String get addBackendTabQr => 'Scan QR';
+
+  @override
+  String get addBackendTabLan => 'Local Network';
+
+  @override
+  String get addBackendUrlLabel => 'Server URL';
+
+  @override
+  String get addBackendUrlHint => 'ws://192.168.1.100:9119';
+
+  @override
+  String get addBackendTokenLabel => 'Token';
+
+  @override
+  String get addBackendTokenHint => 'Your Hermes session token';
+
+  @override
+  String get addBackendProfileLabel => 'Profile (optional)';
+
+  @override
+  String get addBackendProfileHint => 'default';
+
+  @override
+  String get addBackendTestConnection => 'Test Connection';
+
+  @override
+  String get addBackendAutoDetect => 'Auto Detect';
+
+  @override
+  String get addBackendSave => 'Save';
+
+  @override
+  String get addBackendCancel => 'Cancel';
+
+  @override
+  String get backendDetailTitle => 'Backend Details';
+
+  @override
+  String get backendDetailUrl => 'URL';
+
+  @override
+  String get backendDetailAuthMode => 'Auth Mode';
+
+  @override
+  String get backendDetailAuthModeLoopback => 'Token (insecure)';
+
+  @override
+  String get backendDetailAuthModeGated => 'OAuth (secure)';
+
+  @override
+  String get backendDetailLastConnected => 'Last Connected';
+
+  @override
+  String get backendDetailLastError => 'Last Error';
+
+  @override
+  String get backendDetailReconnect => 'Reconnect';
+
+  @override
+  String get backendDetailEdit => 'Edit';
+
+  @override
+  String get backendDetailDelete => 'Delete';
+
+  @override
+  String get backendDetailDeleteConfirm => 'Delete this backend?';
+
+  @override
+  String get backendDetailTestConnection => 'Test Connection';
+
+  @override
+  String get connectionGateTitle => 'Connecting…';
+
+  @override
+  String connectionGateConnecting(Object url) {
+    return 'Connecting to $url';
+  }
+
+  @override
+  String get connectionGateFailed => 'Connection Failed';
+
+  @override
+  String get connectionGateNoBackend => 'No Backend Configured';
+
+  @override
+  String get connectionGateNoBackendHint =>
+      'Add a Hermes backend to start chatting';
+
+  @override
+  String get connectionGateRetry => 'Retry';
+
+  @override
+  String get connectionGateViewBackend => 'View Backend';
+
+  @override
+  String get lanDiscoverySearching => 'Searching for local Hermes servers…';
+
+  @override
+  String lanDiscoveryFound(Object count) {
+    return '$count found';
+  }
+
+  @override
+  String get lanDiscoveryNone => 'No Hermes servers found on local network';
+
+  @override
+  String get lanDiscoveryHint =>
+      'Make sure Hermes is running on your local network';
+
+  @override
+  String get qrScanTitle => 'Scan QR Code';
+
+  @override
+  String get qrScanHint => 'Scan the QR code shown on Hermes';
+
+  @override
+  String get authModeLoopback => 'Token Auth';
+
+  @override
+  String get authModeGated => 'OAuth Auth';
+
+  @override
+  String get authModeAutoDetect => 'Auto Detect';
 }
