@@ -21,13 +21,14 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../features/home/services/input_draft_persistence.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../../theme/app_font_weights.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -181,6 +182,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  bool _restorePending = true;
+
+  InputDraftPersistence? _draftPersistence;
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -250,24 +254,32 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
 
   // Instance method for onChanged to avoid recreating the callback on every build
-  void _onTextChanged(String _) => setState(() {});
+  void _onTextChanged(String _) {
+    setState(() {});
+    if (_restorePending) return;
+    _scheduleDraftSave();
+  }
 
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
     setState(() => _images.addAll(paths));
+    _scheduleDraftSave();
   }
 
   void _clearImages() {
     setState(() => _images.clear());
+    _scheduleDraftSave();
   }
 
   void _addFiles(List<DocumentAttachment> docs) {
     if (docs.isEmpty) return;
     setState(() => _docs.addAll(docs));
+    _scheduleDraftSave();
   }
 
   void _clearFiles() {
     setState(() => _docs.clear());
+    _scheduleDraftSave();
   }
 
   void _restoreInput(ChatInputData input) {
@@ -296,14 +308,49 @@ class _ChatInputBarState extends State<ChatInputBar>
       _images.clear();
       _docs.clear();
     });
+    _draftPersistence?.delete();
+  }
+
+  void _scheduleDraftSave() {
+    final data = _snapshotInput(_controller.text);
+    _draftPersistence?.scheduleSave(data);
+  }
+
+  Future<void> _restoreDraft() async {
+    final data = await _draftPersistence?.restore();
+    _restorePending = false;
+    if (!mounted || data == null) return;
+    if (_controller.text.isNotEmpty) {
+      // 用户已输入文本，仅恢复附件，不覆盖文字
+      setState(() {
+        _images
+          ..clear()
+          ..addAll(data.imagePaths);
+        _docs
+          ..clear()
+          ..addAll(data.documents);
+      });
+      return;
+    }
+    _controller.text = data.text;
+    setState(() {
+      _images
+        ..clear()
+        ..addAll(data.imagePaths);
+      _docs
+        ..clear()
+        ..addAll(data.documents);
+    });
   }
 
   void _removeImageAt(int index) {
     setState(() => _images.removeAt(index));
+    _scheduleDraftSave();
   }
 
   void _removeDocumentAt(int index) {
     setState(() => _docs.removeAt(index));
+    _scheduleDraftSave();
   }
 
   @override
@@ -312,6 +359,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     _controller = widget.controller ?? TextEditingController();
     widget.mediaController?._bind(this);
     WidgetsBinding.instance.addObserver(this);
+    _draftPersistence = InputDraftPersistence();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _restoreDraft();
+    });
   }
 
   @override
@@ -333,6 +384,7 @@ class _ChatInputBarState extends State<ChatInputBar>
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
       widget.focusNode?.unfocus();
+      _draftPersistence?.saveImmediately();
     }
   }
 
@@ -349,6 +401,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (widget.controller == null) {
       _controller.dispose();
     }
+    _draftPersistence?.dispose();
     super.dispose();
   }
 
@@ -394,6 +447,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         _controller.clear();
         _images.clear();
         _docs.clear();
+        _draftPersistence?.delete();
         setState(() {});
         // Keep focus on desktop so user can continue typing
         try {
