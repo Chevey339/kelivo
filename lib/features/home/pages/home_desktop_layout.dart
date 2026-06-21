@@ -64,6 +64,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onRightSidebarWidthChangeEnd,
     required this.buildAssistantBackground,
     this.appBarOverride,
+    this.onOpenHermesTerminal,
     required this.body,
   });
 
@@ -103,6 +104,7 @@ class HomeDesktopScaffold extends StatelessWidget {
   final VoidCallback onRightSidebarWidthChangeEnd;
   final Widget Function(BuildContext context) buildAssistantBackground;
   final PreferredSizeWidget? appBarOverride;
+  final VoidCallback? onOpenHermesTerminal;
   final Widget body;
 
   static const Duration _sidebarAnimDuration = Duration(milliseconds: 260);
@@ -580,6 +582,16 @@ class HomeDesktopScaffold extends StatelessWidget {
           }
         },
       ),
+      const SizedBox(width: 6),
+      if (onOpenHermesTerminal != null)
+        IosIconButton(
+          size: 20,
+          padding: const EdgeInsets.all(8),
+          minSize: 40,
+          semanticLabel: AppLocalizations.of(context)!.hermesTerminalOpen,
+          icon: Lucide.Terminal,
+          onTap: onOpenHermesTerminal!,
+        ),
       const SizedBox(width: 6),
     ];
   }

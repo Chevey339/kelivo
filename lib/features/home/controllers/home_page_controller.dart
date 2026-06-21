@@ -11,6 +11,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/hermes_gateway_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../hermes/hermes_gateway.dart';
 import '../../../hermes/hermes_models.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/tts_provider.dart';
@@ -24,6 +25,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/dialogs/hermes_interactive_sheet.dart';
 import '../../hermes/hermes_handoff_sheet.dart';
+import '../../hermes/hermes_terminal_sheet.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
@@ -847,6 +849,36 @@ class HomePageController extends ChangeNotifier {
   Future<void> cancelStreaming() async {
     await _viewModel.cancelStreaming();
     notifyListeners();
+  }
+
+  // ============================================================================
+  // Public Methods - Hermes Terminal
+  // ============================================================================
+
+  /// Open the Hermes terminal for the current session.
+  Future<void> openHermesTerminal() async {
+    final hp = _hermesGatewayProvider;
+    if (hp == null) return;
+    if (hp.state != HermesConnectionState.ready) return;
+
+    final adapter = hp.openTerminal();
+    if (adapter == null) return;
+
+    final ctx = _scaffoldKey.currentContext ?? _context;
+    if (!ctx.mounted) return;
+
+    await showModalBottomSheet(
+      context: ctx,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: true,
+      builder: (_) => HermesTerminalSheet(
+        terminal: adapter.terminal,
+        onClose: () => hp.closeTerminal(),
+      ),
+    );
+    // Sheet dismissed — close the terminal adapter
+    hp.closeTerminal();
   }
 
   // ============================================================================

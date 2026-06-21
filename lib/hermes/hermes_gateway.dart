@@ -358,6 +358,23 @@ class HermesGateway {
           text: payload['text'] as String?,
         );
 
+      case 'terminal.output':
+        return TerminalOutput(
+          sessionId: sid,
+          text: payload['text'] as String? ?? '',
+          isError: payload['is_error'] as bool? ?? false,
+        );
+      case 'terminal.read':
+        return TerminalReadRequest(
+          sessionId: sid,
+          prompt: payload['prompt'] as String? ?? '',
+        );
+      case 'terminal.closed':
+        return TerminalClosed(
+          sessionId: sid,
+          exitCode: (payload['exit_code'] as num?)?.toInt(),
+        );
+
       default:
         // Unknown event — emit as generic notice
         return GatewayNotice(kind: 'unknown', text: type);
@@ -427,5 +444,24 @@ class HermesGateway {
   void dispose() {
     disconnect();
     _eventBus.dispose();
+  }
+
+  // ── Terminal ──────────────────────────────────────────────────────
+
+  /// Send user input from terminal to the backend.
+  Future<void> terminalReadRespond(String sessionId, String data) async {
+    await sendRpc('terminal.read_respond', {
+      'session_id': sessionId,
+      'data': data,
+    });
+  }
+
+  /// Notify backend of terminal resize.
+  Future<void> terminalResize(String sessionId, int width, int height) async {
+    await sendRpc('terminal.resize', {
+      'session_id': sessionId,
+      'width': width,
+      'height': height,
+    });
   }
 }

@@ -8,6 +8,7 @@ import '../../hermes/hermes_gateway.dart';
 import '../../hermes/hermes_models.dart';
 import '../../hermes/hermes_rpc.dart';
 import '../../hermes/hermes_usage.dart';
+import '../../hermes/hermes_terminal_adapter.dart';
 
 /// A pending handoff request awaiting user confirmation.
 class HandoffPendingRequest {
@@ -508,6 +509,40 @@ class HermesGatewayProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  // ── Terminal ──────────────────────────────────────────────────────
+
+  /// Current terminal adapter (null when terminal is closed).
+  HermesTerminalAdapter? _terminalAdapter;
+  HermesTerminalAdapter? get terminalAdapter => _terminalAdapter;
+
+  /// Whether the terminal sheet is currently visible.
+  bool _terminalVisible = false;
+  bool get terminalVisible => _terminalVisible;
+
+  /// Open a terminal for the active session.
+  /// Returns null if no active session.
+  HermesTerminalAdapter? openTerminal() {
+    if (_activeSessionId == null) return null;
+    closeTerminal();
+
+    _terminalAdapter = HermesTerminalAdapter(
+      eventBus: _eventBus,
+      sessionId: _activeSessionId!,
+      gateway: _gateway,
+    );
+    _terminalVisible = true;
+    notifyListeners();
+    return _terminalAdapter;
+  }
+
+  /// Close the current terminal.
+  void closeTerminal() {
+    _terminalAdapter?.dispose();
+    _terminalAdapter = null;
+    _terminalVisible = false;
+    notifyListeners();
   }
 
   @override

@@ -821,6 +821,7 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
+      onOpenHermesTerminal: _controller.openHermesTerminal,
       body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
     );
   }

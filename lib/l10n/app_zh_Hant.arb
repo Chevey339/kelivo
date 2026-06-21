@@ -2084,5 +2084,9 @@
   "hermesHandoffSuggested": "推薦",
   "hermesHandoffNoAgents": "後端暫無可用的智慧體",
   "hermesHandoffConfirm": "切換",
-  "hermesHandoffCancel": "取消"
+  "hermesHandoffCancel": "取消",
+  "hermesTerminalTitle": "終端",
+  "hermesTerminalCopy": "複製",
+  "hermesTerminalClose": "關閉",
+  "hermesTerminalOpen": "打開終端"
 }

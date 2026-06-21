@@ -5825,4 +5825,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hermesHandoffFailed => 'Transfer failed';
+
+  @override
+  String get hermesHandoffTitle => 'Switch Agent';
+
+  @override
+  String get hermesHandoffDescription =>
+      'The agent would like to hand off the conversation to another agent. Choose which agent should take over.';
+
+  @override
+  String get hermesHandoffFrom => 'Current';
+
+  @override
+  String get hermesHandoffTo => 'Target';
+
+  @override
+  String get hermesHandoffChooseAgent => 'Choose Agent';
+
+  @override
+  String get hermesHandoffAgentsAvailable => 'available';
+
+  @override
+  String get hermesHandoffSuggested => 'suggested';
+
+  @override
+  String get hermesHandoffNoAgents => 'No agents available on this backend';
+
+  @override
+  String get hermesHandoffConfirm => 'Switch';
+
+  @override
+  String get hermesHandoffCancel => 'Cancel';
+
+  @override
+  String get hermesTerminalTitle => 'Terminal';
+
+  @override
+  String get hermesTerminalCopy => 'Copy';
+
+  @override
+  String get hermesTerminalClose => 'Close';
+
+  @override
+  String get hermesTerminalOpen => 'Open terminal';
 }

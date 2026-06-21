@@ -5605,6 +5605,48 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hermesHandoffFailed => '切换失败';
+
+  @override
+  String get hermesHandoffTitle => '切换智能体';
+
+  @override
+  String get hermesHandoffDescription => '当前智能体希望将会话移交给另一个智能体。请选择接管对话的智能体。';
+
+  @override
+  String get hermesHandoffFrom => '当前';
+
+  @override
+  String get hermesHandoffTo => '目标';
+
+  @override
+  String get hermesHandoffChooseAgent => '选择智能体';
+
+  @override
+  String get hermesHandoffAgentsAvailable => '可选';
+
+  @override
+  String get hermesHandoffSuggested => '推荐';
+
+  @override
+  String get hermesHandoffNoAgents => '后端暂无可用的智能体';
+
+  @override
+  String get hermesHandoffConfirm => '切换';
+
+  @override
+  String get hermesHandoffCancel => '取消';
+
+  @override
+  String get hermesTerminalTitle => '终端';
+
+  @override
+  String get hermesTerminalCopy => '复制';
+
+  @override
+  String get hermesTerminalClose => '关闭';
+
+  @override
+  String get hermesTerminalOpen => '打开终端';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11208,6 +11250,48 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hermesHandoffFailed => '切换失败';
+
+  @override
+  String get hermesHandoffTitle => '切换智能体';
+
+  @override
+  String get hermesHandoffDescription => '当前智能体希望将会话移交给另一个智能体。请选择接管对话的智能体。';
+
+  @override
+  String get hermesHandoffFrom => '当前';
+
+  @override
+  String get hermesHandoffTo => '目标';
+
+  @override
+  String get hermesHandoffChooseAgent => '选择智能体';
+
+  @override
+  String get hermesHandoffAgentsAvailable => '可选';
+
+  @override
+  String get hermesHandoffSuggested => '推荐';
+
+  @override
+  String get hermesHandoffNoAgents => '后端暂无可用的智能体';
+
+  @override
+  String get hermesHandoffConfirm => '切换';
+
+  @override
+  String get hermesHandoffCancel => '取消';
+
+  @override
+  String get hermesTerminalTitle => '终端';
+
+  @override
+  String get hermesTerminalCopy => '复制';
+
+  @override
+  String get hermesTerminalClose => '关闭';
+
+  @override
+  String get hermesTerminalOpen => '打开终端';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16811,4 +16895,46 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hermesHandoffFailed => '切換失敗';
+
+  @override
+  String get hermesHandoffTitle => '切換智慧體';
+
+  @override
+  String get hermesHandoffDescription => '目前智慧體希望將對話移交給另一個智慧體。請選擇接管對話的智慧體。';
+
+  @override
+  String get hermesHandoffFrom => '目前';
+
+  @override
+  String get hermesHandoffTo => '目標';
+
+  @override
+  String get hermesHandoffChooseAgent => '選擇智慧體';
+
+  @override
+  String get hermesHandoffAgentsAvailable => '可選';
+
+  @override
+  String get hermesHandoffSuggested => '推薦';
+
+  @override
+  String get hermesHandoffNoAgents => '後端暫無可用的智慧體';
+
+  @override
+  String get hermesHandoffConfirm => '切換';
+
+  @override
+  String get hermesHandoffCancel => '取消';
+
+  @override
+  String get hermesTerminalTitle => '終端';
+
+  @override
+  String get hermesTerminalCopy => '複製';
+
+  @override
+  String get hermesTerminalClose => '關閉';
+
+  @override
+  String get hermesTerminalOpen => '打開終端';
 }

@@ -559,3 +559,70 @@ class HandoffFailed extends HermesStreamEvent {
 
   Map<String, dynamic> toJson() => {'session_id': sessionId, 'reason': reason};
 }
+
+// ── Terminal events ────────────────────────────────────────────────
+
+/// Terminal output (stdout / stderr from the backend process).
+class TerminalOutput extends HermesStreamEvent {
+  final String sessionId;
+  final String text;
+  final bool isError;
+
+  const TerminalOutput({
+    required this.sessionId,
+    required this.text,
+    this.isError = false,
+  });
+
+  factory TerminalOutput.fromJson(Map<String, dynamic> json) => TerminalOutput(
+    sessionId: json['session_id'] as String? ?? '',
+    text: json['text'] as String? ?? '',
+    isError: json['is_error'] as bool? ?? false,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'text': text,
+    'is_error': isError,
+  };
+}
+
+/// Backend is waiting for terminal input (stdin).
+class TerminalReadRequest extends HermesStreamEvent {
+  final String sessionId;
+  final String prompt;
+
+  const TerminalReadRequest({
+    required this.sessionId,
+    this.prompt = '',
+  });
+
+  factory TerminalReadRequest.fromJson(Map<String, dynamic> json) =>
+      TerminalReadRequest(
+        sessionId: json['session_id'] as String? ?? '',
+        prompt: json['prompt'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'prompt': prompt,
+  };
+}
+
+/// Terminal session closed.
+class TerminalClosed extends HermesStreamEvent {
+  final String sessionId;
+  final int? exitCode;
+
+  const TerminalClosed({required this.sessionId, this.exitCode});
+
+  factory TerminalClosed.fromJson(Map<String, dynamic> json) => TerminalClosed(
+    sessionId: json['session_id'] as String? ?? '',
+    exitCode: (json['exit_code'] as num?)?.toInt(),
+  );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    if (exitCode != null) 'exit_code': exitCode,
+  };
+}

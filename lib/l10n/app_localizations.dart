@@ -10735,6 +10735,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Transfer failed'**
   String get hermesHandoffFailed;
+
+  /// No description provided for @hermesHandoffTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Agent'**
+  String get hermesHandoffTitle;
+
+  /// No description provided for @hermesHandoffDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent would like to hand off the conversation to another agent. Choose which agent should take over.'**
+  String get hermesHandoffDescription;
+
+  /// No description provided for @hermesHandoffFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get hermesHandoffFrom;
+
+  /// No description provided for @hermesHandoffTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Target'**
+  String get hermesHandoffTo;
+
+  /// No description provided for @hermesHandoffChooseAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Agent'**
+  String get hermesHandoffChooseAgent;
+
+  /// No description provided for @hermesHandoffAgentsAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'available'**
+  String get hermesHandoffAgentsAvailable;
+
+  /// No description provided for @hermesHandoffSuggested.
+  ///
+  /// In en, this message translates to:
+  /// **'suggested'**
+  String get hermesHandoffSuggested;
+
+  /// No description provided for @hermesHandoffNoAgents.
+  ///
+  /// In en, this message translates to:
+  /// **'No agents available on this backend'**
+  String get hermesHandoffNoAgents;
+
+  /// No description provided for @hermesHandoffConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch'**
+  String get hermesHandoffConfirm;
+
+  /// No description provided for @hermesHandoffCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get hermesHandoffCancel;
+
+  /// No description provided for @hermesTerminalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal'**
+  String get hermesTerminalTitle;
+
+  /// No description provided for @hermesTerminalCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get hermesTerminalCopy;
+
+  /// No description provided for @hermesTerminalClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get hermesTerminalClose;
+
+  /// No description provided for @hermesTerminalOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open terminal'**
+  String get hermesTerminalOpen;
 }
 
 class _AppLocalizationsDelegate

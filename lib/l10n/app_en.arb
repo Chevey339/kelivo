@@ -2507,5 +2507,9 @@
   "hermesHandoffSuggested": "suggested",
   "hermesHandoffNoAgents": "No agents available on this backend",
   "hermesHandoffConfirm": "Switch",
-  "hermesHandoffCancel": "Cancel"
+  "hermesHandoffCancel": "Cancel",
+  "hermesTerminalTitle": "Terminal",
+  "hermesTerminalCopy": "Copy",
+  "hermesTerminalClose": "Close",
+  "hermesTerminalOpen": "Open terminal"
 }
