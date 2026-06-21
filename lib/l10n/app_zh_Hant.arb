@@ -2088,5 +2088,11 @@
   "hermesTerminalTitle": "終端",
   "hermesTerminalCopy": "複製",
   "hermesTerminalClose": "關閉",
-  "hermesTerminalOpen": "打開終端"
+  "hermesTerminalOpen": "打開終端",
+  "hermesTerminalSettings": "終端設置",
+  "hermesTerminalFontSize": "字體大小",
+  "hermesTerminalTheme": "主題",
+  "hermesTerminalThemeSystem": "跟隨系統",
+  "hermesTerminalThemeDark": "深色",
+  "hermesTerminalThemeLight": "淺色"
 }

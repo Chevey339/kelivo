@@ -2088,5 +2088,11 @@
   "hermesTerminalTitle": "终端",
   "hermesTerminalCopy": "复制",
   "hermesTerminalClose": "关闭",
-  "hermesTerminalOpen": "打开终端"
+  "hermesTerminalOpen": "打开终端",
+  "hermesTerminalSettings": "终端设置",
+  "hermesTerminalFontSize": "字体大小",
+  "hermesTerminalTheme": "主题",
+  "hermesTerminalThemeSystem": "跟随系统",
+  "hermesTerminalThemeDark": "深色",
+  "hermesTerminalThemeLight": "浅色"
 }

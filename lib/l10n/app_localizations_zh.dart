@@ -5647,6 +5647,24 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hermesTerminalOpen => '打开终端';
+
+  @override
+  String get hermesTerminalSettings => '终端设置';
+
+  @override
+  String get hermesTerminalFontSize => '字体大小';
+
+  @override
+  String get hermesTerminalTheme => '主题';
+
+  @override
+  String get hermesTerminalThemeSystem => '跟随系统';
+
+  @override
+  String get hermesTerminalThemeDark => '深色';
+
+  @override
+  String get hermesTerminalThemeLight => '浅色';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11292,6 +11310,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hermesTerminalOpen => '打开终端';
+
+  @override
+  String get hermesTerminalSettings => '终端设置';
+
+  @override
+  String get hermesTerminalFontSize => '字体大小';
+
+  @override
+  String get hermesTerminalTheme => '主题';
+
+  @override
+  String get hermesTerminalThemeSystem => '跟随系统';
+
+  @override
+  String get hermesTerminalThemeDark => '深色';
+
+  @override
+  String get hermesTerminalThemeLight => '浅色';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16937,4 +16973,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hermesTerminalOpen => '打開終端';
+
+  @override
+  String get hermesTerminalSettings => '終端設置';
+
+  @override
+  String get hermesTerminalFontSize => '字體大小';
+
+  @override
+  String get hermesTerminalTheme => '主題';
+
+  @override
+  String get hermesTerminalThemeSystem => '跟隨系統';
+
+  @override
+  String get hermesTerminalThemeDark => '深色';
+
+  @override
+  String get hermesTerminalThemeLight => '淺色';
 }

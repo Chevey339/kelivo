@@ -2511,5 +2511,11 @@
   "hermesTerminalTitle": "Terminal",
   "hermesTerminalCopy": "Copy",
   "hermesTerminalClose": "Close",
-  "hermesTerminalOpen": "Open terminal"
+  "hermesTerminalOpen": "Open terminal",
+  "hermesTerminalSettings": "Terminal Settings",
+  "hermesTerminalFontSize": "Font Size",
+  "hermesTerminalTheme": "Theme",
+  "hermesTerminalThemeSystem": "Follow System",
+  "hermesTerminalThemeDark": "Dark",
+  "hermesTerminalThemeLight": "Light"
 }

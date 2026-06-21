@@ -5868,4 +5868,22 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hermesTerminalOpen => 'Open terminal';
+
+  @override
+  String get hermesTerminalSettings => 'Terminal Settings';
+
+  @override
+  String get hermesTerminalFontSize => 'Font Size';
+
+  @override
+  String get hermesTerminalTheme => 'Theme';
+
+  @override
+  String get hermesTerminalThemeSystem => 'Follow System';
+
+  @override
+  String get hermesTerminalThemeDark => 'Dark';
+
+  @override
+  String get hermesTerminalThemeLight => 'Light';
 }

@@ -10819,6 +10819,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open terminal'**
   String get hermesTerminalOpen;
+
+  /// No description provided for @hermesTerminalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminal Settings'**
+  String get hermesTerminalSettings;
+
+  /// No description provided for @hermesTerminalFontSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Font Size'**
+  String get hermesTerminalFontSize;
+
+  /// No description provided for @hermesTerminalTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme'**
+  String get hermesTerminalTheme;
+
+  /// No description provided for @hermesTerminalThemeSystem.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow System'**
+  String get hermesTerminalThemeSystem;
+
+  /// No description provided for @hermesTerminalThemeDark.
+  ///
+  /// In en, this message translates to:
+  /// **'Dark'**
+  String get hermesTerminalThemeDark;
+
+  /// No description provided for @hermesTerminalThemeLight.
+  ///
+  /// In en, this message translates to:
+  /// **'Light'**
+  String get hermesTerminalThemeLight;
 }
 
 class _AppLocalizationsDelegate
