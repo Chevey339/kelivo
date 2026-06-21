@@ -52,3 +52,17 @@
 - 改动文件（本轮新增项相对第一批）：`windows/CMakeLists.txt` —— 追加 MSVC 协程实验警告静默宏。
 - 回滚点：`git checkout -- windows/CMakeLists.txt` 即可撤回本批唯一保留改动。
 - 教训：搬“紧跟第一批”的批次，必须先用本地提交 DAG / ancestry 钉边界，禁止按主题相近或能贴上来猜。
+
+## 2026-06-21 - Task: 版本号补搬至 1.1.17+61（对齐上游 64da091）
+
+### What was done
+- 上游提交 `64da091`（`build: bump version to 1.1.17+61`）此前在第二批纠偏时被跳过，导致 CI 编出的 iOS 包仍为 1.1.16+60。
+- 经查 `64da091` 仅改 `pubspec.yaml` 一行版本号，无其他夹带，故仅同步该行：`1.1.16+60` -> `1.1.17+61`。
+
+### Testing
+- 本机无 Flutter/Dart SDK，验证走 GitHub Actions：commit + push 到 doimty/image-edit-remote-multipart 后，手动 workflow_dispatch 触发 build-stable-44.yml。
+- 验收以云端五平台 build success 为准。
+
+### Notes
+- 改动文件：`pubspec.yaml` —— 版本号 1.1.16+60 -> 1.1.17+61。
+- 回滚点：`git checkout -- pubspec.yaml`（撤回版本号改动）；或 reset 掉本 commit。
