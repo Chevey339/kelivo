@@ -4782,6 +4782,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.';
 
   @override
+  String get assistantEditLocalToolJsCodeTitle => 'JavaScript Code';
+
+  @override
+  String get assistantEditLocalToolJsCodeSubtitle =>
+      'Run JavaScript code for calculations, text processing, data transformation, and more.';
+
+  @override
   String get assistantEditMemorySwitchTitle => 'Memory';
 
   @override

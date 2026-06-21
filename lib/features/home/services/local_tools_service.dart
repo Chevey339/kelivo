@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:flutter_js/flutter_js.dart';
 import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
@@ -15,6 +17,7 @@ class LocalToolNames {
   static const String textToSpeech = 'text_to_speech';
   static const String askUser = 'ask_user_input_v0';
   static const String calculate = 'calculate';
+  static const String jsCodeExecution = 'js_code_execution';
 }
 
 class LocalToolsService {
@@ -134,6 +137,27 @@ class LocalToolsService {
         },
       });
     }
+    if (assistant.localToolIds.contains(LocalToolNames.jsCodeExecution)) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.jsCodeExecution,
+          'description':
+              'Execute JavaScript code and return the result of the last expression. Each call runs in an isolated scope, so you can safely use "const", "let", or "var" without redeclaration errors. Suitable for calculations, string manipulation, data transformation, and logic. Supports ES2020 with Math, JSON, Array, String, Promise, BigInt. Examples: 2+2, Math.sin(Math.PI/4), "hello".length, [1,2,3].map(x=>x*2)',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'code': {
+                'type': 'string',
+                'description':
+                    'JavaScript code to execute. The result of the last expression is returned. Each call has an isolated scope so you can safely use const, let, or var.',
+              },
+            },
+            'required': ['code'],
+          },
+        },
+      });
+    }
     if (assistant.localToolIds.contains(LocalToolNames.calculate)) {
       tools.add(const {
         'type': 'function',
@@ -178,6 +202,9 @@ class LocalToolsService {
     }
     if (name == LocalToolNames.calculate) {
       return _handleCalculateTool(args);
+    }
+    if (name == LocalToolNames.jsCodeExecution) {
+      return _handleJsCodeExecutionTool(args);
     }
     return null;
   }
@@ -259,12 +286,23 @@ class LocalToolsService {
     };
   }
 
+  static final JavascriptRuntime? _jsEngine = _createJsEngine();
+
+  static JavascriptRuntime? _createJsEngine() {
+    try {
+      return getJavascriptRuntime();
+    } catch (_) {
+      return null;
+    }
+  }
+
   static String _handleCalculateTool(Map<String, dynamic> args) {
     final expression = (args['expression'] ?? '').toString().trim();
     if (expression.isEmpty) {
       return jsonEncode({
         'error': 'empty_expression',
-        'message': 'Expression is empty. Please provide a mathematical expression in standard notation, e.g. "(15 + 3) * 2".',
+        'message':
+            'Expression is empty. Please provide a mathematical expression in standard notation, e.g. "(15 + 3) * 2".',
       });
     }
 
@@ -274,7 +312,8 @@ class LocalToolsService {
       if (!result.isFinite) {
         return jsonEncode({
           'error': 'math_error',
-          'message': 'The result is not a finite number. Please check your expression (e.g. division by zero).',
+          'message':
+              'The result is not a finite number. Please check your expression (e.g. division by zero).',
         });
       }
       return jsonEncode({
@@ -284,8 +323,60 @@ class LocalToolsService {
     } catch (e) {
       return jsonEncode({
         'error': 'parse_error',
-        'message': 'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
+        'message':
+            'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
         'detail': e.toString(),
+      });
+    }
+  }
+
+  static Future<String> _handleJsCodeExecutionTool(
+      Map<String, dynamic> args) async {
+    final code = (args['code'] ?? '').toString().trim();
+    if (code.isEmpty) {
+      return jsonEncode({
+        'error': 'empty_code',
+        'message': 'No JavaScript code provided.',
+      });
+    }
+
+    final engine = _jsEngine;
+    if (engine == null) {
+      return jsonEncode({
+        'error': 'engine_error',
+        'message': 'JavaScript engine is not available on this platform.',
+      });
+    }
+
+    // Wrap in a block scope so that const/let declarations are scoped
+    // to each call, preventing redeclaration errors. The last expression
+    // value is still returned (eval semantics).
+    final wrappedCode = '{\n$code\n}';
+
+    try {
+      final result = await Future(() => engine.evaluate(wrappedCode))
+          .timeout(const Duration(seconds: 10));
+      if (result.stringResult == '[object Promise]') {
+        return jsonEncode({
+          'error': 'async_not_supported',
+          'message':
+              'Asynchronous JavaScript (Promises/async/await) is not supported. Please use synchronous code that returns the value directly, e.g. use "let x = 2 + 2; x" instead of "Promise.resolve(2+2)".',
+        });
+      }
+      return jsonEncode({
+        'code': code,
+        'result': result.stringResult,
+      });
+    } on TimeoutException {
+      return jsonEncode({
+        'error': 'timeout',
+        'message':
+            'JavaScript execution timed out after 10 seconds. Please simplify your code or avoid infinite loops.',
+      });
+    } catch (e) {
+      return jsonEncode({
+        'error': 'js_error',
+        'message': e.toString(),
       });
     }
   }
