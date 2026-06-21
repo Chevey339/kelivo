@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../../hermes/hermes_stream_adapter.dart';
 import '../../hermes/hermes_auth.dart';
 import '../../hermes/hermes_config.dart';
 import '../../hermes/hermes_event_bus.dart';
@@ -105,6 +106,21 @@ class HermesGatewayProvider extends ChangeNotifier {
 
   /// Pending interactive requests (approval, clarify, sudo, secret).
   final List<HermesPendingRequest> _pendingRequests = [];
+
+  /// Stream adapter for Hermes chat events (managed by HermesChatProviderX).
+  HermesStreamAdapter? _hermesStreamAdapter;
+
+  /// Gets the current stream adapter.
+  HermesStreamAdapter? get streamAdapter => _hermesStreamAdapter;
+
+  /// Sets the stream adapter. Disposes the previous one if any.
+  set streamAdapter(HermesStreamAdapter? adapter) {
+    if (adapter != _hermesStreamAdapter) {
+      _hermesStreamAdapter?.dispose();
+      _hermesStreamAdapter = adapter;
+      notifyListeners();
+    }
+  }
 
   /// Stream subscription for forwarding interactive events to the UI.
   StreamSubscription<HermesStreamEvent>? _eventSubscription;
@@ -330,6 +346,30 @@ class HermesGatewayProvider extends ChangeNotifier {
     }
   }
 
+  /// Branch (fork) the current session at the current point.
+  Future<String> branchSession({String? label}) async {
+    if (_activeSessionId == null) throw StateError('No active session');
+    return _gateway.sessionBranch(_activeSessionId!, label: label);
+  }
+
+  /// Undo the last turn(s) in the session.
+  Future<void> undoSession({int? count}) async {
+    if (_activeSessionId == null) return;
+    await _gateway.sessionUndo(_activeSessionId!, count: count);
+  }
+
+  /// Compress / summarize conversation history.
+  Future<void> compressSession() async {
+    if (_activeSessionId == null) return;
+    await _gateway.sessionCompress(_activeSessionId!);
+  }
+
+  /// Interrupt the active generation in the current session.
+  Future<void> interruptSession() async {
+    if (_activeSessionId == null) return;
+    await _gateway.sessionInterrupt(_activeSessionId!);
+  }
+
   /// Close the active session.
   Future<void> closeSession() async {
     if (_activeSessionId != null) {
@@ -547,6 +587,7 @@ class HermesGatewayProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _hermesStreamAdapter?.dispose();
     _eventSubscription?.cancel();
     _gateway.dispose();
     super.dispose();
