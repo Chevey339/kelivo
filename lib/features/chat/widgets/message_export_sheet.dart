@@ -685,7 +685,8 @@ Future<File?> _renderAndSaveMessageImage(
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
 }) async {
-  final cs = Theme.of(context).colorScheme;
+  final theme = Theme.of(context);
+  final cs = theme.colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
   final chatService = context.read<ChatService>();
@@ -702,7 +703,7 @@ Future<File?> _renderAndSaveMessageImage(
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   final exportConfig = _exportImageRenderConfig(isDesktop: isDesktop);
 
-  final content = ExportCaptureScope(
+  Widget buildContent() => ExportCaptureScope(
     enabled: true,
     child: _ExportedMessageCard(
       message: message,
@@ -717,7 +718,8 @@ Future<File?> _renderAndSaveMessageImage(
   if (!context.mounted) return null;
   return _renderWidgetDirectly(
     context,
-    content,
+    buildContent,
+    theme: theme,
     width: exportConfig.width,
     pixelRatio: exportConfig.pixelRatio,
   );
@@ -730,7 +732,8 @@ Future<File?> _renderAndSaveChatImage(
   bool showThinkingAndToolCards = false,
   bool expandThinkingContent = false,
 }) async {
-  final cs = Theme.of(context).colorScheme;
+  final theme = Theme.of(context);
+  final cs = theme.colorScheme;
   final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
   // Pre-render all mermaid diagrams found in selected messages
@@ -746,7 +749,7 @@ Future<File?> _renderAndSaveChatImage(
       Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   final exportConfig = _exportImageRenderConfig(isDesktop: isDesktop);
 
-  final content = ExportCaptureScope(
+  Widget buildContent() => ExportCaptureScope(
     enabled: true,
     child: _ExportedChatImage(
       conversationTitle: (conversation.title.trim().isNotEmpty)
@@ -764,7 +767,8 @@ Future<File?> _renderAndSaveChatImage(
   if (!context.mounted) return null;
   return _renderWidgetDirectly(
     context,
-    content,
+    buildContent,
+    theme: theme,
     width: exportConfig.width,
     pixelRatio: exportConfig.pixelRatio,
   );
@@ -796,7 +800,8 @@ const int _exportImageBlankColorTolerance = 3;
 // New direct rendering approach without pagination
 Future<File?> _renderWidgetDirectly(
   BuildContext context,
-  Widget content, {
+  Widget Function() buildContent, {
+  required ThemeData theme,
   double width = 480, // 宽度*3
   double pixelRatio = 3.0,
 }) async {
@@ -827,19 +832,18 @@ Future<File?> _renderWidgetDirectly(
       return Positioned(
         left: -10000, // Position far offscreen
         top: -10000,
-        child: RepaintBoundary(
-          key: boundaryKey,
-          child: Container(
-            width: width,
-            color: Theme.of(ctx).colorScheme.surface,
-            child: Material(type: MaterialType.transparency, child: content),
-          ),
+        child: _ExportCaptureRoot(
+          theme: theme,
+          boundaryKey: boundaryKey,
+          width: width,
+          child: buildContent(),
         ),
       );
     },
   );
 
   overlay.insert(entry);
+  var entryRemoved = false;
 
   try {
     // Wait for the widget to be ready
@@ -852,10 +856,21 @@ Future<File?> _renderWidgetDirectly(
             as RenderRepaintBoundary?;
     if (boundary == null) return null;
 
-    final data = await _captureBoundaryPngBytes(
-      boundary,
-      pixelRatio: pixelRatio,
-    );
+    final contentSize = boundary.size;
+    var data = await _captureBoundaryPngBytes(boundary, pixelRatio: pixelRatio);
+    if (data == null && !contentSize.isEmpty) {
+      entry.remove();
+      entryRemoved = true;
+      await WidgetsBinding.instance.endOfFrame;
+      data = await _captureWidgetViewportSlicesPngBytes(
+        overlay,
+        buildContent,
+        theme: theme,
+        width: width,
+        pixelRatio: pixelRatio,
+        contentSize: contentSize,
+      );
+    }
     if (data == null) return null;
 
     // Save to file
@@ -867,11 +882,129 @@ Future<File?> _renderWidgetDirectly(
 
     return file;
   } finally {
-    entry.remove();
+    if (!entryRemoved) entry.remove();
   }
 }
 
+@visibleForTesting
+Widget buildExportCaptureRootForTesting({
+  required ThemeData theme,
+  required Widget child,
+  double width = 480,
+}) {
+  return _ExportCaptureRoot(
+    theme: theme,
+    boundaryKey: GlobalKey(),
+    width: width,
+    child: child,
+  );
+}
+
+@visibleForTesting
+Widget buildExportCaptureViewportRootForTesting({
+  required ThemeData theme,
+  required Widget child,
+  required double viewportHeight,
+  required double contentHeight,
+  double width = 480,
+  double offsetY = 0,
+}) {
+  return _ExportCaptureViewportRoot(
+    theme: theme,
+    boundaryKey: GlobalKey(),
+    width: width,
+    viewportHeight: viewportHeight,
+    contentHeight: contentHeight,
+    offsetY: offsetY,
+    child: child,
+  );
+}
+
+class _ExportCaptureRoot extends StatelessWidget {
+  const _ExportCaptureRoot({
+    required this.theme,
+    required this.boundaryKey,
+    required this.width,
+    required this.child,
+  });
+
+  final ThemeData theme;
+  final GlobalKey boundaryKey;
+  final double width;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: theme,
+      child: RepaintBoundary(
+        key: boundaryKey,
+        child: Container(
+          width: width,
+          color: theme.colorScheme.surface,
+          child: Material(type: MaterialType.transparency, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportCaptureViewportRoot extends StatelessWidget {
+  const _ExportCaptureViewportRoot({
+    required this.theme,
+    required this.boundaryKey,
+    required this.width,
+    required this.viewportHeight,
+    required this.contentHeight,
+    required this.offsetY,
+    required this.child,
+  });
+
+  final ThemeData theme;
+  final GlobalKey boundaryKey;
+  final double width;
+  final double viewportHeight;
+  final double contentHeight;
+  final double offsetY;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: theme,
+      child: RepaintBoundary(
+        key: boundaryKey,
+        child: Container(
+          width: width,
+          height: viewportHeight,
+          color: theme.colorScheme.surface,
+          child: Material(
+            type: MaterialType.transparency,
+            child: ClipRect(
+              child: OverflowBox(
+                alignment: Alignment.topCenter,
+                minWidth: width,
+                maxWidth: width,
+                minHeight: contentHeight,
+                maxHeight: contentHeight,
+                child: Transform.translate(
+                  offset: Offset(0, -offsetY),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Keep whole-image captures below the common 16384px GPU texture edge while
+// avoiding the slice compositor for exports that can still fit at >=2x.
+const double _maxExportFullCapturePhysicalDimension = 15360.0;
 const double _maxExportCaptureSlicePhysicalHeight = 4096.0;
+const double _minExportFullCapturePixelRatio = 2.0;
 
 @visibleForTesting
 Future<Uint8List?> captureExportBoundaryPngBytesForTesting(
@@ -879,6 +1012,30 @@ Future<Uint8List?> captureExportBoundaryPngBytesForTesting(
   required double pixelRatio,
 }) {
   return _captureBoundaryPngBytes(boundary, pixelRatio: pixelRatio);
+}
+
+@visibleForTesting
+bool shouldUseFullExportCaptureForTesting({
+  required Size logicalSize,
+  required double pixelRatio,
+}) {
+  return _shouldUseFullExportCapture(logicalSize, pixelRatio: pixelRatio);
+}
+
+@visibleForTesting
+double? exportFullCapturePixelRatioForTesting({
+  required Size logicalSize,
+  required double requestedPixelRatio,
+}) {
+  return _exportFullCapturePixelRatio(
+    logicalSize,
+    requestedPixelRatio: requestedPixelRatio,
+  );
+}
+
+@visibleForTesting
+double exportCaptureSliceLogicalHeightForTesting({required double pixelRatio}) {
+  return _exportCaptureSliceLogicalHeight(pixelRatio: pixelRatio);
 }
 
 @visibleForTesting
@@ -899,54 +1056,87 @@ Future<Uint8List?> _captureBoundaryPngBytes(
   required double pixelRatio,
 }) async {
   if (boundary.size.isEmpty) return null;
-
-  final sliceLogicalHeight = _maxExportCaptureSlicePhysicalHeight / pixelRatio;
-  if (boundary.size.height <= sliceLogicalHeight) {
-    final image = await _captureBoundaryImageWithRetries(
+  final fullCapturePixelRatio = _exportFullCapturePixelRatio(
+    boundary.size,
+    requestedPixelRatio: pixelRatio,
+  );
+  if (fullCapturePixelRatio != null) {
+    final fullCapture = await _captureFullBoundaryPngBytes(
       boundary,
-      Rect.fromLTWH(0, 0, boundary.size.width, boundary.size.height),
-      pixelRatio: pixelRatio,
+      pixelRatio: fullCapturePixelRatio,
     );
-    if (image == null) return null;
-    try {
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      final bytes = data?.buffer.asUint8List();
-      if (bytes == null) return null;
+    if (fullCapture != null) {
       return _processCapturedExportPng(
         _CapturedExportPngProcessingRequest.single(
-          singlePngBytes: bytes,
+          singlePngBytes: fullCapture,
           preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
         ),
       );
-    } finally {
-      image.dispose();
     }
   }
+  return null;
+}
 
-  final outputWidth = (boundary.size.width * pixelRatio).ceil();
-  final outputHeight = (boundary.size.height * pixelRatio).ceil();
+Future<Uint8List?> _captureWidgetViewportSlicesPngBytes(
+  OverlayState overlay,
+  Widget Function() buildContent, {
+  required ThemeData theme,
+  required double width,
+  required double pixelRatio,
+  required Size contentSize,
+}) async {
+  final sliceLogicalHeight = _exportCaptureSliceLogicalHeight(
+    pixelRatio: pixelRatio,
+  );
+  final outputWidth = (contentSize.width * pixelRatio).ceil();
+  final outputHeight = (contentSize.height * pixelRatio).ceil();
   final slices = <({Uint8List bytes, int y})>[];
 
   double top = 0;
-  while (top < boundary.size.height) {
-    final height = (boundary.size.height - top).clamp(0.0, sliceLogicalHeight);
-    final slice = await _captureBoundaryImageWithRetries(
-      boundary,
-      Rect.fromLTWH(0, top, boundary.size.width, height),
-      pixelRatio: pixelRatio,
+  while (top < contentSize.height) {
+    final height = (contentSize.height - top).clamp(0.0, sliceLogicalHeight);
+    final boundaryKey = GlobalKey();
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) {
+        return Positioned(
+          left: -10000,
+          top: -10000,
+          child: _ExportCaptureViewportRoot(
+            theme: theme,
+            boundaryKey: boundaryKey,
+            width: width,
+            viewportHeight: height,
+            contentHeight: contentSize.height,
+            offsetY: top,
+            child: buildContent(),
+          ),
+        );
+      },
     );
-    if (slice == null) return null;
+
+    overlay.insert(entry);
     try {
-      final data = await slice.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) return null;
-      slices.add((
-        bytes: data.buffer.asUint8List(),
-        y: (top * pixelRatio).round(),
-      ));
+      await _waitForExportCaptureFrames(
+        frameCount: 2,
+        settleDelay: const Duration(milliseconds: 80),
+      );
+      final boundary =
+          boundaryKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return null;
+      final slice = await _captureFullBoundaryPngBytes(
+        boundary,
+        pixelRatio: pixelRatio,
+      );
+      if (slice == null) return null;
+      slices.add((bytes: slice, y: (top * pixelRatio).round()));
     } finally {
-      slice.dispose();
+      entry.remove();
     }
+
     top += height;
+    await WidgetsBinding.instance.endOfFrame;
   }
 
   return _processCapturedExportPng(
@@ -961,6 +1151,78 @@ Future<Uint8List?> _captureBoundaryPngBytes(
       preservePadding: _exportImageBlankTrimPreservePaddingPhysical,
     ),
   );
+}
+
+Future<void> _waitForExportCaptureFrames({
+  required int frameCount,
+  Duration settleDelay = Duration.zero,
+}) async {
+  for (var i = 0; i < frameCount; i += 1) {
+    await WidgetsBinding.instance.endOfFrame;
+  }
+  if (settleDelay > Duration.zero) {
+    await Future<void>.delayed(settleDelay);
+  }
+}
+
+bool _shouldUseFullExportCapture(
+  Size logicalSize, {
+  required double pixelRatio,
+}) {
+  return _exportFullCapturePixelRatio(
+        logicalSize,
+        requestedPixelRatio: pixelRatio,
+      ) !=
+      null;
+}
+
+double? _exportFullCapturePixelRatio(
+  Size logicalSize, {
+  required double requestedPixelRatio,
+}) {
+  if (logicalSize.isEmpty || requestedPixelRatio <= 0) return null;
+  final maxLogicalDimension = math.max(logicalSize.width, logicalSize.height);
+  if (maxLogicalDimension <= 0) return null;
+  final requestedPhysicalDimension = maxLogicalDimension * requestedPixelRatio;
+  if (requestedPhysicalDimension <= _maxExportFullCapturePhysicalDimension) {
+    return requestedPixelRatio;
+  }
+  final cappedPixelRatio =
+      _maxExportFullCapturePhysicalDimension / maxLogicalDimension;
+  if (cappedPixelRatio < _minExportFullCapturePixelRatio) return null;
+  return math.min(requestedPixelRatio, cappedPixelRatio);
+}
+
+double _exportCaptureSliceLogicalHeight({required double pixelRatio}) {
+  final height = (_maxExportCaptureSlicePhysicalHeight / pixelRatio).floor();
+  return math.max(height, 1).toDouble();
+}
+
+Future<Uint8List?> _captureFullBoundaryPngBytes(
+  RenderRepaintBoundary boundary, {
+  required double pixelRatio,
+}) async {
+  ui.Image? image;
+  try {
+    image = await boundary.toImage(pixelRatio: pixelRatio);
+    final expectedWidth = (boundary.size.width * pixelRatio).ceil();
+    final expectedHeight = (boundary.size.height * pixelRatio).ceil();
+    if (image.width < expectedWidth || image.height < expectedHeight) {
+      debugPrint(
+        'Full export image capture was clipped '
+        '(${image.width}x${image.height}, expected '
+        '${expectedWidth}x$expectedHeight); falling back to slices.',
+      );
+      return null;
+    }
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    return data?.buffer.asUint8List();
+  } catch (e) {
+    debugPrint('Full export image capture failed, falling back to slices: $e');
+    return null;
+  } finally {
+    image?.dispose();
+  }
 }
 
 Future<Uint8List> _processCapturedExportPng(
@@ -1245,31 +1507,6 @@ bool _exportImageIsBlankPixel(
 
 bool _exportImageChannelNear(num a, num b) {
   return (a - b).abs() <= _exportImageBlankColorTolerance;
-}
-
-Future<ui.Image?> _captureBoundaryImageWithRetries(
-  RenderRepaintBoundary boundary,
-  Rect bounds, {
-  required double pixelRatio,
-}) async {
-  for (int retry = 0; retry < 10; retry++) {
-    try {
-      // RenderRepaintBoundary.toImage always captures the full boundary.
-      // Use its backing layer so overlong exports can be sampled in bounded
-      // slices and stitched without asking the GPU for one huge texture.
-      // ignore: invalid_use_of_protected_member
-      final layer = boundary.layer as OffsetLayer?;
-      if (layer == null) return null;
-      return await layer.toImage(bounds, pixelRatio: pixelRatio);
-    } catch (e) {
-      if (retry == 9) {
-        debugPrint('Failed to capture image after 10 retries: $e');
-        return null;
-      }
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-    }
-  }
-  return null;
 }
 
 Future<void> showMessageExportSheet(

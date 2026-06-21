@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 
@@ -46,11 +47,124 @@ Uint8List _blankPaddedPng({
 }
 
 void main() {
+  testWidgets('export capture root keeps the captured theme', (tester) async {
+    final exportTheme = ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+    );
+    Color? capturedSurface;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: buildExportCaptureRootForTesting(
+          theme: exportTheme,
+          child: Builder(
+            builder: (context) {
+              capturedSurface = Theme.of(context).colorScheme.surface;
+              return const SizedBox(width: 80, height: 40);
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(capturedSurface, exportTheme.colorScheme.surface);
+  });
+
+  testWidgets('export viewport root captures a shifted slice', (tester) async {
+    final exportTheme = ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: buildExportCaptureViewportRootForTesting(
+          theme: exportTheme,
+          width: 80,
+          viewportHeight: 40,
+          contentHeight: 120,
+          offsetY: 40,
+          child: Column(
+            children: const [
+              SizedBox(
+                width: 80,
+                height: 40,
+                child: ColoredBox(color: Colors.red),
+              ),
+              SizedBox(
+                width: 80,
+                height: 40,
+                child: ColoredBox(color: Colors.green),
+              ),
+              SizedBox(
+                width: 80,
+                height: 40,
+                child: ColoredBox(color: Colors.blue),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final overflowBox = tester.widget<OverflowBox>(find.byType(OverflowBox));
+    final transform = tester.widget<Transform>(find.byType(Transform));
+
+    expect(overflowBox.minHeight, 120);
+    expect(overflowBox.maxHeight, 120);
+    expect(transform.transform.getTranslation().y, -40);
+  });
+
   test('desktop export image config keeps enough source pixels for text', () {
     final config = exportImageRenderConfigForTesting(isDesktop: true);
 
     expect(config.width * config.pixelRatio, greaterThanOrEqualTo(2160));
     expect(config.pixelRatio, greaterThanOrEqualTo(3.0));
+  });
+
+  test('export capture keeps medium-long images on the whole-capture path', () {
+    expect(
+      shouldUseFullExportCaptureForTesting(
+        logicalSize: const Size(480, 2665),
+        pixelRatio: 3,
+      ),
+      isTrue,
+    );
+    expect(
+      exportFullCapturePixelRatioForTesting(
+        logicalSize: const Size(480, 2665),
+        requestedPixelRatio: 3,
+      ),
+      3,
+    );
+  });
+
+  test('export capture downscales very long whole captures before slicing', () {
+    final pixelRatio = exportFullCapturePixelRatioForTesting(
+      logicalSize: const Size(480, 7537),
+      requestedPixelRatio: 3,
+    );
+
+    expect(pixelRatio, isNotNull);
+    expect(pixelRatio!, closeTo(15360 / 7537, 0.0001));
+    expect(
+      shouldUseFullExportCaptureForTesting(
+        logicalSize: const Size(480, 8000),
+        pixelRatio: 3,
+      ),
+      isFalse,
+    );
+  });
+
+  test('export capture slice height stays on logical pixel boundaries', () {
+    final logicalHeight = exportCaptureSliceLogicalHeightForTesting(
+      pixelRatio: 3,
+    );
+
+    expect(logicalHeight, 1365);
+    expect(logicalHeight * 3, lessThanOrEqualTo(4096));
   });
 
   test('export image stitching keeps bottom slice content', () {
