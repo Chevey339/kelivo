@@ -337,6 +337,13 @@ class HermesGateway {
           text: payload['text'] as String? ?? '',
         );
 
+      case 'handoff.requested':
+        return HandoffRequested.fromJson({'session_id': sid, ...payload});
+      case 'handoff.completed':
+        return HandoffCompleted.fromJson({'session_id': sid, ...payload});
+      case 'handoff.failed':
+        return HandoffFailed.fromJson({'session_id': sid, ...payload});
+
       case 'preview.restart.progress':
         return PreviewRestartProgress(
           sessionId: sid,

@@ -23,6 +23,7 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../hermes/hermes_handoff_indicator.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -541,6 +542,8 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
     return [
+      // Handoff state indicator (Hermes)
+      const HermesHandoffIndicator(),
       // Right sidebar toggle (desktop + topics on right)
       if (_isDesktop && topicsOnRight)
         IosIconButton(

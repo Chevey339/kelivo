@@ -3,8 +3,83 @@
 
 import 'hermes_gateway.dart';
 
+/// Session metadata returned by session.list / session.search.
+class HermesSessionSummary {
+  final String sessionId;
+  final String? title;
+  final DateTime createdAt;
+  final DateTime? lastActiveAt;
+  final int messageCount;
+  final String? agentId;
+  final String? agentName;
+
+  const HermesSessionSummary({
+    required this.sessionId,
+    this.title,
+    required this.createdAt,
+    this.lastActiveAt,
+    this.messageCount = 0,
+    this.agentId,
+    this.agentName,
+  });
+
+  factory HermesSessionSummary.fromJson(Map<String, dynamic> json) {
+    return HermesSessionSummary(
+      sessionId: json['session_id'] as String? ?? '',
+      title: json['title'] as String?,
+      createdAt: _parseDate(json['created_at']),
+      lastActiveAt: _parseDate(json['last_active_at']),
+      messageCount: (json['message_count'] as num?)?.toInt() ?? 0,
+      agentId: json['agent_id'] as String?,
+      agentName: json['agent_name'] as String?,
+    );
+  }
+
+  static DateTime _parseDate(dynamic value) {
+    if (value == null) return DateTime.now();
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+    return DateTime.now();
+  }
+}
+
 /// Session management.
 extension HermesSessionRpc on HermesGateway {
+  /// List all sessions.
+  Future<List<HermesSessionSummary>> sessionList({
+    int? limit,
+    int? offset,
+    String? sortBy,
+  }) async {
+    final result = await sendRpc('session.list', {
+      if (limit != null) 'limit': limit,
+      if (offset != null) 'offset': offset,
+      if (sortBy != null) 'sort_by': sortBy,
+    });
+    final list = result as List<dynamic>? ?? const [];
+    return list
+        .cast<Map<String, dynamic>>()
+        .map((j) => HermesSessionSummary.fromJson(j))
+        .toList();
+  }
+
+  /// Search sessions by title or content.
+  Future<List<HermesSessionSummary>> sessionSearch(
+    String query, {
+    int? limit,
+  }) async {
+    final result = await sendRpc('session.search', {
+      'query': query,
+      if (limit != null) 'limit': limit,
+    });
+    final list = result as List<dynamic>? ?? const [];
+    return list
+        .cast<Map<String, dynamic>>()
+        .map((j) => HermesSessionSummary.fromJson(j))
+        .toList();
+  }
+
   /// Create a new session.
   Future<String> sessionCreate({
     String? cwd,

@@ -2014,5 +2014,65 @@
   "hermesSudoDeny": "拒绝",
   "hermesSecretTitle": "需要密钥",
   "hermesSecretSubmit": "提交",
-  "hermesSecretCancel": "取消"
+  "hermesSecretCancel": "取消",
+  "hermesSessionListTitle": "会话列表",
+  "hermesSessionListRefresh": "刷新",
+  "hermesSessionListSearchHint": "搜索会话…",
+  "hermesSessionListEmpty": "暂无会话",
+  "hermesSessionListEmptyHint": "开始新对话以创建会话",
+  "hermesSessionListNoResults": "没有匹配的会话",
+  "hermesSessionListError": "加载会话失败",
+  "hermesSessionListRetry": "重试",
+  "hermesSessionUntitled": "（无标题）",
+  "hermesSessionAgent": "智能体",
+  "hermesSessionMessageCount": "{count} 条消息",
+  "@hermesSessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hermesSessionResume": "继续",
+  "hermesSessionRename": "重命名",
+  "hermesSessionDelete": "删除",
+  "hermesSessionDeleteTitle": "删除会话",
+  "hermesSessionDeleteConfirm": "确定删除「{title}」？此操作无法撤销。",
+  "@hermesSessionDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesSessionRenameConfirm": "确认重命名",
+  "hermesSessionRenameHint": "会话标题",
+  "hermesSessionUsage": "用量统计",
+  "hermesSessionUsageUnavailable": "用量数据不可用",
+  "hermesSessionUsageInputTokens": "输入",
+  "hermesSessionUsageOutputTokens": "输出",
+  "hermesSessionUsageTotalTokens": "总计",
+  "hermesSessionUsageCreditsUsed": "已用积分",
+  "hermesSessionUsageCreditsRemaining": "剩余积分",
+  "hermesSessionUsageCost": "费用",
+  "hermesSessionUsageTurns": "轮",
+  "hermesHandoffInProgress": "正在切换到 {agent}",
+  "@hermesHandoffInProgress": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesHandoffTransferring": "切换中…",
+  "hermesHandoffCompleted": "已切换到 {agent}",
+  "@hermesHandoffCompleted": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesHandoffDone": "切换完成",
+  "hermesHandoffFailed": "切换失败"
 }

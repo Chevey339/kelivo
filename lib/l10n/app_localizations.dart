@@ -10543,6 +10543,198 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get hermesSecretCancel;
+
+  /// No description provided for @hermesSessionListTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sessions'**
+  String get hermesSessionListTitle;
+
+  /// No description provided for @hermesSessionListRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get hermesSessionListRefresh;
+
+  /// No description provided for @hermesSessionListSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search sessions…'**
+  String get hermesSessionListSearchHint;
+
+  /// No description provided for @hermesSessionListEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No Sessions'**
+  String get hermesSessionListEmpty;
+
+  /// No description provided for @hermesSessionListEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a new conversation to create a session'**
+  String get hermesSessionListEmptyHint;
+
+  /// No description provided for @hermesSessionListNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching sessions'**
+  String get hermesSessionListNoResults;
+
+  /// No description provided for @hermesSessionListError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load sessions'**
+  String get hermesSessionListError;
+
+  /// No description provided for @hermesSessionListRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get hermesSessionListRetry;
+
+  /// No description provided for @hermesSessionUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'(Untitled)'**
+  String get hermesSessionUntitled;
+
+  /// No description provided for @hermesSessionAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get hermesSessionAgent;
+
+  /// No description provided for @hermesSessionMessageCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} messages'**
+  String hermesSessionMessageCount(int count);
+
+  /// No description provided for @hermesSessionResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get hermesSessionResume;
+
+  /// No description provided for @hermesSessionRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get hermesSessionRename;
+
+  /// No description provided for @hermesSessionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get hermesSessionDelete;
+
+  /// No description provided for @hermesSessionDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Session'**
+  String get hermesSessionDeleteTitle;
+
+  /// No description provided for @hermesSessionDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{title}\"? This cannot be undone.'**
+  String hermesSessionDeleteConfirm(String title);
+
+  /// No description provided for @hermesSessionRenameConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get hermesSessionRenameConfirm;
+
+  /// No description provided for @hermesSessionRenameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Session title'**
+  String get hermesSessionRenameHint;
+
+  /// No description provided for @hermesSessionUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage'**
+  String get hermesSessionUsage;
+
+  /// No description provided for @hermesSessionUsageUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage data unavailable'**
+  String get hermesSessionUsageUnavailable;
+
+  /// No description provided for @hermesSessionUsageInputTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Input'**
+  String get hermesSessionUsageInputTokens;
+
+  /// No description provided for @hermesSessionUsageOutputTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get hermesSessionUsageOutputTokens;
+
+  /// No description provided for @hermesSessionUsageTotalTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get hermesSessionUsageTotalTokens;
+
+  /// No description provided for @hermesSessionUsageCreditsUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits Used'**
+  String get hermesSessionUsageCreditsUsed;
+
+  /// No description provided for @hermesSessionUsageCreditsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get hermesSessionUsageCreditsRemaining;
+
+  /// No description provided for @hermesSessionUsageCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost'**
+  String get hermesSessionUsageCost;
+
+  /// No description provided for @hermesSessionUsageTurns.
+  ///
+  /// In en, this message translates to:
+  /// **'turns'**
+  String get hermesSessionUsageTurns;
+
+  /// No description provided for @hermesHandoffInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Switching to {agent}'**
+  String hermesHandoffInProgress(String agent);
+
+  /// No description provided for @hermesHandoffTransferring.
+  ///
+  /// In en, this message translates to:
+  /// **'Transferring…'**
+  String get hermesHandoffTransferring;
+
+  /// No description provided for @hermesHandoffCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Switched to {agent}'**
+  String hermesHandoffCompleted(String agent);
+
+  /// No description provided for @hermesHandoffDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer complete'**
+  String get hermesHandoffDone;
+
+  /// No description provided for @hermesHandoffFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer failed'**
+  String get hermesHandoffFailed;
 }
 
 class _AppLocalizationsDelegate

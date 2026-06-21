@@ -5720,4 +5720,109 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hermesSecretCancel => 'Cancel';
+
+  @override
+  String get hermesSessionListTitle => 'Sessions';
+
+  @override
+  String get hermesSessionListRefresh => 'Refresh';
+
+  @override
+  String get hermesSessionListSearchHint => 'Search sessions…';
+
+  @override
+  String get hermesSessionListEmpty => 'No Sessions';
+
+  @override
+  String get hermesSessionListEmptyHint =>
+      'Start a new conversation to create a session';
+
+  @override
+  String get hermesSessionListNoResults => 'No matching sessions';
+
+  @override
+  String get hermesSessionListError => 'Failed to load sessions';
+
+  @override
+  String get hermesSessionListRetry => 'Retry';
+
+  @override
+  String get hermesSessionUntitled => '(Untitled)';
+
+  @override
+  String get hermesSessionAgent => 'Agent';
+
+  @override
+  String hermesSessionMessageCount(int count) {
+    return '$count messages';
+  }
+
+  @override
+  String get hermesSessionResume => 'Resume';
+
+  @override
+  String get hermesSessionRename => 'Rename';
+
+  @override
+  String get hermesSessionDelete => 'Delete';
+
+  @override
+  String get hermesSessionDeleteTitle => 'Delete Session';
+
+  @override
+  String hermesSessionDeleteConfirm(String title) {
+    return 'Delete \"$title\"? This cannot be undone.';
+  }
+
+  @override
+  String get hermesSessionRenameConfirm => 'Rename';
+
+  @override
+  String get hermesSessionRenameHint => 'Session title';
+
+  @override
+  String get hermesSessionUsage => 'Usage';
+
+  @override
+  String get hermesSessionUsageUnavailable => 'Usage data unavailable';
+
+  @override
+  String get hermesSessionUsageInputTokens => 'Input';
+
+  @override
+  String get hermesSessionUsageOutputTokens => 'Output';
+
+  @override
+  String get hermesSessionUsageTotalTokens => 'Total';
+
+  @override
+  String get hermesSessionUsageCreditsUsed => 'Credits Used';
+
+  @override
+  String get hermesSessionUsageCreditsRemaining => 'Remaining';
+
+  @override
+  String get hermesSessionUsageCost => 'Cost';
+
+  @override
+  String get hermesSessionUsageTurns => 'turns';
+
+  @override
+  String hermesHandoffInProgress(String agent) {
+    return 'Switching to $agent';
+  }
+
+  @override
+  String get hermesHandoffTransferring => 'Transferring…';
+
+  @override
+  String hermesHandoffCompleted(String agent) {
+    return 'Switched to $agent';
+  }
+
+  @override
+  String get hermesHandoffDone => 'Transfer complete';
+
+  @override
+  String get hermesHandoffFailed => 'Transfer failed';
 }

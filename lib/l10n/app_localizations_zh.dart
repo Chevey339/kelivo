@@ -5501,6 +5501,110 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hermesSecretCancel => '取消';
+
+  @override
+  String get hermesSessionListTitle => '会话列表';
+
+  @override
+  String get hermesSessionListRefresh => '刷新';
+
+  @override
+  String get hermesSessionListSearchHint => '搜索会话…';
+
+  @override
+  String get hermesSessionListEmpty => '暂无会话';
+
+  @override
+  String get hermesSessionListEmptyHint => '开始新对话以创建会话';
+
+  @override
+  String get hermesSessionListNoResults => '没有匹配的会话';
+
+  @override
+  String get hermesSessionListError => '加载会话失败';
+
+  @override
+  String get hermesSessionListRetry => '重试';
+
+  @override
+  String get hermesSessionUntitled => '（无标题）';
+
+  @override
+  String get hermesSessionAgent => '智能体';
+
+  @override
+  String hermesSessionMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String get hermesSessionResume => '继续';
+
+  @override
+  String get hermesSessionRename => '重命名';
+
+  @override
+  String get hermesSessionDelete => '删除';
+
+  @override
+  String get hermesSessionDeleteTitle => '删除会话';
+
+  @override
+  String hermesSessionDeleteConfirm(String title) {
+    return '确定删除「$title」？此操作无法撤销。';
+  }
+
+  @override
+  String get hermesSessionRenameConfirm => '确认重命名';
+
+  @override
+  String get hermesSessionRenameHint => '会话标题';
+
+  @override
+  String get hermesSessionUsage => '用量统计';
+
+  @override
+  String get hermesSessionUsageUnavailable => '用量数据不可用';
+
+  @override
+  String get hermesSessionUsageInputTokens => '输入';
+
+  @override
+  String get hermesSessionUsageOutputTokens => '输出';
+
+  @override
+  String get hermesSessionUsageTotalTokens => '总计';
+
+  @override
+  String get hermesSessionUsageCreditsUsed => '已用积分';
+
+  @override
+  String get hermesSessionUsageCreditsRemaining => '剩余积分';
+
+  @override
+  String get hermesSessionUsageCost => '费用';
+
+  @override
+  String get hermesSessionUsageTurns => '轮';
+
+  @override
+  String hermesHandoffInProgress(String agent) {
+    return '正在切换到 $agent';
+  }
+
+  @override
+  String get hermesHandoffTransferring => '切换中…';
+
+  @override
+  String hermesHandoffCompleted(String agent) {
+    return '已切换到 $agent';
+  }
+
+  @override
+  String get hermesHandoffDone => '切换完成';
+
+  @override
+  String get hermesHandoffFailed => '切换失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11000,6 +11104,110 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hermesSecretCancel => '取消';
+
+  @override
+  String get hermesSessionListTitle => '会话列表';
+
+  @override
+  String get hermesSessionListRefresh => '刷新';
+
+  @override
+  String get hermesSessionListSearchHint => '搜索会话…';
+
+  @override
+  String get hermesSessionListEmpty => '暂无会话';
+
+  @override
+  String get hermesSessionListEmptyHint => '开始新对话以创建会话';
+
+  @override
+  String get hermesSessionListNoResults => '没有匹配的会话';
+
+  @override
+  String get hermesSessionListError => '加载会话失败';
+
+  @override
+  String get hermesSessionListRetry => '重试';
+
+  @override
+  String get hermesSessionUntitled => '（无标题）';
+
+  @override
+  String get hermesSessionAgent => '智能体';
+
+  @override
+  String hermesSessionMessageCount(int count) {
+    return '$count 条消息';
+  }
+
+  @override
+  String get hermesSessionResume => '继续';
+
+  @override
+  String get hermesSessionRename => '重命名';
+
+  @override
+  String get hermesSessionDelete => '删除';
+
+  @override
+  String get hermesSessionDeleteTitle => '删除会话';
+
+  @override
+  String hermesSessionDeleteConfirm(String title) {
+    return '确定删除「$title」？此操作无法撤销。';
+  }
+
+  @override
+  String get hermesSessionRenameConfirm => '确认重命名';
+
+  @override
+  String get hermesSessionRenameHint => '会话标题';
+
+  @override
+  String get hermesSessionUsage => '用量统计';
+
+  @override
+  String get hermesSessionUsageUnavailable => '用量数据不可用';
+
+  @override
+  String get hermesSessionUsageInputTokens => '输入';
+
+  @override
+  String get hermesSessionUsageOutputTokens => '输出';
+
+  @override
+  String get hermesSessionUsageTotalTokens => '总计';
+
+  @override
+  String get hermesSessionUsageCreditsUsed => '已用积分';
+
+  @override
+  String get hermesSessionUsageCreditsRemaining => '剩余积分';
+
+  @override
+  String get hermesSessionUsageCost => '费用';
+
+  @override
+  String get hermesSessionUsageTurns => '轮';
+
+  @override
+  String hermesHandoffInProgress(String agent) {
+    return '正在切换到 $agent';
+  }
+
+  @override
+  String get hermesHandoffTransferring => '切换中…';
+
+  @override
+  String hermesHandoffCompleted(String agent) {
+    return '已切换到 $agent';
+  }
+
+  @override
+  String get hermesHandoffDone => '切换完成';
+
+  @override
+  String get hermesHandoffFailed => '切换失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16499,4 +16707,108 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hermesSecretCancel => '取消';
+
+  @override
+  String get hermesSessionListTitle => '對話列表';
+
+  @override
+  String get hermesSessionListRefresh => '重新整理';
+
+  @override
+  String get hermesSessionListSearchHint => '搜尋對話…';
+
+  @override
+  String get hermesSessionListEmpty => '暫無對話';
+
+  @override
+  String get hermesSessionListEmptyHint => '開始新對話以建立對話';
+
+  @override
+  String get hermesSessionListNoResults => '沒有符合的對話';
+
+  @override
+  String get hermesSessionListError => '載入對話失敗';
+
+  @override
+  String get hermesSessionListRetry => '重試';
+
+  @override
+  String get hermesSessionUntitled => '（無標題）';
+
+  @override
+  String get hermesSessionAgent => '智慧體';
+
+  @override
+  String hermesSessionMessageCount(int count) {
+    return '$count 條訊息';
+  }
+
+  @override
+  String get hermesSessionResume => '繼續';
+
+  @override
+  String get hermesSessionRename => '重新命名';
+
+  @override
+  String get hermesSessionDelete => '刪除';
+
+  @override
+  String get hermesSessionDeleteTitle => '刪除對話';
+
+  @override
+  String hermesSessionDeleteConfirm(String title) {
+    return '確定刪除「$title」？此操作無法撤銷。';
+  }
+
+  @override
+  String get hermesSessionRenameConfirm => '確認重新命名';
+
+  @override
+  String get hermesSessionRenameHint => '對話標題';
+
+  @override
+  String get hermesSessionUsage => '用量統計';
+
+  @override
+  String get hermesSessionUsageUnavailable => '用量資料不可用';
+
+  @override
+  String get hermesSessionUsageInputTokens => '輸入';
+
+  @override
+  String get hermesSessionUsageOutputTokens => '輸出';
+
+  @override
+  String get hermesSessionUsageTotalTokens => '總計';
+
+  @override
+  String get hermesSessionUsageCreditsUsed => '已用積分';
+
+  @override
+  String get hermesSessionUsageCreditsRemaining => '剩餘積分';
+
+  @override
+  String get hermesSessionUsageCost => '費用';
+
+  @override
+  String get hermesSessionUsageTurns => '輪';
+
+  @override
+  String hermesHandoffInProgress(String agent) {
+    return '正在切換到 $agent';
+  }
+
+  @override
+  String get hermesHandoffTransferring => '切換中…';
+
+  @override
+  String hermesHandoffCompleted(String agent) {
+    return '已切換到 $agent';
+  }
+
+  @override
+  String get hermesHandoffDone => '切換完成';
+
+  @override
+  String get hermesHandoffFailed => '切換失敗';
 }

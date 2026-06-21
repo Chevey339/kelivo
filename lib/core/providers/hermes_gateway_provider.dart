@@ -7,6 +7,58 @@ import '../../hermes/hermes_event_bus.dart';
 import '../../hermes/hermes_gateway.dart';
 import '../../hermes/hermes_models.dart';
 import '../../hermes/hermes_rpc.dart';
+import '../../hermes/hermes_usage.dart';
+
+/// Immutable handoff state for the active session.
+class HermesHandoffState {
+  final HermesHandoffStatus status;
+  final String? fromAgentId;
+  final String? fromAgentName;
+  final String? toAgentId;
+  final String? toAgentName;
+  final String? reason;
+
+  const HermesHandoffState({
+    this.status = HermesHandoffStatus.idle,
+    this.fromAgentId,
+    this.fromAgentName,
+    this.toAgentId,
+    this.toAgentName,
+    this.reason,
+  });
+
+  HermesHandoffState copyWith({
+    HermesHandoffStatus? status,
+    String? fromAgentId,
+    String? fromAgentName,
+    String? toAgentId,
+    String? toAgentName,
+    String? reason,
+  }) {
+    return HermesHandoffState(
+      status: status ?? this.status,
+      fromAgentId: fromAgentId ?? this.fromAgentId,
+      fromAgentName: fromAgentName ?? this.fromAgentName,
+      toAgentId: toAgentId ?? this.toAgentId,
+      toAgentName: toAgentName ?? this.toAgentName,
+      reason: reason ?? this.reason,
+    );
+  }
+}
+
+enum HermesHandoffStatus {
+  /// No handoff in progress.
+  idle,
+
+  /// Handoff requested — waiting for completion.
+  inProgress,
+
+  /// Handoff completed — agent switched.
+  completed,
+
+  /// Handoff failed or cancelled.
+  failed,
+}
 
 /// Pending interactive request (approval, clarify, sudo, secret).
 class HermesPendingRequest {
@@ -70,6 +122,40 @@ class HermesGatewayProvider extends ChangeNotifier {
         HermesPendingRequest(sessionId: event.sessionId, event: event),
       );
       notifyListeners();
+    } else if (event is HandoffRequested) {
+      _handoffState = HermesHandoffState(
+        status: HermesHandoffStatus.inProgress,
+        fromAgentId: event.fromAgentId,
+        fromAgentName: event.fromAgentName,
+        toAgentId: event.toAgentId,
+        toAgentName: event.toAgentName,
+      );
+      notifyListeners();
+    } else if (event is HandoffCompleted) {
+      _handoffState = HermesHandoffState(
+        status: HermesHandoffStatus.completed,
+        fromAgentId: _handoffState.fromAgentId,
+        fromAgentName: _handoffState.fromAgentName,
+        toAgentId: event.agentId,
+        toAgentName: event.agentName,
+      );
+      notifyListeners();
+      // Reset to idle after a short delay so the UI can show "completed" briefly
+      Future<void>.delayed(const Duration(seconds: 3), () {
+        _handoffState = const HermesHandoffState();
+        notifyListeners();
+      });
+    } else if (event is HandoffFailed) {
+      _handoffState = HermesHandoffState(
+        status: HermesHandoffStatus.failed,
+        reason: event.reason,
+      );
+      notifyListeners();
+      // Reset to idle after a delay
+      Future<void>.delayed(const Duration(seconds: 5), () {
+        _handoffState = const HermesHandoffState();
+        notifyListeners();
+      });
     }
   }
 
@@ -243,6 +329,102 @@ class HermesGatewayProvider extends ChangeNotifier {
     _pendingRequests.clear();
     notifyListeners();
   }
+
+  // ── Session List ───────────────────────────────────────────────────
+
+  /// All known Hermes sessions (loaded from backend).
+  List<HermesSessionSummary> _sessions = [];
+  List<HermesSessionSummary> get sessions => List.unmodifiable(_sessions);
+
+  /// Whether a session list load is in progress.
+  bool _loadingSessions = false;
+  bool get loadingSessions => _loadingSessions;
+
+  /// Last session list load error, if any.
+  String? _sessionsError;
+  String? get sessionsError => _sessionsError;
+
+  /// Load the session list from the backend.
+  Future<void> loadSessions({int? limit, int? offset}) async {
+    if (_state != HermesConnectionState.ready) return;
+    _loadingSessions = true;
+    _sessionsError = null;
+    notifyListeners();
+
+    try {
+      _sessions = await _gateway.sessionList(limit: limit, offset: offset);
+      _sessionsError = null;
+    } catch (e) {
+      _sessionsError = e.toString();
+    } finally {
+      _loadingSessions = false;
+      notifyListeners();
+    }
+  }
+
+  /// Search sessions by query.
+  Future<List<HermesSessionSummary>> searchSessions(
+    String query, {
+    int? limit,
+  }) async {
+    if (_state != HermesConnectionState.ready) return [];
+    try {
+      return await _gateway.sessionSearch(query, limit: limit);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Delete a session from the backend.
+  Future<void> deleteSession(String sessionId) async {
+    if (_state != HermesConnectionState.ready) return;
+    await _gateway.sessionDelete(sessionId);
+    _sessions.removeWhere((s) => s.sessionId == sessionId);
+    if (_activeSessionId == sessionId) {
+      _activeSessionId = null;
+    }
+    notifyListeners();
+  }
+
+  /// Rename a session.
+  Future<void> renameSession(String sessionId, String title) async {
+    if (_state != HermesConnectionState.ready) return;
+    await _gateway.sessionTitle(sessionId, title);
+    final idx = _sessions.indexWhere((s) => s.sessionId == sessionId);
+    if (idx >= 0) {
+      // Replace with updated entry (title changed)
+      _sessions[idx] = HermesSessionSummary(
+        sessionId: _sessions[idx].sessionId,
+        title: title,
+        createdAt: _sessions[idx].createdAt,
+        lastActiveAt: _sessions[idx].lastActiveAt,
+        messageCount: _sessions[idx].messageCount,
+        agentId: _sessions[idx].agentId,
+        agentName: _sessions[idx].agentName,
+      );
+      notifyListeners();
+    }
+  }
+
+  // ── Session Usage ─────────────────────────────────────────────────
+
+  /// Fetch token usage and credits for a session.
+  Future<HermesUsage?> fetchSessionUsage(String sessionId) async {
+    if (_state != HermesConnectionState.ready) return null;
+    try {
+      final raw = await _gateway.sessionUsage(sessionId);
+      if (raw is Map) {
+        return HermesUsage.fromJson(Map<String, dynamic>.from(raw));
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  // ── Handoff State ─────────────────────────────────────────────────
+
+  /// Current handoff state for the active session.
+  HermesHandoffState _handoffState = const HermesHandoffState();
+  HermesHandoffState get handoffState => _handoffState;
 
   @override
   void dispose() {

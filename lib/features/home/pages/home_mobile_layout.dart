@@ -11,6 +11,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/interactive_drawer.dart';
 import '../widgets/side_drawer.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../../../features/hermes/hermes_handoff_indicator.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
@@ -256,6 +257,7 @@ class HomeMobileScaffold extends StatelessWidget {
               ],
             ),
       actions: [
+        const HermesHandoffIndicator(),
         IosIconButton(
           size: 20,
           minSize: 44,

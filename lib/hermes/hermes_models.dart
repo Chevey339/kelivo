@@ -482,3 +482,80 @@ class Commentary extends HermesStreamEvent {
 
   Map<String, dynamic> toJson() => {'session_id': sessionId, 'text': text};
 }
+
+// ── Handoff events ─────────────────────────────────────────────────
+
+/// Handoff request initiated (agent wants to transfer to another agent).
+class HandoffRequested extends HermesStreamEvent {
+  final String sessionId;
+  final String fromAgentId;
+  final String fromAgentName;
+  final String toAgentId;
+  final String toAgentName;
+
+  const HandoffRequested({
+    required this.sessionId,
+    required this.fromAgentId,
+    required this.fromAgentName,
+    required this.toAgentId,
+    required this.toAgentName,
+  });
+
+  factory HandoffRequested.fromJson(Map<String, dynamic> json) =>
+      HandoffRequested(
+        sessionId: json['session_id'] as String? ?? '',
+        fromAgentId: json['from_agent_id'] as String? ?? '',
+        fromAgentName: json['from_agent_name'] as String? ?? '',
+        toAgentId: json['to_agent_id'] as String? ?? '',
+        toAgentName: json['to_agent_name'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'from_agent_id': fromAgentId,
+    'from_agent_name': fromAgentName,
+    'to_agent_id': toAgentId,
+    'to_agent_name': toAgentName,
+  };
+}
+
+/// Handoff completed — agent has switched.
+class HandoffCompleted extends HermesStreamEvent {
+  final String sessionId;
+  final String agentId;
+  final String agentName;
+
+  const HandoffCompleted({
+    required this.sessionId,
+    required this.agentId,
+    required this.agentName,
+  });
+
+  factory HandoffCompleted.fromJson(Map<String, dynamic> json) =>
+      HandoffCompleted(
+        sessionId: json['session_id'] as String? ?? '',
+        agentId: json['agent_id'] as String? ?? '',
+        agentName: json['agent_name'] as String? ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+    'session_id': sessionId,
+    'agent_id': agentId,
+    'agent_name': agentName,
+  };
+}
+
+/// Handoff failed or was cancelled.
+class HandoffFailed extends HermesStreamEvent {
+  final String sessionId;
+  final String reason;
+
+  const HandoffFailed({required this.sessionId, required this.reason});
+
+  factory HandoffFailed.fromJson(Map<String, dynamic> json) => HandoffFailed(
+    sessionId: json['session_id'] as String? ?? '',
+    reason: json['reason'] as String? ?? '',
+  );
+
+  Map<String, dynamic> toJson() => {'session_id': sessionId, 'reason': reason};
+}

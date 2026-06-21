@@ -2437,5 +2437,65 @@
   "hermesSudoDeny": "Deny",
   "hermesSecretTitle": "Secret Required",
   "hermesSecretSubmit": "Submit",
-  "hermesSecretCancel": "Cancel"
+  "hermesSecretCancel": "Cancel",
+  "hermesSessionListTitle": "Sessions",
+  "hermesSessionListRefresh": "Refresh",
+  "hermesSessionListSearchHint": "Search sessions…",
+  "hermesSessionListEmpty": "No Sessions",
+  "hermesSessionListEmptyHint": "Start a new conversation to create a session",
+  "hermesSessionListNoResults": "No matching sessions",
+  "hermesSessionListError": "Failed to load sessions",
+  "hermesSessionListRetry": "Retry",
+  "hermesSessionUntitled": "(Untitled)",
+  "hermesSessionAgent": "Agent",
+  "hermesSessionMessageCount": "{count} messages",
+  "@hermesSessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "hermesSessionResume": "Resume",
+  "hermesSessionRename": "Rename",
+  "hermesSessionDelete": "Delete",
+  "hermesSessionDeleteTitle": "Delete Session",
+  "hermesSessionDeleteConfirm": "Delete \"{title}\"? This cannot be undone.",
+  "@hermesSessionDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesSessionRenameConfirm": "Rename",
+  "hermesSessionRenameHint": "Session title",
+  "hermesSessionUsage": "Usage",
+  "hermesSessionUsageUnavailable": "Usage data unavailable",
+  "hermesSessionUsageInputTokens": "Input",
+  "hermesSessionUsageOutputTokens": "Output",
+  "hermesSessionUsageTotalTokens": "Total",
+  "hermesSessionUsageCreditsUsed": "Credits Used",
+  "hermesSessionUsageCreditsRemaining": "Remaining",
+  "hermesSessionUsageCost": "Cost",
+  "hermesSessionUsageTurns": "turns",
+  "hermesHandoffInProgress": "Switching to {agent}",
+  "@hermesHandoffInProgress": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesHandoffTransferring": "Transferring…",
+  "hermesHandoffCompleted": "Switched to {agent}",
+  "@hermesHandoffCompleted": {
+    "placeholders": {
+      "agent": {
+        "type": "String"
+      }
+    }
+  },
+  "hermesHandoffDone": "Transfer complete",
+  "hermesHandoffFailed": "Transfer failed"
 }
