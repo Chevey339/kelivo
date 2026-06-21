@@ -2094,5 +2094,28 @@
   "hermesTerminalTheme": "主題",
   "hermesTerminalThemeSystem": "跟隨系統",
   "hermesTerminalThemeDark": "深色",
-  "hermesTerminalThemeLight": "淺色"
+  "hermesTerminalThemeLight": "淺色",
+
+  "hermesBillingTitle": "積分與帳單",
+  "hermesBillingCredits": "積分",
+  "hermesBillingCreditsRemaining": "剩餘積分",
+  "hermesBillingPurchase": "購買積分",
+  "hermesBillingAutoReload": "自動儲值",
+  "hermesBillingAutoReloadOn": "開啟",
+  "hermesBillingAutoReloadOff": "關閉",
+  "hermesBillingThreshold": "餘額低於時自動儲值",
+  "hermesBillingPackages": "可用套餐",
+  "hermesBillingCharge": "購買",
+  "hermesBillingChargePending": "處理中…",
+  "hermesBillingChargeSuccess": "購買成功",
+  "hermesBillingChargeFailed": "購買失敗",
+  "hermesBillingClose": "關閉",
+  "hermesBillingEmpty": "暫無可用套餐",
+
+  "hermesSessionExport": "導出",
+  "hermesSessionExportMarkdown": "導出為 Markdown",
+  "hermesSessionExportText": "導出為文字",
+  "hermesSessionExporting": "導出中…",
+  "hermesSessionExportSuccess": "對話已導出",
+  "hermesSessionExportFailed": "導出失敗"
 }

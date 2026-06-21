@@ -7,6 +7,7 @@ import '../../hermes/hermes_config.dart';
 import '../../hermes/hermes_event_bus.dart';
 import '../../hermes/hermes_gateway.dart';
 import '../../hermes/hermes_models.dart';
+import '../../hermes/hermes_rest_client.dart';
 import '../../hermes/hermes_rpc.dart';
 import '../../hermes/hermes_usage.dart';
 import '../../hermes/hermes_terminal_adapter.dart';
@@ -210,6 +211,7 @@ class HermesGatewayProvider extends ChangeNotifier {
   HermesEventBus get eventBus => _eventBus;
   HermesGateway get gateway => _gateway;
   HermesConfig get config => _config;
+  HermesRestClient? get restClient => _gateway.restClient;
   String? get lastError => _lastError;
 
   /// Initialize Hive config and load persisted backends.
@@ -486,6 +488,109 @@ class HermesGatewayProvider extends ChangeNotifier {
       return HermesUsage.fromJson(raw);
     } catch (_) {}
     return null;
+  }
+
+  // ── Session Bulk Operations ────────────────────────────────────────
+
+  /// Export a session as markdown text.
+  Future<String> exportSession(
+    String sessionId, {
+    String format = 'markdown',
+  }) async {
+    if (_state != HermesConnectionState.ready) return '';
+    try {
+      return await _gateway.sessionExport(sessionId, format: format);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Prune (delete) all empty sessions.
+  Future<int> pruneEmptySessions() async {
+    if (_state != HermesConnectionState.ready) return 0;
+    final count = await _gateway.sessionPrune();
+    if (count > 0) {
+      await loadSessions();
+    }
+    return count;
+  }
+
+  /// Empty (clear messages from) a session.
+  Future<void> emptySession(String sessionId) async {
+    if (_state != HermesConnectionState.ready) return;
+    await _gateway.sessionEmpty(sessionId);
+    notifyListeners();
+  }
+
+  /// Bulk-delete sessions.
+  Future<int> bulkDeleteSessions(List<String> sessionIds) async {
+    if (_state != HermesConnectionState.ready) return 0;
+    final count = await _gateway.sessionBulkDelete(sessionIds);
+    if (count > 0) {
+      _sessions.removeWhere((s) => sessionIds.contains(s.sessionId));
+      if (_activeSessionId != null && sessionIds.contains(_activeSessionId)) {
+        _activeSessionId = null;
+      }
+      notifyListeners();
+    }
+    return count;
+  }
+
+  /// Activate a session (bring to front of active list).
+  Future<void> activateSession(String sessionId) async {
+    if (_state != HermesConnectionState.ready) return;
+    await _gateway.sessionActivate(sessionId);
+    _activeSessionId = sessionId;
+    notifyListeners();
+  }
+
+  // ── Billing / Credits ─────────────────────────────────────────────
+
+  /// Get current credits balance.
+  Future<double> fetchCredits() async {
+    if (_state != HermesConnectionState.ready) return 0.0;
+    try {
+      return await _gateway.billingCredits();
+    } catch (_) {
+      return 0.0;
+    }
+  }
+
+  /// Get available billing packages.
+  Future<List<Map<String, dynamic>>> fetchBillingPackages() async {
+    if (_state != HermesConnectionState.ready) return [];
+    try {
+      final list = await _gateway.billingPackages();
+      return list;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Trigger a credit purchase.
+  Future<Map<String, dynamic>> purchaseCredits(String packageId) async {
+    if (_state != HermesConnectionState.ready) return {};
+    try {
+      return await _gateway.billingCharge(packageId);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Get charge status.
+  Future<Map<String, dynamic>> fetchChargeStatus(String chargeId) async {
+    if (_state != HermesConnectionState.ready) return {};
+    try {
+      return await _gateway.billingChargeStatus(chargeId);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Update auto-reload setting.
+  Future<void> setAutoReload({required bool enabled, double? threshold}) async {
+    if (_state != HermesConnectionState.ready) return;
+    await _gateway.billingAutoReload(enabled: enabled, threshold: threshold);
   }
 
   // ── Handoff State ─────────────────────────────────────────────────

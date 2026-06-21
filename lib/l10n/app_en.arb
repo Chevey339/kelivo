@@ -2517,5 +2517,28 @@
   "hermesTerminalTheme": "Theme",
   "hermesTerminalThemeSystem": "Follow System",
   "hermesTerminalThemeDark": "Dark",
-  "hermesTerminalThemeLight": "Light"
+  "hermesTerminalThemeLight": "Light",
+
+  "hermesBillingTitle": "Credits & Billing",
+  "hermesBillingCredits": "Credits",
+  "hermesBillingCreditsRemaining": "Credits Remaining",
+  "hermesBillingPurchase": "Purchase Credits",
+  "hermesBillingAutoReload": "Auto-reload",
+  "hermesBillingAutoReloadOn": "On",
+  "hermesBillingAutoReloadOff": "Off",
+  "hermesBillingThreshold": "Reload when below",
+  "hermesBillingPackages": "Available Packages",
+  "hermesBillingCharge": "Buy",
+  "hermesBillingChargePending": "Processing…",
+  "hermesBillingChargeSuccess": "Purchase successful",
+  "hermesBillingChargeFailed": "Purchase failed",
+  "hermesBillingClose": "Close",
+  "hermesBillingEmpty": "No packages available",
+
+  "hermesSessionExport": "Export",
+  "hermesSessionExportMarkdown": "Export as Markdown",
+  "hermesSessionExportText": "Export as Text",
+  "hermesSessionExporting": "Exporting…",
+  "hermesSessionExportSuccess": "Session exported",
+  "hermesSessionExportFailed": "Export failed"
 }

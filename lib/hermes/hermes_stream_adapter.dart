@@ -158,16 +158,19 @@ class HermesStreamAdapter {
   Stream<HermesStreamChunk> get stream => _controller.stream;
 
   void _emit() {
-    _controller.add(HermesStreamChunk(
-      content: _content,
-      reasoning: _reasoning.isNotEmpty ? _reasoning : null,
-      isDone: _isDone,
-      totalTokens: _totalTokens,
-      usage: _usage,
-      toolCalls: _toolCalls.isNotEmpty ? List.unmodifiable(_toolCalls) : null,
-      toolResults:
-          _toolResults.isNotEmpty ? List.unmodifiable(_toolResults) : null,
-    ));
+    _controller.add(
+      HermesStreamChunk(
+        content: _content,
+        reasoning: _reasoning.isNotEmpty ? _reasoning : null,
+        isDone: _isDone,
+        totalTokens: _totalTokens,
+        usage: _usage,
+        toolCalls: _toolCalls.isNotEmpty ? List.unmodifiable(_toolCalls) : null,
+        toolResults: _toolResults.isNotEmpty
+            ? List.unmodifiable(_toolResults)
+            : null,
+      ),
+    );
   }
 
   void _onEvent(HermesStreamEvent event) {
@@ -202,13 +205,15 @@ class HermesStreamAdapter {
     }
 
     if (event is ToolComplete && event.sessionId == _currentSessionId) {
-      _toolResults.add(HermesToolResult(
-        id: event.openTool?['id']?.toString(),
-        name: event.name,
-        args: event.openTool?['args'] as Map<String, dynamic>?,
-        content: event.openTool?['content']?.toString(),
-        durationMs: (event.duration * 1000).toInt(),
-      ));
+      _toolResults.add(
+        HermesToolResult(
+          id: event.openTool?['id']?.toString(),
+          name: event.name,
+          args: event.openTool?['args'] as Map<String, dynamic>?,
+          content: event.openTool?['content']?.toString(),
+          durationMs: (event.duration * 1000).toInt(),
+        ),
+      );
       emit = true;
     }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:provider/provider.dart';
 import '../../core/providers/hermes_gateway_provider.dart';
 import '../../hermes/hermes_rpc.dart';
@@ -239,6 +240,10 @@ class _HermesSessionListPageState extends State<HermesSessionListPage> {
               AppLocalizations.of(context)!,
             );
           },
+          onExport: () {
+            Navigator.of(context).pop();
+            _exportSession(context, hp, session, AppLocalizations.of(context)!);
+          },
         ),
       );
     }
@@ -275,6 +280,33 @@ class _HermesSessionListPageState extends State<HermesSessionListPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _exportSession(
+    BuildContext context,
+    HermesGatewayProvider hp,
+    HermesSessionSummary session,
+    AppLocalizations l10n,
+  ) async {
+    final content = await hp.exportSession(session.sessionId);
+    if (!context.mounted) return;
+    if (content.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.hermesSessionExportFailed)));
+      return;
+    }
+    // Copy to clipboard as a simple export mechanism
+    await _copyToClipboard(context, content);
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.hermesSessionExportSuccess)));
+    }
+  }
+
+  Future<void> _copyToClipboard(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   void _showRenameDialog(
@@ -451,6 +483,7 @@ class HermesSessionDetailSheet extends StatelessWidget {
   final VoidCallback onResume;
   final VoidCallback onDelete;
   final VoidCallback onRename;
+  final VoidCallback onExport;
 
   const HermesSessionDetailSheet({
     super.key,
@@ -459,6 +492,7 @@ class HermesSessionDetailSheet extends StatelessWidget {
     required this.onResume,
     required this.onDelete,
     required this.onRename,
+    required this.onExport,
   });
 
   @override
@@ -523,6 +557,14 @@ class HermesSessionDetailSheet extends StatelessWidget {
                     onResume();
                   },
                   isPrimary: true,
+                ),
+                _ActionButton(
+                  label: l10n.hermesSessionExport,
+                  icon: Icons.download_outlined,
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    onExport();
+                  },
                 ),
                 _ActionButton(
                   label: l10n.hermesSessionRename,

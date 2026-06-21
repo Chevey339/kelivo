@@ -190,6 +190,60 @@ extension HermesSessionRpc on HermesGateway {
     final result = await sendRpc('session.usage', {'session_id': sessionId});
     return (result as Map<String, dynamic>? ?? {});
   }
+
+  /// Get the active (currently-open) sessions for the current profile.
+  Future<List<HermesSessionSummary>> sessionActiveList() async {
+    final result = await sendRpc('session.active_list');
+    final list = result as List<dynamic>? ?? const [];
+    return list
+        .cast<Map<String, dynamic>>()
+        .map((j) => HermesSessionSummary.fromJson(j))
+        .toList();
+  }
+
+  /// Activate a session (bring it to front of active list).
+  Future<void> sessionActivate(String sessionId) async {
+    await sendRpc('session.activate', {'session_id': sessionId});
+  }
+
+  /// Export session as markdown or text.
+  Future<String> sessionExport(
+    String sessionId, {
+    String format = 'markdown',
+  }) async {
+    final result = await sendRpc('session.export', {
+      'session_id': sessionId,
+      'format': format,
+    });
+    return (result as Map<String, dynamic>?)?['content'] as String? ?? '';
+  }
+
+  /// Prune (delete) empty sessions.
+  Future<int> sessionPrune() async {
+    final result = await sendRpc('session.prune');
+    return (result as Map<String, dynamic>?)?['deleted'] as int? ?? 0;
+  }
+
+  /// Empty (clear messages from) a session.
+  Future<void> sessionEmpty(String sessionId) async {
+    await sendRpc('session.empty', {'session_id': sessionId});
+  }
+
+  /// Bulk-delete sessions by IDs.
+  Future<int> sessionBulkDelete(List<String> sessionIds) async {
+    final result = await sendRpc('session.bulk_delete', {
+      'session_ids': sessionIds,
+    });
+    return (result as Map<String, dynamic>?)?['deleted'] as int? ?? 0;
+  }
+
+  /// Get the latest descendant session (for branching navigation).
+  Future<String?> sessionLatestDescendant(String sessionId) async {
+    final result = await sendRpc('session.latest_descendant', {
+      'session_id': sessionId,
+    });
+    return (result as Map<String, dynamic>?)?['session_id'] as String?;
+  }
 }
 
 /// Prompt / generation.
@@ -486,6 +540,52 @@ extension HermesAgentRpc on HermesGateway {
     final result = await sendRpc('agent.get', {'agent_id': agentId});
     if (result == null) return null;
     return HermesAgent.fromJson(result as Map<String, dynamic>);
+  }
+}
+
+/// Billing / credits.
+extension HermesBillingRpc on HermesGateway {
+  /// Get current credits balance.
+  Future<double> billingCredits() async {
+    final result = await sendRpc('billing.credits');
+    return (result as Map<String, dynamic>?)?['credits'] as double? ?? 0.0;
+  }
+
+  /// Trigger a credit purchase / charge.
+  Future<Map<String, dynamic>> billingCharge(String packageId) async {
+    final result = await sendRpc('billing.charge', {'package_id': packageId});
+    return (result as Map<String, dynamic>? ?? {});
+  }
+
+  /// Get charge status (pending / completed / failed).
+  Future<Map<String, dynamic>> billingChargeStatus(String chargeId) async {
+    final result = await sendRpc('billing.charge_status', {
+      'charge_id': chargeId,
+    });
+    return (result as Map<String, dynamic>? ?? {});
+  }
+
+  /// Enable or disable auto-reload.
+  Future<void> billingAutoReload({
+    required bool enabled,
+    double? threshold,
+  }) async {
+    await sendRpc('billing.auto_reload', {
+      'enabled': enabled,
+      if (threshold != null) 'threshold': threshold,
+    });
+  }
+
+  /// Get available top-up packages.
+  Future<List<Map<String, dynamic>>> billingPackages() async {
+    final result = await sendRpc('billing.packages');
+    final list = result as List<dynamic>? ?? const [];
+    return list.cast<Map<String, dynamic>>();
+  }
+
+  /// Step up to a higher tier.
+  Future<void> billingStepUp(String tierId) async {
+    await sendRpc('billing.step_up', {'tier_id': tierId});
   }
 }
 

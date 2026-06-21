@@ -2094,5 +2094,28 @@
   "hermesTerminalTheme": "主题",
   "hermesTerminalThemeSystem": "跟随系统",
   "hermesTerminalThemeDark": "深色",
-  "hermesTerminalThemeLight": "浅色"
+  "hermesTerminalThemeLight": "浅色",
+
+  "hermesBillingTitle": "积分与账单",
+  "hermesBillingCredits": "积分",
+  "hermesBillingCreditsRemaining": "剩余积分",
+  "hermesBillingPurchase": "购买积分",
+  "hermesBillingAutoReload": "自动充值",
+  "hermesBillingAutoReloadOn": "开启",
+  "hermesBillingAutoReloadOff": "关闭",
+  "hermesBillingThreshold": "余额低于时自动充值",
+  "hermesBillingPackages": "可用套餐",
+  "hermesBillingCharge": "购买",
+  "hermesBillingChargePending": "处理中…",
+  "hermesBillingChargeSuccess": "购买成功",
+  "hermesBillingChargeFailed": "购买失败",
+  "hermesBillingClose": "关闭",
+  "hermesBillingEmpty": "暂无可用套餐",
+
+  "hermesSessionExport": "导出",
+  "hermesSessionExportMarkdown": "导出为 Markdown",
+  "hermesSessionExportText": "导出为文本",
+  "hermesSessionExporting": "导出中…",
+  "hermesSessionExportSuccess": "会话已导出",
+  "hermesSessionExportFailed": "导出失败"
 }

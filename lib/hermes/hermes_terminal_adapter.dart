@@ -20,9 +20,9 @@ class HermesTerminalAdapter {
     required HermesEventBus eventBus,
     required String sessionId,
     required HermesGateway gateway,
-  })  : _eventBus = eventBus,
-        _sessionId = sessionId,
-        _gateway = gateway {
+  }) : _eventBus = eventBus,
+       _sessionId = sessionId,
+       _gateway = gateway {
     _subscription = _eventBus.allEvents.listen(_onEvent);
 
     // Pipe user keystrokes to Hermes backend
@@ -48,7 +48,9 @@ class HermesTerminalAdapter {
     if (event is TerminalOutput) {
       terminal.write(event.text);
     } else if (event is TerminalClosed) {
-      terminal.write('\r\n[Process exited${event.exitCode != null ? ' with code ${event.exitCode}' : ''}]\r\n');
+      terminal.write(
+        '\r\n[Process exited${event.exitCode != null ? ' with code ${event.exitCode}' : ''}]\r\n',
+      );
       _isClosed = true;
     }
   }

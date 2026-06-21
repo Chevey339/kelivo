@@ -6,6 +6,7 @@ import 'hermes_auth.dart';
 import 'hermes_config.dart';
 import 'hermes_event_bus.dart';
 import 'hermes_models.dart';
+import 'hermes_rest_client.dart';
 
 /// Connection state of the Hermes WebSocket gateway.
 enum HermesConnectionState {
@@ -59,6 +60,10 @@ class HermesGateway {
   HermesConnectionState _state = HermesConnectionState.disconnected;
   HermesBackendBox? _currentBackend;
   HermesAuth? _currentAuth;
+  HermesRestClient? _restClient;
+
+  /// REST client for non-WebSocket API calls (e.g. session export, billing).
+  HermesRestClient? get restClient => _restClient;
 
   // Pending RPC futures keyed by request id.
   final _pending = <String, Completer<dynamic>>{};
@@ -158,6 +163,7 @@ class HermesGateway {
 
   Future<void> _wsConnect(HermesBackendBox backend, HermesAuth auth) async {
     _currentAuth = auth;
+    _restClient = HermesRestClient(auth: auth, baseUrl: _restBase(backend.url));
     _state = HermesConnectionState.authenticating;
 
     final params = await auth.authParams();

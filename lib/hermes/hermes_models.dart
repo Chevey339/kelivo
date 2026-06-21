@@ -592,10 +592,7 @@ class TerminalReadRequest extends HermesStreamEvent {
   final String sessionId;
   final String prompt;
 
-  const TerminalReadRequest({
-    required this.sessionId,
-    this.prompt = '',
-  });
+  const TerminalReadRequest({required this.sessionId, this.prompt = ''});
 
   factory TerminalReadRequest.fromJson(Map<String, dynamic> json) =>
       TerminalReadRequest(
@@ -603,10 +600,7 @@ class TerminalReadRequest extends HermesStreamEvent {
         prompt: json['prompt'] as String? ?? '',
       );
 
-  Map<String, dynamic> toJson() => {
-    'session_id': sessionId,
-    'prompt': prompt,
-  };
+  Map<String, dynamic> toJson() => {'session_id': sessionId, 'prompt': prompt};
 }
 
 /// Terminal session closed.
