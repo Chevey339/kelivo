@@ -25,103 +25,14 @@ class FaqEntryItem extends FaqListItem {
 }
 
 List<FaqListItem> faqItems(AppLocalizations l10n) => [
-  FaqSectionHeader(title: (_) => l10n.faqSectionGeneral),
+  FaqSectionHeader(title: (_) => 'Kelivo — General'),
   FaqEntryItem(
     key: '1_1',
-    title: (_) => l10n.faqEntry1GeneralTipsTitle,
-    summary: (_) => l10n.faqEntry1GeneralTipsSummary,
+    title: (_) => 'Tips for new Kelivo users',
+    summary: (_) =>
+        '1. Regular backups are strongly recommended (local or remote), as Hive database files may become corrupted after a crash.\n'
+        '2. Do not delete assistants casually — all chat history under that assistant will be permanently lost.\n'
+        '3. For long conversations, avoid the built-in Sample Assistant and the assistant memory feature, as they inject dynamic variables into system prompts which hurt cache hit rates.',
     icon: Lucide.Lightbulb,
-  ),
-  FaqEntryItem(
-    key: '1_2',
-    title: (_) => l10n.faqEntry1BillingPrivacyTitle,
-    summary: (_) => l10n.faqEntry1BillingPrivacySummary,
-    icon: Lucide.Shield,
-  ),
-  FaqEntryItem(
-    key: '1_3',
-    title: (_) => l10n.faqEntry1AgentSkillsTitle,
-    summary: (_) => l10n.faqEntry1AgentSkillsSummary,
-    icon: Lucide.Bot,
-  ),
-  FaqEntryItem(
-    key: '1_4',
-    title: (_) => l10n.faqEntry1ApiCallsTitle,
-    summary: (_) => l10n.faqEntry1ApiCallsSummary,
-    icon: Lucide.Coins,
-  ),
-  FaqEntryItem(
-    key: '1_5',
-    title: (_) => l10n.faqEntry1FeedbackTitle,
-    summary: (_) => l10n.faqEntry1FeedbackSummary,
-    icon: Lucide.MessageCircleQuestionMark,
-  ),
-
-  FaqSectionHeader(title: (_) => l10n.faqSectionErrors),
-  FaqEntryItem(
-    key: '2_1',
-    title: (_) => l10n.faqEntry2Http404Title,
-    summary: (_) => l10n.faqEntry2Http404Summary,
-    icon: Lucide.Settings,
-  ),
-  FaqEntryItem(
-    key: '2_2',
-    title: (_) => l10n.faqEntry2BalanceTitle,
-    summary: (_) => l10n.faqEntry2BalanceSummary,
-    icon: Lucide.Wallet,
-  ),
-  FaqEntryItem(
-    key: '2_3',
-    title: (_) => l10n.faqEntry2GeminiTitle,
-    summary: (_) => l10n.faqEntry2GeminiSummary,
-    icon: Lucide.Settings,
-  ),
-  FaqEntryItem(
-    key: '2_4',
-    title: (_) => l10n.faqEntry2NoVisionTitle,
-    summary: (_) => l10n.faqEntry2NoVisionSummary,
-    icon: Lucide.Image,
-  ),
-
-  FaqSectionHeader(title: (_) => l10n.faqSectionSearch),
-  FaqEntryItem(
-    key: '3_1',
-    title: (_) => l10n.faqEntry3SearchQualityTitle,
-    summary: (_) => l10n.faqEntry3SearchQualitySummary,
-    icon: Lucide.Search,
-  ),
-  FaqEntryItem(
-    key: '3_2',
-    title: (_) => l10n.faqEntry3ContextExplosionTitle,
-    summary: (_) => l10n.faqEntry3ContextExplosionSummary,
-    icon: Lucide.Globe,
-  ),
-
-  FaqSectionHeader(title: (_) => l10n.faqSectionCache),
-  FaqEntryItem(
-    key: '4_1',
-    title: (_) => l10n.faqEntry4CacheHitrateTitle,
-    summary: (_) => l10n.faqEntry4CacheHitrateSummary,
-    icon: Lucide.Zap,
-  ),
-  FaqEntryItem(
-    key: '4_2',
-    title: (_) => l10n.faqEntry4ClaudeCacheTitle,
-    summary: (_) => l10n.faqEntry4ClaudeCacheSummary,
-    icon: Lucide.Zap,
-  ),
-
-  FaqSectionHeader(title: (_) => l10n.faqSectionBackup),
-  FaqEntryItem(
-    key: '5_1',
-    title: (_) => l10n.faqEntry5BackupRestoreTitle,
-    summary: (_) => l10n.faqEntry5BackupRestoreSummary,
-    icon: Lucide.Database,
-  ),
-  FaqEntryItem(
-    key: '5_2',
-    title: (_) => l10n.faqEntry5CrossDeviceSyncTitle,
-    summary: (_) => l10n.faqEntry5CrossDeviceSyncSummary,
-    icon: Lucide.Database,
   ),
 ];
