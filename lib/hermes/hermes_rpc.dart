@@ -404,6 +404,89 @@ extension HermesHandoffRpc on HermesGateway {
   Future<void> handoffFail(String sessionId, String reason) async {
     await sendRpc('handoff.fail', {'session_id': sessionId, 'reason': reason});
   }
+
+  /// Confirm a handoff request with the selected agent id.
+  /// The backend suggested target is in the HandoffRequested stream event;
+  /// the user may override it with a different agent.
+  Future<void> handoffRespond(
+    String sessionId,
+    String agentId, {
+    String? reason,
+  }) async {
+    await sendRpc('handoff.respond', {
+      'session_id': sessionId,
+      'agent_id': agentId,
+      if (reason != null) 'reason': reason,
+    });
+  }
+
+  /// Cancel a pending handoff request.
+  Future<void> handoffCancel(String sessionId, {String? reason}) async {
+    await sendRpc('handoff.cancel', {
+      'session_id': sessionId,
+      if (reason != null) 'reason': reason,
+    });
+  }
+}
+
+/// Agent profile (from Hermes backend agent.list / agent.get).
+class HermesAgent {
+  final String id;
+  final String name;
+  final String? description;
+  final String? avatarUrl;
+  final List<String> capabilities;
+  final bool isDefault;
+
+  const HermesAgent({
+    required this.id,
+    required this.name,
+    this.description,
+    this.avatarUrl,
+    this.capabilities = const [],
+    this.isDefault = false,
+  });
+
+  factory HermesAgent.fromJson(Map<String, dynamic> json) {
+    return HermesAgent(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      capabilities:
+          (json['capabilities'] as List<dynamic>?)?.cast<String>() ?? const [],
+      isDefault: json['is_default'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    if (description != null) 'description': description,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    'capabilities': capabilities,
+    'is_default': isDefault,
+  };
+}
+
+/// Agent management RPC.
+extension HermesAgentRpc on HermesGateway {
+  /// List all available agents on the backend.
+  Future<List<HermesAgent>> agentList() async {
+    final result = await sendRpc('agent.list');
+    final list = result as List<dynamic>? ?? const [];
+    return list
+        .cast<Map<String, dynamic>>()
+        .map((j) => HermesAgent.fromJson(j))
+        .toList();
+  }
+
+  /// Get details of a specific agent.
+  Future<HermesAgent?> agentGet(String agentId) async {
+    final result = await sendRpc('agent.get', {'agent_id': agentId});
+    if (result == null) return null;
+    return HermesAgent.fromJson(result as Map<String, dynamic>);
+  }
 }
 
 /// Terminal.

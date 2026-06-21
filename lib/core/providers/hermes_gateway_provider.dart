@@ -9,6 +9,24 @@ import '../../hermes/hermes_models.dart';
 import '../../hermes/hermes_rpc.dart';
 import '../../hermes/hermes_usage.dart';
 
+/// A pending handoff request awaiting user confirmation.
+class HandoffPendingRequest {
+  final String sessionId;
+  final String fromAgentId;
+  final String fromAgentName;
+  final String suggestedAgentId;
+  final String suggestedAgentName;
+  final DateTime createdAt;
+
+  HandoffPendingRequest({
+    required this.sessionId,
+    required this.fromAgentId,
+    required this.fromAgentName,
+    required this.suggestedAgentId,
+    required this.suggestedAgentName,
+  }) : createdAt = DateTime.now();
+}
+
 /// Immutable handoff state for the active session.
 class HermesHandoffState {
   final HermesHandoffStatus status;
@@ -123,6 +141,13 @@ class HermesGatewayProvider extends ChangeNotifier {
       );
       notifyListeners();
     } else if (event is HandoffRequested) {
+      _pendingHandoff = HandoffPendingRequest(
+        sessionId: event.sessionId,
+        fromAgentId: event.fromAgentId,
+        fromAgentName: event.fromAgentName,
+        suggestedAgentId: event.toAgentId,
+        suggestedAgentName: event.toAgentName,
+      );
       _handoffState = HermesHandoffState(
         status: HermesHandoffStatus.inProgress,
         fromAgentId: event.fromAgentId,
@@ -131,7 +156,10 @@ class HermesGatewayProvider extends ChangeNotifier {
         toAgentName: event.toAgentName,
       );
       notifyListeners();
+      // Load agent list in background for the handoff sheet
+      loadAgents();
     } else if (event is HandoffCompleted) {
+      _pendingHandoff = null;
       _handoffState = HermesHandoffState(
         status: HermesHandoffStatus.completed,
         fromAgentId: _handoffState.fromAgentId,
@@ -146,6 +174,7 @@ class HermesGatewayProvider extends ChangeNotifier {
         notifyListeners();
       });
     } else if (event is HandoffFailed) {
+      _pendingHandoff = null;
       _handoffState = HermesHandoffState(
         status: HermesHandoffStatus.failed,
         reason: event.reason,
@@ -413,9 +442,7 @@ class HermesGatewayProvider extends ChangeNotifier {
     if (_state != HermesConnectionState.ready) return null;
     try {
       final raw = await _gateway.sessionUsage(sessionId);
-      if (raw is Map) {
-        return HermesUsage.fromJson(Map<String, dynamic>.from(raw));
-      }
+      return HermesUsage.fromJson(raw);
     } catch (_) {}
     return null;
   }
@@ -425,6 +452,63 @@ class HermesGatewayProvider extends ChangeNotifier {
   /// Current handoff state for the active session.
   HermesHandoffState _handoffState = const HermesHandoffState();
   HermesHandoffState get handoffState => _handoffState;
+
+  /// Pending handoff request awaiting user confirmation.
+  /// Cleared after confirm/cancel.
+  HandoffPendingRequest? _pendingHandoff;
+  HandoffPendingRequest? get pendingHandoff => _pendingHandoff;
+
+  /// Confirm a handoff with the selected agent id.
+  Future<void> confirmHandoff(String agentId, {String? reason}) async {
+    if (_activeSessionId == null) return;
+    await _gateway.handoffRespond(_activeSessionId!, agentId, reason: reason);
+    _pendingHandoff = null;
+    notifyListeners();
+  }
+
+  /// Cancel the pending handoff.
+  Future<void> cancelHandoff({String? reason}) async {
+    if (_activeSessionId == null) return;
+    await _gateway.handoffCancel(_activeSessionId!, reason: reason);
+    _pendingHandoff = null;
+    _handoffState = const HermesHandoffState();
+    notifyListeners();
+  }
+
+  // ── Agent Management ───────────────────────────────────────────────
+
+  /// All known agents from the Hermes backend.
+  List<HermesAgent> _agents = [];
+  List<HermesAgent> get agents => List.unmodifiable(_agents);
+
+  /// Whether agent list is loading.
+  bool _loadingAgents = false;
+  bool get loadingAgents => _loadingAgents;
+
+  /// Load the agent list from the backend.
+  Future<void> loadAgents() async {
+    if (_state != HermesConnectionState.ready) return;
+    _loadingAgents = true;
+    notifyListeners();
+
+    try {
+      _agents = await _gateway.agentList();
+    } catch (_) {
+      _agents = [];
+    } finally {
+      _loadingAgents = false;
+      notifyListeners();
+    }
+  }
+
+  /// Get an agent by id.
+  HermesAgent? getAgent(String id) {
+    try {
+      return _agents.firstWhere((a) => a.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void dispose() {

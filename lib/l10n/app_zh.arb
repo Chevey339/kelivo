@@ -2074,5 +2074,15 @@
     }
   },
   "hermesHandoffDone": "切换完成",
-  "hermesHandoffFailed": "切换失败"
+  "hermesHandoffFailed": "切换失败",
+  "hermesHandoffTitle": "切换智能体",
+  "hermesHandoffDescription": "当前智能体希望将会话移交给另一个智能体。请选择接管对话的智能体。",
+  "hermesHandoffFrom": "当前",
+  "hermesHandoffTo": "目标",
+  "hermesHandoffChooseAgent": "选择智能体",
+  "hermesHandoffAgentsAvailable": "可选",
+  "hermesHandoffSuggested": "推荐",
+  "hermesHandoffNoAgents": "后端暂无可用的智能体",
+  "hermesHandoffConfirm": "切换",
+  "hermesHandoffCancel": "取消"
 }

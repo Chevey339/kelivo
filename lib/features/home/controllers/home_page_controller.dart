@@ -23,6 +23,7 @@ import '../../../core/services/haptics.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/dialogs/hermes_interactive_sheet.dart';
+import '../../hermes/hermes_handoff_sheet.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../chat/models/message_edit_result.dart';
@@ -491,6 +492,16 @@ class HomePageController extends ChangeNotifier {
   void _onHermesPendingRequestsChanged() {
     final hp = _hermesGatewayProvider;
     if (hp == null) return;
+
+    // Handle handoff request first (higher priority)
+    final pendingHandoff = hp.pendingHandoff;
+    if (pendingHandoff != null) {
+      final ctx = _scaffoldKey.currentContext ?? _context;
+      if (ctx.mounted) {
+        HermesHandoffSheet.showIfPending(ctx, hp);
+      }
+      return;
+    }
 
     final requests = hp.pendingRequests;
     if (requests.isEmpty) return;

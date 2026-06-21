@@ -2074,5 +2074,15 @@
     }
   },
   "hermesHandoffDone": "切換完成",
-  "hermesHandoffFailed": "切換失敗"
+  "hermesHandoffFailed": "切換失敗",
+  "hermesHandoffTitle": "切換智慧體",
+  "hermesHandoffDescription": "目前智慧體希望將對話移交給另一個智慧體。請選擇接管對話的智慧體。",
+  "hermesHandoffFrom": "目前",
+  "hermesHandoffTo": "目標",
+  "hermesHandoffChooseAgent": "選擇智慧體",
+  "hermesHandoffAgentsAvailable": "可選",
+  "hermesHandoffSuggested": "推薦",
+  "hermesHandoffNoAgents": "後端暫無可用的智慧體",
+  "hermesHandoffConfirm": "切換",
+  "hermesHandoffCancel": "取消"
 }

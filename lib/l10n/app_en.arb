@@ -2497,5 +2497,15 @@
     }
   },
   "hermesHandoffDone": "Transfer complete",
-  "hermesHandoffFailed": "Transfer failed"
+  "hermesHandoffFailed": "Transfer failed",
+  "hermesHandoffTitle": "Switch Agent",
+  "hermesHandoffDescription": "The agent would like to hand off the conversation to another agent. Choose which agent should take over.",
+  "hermesHandoffFrom": "Current",
+  "hermesHandoffTo": "Target",
+  "hermesHandoffChooseAgent": "Choose Agent",
+  "hermesHandoffAgentsAvailable": "available",
+  "hermesHandoffSuggested": "suggested",
+  "hermesHandoffNoAgents": "No agents available on this backend",
+  "hermesHandoffConfirm": "Switch",
+  "hermesHandoffCancel": "Cancel"
 }
