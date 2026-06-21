@@ -56,6 +56,7 @@ import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
+import 'setting/faq_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -99,6 +100,7 @@ enum _SettingsMenuItem {
   backup,
   hotkeys,
   stats,
+  faq,
   about,
 }
 
@@ -235,6 +237,8 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           );
                         case _SettingsMenuItem.stats:
                           return const DesktopStatsPane(key: ValueKey('stats'));
+                        case _SettingsMenuItem.faq:
+                          return const DesktopFaqPane(key: ValueKey('faq'));
                         case _SettingsMenuItem.about:
                           return const DesktopAboutPane(key: ValueKey('about'));
                       }
@@ -321,6 +325,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.stats,
         lucide.Lucide.ChartColumnBig,
         l10n.settingsPageStatistics,
+      ),
+      (
+        _SettingsMenuItem.faq,
+        lucide.Lucide.MessageCircleQuestionMark,
+        l10n.settingsPageFaq,
       ),
       (
         _SettingsMenuItem.about,

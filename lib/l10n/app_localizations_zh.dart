@@ -256,6 +256,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageStatistics => '统计';
 
   @override
+  String get settingsPageFaq => '常见疑问';
+
+  @override
   String get settingsPageDocs => '使用文档';
 
   @override
@@ -5320,6 +5323,129 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get faqPageTitle => '常见疑问';
+
+  @override
+  String get faqSectionGeneral => 'Kelivo 整体相关';
+
+  @override
+  String get faqEntry1GeneralTipsTitle => 'Kelivo 新手使用注意事项';
+
+  @override
+  String get faqEntry1GeneralTipsSummary =>
+      '1. 建议多备份——无论是本地还是远程，因为 Hive 文件格式可能在崩溃后损坏。\n2. 不要随意删除助手，下面的聊天记录会一起丢失。\n3. 长对话不要使用「示例助手」和内置记忆功能——系统提示词太多变量会影响缓存命中。\n4. 如果不了解 Temperature 和 Top_P，建议留空使用供应商默认值（目前大部分厂商默认参数够用）。\n5. 如果要保证缓存命中，请关闭消息数量限制。\n6. 把不相关的聊天分在多个对话窗口中，而不是一个，使模型集中注意力并减少成本消耗。';
+
+  @override
+  String get faqEntry1BillingPrivacyTitle => 'Kelivo 会收费或收集数据吗？';
+
+  @override
+  String get faqEntry1BillingPrivacySummary =>
+      'Kelivo 是免费开源客户端，不收取任何费用，也没有后端服务器——你的数据只流向实际处理你请求的 AI 供应商。和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。';
+
+  @override
+  String get faqEntry1AgentSkillsTitle => 'Kelivo 支持 Skills / Agent / 本地沙箱吗？';
+
+  @override
+  String get faqEntry1AgentSkillsSummary =>
+      '作为轻量客户端，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。完整的 Agent 功能和本地沙箱不在本项目的规划内，建议使用专门的平台。';
+
+  @override
+  String get faqEntry1ApiCallsTitle => 'Kelivo 一次对话只调用一次 API 吗？';
+
+  @override
+  String get faqEntry1ApiCallsSummary =>
+      '不是，以下场景会触发额外调用：\n1. 标题生成自动触发——建议在默认模型界面将其设置为廉价模型而非聊天主力，且可以关闭其思考功能。\n2. 聊天建议功能默认关闭，若手动开启，会自动生成请求。\n3. 历史摘要功能默认关闭，若手动开启，会自动生成请求。\n4. 若向无视觉能力模型发送图片且配置了 OCR 模型，会发出一次 OCR 请求。\n5. 工具调用需要回传上下文，一次会话产生多次调用——这是预期行为。\n6. 不会在后台无故生成无关请求。';
+
+  @override
+  String get faqEntry1FeedbackTitle => 'Kelivo 在哪里可以进行提问和反馈？';
+
+  @override
+  String get faqEntry1FeedbackSummary =>
+      '前往 App 内的关注页查看社区链接，可以加入相关社区提问；也可以在 GitHub 反馈相关问题。';
+
+  @override
+  String get faqSectionErrors => '故障排查';
+
+  @override
+  String get faqEntry2Http404Title => 'HTTP 404 错误';
+
+  @override
+  String get faqEntry2Http404Summary =>
+      '请确认：\n1. 供应商是否支持 Response API——截至 2025 年 6 月仅 OpenAI 等少数支持，DeepSeek 不支持。\n2. 是否擅自删改 API 路径——如果不是黑色的 /chat/completions 则恢复。灰色表示你已删除该字段，也需要重输。';
+
+  @override
+  String get faqEntry2BalanceTitle => '余额不足';
+
+  @override
+  String get faqEntry2BalanceSummary => 'API 返回了余额不足错误，请前往对应的开放平台充值。';
+
+  @override
+  String get faqEntry2GeminiTitle => '通过第三方供应商使用 Gemini 模型';
+
+  @override
+  String get faqEntry2GeminiSummary =>
+      '当通过第三方 API 端点（非 Google 官方 API）使用 Gemini 模型时，请将供应商类型保持为 OpenAI——该类型仅表示兼容协议，不代表实际模型选择。第三方端点几乎必然只支持 OpenAI 兼容格式；更改为 Gemini 类型或手动添加 /v1beta 路径无法解决问题，还可能引发额外错误。';
+
+  @override
+  String get faqEntry2NoVisionTitle =>
+      '模型看不到图片 / 返回 image_url / no endpoint 错误';
+
+  @override
+  String get faqEntry2NoVisionSummary =>
+      '请先通过权威信源确认你所调用的模型是否支持识图。如果是，请前往模型界面手动声明开启识图能力；如果不是（如 DeepSeek V4 Flash/Pro 官网可识图但 API 不可识图），请前往「默认模型」外接 OCR 模型。';
+
+  @override
+  String get faqSectionSearch => '搜索';
+
+  @override
+  String get faqEntry3SearchQualityTitle => '搜索质量不佳';
+
+  @override
+  String get faqEntry3SearchQualitySummary =>
+      '内置必应搜索质量有限。建议使用 Tavily API 或 Exa MCP 服务（目前有免费额度）。\n\n本推荐基于社区经验，并非 Kelivo 官方推荐。服务可用性和价格可能随时间变化。';
+
+  @override
+  String get faqEntry3ContextExplosionTitle => '获取网页后上下文长度激增';
+
+  @override
+  String get faqEntry3ContextExplosionSummary =>
+      '如无特别需求，建议在 fetch 工具设置中关闭 fetch_html 方法，避免大量原始 HTML 注入上下文。';
+
+  @override
+  String get faqSectionCache => '缓存命中';
+
+  @override
+  String get faqEntry4CacheHitrateTitle => '缓存命中率异常偏低';
+
+  @override
+  String get faqEntry4CacheHitrateSummary =>
+      '提升缓存性能：\n1. 在助手设置中关闭助手记忆。\n2. 检查系统提示词，移除 cur_time 等频繁变化的变量。\n3. 避免使用内置的「示例助手」（它包含动态变量）。\n4. 关闭消息数量限制——其查询条件随对话长度变化。';
+
+  @override
+  String get faqEntry4ClaudeCacheTitle => 'Claude 没有触发缓存';
+
+  @override
+  String get faqEntry4ClaudeCacheSummary =>
+      '请前往供应商设置中打开「Claude Prompt Caching」开关，可根据使用习惯将有效期设为 5 分钟或 1 小时。';
+
+  @override
+  String get faqSectionBackup => '备份与同步';
+
+  @override
+  String get faqEntry5BackupRestoreTitle => '如何触发备份和恢复？';
+
+  @override
+  String get faqEntry5BackupRestoreSummary =>
+      '本机备份：直接从备份设置页面导出备份文件即可。恢复时选择「智能合并」而非「完全覆盖」，以避免丢失近期数据。';
+
+  @override
+  String get faqEntry5CrossDeviceSyncTitle => '如何在两台设备间同步数据？';
+
+  @override
+  String get faqEntry5CrossDeviceSyncSummary =>
+      '使用 WebDAV 或 S3 存储（推荐坚果云或 Cloudflare R2）。一端上传，另一端恢复时选择「智能合并」而非「完全覆盖」，以保留两端数据。\n\n本推荐基于社区经验，并非 Kelivo 官方推荐。服务可用性可能随时间变化。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5572,6 +5698,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageStatistics => '统计';
+
+  @override
+  String get settingsPageFaq => '常见疑问';
 
   @override
   String get settingsPageDocs => '使用文档';
@@ -10638,6 +10767,129 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get faqPageTitle => '常见疑问';
+
+  @override
+  String get faqSectionGeneral => 'Kelivo 整体相关';
+
+  @override
+  String get faqEntry1GeneralTipsTitle => 'Kelivo 新手使用注意事项';
+
+  @override
+  String get faqEntry1GeneralTipsSummary =>
+      '1. 建议多备份——无论是本地还是远程，因为 Hive 文件格式可能在崩溃后损坏。\n2. 不要随意删除助手，下面的聊天记录会一起丢失。\n3. 长对话不要使用「示例助手」和内置记忆功能——系统提示词太多变量会影响缓存命中。\n4. 如果不了解 Temperature 和 Top_P，建议留空使用供应商默认值（目前大部分厂商默认参数够用）。\n5. 如果要保证缓存命中，请关闭消息数量限制。\n6. 把不相关的聊天分在多个对话窗口中，而不是一个，使模型集中注意力并减少成本消耗。';
+
+  @override
+  String get faqEntry1BillingPrivacyTitle => 'Kelivo 会收费或收集数据吗？';
+
+  @override
+  String get faqEntry1BillingPrivacySummary =>
+      'Kelivo 是免费开源客户端，不收取任何费用，也没有后端服务器——你的数据只流向实际处理你请求的 AI 供应商。和所有第三方客户端一样，多数情况下你需要充值才能使用服务（除非使用本地部署的模型或部分供应商的免费模型）。';
+
+  @override
+  String get faqEntry1AgentSkillsTitle => 'Kelivo 支持 Skills / Agent / 本地沙箱吗？';
+
+  @override
+  String get faqEntry1AgentSkillsSummary =>
+      '作为轻量客户端，Kelivo 专注于打磨基础的聊天和工具调用（含 MCP）功能。Skills 支持在未来随时可能添加。完整的 Agent 功能和本地沙箱不在本项目的规划内，建议使用专门的平台。';
+
+  @override
+  String get faqEntry1ApiCallsTitle => 'Kelivo 一次对话只调用一次 API 吗？';
+
+  @override
+  String get faqEntry1ApiCallsSummary =>
+      '不是，以下场景会触发额外调用：\n1. 标题生成自动触发——建议在默认模型界面将其设置为廉价模型而非聊天主力，且可以关闭其思考功能。\n2. 聊天建议功能默认关闭，若手动开启，会自动生成请求。\n3. 历史摘要功能默认关闭，若手动开启，会自动生成请求。\n4. 若向无视觉能力模型发送图片且配置了 OCR 模型，会发出一次 OCR 请求。\n5. 工具调用需要回传上下文，一次会话产生多次调用——这是预期行为。\n6. 不会在后台无故生成无关请求。';
+
+  @override
+  String get faqEntry1FeedbackTitle => 'Kelivo 在哪里可以进行提问和反馈？';
+
+  @override
+  String get faqEntry1FeedbackSummary =>
+      '前往 App 内的关注页查看社区链接，可以加入相关社区提问；也可以在 GitHub 反馈相关问题。';
+
+  @override
+  String get faqSectionErrors => '故障排查';
+
+  @override
+  String get faqEntry2Http404Title => 'HTTP 404 错误';
+
+  @override
+  String get faqEntry2Http404Summary =>
+      '请确认：\n1. 供应商是否支持 Response API——截至 2025 年 6 月仅 OpenAI 等少数支持，DeepSeek 不支持。\n2. 是否擅自删改 API 路径——如果不是黑色的 /chat/completions 则恢复。灰色表示你已删除该字段，也需要重输。';
+
+  @override
+  String get faqEntry2BalanceTitle => '余额不足';
+
+  @override
+  String get faqEntry2BalanceSummary => 'API 返回了余额不足错误，请前往对应的开放平台充值。';
+
+  @override
+  String get faqEntry2GeminiTitle => '通过第三方供应商使用 Gemini 模型';
+
+  @override
+  String get faqEntry2GeminiSummary =>
+      '当通过第三方 API 端点（非 Google 官方 API）使用 Gemini 模型时，请将供应商类型保持为 OpenAI——该类型仅表示兼容协议，不代表实际模型选择。第三方端点几乎必然只支持 OpenAI 兼容格式；更改为 Gemini 类型或手动添加 /v1beta 路径无法解决问题，还可能引发额外错误。';
+
+  @override
+  String get faqEntry2NoVisionTitle =>
+      '模型看不到图片 / 返回 image_url / no endpoint 错误';
+
+  @override
+  String get faqEntry2NoVisionSummary =>
+      '请先通过权威信源确认你所调用的模型是否支持识图。如果是，请前往模型界面手动声明开启识图能力；如果不是（如 DeepSeek V4 Flash/Pro 官网可识图但 API 不可识图），请前往「默认模型」外接 OCR 模型。';
+
+  @override
+  String get faqSectionSearch => '搜索';
+
+  @override
+  String get faqEntry3SearchQualityTitle => '搜索质量不佳';
+
+  @override
+  String get faqEntry3SearchQualitySummary =>
+      '内置必应搜索质量有限。建议使用 Tavily API 或 Exa MCP 服务（目前有免费额度）。\n\n本推荐基于社区经验，并非 Kelivo 官方推荐。服务可用性和价格可能随时间变化。';
+
+  @override
+  String get faqEntry3ContextExplosionTitle => '获取网页后上下文长度激增';
+
+  @override
+  String get faqEntry3ContextExplosionSummary =>
+      '如无特别需求，建议在 fetch 工具设置中关闭 fetch_html 方法，避免大量原始 HTML 注入上下文。';
+
+  @override
+  String get faqSectionCache => '缓存命中';
+
+  @override
+  String get faqEntry4CacheHitrateTitle => '缓存命中率异常偏低';
+
+  @override
+  String get faqEntry4CacheHitrateSummary =>
+      '提升缓存性能：\n1. 在助手设置中关闭助手记忆。\n2. 检查系统提示词，移除 cur_time 等频繁变化的变量。\n3. 避免使用内置的「示例助手」（它包含动态变量）。\n4. 关闭消息数量限制——其查询条件随对话长度变化。';
+
+  @override
+  String get faqEntry4ClaudeCacheTitle => 'Claude 没有触发缓存';
+
+  @override
+  String get faqEntry4ClaudeCacheSummary =>
+      '请前往供应商设置中打开「Claude Prompt Caching」开关，可根据使用习惯将有效期设为 5 分钟或 1 小时。';
+
+  @override
+  String get faqSectionBackup => '备份与同步';
+
+  @override
+  String get faqEntry5BackupRestoreTitle => '如何触发备份和恢复？';
+
+  @override
+  String get faqEntry5BackupRestoreSummary =>
+      '本机备份：直接从备份设置页面导出备份文件即可。恢复时选择「智能合并」而非「完全覆盖」，以避免丢失近期数据。';
+
+  @override
+  String get faqEntry5CrossDeviceSyncTitle => '如何在两台设备间同步数据？';
+
+  @override
+  String get faqEntry5CrossDeviceSyncSummary =>
+      '使用 WebDAV 或 S3 存储（推荐坚果云或 Cloudflare R2）。一端上传，另一端恢复时选择「智能合并」而非「完全覆盖」，以保留两端数据。\n\n本推荐基于社区经验，并非 Kelivo 官方推荐。服务可用性可能随时间变化。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10890,6 +11142,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageStatistics => '統計';
+
+  @override
+  String get settingsPageFaq => '常見疑問';
 
   @override
   String get settingsPageDocs => '使用文件';
@@ -15956,4 +16211,127 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get faqPageTitle => '常見疑問';
+
+  @override
+  String get faqSectionGeneral => 'Kelivo 整體相關';
+
+  @override
+  String get faqEntry1GeneralTipsTitle => 'Kelivo 新手使用注意事項';
+
+  @override
+  String get faqEntry1GeneralTipsSummary =>
+      '1. 建議多備份——無論是本機還是遠端，因為 Hive 檔案格式可能在崩潰後損壞。\n2. 不要隨意刪除助手，底下的聊天記錄會一併遺失。\n3. 長對話不要使用「範例助理」和內建記憶功能——系統提示詞太多變數會影響快取命中。\n4. 如果不了解 Temperature 和 Top_P，建議留空使用供應商預設值（目前大部分廠商預設參數夠用）。\n5. 如果要保證快取命中，請關閉訊息數量限制。\n6. 不相關的聊天分在多個對話視窗中，使模型集中注意力並減少成本消耗。';
+
+  @override
+  String get faqEntry1BillingPrivacyTitle => 'Kelivo 會收費或收集資料嗎？';
+
+  @override
+  String get faqEntry1BillingPrivacySummary =>
+      'Kelivo 是免費開源客戶端，不收取任何費用，也沒有後端伺服器——你的資料只流向實際處理你請求的 AI 供應商。和所有第三方客戶端一樣，多數情況下你需要儲值才能使用服務（除非使用本地部署的模型或部分供應商的免費模型）。';
+
+  @override
+  String get faqEntry1AgentSkillsTitle => 'Kelivo 支援 Skills / Agent / 本機沙箱嗎？';
+
+  @override
+  String get faqEntry1AgentSkillsSummary =>
+      '作為輕量客戶端，Kelivo 專注於打磨基礎的聊天和工具呼叫（含 MCP）功能。Skills 支援在未來隨時可能新增。完整的 Agent 功能和本機沙箱不在本專案的規劃內，建議使用專門的平台。';
+
+  @override
+  String get faqEntry1ApiCallsTitle => 'Kelivo 一次對話只呼叫一次 API 嗎？';
+
+  @override
+  String get faqEntry1ApiCallsSummary =>
+      '不是，以下場景會觸發額外呼叫：\n1. 標題生成自動觸發——建議在預設模型介面將其設定為廉價模型而非聊天主力，且可以關閉其思考功能。\n2. 聊天建議功能預設關閉，若手動開啟，會自動產生請求。\n3. 歷史摘要功能預設關閉，若手動開啟，會自動產生請求。\n4. 若向無視覺能力模型傳送圖片且配置了 OCR 模型，會發出一次 OCR 請求。\n5. 工具呼叫需要回傳上下文，一次會話產生多次呼叫——這是預期行為。\n6. 不會在背景無故產生無關請求。';
+
+  @override
+  String get faqEntry1FeedbackTitle => 'Kelivo 在哪裡可以提問和反饋？';
+
+  @override
+  String get faqEntry1FeedbackSummary =>
+      '前往 App 內的關注頁檢視社群連結，可以加入相關社群提問；也可以在 GitHub 回報相關問題。';
+
+  @override
+  String get faqSectionErrors => '故障排除';
+
+  @override
+  String get faqEntry2Http404Title => 'HTTP 404 錯誤';
+
+  @override
+  String get faqEntry2Http404Summary =>
+      '請確認：\n1. 供應商是否支援 Response API——截至 2025 年 6 月僅 OpenAI 等少數支援，DeepSeek 不支援。\n2. 是否擅自刪改 API 路徑——如果不是黑色的 /chat/completions 則恢復。灰色表示你已刪除該欄位，也需要重輸。';
+
+  @override
+  String get faqEntry2BalanceTitle => '餘額不足';
+
+  @override
+  String get faqEntry2BalanceSummary => 'API 傳回了餘額不足錯誤，請前往對應的開放平台儲值。';
+
+  @override
+  String get faqEntry2GeminiTitle => '透過第三方供應商使用 Gemini 模型';
+
+  @override
+  String get faqEntry2GeminiSummary =>
+      '當透過第三方 API 端點（非 Google 官方 API）使用 Gemini 模型時，請將供應商類型保持為 OpenAI——該類型僅表示相容協議，不代表實際模型選擇。第三方端點幾乎必然只支援 OpenAI 相容格式；變更為 Gemini 類型或手動新增 /v1beta 路徑無法解決問題，還可能引發額外錯誤。';
+
+  @override
+  String get faqEntry2NoVisionTitle =>
+      '模型看不到圖片 / 回傳 image_url / no endpoint 錯誤';
+
+  @override
+  String get faqEntry2NoVisionSummary =>
+      '請先透過權威信源確認你所呼叫的模型是否支援識圖。如果是，請前往模型介面手動宣告開啟識圖能力；如果不是（如 DeepSeek V4 Flash/Pro 官網可識圖但 API 不可識圖），請前往「預設模型」外接 OCR 模型。';
+
+  @override
+  String get faqSectionSearch => '搜尋';
+
+  @override
+  String get faqEntry3SearchQualityTitle => '搜尋品質不佳';
+
+  @override
+  String get faqEntry3SearchQualitySummary =>
+      '內建必應搜尋品質有限。建議使用 Tavily API 或 Exa MCP 服務（目前有免費額度）。\n\n本推薦基於社群經驗，並非 Kelivo 官方推薦。服務可用性和價格可能隨時間變化。';
+
+  @override
+  String get faqEntry3ContextExplosionTitle => '取得網頁後上下文長度激增';
+
+  @override
+  String get faqEntry3ContextExplosionSummary =>
+      '如無特別需求，建議在 fetch 工具設定中關閉 fetch_html 方法，避免大量原始 HTML 注入上下文。';
+
+  @override
+  String get faqSectionCache => '快取命中';
+
+  @override
+  String get faqEntry4CacheHitrateTitle => '快取命中率異常偏低';
+
+  @override
+  String get faqEntry4CacheHitrateSummary =>
+      '提升快取效能：\n1. 在助手設定中關閉助手記憶。\n2. 檢查系統提示詞，移除 cur_time 等頻繁變化的變數。\n3. 避免使用內建的「範例助理」（它包含動態變數）。\n4. 關閉訊息數量限制——其查詢條件隨對話長度變化。';
+
+  @override
+  String get faqEntry4ClaudeCacheTitle => 'Claude 沒有觸發快取';
+
+  @override
+  String get faqEntry4ClaudeCacheSummary =>
+      '請前往供應商設定中開啟「Claude Prompt Caching」開關，可根據使用習慣將有效期設為 5 分鐘或 1 小時。';
+
+  @override
+  String get faqSectionBackup => '備份與同步';
+
+  @override
+  String get faqEntry5BackupRestoreTitle => '如何觸發備份和還原？';
+
+  @override
+  String get faqEntry5BackupRestoreSummary =>
+      '本機備份：直接從備份設定頁面匯出備份檔案即可。還原時選擇「智慧合併」而非「完全覆蓋」，以避免遺失近期資料。';
+
+  @override
+  String get faqEntry5CrossDeviceSyncTitle => '如何在兩台裝置間同步資料？';
+
+  @override
+  String get faqEntry5CrossDeviceSyncSummary =>
+      '使用 WebDAV 或 S3 儲存（推薦堅果雲或 Cloudflare R2）。一端上傳，另一端還原時選擇「智慧合併」而非「完全覆蓋」，以保留兩端資料。\n\n本推薦基於社群經驗，並非 Kelivo 官方推薦。服務可用性可能隨時間變化。';
 }
