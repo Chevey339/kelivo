@@ -45,6 +45,8 @@ import 'dart:io'
     show Platform; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/proactive_care_alarm_service.dart';
+import 'core/services/proactive_care_message_flow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
@@ -81,6 +83,10 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Android: start AlarmManager service for proactive care exact alarms
+      if (!kIsWeb && Platform.isAndroid) {
+        await ProactiveCareAlarmService.initialize();
+      }
       // Start app (Flutter log capture is toggleable and off by default)
       runApp(const MyApp());
     },
@@ -406,6 +412,25 @@ class MyApp extends StatelessWidget {
                           AppLocalizations.of(ctx)!.userProviderDefaultUserName,
                         );
                       } catch (_) {}
+                      // Snapshot localized strings for the proactive care
+                      // background isolate, which has no AppLocalizations.
+                      if (!kIsWeb && Platform.isAndroid) {
+                        try {
+                          final l10nSnap = AppLocalizations.of(ctx)!;
+                          unawaited(
+                            ProactiveCareL10nSnapshot.save(
+                              defaultConversationTitle:
+                                  l10nSnap.chatServiceDefaultConversationTitle,
+                              carePromptDefault: l10nSnap
+                                  .assistantEditProactiveCarePromptDefault,
+                              decisionPromptDefault: l10nSnap
+                                  .assistantEditProactiveCareDecisionPromptDefault,
+                              failureNotificationBody:
+                                  l10nSnap.proactiveCareFailedNotificationBody,
+                            ),
+                          );
+                        } catch (_) {}
+                      }
                     });
                   }
 

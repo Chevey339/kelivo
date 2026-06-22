@@ -4747,6 +4747,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditPageMemoryTab => 'Memory';
 
   @override
+  String get assistantEditPageProactiveLetterTab => 'Their Letter';
+
+  @override
+  String get assistantEditProactiveCareEnableTitle => 'Proactive Care';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeTitle =>
+      'Next proactive message time';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeUnset => 'Not set';
+
+  @override
+  String get assistantEditProactiveCarePromptTitle => 'Proactive care prompt';
+
+  @override
+  String get assistantEditProactiveCarePromptHint =>
+      'Prompt used when the assistant proactively sends a message';
+
+  @override
+  String get assistantEditProactiveCarePromptDefault =>
+      'It is time to proactively message the user. Stay in character, consider the conversation context and the current time, and write one natural, caring message to the user. Output only the message itself.';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptTitle =>
+      'Decision time instruction prompt';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptDefault =>
+      'You are in the \"proactive message time decision\" phase. Take on the assistant\'s role and decide when to message the user next.\n\n[Feature description]\n- Proactive messaging: the assistant sends a message at the scheduled time without waiting for the user to ask.\n- First check the next scheduled message time. Keep it if it still fits; otherwise change it.\n- As the assistant, using context and the time of your last reply, consider:\n1. If the user has not messaged you, when would you reach out?\n2. Match timing to personality: clingy or warm personalities message sooner; aloof personalities later.\n3. If context mentions reminders, supervision, or care, message sooner at a fitting time.\n4. If you were sleeping or busy, message when you would wake up or finish.\n5. You may invent a situational event and schedule the message for when it would happen.';
+
+  @override
+  String get assistantEditProactiveCareDateTimePickerTitle =>
+      'Choose date and time';
+
+  @override
+  String get assistantEditProactiveCareExactAlarmPermissionDenied =>
+      'Exact alarm permission not granted. Proactive care cannot wake the app on time. Please allow \"Alarms & reminders\" in system settings.';
+
+  @override
+  String get assistantEditProactiveCareNotificationPermissionDenied =>
+      'Notification permission not granted. Proactive care messages cannot notify you. Please enable notifications in system settings.';
+
+  @override
+  String get proactiveCareFailedNotificationBody =>
+      'Couldn\'t generate the proactive care message. Open the app to check the model settings and network.';
+
+  @override
   String get assistantEditLocalToolTimeInfoTitle => 'Time Info';
 
   @override

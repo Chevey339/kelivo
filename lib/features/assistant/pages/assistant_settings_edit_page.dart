@@ -34,6 +34,7 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -49,6 +50,7 @@ import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
+import '../widgets/proactive_care_datetime_picker.dart';
 import 'assistant_regex_tab.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
@@ -58,6 +60,7 @@ part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
+part 'assistant_settings_edit_proactive_letter_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -100,6 +103,13 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       icon: Lucide.Brain,
       child: _MemoryTab(assistantId: assistantId),
     ),
+    if (ProactiveCareAlarmService.isSupported)
+      _AssistantEditTabSpec(
+        id: assistantEditTabProactiveLetter,
+        label: l10n.assistantEditPageProactiveLetterTab,
+        icon: Lucide.MessageCircle,
+        child: _ProactiveLetterTab(assistantId: assistantId),
+      ),
     _AssistantEditTabSpec(
       id: assistantEditTabLocalTools,
       label: l10n.assistantEditPageLocalToolsTab,
@@ -140,6 +150,9 @@ List<_AssistantEditTabSpec> _orderedAssistantEditTabs(
   final byId = {for (final tab in tabs) tab.id: tab};
   return orderAssistantEditTabIds(
     savedOrder: order,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: ProactiveCareAlarmService.isSupported,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 
@@ -155,6 +168,9 @@ List<_AssistantEditTabSpec> _visibleAssistantEditTabs(
   return visibleAssistantEditTabIds(
     savedOrder: settings.mobileAssistantEditTabOrder,
     hiddenIds: settings.hiddenMobileAssistantEditTabs,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: ProactiveCareAlarmService.isSupported,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 
@@ -1475,6 +1491,7 @@ enum _AssistantDesktopMenu {
   basic,
   prompts,
   memory,
+  proactiveLetter,
   localTools,
   mcp,
   quick,
@@ -1585,6 +1602,10 @@ class _DesktopAssistantDialogShellState
                         return _PromptTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.memory:
                         return _MemoryTab(assistantId: widget.assistantId);
+                      case _AssistantDesktopMenu.proactiveLetter:
+                        return _ProactiveLetterTab(
+                          assistantId: widget.assistantId,
+                        );
                       case _AssistantDesktopMenu.localTools:
                         return _LocalToolsTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.mcp:
@@ -1630,6 +1651,11 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.basic, l10n.assistantEditPageBasicTab),
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
+      if (ProactiveCareAlarmService.isSupported)
+        (
+          _AssistantDesktopMenu.proactiveLetter,
+          l10n.assistantEditPageProactiveLetterTab,
+        ),
       (_AssistantDesktopMenu.localTools, l10n.assistantEditPageLocalToolsTab),
       (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),

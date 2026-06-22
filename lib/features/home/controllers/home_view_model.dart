@@ -7,9 +7,13 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/user_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/logging/flutter_logger.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/proactive_care_alarm_service.dart';
+import '../../../core/services/proactive_care_message_flow.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../services/message_builder_service.dart';
@@ -181,6 +185,7 @@ class HomeViewModel extends ChangeNotifier {
     _chatActions.onMaybeGenerateTitle = _onMaybeGenerateTitle;
     _chatActions.onMaybeGenerateSummary = _onMaybeGenerateSummary;
     _chatActions.onMaybeGenerateSuggestions = _onMaybeGenerateSuggestions;
+    _chatActions.onMaybeUpdateProactiveCare = _onMaybeUpdateProactiveCare;
     _chatActions.onStreamFinished = _onStreamFinished;
     _chatActions.onAssistantMessageFinished = _onAssistantMessageFinished;
     _chatActions.onFileProcessingStarted = _onFileProcessingStarted;
@@ -322,6 +327,10 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onMaybeGenerateSuggestions(String conversationId) {
     _maybeGenerateSuggestionsFor(conversationId);
+  }
+
+  void _onMaybeUpdateProactiveCare(String conversationId) {
+    _maybeUpdateProactiveCareFor(conversationId);
   }
 
   void _onStreamFinished() {
@@ -1376,6 +1385,203 @@ class HomeViewModel extends ChangeNotifier {
       }
     } catch (_) {
       // Keep old summary on failure, ignore silently
+    }
+  }
+
+  // ============================================================================
+  // Proactive Care ("Ta的来信") Decision
+  // ============================================================================
+
+  /// After each completed assistant reply, silently asks the assistant model
+  /// whether the proactive care next-message time should change.
+  ///
+  /// The request (full context + decision prompts) and its reply are never
+  /// written to the conversation.
+  Future<void> _maybeUpdateProactiveCareFor(String conversationId) async {
+    if (!ProactiveCareAlarmService.isSupported) return;
+
+    final convo = _chatService.getConversation(conversationId);
+    if (convo == null) return;
+
+    final assistantProvider = _contextProvider.read<AssistantProvider>();
+    final assistant = convo.assistantId != null
+        ? assistantProvider.getById(convo.assistantId!)
+        : assistantProvider.currentAssistant;
+    if (assistant == null || !assistant.enableProactiveCare) return;
+
+    final settings = _contextProvider.read<SettingsProvider>();
+    // "Send to the assistant": use the assistant's chat model, falling back
+    // to the globally selected model.
+    final provKey =
+        assistant.chatModelProvider ?? settings.currentModelProvider;
+    final mdlId = assistant.chatModelId ?? settings.currentModelId;
+    if (provKey == null || mdlId == null) return;
+    final cfg = settings.getProviderConfig(provKey);
+
+    // history 统一用 buildHistory（与后台一致：collapseMessageVersions +
+    // truncateIndex + 角色过滤，版本选择取 conversation.versionSelections）。
+    final history = ProactiveCareMessageFlow.buildHistory(
+      conversation: convo,
+      messages: _chatService.getMessages(convo.id),
+    );
+
+    final l10n = AppLocalizations.of(_contextProvider);
+    final decisionPrompt = assistant.proactiveCareDecisionPrompt.trim().isEmpty
+        ? (l10n?.assistantEditProactiveCareDecisionPromptDefault ?? '')
+        : assistant.proactiveCareDecisionPrompt;
+
+    try {
+      // 决策纯逻辑统一走 decideNextCareTime（内部含 personaPrompt 占位符替换、
+      // memoriesBlock 构建、buildDecisionApiMessages、sendMessageStream、
+      // parseDecision 及 try/catch；空 history 返回 null）。
+      final newTime = await ProactiveCareMessageFlow.decideNextCareTime(
+        config: cfg,
+        modelId: mdlId,
+        assistant: assistant,
+        userNickname: _contextProvider.read<UserProvider>().name,
+        history: history,
+        decisionPrompt: decisionPrompt,
+        fallbackThinkingBudget: settings.thinkingBudget,
+      );
+      if (newTime == null) return;
+
+      // Re-read to avoid overwriting concurrent edits with stale fields.
+      final latest = assistantProvider.getById(assistant.id);
+      if (latest == null || !latest.enableProactiveCare) return;
+      await assistantProvider.updateAssistant(
+        latest.copyWith(proactiveCareNextMessageAt: newTime),
+      );
+    } catch (e) {
+      FlutterLogger.log(
+        '[ProactiveCare] Decision request failed: $e',
+        tag: 'HomeViewModel',
+      );
+      // Keep the previously configured time on failure.
+    }
+  }
+
+  /// Handles a proactive care alarm while the app process is alive
+  /// (foreground or background). The alarm background isolate forwards the
+  /// assistantId here so the main isolate, which owns the Hive boxes and the
+  /// provider stack, runs the whole pipeline: build the silent care request,
+  /// append the reply to the assistant's most recent conversation (creating
+  /// one when missing), notify the user, and re-decide the next care time.
+  Future<void> handleProactiveCareTrigger(String assistantId) async {
+    final assistantProvider = _contextProvider.read<AssistantProvider>();
+    final assistant = assistantProvider.getById(assistantId);
+    if (assistant == null || !assistant.enableProactiveCare) return;
+
+    final settings = _contextProvider.read<SettingsProvider>();
+    final provKey =
+        assistant.chatModelProvider ?? settings.currentModelProvider;
+    final mdlId = assistant.chatModelId ?? settings.currentModelId;
+    final l10n = AppLocalizations.of(_contextProvider);
+    if (provKey == null || mdlId == null) {
+      FlutterLogger.log(
+        '[ProactiveCare] No chat model configured for $assistantId',
+        tag: 'HomeViewModel',
+      );
+      await _showProactiveCareNotification(
+        assistant,
+        l10n?.proactiveCareFailedNotificationBody,
+      );
+      return;
+    }
+    final cfg = settings.getProviderConfig(provKey);
+    final userNickname = _contextProvider.read<UserProvider>().name;
+
+    try {
+      // Most recently active conversation of this assistant (the list is
+      // already sorted by updatedAt descending); create one when missing.
+      Conversation? convo;
+      for (final c in _chatService.getAllConversations()) {
+        if (c.assistantId == assistantId) {
+          convo = c;
+          break;
+        }
+      }
+      convo ??= await _chatService.createConversation(assistantId: assistantId);
+
+      final history = ProactiveCareMessageFlow.buildHistory(
+        conversation: convo,
+        messages: _chatService.getMessages(convo.id),
+      );
+      final carePrompt = assistant.proactiveCarePrompt.trim().isNotEmpty
+          ? assistant.proactiveCarePrompt
+          : (l10n?.assistantEditProactiveCarePromptDefault ?? '');
+      final apiMessages = await ProactiveCareMessageFlow.buildCareApiMessages(
+        assistant: assistant,
+        userNickname: userNickname,
+        modelId: mdlId,
+        history: history,
+        carePrompt: carePrompt,
+        now: DateTime.now(),
+      );
+
+      final reply = await ProactiveCareMessageFlow.requestCareReply(
+        config: cfg,
+        modelId: mdlId,
+        assistant: assistant,
+        apiMessages: apiMessages,
+        fallbackThinkingBudget: settings.thinkingBudget,
+      );
+      if (reply.isEmpty) {
+        throw StateError('model returned an empty proactive care reply');
+      }
+
+      final message = await _chatService.addMessage(
+        conversationId: convo.id,
+        role: 'assistant',
+        content: reply,
+        modelId: mdlId,
+        providerId: provKey,
+      );
+      // Refresh the open chat when the reply landed in it.
+      if (currentConversation?.id == convo.id) {
+        if (_chatController.appendPersistedTailMessage(message)) {
+          restoreMessageUiState();
+        }
+        notifyListeners();
+      }
+
+      await _showProactiveCareNotification(assistant, reply);
+
+      // Let the assistant decide the next care time (continuous care).
+      await _maybeUpdateProactiveCareFor(convo.id);
+    } catch (e) {
+      FlutterLogger.log(
+        '[ProactiveCare] Foreground care flow failed: $e',
+        tag: 'HomeViewModel',
+      );
+      await _showProactiveCareNotification(
+        assistant,
+        l10n?.proactiveCareFailedNotificationBody,
+      );
+    }
+  }
+
+  Future<void> _showProactiveCareNotification(
+    Assistant assistant,
+    String? body,
+  ) async {
+    if (body == null || body.isEmpty) return;
+    try {
+      final id = ProactiveCareAlarmService.alarmIdFor(assistant.id);
+      final iconPath = await resolveProactiveCareNotificationIconPath(
+        assistant,
+        id,
+      );
+      await NotificationService.showProactiveCare(
+        id: id,
+        title: assistant.name,
+        body: body,
+        largeIconPath: iconPath,
+      );
+    } catch (e) {
+      FlutterLogger.log(
+        '[ProactiveCare] Failed to show notification: $e',
+        tag: 'HomeViewModel',
+      );
     }
   }
 

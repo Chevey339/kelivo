@@ -4,8 +4,8 @@ import 'package:Kelivo/features/assistant/utils/assistant_edit_tab_layout.dart';
 
 void main() {
   group('assistant edit tab layout', () {
-    test('default order keeps MCP after regex replace', () {
-      expect(defaultAssistantEditTabIds, const [
+    test('default base order keeps MCP after regex replace', () {
+      expect(defaultAssistantEditTabIdsBase, const [
         'basic',
         'prompts',
         'memory',
@@ -15,6 +15,31 @@ void main() {
         'localTools',
         'mcp',
       ]);
+    });
+
+    test('default order with proactive care inserts proactiveLetter tab', () {
+      expect(defaultAssistantEditTabIdsWithProactiveCare, const [
+        'basic',
+        'prompts',
+        'memory',
+        'proactiveLetter',
+        'quickPhrase',
+        'custom',
+        'regex',
+        'localTools',
+        'mcp',
+      ]);
+    });
+
+    test('defaultAssistantEditTabIdsFor toggles proactive care tab', () {
+      expect(
+        defaultAssistantEditTabIdsFor(includeProactiveCare: false),
+        defaultAssistantEditTabIdsBase,
+      );
+      expect(
+        defaultAssistantEditTabIdsFor(includeProactiveCare: true),
+        defaultAssistantEditTabIdsWithProactiveCare,
+      );
     });
 
     test('orders saved ids first and appends missing defaults', () {
@@ -45,6 +70,17 @@ void main() {
       expect(visible.take(3), const ['basic', 'memory', 'quickPhrase']);
       expect(visible, isNot(contains('mcp')));
       expect(visible, isNot(contains('prompts')));
+    });
+
+    test('hides proactiveLetter when using base default order', () {
+      final visible = visibleAssistantEditTabIds(
+        savedOrder: const ['proactiveLetter', 'basic'],
+        hiddenIds: const {},
+        defaultOrder: defaultAssistantEditTabIdsBase,
+      );
+
+      expect(visible.first, 'basic');
+      expect(visible, isNot(contains('proactiveLetter')));
     });
 
     test('keeps first ordered tab visible when all tabs are hidden', () {
