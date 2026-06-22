@@ -35,7 +35,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.timeInfo,
           'description':
-              'Get the current local date and time info from the device. Returns year, month, day, weekday, ISO date and time strings, timezone, UTC offset, and timestamp.',
+              'Get the current local date and time information from the user\'s device. Returns structured fields including year, month, day, weekday name (English), weekday index, ISO 8601 date string, ISO 8601 datetime string, timezone name, UTC offset (e.g. "+08:00"), and Unix timestamp in milliseconds. Use this tool when the user asks "what time is it", "what\'s the date", "what day is it", "what\'s the timezone", or any question that depends on the current wall-clock time. Do NOT use this tool to calculate time differences, durations, or scheduling logic; this tool only returns the current instant, not computed time ranges. No input parameters required; call with an empty arguments object.',
           'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
         },
       });
@@ -46,7 +46,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.clipboard,
           'description':
-              'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
+              'Read or write plain text from/to the device clipboard. Accepts two actions via the "action" parameter: "read" (retrieves the current clipboard text) or "write" (sets clipboard text, requires the "text" parameter). Use this tool when the user explicitly asks you to read their clipboard content, copy something to their clipboard, or paste content they have copied. CRITICAL: Do NOT write to the clipboard unless the user has explicitly requested it. Never read the clipboard speculatively or without a clear user request — clipboard content is private and belongs to the user. For write operations, always confirm the text content with the user before writing if there is any ambiguity. Returns the clipboard text for read, or success confirmation for write.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -92,7 +92,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.askUser,
           'description':
-              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
+              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before you can continue with the current task. Use this when: the user\'s request is ambiguous and you need to pick a direction; you need the user to choose between multiple options; you need a specific piece of information that the user has not provided. The tool accepts an array of 1 to 4 questions, each with a unique stable "id", the full question "text", a "type" of either "single" (single-choice) or "multi" (multi-choice), and an optional "options" array of suggested choices. IMPORTANT: The UI automatically provides "Other" and "Skip" options for each question, so do NOT include those as explicit options. Do NOT use this tool for yes/no questions that the user can simply answer inline — reserve it for cases requiring structured choices. Do NOT use this tool when you can infer the answer from conversation context or the user\'s history. Limit questions to at most 4 at a time to avoid overwhelming the user.',
           'parameters': {
             'type': 'object',
             'properties': {
