@@ -1,0 +1,10 @@
+>>> not a link 
+mhttp://www.foo.com
+<<<
+<p>mhttp://www.foo.com</p>
+>>> following a newline
+m
+http://www.foo.com
+<<<
+<p>m
+<a href="http://www.foo.com">http://www.foo.com</a></p>

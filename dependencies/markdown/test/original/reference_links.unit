@@ -1,0 +1,100 @@
+>>> double quotes for title
+links [are][a] awesome
+
+[a]: http://foo.com "woo"
+
+<<<
+<p>links <a href="http://foo.com" title="woo">are</a> awesome</p>
+>>> single quoted title
+links [are][a] awesome
+
+[a]: http://foo.com 'woo'
+
+<<<
+<p>links <a href="http://foo.com" title="woo">are</a> awesome</p>
+>>> parentheses for title
+links [are][a] awesome
+
+[a]: http://foo.com (woo)
+
+<<<
+<p>links <a href="http://foo.com" title="woo">are</a> awesome</p>
+>>> no title
+links [are][a] awesome
+
+[a]: http://foo.com
+
+<<<
+<p>links <a href="http://foo.com">are</a> awesome</p>
+>>> unknown link becomes plaintext
+[not] [known]
+
+<<<
+<p>[not] [known]</p>
+>>> can style link contents
+links [*are*][a] awesome
+
+[a]: http://foo.com
+
+<<<
+<p>links <a href="http://foo.com"><em>are</em></a> awesome</p>
+>>> inline styles after a bad link are processed
+[bad] `code`
+
+<<<
+<p>[bad] <code>code</code></p>
+>>> empty reference uses text from link
+links [are][] awesome
+
+[are]: http://foo.com
+
+<<<
+<p>links <a href="http://foo.com">are</a> awesome</p>
+>>> references are case-insensitive
+links [ARE][] awesome
+
+[are]: http://foo.com
+
+<<<
+<p>links <a href="http://foo.com">ARE</a> awesome</p>
+>>> shortcut reference links
+links [are] awesome
+
+[are]: http://foo.com
+<<<
+<p>links <a href="http://foo.com">are</a> awesome</p>
+>>> reference definitions can span lines
+links [are] [awesome]
+
+[are]:
+http://foo.com
+[awesome]:
+http://bar.com
+"Long
+Title"
+<<<
+<p>links <a href="http://foo.com">are</a> <a href="http://bar.com" title="Long
+Title">awesome</a></p>
+>>> references can be defined in blocks
+> links [are] awesome
+>
+> [are]: http://foo.com
+<<<
+<blockquote>
+<p>links <a href="http://foo.com">are</a> awesome</p>
+</blockquote>
+>>> reference link regression for github.com/dart-lang/markdown/issues/176
+[![Coverage Status][coverage_status]][coverage_page]
+
+[coverage_page]:https://coveralls.io/github/yeradis/stay_points.dart?branch=master
+[coverage_status]: https://coveralls.io/repos/github/yeradis/stay_points.dart/badge.svg?branch=master
+<<<
+<p><a href="https://coveralls.io/github/yeradis/stay_points.dart?branch=master"><img src="https://coveralls.io/repos/github/yeradis/stay_points.dart/badge.svg?branch=master" alt="Coverage Status" /></a></p>
+>>> compressed reference link label is normalized
+Text [foo
+bar][].
+
+[foo bar]: http://bar.com
+<<<
+<p>Text <a href="http://bar.com">foo
+bar</a>.</p>

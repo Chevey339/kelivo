@@ -65,6 +65,8 @@ dependencies:
   package_info_plus: ^8.3.1
   gpt_markdown: #^1.1.7
     path: ./dependencies/gpt_markdown
+  flutter_markdown_plus:
+    path: ./dependencies/flutter_markdown_plus
   uuid: ^4.5.0
   intl: ^0.20.2
   path: ^1.9.1
@@ -107,6 +109,8 @@ dependencies:
   flutter_background: ^1.3.0+1
   flutter_local_notifications: ^17.2.3
   image: ^4.8.0
+  markdown:
+    path: ./dependencies/markdown
   math_expressions: ^2.6.2
 
   # The following adds the Cupertino Icons font to your application.

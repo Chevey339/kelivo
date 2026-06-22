@@ -1,0 +1,24 @@
+>>> Missing leading whitespace
+word pas~~t~~ word
+<<<
+<p>word pas<del>t</del> word</p>
+>>> Missing trailing whitespace
+word ~~p~~ast word
+<<<
+<p>word <del>p</del>ast word</p>
+>>> Middle of word
+word p~~as~~t word
+<<<
+<p>word p<del>as</del>t word</p>
+>>> Whitespace after opening
+word~~ past~~ word
+<<<
+<p>word~~ past~~ word</p>
+>>> Whitespace before closing
+word ~~past ~~word
+<<<
+<p>word ~~past ~~word</p>
+>>> mixed with emphasis and order changes
+**~~first~~** ~~**second**~~
+<<<
+<p><strong><del>first</del></strong> <del><strong>second</strong></del></p>

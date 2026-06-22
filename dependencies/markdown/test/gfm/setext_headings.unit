@@ -1,0 +1,229 @@
+>>> Setext headings - 50
+Foo *bar*
+=========
+
+Foo *bar*
+---------
+<<<
+<h1>Foo <em>bar</em></h1>
+<h2>Foo <em>bar</em></h2>
+>>> Setext headings - 51
+Foo *bar
+baz*
+====
+<<<
+<h1>Foo <em>bar
+baz</em></h1>
+>>> Setext headings - 52
+  Foo *bar
+baz*	
+====
+<<<
+<h1>  Foo <em>bar
+baz</em></h1>
+>>> Setext headings - 53
+Foo
+-------------------------
+
+Foo
+=
+<<<
+<h2>Foo</h2>
+<h1>Foo</h1>
+>>> Setext headings - 54
+   Foo
+---
+
+  Foo
+-----
+
+  Foo
+  ===
+<<<
+<h2>   Foo</h2>
+<h2>  Foo</h2>
+<h1>  Foo</h1>
+>>> Setext headings - 55
+    Foo
+    ---
+
+    Foo
+---
+<<<
+<pre><code>Foo
+---
+
+Foo
+</code></pre>
+<hr />
+>>> Setext headings - 56
+Foo
+   ----      
+<<<
+<h2>Foo</h2>
+>>> Setext headings - 57
+Foo
+    ---
+<<<
+<p>Foo
+---</p>
+>>> Setext headings - 58
+Foo
+= =
+
+Foo
+--- -
+<<<
+<p>Foo
+= =</p>
+<p>Foo</p>
+<hr />
+>>> Setext headings - 59
+Foo  
+-----
+<<<
+<h2>Foo</h2>
+>>> Setext headings - 60
+Foo\
+----
+<<<
+<h2>Foo\</h2>
+>>> Setext headings - 61
+`Foo
+----
+`
+
+<a title="a lot
+---
+of dashes"/>
+<<<
+<h2>`Foo</h2>
+<p>`</p>
+<h2>&lt;a title=&quot;a lot</h2>
+<p>of dashes&quot;/&gt;</p>
+>>> Setext headings - 62
+> Foo
+---
+<<<
+<blockquote>
+<p>Foo</p>
+</blockquote>
+<hr />
+>>> Setext headings - 63
+> foo
+bar
+===
+<<<
+<blockquote>
+<p>foo
+bar
+===</p>
+</blockquote>
+>>> Setext headings - 64
+- Foo
+---
+<<<
+<ul>
+<li>Foo</li>
+</ul>
+<hr />
+>>> Setext headings - 65
+Foo
+Bar
+---
+<<<
+<h2>Foo
+Bar</h2>
+>>> Setext headings - 66
+---
+Foo
+---
+Bar
+---
+Baz
+<<<
+<hr />
+<h2>Foo</h2>
+<h2>Bar</h2>
+<p>Baz</p>
+>>> Setext headings - 67
+
+====
+<<<
+<p>====</p>
+>>> Setext headings - 68
+---
+---
+<<<
+<hr />
+<hr />
+>>> Setext headings - 69
+- foo
+-----
+<<<
+<ul>
+<li>foo</li>
+</ul>
+<hr />
+>>> Setext headings - 70
+    foo
+---
+<<<
+<pre><code>foo
+</code></pre>
+<hr />
+>>> Setext headings - 71
+> foo
+-----
+<<<
+<blockquote>
+<p>foo</p>
+</blockquote>
+<hr />
+>>> Setext headings - 72
+\> foo
+------
+<<<
+<h2>&gt; foo</h2>
+>>> Setext headings - 73
+Foo
+
+bar
+---
+baz
+<<<
+<p>Foo</p>
+<h2>bar</h2>
+<p>baz</p>
+>>> Setext headings - 74
+Foo
+bar
+
+---
+
+baz
+<<<
+<p>Foo
+bar</p>
+<hr />
+<p>baz</p>
+>>> Setext headings - 75
+Foo
+bar
+* * *
+baz
+<<<
+<p>Foo
+bar</p>
+<hr />
+<p>baz</p>
+>>> Setext headings - 76
+Foo
+bar
+\---
+baz
+<<<
+<p>Foo
+bar
+---
+baz</p>

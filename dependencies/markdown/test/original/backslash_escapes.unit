@@ -1,0 +1,38 @@
+>>> Escaped punctuation is indeed escaped.
+Punctuations like \! and \" and \# and \$ and \% and \& and \' and \( and \)
+and \* and \+ and \, and \- and \. and \/ and \: and \; and \< and \= and \>
+and \? and \@ and \[ and \\ and \] and \^ and \_ and \` and \{ and \| and \}
+and \~.
+
+<<<
+<p>Punctuations like ! and &quot; and # and $ and % and &amp; and ' and ( and )
+and * and + and , and - and . and / and : and ; and &lt; and = and &gt;
+and ? and @ and [ and \ and ] and ^ and _ and ` and { and | and }
+and ~.</p>
+>>> Inline code blocks can be escaped.
+Not \`code`.
+
+<<<
+<p>Not `code`.</p>
+>>> Emphasis can be escaped.
+\*Both* \_kinds_.
+
+<<<
+<p>*Both* _kinds_.</p>
+>>> Links can be escaped.
+Escaped brackets: \[foo](bar), and parens: [foo]\(bar).
+
+<<<
+<p>Escaped brackets: [foo](bar), and parens: [foo](bar).</p>
+>>> Reference links can be escaped.
+Front: \[foo][bar] and back: [foo]\[bar].
+
+<<<
+<p>Front: [foo][bar] and back: [foo][bar].</p>
+>>> Images can be escaped.
+Escapes the bang: \![img](img.png),
+and escapes the image: !\[img](img.png).
+
+<<<
+<p>Escapes the bang: !<a href="img.png">img</a>,
+and escapes the image: ![img](img.png).</p>

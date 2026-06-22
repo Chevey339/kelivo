@@ -1,0 +1,378 @@
+>>> basic table
+head | cells
+-----|------
+body | cells
+
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>cells</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td>cells</td>
+</tr>
+</tbody>
+</table>
+>>> multiple rows
+head | cells
+-----|------
+body | cells
+more | cells
+
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>cells</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td>cells</td>
+</tr>
+<tr>
+<td>more</td>
+<td>cells</td>
+</tr>
+</tbody>
+</table>
+>>> rows wrapped in pipes
+| head | cells |
+|------|-------|
+| body | cells |
+
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>cells</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td>cells</td>
+</tr>
+</tbody>
+</table>
+>>> rows wrapped in pipes, whitespace alignment row
+| head | cells |
+|  --  |  ---  |
+| body | cells |
+
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>cells</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td>cells</td>
+</tr>
+</tbody>
+</table>
+>>> rows wrapped in pipes, tabs in whitespace
+|	head	|	cells	|
+|	--	|	---	|
+|	body	|	cells	|
+
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>cells</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td>cells</td>
+</tr>
+</tbody>
+</table>
+>>> cells with inline syntax
+head `code` | _cells_
+------------|--------
+*text*      | <span>text</span>
+<<<
+<table>
+<thead>
+<tr>
+<th>head <code>code</code></th>
+<th><em>cells</em></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><em>text</em></td>
+<td><span>text</span></td>
+</tr>
+</tbody>
+</table>
+>>> cells are parsed before inline syntax
+header | _foo | bar_
+-------|------------|---
+text   | text
+<<<
+<table>
+<thead>
+<tr>
+<th>header</th>
+<th>_foo</th>
+<th>bar_</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text</td>
+<td>text</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+>>> cells contain reference links
+header | header
+-------|--------
+text   | [link][here]
+
+[here]: http://url
+<<<
+<table>
+<thead>
+<tr>
+<th>header</th>
+<th>header</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>text</td>
+<td><a href="http://url">link</a></td>
+</tr>
+</tbody>
+</table>
+>>> one column tables
+head
+-----|
+body
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+</tr>
+</tbody>
+</table>
+>>> varying cells per row
+head | foo | bar
+-----|-----|-----
+body
+row with | two cells
+<<<
+<table>
+<thead>
+<tr>
+<th>head</th>
+<th>foo</th>
+<th>bar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>body</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>row with</td>
+<td>two cells</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+>>> left, center, and right alignment
+head | cells | here
+:----|:-----:|----:
+body | cells | here
+too | many | cells | here
+
+<<<
+<table>
+<thead>
+<tr>
+<th align="left">head</th>
+<th align="center">cells</th>
+<th align="right">here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">body</td>
+<td align="center">cells</td>
+<td align="right">here</td>
+</tr>
+<tr>
+<td align="left">too</td>
+<td align="center">many</td>
+<td align="right">cells</td>
+</tr>
+</tbody>
+</table>
+>>> left, center, and right alignment, with whitespace
+head | cells | here
+ :-- | :---: | ---:
+body | cells | here
+too | many | cells | here
+
+<<<
+<table>
+<thead>
+<tr>
+<th align="left">head</th>
+<th align="center">cells</th>
+<th align="right">here</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">body</td>
+<td align="center">cells</td>
+<td align="right">here</td>
+</tr>
+<tr>
+<td align="left">too</td>
+<td align="center">many</td>
+<td align="right">cells</td>
+</tr>
+</tbody>
+</table>
+>>> escape pipe
+| Name     | Character |
+| ---      | ---       |
+| Backtick | `         |
+| Pipe     | \|        |
+
+<<<
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Character</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backtick</td>
+<td>`</td>
+</tr>
+<tr>
+<td>Pipe</td>
+<td>|</td>
+</tr>
+</tbody>
+</table>
+>>> escape pipe, preserve trailing whitespace
+| Name     | Character |
+| ---      | ---       |
+| Pipe     | \| abcdef |
+
+<<<
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Character</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pipe</td>
+<td>| abcdef</td>
+</tr>
+</tbody>
+</table>
+>>> trailing whitespace after final pipe
+| Name     | Character | 
+| ---      | ---       |	
+| Pipe     | abcdef    |
+<<<
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Character</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pipe</td>
+<td>abcdef</td>
+</tr>
+</tbody>
+</table>
+>>> issue #531
+| A | [B](url) | C |
+|---|---|
+|  a | b | c |
+<<<
+<p>| A | <a href="url">B</a> | C |
+|---|---|
+|  a | b | c |</p>
+>>> trailing whitespace after delimiter row
+| Name    | Value |
+| ---     | ---   |     
+| Foo     | bar   |
+<<<
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Foo</td>
+<td>bar</td>
+</tr>
+</tbody>
+</table>
+>>> can interrupt a paragraph
+paragraph
+foo | bar
+--- | ---
+baz | bim
+<<<
+<p>paragraph</p>
+<table>
+<thead>
+<tr>
+<th>foo</th>
+<th>bar</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>baz</td>
+<td>bim</td>
+</tr>
+</tbody>
+</table>

@@ -1,0 +1,87 @@
+>>> simple case
+before `source` after
+
+<<<
+<p>before <code>source</code> after</p>
+>>> single characters
+before `x` and `_` after
+
+<<<
+<p>before <code>x</code> and <code>_</code> after</p>
+>>> unmatched backtick
+before ` after
+
+<<<
+<p>before ` after</p>
+>>> multiple spans in one text
+a `one` b `two` c
+
+<<<
+<p>a <code>one</code> b <code>two</code> c</p>
+>>> multi-line
+before `first
+second` after
+
+<<<
+<p>before <code>first second</code> after</p>
+>>> simple double backticks
+before ``source`` after
+
+<<<
+<p>before <code>source</code> after</p>
+>>> even more backticks
+before ````source with ``` and```` after
+
+<<<
+<p>before <code>source with ``` and</code> after</p>
+>>> double backticks
+before ``can `contain` backticks`` after
+
+<<<
+<p>before <code>can `contain` backticks</code> after</p>
+>>> double backticks with spaces
+before `` `tick` `` after
+
+<<<
+<p>before <code>`tick`</code> after</p>
+>>> multiline single backticks with spaces
+before `in tick
+another` after
+
+<<<
+<p>before <code>in tick another</code> after</p>
+>>> multiline double backticks with spaces
+before ``in `tick`
+another`` after
+
+<<<
+<p>before <code>in `tick` another</code> after</p>
+>>> ignore markup inside code
+before `*b* _c_` after
+
+<<<
+<p>before <code>*b* _c_</code> after</p>
+>>> escape HTML characters
+`<&>`
+
+<<<
+<p><code>&lt;&amp;&gt;</code></p>
+>>> escape HTML tags
+'*' `<em>`
+
+<<<
+<p>'*' <code>&lt;em&gt;</code></p>
+>>> leave unmatched backticks when first are too long
+before ``` tick `` after
+
+<<<
+<p>before ``` tick `` after</p>
+>>> leave unmatched backticks when first are too short
+before `` tick ``` after
+
+<<<
+<p>before `` tick ``` after</p>
+>>> issue #497
+`'foo'`
+<<<
+<p><code>'foo'</code></p>

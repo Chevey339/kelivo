@@ -1,0 +1,97 @@
+>>> Code spans - 328
+`foo`
+<<<
+<p><code>foo</code></p>
+>>> Code spans - 329
+`` foo ` bar ``
+<<<
+<p><code>foo ` bar</code></p>
+>>> Code spans - 330
+` `` `
+<<<
+<p><code>``</code></p>
+>>> Code spans - 331
+`  ``  `
+<<<
+<p><code> `` </code></p>
+>>> Code spans - 332
+` a`
+<<<
+<p><code> a</code></p>
+>>> Code spans - 333
+` b `
+<<<
+<p><code> b </code></p>
+>>> Code spans - 334
+` `
+`  `
+<<<
+<p><code> </code>
+<code>  </code></p>
+>>> Code spans - 335
+``
+foo
+bar  
+baz
+``
+<<<
+<p><code>foo bar   baz</code></p>
+>>> Code spans - 336
+``
+foo 
+``
+<<<
+<p><code>foo </code></p>
+>>> Code spans - 337
+`foo   bar 
+baz`
+<<<
+<p><code>foo   bar  baz</code></p>
+>>> Code spans - 338
+`foo\`bar`
+<<<
+<p><code>foo\</code>bar`</p>
+>>> Code spans - 339
+``foo`bar``
+<<<
+<p><code>foo`bar</code></p>
+>>> Code spans - 340
+` foo `` bar `
+<<<
+<p><code>foo `` bar</code></p>
+>>> Code spans - 341
+*foo`*`
+<<<
+<p>*foo<code>*</code></p>
+>>> Code spans - 342
+[not a `link](/foo`)
+<<<
+<p>[not a <code>link](/foo</code>)</p>
+>>> Code spans - 343
+`<a href="`">`
+<<<
+<p><code>&lt;a href=&quot;</code>&quot;&gt;`</p>
+>>> Code spans - 344
+<a href="`">`
+<<<
+<p><a href="`">`</p>
+>>> Code spans - 345
+`<https://foo.bar.`baz>`
+<<<
+<p><code>&lt;https://foo.bar.</code>baz&gt;`</p>
+>>> Code spans - 346
+<https://foo.bar.`baz>`
+<<<
+<p><a href="https://foo.bar.%60baz">https://foo.bar.`baz</a>`</p>
+>>> Code spans - 347
+```foo``
+<<<
+<p>```foo``</p>
+>>> Code spans - 348
+`foo
+<<<
+<p>`foo</p>
+>>> Code spans - 349
+`foo``bar``
+<<<
+<p>`foo<code>bar</code></p>

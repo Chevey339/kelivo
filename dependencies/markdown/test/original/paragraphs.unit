@@ -1,0 +1,55 @@
+>>> consecutive lines form a single paragraph
+This is the first line.
+This is the second line.
+
+<<<
+<p>This is the first line.
+This is the second line.</p>
+>>> are terminated by a header
+para
+# header
+
+<<<
+<p>para</p>
+<h1>header</h1>
+>>> are terminated by a hr
+para
+___
+
+<<<
+<p>para</p>
+<hr />
+>>> are terminated by an unordered list
+para
+* list
+
+<<<
+<p>para</p>
+<ul>
+<li>list</li>
+</ul>
+>>> are terminated by an ordered list
+para
+1. list
+
+<<<
+<p>para</p>
+<ol>
+<li>list</li>
+</ol>
+>>> take account of windows line endings
+line1
+
+line2
+
+
+<<<
+<p>line1</p>
+<p>line2</p>
+>>> cannot be terminated by indented code blocks
+para
+    not code
+
+<<<
+<p>para
+not code</p>

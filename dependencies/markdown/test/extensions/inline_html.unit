@@ -1,0 +1,17 @@
+>>> within a paragraph
+Within a <em class="x">paragraph</EM>.
+
+<<<
+<p>Within a <em class="x">paragraph</EM>.</p>
+>>> not HTML
+Obviously, 3 < 5 and 7 > 2.
+Not HTML: <3>, <_a>, <>
+
+<<<
+<p>Obviously, 3 &lt; 5 and 7 &gt; 2.
+Not HTML: &lt;3&gt;, &lt;_a&gt;, &lt;&gt;</p>
+>>> "markdown" within a tag is not parsed
+Text <a href="_foo_">And "_foo_"</a>.
+
+<<<
+<p>Text <a href="_foo_">And &quot;<em>foo</em>&quot;</a>.</p>

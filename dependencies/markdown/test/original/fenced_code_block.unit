@@ -1,0 +1,31 @@
+>>> issue #497
+```
+'foo'
+```
+<<<
+<pre><code>'foo'
+</code></pre>
+>>> with basic metadata string
+```dart meta
+code
+```
+
+<<<
+<pre data-metadata="meta"><code class="language-dart">code
+</code></pre>
+>>> with characters to escape
+```dart title="main.dart"
+code
+```
+
+<<<
+<pre data-metadata="title=&quot;main.dart&quot;"><code class="language-dart">code
+</code></pre>
+>>> with HTML character reference
+```dart &#124;
+code
+```
+
+<<<
+<pre data-metadata="|"><code class="language-dart">code
+</code></pre>

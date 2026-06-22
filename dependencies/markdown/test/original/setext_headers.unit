@@ -1,0 +1,32 @@
+>>> h1
+text
+===
+
+<<<
+<h1>text</h1>
+>>> h2
+text
+---
+
+<<<
+<h2>text</h2>
+>>> h1 bar on first line becomes text
+===
+
+<<<
+<p>===</p>
+>>> h2 bar on first line becomes list
+-
+
+<<<
+<ul>
+<li></li>
+</ul>
+>>> can be multiline
+header
+on two lines
+==
+
+<<<
+<h1>header
+on two lines</h1>

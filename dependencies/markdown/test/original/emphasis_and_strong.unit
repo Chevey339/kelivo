@@ -1,0 +1,83 @@
+>>> single asterisks
+before *em* after
+
+<<<
+<p>before <em>em</em> after</p>
+>>> single underscores
+before _em_ after
+
+<<<
+<p>before <em>em</em> after</p>
+>>> double asterisks
+before **strong** after
+
+<<<
+<p>before <strong>strong</strong> after</p>
+>>> double underscores
+before __strong__ after
+
+<<<
+<p>before <strong>strong</strong> after</p>
+>>> unmatched asterisk
+before *after
+
+<<<
+<p>before *after</p>
+>>> unmatched underscore
+before _after
+
+<<<
+<p>before _after</p>
+>>> multiple spans in one text
+a *one* b _two_ c
+
+<<<
+<p>a <em>one</em> b <em>two</em> c</p>
+>>> multi-line
+before *first
+second* after
+
+<<<
+<p>before <em>first
+second</em> after</p>
+>>> not processed when surrounded by spaces
+a * b * c _ d _ e
+
+<<<
+<p>a * b * c _ d _ e</p>
+>>> strong then emphasis
+**strong***em*
+
+<<<
+<p><strong>strong</strong><em>em</em></p>
+>>> emphasis then strong
+*em***strong**
+
+<<<
+<p><em>em</em><strong>strong</strong></p>
+>>> emphasis inside strong
+**strong *em***
+
+<<<
+<p><strong>strong <em>em</em></strong></p>
+>>> mismatched in nested
+*a _b* c_
+
+<<<
+<p><em>a _b</em> c_</p>
+>>> in the middle of a word
+a_b_c a__b__c a*b*c a**b**c
+<<<
+<p>a_b_c a__b__c a<em>b</em>c a<strong>b</strong>c</p>
+>>> prefixing a word
+_a_b __a__b *a*b **a**b
+<<<
+<p>_a_b __a__b <em>a</em>b <strong>a</strong>b</p>
+>>> suffixing a word
+a_b_ a__b__ a*b* a**b**
+<<<
+<p>a_b_ a__b__ a<em>b</em> a<strong>b</strong></p>
+>>> spanning words
+_a_b c_d_ __a__b c__d__ *a*b c*d* **a**b c**d**
+<<<
+<p><em>a_b c_d</em> <strong>a__b c__d</strong> <em>a</em>b c<em>d</em> <strong>a</strong>b c<strong>d</strong></p>

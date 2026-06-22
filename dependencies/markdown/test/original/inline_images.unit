@@ -1,0 +1,29 @@
+>>> image
+![](http://foo.com/foo.png)
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="" /></p>
+>>> alternate text
+![alternate text](http://foo.com/foo.png)
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="alternate text" /></p>
+>>> title
+![](http://foo.com/foo.png "optional title")
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="" title="optional title" /></p>
+>>> invalid alt text
+![`alt`](http://foo.com/foo.png)
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="alt" /></p>
+>>> XSS
+![Uh oh...]("onerror="alert('XSS'))
+
+<<<
+<p><img src="%22onerror=%22alert('XSS')" alt="Uh oh..." /></p>
+>>> URL-escaping should be left alone inside the destination
+![](https://example/foo%2Fvar)
+<<<
+<p><img src="https://example/foo%2Fvar" alt="" /></p>

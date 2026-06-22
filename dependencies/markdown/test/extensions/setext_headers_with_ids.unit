@@ -1,0 +1,18 @@
+>>> h1
+text
+===
+
+<<<
+<h1 id="text">text</h1>
+>>> h2
+text
+---
+
+<<<
+<h2 id="text">text</h2>
+>>> header with inline syntax
+header *emphasised*
+===
+
+<<<
+<h1 id="header-emphasised">header <em>emphasised</em></h1>

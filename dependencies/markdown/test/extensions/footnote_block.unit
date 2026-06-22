@@ -1,0 +1,288 @@
+>>> footnote reference in footnote definition
+
+Footnote 1 link[^first].
+
+[^first]: footnote reference in footnote definition[^first]
+
+<<<
+<p>Footnote 1 link<sup class="footnote-ref"><a href="#fn-first" id="fnref-first">1</a></sup>.</p>
+<section class="footnotes">
+<ol>
+<li id="fn-first">
+<p>footnote reference in footnote definition<sup class="footnote-ref"><a href="#fn-first" id="fnref-first-2">1</a></sup> <a href="#fnref-first" class="footnote-backref">↩</a> <a href="#fnref-first-2" class="footnote-backref">↩<sup class="footnote-ref">2</sup></a></p>
+</li>
+</ol>
+</section>
+>>> footnote reference cases
+[^fifth]: ending with another ']' and different order
+
+Footnote 1 link[^first].
+
+Footnote 2 link[^きゃくちゅう脚注].
+
+Footnote 3 link[^p1 p2].
+
+Footnote 4 link![^forth].
+
+Footnote 5 link![^fifth]].
+
+Footnote 6 link![^ sixth ].
+
+Footnote 7 link[^きゃくちゅう脚注].
+
+[^first]: Here is the footnote definition
+
+[^きゃくちゅう脚注]: unicode label and duplicated reference.
+
+[^p1 p2]: p1 p2
+
+[^ForTh]: start with '[' and with upper case
+
+[^sixth]: label-start-with-blank
+<<<
+<p>Footnote 1 link<sup class="footnote-ref"><a href="#fn-first" id="fnref-first">1</a></sup>.</p>
+<p>Footnote 2 link<sup class="footnote-ref"><a href="#fn-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8" id="fnref-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8">2</a></sup>.</p>
+<p>Footnote 3 link[^p1 p2].</p>
+<p>Footnote 4 link!<sup class="footnote-ref"><a href="#fn-ForTh" id="fnref-ForTh">3</a></sup>.</p>
+<p>Footnote 5 link!<sup class="footnote-ref"><a href="#fn-fifth" id="fnref-fifth">4</a></sup>].</p>
+<p>Footnote 6 link!<sup class="footnote-ref"><a href="#fn-sixth" id="fnref-sixth">5</a></sup>.</p>
+<p>Footnote 7 link<sup class="footnote-ref"><a href="#fn-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8" id="fnref-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8-2">2</a></sup>.</p>
+<p>[^p1 p2]: p1 p2</p>
+<section class="footnotes">
+<ol>
+<li id="fn-first">
+<p>Here is the footnote definition <a href="#fnref-first" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8">
+<p>unicode label and duplicated reference. <a href="#fnref-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8" class="footnote-backref">↩</a> <a href="#fnref-%E3%81%8D%E3%82%83%E3%81%8F%E3%81%A1%E3%82%85%E3%81%86%E8%84%9A%E6%B3%A8-2" class="footnote-backref">↩<sup class="footnote-ref">2</sup></a></p>
+</li>
+<li id="fn-ForTh">
+<p>start with '[' and with upper case <a href="#fnref-ForTh" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-fifth">
+<p>ending with another ']' and different order <a href="#fnref-fifth" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-sixth">
+<p>label-start-with-blank <a href="#fnref-sixth" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> footnote labels with special chars
+empty label[^] and blank label[^ ]
+
+some[^-] strange[^^] but[^\[] labels[^\[\]]
+
+[^]:
+[^ ]:
+
+[^-]: valid1
+
+[^^]:valid2
+
+[^\[]: valid3
+
+[^\[\]]: this-is-link-not-footnote
+<<<
+<p>empty label[^] and blank label[^ ]</p>
+<p>some<sup class="footnote-ref"><a href="#fn--" id="fnref--">1</a></sup> strange<sup class="footnote-ref"><a href="#fn-%5E" id="fnref-%5E">2</a></sup> but<sup class="footnote-ref"><a href="#fn-%5C%5B" id="fnref-%5C%5B">3</a></sup> labels<a href="this-is-link-not-footnote">^[]</a></p>
+<p>[^]:
+[^ ]:</p>
+<section class="footnotes">
+<ol>
+<li id="fn--">
+<p>valid1 <a href="#fnref--" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-%5E">
+<p>valid2 <a href="#fnref-%5E" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-%5C%5B">
+<p>valid3 <a href="#fnref-%5C%5B" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> footnote with paragraph
+test footnote[^first].
+
+[^first]: Footnote **can have markup**
+
+    and multiple paragraphs.
+
+"Smartypants, double quotes" and 'single quotes'
+<<<
+<p>test footnote<sup class="footnote-ref"><a href="#fn-first" id="fnref-first">1</a></sup>.</p>
+<p>&quot;Smartypants, double quotes&quot; and 'single quotes'</p>
+<section class="footnotes">
+<ol>
+<li id="fn-first">
+<p>Footnote <strong>can have markup</strong></p>
+<p>and multiple paragraphs. <a href="#fnref-first" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> footnote adjacent paragraph
+Here is a footnote reference,[^1]
+[^1]: Here is the footnote.
+    Subsequent paragraphs
+<<<
+<p>Here is a footnote reference,<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">1</a></sup></p>
+<section class="footnotes">
+<ol>
+<li id="fn-1">
+<p>Here is the footnote.
+Subsequent paragraphs <a href="#fnref-1" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> footnote without ref
+Here is a footnote reference
+[^1]: Here is the footnote.
+<<<
+<p>Here is a footnote reference</p>
+>>> footnote example from github
+Here is a simple footnote[^1].
+
+A footnote can also have multiple lines[^2].
+
+You can also use words, to fit your writing style more closely[^note].
+
+[^1]: My reference.
+[^2]: Every new line should be prefixed with 2 spaces.
+  This allows you to have a footnote with multiple lines.
+[^note]:
+    Named footnotes will still render with numbers instead of the text but allow easier identification and linking.
+    This footnote also has been made with a different syntax using 4 spaces for new lines.
+<<<
+<p>Here is a simple footnote<sup class="footnote-ref"><a href="#fn-1" id="fnref-1">1</a></sup>.</p>
+<p>A footnote can also have multiple lines<sup class="footnote-ref"><a href="#fn-2" id="fnref-2">2</a></sup>.</p>
+<p>You can also use words, to fit your writing style more closely<sup class="footnote-ref"><a href="#fn-note" id="fnref-note">3</a></sup>.</p>
+<section class="footnotes">
+<ol>
+<li id="fn-1">
+<p>My reference. <a href="#fnref-1" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-2">
+<p>Every new line should be prefixed with 2 spaces.
+This allows you to have a footnote with multiple lines. <a href="#fnref-2" class="footnote-backref">↩</a></p>
+</li>
+<li id="fn-note">
+<p>Named footnotes will still render with numbers instead of the text but allow easier identification and linking.
+This footnote also has been made with a different syntax using 4 spaces for new lines. <a href="#fnref-note" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> ![^  **image**] without definition should be formatted: unlike github
+![^  **image**]
+<<<
+<p>![^  <strong>image</strong>]</p>
+>>> ![^  **image**] with definition should be image: unlike github
+![^  **image**]
+
+[^  **image**]: valid-link
+<<<
+<p><img src="valid-link" alt="^  image" /></p>
+>>> ![^  **image**] with definition should be plain html: unlike github
+![^  **image**]
+
+[^  **image**]: invalid link
+<<<
+<p>![^  <strong>image</strong>]</p>
+<p>[^  <strong>image</strong>]: invalid link</p>
+>>> ![ ^**image**] without definition should be formatted
+![ ^**image**]
+<<<
+<p>![ ^<strong>image</strong>]</p>
+>>> ![^ ^**image**] without definition should be formatted: unlike github
+![^ ^**image**]
+<<<
+<p>![^ ^<strong>image</strong>]</p>
+>>> ![^ ^**image**] with definition should be image: unlike github
+![^ ^**image**]
+
+[^ ^**image**]: valid-link
+<<<
+<p><img src="valid-link" alt="^ ^image" /></p>
+>>> [^  **label**] without definition should be formatted: unlike github
+[^  **label**]
+<<<
+<p>[^  <strong>label</strong>]</p>
+>>> [adc][^**link**] without definition should be formatted: unlike github
+[adc][^**link**]
+<<<
+<p>[adc][^<strong>link</strong>]</p>
+>>> [adc][^**link**] with definition should be footnotes:
+[adc][^**link**]
+
+[^**link**]: valid-link
+<<<
+<p>[adc]<sup class="footnote-ref"><a href="#fn-**link**" id="fnref-**link**">1</a></sup></p>
+<section class="footnotes">
+<ol>
+<li id="fn-**link**">
+<p>valid-link <a href="#fnref-**link**" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> \[^good] should be text
+\[^good]
+
+[^good]: good
+<<<
+<p>[^good]</p>
+>>>[^ nice] should be link
+[^ nice]
+
+[^ nice ]: good
+<<<
+<p><a href="good">^ nice</a></p>
+>>>[^ nice ] should be text
+[^ nice ]
+
+[^nice ]: good
+<<<
+<p>[^ nice ]</p>
+>>> [^\]] with definition should be link
+[^\]]
+
+[^\]]: good
+<<<
+<p><a href="good">^]</a></p>
+>>> [^a-\nb] with definition should be paragraph
+[^a-
+b]
+
+[^a-
+b]: good
+<<<
+<p><a href="good">^a-
+b</a></p>
+>>> [^a] with error definition should be text
+[^a]
+
+[^a\]: good
+<<<
+<p>[^a]</p>
+>>> [^a] with double definition contain '\]' should be text
+[^a]
+
+[^a\]:]: definition contain '\]'
+<<<
+<p>[^a]</p>
+>>> [^a] with double definition trailing should be footnote
+[^a]
+
+[^a]:]: good
+<<<
+<p><sup class="footnote-ref"><a href="#fn-a" id="fnref-a">1</a></sup></p>
+<section class="footnotes">
+<ol>
+<li id="fn-a">
+<p>]: good <a href="#fnref-a" class="footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>
+>>> complete image link with definition would be image: unlike github
+![^image](example.png)
+
+[^image]: image footnote
+<<<
+<p><img src="example.png" alt="^image" /></p>

@@ -1,0 +1,93 @@
+>>> Entity and numeric character references - 25
+&nbsp; &amp; &copy; &AElig; &Dcaron;
+&frac34; &HilbertSpace; &DifferentialD;
+&ClockwiseContourIntegral; &ngE;
+<<<
+<p>&amp; © Æ Ď
+¾ ℋ ⅆ
+∲ ≧̸</p>
+>>> Entity and numeric character references - 26
+&#35; &#1234; &#992; &#0;
+<<<
+<p># Ӓ Ϡ �</p>
+>>> Entity and numeric character references - 27
+&#X22; &#XD06; &#xcab;
+<<<
+<p>&quot; ആ ಫ</p>
+>>> Entity and numeric character references - 28
+&nbsp &x; &#; &#x;
+&#87654321;
+&#abcdef0;
+&ThisIsNotDefined; &hi?;
+<<<
+<p>&amp;nbsp &amp;x; &amp;#; &amp;#x;
+&amp;#87654321;
+&amp;#abcdef0;
+&amp;ThisIsNotDefined; &amp;hi?;</p>
+>>> Entity and numeric character references - 29
+&copy
+<<<
+<p>&amp;copy</p>
+>>> Entity and numeric character references - 30
+&MadeUpEntity;
+<<<
+<p>&amp;MadeUpEntity;</p>
+>>> Entity and numeric character references - 31
+<a href="&ouml;&ouml;.html">
+<<<
+<a href="&ouml;&ouml;.html">
+>>> Entity and numeric character references - 32
+[foo](/f&ouml;&ouml; "f&ouml;&ouml;")
+<<<
+<p><a href="/f%C3%B6%C3%B6" title="föö">foo</a></p>
+>>> Entity and numeric character references - 33
+[foo]
+
+[foo]: /f&ouml;&ouml; "f&ouml;&ouml;"
+<<<
+<p><a href="/f%C3%B6%C3%B6" title="föö">foo</a></p>
+>>> Entity and numeric character references - 34
+``` f&ouml;&ouml;
+foo
+```
+<<<
+<pre><code class="language-föö">foo
+</code></pre>
+>>> Entity and numeric character references - 35
+`f&ouml;&ouml;`
+<<<
+<p><code>f&amp;ouml;&amp;ouml;</code></p>
+>>> Entity and numeric character references - 36
+    f&ouml;f&ouml;
+<<<
+<pre><code>f&amp;ouml;f&amp;ouml;
+</code></pre>
+>>> Entity and numeric character references - 37
+&#42;foo&#42;
+*foo*
+<<<
+<p>*foo*
+<em>foo</em></p>
+>>> Entity and numeric character references - 38
+&#42; foo
+
+* foo
+<<<
+<p>* foo</p>
+<ul>
+<li>foo</li>
+</ul>
+>>> Entity and numeric character references - 39
+foo&#10;&#10;bar
+<<<
+<p>foo
+
+bar</p>
+>>> Entity and numeric character references - 40
+&#9;foo
+<<<
+<p>foo</p>
+>>> Entity and numeric character references - 41
+[a](url &quot;tit&quot;)
+<<<
+<p>[a](url &quot;tit&quot;)</p>

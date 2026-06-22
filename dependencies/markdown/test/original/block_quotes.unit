@@ -1,0 +1,54 @@
+>>> single line
+> blah
+
+<<<
+<blockquote>
+<p>blah</p>
+</blockquote>
+>>> with two paragraphs
+> first
+>
+> second
+
+<<<
+<blockquote>
+<p>first</p>
+<p>second</p>
+</blockquote>
+>>> nested
+> one
+>> two
+> > > three
+
+<<<
+<blockquote>
+<p>one</p>
+<blockquote>
+<p>two</p>
+<blockquote>
+<p>three</p>
+</blockquote>
+</blockquote>
+</blockquote>
+>>> qoute with lazy continuation
+> quote
+text
+<<<
+<blockquote>
+<p>quote
+text</p>
+</blockquote>
+>>> quote turns what might be an h2 into an hr
+> quote
+---
+
+<<<
+<blockquote>
+<p>quote</p>
+</blockquote>
+<hr />
+>>> issue #495
+  >
+<<<
+<blockquote>
+</blockquote>

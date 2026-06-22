@@ -1,0 +1,41 @@
+>>> simple header
+# header
+
+<<<
+<h1 id="header">header</h1>
+>>> header that starts with garbage
+## 2. header again
+
+<<<
+<h2 id="2-header-again">2. header again</h2>
+>>> header with inline syntaxes
+### headers **rock** `etc.`
+
+<<<
+<h3 id="headers-rock-etc">headers <strong>rock</strong> <code>etc.</code></h3>
+>>> non-unique headers
+# header
+
+## header
+
+<<<
+<h1 id="header">header</h1>
+<h2 id="header-2">header</h2>
+>>> header starts with inline syntax
+# *headers* etc.
+<<<
+<h1 id="headers-etc"><em>headers</em> etc.</h1>
+>>> numbers-only headers (like a changelog)
+# 1.2.34
+
+## 1.23.4
+
+## 1.2.3+4
+<<<
+<h1 id="1234">1.2.34</h1>
+<h2 id="1234-2">1.23.4</h2>
+<h2 id="1234-3">1.2.3+4</h2>
+>>> no id
+# #
+<<<
+<h1></h1>

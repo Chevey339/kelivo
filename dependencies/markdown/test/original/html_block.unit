@@ -1,0 +1,11 @@
+>>> issue https://github.com/dart-lang/markdown/issues/547
+<?code-excerpt ?>
+```xml
+<q>
+</q>
+```
+<<<
+<?code-excerpt ?>
+<pre><code class="language-xml">&lt;q&gt;
+&lt;/q&gt;
+</code></pre>

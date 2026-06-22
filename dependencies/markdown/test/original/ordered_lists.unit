@@ -1,0 +1,49 @@
+>>> ordered list with multiple items
+1.  one
+2.  two
+10. ten
+<<<
+<ol>
+<li>one</li>
+<li>two</li>
+<li>ten</li>
+</ol>
+>>> ordered list with almost nested item
+1.  one
+45.  two
+   12345. three
+
+<<<
+<ol>
+<li>one</li>
+<li>two</li>
+<li>three</li>
+</ol>
+>>> nested ordered lists
+1. one
+2. two
+   3. three
+   4. four
+5. five
+<<<
+<ol>
+<li>one</li>
+<li>two
+<ol start="3">
+<li>three</li>
+<li>four</li>
+</ol>
+</li>
+<li>five</li>
+</ol>
+>>> new list markers start new lists
+1. a
+* b
+
+<<<
+<ol>
+<li>a</li>
+</ol>
+<ul>
+<li>b</li>
+</ul>

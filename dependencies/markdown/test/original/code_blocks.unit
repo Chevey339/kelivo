@@ -1,0 +1,65 @@
+>>> single line
+    code
+
+<<<
+<pre><code>code
+</code></pre>
+>>> include leading whitespace after indentation
+    zero
+     one
+      two
+       three
+
+<<<
+<pre><code>zero
+ one
+  two
+   three
+</code></pre>
+>>> code blocks separated by newlines form one block
+    zero
+    one
+
+    two
+
+    three
+
+<<<
+<pre><code>zero
+one
+
+two
+
+three
+</code></pre>
+>>> code blocks separated by two newlines form multiple blocks
+    zero
+    one
+
+
+    two
+
+
+    three
+
+<<<
+<pre><code>zero
+one
+
+
+two
+
+
+three
+</code></pre>
+>>> escape HTML characters
+    <&>
+
+<<<
+<pre><code>&lt;&amp;&gt;
+</code></pre>
+>>> issue #497
+    'foo'
+<<<
+<pre><code>'foo'
+</code></pre>

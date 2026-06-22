@@ -1,0 +1,34 @@
+>>> image
+![][foo]
+
+[foo]: http://foo.com/foo.png
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="" /></p>
+>>> alternate text
+![alternate text][foo]
+
+[foo]: http://foo.com/foo.png
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="alternate text" /></p>
+>>> title
+![][foo]
+
+[foo]: http://foo.com/foo.png "optional title"
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="" title="optional title" /></p>
+>>> invalid alt text
+![`alt`][foo]
+
+[foo]: http://foo.com/foo.png "optional title"
+
+<<<
+<p><img src="http://foo.com/foo.png" alt="alt" title="optional title" /></p>
+>>> shortcut reference image
+![foo]
+
+[foo]: http://foo.com/foo.png
+<<<
+<p><img src="http://foo.com/foo.png" alt="foo" /></p>

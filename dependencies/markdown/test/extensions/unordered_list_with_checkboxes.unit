@@ -1,0 +1,83 @@
+>>> checkbox with space
+* [ ] one
+* [ ] two
+<<<
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox"></input>one</li>
+<li class="task-list-item"><input type="checkbox"></input>two</li>
+</ul>
+>>> empty checkbox
+* [] one
+* [] two
+<<<
+<ul>
+<li>[] one</li>
+<li>[] two</li>
+</ul>
+>>> checkbox with x
+* [x] one
+* [x] two
+<<<
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" checked="true"></input>one</li>
+<li class="task-list-item"><input type="checkbox" checked="true"></input>two</li>
+</ul>
+>>> checkbox with X
+* [X] one
+* [X] two
+<<<
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox" checked="true"></input>one</li>
+<li class="task-list-item"><input type="checkbox" checked="true"></input>two</li>
+</ul>
+>>> mixed checkboxes
+* [ ] one
+* [] two
+* [x] three
+* [X] four
+* five
+<<<
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox"></input>one</li>
+<li>[] two</li>
+<li class="task-list-item"><input type="checkbox" checked="true"></input>three</li>
+<li class="task-list-item"><input type="checkbox" checked="true"></input>four</li>
+<li>five</li>
+</ul>
+>>> mixed leading spaces
+*[ ] zero
+* [ ] one
+*  [ ] two
+*   [ ] three
+*    [ ] four
+*     [ ] five
+<<<
+<p>*[ ] zero</p>
+<ul class="contains-task-list">
+<li class="task-list-item"><input type="checkbox"></input>one</li>
+<li class="task-list-item"><input type="checkbox"></input>two</li>
+<li class="task-list-item"><input type="checkbox"></input>three</li>
+<li class="task-list-item"><input type="checkbox"></input>four</li>
+<li>
+<pre><code>[ ] five
+</code></pre>
+</li>
+</ul>
+>>> checkbox list separated with blank lines
+- [ ] A
+
+- [ ] B
+
+- [ ]
+<<<
+<ul class="contains-task-list">
+<li class="task-list-item">
+<p><input type="checkbox"></input>A</p>
+</li>
+<li class="task-list-item">
+<p><input type="checkbox"></input>B</p>
+</li>
+<li>
+<p>[ ]</p>
+</li>
+</ul>
