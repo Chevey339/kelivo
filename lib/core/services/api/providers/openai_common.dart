@@ -885,6 +885,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
+  // id → args cache: tool_use stores args here; tool_result retrieves & removes them
+  final _ccBridgeToolArgs = <String, Map<String, dynamic>>{};
 
   final effectiveInfo = _effectiveModelInfo(config, modelId);
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
@@ -3092,6 +3094,71 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           }
           usage = _mergeOpenAICompatibleUsage(usage, json['usage']);
           if (usage != null) totalTokens = usage.totalTokens;
+        }
+
+        // cc_bridge (bridge.py) tool events → native tool card + thinking segment split
+        // tool_use closes current thinking segment; tool_result fills the card content.
+        final ccBridgeEvent = json['cc_bridge_event'] as Map<String, dynamic>?;
+        if (ccBridgeEvent != null && config.useResponseApi != true) {
+          final ccType = (ccBridgeEvent['type'] ?? '').toString();
+          if (ccType == 'tool_use') {
+            final ccId = (ccBridgeEvent['id'] ?? 'cc_call').toString();
+            final ccName = (ccBridgeEvent['name'] ?? 'tool').toString();
+            final ccInputRaw =
+                ccBridgeEvent['input'] ?? ccBridgeEvent['input_preview'];
+            Map<String, dynamic> ccArgs;
+            try {
+              if (ccInputRaw is String && ccInputRaw.isNotEmpty) {
+                ccArgs =
+                    (jsonDecode(ccInputRaw) as Map).cast<String, dynamic>();
+              } else if (ccInputRaw is Map) {
+                ccArgs = ccInputRaw.cast<String, dynamic>();
+              } else {
+                ccArgs = const <String, dynamic>{};
+              }
+            } catch (_) {
+              ccArgs = const <String, dynamic>{};
+            }
+            // cache args so tool_result can reuse them
+            _ccBridgeToolArgs[ccId] = ccArgs;
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: totalTokens,
+              toolCalls: [
+                ToolCallInfo(id: ccId, name: ccName, arguments: ccArgs),
+              ],
+            );
+          } else if (ccType == 'tool_result') {
+            final ccId = (ccBridgeEvent['id'] ?? '').toString();
+            final ccName = (ccBridgeEvent['name'] ?? '').toString();
+            // prefer full content over preview (Codex P2 fix)
+            final ccContent =
+                (ccBridgeEvent['content'] ??
+                        ccBridgeEvent['content_preview'] ??
+                        '')
+                    .toString();
+            final ccIsError = ccBridgeEvent['is_error'] == true;
+            // reuse args from matching tool_use so upsertToolEvent doesn't wipe them (Codex P2 fix)
+            final ccArgs =
+                _ccBridgeToolArgs.remove(ccId) ?? const <String, dynamic>{};
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: totalTokens,
+              toolResults: [
+                ToolResultInfo(
+                  id: ccId,
+                  name: ccName,
+                  arguments: ccArgs,
+                  content: ccContent,
+                  metadata: ccIsError
+                      ? const <String, dynamic>{'is_error': true}
+                      : null,
+                ),
+              ],
+            );
+          }
         }
 
         if (content.isNotEmpty || (reasoning?.isNotEmpty ?? false)) {
