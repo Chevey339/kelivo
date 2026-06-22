@@ -1955,5 +1955,21 @@
         "type": "int"
       }
     }
+  },
+  "titlePresetStandard": "标准（默认）",
+  "@titlePresetStandard": {
+    "description": "标题预设选项：标准版（无 emoji）"
+  },
+  "titlePresetEmoji": "添加 Emoji",
+  "@titlePresetEmoji": {
+    "description": "标题预设选项：Emoji 版"
+  },
+  "titlePresetCustom": "自定义",
+  "@titlePresetCustom": {
+    "description": "当自定义提示词不匹配任何预设时显示的标签"
+  },
+  "titlePresetUnsavedHint": "更改或选择预设后，需点击「保存」方可生效",
+  "@titlePresetUnsavedHint": {
+    "description": "标题提示词编辑器中提醒用户在更改预设后保存的提示"
   }
 }
