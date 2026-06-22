@@ -1,5 +1,42 @@
 {
   "@@locale": "ru",
+  "appTitle": "Kelivo",
+  "askUserCardInactive": "Этот вопрос больше не активен. Перегенерируйте или продолжите разговор.",
+  "tokenDetailDuration": "{value} с.",
+  "tokenDetailTotalTokens": "{count} токенов",
+  "debugPageNoCurrentAssistant": "Нет текущего помощника. Сначала создайте или выберите помощника.",
+  "debugPageConversationCreated": "Создан диалог отладки с сообщениями {count}.",
+  "debugPageCreateConversationFailed": "Не удалось создать диалог отладки: {error}.",
+  "debugPageOversizedConversationTitle": "Тест слишком большого размера разговора ({sizeMB} МБ)",
+  "debugPageOversizedConversationSeedText": "Это длинный отладочный текст для воспроизведения медленного рендеринга.",
+  "debugPageManyMessagesConversationTitle": "{count} - тест разговора сообщений",
+  "debugPageManyMessagesSeedText": "{role} сообщение № {index}: быстрый случайный образец отладки.",
+  "debugPageLongReasoningConversationTitle": "{count} - тест на рассуждение длинного сообщения",
+  "debugPageCreatingLongReasoningConversation": "Создание длинного аргументированного разговора об отладке...",
+  "debugPageCreateLongReasoningConversationButton": "Создайте длинный аргументированный разговор (128 сообщений)",
+  "debugPageCreatingDailyMixedMarkdownConversation": "Создание ежедневного смешанного диалога Markdown...",
+  "debugPageCreateDailyMixedMarkdownConversationButton": "Создавайте 3000 ежедневных смешанных сообщений Markdown.",
+  "debugPageCreatingOversizedConversation": "Создание беседы размером 30 МБ...",
+  "debugPageCreatingManyMessagesConversation": "Создание диалога из 1024 сообщений...",
+  "debugPageCreateManyMessagesConversationButton": "Создать разговор из 1024 сообщений"
+}            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Полный Русский Перевод (app_ru.arb)</h1>
+        <p>Я залил весь переведенный русский пакет (1934 строки). Чтобы обновить его у себя на GitHub, нажми синюю кнопку ниже (весь текст скопируется в буфер обмена телефона), перейди в файл на гитхабе, выдели весь старый куцый текст и вставь новый.</p>
+        
+        <div class="actions">
+            <button onclick="copyToClipboard()">📋 Скопировать весь код перевода</button>
+        </div>
+
+        <textarea id="output" readonly>{
+  "@@locale": "ru",
   "appName": "Kelivo",
   "serverAddress": "Адрес сервера",
   "scanDevice": "Сканировать устройство",
@@ -35,6 +72,446 @@
   "cancel": "Отмена",
   "delete": "Удалить",
   "edit": "Редактировать",
+  "add": "Добавить",
+  "name": "Имя",
+  "deviceAddress": "Адрес устройства",
+  "deviceName": "Имя устройства",
+  "scan": "Сканировать",
+  "scanning": "Сканирование...",
+  "stopScanning": "Остановить сканирование",
+  "deviceFound": "Найдено устройств: {count}",
+  "noDeviceFound": "Устройства не найдены",
+  "unknownDevice": "Неизвестное устройство",
+  "unknown": "Неизвестно",
+  "addDevice": "Добавить устройство",
+  "editDevice": "Редактировать устройство",
+  "deleteDevice": "Удалить устройство",
+  "deleteDeviceConfirm": "Вы уверены, что хотите удалить {name}?",
+  "invalidAddress": "Неверный адрес устройства",
+  "addressRequired": "Адрес обязателен",
+  "nameRequired": "Имя обязательно",
+  "success": "Успех",
+  "error": "Ошибка",
+  "loading": "Загрузка...",
+  "chart": "График",
+  "history": "История",
+  "realtime": "В реальном времени",
+  "day": "День",
+  "week": "Неделя",
+  "month": "Месяц",
+  "year": "Год",
+  "export": "Экспорт",
+  "import": "Импорт",
+  "exportSuccess": "Данные успешно экспортированы",
+  "importSuccess": "Данные успешно импортированы",
+  "exportError": "Ошибка экспорта данных",
+  "importError": "Ошибка импорта данных",
+  "confirm": "Подтвердить",
+  "yes": "Да",
+  "no": "Нет",
+  "retry": "Повторить",
+  "warning": "Предупреждение",
+  "info": "Информация",
+  "update": "Обновить",
+  "checkingForUpdates": "Проверка обновлений...",
+  "updateAvailable": "Доступно обновление",
+  "updateAvailableMessage": "Доступна новая версия {version}. Хотите обновиться?",
+  "downloadingUpdate": "Загрузка обновления...",
+  "installUpdate": "Установить обновление",
+  "upToDate": "У вас установлена последняя версия",
+  "updateError": "Ошибка обновления",
+  "help": "Помощь",
+  "feedback": "Обратная связь",
+  "share": "Поделиться",
+  "open": "Открыть",
+  "close": "Закрыть",
+  "clear": "Очистить",
+  "search": "Поиск",
+  "all": "Все",
+  "none": "Нет",
+  "enabled": "Включено",
+  "disabled": "Выключено",
+  "on": "Вкл.",
+  "off": "Выкл.",
+  "high": "Высокий",
+  "medium": "Средний",
+  "low": "Низкий",
+  "critical": "Критический",
+  "normal": "Нормальный",
+  "active": "Активен",
+  "inactive": "Неактивен",
+  "pending": "В ожидании",
+  "completed": "Завершено",
+  "failed": "Ошибка",
+  "running": "Запущено",
+  "stopped": "Остановлено",
+  "paused": "Приостановлено",
+  "reset": "Сбросить",
+  "apply": "Применить",
+  "defaultText": "По умолчанию",
+  "custom": "Пользовательский",
+  "more": "Еще",
+  "less": "Меньше",
+  "back": "Назад",
+  "next": "Далее",
+  "finish": "Готово",
+  "start": "Старт",
+  "stop": "Стоп",
+  "play": "Играть",
+  "pauseText": "Пауза",
+  "unmute": "Включить звук",
+  "mute": "Выключить звук",
+  "volume": "Громкость",
+  "brightness": "Яркость",
+  "contrast": "Контраст",
+  "saturation": "Насыщенность",
+  "sharpness": "Резкость",
+  "resolution": "Разрешение",
+  "fps": "Кадров в секунду",
+  "bitrate": "Битрейт",
+  "codec": "Кодек",
+  "format": "Формат",
+  "size": "Размер",
+  "typeText": "Тип",
+  "path": "Путь",
+  "file": "Файл",
+  "folder": "Папка",
+  "created": "Создано",
+  "modified": "Изменено",
+  "accessed": "Доступ",
+  "owner": "Владелец",
+  "permissions": "Права доступа",
+  "sizeBytes": "{size} байт",
+  "sizeKb": "{size} КБ",
+  "sizeMb": "{size} МБ",
+  "sizeGb": "{size} ГБ",
+  "timeSeconds": "{time} сек",
+  "timeMinutes": "{time} мин",
+  "timeHours": "{time} ч",
+  "timeDays": "{time} дн",
+  "timeWeeks": "{time} нед",
+  "timeMonths": "{time} мес",
+  "timeYears": "{time} лет",
+  "now": "Сейчас",
+  "today": "Сегодня",
+  "yesterday": "Вчера",
+  "tomorrow": "Завтра",
+  "never": "Никогда",
+  "helloWorld": "Привет, мир!",
+  "settingsPageBackButton": "Назад",
+  "settingsPageTitle": "Настройки",
+  "settingsPageDarkMode": "Темный",
+  "settingsPageLightMode": "Свет",
+  "settingsPageSystemMode": "Система",
+  "settingsPageWarningMessage": "Некоторые службы не настроены; возможности могут быть ограничены.",
+  "settingsPageGeneralSection": "Общий",
+  "settingsPageColorMode": "Цветовой режим",
+  "settingsPageDisplay": "Предпочтения",
+  "settingsPageDisplaySubtitle": "Предпочтения по внешности, поведению и взаимодействию",
+  "settingsPageAssistant": "Ассистент",
+  "settingsPageAssistantSubtitle": "Помощник и стиль по умолчанию",
+  "settingsPageModelsServicesSection": "Модели и услуги",
+  "settingsPageDefaultModel": "Модель по умолчанию",
+  "settingsPageProviders": "Провайдеры",
+  "settingsPageHotkeys": "Горячие клавиши",
+  "settingsPageSearch": "Поиск",
+  "settingsPageTts": "ТТС",
+  "settingsPageMcp": "МКП",
+  "settingsPageQuickPhrase": "Быстрая фраза",
+  "settingsPageInstructionInjection": "Инструкция Инъекции",
+  "settingsPageDataSection": "Данные",
+  "settingsPageBackup": "Резервное копирование",
+  "settingsPageChatStorage": "Хранилище чата",
+  "settingsPageCalculating": "Расчет…",
+  "settingsPageFilesCount": "Файлов: {count} · {size}",
+  "@settingsPageFilesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpacePageTitle": "Место для хранения",
+  "storageSpaceRefreshTooltip": "Обновить",
+  "storageSpaceLoadFailed": "Не удалось загрузить данные об использовании хранилища.",
+  "storageSpaceTotalLabel": "Использовал",
+  "storageSpaceClearableLabel": "Очищается: {size}",
+  "@storageSpaceClearableLabel": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearableHint": "Можно очистить: {size}",
+  "@storageSpaceClearableHint": {
+    "placeholders": {
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceCategoryImages": "Изображения",
+  "storageSpaceCategoryFiles": "Файлы",
+  "storageSpaceCategoryChatData": "Записи чата",
+  "storageSpaceCategoryAssistantData": "Ассистенты",
+  "storageSpaceCategoryCache": "Кэш",
+  "storageSpaceCategoryLogs": "Журналы",
+  "storageSpaceCategoryOther": "Приложение",
+  "storageSpaceFilesCount": "{count} файлов",
+  "@storageSpaceFilesCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceSafeToClearHint": "Безопасно очистить. Это не повлияет на историю вашего чата.",
+  "storageSpaceNotSafeToClearHint": "Может повлиять на историю вашего чата. Удаляйте с осторожностью.",
+  "storageSpaceBreakdownTitle": "Авария",
+  "storageSpaceSubChatMessages": "Сообщения",
+  "storageSpaceSubChatConversations": "Разговоры",
+  "storageSpaceSubChatToolEvents": "События инструмента",
+  "storageSpaceSubAssistantAvatars": "Аватары",
+  "storageSpaceSubAssistantImages": "Изображения",
+  "storageSpaceSubCacheAvatars": "Кэш аватара",
+  "storageSpaceSubCacheOther": "Другой кэш",
+  "storageSpaceSubCacheSystem": "Системный кеш",
+  "storageSpaceSubLogsFlutter": "Журналы флаттера",
+  "storageSpaceSubLogsRequests": "Сетевые журналы",
+  "storageSpaceSubLogsOther": "Другие журналы",
+  "storageSpaceClearConfirmTitle": "Подтвердить очистку",
+  "storageSpaceClearConfirmMessage": "Очистить {targetName} ?",
+  "@storageSpaceClearConfirmMessage": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearButton": "Прозрачный",
+  "storageSpaceClearDone": "{targetName} очищен",
+  "@storageSpaceClearDone": {
+    "placeholders": {
+      "targetName": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearFailed": "Очистить не удалось: {error}",
+  "@storageSpaceClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "storageSpaceClearAvatarCacheButton": "Очистить кэш аватара",
+  "storageSpaceClearCacheButton": "Очистить кэш",
+  "storageSpaceClearLogsButton": "Очистить журналы",
+  "storageSpaceViewLogsButton": "Просмотр журналов",
+  "storageSpaceDeleteConfirmTitle": "Подтвердить удаление",
+  "storageSpaceDeleteUploadsConfirmMessage": "Удалить элементы {count}? Вложения в истории чата могут стать недоступными.",
+  "@storageSpaceDeleteUploadsConfirmMessage": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceDeletedUploadsDone": "Удалены элементы: {count}",
+  "@storageSpaceDeletedUploadsDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceNoUploads": "Нет товаров",
+  "storageSpaceSelectAll": "Выбрать все",
+  "storageSpaceClearSelection": "Очистить выбор",
+  "storageSpaceSelectedCount": "{count} выбрано",
+  "@storageSpaceSelectedCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "storageSpaceUploadsCount": "{count} объектов",
+  "@storageSpaceUploadsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsPageAboutSection": "О",
+  "settingsPageAbout": "О",
+  "settingsPageStatistics": "Статистика",
+  "settingsPageDocs": "Документы",
+  "settingsPageLogs": "Журналы",
+  "settingsPageSponsor": "Спонсор",
+  "settingsPageShare": "Делиться",
+  "statsPageTitle": "Статистика",
+  "statsPageRangeAllTime": "Все время",
+  "statsPageRangeLast30Days": "Последние 30 дней",
+  "statsPageRangePreviousMonth": "В прошлом месяце",
+  "statsPageRangePreviousQuarter": "Последний квартал",
+  "statsPageRangeCustom": "Обычай",
+  "statsPageHeatmapTitle": "Тепловая карта чата",
+  "statsPageHeatmapLess": "Меньше",
+  "statsPageHeatmapMore": "Более",
+  "statsPageSummaryTitle": "Обзор",
+  "statsPageTotalConversations": "Всего разговоров",
+  "statsPageTotalMessages": "Всего сообщений",
+  "statsPageInputTokens": "Входные токены",
+  "statsPageOutputTokens": "Выходные токены",
+  "statsPageCachedTokens": "Кэшированные токены",
+  "statsPageLaunchCount": "Запуск приложения",
+  "statsPageUsageTrendTitle": "Тенденция использования",
+  "statsPageModelUsageTitle": "Использование модели",
+  "statsPageAssistantUsageTitle": "Использование Ассистента",
+  "statsPageTopicVolumeTitle": "Объем темы",
+  "statsPageModelColumn": "Модель",
+  "statsPageAssistantColumn": "Ассистент",
+  "statsPageTopicColumn": "Тема",
+  "statsPageMessagesColumn": "Сообщения",
+  "statsPageTopicsColumn": "Темы",
+  "statsPageEmptyTitle": "Статистики пока нет",
+  "statsPageShowAllTooltip": "Показать все",
+  "statsPageClose": "Закрывать",
+  "statsPageUnknownProvider": "Неизвестный поставщик",
+  "statsPageUnknownAssistant": "Помощник по умолчанию",
+  "statsPageUnknownModel": "Неизвестная модель",
+  "statsPageUnknownTopic": "Безымянная тема",
+  "statsPageCustomRangeTitle": "Пользовательский диапазон",
+  "statsPageCustomRangeStart": "Начинать",
+  "statsPageCustomRangeEnd": "Конец",
+  "statsPageCustomRangeCancel": "Отмена",
+  "statsPageCustomRangeApply": "Применять",
+  "sponsorPageMethodsSectionTitle": "Методы спонсорства",
+  "sponsorPageSponsorsSectionTitle": "Спонсоры",
+  "sponsorPageEmpty": "Спонсоров пока нет",
+  "sponsorPageAfdianTitle": "афдиец",
+  "sponsorPageAfdianSubtitle": "afdian.com/a/kelivo",
+  "sponsorPageWeChatTitle": "Спонсор WeChat",
+  "sponsorPageWeChatSubtitle": "Спонсорский код WeChat",
+  "sponsorPageScanQrHint": "Отсканируйте QR-код, чтобы стать спонсором",
+  "languageDisplaySimplifiedChinese": "Упрощенный китайский",
+  "languageDisplayEnglish": "Английский",
+  "languageDisplayTraditionalChinese": "Традиционный китайский",
+  "languageDisplayJapanese": "японский",
+  "languageDisplayKorean": "корейский",
+  "languageDisplayFrench": "Французский",
+  "languageDisplayGerman": "немецкий",
+  "languageDisplayItalian": "итальянский",
+  "languageDisplaySpanish": "испанский",
+  "languageSelectSheetTitle": "Выберите язык перевода",
+  "languageSelectSheetClearButton": "Четкий перевод",
+  "homePageClearContext": "Очистить контекст",
+  "homePageClearContextWithCount": "Очистить контекст ({actual}/{configured})",
+  "@homePageClearContextWithCount": {
+    "placeholders": {
+      "actual": {
+        "type": "String"
+      },
+      "configured": {
+        "type": "String"
+      }
+    }
+  },
+  "homePageDefaultAssistant": "Помощник по умолчанию",
+  "mermaidExportPng": "Экспорт PNG",
+  "mermaidExportFailed": "Экспорт не удался",
+  "mermaidImageTab": "Изображение",
+  "mermaidCodeTab": "Код",
+  "mermaidFullScreen": "Полноэкранный",
+  "mermaidGeneratingImage": "Создание изображения",
+  "mermaidGenerationFailedHint": "Генерация не удалась. Попробуйте спросить по-другому.",
+  "mermaidPreviewOpen": "Открыть предварительный просмотр",
+  "mermaidPreviewOpenFailed": "Не могу открыть предварительный просмотр",
+  "assistantProviderDefaultAssistantName": "Помощник по умолчанию",
+  "assistantProviderSampleAssistantName": "Образец помощника",
+  "assistantProviderNewAssistantName": "Новый помощник",
+  "assistantProviderSampleAssistantSystemPrompt": "Вы {model_name}, ИИ-помощник, который с радостью предоставит точную и полезную помощь. Текущее время — {cur_datetime}, язык устройства — {locale}, часовой пояс — {timezone}, пользователь использует {device_info}, версию {system_version}. Если пользователь явно не указал иное, при ответе используйте язык устройства пользователя.",
+  "@assistantProviderSampleAssistantSystemPrompt": {
+    "placeholders": {
+      "model_name": {
+        "type": "String"
+      },
+      "cur_datetime": {
+        "type": "String"
+      },
+      "locale": {
+        "type": "String"
+      },
+      "timezone": {
+        "type": "String"
+      },
+      "device_info": {
+        "type": "String"
+      },
+      "system_version": {
+        "type": "String"
+      }
+    }
+  },
+  "displaySettingsPageLanguageTitle": "Язык приложения",
+  "displaySettingsPageLanguageSubtitle": "Выберите язык интерфейса",
+  "assistantTagsManageTitle": "Управление тегами",
+  "assistantTagsCreateButton": "Создавать",
+  "assistantTagsCreateDialogTitle": "Создать тег",
+  "assistantTagsCreateDialogOk": "Создавать",
+  "assistantTagsCreateDialogCancel": "Отмена",
+  "assistantTagsNameHint": "Имя тега",
+  "assistantTagsRenameButton": "Переименовать",
+  "assistantTagsRenameDialogTitle": "Переименовать тег",
+  "assistantTagsRenameDialogOk": "Переименовать",
+  "assistantTagsDeleteButton": "Удалить",
+  "assistantTagsDeleteConfirmTitle": "Удалить тег",
+  "assistantTagsDeleteConfirmContent": "Вы уверены, что хотите удалить этот тег?",
+  "assistantTagsDeleteConfirmOk": "Удалить",
+  "assistantTagsDeleteConfirmCancel": "Отмена",
+  "assistantTagsContextMenuEditAssistant": "Редактировать помощник",
+  "assistantTagsContextMenuManageTags": "Управление тегами",
+  "mcpTransportOptionStdio": "СТДИО",
+  "mcpTransportTagStdio": "СТДИО",
+  "mcpTransportTagInmemory": "Встроенный",
+  "mcpTransportTagSse": "СШЭ",
+  "mcpTransportTagHttp": "HTTP",
+  "mcpServerEditSheetStdioOnlyDesktop": "STDIO доступен только на настольном компьютере.",
+  "mcpServerEditSheetStdioCommandLabel": "Команда",
+  "mcpServerEditSheetStdioArgumentsLabel": "Аргументы",
+  "mcpServerEditSheetStdioWorkingDirectoryLabel": "Рабочий каталог (необязательно)",
+  "mcpServerEditSheetStdioEnvironmentTitle": "Среда",
+  "mcpServerEditSheetStdioEnvNameLabel": "Имя",
+  "mcpServerEditSheetStdioEnvValueLabel": "Ценить",
+  "mcpServerEditSheetStdioAddEnv": "Добавить конверт",
+  "mcpServerEditSheetStdioCommandRequired": "Требуется команда для STDIO",
+  "assistantTagsContextMenuDeleteAssistant": "Удалить помощника",
+  "assistantTagsClearTag": "Очистить тег",
+  "displaySettingsPageLanguageChineseLabel": "Упрощенный китайский",
+  "displaySettingsPageLanguageEnglishLabel": "Английский",
+  "homePagePleaseSelectModel": "Пожалуйста, сначала выберите модель",
+  "homePageAudioAttachmentUnsupported": "Текущая модель не поддерживает аудио-вложения. Переключитесь на модель, поддерживающую аудиовход, или удалите аудиофайл и повторите попытку.",
+  "homePagePleaseSetupTranslateModel": "Сначала установите модель перевода",
+  "homePageTranslating": "Перевод...",
+  "homePageTranslateFailed": "Не удалось перевести: {error}",
+  "@homePageTranslateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "chatServiceDefaultConversationTitle": "Новый чат",
+  "userProviderDefaultUserName": "Пользователь",
+  "homePageDeleteMessage": "Удалить эту версию",
+  "homePageDeleteMessageConfirm": "Вы уверены, что хотите удалить эту  "edit": "Редактировать",
   "add": "Добавить",
   "name": "Имя",
   "deviceAddress": "Адрес устройства",
