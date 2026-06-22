@@ -16,6 +16,7 @@ import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
+import '../../../core/services/image_compression_progress.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
@@ -743,6 +744,8 @@ class _ChatInputBarState extends State<ChatInputBar>
               destPath = p.join(dir.path, name);
             }
             await File(destPath).writeAsBytes(bytes, flush: true);
+            // 入库时压缩图片（替换原文件，可能改变扩展名）
+            destPath = await _compressOnIngestIfEnabled(destPath);
             return destPath;
           } catch (_) {
             return null;
@@ -904,7 +907,8 @@ class _ChatInputBarState extends State<ChatInputBar>
         if (savedPath != null) {
           final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {
-            images.add(savedPath);
+            // Mirror copyPickedFiles: compress images on ingestion.
+            images.add(await _compressOnIngestIfEnabled(savedPath));
           } else {
             final mime = _inferMimeByExtension(savedName);
             docs.add(
@@ -1378,6 +1382,25 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
+  /// Compress an image at ingestion time if the user enabled it. Returns the
+  /// path to use afterwards (extension may change, e.g. png → jpg). No-op (and
+  /// returns [path] unchanged) when unmounted or compression is disabled.
+  Future<String> _compressOnIngestIfEnabled(String path) async {
+    if (!mounted) return path;
+    final sp = context.read<SettingsProvider>();
+    if (!sp.imageCompressionEnabled) return path;
+    final prog = ImageCompressionProgress.instance;
+    prog.start(1);
+    try {
+      return await prog.compressAndReport(
+        path,
+        quality: sp.imageCompressionQuality,
+      );
+    } finally {
+      prog.finishBatch();
+    }
+  }
+
   String _inferMimeByExtension(String name) {
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
@@ -1448,7 +1471,8 @@ class _ChatInputBarState extends State<ChatInputBar>
             try {
               await from.delete();
             } catch (_) {}
-            out.add(destPath);
+            // 入库时压缩图片（与 saveImageBytes 路径保持一致）
+            out.add(await _compressOnIngestIfEnabled(destPath));
           }
         } catch (_) {
           // skip single file errors

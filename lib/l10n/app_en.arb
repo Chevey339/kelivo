@@ -1648,6 +1648,18 @@
   "@displaySettingsPageEnableImageCropperTitle": {},
   "displaySettingsPageEnableImageCropperSubtitle": "Crop images after selecting from gallery or camera",
   "@displaySettingsPageEnableImageCropperSubtitle": {},
+  "displaySettingsPageEnableImageCompressionTitle": "Image Compression",
+  "@displaySettingsPageEnableImageCompressionTitle": {
+    "description": "Title for the image compression toggle on the display settings page"
+  },
+  "displaySettingsPageEnableImageCompressionSubtitle": "Compress images before saving and sending",
+  "@displaySettingsPageEnableImageCompressionSubtitle": {
+    "description": "Subtitle for the image compression toggle on the display settings page"
+  },
+  "displaySettingsPageImageCompressionQualityTitle": "Image quality",
+  "@displaySettingsPageImageCompressionQualityTitle": {
+    "description": "Title for the JPEG quality slider in image compression settings"
+  },
   "displaySettingsPageKeepSidebarOpenOnAssistantTapTitle": "Keep sidebar open when selecting assistant",
   "displaySettingsPageKeepSidebarOpenOnTopicTapTitle": "Keep sidebar open when selecting topic",
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "Don't collapse assistant list when closing sidebar",

@@ -1614,6 +1614,85 @@ Widget _iosSwitchRow(
   );
 }
 
+Widget _iosSliderRow(
+  BuildContext context, {
+  IconData? icon,
+  required String label,
+  required String valueLabel,
+  required double value,
+  required double min,
+  required double max,
+  required int divisions,
+  required ValueChanged<double> onChanged,
+}) {
+  final cs = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            if (icon != null) ...[
+              SizedBox(
+                width: 36,
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              valueLabel,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.primary,
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 3,
+            activeTrackColor: cs.primary,
+            inactiveTrackColor: cs.onSurface.withValues(
+              alpha: isDark ? 0.22 : 0.18,
+            ),
+            thumbColor: cs.primary,
+            overlayColor: cs.primary.withValues(alpha: 0.12),
+            activeTickMarkColor: Colors.transparent,
+            inactiveTickMarkColor: Colors.transparent,
+            showValueIndicator: ShowValueIndicator.never,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 Widget _sheetOption(
   BuildContext context, {
   IconData? icon,
@@ -2208,6 +2287,23 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 value: sp.imageCropperEnabled,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setImageCropperEnabled(v),
+              ),
+              _iosDivider(context),
+              _iosSliderRow(
+                context,
+                icon: Lucide.Sparkles,
+                label: l10n.displaySettingsPageImageCompressionQualityTitle,
+                valueLabel: '${sp.imageCompressionQuality}%',
+                value: sp.imageCompressionQuality.toDouble().clamp(
+                  30.0,
+                  100.0,
+                ),
+                min: 30,
+                max: 100,
+                divisions: 70,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setImageCompressionQuality(v.round()),
               ),
               _iosDivider(context),
               _iosSwitchRow(
