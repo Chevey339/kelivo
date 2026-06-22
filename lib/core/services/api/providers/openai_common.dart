@@ -3094,6 +3094,65 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           if (usage != null) totalTokens = usage.totalTokens;
         }
 
+        // cc_bridge (bridge.py) tool events → native tool card + thinking segment split
+        // tool_use closes current thinking segment; tool_result fills the card content.
+        final ccBridgeEvent = json['cc_bridge_event'] as Map<String, dynamic>?;
+        if (ccBridgeEvent != null && config.useResponseApi != true) {
+          final ccType = (ccBridgeEvent['type'] ?? '').toString();
+          if (ccType == 'tool_use') {
+            final ccId = (ccBridgeEvent['id'] ?? 'cc_call').toString();
+            final ccName = (ccBridgeEvent['name'] ?? 'tool').toString();
+            final ccInputRaw =
+                ccBridgeEvent['input'] ?? ccBridgeEvent['input_preview'];
+            Map<String, dynamic> ccArgs;
+            try {
+              if (ccInputRaw is String && ccInputRaw.isNotEmpty) {
+                ccArgs =
+                    (jsonDecode(ccInputRaw) as Map).cast<String, dynamic>();
+              } else if (ccInputRaw is Map) {
+                ccArgs = ccInputRaw.cast<String, dynamic>();
+              } else {
+                ccArgs = const <String, dynamic>{};
+              }
+            } catch (_) {
+              ccArgs = const <String, dynamic>{};
+            }
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: totalTokens,
+              toolCalls: [
+                ToolCallInfo(id: ccId, name: ccName, arguments: ccArgs),
+              ],
+            );
+          } else if (ccType == 'tool_result') {
+            final ccId = (ccBridgeEvent['id'] ?? '').toString();
+            final ccName = (ccBridgeEvent['name'] ?? '').toString();
+            final ccContent =
+                (ccBridgeEvent['content_preview'] ??
+                        ccBridgeEvent['content'] ??
+                        '')
+                    .toString();
+            final ccIsError = ccBridgeEvent['is_error'] == true;
+            yield ChatStreamChunk(
+              content: '',
+              isDone: false,
+              totalTokens: totalTokens,
+              toolResults: [
+                ToolResultInfo(
+                  id: ccId,
+                  name: ccName,
+                  arguments: const <String, dynamic>{},
+                  content: ccContent,
+                  metadata: ccIsError
+                      ? const <String, dynamic>{'is_error': true}
+                      : null,
+                ),
+              ],
+            );
+          }
+        }
+
         if (content.isNotEmpty || (reasoning?.isNotEmpty ?? false)) {
           final approxTotal =
               approxPromptTokens + approxTokensFromChars(approxCompletionChars);
