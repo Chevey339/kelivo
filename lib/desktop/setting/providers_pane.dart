@@ -299,6 +299,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Claude', key: 'Claude'),
       (name: 'Grok', key: 'Grok'),
       (name: l10n.providersPageByteDanceName, key: 'ByteDance'),
+      (name: 'Fireworks AI', key: 'Fireworks AI'),
     ];
 
     final cfgs = settings.providerConfigs;
