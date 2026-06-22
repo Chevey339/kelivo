@@ -887,6 +887,23 @@ class HomeViewModel extends ChangeNotifier {
     onScrollToBottom?.call();
   }
 
+  /// Persist the current temporary conversation to permanent storage
+  /// and automatically trigger title generation.
+  Future<void> saveTemporaryConversation() async {
+    final convo = currentConversation;
+    if (convo == null) return;
+    if (!_chatService.isTemporaryConversation(convo.id)) return;
+
+    await _chatService.persistTemporaryConversation(convo.id);
+    _chatController.updateCurrentConversation(
+      _chatService.getConversation(convo.id),
+    );
+    notifyListeners();
+
+    // Trigger title generation after saving
+    await generateTitle(force: true);
+  }
+
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
     final allMessages = _chatController

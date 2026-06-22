@@ -42,8 +42,10 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onOpenMiniMap,
     required this.onCreateNewConversation,
     required this.onToggleTemporaryConversation,
+    required this.onSaveTemporaryConversation,
     required this.onSelectModel,
     required this.canToggleTemporaryConversation,
+    required this.canSaveTemporaryConversation,
     required this.temporaryConversationEnabled,
     required this.globalSearchMode,
     required this.globalSearchQuery,
@@ -69,8 +71,10 @@ class HomeMobileScaffold extends StatelessWidget {
   final VoidCallback onOpenMiniMap;
   final Future<void> Function() onCreateNewConversation;
   final Future<void> Function() onToggleTemporaryConversation;
+  final Future<void> Function() onSaveTemporaryConversation;
   final VoidCallback onSelectModel;
   final bool canToggleTemporaryConversation;
+  final bool canSaveTemporaryConversation;
   final bool temporaryConversationEnabled;
   final bool globalSearchMode;
   final String globalSearchQuery;
@@ -263,6 +267,19 @@ class HomeMobileScaffold extends StatelessWidget {
           semanticLabel: AppLocalizations.of(context)!.miniMapTooltip,
           icon: Lucide.Map,
         ),
+        if (canSaveTemporaryConversation)
+          IosIconButton(
+            size: 20,
+            minSize: 44,
+            onTap: () async => onSaveTemporaryConversation(),
+            semanticLabel: AppLocalizations.of(context)!.temporaryChatSave,
+            builder: (color) => SvgPicture.asset(
+              'assets/icons/temporary_chat_save.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            ),
+          ),
         IosIconButton(
           size: 22,
           minSize: 44,

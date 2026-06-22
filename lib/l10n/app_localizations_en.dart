@@ -4619,6 +4619,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get temporaryChatToggleTooltip => 'Toggle temporary chat';
 
   @override
+  String get temporaryChatSave => 'Save temporary chat';
+
+  @override
   String get quickPhraseBackTooltip => 'Back';
 
   @override

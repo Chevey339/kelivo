@@ -4431,6 +4431,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get temporaryChatToggleTooltip => '切换临时对话';
 
   @override
+  String get temporaryChatSave => '保存临时对话';
+
+  @override
   String get quickPhraseBackTooltip => '返回';
 
   @override
@@ -9749,6 +9752,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get temporaryChatToggleTooltip => '切换临时对话';
 
   @override
+  String get temporaryChatSave => '保存临时对话';
+
+  @override
   String get quickPhraseBackTooltip => '返回';
 
   @override
@@ -15064,6 +15070,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get temporaryChatToggleTooltip => '切換臨時對話';
+
+  @override
+  String get temporaryChatSave => '保存臨時對話';
 
   @override
   String get quickPhraseBackTooltip => '返回';
