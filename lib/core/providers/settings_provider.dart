@@ -1840,7 +1840,6 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   String _localeToTag(Locale l) {
-  String _localeToTag(Locale l) {
   final lc = l.languageCode.toLowerCase();
   if (lc == 'zh') {
     final script = (l.scriptCode ?? '').toLowerCase();
