@@ -3221,6 +3221,48 @@ abstract class AppLocalizations {
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
 
+  /// No description provided for @backupPageIncrementalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental Backup'**
+  String get backupPageIncrementalTitle;
+
+  /// No description provided for @backupPageIncrementalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Export only chats since a chosen date. Attachments are excluded.'**
+  String get backupPageIncrementalDescription;
+
+  /// No description provided for @backupPageIncrementalStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Date'**
+  String get backupPageIncrementalStartDate;
+
+  /// No description provided for @backupPageIncrementalLastBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Use last backup date'**
+  String get backupPageIncrementalLastBackup;
+
+  /// No description provided for @backupPageIncrementalIncludeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Include Settings'**
+  String get backupPageIncrementalIncludeSettings;
+
+  /// No description provided for @backupPageIncrementalUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Incremental'**
+  String get backupPageIncrementalUpload;
+
+  /// No description provided for @backupPageIncrementalUpdateBackupTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Update last backup time'**
+  String get backupPageIncrementalUpdateBackupTime;
+
   /// No description provided for @backupReminderSectionTitle.
   ///
   /// In en, this message translates to:

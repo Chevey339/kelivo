@@ -1619,6 +1619,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupPageIncrementalTitle => '增量备份';
+
+  @override
+  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据，不包含附件';
+
+  @override
+  String get backupPageIncrementalStartDate => '起始日期';
+
+  @override
+  String get backupPageIncrementalLastBackup => '使用上次备份日期';
+
+  @override
+  String get backupPageIncrementalIncludeSettings => '包含设置';
+
+  @override
+  String get backupPageIncrementalUpload => '增量上传';
+
+  @override
+  String get backupPageIncrementalUpdateBackupTime => '更新上次备份日期';
+
+  @override
   String get backupReminderSectionTitle => '备份提醒';
 
   @override
@@ -6937,6 +6958,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageImportFromChatbox => '从 Chatbox 导入';
 
   @override
+  String get backupPageIncrementalTitle => '增量备份';
+
+  @override
+  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据，不包含附件';
+
+  @override
+  String get backupPageIncrementalStartDate => '起始日期';
+
+  @override
+  String get backupPageIncrementalLastBackup => '使用上次备份日期';
+
+  @override
+  String get backupPageIncrementalIncludeSettings => '包含设置';
+
+  @override
+  String get backupPageIncrementalUpload => '增量上传';
+
+  @override
+  String get backupPageIncrementalUpdateBackupTime => '更新上次备份日期';
+
+  @override
   String get backupReminderSectionTitle => '备份提醒';
 
   @override
@@ -12253,6 +12295,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageImportFromChatbox => '從 Chatbox 匯入';
+
+  @override
+  String get backupPageIncrementalTitle => '增量備份';
+
+  @override
+  String get backupPageIncrementalDescription => '僅匯出某個日期之後的聊天資料，不包含附件';
+
+  @override
+  String get backupPageIncrementalStartDate => '起始日期';
+
+  @override
+  String get backupPageIncrementalLastBackup => '使用上次備份日期';
+
+  @override
+  String get backupPageIncrementalIncludeSettings => '包含設定';
+
+  @override
+  String get backupPageIncrementalUpload => '增量上傳';
+
+  @override
+  String get backupPageIncrementalUpdateBackupTime => '更新上次備份日期';
 
   @override
   String get backupReminderSectionTitle => '備份提醒';

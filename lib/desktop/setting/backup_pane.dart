@@ -356,7 +356,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              _buildLocalBackupSliver(context, l10n, cs),
+              _buildLocalBackupSliver(context, l10n, cs, busy),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -552,6 +552,53 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     showAppSnackBar(
                                       context,
                                       message: message,
+                                      type: NotificationType.info,
+                                    );
+                                  },
+                          ),
+                          _DeskIosButton(
+                            label: l10n.backupPageIncrementalTitle,
+                            filled: false,
+                            dense: true,
+                            onTap: busy
+                                ? () {}
+                                : () async {
+                                    final backupProvider = context
+                                        .read<BackupProvider>();
+                                    await _saveConfig();
+                                    if (!context.mounted) return;
+                                    final result =
+                                        await _IncrementalBackupDialog.show(
+                                          context,
+                                          lastBackupTime: context
+                                              .read<BackupReminderProvider>()
+                                              .lastBackupAt,
+                                        );
+                                    if (result == null || !context.mounted) {
+                                      return;
+                                    }
+                                    final (
+                                      since,
+                                      includeSettings,
+                                      updateBackupTime,
+                                    ) = result;
+                                    final success = await backupProvider
+                                        .incrementalBackup(
+                                          since,
+                                          includeSettings,
+                                        );
+                                    if (!context.mounted) return;
+                                    if (success && updateBackupTime) {
+                                      await context
+                                          .read<BackupReminderProvider>()
+                                          .recordBackupCompleted();
+                                    }
+                                    if (!context.mounted) return;
+                                    showAppSnackBar(
+                                      context,
+                                      message:
+                                          backupProvider.message ??
+                                          l10n.backupPageBackupUploaded,
                                       type: NotificationType.info,
                                     );
                                   },
@@ -822,6 +869,53 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     );
                                   },
                           ),
+                          _DeskIosButton(
+                            label: l10n.backupPageIncrementalTitle,
+                            filled: false,
+                            dense: true,
+                            onTap: busy
+                                ? () {}
+                                : () async {
+                                    final s3BackupProvider = context
+                                        .read<S3BackupProvider>();
+                                    await _saveS3Config();
+                                    if (!context.mounted) return;
+                                    final result =
+                                        await _IncrementalBackupDialog.show(
+                                          context,
+                                          lastBackupTime: context
+                                              .read<BackupReminderProvider>()
+                                              .lastBackupAt,
+                                        );
+                                    if (result == null || !context.mounted) {
+                                      return;
+                                    }
+                                    final (
+                                      since,
+                                      includeSettings,
+                                      updateBackupTime,
+                                    ) = result;
+                                    final success = await s3BackupProvider
+                                        .incrementalBackup(
+                                          since,
+                                          includeSettings,
+                                        );
+                                    if (!context.mounted) return;
+                                    if (success && updateBackupTime) {
+                                      await context
+                                          .read<BackupReminderProvider>()
+                                          .recordBackupCompleted();
+                                    }
+                                    if (!context.mounted) return;
+                                    showAppSnackBar(
+                                      context,
+                                      message:
+                                          s3BackupProvider.message ??
+                                          l10n.backupPageBackupUploaded,
+                                      type: NotificationType.info,
+                                    );
+                                  },
+                          ),
                         ],
                       ),
                     ),
@@ -839,6 +933,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     BuildContext context,
     AppLocalizations l10n,
     ColorScheme cs,
+    bool busy,
   ) {
     return SliverToBoxAdapter(
       child: _sectionCard(
@@ -1238,6 +1333,176 @@ class _ReminderDetailText extends StatelessWidget {
   }
 }
 
+class _IncrementalBackupDialog extends StatefulWidget {
+  const _IncrementalBackupDialog({required this.lastBackupTime});
+  final DateTime? lastBackupTime;
+
+  static Future<(DateTime, bool, bool)?> show(
+    BuildContext context, {
+    DateTime? lastBackupTime,
+  }) {
+    return showDialog<(DateTime, bool, bool)>(
+      context: context,
+      builder: (_) => _IncrementalBackupDialog(lastBackupTime: lastBackupTime),
+    );
+  }
+
+  @override
+  State<_IncrementalBackupDialog> createState() =>
+      _IncrementalBackupDialogState();
+}
+
+class _IncrementalBackupDialogState extends State<_IncrementalBackupDialog> {
+  late DateTime _since;
+  bool _includeSettings = true;
+  bool _updateBackupTime = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _since =
+        widget.lastBackupTime ??
+        DateTime.now().subtract(const Duration(days: 30));
+  }
+
+  String _fmt(DateTime d) => d.toIso8601String().split('T')[0];
+
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _since,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) setState(() => _since = picked);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    return Dialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.backupPageIncrementalTitle,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: AppFontWeights.semibold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.backupPageIncrementalDescription,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: cs.onSurface.withValues(alpha: 0.8),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Text(
+                      l10n.backupPageIncrementalStartDate,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                  _DeskIosButton(
+                    label: _fmt(_since),
+                    filled: false,
+                    dense: true,
+                    onTap: _pickDate,
+                  ),
+                  const SizedBox(width: 6),
+                  if (widget.lastBackupTime != null)
+                    Tooltip(
+                      message: l10n.backupPageIncrementalLastBackup,
+                      child: _DeskIosButton(
+                        label: '↻',
+                        filled: false,
+                        dense: true,
+                        onTap: () =>
+                            setState(() => _since = widget.lastBackupTime!),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text(
+                    l10n.backupPageIncrementalIncludeSettings,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurface.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  const Spacer(),
+                  IosSwitch(
+                    value: _includeSettings,
+                    onChanged: (v) => setState(() => _includeSettings = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      l10n.backupPageIncrementalUpdateBackupTime,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurface.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ),
+                  IosSwitch(
+                    value: _updateBackupTime,
+                    onChanged: (v) => setState(() => _updateBackupTime = v),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(l10n.backupPageCancel),
+                  ),
+                  const SizedBox(width: 8),
+                  _DeskIosButton(
+                    label: l10n.backupPageIncrementalUpload,
+                    filled: true,
+                    dense: true,
+                    onTap: () => Navigator.of(
+                      context,
+                    ).pop((_since, _includeSettings, _updateBackupTime)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _RemoteItemCard extends StatefulWidget {
   const _RemoteItemCard({
     required this.item,
@@ -1457,6 +1722,45 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     );
   }
 
+  Future<void> _restoreWithMerge(BackupFileItem item) async {
+    setState(() => _loading = true);
+    try {
+      await widget.restoreFromItem(item, RestoreMode.merge);
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(l10n.backupPageRestartRequired),
+        content: Text(l10n.backupPageRestartContent),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dctx).pop();
+              PlatformUtils.restartApp();
+            },
+            child: Text(l10n.backupPageOK),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1525,10 +1829,15 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                             final it = _items[i];
                             return _RemoteItemCard(
                               item: it,
-                              onRestore: () =>
+                              onRestore: () {
+                                if (it.displayName.contains('_incr')) {
+                                  _restoreWithMerge(it);
+                                } else {
                                   _chooseRestoreModeAndRun((mode) async {
                                     await widget.restoreFromItem(it, mode);
-                                  }),
+                                  });
+                                }
+                              },
                               onDelete: () async {
                                 final confirm = await showDialog<bool>(
                                   context: context,
