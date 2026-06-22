@@ -106,6 +106,32 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> incrementalBackup(DateTime since, bool includeSettings) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? file;
+    try {
+      file = await _dataSync.prepareBackupFile(
+        _scopeAsWebdavConfig(),
+        since: since,
+        includeSettings: includeSettings,
+      );
+      final prefix = _normalizePrefix(_cfg.prefix);
+      final key = '$prefix${p.basename(file.path)}';
+      await _client.uploadFile(_cfg, key: key, file: file);
+      _message = 'Backup uploaded';
+      return true;
+    } catch (e) {
+      _message = e.toString();
+      return false;
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<List<BackupFileItem>> listRemote() async {
     return _client.listObjects(_cfg);
   }
