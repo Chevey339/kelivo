@@ -1530,6 +1530,7 @@
   "displaySettingsPageEnableUserMarkdownTitle": "使用者訊息 Markdown 渲染",
   "displaySettingsPageEnableReasoningMarkdownTitle": "思维鏈 Markdown 渲染",
   "displaySettingsPageEnableAssistantMarkdownTitle": "助手訊息 Markdown 渲染",
+  "displaySettingsPageEnableExperimentalMarkdownTitle": "實驗性 Markdown 渲染引擎",
   "displaySettingsPageEnableMathSubtitle": "渲染 LaTeX 數學公式（行內與區塊）",
   "displaySettingsPageEnableImageCropperTitle": "啟用圖片裁剪",
   "displaySettingsPageEnableImageCropperSubtitle": "從相簿或相機選擇圖片後，允許裁剪圖片",

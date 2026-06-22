@@ -4247,6 +4247,12 @@ abstract class AppLocalizations {
   /// **'Render assistant messages with Markdown'**
   String get displaySettingsPageEnableAssistantMarkdownTitle;
 
+  /// No description provided for @displaySettingsPageEnableExperimentalMarkdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Experimental Markdown Renderer'**
+  String get displaySettingsPageEnableExperimentalMarkdownTitle;
+
   /// No description provided for @displaySettingsPageMobileCodeBlockWrapTitle.
   ///
   /// In en, this message translates to:
