@@ -35,6 +35,47 @@ Future<String> _saveResponsesImageGenerationMarkdown(
   return '\n![image]($savedPath)\n';
 }
 
+Future<String?> _downloadAndSaveRemoteImage(
+  http.Client client,
+  String url,
+) async {
+  try {
+    final uri = Uri.tryParse(url);
+    if (uri == null ||
+        (uri.scheme != 'http' && uri.scheme != 'https') ||
+        uri.host.isEmpty) {
+      return null;
+    }
+    final response = await client.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) return null;
+    
+    // Detect MIME type from response headers or URL extension
+    String mime = 'image/png';
+    final contentType = response.headers['content-type'];
+    if (contentType != null) {
+      if (contentType.contains('jpeg') || contentType.contains('jpg')) {
+        mime = 'image/jpeg';
+      } else if (contentType.contains('webp')) {
+        mime = 'image/webp';
+      } else if (contentType.contains('png')) {
+        mime = 'image/png';
+      }
+    } else if (url.toLowerCase().endsWith('.jpg') ||
+        url.toLowerCase().endsWith('.jpeg')) {
+      mime = 'image/jpeg';
+    } else if (url.toLowerCase().endsWith('.webp')) {
+      mime = 'image/webp';
+    }
+    
+    return AppDirectories.saveBase64Image(
+      mime,
+      base64Encode(response.bodyBytes),
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
 void _applyCompatibleBuiltInSearch(
   Map<String, dynamic> body, {
   required ProviderConfig config,
@@ -1652,7 +1693,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   if (u2 is String) url = u2;
                 }
                 if (url != null && url.isNotEmpty) {
-                  buf.write('\n\n![image]($url)');
+                  final localPath = await _downloadAndSaveRemoteImage(client, url);
+                  buf.write('\n\n![image](${localPath ?? url})');
                 }
               }
             }
@@ -2062,7 +2104,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                             if (u2 is String) url = u2;
                           }
                           if (url != null && url.isNotEmpty) {
-                            final md = '\n\n![image]($url)';
+                            final localPath = await _downloadAndSaveRemoteImage(client, url);
+                            final md = '\n\n![image](${localPath ?? url})';
                             buf.write(md);
                             contentAccum += md;
                           }
@@ -2951,7 +2994,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       if (u2 is String) url = u2;
                     }
                     if (url != null && url.isNotEmpty) {
-                      buf.write('\n\n![image]($url)');
+                      final localPath = await _downloadAndSaveRemoteImage(client, url);
+                      buf.write('\n\n![image](${localPath ?? url})');
                     }
                   }
                   if (buf.isNotEmpty) content = content + buf.toString();
@@ -3045,7 +3089,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       if (u2 is String) url = u2;
                     }
                     if (url != null && url.isNotEmpty) {
-                      buf.write('\n\n![image]($url)');
+                      final localPath = await _downloadAndSaveRemoteImage(client, url);
+                      buf.write('\n\n![image](${localPath ?? url})');
                     }
                   }
                   if (buf.isNotEmpty) content = content + buf.toString();
@@ -3413,7 +3458,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                             if (u2 is String) url = u2;
                           }
                           if (url != null && url.isNotEmpty) {
-                            final md = '\n\n![image]($url)';
+                            final localPath = await _downloadAndSaveRemoteImage(client, url);
+                            final md = '\n\n![image](${localPath ?? url})';
                             buf.write(md);
                             contentAccum += md;
                           }
@@ -3901,7 +3947,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                                 if (u2 is String) url = u2;
                               }
                               if (url != null && url.isNotEmpty) {
-                                final md = '\n\n![image]($url)';
+                                final localPath = await _downloadAndSaveRemoteImage(client, url);
+                                final md = '\n\n![image](${localPath ?? url})';
                                 buf.write(md);
                                 contentAccum += md;
                               }

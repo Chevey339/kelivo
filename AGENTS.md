@@ -303,6 +303,20 @@ flutter test
   - Do not write "heard this might happen" hearsay entries.
   - When adding entries, prefer "symptom -> root cause -> fix/constraint". Avoid recording conclusions without context.
 
+## 9. Progress Log (progress.md)
+
+> 施工流水账纪律。来源：温控仓库 `AGENTS.md` 中验证有效的留痕规范，搬入此处以支持多批次、跨会话续接。
+
+- 进度日志统一使用根目录 `progress.md`，仅在末尾追加，不改写历史记录。
+- 仅在以下情况追加：实际修改仓库文件（创建、编辑、删除、移动、重命名）、生成正式交付文档、或用户明确要求记录。
+- 纯问答、只读检查、配置解释、方案讨论不视为代码改动任务，不强制追加。
+- 每个需记录的任务追加一轮，固定格式：
+  - `## YYYY-MM-DD - Task: <description>`
+  - `### What was done`：本轮完成了什么，按业务动作或结果概括。
+  - `### Testing`：验证证据；若本机缺 Flutter/Dart SDK 无法实跑，必须如实写明“未跑什么、为什么、风险在哪”，不得把“未验证”说成“已可用”。
+  - `### Notes`：必须列出改动文件清单（每个文件一句说明），并给出可执行的回滚方式或回滚点。
+- 此节只补充施工留痕；功能验证标准仍以本文件第 3、4、5 节为准。
+
 ## Appendix: Skills Usage Rules
 
 - Before starting a task, scan available skill documents in `/.agents/skills/`.

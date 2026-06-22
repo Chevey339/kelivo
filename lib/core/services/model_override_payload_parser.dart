@@ -17,8 +17,19 @@ class ModelOverridePayloadParser {
   }
 
   static Map<String, String> customHeaders(Map<String, dynamic> ov) {
-    final list = (ov['headers'] as List?) ?? const <dynamic>[];
     final out = <String, String>{};
+    final raw = ov['headers'];
+    if (raw is Map) {
+      for (final entry in raw.entries) {
+        final name = entry.key.toString().trim();
+        if (name.isNotEmpty && entry.value != null) {
+          out[name] = entry.value.toString();
+        }
+      }
+      return out;
+    }
+
+    final list = (raw as List?) ?? const <dynamic>[];
     for (final e in list) {
       if (e is Map) {
         final name = (e['name'] ?? e['key'] ?? '').toString().trim();

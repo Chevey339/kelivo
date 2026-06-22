@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
 import '../../../theme/design_tokens.dart';
 import '../../../icons/lucide_adapter.dart';
+import 'image_generation_options.dart';
 import '../../../icons/reasoning_icons.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +16,7 @@ import 'package:path/path.dart' as p;
 import '../../../shared/responsive/breakpoints.dart';
 import 'dart:async';
 import 'dart:io';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -21,6 +24,7 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/model_override_payload_parser.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
@@ -181,8 +185,80 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  String? _lastImageDefaultsSignature;
+  bool _restoredUnsupportedImagesApiRouting = false;
+  final _imageGenController = ImageGenerationOptionsController();
 
   bool get _composerLocked => widget.hasQueuedInput;
+
+  Map<String, dynamic> _filterImageOptionBody(Map<String, dynamic> body) {
+    const allowedKeys = <String>{
+      'quality',
+      'size',
+      'output_format',
+      'output_compression',
+      'n',
+    };
+    return <String, dynamic>{
+      for (final entry in body.entries)
+        if (allowedKeys.contains(entry.key) && entry.value != null)
+          entry.key: entry.value,
+    };
+  }
+
+  Map<String, dynamic> _assistantImageOptionDefaults(Assistant? assistant) {
+    if (assistant == null || assistant.customBody.isEmpty) {
+      return const <String, dynamic>{};
+    }
+    final body = <String, dynamic>{
+      for (final entry in assistant.customBody)
+        if ((entry['key'] ?? '').trim().isNotEmpty)
+          (entry['key']!.trim()): ModelOverridePayloadParser.parseOverrideValue(
+            (entry['value'] ?? '').trim(),
+          ),
+    };
+    return _filterImageOptionBody(body);
+  }
+
+  Map<String, dynamic> _effectiveImageOptionDefaults(
+    ProviderConfig? cfg,
+    String modelId,
+    Assistant? assistant,
+  ) {
+    if (cfg == null) return const <String, dynamic>{};
+    final ov = ModelOverridePayloadParser.modelOverride(cfg.modelOverrides, modelId);
+    final rawApiModelId =
+        (ov['apiModelId'] ?? ov['api_model_id'])?.toString().trim();
+    final upstreamModelId =
+        rawApiModelId == null || rawApiModelId.isEmpty
+            ? modelId
+            : rawApiModelId;
+
+    final body = <String, dynamic>{};
+    final normalized = upstreamModelId.toLowerCase();
+    if (normalized.startsWith('gpt-image-') ||
+        normalized.startsWith('chatgpt-image-')) {
+      body['quality'] = 'high';
+      body['output_format'] = 'png';
+    }
+    body.addAll(_filterImageOptionBody(ModelOverridePayloadParser.customBody(ov)));
+    body.addAll(_assistantImageOptionDefaults(assistant));
+    return body;
+  }
+
+  void _syncImageGenerationDefaults(
+    ProviderConfig? cfg,
+    String modelId,
+    Assistant? assistant,
+  ) {
+    final defaults = _effectiveImageOptionDefaults(cfg, modelId, assistant);
+    final signature = jsonEncode(defaults);
+    if (signature == _lastImageDefaultsSignature) return;
+    _lastImageDefaultsSignature = signature;
+    _imageGenController.applyDefaultsFromBody(defaults);
+
+  }
+
 
   Color _inputFillColor({
     required ThemeData theme,
@@ -234,6 +310,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       _lastImageModeModelKey = nextKey;
     }
     _imageModeModelKey = nextKey;
+    if (supported) {
+      _restoredUnsupportedImagesApiRouting = false;
+      _syncImageGenerationDefaults(cfg, modelId, a);
+    }
     return supported;
   }
 
@@ -243,14 +323,30 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   bool get _allowImagesApiRouting {
+    if (_restoredUnsupportedImagesApiRouting) return false;
     final key = _imageModeModelKey;
     return key == null || key != _dismissedImageModeModelKey;
   }
 
-  bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
+  bool get _imageParamsCustomized => _imageGenController.customized;
+
+  String get _imageParamsSummary =>
+      _imageGenController.summary(AppLocalizations.of(context)!);
+
+  Map<String, dynamic> _imageGenerationExtraBody() {
+    if (!_imageModeActive ||
+        !_allowImagesApiRouting ||
+        !_imageParamsCustomized) {
+      return const <String, dynamic>{};
+    }
+    return _imageGenController.toExtraBody();
+  }
+
+bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
 
   // Instance method for onChanged to avoid recreating the callback on every build
   void _onTextChanged(String _) => setState(() {});
+
 
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
@@ -278,6 +374,22 @@ class _ChatInputBarState extends State<ChatInputBar>
       _docs
         ..clear()
         ..addAll(input.documents);
+      if (input.allowImagesApiRouting) {
+        if (_imageModeModelKey == null) {
+          _restoredUnsupportedImagesApiRouting = true;
+        } else {
+          _restoredUnsupportedImagesApiRouting = false;
+          if (_dismissedImageModeModelKey == _imageModeModelKey) {
+            _dismissedImageModeModelKey = null;
+          }
+        }
+      } else {
+        _restoredUnsupportedImagesApiRouting = false;
+        if (_imageModeModelKey != null) {
+          _dismissedImageModeModelKey = _imageModeModelKey;
+        }
+      }
+      _imageGenController.restoreFromBody(input.extraBody);
     });
   }
 
@@ -385,6 +497,7 @@ class _ChatInputBarState extends State<ChatInputBar>
               imagePaths: List.of(_images),
               documents: List.of(_docs),
               allowImagesApiRouting: _allowImagesApiRouting,
+              extraBody: _imageGenerationExtraBody(),
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
@@ -405,6 +518,25 @@ class _ChatInputBarState extends State<ChatInputBar>
     } finally {
       _isSubmitting = false;
     }
+  }
+
+  Future<void> _showImageGenerationOptions() async {
+    if (_composerLocked) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setSheetState) => ImageGenerationOptionsSheet(
+          controller: _imageGenController,
+          onChanged: () {
+            setState(() {});
+            setSheetState(() {});
+          },
+        ),
+      ),
+    );
   }
 
   void _insertNewlineAtCursor() {
@@ -1075,6 +1207,25 @@ class _ChatInputBarState extends State<ChatInputBar>
             }(),
           ),
         );
+
+        if (_imageModeActive) {
+          actions.add(
+            _OverflowAction(
+              width: normalButtonW,
+              builder: () => _CompactIconButton(
+                tooltip: l10n.imageGenPaletteTooltip(_imageParamsSummary),
+                icon: Lucide.Palette,
+                active: _imageParamsCustomized,
+                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
+              ),
+              menu: DesktopContextMenuItem(
+                icon: Lucide.Palette,
+                label: l10n.imageGenPaletteTooltip(_imageParamsSummary),
+                onTap: lockTap(() => unawaited(_showImageGenerationOptions())),
+              ),
+            ),
+          );
+        }
 
         if (widget.supportsReasoning) {
           actions.add(

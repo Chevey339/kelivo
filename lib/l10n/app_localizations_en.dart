@@ -5534,6 +5534,51 @@ class AppLocalizationsEn extends AppLocalizations {
       'This is long debug text for reproducing slow rendering in oversized conversations. It includes repeated Markdown-like text, punctuation, CJK content, and plain words so chat rendering, storage, and scrolling can be profiled.';
 
   @override
+
+  @override
+  String get imageGenTitle => 'Image Generation Options';
+  @override
+  String get imageGenReset => 'Reset';
+  @override
+  String get imageGenQualityLabel => 'Quality';
+  @override
+  String get imageGenSizeLabel => 'Resolution';
+  @override
+  String get imageGenAspectRatioLabel => 'Aspect Ratio';
+  @override
+  String get imageGenFormatLabel => 'Output Format';
+  @override
+  String get imageGenCompressionLabel => 'Compression';
+  @override
+  String get imageGenCountLabel => 'Count';
+  @override
+  String get imageGenAuto => 'Auto';
+  @override
+  String get imageGenLow => 'Low';
+  @override
+  String get imageGenMedium => 'Medium';
+  @override
+  String get imageGenHigh => 'High';
+  @override
+  String get imageGenAutoSize => 'Auto size';
+  @override
+  String get imageGenAutoRatio => 'Auto ratio';
+  @override
+  String get imageGenCustomRatio => 'Custom';
+  @override
+  String get imageGenCustomRatioLabel => 'Custom ratio';
+  @override
+  String get imageGenCustomRatioHint => 'e.g. 7:5, 2.39:1';
+  @override
+  String get imageGenActualSize => 'Actual size';
+  @override
+  String get imageGenCurrent => 'Current';
+  @override
+  String get imageGenPNG => 'PNG';
+  @override
+  String get imageGenLossless => '(lossless)';
+  @override
+  String imageGenPaletteTooltip(String summary) => 'Generation params: $summary';
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }

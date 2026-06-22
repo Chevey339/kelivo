@@ -229,6 +229,29 @@ class ChatActions {
     return messageGenerationService.isReasoningEnabled(budget);
   }
 
+  ({bool allowImagesApiRouting, Map<String, dynamic>? requestExtraBody})
+  _resolveRequestOptionsFromMessages(
+    List<ChatMessage> messages, {
+    required bool fallbackAllowImagesApiRouting,
+  }) {
+    for (int i = messages.length - 1; i >= 0; i--) {
+      final message = messages[i];
+      if (message.role != 'user') continue;
+      final requestExtraBody = message.requestExtraBody;
+      return (
+        allowImagesApiRouting:
+            message.requestAllowImagesApiRouting ??
+            fallbackAllowImagesApiRouting,
+        requestExtraBody:
+            requestExtraBody.isEmpty ? null : requestExtraBody,
+      );
+    }
+    return (
+      allowImagesApiRouting: fallbackAllowImagesApiRouting,
+      requestExtraBody: null,
+    );
+  }
+
   Conversation _conversationForMessageContext(
     Conversation conversation,
     List<ChatMessage> messages, {
@@ -583,6 +606,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: true,
+        requestExtraBody: input.extraBody,
       );
 
       await _executeGeneration(ctx);
@@ -764,13 +788,17 @@ class ChatActions {
       providerKey: providerKey,
       modelId: modelId,
     );
+    final requestOptions = _resolveRequestOptionsFromMessages(
+      regenerationMessages,
+      fallbackAllowImagesApiRouting: allowImagesApiRouting,
+    );
 
     // Execute generation
     final ctx = messageGenerationService.buildGenerationContext(
       assistantMessage: assistantMessage,
       prepared: prepared,
       userImagePaths: userImagePaths,
-      allowImagesApiRouting: allowImagesApiRouting,
+      allowImagesApiRouting: requestOptions.allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
       assistant: assistant,
@@ -778,6 +806,7 @@ class ChatActions {
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
       generateTitleOnFinish: false,
+      requestExtraBody: requestOptions.requestExtraBody,
     );
 
     await _executeGeneration(ctx);
@@ -870,12 +899,16 @@ class ChatActions {
         providerKey: providerKey,
         modelId: modelId,
       );
+      final requestOptions = _resolveRequestOptionsFromMessages(
+        apiContextMessages,
+        fallbackAllowImagesApiRouting: allowImagesApiRouting,
+      );
 
       final ctx = messageGenerationService.buildGenerationContext(
         assistantMessage: streamingMessage,
         prepared: prepared,
         userImagePaths: userImagePaths,
-        allowImagesApiRouting: allowImagesApiRouting,
+        allowImagesApiRouting: requestOptions.allowImagesApiRouting,
         providerKey: providerKey,
         modelId: modelId,
         assistant: assistant,
@@ -883,6 +916,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        requestExtraBody: requestOptions.requestExtraBody,
       );
 
       await _executeGeneration(ctx);
@@ -1453,22 +1487,9 @@ class ChatActions {
     final finalCompletionTokens = state.usage?.completionTokens;
     final finalCachedTokens = state.usage?.cachedTokens;
 
-    // Flush final content to the streaming notifier before async operations.
-    // This ensures any intermediate rebuild (e.g., from isProcessingFiles change
-    // or onDone firing concurrently) still shows the correct content via the
-    // notifier-based streaming path.
-    streamController.streamingContentNotifier.updateContent(
-      messageId,
-      processedContent,
-      state.totalTokens,
-      contentSplitOffsets: state.contentSplitOffsets,
-      reasoningCountAtSplit: state.reasoningCountAtSplit,
-      toolCountAtSplit: state.toolCountAtSplit,
-      promptTokens: finalPromptTokens,
-      completionTokens: finalCompletionTokens,
-      cachedTokens: finalCachedTokens,
-      durationMs: finalDurationMs,
-    );
+    // Remove notifier before final persistence so the streaming widget does not
+    // rebuild with isStreaming:true + large final content on mobile.
+    streamController.removeStreamingNotifier(messageId);
 
     final sanitizedContent =
         await MarkdownMediaSanitizer.replaceInlineBase64Images(
@@ -1500,9 +1521,6 @@ class ChatActions {
       _messages[index] = finalizedMessage;
       onMessagesChanged?.call();
     }
-
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
 
     _setConversationLoading(conversationId, false);
     onAssistantMessageFinished?.call(finalizedMessage);

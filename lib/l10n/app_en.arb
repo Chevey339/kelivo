@@ -2378,5 +2378,34 @@
         "type": "int"
       }
     }
+  },
+  "imageGenTitle": "Image Generation Options",
+  "imageGenReset": "Reset",
+  "imageGenQualityLabel": "Quality",
+  "imageGenSizeLabel": "Resolution",
+  "imageGenAspectRatioLabel": "Aspect Ratio",
+  "imageGenFormatLabel": "Output Format",
+  "imageGenCompressionLabel": "Compression",
+  "imageGenCountLabel": "Count",
+  "imageGenAuto": "Auto",
+  "imageGenLow": "Low",
+  "imageGenMedium": "Medium",
+  "imageGenHigh": "High",
+  "imageGenAutoSize": "Auto size",
+  "imageGenAutoRatio": "Auto ratio",
+  "imageGenCustomRatio": "Custom",
+  "imageGenCustomRatioLabel": "Custom ratio",
+  "imageGenCustomRatioHint": "e.g. 7:5, 2.39:1",
+  "imageGenActualSize": "Actual size",
+  "imageGenCurrent": "Current",
+  "imageGenPNG": "PNG",
+  "imageGenLossless": "(lossless)",
+  "imageGenPaletteTooltip": "Generation params: {summary}",
+  "@imageGenPaletteTooltip": {
+    "placeholders": {
+      "summary": {
+        "type": "String"
+      }
+    }
   }
 }
