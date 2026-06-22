@@ -74,6 +74,7 @@
   "settingsPageAboutSection": "關於",
   "settingsPageAbout": "關於",
   "settingsPageStatistics": "統計",
+  "settingsPageFaq": "常見疑問",
   "settingsPageDocs": "使用文件",
   "settingsPageLogs": "日誌",
   "settingsPageSponsor": "贊助",
@@ -1955,5 +1956,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "faqPageTitle": "常見疑問",
+  "faqPagePlaceholder": "常見疑問內容即將上線。"
 }

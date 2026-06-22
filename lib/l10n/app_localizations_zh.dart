@@ -256,6 +256,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsPageStatistics => '统计';
 
   @override
+  String get settingsPageFaq => '常见疑问';
+
+  @override
   String get settingsPageDocs => '使用文档';
 
   @override
@@ -5320,6 +5323,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get faqPageTitle => '常见疑问';
+
+  @override
+  String get faqPagePlaceholder => '常见疑问内容即将上线。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5572,6 +5581,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageStatistics => '统计';
+
+  @override
+  String get settingsPageFaq => '常见疑问';
 
   @override
   String get settingsPageDocs => '使用文档';
@@ -10638,6 +10650,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get faqPageTitle => '常见疑问';
+
+  @override
+  String get faqPagePlaceholder => '常见疑问内容即将上线。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10890,6 +10908,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageStatistics => '統計';
+
+  @override
+  String get settingsPageFaq => '常見疑問';
 
   @override
   String get settingsPageDocs => '使用文件';
@@ -15956,4 +15977,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get faqPageTitle => '常見疑問';
+
+  @override
+  String get faqPagePlaceholder => '常見疑問內容即將上線。';
 }

@@ -74,6 +74,7 @@
   "settingsPageAboutSection": "关于",
   "settingsPageAbout": "关于",
   "settingsPageStatistics": "统计",
+  "settingsPageFaq": "常见疑问",
   "settingsPageDocs": "使用文档",
   "settingsPageLogs": "日志",
   "settingsPageSponsor": "赞助",
@@ -1955,5 +1956,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "faqPageTitle": "常见疑问",
+  "faqPagePlaceholder": "常见疑问内容即将上线。"
 }

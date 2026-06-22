@@ -260,6 +260,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPageStatistics => 'Statistics';
 
   @override
+  String get settingsPageFaq => 'FAQ';
+
+  @override
   String get settingsPageDocs => 'Docs';
 
   @override
@@ -5537,4 +5540,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get faqPageTitle => 'FAQ';
+
+  @override
+  String get faqPagePlaceholder => 'FAQ content coming soon.';
 }

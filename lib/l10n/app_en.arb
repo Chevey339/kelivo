@@ -154,6 +154,7 @@
   "settingsPageAboutSection": "About",
   "settingsPageAbout": "About",
   "settingsPageStatistics": "Statistics",
+  "settingsPageFaq": "FAQ",
   "settingsPageDocs": "Docs",
   "settingsPageLogs": "Logs",
   "settingsPageSponsor": "Sponsor",
@@ -2378,5 +2379,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "faqPageTitle": "FAQ",
+  "faqPagePlaceholder": "FAQ content coming soon."
 }

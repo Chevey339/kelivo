@@ -550,6 +550,12 @@ abstract class AppLocalizations {
   /// **'Statistics'**
   String get settingsPageStatistics;
 
+  /// No description provided for @settingsPageFaq.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQ'**
+  String get settingsPageFaq;
+
   /// No description provided for @settingsPageDocs.
   ///
   /// In en, this message translates to:
@@ -10189,6 +10195,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @faqPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQ'**
+  String get faqPageTitle;
+
+  /// No description provided for @faqPagePlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'FAQ content coming soon.'**
+  String get faqPagePlaceholder;
 }
 
 class _AppLocalizationsDelegate
