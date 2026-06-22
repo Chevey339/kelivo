@@ -131,14 +131,20 @@ class DataSync {
     }
   }
 
-  Future<File> prepareBackupFile(WebDavConfig cfg) async {
+  Future<File> prepareBackupFile(
+    WebDavConfig cfg, {
+    DateTime? since,
+    bool includeSettings = true,
+  }) async {
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
     final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
+    final incrSuffix = since != null ? '_incr' : '';
+    final dirName = 'kelivo_backup_$timestamp$incrSuffix';
+    final workDir = Directory(p.join(tmp.path, dirName));
     await workDir.create(recursive: true);
 
-    final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
+    final outPath = p.join(workDir.path, '$dirName.zip');
     final outFile = File(outPath);
     if (await outFile.exists()) await outFile.delete();
 
@@ -147,16 +153,18 @@ class DataSync {
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json
-      final settingsJson = await _exportSettingsJson();
-      settingsTmp = await _writeTempText(
-        workDir,
-        '_bk_settings.json',
-        settingsJson,
-      );
+      if (includeSettings) {
+        final settingsJson = await _exportSettingsJson();
+        settingsTmp = await _writeTempText(
+          workDir,
+          '_bk_settings.json',
+          settingsJson,
+        );
+      }
 
       // chats.json — stream to file to avoid huge string in memory
       if (cfg.includeChats) {
-        chatsTmp = await _exportChatsToFile(workDir);
+        chatsTmp = await _exportChatsToFile(workDir, since: since);
       }
 
       // Resolve directory paths (need AppDirectories on main isolate)
@@ -164,9 +172,9 @@ class DataSync {
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
       final fontsDirPath = (await _getFontsDir()).path;
-      final settingsPath = settingsTmp.path;
+      final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
-      final includeFiles = cfg.includeFiles;
+      final includeFiles = since != null ? false : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       await Isolate.run(() {
@@ -231,7 +239,7 @@ class DataSync {
         if (ent is Directory && name.startsWith('kelivo_backup_')) {
           await _deleteDirectoryQuietly(ent);
         } else if (ent is File &&
-            ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
+            (name.startsWith('kelivo_backup_') && name.endsWith('.zip') ||
                 name == '_bk_settings.json' ||
                 name == '_bk_chats.json')) {
           await _deleteFileQuietly(ent);
@@ -243,7 +251,7 @@ class DataSync {
   /// Synchronous ZIP packing — runs inside an Isolate.
   static void _packZipSync({
     required String outPath,
-    required String settingsPath,
+    String? settingsPath,
     String? chatsPath,
     required bool includeFiles,
     required String uploadDirPath,
@@ -254,7 +262,9 @@ class DataSync {
     final writer = _StreamingZipWriter(outPath);
     try {
       // settings.json
-      _addFileToZip(writer, settingsPath, 'settings.json');
+      if (settingsPath != null) {
+        _addFileToZip(writer, settingsPath, 'settings.json');
+      }
 
       // chats.json
       if (chatsPath != null) {
@@ -370,8 +380,16 @@ class DataSync {
     }
   }
 
-  Future<void> backupToWebDav(WebDavConfig cfg) async {
-    final file = await prepareBackupFile(cfg);
+  Future<void> backupToWebDav(
+    WebDavConfig cfg, {
+    DateTime? since,
+    bool includeSettings = true,
+  }) async {
+    final file = await prepareBackupFile(
+      cfg,
+      since: since,
+      includeSettings: includeSettings,
+    );
     try {
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
@@ -463,10 +481,10 @@ class DataSync {
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
-      // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip)
+      // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip or _incr variant)
       if (mtime == null) {
         final match = RegExp(
-          r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.zip',
+          r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)(?:_incr)?\.zip',
         ).firstMatch(name);
         if (match != null) {
           try {
@@ -542,7 +560,11 @@ class DataSync {
     }
   }
 
-  Future<File> exportToFile(WebDavConfig cfg) => prepareBackupFile(cfg);
+  Future<File> exportToFile(
+    WebDavConfig cfg, {
+    DateTime? since,
+    bool includeSettings = true,
+  }) => prepareBackupFile(cfg, since: since, includeSettings: includeSettings);
 
   Future<void> restoreFromLocalFile(
     File file,
@@ -602,11 +624,23 @@ class DataSync {
 
   /// Stream chat data to a temporary JSON file instead of building a huge
   /// in-memory String.  Uses IOSink for low memory overhead.
-  Future<File> _exportChatsToFile(Directory directory) async {
+  Future<File> _exportChatsToFile(
+    Directory directory, {
+    DateTime? since,
+  }) async {
     if (!chatService.initialized) {
       await chatService.init();
     }
-    final conversations = chatService.getAllConversations();
+    var conversations = chatService.getAllConversations();
+    if (since != null) {
+      conversations = conversations
+          .where(
+            (c) =>
+                c.createdAt.isAfter(since) ||
+                c.createdAt.isAtSameMomentAs(since),
+          )
+          .toList();
+    }
     final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
 
@@ -669,6 +703,11 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
+    // Incremental backup detection: _incr suffix forces merge mode
+    final fileName = p.basenameWithoutExtension(file.path);
+    if (fileName.endsWith('_incr') && mode == RestoreMode.overwrite) {
+      mode = RestoreMode.merge;
+    }
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).
