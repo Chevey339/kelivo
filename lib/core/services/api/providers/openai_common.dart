@@ -885,6 +885,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 }) async* {
   final upstreamModelId = _apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
+  // id → args cache: tool_use stores args here; tool_result retrieves & removes them
+  final _ccBridgeToolArgs = <String, Map<String, dynamic>>{};
 
   final effectiveInfo = _effectiveModelInfo(config, modelId);
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
@@ -3117,6 +3119,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             } catch (_) {
               ccArgs = const <String, dynamic>{};
             }
+            // cache args so tool_result can reuse them
+            _ccBridgeToolArgs[ccId] = ccArgs;
             yield ChatStreamChunk(
               content: '',
               isDone: false,
@@ -3128,12 +3132,16 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           } else if (ccType == 'tool_result') {
             final ccId = (ccBridgeEvent['id'] ?? '').toString();
             final ccName = (ccBridgeEvent['name'] ?? '').toString();
+            // prefer full content over preview (Codex P2 fix)
             final ccContent =
-                (ccBridgeEvent['content_preview'] ??
-                        ccBridgeEvent['content'] ??
+                (ccBridgeEvent['content'] ??
+                        ccBridgeEvent['content_preview'] ??
                         '')
                     .toString();
             final ccIsError = ccBridgeEvent['is_error'] == true;
+            // reuse args from matching tool_use so upsertToolEvent doesn't wipe them (Codex P2 fix)
+            final ccArgs =
+                _ccBridgeToolArgs.remove(ccId) ?? const <String, dynamic>{};
             yield ChatStreamChunk(
               content: '',
               isDone: false,
@@ -3142,7 +3150,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 ToolResultInfo(
                   id: ccId,
                   name: ccName,
-                  arguments: const <String, dynamic>{},
+                  arguments: ccArgs,
                   content: ccContent,
                   metadata: ccIsError
                       ? const <String, dynamic>{'is_error': true}
