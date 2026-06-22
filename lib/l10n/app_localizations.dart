@@ -2231,6 +2231,24 @@ abstract class AppLocalizations {
   /// **'Detect'**
   String get multiKeyPageDetect;
 
+  /// No description provided for @multiKeyPageQueryBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Query Balances'**
+  String get multiKeyPageQueryBalance;
+
+  /// No description provided for @multiKeyPageBalanceDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable balance query in Balance settings first'**
+  String get multiKeyPageBalanceDisabled;
+
+  /// No description provided for @multiKeyPageBalanceQueriedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Queried balance for {n} keys'**
+  String multiKeyPageBalanceQueriedSnackbar(int n);
+
   /// No description provided for @multiKeyPageAdd.
   ///
   /// In en, this message translates to:

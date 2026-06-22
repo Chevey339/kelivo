@@ -1612,6 +1612,16 @@
   "providerDetailPageManageKeysButton": "多Key管理",
   "multiKeyPageTitle": "多Key管理",
   "multiKeyPageDetect": "檢測",
+  "multiKeyPageQueryBalance": "查詢餘額",
+  "multiKeyPageBalanceDisabled": "請先在餘額設定中開啟餘額查詢",
+  "multiKeyPageBalanceQueriedSnackbar": "已查詢 {n} 個 key 的餘額",
+  "@multiKeyPageBalanceQueriedSnackbar": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
   "multiKeyPageAdd": "新增",
   "multiKeyPageAddHint": "請輸入 API Key（多個以逗號或空格分隔）",
   "multiKeyPageImportedSnackbar": "已匯入 {n} 個 key",
