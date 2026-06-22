@@ -2300,7 +2300,7 @@
   "providerDetailPageDetectSuccess": "Обнаружение успешно",
   "worldBookInjectionPositionBottomOfChat": "Внизу чата",
   "debugPageTitle": "Отлаживать",
-  "askUserCardQuestionCount": "{count, множественное число, =1{Задать 1 вопрос}other{Задать {count} вопросов}}",
+  "askUserCardQuestionCount": "{count, plural, =1{Задать 1 вопрос}other{Задать {count} вопросов}}",
   "debugPageCreatingButton": "Создание...",
   "@debugPageConversationCreated": {
     "placeholders": {
