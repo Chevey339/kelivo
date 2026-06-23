@@ -1989,6 +1989,10 @@
   "connectionGateTitle": "连接中…",
   "connectionGateConnecting": "正在连接到 {url}",
   "connectionGateFailed": "连接失败",
+  "connectionGateFailedTimeout": "连接超时，请检查服务器是否可达",
+  "connectionGateFailedNetwork": "无法连接到服务器，请检查网络连接后重试",
+  "connectionGateFailedAuth": "认证失败，请检查 Token 是否正确",
+  "connectionGateFailedServer": "服务器错误，请稍后重试",
   "connectionGateNoBackend": "未配置后端",
   "connectionGateNoBackendHint": "添加 Hermes 后端以开始聊天",
   "connectionGateRetry": "重试",
@@ -2095,7 +2099,6 @@
   "hermesTerminalThemeSystem": "跟随系统",
   "hermesTerminalThemeDark": "深色",
   "hermesTerminalThemeLight": "浅色",
-
   "hermesBillingTitle": "积分与账单",
   "hermesBillingCredits": "积分",
   "hermesBillingCreditsRemaining": "剩余积分",
@@ -2111,11 +2114,15 @@
   "hermesBillingChargeFailed": "购买失败",
   "hermesBillingClose": "关闭",
   "hermesBillingEmpty": "暂无可用套餐",
-
   "hermesSessionExport": "导出",
   "hermesSessionExportMarkdown": "导出为 Markdown",
   "hermesSessionExportText": "导出为文本",
   "hermesSessionExporting": "导出中…",
   "hermesSessionExportSuccess": "会话已导出",
-  "hermesSessionExportFailed": "导出失败"
+  "hermesSessionExportFailed": "导出失败",
+  "lanDiscoveryStartScan": "开始扫描",
+  "lanDiscoveryScanning": "正在扫描网络…",
+  "lanDiscoveryStop": "停止",
+  "lanDiscoveryRescan": "重新扫描",
+  "lanDiscoveryBack": "返回"
 }

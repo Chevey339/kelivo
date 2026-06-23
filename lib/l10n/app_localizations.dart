@@ -10388,6 +10388,30 @@ abstract class AppLocalizations {
   /// **'Connection Failed'**
   String get connectionGateFailed;
 
+  /// No description provided for @connectionGateFailedTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection timed out. Please check if the server is reachable.'**
+  String get connectionGateFailedTimeout;
+
+  /// No description provided for @connectionGateFailedNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to reach the server. Please check your network connection.'**
+  String get connectionGateFailedNetwork;
+
+  /// No description provided for @connectionGateFailedAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Authentication failed. Please check your token.'**
+  String get connectionGateFailedAuth;
+
+  /// No description provided for @connectionGateFailedServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server error. Please try again later.'**
+  String get connectionGateFailedServer;
+
   /// No description provided for @connectionGateNoBackend.
   ///
   /// In en, this message translates to:
@@ -10981,6 +11005,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Export failed'**
   String get hermesSessionExportFailed;
+
+  /// No description provided for @lanDiscoveryStartScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Scan'**
+  String get lanDiscoveryStartScan;
+
+  /// No description provided for @lanDiscoveryScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning network…'**
+  String get lanDiscoveryScanning;
+
+  /// No description provided for @lanDiscoveryStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get lanDiscoveryStop;
+
+  /// No description provided for @lanDiscoveryRescan.
+  ///
+  /// In en, this message translates to:
+  /// **'Rescan'**
+  String get lanDiscoveryRescan;
+
+  /// No description provided for @lanDiscoveryBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get lanDiscoveryBack;
 }
 
 class _AppLocalizationsDelegate

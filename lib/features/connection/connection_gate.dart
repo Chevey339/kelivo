@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
-import '../../core/providers/hermes_gateway_provider.dart';
+import '../../../core/providers/hermes_gateway_provider.dart';
 import '../../hermes/hermes_config.dart';
 import '../../hermes/hermes_gateway.dart';
 import '../../shared/widgets/ios_tactile.dart';
@@ -29,7 +29,6 @@ class ConnectionGate extends StatelessWidget {
       builder: (context, provider, _) {
         final state = provider.state;
         final backend = provider.currentBackend;
-        final error = provider.lastError;
 
         // Connected — show the real app
         if (state == HermesConnectionState.ready) {
@@ -56,12 +55,7 @@ class ConnectionGate extends StatelessWidget {
         }
 
         // Error — show error with retry
-        return _ErrorGate(
-          l10n: l10n,
-          backend: backend,
-          error: error,
-          provider: provider,
-        );
+        return _ErrorGate(l10n: l10n, backend: backend, provider: provider);
       },
     );
   }
@@ -186,15 +180,28 @@ class _ConnectingGate extends StatelessWidget {
 class _ErrorGate extends StatelessWidget {
   final AppLocalizations l10n;
   final HermesBackendBox? backend;
-  final String? error;
   final HermesGatewayProvider provider;
 
   const _ErrorGate({
     required this.l10n,
     required this.backend,
-    required this.error,
     required this.provider,
   });
+
+  String? get _friendlyMessage {
+    switch (provider.lastErrorKind) {
+      case HermesConnectionErrorKind.timeout:
+        return l10n.connectionGateFailedTimeout;
+      case HermesConnectionErrorKind.network:
+        return l10n.connectionGateFailedNetwork;
+      case HermesConnectionErrorKind.auth:
+        return l10n.connectionGateFailedAuth;
+      case HermesConnectionErrorKind.server:
+        return l10n.connectionGateFailedServer;
+      case HermesConnectionErrorKind.unknown:
+        return null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -216,10 +223,10 @@ class _ErrorGate extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
-              if (error != null) ...[
+              if (_friendlyMessage != null) ...[
                 const SizedBox(height: 12),
                 Text(
-                  error!,
+                  _friendlyMessage!,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.error,
                   ),

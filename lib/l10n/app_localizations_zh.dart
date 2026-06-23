@@ -5423,6 +5423,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionGateFailed => '连接失败';
 
   @override
+  String get connectionGateFailedTimeout => '连接超时，请检查服务器是否可达';
+
+  @override
+  String get connectionGateFailedNetwork => '无法连接到服务器，请检查网络连接后重试';
+
+  @override
+  String get connectionGateFailedAuth => '认证失败，请检查 Token 是否正确';
+
+  @override
+  String get connectionGateFailedServer => '服务器错误，请稍后重试';
+
+  @override
   String get connectionGateNoBackend => '未配置后端';
 
   @override
@@ -5728,6 +5740,21 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hermesSessionExportFailed => '导出失败';
+
+  @override
+  String get lanDiscoveryStartScan => '开始扫描';
+
+  @override
+  String get lanDiscoveryScanning => '正在扫描网络…';
+
+  @override
+  String get lanDiscoveryStop => '停止';
+
+  @override
+  String get lanDiscoveryRescan => '重新扫描';
+
+  @override
+  String get lanDiscoveryBack => '返回';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11149,6 +11176,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get connectionGateFailed => '连接失败';
 
   @override
+  String get connectionGateFailedTimeout => '连接超时，请检查服务器是否可达';
+
+  @override
+  String get connectionGateFailedNetwork => '无法连接到服务器，请检查网络连接后重试';
+
+  @override
+  String get connectionGateFailedAuth => '认证失败，请检查 Token 是否正确';
+
+  @override
+  String get connectionGateFailedServer => '服务器错误，请稍后重试';
+
+  @override
   String get connectionGateNoBackend => '未配置后端';
 
   @override
@@ -11454,6 +11493,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hermesSessionExportFailed => '导出失败';
+
+  @override
+  String get lanDiscoveryStartScan => '开始扫描';
+
+  @override
+  String get lanDiscoveryScanning => '正在扫描网络…';
+
+  @override
+  String get lanDiscoveryStop => '停止';
+
+  @override
+  String get lanDiscoveryRescan => '重新扫描';
+
+  @override
+  String get lanDiscoveryBack => '返回';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16875,6 +16929,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get connectionGateFailed => '連線失敗';
 
   @override
+  String get connectionGateFailedTimeout => '連線逾時，請檢查伺服器是否可達';
+
+  @override
+  String get connectionGateFailedNetwork => '無法連線到伺服器，請檢查網路連線後重試';
+
+  @override
+  String get connectionGateFailedAuth => '認證失敗，請檢查 Token 是否正確';
+
+  @override
+  String get connectionGateFailedServer => '伺服器錯誤，請稍後重試';
+
+  @override
   String get connectionGateNoBackend => '未配置後端';
 
   @override
@@ -17180,4 +17246,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hermesSessionExportFailed => '導出失敗';
+
+  @override
+  String get lanDiscoveryStartScan => '開始掃描';
+
+  @override
+  String get lanDiscoveryScanning => '正在掃描網絡…';
+
+  @override
+  String get lanDiscoveryStop => '停止';
+
+  @override
+  String get lanDiscoveryRescan => '重新掃描';
+
+  @override
+  String get lanDiscoveryBack => '返回';
 }

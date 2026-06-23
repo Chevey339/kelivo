@@ -2412,6 +2412,10 @@
   "connectionGateTitle": "Connecting…",
   "connectionGateConnecting": "Connecting to {url}",
   "connectionGateFailed": "Connection Failed",
+  "connectionGateFailedTimeout": "Connection timed out. Please check if the server is reachable.",
+  "connectionGateFailedNetwork": "Unable to reach the server. Please check your network connection.",
+  "connectionGateFailedAuth": "Authentication failed. Please check your token.",
+  "connectionGateFailedServer": "Server error. Please try again later.",
   "connectionGateNoBackend": "No Backend Configured",
   "connectionGateNoBackendHint": "Add a Hermes backend to start chatting",
   "connectionGateRetry": "Retry",
@@ -2518,7 +2522,6 @@
   "hermesTerminalThemeSystem": "Follow System",
   "hermesTerminalThemeDark": "Dark",
   "hermesTerminalThemeLight": "Light",
-
   "hermesBillingTitle": "Credits & Billing",
   "hermesBillingCredits": "Credits",
   "hermesBillingCreditsRemaining": "Credits Remaining",
@@ -2534,11 +2537,15 @@
   "hermesBillingChargeFailed": "Purchase failed",
   "hermesBillingClose": "Close",
   "hermesBillingEmpty": "No packages available",
-
   "hermesSessionExport": "Export",
   "hermesSessionExportMarkdown": "Export as Markdown",
   "hermesSessionExportText": "Export as Text",
   "hermesSessionExporting": "Exporting…",
   "hermesSessionExportSuccess": "Session exported",
-  "hermesSessionExportFailed": "Export failed"
+  "hermesSessionExportFailed": "Export failed",
+  "lanDiscoveryStartScan": "Start Scan",
+  "lanDiscoveryScanning": "Scanning network…",
+  "lanDiscoveryStop": "Stop",
+  "lanDiscoveryRescan": "Rescan",
+  "lanDiscoveryBack": "Back"
 }

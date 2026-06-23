@@ -5640,6 +5640,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionGateFailed => 'Connection Failed';
 
   @override
+  String get connectionGateFailedTimeout =>
+      'Connection timed out. Please check if the server is reachable.';
+
+  @override
+  String get connectionGateFailedNetwork =>
+      'Unable to reach the server. Please check your network connection.';
+
+  @override
+  String get connectionGateFailedAuth =>
+      'Authentication failed. Please check your token.';
+
+  @override
+  String get connectionGateFailedServer =>
+      'Server error. Please try again later.';
+
+  @override
   String get connectionGateNoBackend => 'No Backend Configured';
 
   @override
@@ -5949,4 +5965,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hermesSessionExportFailed => 'Export failed';
+
+  @override
+  String get lanDiscoveryStartScan => 'Start Scan';
+
+  @override
+  String get lanDiscoveryScanning => 'Scanning network…';
+
+  @override
+  String get lanDiscoveryStop => 'Stop';
+
+  @override
+  String get lanDiscoveryRescan => 'Rescan';
+
+  @override
+  String get lanDiscoveryBack => 'Back';
 }

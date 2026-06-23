@@ -1989,6 +1989,10 @@
   "connectionGateTitle": "連線中…",
   "connectionGateConnecting": "正在連線到 {url}",
   "connectionGateFailed": "連線失敗",
+  "connectionGateFailedTimeout": "連線逾時，請檢查伺服器是否可達",
+  "connectionGateFailedNetwork": "無法連線到伺服器，請檢查網路連線後重試",
+  "connectionGateFailedAuth": "認證失敗，請檢查 Token 是否正確",
+  "connectionGateFailedServer": "伺服器錯誤，請稍後重試",
   "connectionGateNoBackend": "未配置後端",
   "connectionGateNoBackendHint": "添加 Hermes 後端以開始聊天",
   "connectionGateRetry": "重試",
@@ -2095,7 +2099,6 @@
   "hermesTerminalThemeSystem": "跟隨系統",
   "hermesTerminalThemeDark": "深色",
   "hermesTerminalThemeLight": "淺色",
-
   "hermesBillingTitle": "積分與帳單",
   "hermesBillingCredits": "積分",
   "hermesBillingCreditsRemaining": "剩餘積分",
@@ -2111,11 +2114,15 @@
   "hermesBillingChargeFailed": "購買失敗",
   "hermesBillingClose": "關閉",
   "hermesBillingEmpty": "暫無可用套餐",
-
   "hermesSessionExport": "導出",
   "hermesSessionExportMarkdown": "導出為 Markdown",
   "hermesSessionExportText": "導出為文字",
   "hermesSessionExporting": "導出中…",
   "hermesSessionExportSuccess": "對話已導出",
-  "hermesSessionExportFailed": "導出失敗"
+  "hermesSessionExportFailed": "導出失敗",
+  "lanDiscoveryStartScan": "開始掃描",
+  "lanDiscoveryScanning": "正在掃描網絡…",
+  "lanDiscoveryStop": "停止",
+  "lanDiscoveryRescan": "重新掃描",
+  "lanDiscoveryBack": "返回"
 }

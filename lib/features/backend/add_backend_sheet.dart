@@ -638,29 +638,70 @@ class _LanDiscoveryTab extends StatefulWidget {
 class _LanDiscoveryTabState extends State<_LanDiscoveryTab> {
   HermesBackendDiscovery? _discovery;
   List<DiscoveredHermesBackend> _found = [];
+  StreamSubscription<List<DiscoveredHermesBackend>>? _subscription;
+  bool _isScanning = false;  // Local state for immediate UI feedback
 
   @override
   void dispose() {
+    _subscription?.cancel();
     _discovery?.dispose();
     super.dispose();
   }
 
   Future<void> _startScan() async {
+    // Update local state immediately for responsive UI
+    setState(() {
+      _isScanning = true;
+      _found = [];
+    });
+    
     _discovery = HermesBackendDiscovery();
-    _discovery!.discovered.listen((backends) {
+    _subscription?.cancel();
+    _subscription = _discovery!.discovered.listen((backends) {
       if (mounted) setState(() => _found = backends);
     });
-    await _discovery!.startScan();
+    
+    try {
+      await _discovery!.startScan();
+    } catch (e) {
+      // Handle scan error silently
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isScanning = false);
+      }
+    }
+  }
+
+  Future<void> _stopScan() async {
+    await _discovery?.stopScan();
+    if (mounted) {
+      setState(() => _isScanning = false);
+    }
+  }
+
+  void _resetScan() {
+    _subscription?.cancel();
+    _discovery?.dispose();
+    _discovery = null;
+    setState(() {
+      _isScanning = false;
+      _found = [];
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final isScanning = _isScanning || (_discovery?.isScanning ?? false);
+
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          if (_found.isEmpty) ...[
+          if (_found.isEmpty && !isScanning) ...[
             Icon(
               Icons.wifi_find,
               size: 64,
@@ -686,12 +727,73 @@ class _LanDiscoveryTabState extends State<_LanDiscoveryTab> {
               baseColor: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(10),
               child: Text(
-                'Start Scan',
+                widget.l10n.lanDiscoveryStartScan,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onPrimary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
+            ),
+          ] else if (isScanning) ...[
+            Icon(
+              Icons.radar,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              widget.l10n.lanDiscoveryScanning,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            if (_found.isNotEmpty)
+              Text(
+                widget.l10n.lanDiscoveryFound(_found.length),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IosCardPress(
+                  onTap: _stopScan,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  baseColor: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Text(
+                    widget.l10n.lanDiscoveryStop,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IosCardPress(
+                  onTap: _startScan,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  baseColor: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Text(
+                    widget.l10n.lanDiscoveryRescan,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ] else ...[
             Text(
@@ -700,51 +802,105 @@ class _LanDiscoveryTabState extends State<_LanDiscoveryTab> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
-                itemCount: _found.length,
-                itemBuilder: (context, index) {
-                  final b = _found[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: IosCardPress(
-                      onTap: () => widget.onSelected(b),
-                      padding: const EdgeInsets.all(12),
-                      baseColor: Theme.of(
-                        context,
-                      ).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Row(
+              child: _found.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.computer, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                          Icon(
+                            Icons.search_off,
+                            size: 48,
+                            color: Theme.of(context).colorScheme.outline,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            widget.l10n.lanDiscoveryNone,
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _found.length,
+                      itemBuilder: (context, index) {
+                        final b = _found[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: IosCardPress(
+                            onTap: () => widget.onSelected(b),
+                            padding: const EdgeInsets.all(12),
+                            baseColor: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(10),
+                            child: Row(
                               children: [
-                                Text(
-                                  b.name,
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
-                                Text(
-                                  b.url,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.outline,
-                                        fontFamily: 'monospace',
+                                const Icon(Icons.computer, size: 20),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        b.name,
+                                        style: Theme.of(context).textTheme.titleSmall,
                                       ),
+                                      Text(
+                                        b.url,
+                                        style: Theme.of(context).textTheme.bodySmall
+                                            ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.outline,
+                                          fontFamily: 'monospace',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                                const Icon(Icons.add_circle_outline),
                               ],
                             ),
                           ),
-                          const Icon(Icons.add_circle_outline),
-                        ],
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IosCardPress(
+                  onTap: _startScan,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  baseColor: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Text(
+                    widget.l10n.lanDiscoveryRescan,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                IosCardPress(
+                  onTap: _resetScan,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  baseColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Text(
+                    widget.l10n.lanDiscoveryBack,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
