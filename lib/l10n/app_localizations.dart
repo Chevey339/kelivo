@@ -382,6 +382,24 @@ abstract class AppLocalizations {
   /// **'Tool events'**
   String get storageSpaceSubChatToolEvents;
 
+  /// No description provided for @storageSpaceSubChatDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat database'**
+  String get storageSpaceSubChatDatabase;
+
+  /// No description provided for @storageSpaceSubChatWriteAheadLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Write-ahead log'**
+  String get storageSpaceSubChatWriteAheadLog;
+
+  /// No description provided for @storageSpaceSubChatSharedMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared memory index'**
+  String get storageSpaceSubChatSharedMemory;
+
   /// No description provided for @storageSpaceSubAssistantAvatars.
   ///
   /// In en, this message translates to:
