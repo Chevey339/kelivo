@@ -1988,6 +1988,7 @@
   "migrationMigratingToolEventsDetail": "正在遷移工具呼叫記錄",
   "migrationMigratingValidateDetail": "正在校驗遷移資料",
   "migrationBackupReadyDetail": "備份 ZIP 已準備好",
+  "migrationSavingBackupZipDetail": "正在儲存備份 ZIP",
   "migrationBackupFileSavedTitle": "備份 ZIP 已保存",
   "migrationChecklistBackupFiles": "匯出 Hive 備份 ZIP",
   "migrationChecklistPrepareSqlite": "準備 SQLite 資料庫",

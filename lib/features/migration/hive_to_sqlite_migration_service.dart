@@ -352,6 +352,14 @@ class HiveToSqliteMigrationService {
     LazyBox<ChatMessage>? messagesBox;
     LazyBox<dynamic>? toolEventsBox;
     try {
+      _emit(
+        HiveToSqliteMigrationStage.migrating,
+        0,
+        'migrate',
+        'schema',
+        backupPath: backupFile.path,
+        backupItems: _lastBackupItems,
+      );
       _registerHiveAdapters();
       await Hive.initFlutter(decision.appDataDir.path);
       conversationsBox = await Hive.openLazyBox<Conversation>(

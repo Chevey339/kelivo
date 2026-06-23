@@ -10298,6 +10298,12 @@ abstract class AppLocalizations {
   /// **'Backup ZIP is ready'**
   String get migrationBackupReadyDetail;
 
+  /// No description provided for @migrationSavingBackupZipDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving backup ZIP'**
+  String get migrationSavingBackupZipDetail;
+
   /// No description provided for @migrationBackupFileSavedTitle.
   ///
   /// In en, this message translates to:
