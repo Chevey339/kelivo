@@ -958,7 +958,7 @@ class CherryImporter {
     if (!chatService.initialized) await chatService.init();
 
     // Build map of existing conv ids for merge
-    final existingConvs = chatService.getAllConversations();
+    final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {

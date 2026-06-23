@@ -5320,6 +5320,125 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle => '正在分批写入会话和消息，避免超大聊天记录占满内存。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10638,6 +10757,125 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle => '正在分批写入会话和消息，避免超大聊天记录占满内存。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15956,4 +16194,123 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升級聊天記錄儲存';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。';
+
+  @override
+  String get migrationBackupNote => '遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '遷移後，啟動、歷史載入和搜尋都會使用 SQLite 索引，長對話會更流暢。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '選擇資料夾並備份';
+
+  @override
+  String get migrationSaveBackupButton => '儲存備份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在備份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在遷移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle => '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在備份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已遷移 $count 條訊息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在準備 SQLite 資料庫';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在遷移工具呼叫記錄';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校驗遷移資料';
+
+  @override
+  String get migrationBackupReadyDetail => '備份 ZIP 已準備好';
+
+  @override
+  String get migrationBackupFileSavedTitle => '備份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '匯出 Hive 備份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '準備 SQLite 資料庫';
+
+  @override
+  String get migrationChecklistMigrateMessages => '遷移對話和訊息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '遷移工具呼叫記錄';
+
+  @override
+  String get migrationChecklistValidate => '校驗遷移資料';
+
+  @override
+  String get migrationStepBackup => '備份';
+
+  @override
+  String get migrationStepMigrate => '遷移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升級完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。';
+
+  @override
+  String get migrationConversationCount => '對話';
+
+  @override
+  String get migrationMessageCount => '訊息';
+
+  @override
+  String get migrationRestartButton => '重啟 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '遷移失敗';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。';
+
+  @override
+  String get migrationUnknownError => '未知遷移錯誤。';
+
+  @override
+  String get migrationFailureLogTitle => '失敗日誌';
+
+  @override
+  String get migrationRetryButton => '重試遷移';
 }

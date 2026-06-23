@@ -54,6 +54,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
@@ -63,17 +64,27 @@ void main() {
   });
 
   tearDown(() async {
+    for (final service in services) {
+      await service.close();
+    }
+    services.clear();
     await Hive.close();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
   });
 
+  ChatService createService() {
+    final service = ChatService();
+    services.add(service);
+    return service;
+  }
+
   group('AssistantProvider cascade delete', () {
     test(
       'deletes conversations and messages owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -131,7 +142,7 @@ void main() {
     test(
       'deletes draft conversations owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -158,7 +169,7 @@ void main() {
     test(
       'notifies once when deleting multiple assistant conversations',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
 
         final first = await chatService.createConversation(
@@ -201,7 +212,7 @@ void main() {
     test(
       'keeps conversations when deleting the last assistant is rejected',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,

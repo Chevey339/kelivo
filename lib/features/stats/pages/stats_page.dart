@@ -161,7 +161,7 @@ class _StatsPageState extends State<StatsPage> {
     final chatService = context.watch<ChatService>();
     final settings = context.watch<SettingsProvider>();
     final assistantProvider = context.watch<AssistantProvider>();
-    final conversations = chatService.getAllConversations();
+    final conversations = chatService.getAllCompleteConversations();
     final messagesByConversation = {
       for (final conversation in conversations)
         conversation.id: chatService.getMessages(conversation.id),

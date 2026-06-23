@@ -61,6 +61,38 @@ class _FakeLazyChatService extends ChatService {
       Map<String, int>.from(versionSelections);
 
   @override
+  Map<String, int> getFirstMessageIndicesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (remaining.isEmpty) return const <String, int>{};
+
+    final result = <String, int>{};
+    for (var i = 0; i < _messages.length && remaining.isNotEmpty; i++) {
+      final groupId = _messages[i].groupId ?? _messages[i].id;
+      if (remaining.remove(groupId)) result[groupId] = i;
+    }
+    return result;
+  }
+
+  @override
+  List<ChatMessage> getMessagesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) {
+    final targets = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (targets.isEmpty) return const <ChatMessage>[];
+
+    return _messages
+        .where((message) {
+          final groupId = message.groupId ?? message.id;
+          return targets.contains(groupId);
+        })
+        .toList(growable: false);
+  }
+
+  @override
   Conversation? getConversation(String id) {
     if (deletedConversationIds.contains(id)) return null;
     if (!knownConversationIds.contains(id)) return null;
