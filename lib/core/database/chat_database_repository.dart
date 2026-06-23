@@ -431,9 +431,7 @@ class ChatDatabaseRepository {
           return ConversationSearchMatch(
             conversationId: row['conversation_id'] as String,
             conversationTitle: row['conversation_title'] as String,
-            updatedAt: DateTime.fromMillisecondsSinceEpoch(
-              row['updated_at'] as int,
-            ),
+            updatedAt: _dateTimeFromSqlite(row['updated_at']),
             versionSelections: _decodeStringIntMap(
               row['version_selections_json'] as String? ?? '{}',
             ),
@@ -775,8 +773,8 @@ class ChatDatabaseRepository {
     return Conversation(
       id: id,
       title: row['title'] as String,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(row['created_at'] as int),
-      updatedAt: DateTime.fromMillisecondsSinceEpoch(row['updated_at'] as int),
+      createdAt: _dateTimeFromSqlite(row['created_at']),
+      updatedAt: _dateTimeFromSqlite(row['updated_at']),
       messageIds:
           messageRows?.map((m) => m['id'] as String).toList(growable: false) ??
           const <String>[],
@@ -845,15 +843,15 @@ class ChatDatabaseRepository {
 
   ChatMessage _messageFromSqliteRow(sqlite.Row row) {
     DateTime? nullableDate(String key) {
-      final value = row[key] as int?;
-      return value == null ? null : DateTime.fromMillisecondsSinceEpoch(value);
+      final value = row[key];
+      return value == null ? null : _dateTimeFromSqlite(value);
     }
 
     return ChatMessage(
       id: row['id'] as String,
       role: row['role'] as String,
       content: row['content'] as String,
-      timestamp: DateTime.fromMillisecondsSinceEpoch(row['timestamp'] as int),
+      timestamp: _dateTimeFromSqlite(row['timestamp']),
       modelId: row['model_id'] as String?,
       providerId: row['provider_id'] as String?,
       totalTokens: row['total_tokens'] as int?,
@@ -871,6 +869,20 @@ class ChatDatabaseRepository {
       cachedTokens: row['cached_tokens'] as int?,
       durationMs: row['duration_ms'] as int?,
     );
+  }
+
+  DateTime _dateTimeFromSqlite(Object? value) {
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        value * Duration.millisecondsPerSecond,
+      );
+    }
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(
+        value.toInt() * Duration.millisecondsPerSecond,
+      );
+    }
+    throw StateError('Invalid SQLite DateTime value: $value.');
   }
 
   MessageRowsCompanion _messageCompanion(
