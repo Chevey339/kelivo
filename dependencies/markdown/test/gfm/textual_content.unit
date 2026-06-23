@@ -1,0 +1,12 @@
+>>> Textual content - 670
+hello $.;'there
+<<<
+<p>hello $.;'there</p>
+>>> Textual content - 671
+Foo χρῆν
+<<<
+<p>Foo χρῆν</p>
+>>> Textual content - 672
+Multiple     spaces
+<<<
+<p>Multiple     spaces</p>

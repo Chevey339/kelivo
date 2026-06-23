@@ -93,6 +93,8 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowAssistantMarkdown(),
                   _RowDivider(),
+                  _ToggleRowExperimentalMarkdown(),
+                  _RowDivider(),
                   _AutoCollapseCodeBlocksSection(),
                 ],
               ),
@@ -2148,6 +2150,39 @@ class _ToggleRowAssistantMarkdown extends StatelessWidget {
   }
 }
 
+class _ToggleRowExperimentalMarkdown extends StatelessWidget {
+  const _ToggleRowExperimentalMarkdown();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.displaySettingsPageEnableExperimentalMarkdownTitle,
+      value: sp.enableExperimentalMarkdown,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setEnableExperimentalMarkdown(v),
+      badge: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(
+          color: cs.error.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          'Beta',
+          style: TextStyle(
+            fontSize: 10,
+            height: 1.3,
+            fontWeight: AppFontWeights.semibold,
+            color: cs.error,
+            decoration: TextDecoration.none,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ToggleRowAutoCollapseCodeBlocks extends StatelessWidget {
   const _ToggleRowAutoCollapseCodeBlocks();
   @override
@@ -2534,10 +2569,12 @@ class _ToggleRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onChanged,
+    this.badge,
   });
   final String label;
   final bool value;
   final ValueChanged<bool>? onChanged;
+  final Widget? badge;
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -2549,15 +2586,21 @@ class _ToggleRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  label,
-                  // Reduce toggle row label size to 14 to match other panes
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: AppFontWeights.regular,
-                    color: cs.onSurface.withValues(alpha: 0.9),
-                    decoration: TextDecoration.none,
-                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: AppFontWeights.regular,
+                          color: cs.onSurface.withValues(alpha: 0.9),
+                          decoration: TextDecoration.none,
+                        ),
+                      ),
+                    ),
+                    if (badge != null) ...[const SizedBox(width: 6), badge!],
+                  ],
                 ),
               ],
             ),

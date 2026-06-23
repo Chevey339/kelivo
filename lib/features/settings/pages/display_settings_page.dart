@@ -1559,6 +1559,7 @@ Widget _iosSwitchRow(
   IconData? icon,
   required String label,
   String? subtitle,
+  Widget? badge,
   required bool value,
   required ValueChanged<bool> onChanged,
 }) {
@@ -1586,7 +1587,20 @@ Widget _iosSwitchRow(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(label, style: TextStyle(fontSize: 15, color: c)),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              label,
+                              style: TextStyle(fontSize: 15, color: c),
+                            ),
+                          ),
+                          if (badge != null) ...[
+                            const SizedBox(width: 6),
+                            badge,
+                          ],
+                        ],
+                      ),
                       if (subtitle != null && subtitle.isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
@@ -1917,6 +1931,35 @@ class RenderingSettingsPage extends StatelessWidget {
                 onChanged: (v) => context
                     .read<SettingsProvider>()
                     .setEnableAssistantMarkdown(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
+                icon: Lucide.Wrench,
+                label: l10n.displaySettingsPageEnableExperimentalMarkdownTitle,
+                value: sp.enableExperimentalMarkdown,
+                onChanged: (v) => context
+                    .read<SettingsProvider>()
+                    .setEnableExperimentalMarkdown(v),
+                badge: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.error.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'Beta',
+                    style: TextStyle(
+                      fontSize: 10,
+                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                      color: cs.error,
+                    ),
+                  ),
+                ),
               ),
               _iosDivider(context),
               _iosSwitchRow(

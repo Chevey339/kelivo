@@ -191,6 +191,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_enable_reasoning_markdown_v1';
   static const String _displayEnableAssistantMarkdownKey =
       'display_enable_assistant_markdown_v1';
+  static const String _displayEnableExperimentalMarkdownKey =
+      'display_enable_experimental_markdown_v1';
   static const String _displayShowChatListDateKey =
       'display_show_chat_list_date_v1';
   static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
@@ -1044,6 +1046,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayEnableReasoningMarkdownKey) ?? true;
     _enableAssistantMarkdown =
         prefs.getBool(_displayEnableAssistantMarkdownKey) ?? true;
+    _enableExperimentalMarkdown =
+        prefs.getBool(_displayEnableExperimentalMarkdownKey) ?? false;
     _showChatListDate = prefs.getBool(_displayShowChatListDateKey) ?? false;
     _imageCropperEnabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
     _mobileCodeBlockWrap =
@@ -3826,6 +3830,17 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_displayEnableAssistantMarkdownKey, v);
+  }
+
+  // Display: render with experimental markdown engine (flutter_markdown_plus)
+  bool _enableExperimentalMarkdown = false;
+  bool get enableExperimentalMarkdown => _enableExperimentalMarkdown;
+  Future<void> setEnableExperimentalMarkdown(bool v) async {
+    if (_enableExperimentalMarkdown == v) return;
+    _enableExperimentalMarkdown = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_displayEnableExperimentalMarkdownKey, v);
   }
 
   // Display: show chat list date

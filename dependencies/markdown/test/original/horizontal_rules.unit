@@ -1,0 +1,20 @@
+>>> from dashes
+---
+
+<<<
+<hr />
+>>> from asterisks
+***
+
+<<<
+<hr />
+>>> from underscores
+___
+
+<<<
+<hr />
+>>> can include up to two spaces
+_ _  _
+
+<<<
+<hr />

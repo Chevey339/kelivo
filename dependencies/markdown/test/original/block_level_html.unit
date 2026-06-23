@@ -1,0 +1,38 @@
+>>> single line
+<table></table>
+
+<<<
+<table></table>
+>>> multi-line
+<table>
+    blah
+</table>
+
+<<<
+<table>
+    blah
+</table>
+>>> blank line ends block
+<table>
+    blah
+</table>
+
+para
+
+<<<
+<table>
+    blah
+</table>
+<p>para</p>
+>>> HTML can be bogus
+<bogus>
+blah
+</weird>
+
+para
+
+<<<
+<bogus>
+blah
+</weird>
+<p>para</p>

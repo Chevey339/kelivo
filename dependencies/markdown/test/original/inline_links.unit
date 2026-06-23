@@ -1,0 +1,87 @@
+>>> double quotes for title
+links [are](http://foo.com "woo") awesome
+
+<<<
+<p>links <a href="http://foo.com" title="woo">are</a> awesome</p>
+>>> no title
+links [are](http://foo.com) awesome
+
+<<<
+<p>links <a href="http://foo.com">are</a> awesome</p>
+>>> can style link contents
+links [*are*](http://foo.com) awesome
+
+<<<
+<p>links <a href="http://foo.com"><em>are</em></a> awesome</p>
+>>> image inside link
+links [![](/are.png)](http://foo.com) awesome
+
+<<<
+<p>links <a href="http://foo.com"><img src="/are.png" alt="" /></a> awesome</p>
+>>> image with alt inside link
+links [![my alt](/are.png)](http://foo.com) awesome
+
+<<<
+<p>links <a href="http://foo.com"><img src="/are.png" alt="my alt" /></a> awesome</p>
+>>> image with title inside link
+links [![](/are.png "my title")](http://foo.com) awesome
+
+<<<
+<p>links <a href="http://foo.com"><img src="/are.png" alt="" title="my title" /></a> awesome</p>
+>>> no URL
+links [are]() awesome
+
+<<<
+<p>links <a href="">are</a> awesome</p>
+>>> URL wrapped in angle brackets
+links [are](<http://example.com>) awesome
+
+<<<
+<p>links <a href="http://example.com">are</a> awesome</p>
+>>> URL wrapped in angle brackets with a title; https://github.com/commonmark/CommonMark/issues/521
+links [are](<http://example.com> "title") awesome
+
+<<<
+<p>links <a href="http://example.com" title="title">are</a> awesome</p>
+>>> multi-line link
+links [are
+awesome](<http://example.com>).
+
+<<<
+<p>links <a href="http://example.com">are
+awesome</a>.</p>
+>>> multi-line link with a title
+links [are](http://foo.com
+"woo") awesome
+
+<<<
+<p>links <a href="http://foo.com" title="woo">are</a> awesome</p>
+>>> not a real link
+links [are] (http://foo.com) awesome
+
+<<<
+<p>links [are] (http://foo.com) awesome</p>
+>>> resolver link without a resolver
+links [are *awesome*]
+
+<<<
+<p>links [are <em>awesome</em>]</p>
+>>> links with escaped parens
+[a](\(yes-a-link)
+[a](\(yes-a-link\))
+[a](\\(not-a-link\))
+[a](\\(yes-a-link\)))
+<<<
+<p><a href="(yes-a-link">a</a>
+<a href="(yes-a-link)">a</a>
+[a](\(not-a-link))
+<a href="(yes-a-link))">a</a></p>
+>>> links with unbalanced parentheses
+[foo](link(1.png) (what?)
+<<<
+<p>[foo](link(1.png) (what?)</p>
+>>> not an inline link: the title's ending quote is escaped
+links [are](<http://example.com> "title\") awesome
+
+<<<
+<p>links [are](<a href="http://example.com">http://example.com</a> &quot;title&quot;) awesome</p>

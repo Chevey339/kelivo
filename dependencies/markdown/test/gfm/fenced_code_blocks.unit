@@ -1,0 +1,245 @@
+>>> Fenced code blocks - 89
+```
+<
+ >
+```
+<<<
+<pre><code>&lt;
+ &gt;
+</code></pre>
+>>> Fenced code blocks - 90
+~~~
+<
+ >
+~~~
+<<<
+<pre><code>&lt;
+ &gt;
+</code></pre>
+>>> Fenced code blocks - 91
+``
+foo
+``
+<<<
+<p><code>foo</code></p>
+>>> Fenced code blocks - 92
+```
+aaa
+~~~
+```
+<<<
+<pre><code>aaa
+~~~
+</code></pre>
+>>> Fenced code blocks - 93
+~~~
+aaa
+```
+~~~
+<<<
+<pre><code>aaa
+```
+</code></pre>
+>>> Fenced code blocks - 94
+````
+aaa
+```
+``````
+<<<
+<pre><code>aaa
+```
+</code></pre>
+>>> Fenced code blocks - 95
+~~~~
+aaa
+~~~
+~~~~
+<<<
+<pre><code>aaa
+~~~
+</code></pre>
+>>> Fenced code blocks - 96
+```
+<<<
+<pre><code></code></pre>
+>>> Fenced code blocks - 97
+`````
+
+```
+aaa
+<<<
+<pre><code>
+```
+aaa
+</code></pre>
+>>> Fenced code blocks - 98
+> ```
+> aaa
+
+bbb
+<<<
+<blockquote>
+<pre><code>aaa
+</code></pre>
+</blockquote>
+<p>bbb</p>
+>>> Fenced code blocks - 99
+```
+
+  
+```
+<<<
+<pre><code>
+  
+</code></pre>
+>>> Fenced code blocks - 100
+```
+```
+<<<
+<pre><code></code></pre>
+>>> Fenced code blocks - 101
+ ```
+ aaa
+aaa
+```
+<<<
+<pre><code>aaa
+aaa
+</code></pre>
+>>> Fenced code blocks - 102
+  ```
+aaa
+  aaa
+aaa
+  ```
+<<<
+<pre><code>aaa
+aaa
+aaa
+</code></pre>
+>>> Fenced code blocks - 103
+   ```
+   aaa
+    aaa
+  aaa
+   ```
+<<<
+<pre><code>aaa
+ aaa
+aaa
+</code></pre>
+>>> Fenced code blocks - 104
+    ```
+    aaa
+    ```
+<<<
+<pre><code>```
+aaa
+```
+</code></pre>
+>>> Fenced code blocks - 105
+```
+aaa
+  ```
+<<<
+<pre><code>aaa
+</code></pre>
+>>> Fenced code blocks - 106
+   ```
+aaa
+  ```
+<<<
+<pre><code>aaa
+</code></pre>
+>>> Fenced code blocks - 107
+```
+aaa
+    ```
+<<<
+<pre><code>aaa
+    ```
+</code></pre>
+>>> Fenced code blocks - 108
+``` ```
+aaa
+<<<
+<p><code> </code>
+aaa</p>
+>>> Fenced code blocks - 109
+~~~~~~
+aaa
+~~~ ~~
+<<<
+<pre><code>aaa
+~~~ ~~
+</code></pre>
+>>> Fenced code blocks - 110
+foo
+```
+bar
+```
+baz
+<<<
+<p>foo</p>
+<pre><code>bar
+</code></pre>
+<p>baz</p>
+>>> Fenced code blocks - 111
+foo
+---
+~~~
+bar
+~~~
+# baz
+<<<
+<h2>foo</h2>
+<pre><code>bar
+</code></pre>
+<h1>baz</h1>
+>>> Fenced code blocks - 112
+```ruby
+def foo(x)
+  return 3
+end
+```
+<<<
+<pre><code class="language-ruby">def foo(x)
+  return 3
+end
+</code></pre>
+>>> Fenced code blocks - 113
+~~~~    ruby startline=3 $%@#$
+def foo(x)
+  return 3
+end
+~~~~~~~
+<<<
+<pre data-metadata="startline=3 $%@#$"><code class="language-ruby">def foo(x)
+  return 3
+end
+</code></pre>
+>>> Fenced code blocks - 114
+````;
+````
+<<<
+<pre><code class="language-;"></code></pre>
+>>> Fenced code blocks - 115
+``` aa ```
+foo
+<<<
+<p><code>aa</code>
+foo</p>
+>>> Fenced code blocks - 116
+~~~ aa ``` ~~~
+foo
+~~~
+<<<
+<pre data-metadata="``` ~~~"><code class="language-aa">foo
+</code></pre>
+>>> Fenced code blocks - 117
+```
+``` aaa
+```
+<<<
+<pre><code>``` aaa
+</code></pre>

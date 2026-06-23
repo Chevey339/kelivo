@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:gpt_markdown/custom_widgets/markdown_config.dart'
     show GptMarkdownConfig;
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart' as fmp;
 import 'package:flutter_highlight/themes/github.dart';
 import 'package:flutter_highlight/themes/atom-one-dark-reasonable.dart';
 import 'package:flutter/rendering.dart';
@@ -257,7 +258,50 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
     final appFontFamily = resolveAppFont();
 
     // Force rebuild of the markdown when key theme colors change to avoid stale styles
-    final markdownWidget = GptMarkdown(
+    final Widget markdownWidget;
+    if (settings.enableExperimentalMarkdown) {
+      markdownWidget = fmp.Markdown(
+        data: normalized,
+        selectable: true,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+      );
+    } else {
+      markdownWidget = _buildGptMarkdown(
+        normalized: normalized,
+        baseTextStyle: baseTextStyle,
+        imageUrls: imageUrls,
+        appFontFamily: appFontFamily,
+        codeFontFamily: codeFontFamily,
+        components: components,
+        inlineComponents: inlineComponents,
+        colorScheme: cs,
+        settings: settings,
+      );
+    }
+
+    final result = appFontFamily.isEmpty
+        ? markdownWidget
+        : DefaultTextStyle.merge(
+            style: TextStyle(fontFamily: appFontFamily),
+            child: markdownWidget,
+          );
+    return result;
+  }
+
+  Widget _buildGptMarkdown({
+    required String normalized,
+    required TextStyle? baseTextStyle,
+    required List<String> imageUrls,
+    required String appFontFamily,
+    required String codeFontFamily,
+    required List<MarkdownComponent> components,
+    required List<MarkdownComponent> inlineComponents,
+    required ColorScheme colorScheme,
+    required SettingsProvider settings,
+  }) {
+    final cs = colorScheme;
+    return GptMarkdown(
       key: ValueKey(
         '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}',
       ),
@@ -494,14 +538,6 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         );
       },
     );
-
-    final result = appFontFamily.isEmpty
-        ? markdownWidget
-        : DefaultTextStyle.merge(
-            style: TextStyle(fontFamily: appFontFamily),
-            child: markdownWidget,
-          );
-    return result;
   }
 
   Future<void> _handleLinkTap(BuildContext context, String url) async {

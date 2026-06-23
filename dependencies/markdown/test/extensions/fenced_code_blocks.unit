@@ -1,0 +1,52 @@
+>>> without an optional language identifier
+```
+code
+```
+
+<<<
+<pre><code>code
+</code></pre>
+>>> with an optional language identifier
+```dart
+code
+```
+
+<<<
+<pre><code class="language-dart">code
+</code></pre>
+>>> escape HTML characters
+```
+<&>
+```
+
+<<<
+<pre><code>&lt;&amp;&gt;
+</code></pre>
+>>> Pandoc style without language identifier
+~~~~~
+code
+~~~~~
+
+<<<
+<pre><code>code
+</code></pre>
+>>> Pandoc style with language identifier
+~~~~~dart
+code
+~~~~~
+
+<<<
+<pre><code class="language-dart">code
+</code></pre>
+>>> Pandoc style with inner tildes row
+~~~~~
+~~~
+code
+~~~
+~~~~~
+
+<<<
+<pre><code>~~~
+code
+~~~
+</code></pre>

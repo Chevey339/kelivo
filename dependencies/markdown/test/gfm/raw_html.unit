@@ -1,0 +1,95 @@
+>>> Raw HTML - 632
+<a><bab><c2c>
+<<<
+<p><a><bab><c2c></p>
+>>> Raw HTML - 633
+<a/><b2/>
+<<<
+<p><a/><b2/></p>
+>>> Raw HTML - 634
+<a  /><b2
+data="foo" >
+<<<
+<p><a  /><b2
+data="foo" ></p>
+>>> Raw HTML - 635
+<a foo="bar" bam = 'baz <em>"</em>'
+_boolean zoop:33=zoop:33 />
+<<<
+<p><a foo="bar" bam = 'baz <em>"</em>'
+_boolean zoop:33=zoop:33 /></p>
+>>> Raw HTML - 636
+Foo <responsive-image src="foo.jpg" />
+<<<
+<p>Foo <responsive-image src="foo.jpg" /></p>
+>>> Raw HTML - 637
+<33> <__>
+<<<
+<p>&lt;33&gt; &lt;__&gt;</p>
+>>> Raw HTML - 638
+<a h*#ref="hi">
+<<<
+<p>&lt;a h*#ref=&quot;hi&quot;&gt;</p>
+>>> Raw HTML - 639
+<a href="hi'> <a href=hi'>
+<<<
+<p>&lt;a href=&quot;hi'&gt; &lt;a href=hi'&gt;</p>
+>>> Raw HTML - 640
+< a><
+foo><bar/ >
+<foo bar=baz
+bim!bop />
+<<<
+<p>&lt; a&gt;&lt;
+foo&gt;&lt;bar/ &gt;
+&lt;foo bar=baz
+bim!bop /&gt;</p>
+>>> Raw HTML - 641
+<a href='bar'title=title>
+<<<
+<p>&lt;a href='bar'title=title&gt;</p>
+>>> Raw HTML - 642
+</a></foo >
+<<<
+<p></a></foo ></p>
+>>> Raw HTML - 643
+</a href="foo">
+<<<
+<p>&lt;/a href=&quot;foo&quot;&gt;</p>
+>>> Raw HTML - 644
+foo <!-- this is a --
+comment - with hyphens -->
+<<<
+<p>foo &lt;!-- this is a --
+comment - with hyphens --&gt;</p>
+>>> Raw HTML - 645
+foo <!--> foo -->
+
+foo <!---> foo -->
+<<<
+<p>foo &lt;!--&gt; foo --&gt;</p>
+<p>foo &lt;!---&gt; foo --&gt;</p>
+>>> Raw HTML - 646
+foo <?php echo $a; ?>
+<<<
+<p>foo <?php echo $a; ?></p>
+>>> Raw HTML - 647
+foo <!ELEMENT br EMPTY>
+<<<
+<p>foo <!ELEMENT br EMPTY></p>
+>>> Raw HTML - 648
+foo <![CDATA[>&<]]>
+<<<
+<p>foo <![CDATA[>&<]]></p>
+>>> Raw HTML - 649
+foo <a href="&ouml;">
+<<<
+<p>foo <a href="&ouml;"></p>
+>>> Raw HTML - 650
+foo <a href="\*">
+<<<
+<p>foo <a href="\*"></p>
+>>> Raw HTML - 651
+<a href="\"">
+<<<
+<p>&lt;a href=&quot;&quot;&quot;&gt;</p>

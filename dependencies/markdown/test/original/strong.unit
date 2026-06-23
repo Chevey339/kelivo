@@ -1,0 +1,32 @@
+>>> using asterisks
+before **strong** after
+
+<<<
+<p>before <strong>strong</strong> after</p>
+>>> using underscores
+before __strong__ after
+
+<<<
+<p>before <strong>strong</strong> after</p>
+>>> unmatched asterisks
+before ** after
+
+<<<
+<p>before ** after</p>
+>>> unmatched underscores
+before __ after
+
+<<<
+<p>before __ after</p>
+>>> multiple spans in one text
+a **one** b __two__ c
+
+<<<
+<p>a <strong>one</strong> b <strong>two</strong> c</p>
+>>> multi-line
+before **first
+second** after
+
+<<<
+<p>before <strong>first
+second</strong> after</p>

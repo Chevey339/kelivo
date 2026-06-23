@@ -1,0 +1,70 @@
+>>> simple block quote
+>>>
+# Foo
+bar
+baz
+>>>
+
+<<<
+<blockquote>
+<h1>Foo</h1>
+<p>bar
+baz</p>
+</blockquote>
+>>> has blank lines
+>>>
+
+foo
+
+
+
+
+bar
+
+
+>>>
+
+<<<
+<blockquote>
+<p>foo</p>
+<p>bar</p>
+</blockquote>
+>>> with nested block quote
+>>>
+foo
+> bar
+>>>
+
+<<<
+<blockquote>
+<p>foo</p>
+<blockquote>
+<p>bar</p>
+</blockquote>
+</blockquote>
+>>> with nested indented clode block
+>>>
+    foo
+    bar
+>>>
+
+<<<
+<blockquote>
+<pre><code>foo
+bar
+</code></pre>
+</blockquote>
+>>> with nested fenced clode block
+>>>
+```
+foo
+bar
+```
+>>>
+
+<<<
+<blockquote>
+<pre><code>foo
+bar
+</code></pre>
+</blockquote>

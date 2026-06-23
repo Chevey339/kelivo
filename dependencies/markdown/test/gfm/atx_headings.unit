@@ -1,0 +1,112 @@
+>>> ATX headings - 32
+# foo
+## foo
+### foo
+#### foo
+##### foo
+###### foo
+<<<
+<h1>foo</h1>
+<h2>foo</h2>
+<h3>foo</h3>
+<h4>foo</h4>
+<h5>foo</h5>
+<h6>foo</h6>
+>>> ATX headings - 33
+####### foo
+<<<
+<p>####### foo</p>
+>>> ATX headings - 34
+#5 bolt
+
+#hashtag
+<<<
+<p>#5 bolt</p>
+<p>#hashtag</p>
+>>> ATX headings - 35
+\## foo
+<<<
+<p>## foo</p>
+>>> ATX headings - 36
+# foo *bar* \*baz\*
+<<<
+<h1>foo <em>bar</em> *baz*</h1>
+>>> ATX headings - 37
+#                  foo                     
+<<<
+<h1>foo</h1>
+>>> ATX headings - 38
+ ### foo
+  ## foo
+   # foo
+<<<
+<h3>foo</h3>
+<h2>foo</h2>
+<h1>foo</h1>
+>>> ATX headings - 39
+    # foo
+<<<
+<pre><code># foo
+</code></pre>
+>>> ATX headings - 40
+foo
+    # bar
+<<<
+<p>foo
+# bar</p>
+>>> ATX headings - 41
+## foo ##
+  ###   bar    ###
+<<<
+<h2>foo</h2>
+<h3>bar</h3>
+>>> ATX headings - 42
+# foo ##################################
+##### foo ##
+<<<
+<h1>foo</h1>
+<h5>foo</h5>
+>>> ATX headings - 43
+### foo ###     
+<<<
+<h3>foo</h3>
+>>> ATX headings - 44
+### foo ### b
+<<<
+<h3>foo ### b</h3>
+>>> ATX headings - 45
+# foo#
+<<<
+<h1>foo#</h1>
+>>> ATX headings - 46
+### foo \###
+## foo #\##
+# foo \#
+<<<
+<h3>foo ###</h3>
+<h2>foo ###</h2>
+<h1>foo #</h1>
+>>> ATX headings - 47
+****
+## foo
+****
+<<<
+<hr />
+<h2>foo</h2>
+<hr />
+>>> ATX headings - 48
+Foo bar
+# baz
+Bar foo
+<<<
+<p>Foo bar</p>
+<h1>baz</h1>
+<p>Bar foo</p>
+>>> ATX headings - 49
+## 
+#
+### ###
+<<<
+<h2></h2>
+<h1></h1>
+<h3></h3>

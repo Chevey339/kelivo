@@ -1,0 +1,42 @@
+>>> within a paragraph
+I love to :smile:.
+
+<<<
+<p>I love to 😄.</p>
+>>> within other inline syntax
+I *love to :smile:*
+<<<
+<p>I <em>love to 😄</em></p>
+>>> within blockquote
+> I love to :smile:.
+<<<
+<blockquote>
+<p>I love to 😄.</p>
+</blockquote>
+>>> within code block
+    I love to :smile:
+<<<
+<pre><code>I love to :smile:
+</code></pre>
+>>> within a link
+I love [to :smile:](http://www.google.com).
+<<<
+<p>I love <a href="http://www.google.com">to 😄</a>.</p>
+>>> within a reference link
+I love [to :smile:][].
+
+[to :smile:]: http://www.google.com
+<<<
+<p>I love <a href="http://www.google.com">to 😄</a>.</p>
+>>> within inline code
+I love to `:smile:`.
+<<<
+<p>I love to <code>:smile:</code>.</p>
+>>> with multiple code points
+Yay :australia:
+<<<
+<p>Yay 🇦🇺</p>
+>>> leaves unknown emojis alone
+I love :smiles:.
+<<<
+<p>I love :smiles:.</p>

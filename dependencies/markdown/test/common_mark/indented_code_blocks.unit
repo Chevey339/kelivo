@@ -1,0 +1,118 @@
+>>> Indented code blocks - 107
+    a simple
+      indented code block
+<<<
+<pre><code>a simple
+  indented code block
+</code></pre>
+>>> Indented code blocks - 108
+  - foo
+
+    bar
+<<<
+<ul>
+<li>
+<p>foo</p>
+<p>bar</p>
+</li>
+</ul>
+>>> Indented code blocks - 109
+1.  foo
+
+    - bar
+<<<
+<ol>
+<li>
+<p>foo</p>
+<ul>
+<li>bar</li>
+</ul>
+</li>
+</ol>
+>>> Indented code blocks - 110
+    <a/>
+    *hi*
+
+    - one
+<<<
+<pre><code>&lt;a/&gt;
+*hi*
+
+- one
+</code></pre>
+>>> Indented code blocks - 111
+    chunk1
+
+    chunk2
+  
+ 
+ 
+    chunk3
+<<<
+<pre><code>chunk1
+
+chunk2
+
+
+
+chunk3
+</code></pre>
+>>> Indented code blocks - 112
+    chunk1
+      
+      chunk2
+<<<
+<pre><code>chunk1
+  
+  chunk2
+</code></pre>
+>>> Indented code blocks - 113
+Foo
+    bar
+
+<<<
+<p>Foo
+bar</p>
+>>> Indented code blocks - 114
+    foo
+bar
+<<<
+<pre><code>foo
+</code></pre>
+<p>bar</p>
+>>> Indented code blocks - 115
+# Heading
+    foo
+Heading
+------
+    foo
+----
+<<<
+<h1>Heading</h1>
+<pre><code>foo
+</code></pre>
+<h2>Heading</h2>
+<pre><code>foo
+</code></pre>
+<hr />
+>>> Indented code blocks - 116
+        foo
+    bar
+<<<
+<pre><code>    foo
+bar
+</code></pre>
+>>> Indented code blocks - 117
+
+    
+    foo
+    
+
+<<<
+<pre><code>foo
+</code></pre>
+>>> Indented code blocks - 118
+    foo  
+<<<
+<pre><code>foo  
+</code></pre>

@@ -1,0 +1,15 @@
+>>> less than and ampersand are escaped
+< &
+
+<<<
+<p>&lt; &amp;</p>
+>>> greater than is escaped
+not you >
+
+<<<
+<p>not you &gt;</p>
+>>> existing entities are untouched
+&amp;
+
+<<<
+<p>&amp;</p>

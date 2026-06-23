@@ -1,0 +1,74 @@
+>>> Autolinks (extension) - 621
+www.commonmark.org
+<<<
+<p><a href="http://www.commonmark.org">www.commonmark.org</a></p>
+>>> Autolinks (extension) - 622
+Visit www.commonmark.org/help for more information.
+<<<
+<p>Visit <a href="http://www.commonmark.org/help">www.commonmark.org/help</a> for more information.</p>
+>>> Autolinks (extension) - 623
+Visit www.commonmark.org.
+
+Visit www.commonmark.org/a.b.
+<<<
+<p>Visit <a href="http://www.commonmark.org">www.commonmark.org</a>.</p>
+<p>Visit <a href="http://www.commonmark.org/a.b">www.commonmark.org/a.b</a>.</p>
+>>> Autolinks (extension) - 624
+www.google.com/search?q=Markup+(business)
+
+www.google.com/search?q=Markup+(business)))
+
+(www.google.com/search?q=Markup+(business))
+
+(www.google.com/search?q=Markup+(business)
+<<<
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a></p>
+<p><a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>))</p>
+<p>(<a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a>)</p>
+<p>(<a href="http://www.google.com/search?q=Markup+(business)">www.google.com/search?q=Markup+(business)</a></p>
+>>> Autolinks (extension) - 625
+www.google.com/search?q=(business))+ok
+<<<
+<p><a href="http://www.google.com/search?q=(business))+ok">www.google.com/search?q=(business))+ok</a></p>
+>>> Autolinks (extension) - 626
+www.google.com/search?q=commonmark&hl=en
+
+www.google.com/search?q=commonmark&hl;
+<<<
+<p><a href="http://www.google.com/search?q=commonmark&amp;hl=en">www.google.com/search?q=commonmark&amp;hl=en</a></p>
+<p><a href="http://www.google.com/search?q=commonmark">www.google.com/search?q=commonmark</a>&amp;hl;</p>
+>>> Autolinks (extension) - 627
+www.commonmark.org/he<lp
+<<<
+<p><a href="http://www.commonmark.org/he">www.commonmark.org/he</a>&lt;lp</p>
+>>> Autolinks (extension) - 628
+http://commonmark.org
+
+(Visit https://encrypted.google.com/search?q=Markup+(business))
+
+Anonymous FTP is available at ftp://foo.bar.baz.
+<<<
+<p><a href="http://commonmark.org">http://commonmark.org</a></p>
+<p>(Visit <a href="https://encrypted.google.com/search?q=Markup+(business)">https://encrypted.google.com/search?q=Markup+(business)</a>)</p>
+<p>Anonymous FTP is available at <a href="ftp://foo.bar.baz">ftp://foo.bar.baz</a>.</p>
+>>> Autolinks (extension) - 629
+foo@bar.baz
+<<<
+<p><a href="mailto:foo@bar.baz">foo@bar.baz</a></p>
+>>> Autolinks (extension) - 630
+hello@mail+xyz.example isn't valid, but hello+xyz@mail.example is.
+<<<
+<p>hello@mail+xyz.example isn't valid, but <a href="mailto:hello+xyz@mail.example">hello+xyz@mail.example</a> is.</p>
+>>> Autolinks (extension) - 631
+a.b-c_d@a.b
+
+a.b-c_d@a.b.
+
+a.b-c_d@a.b-
+
+a.b-c_d@a.b_
+<<<
+<p><a href="mailto:a.b-c_d@a.b">a.b-c_d@a.b</a></p>
+<p><a href="mailto:a.b-c_d@a.b">a.b-c_d@a.b</a>.</p>
+<p>a.b-c_d@a.b-</p>
+<p>a.b-c_d@a.b_</p>

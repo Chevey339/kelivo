@@ -1,0 +1,40 @@
+>>> hard line break in a paragraph, using backslash
+First line.\
+Second line.
+
+<<<
+<p>First line.<br />
+Second line.</p>
+>>> within emphasis, using backslash
+*Emphasised\
+text.*
+
+<<<
+<p><em>Emphasised<br />
+text.</em></p>
+>>> no escape within code, using backslash
+`Some\
+code`.
+
+<<<
+<p><code>Some\ code</code>.</p>
+>>> hard line break in a paragraph, using trailing spaces
+First line.
+Second line.
+
+<<<
+<p>First line.
+Second line.</p>
+>>> within emphasis, using trailing spaces
+*Emphasised
+text.*
+
+<<<
+<p><em>Emphasised
+text.</em></p>
+>>> no escape within code, using trailing spaces
+`Some
+code`.
+
+<<<
+<p><code>Some code</code>.</p>

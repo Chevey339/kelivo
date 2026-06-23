@@ -1,0 +1,87 @@
+>>> Tabs - 1
+	foo	baz		bim
+<<<
+<pre><code>foo	baz		bim
+</code></pre>
+>>> Tabs - 2
+  	foo	baz		bim
+<<<
+<pre><code>foo	baz		bim
+</code></pre>
+>>> Tabs - 3
+    a	a
+    ὐ	a
+<<<
+<pre><code>a	a
+ὐ	a
+</code></pre>
+>>> Tabs - 4
+  - foo
+
+	bar
+<<<
+<ul>
+<li>
+<p>foo</p>
+<p>bar</p>
+</li>
+</ul>
+>>> Tabs - 5
+- foo
+
+		bar
+<<<
+<ul>
+<li>
+<p>foo</p>
+<pre><code>  bar
+</code></pre>
+</li>
+</ul>
+>>> Tabs - 6
+>		foo
+<<<
+<blockquote>
+<pre><code>foo
+</code></pre>
+</blockquote>
+>>> Tabs - 7
+-		foo
+<<<
+<ul>
+<li>
+<pre><code>  foo
+</code></pre>
+</li>
+</ul>
+>>> Tabs - 8
+    foo
+	bar
+<<<
+<pre><code>foo
+bar
+</code></pre>
+>>> Tabs - 9
+ - foo
+   - bar
+	 - baz
+<<<
+<ul>
+<li>foo
+<ul>
+<li>bar
+<ul>
+<li>baz</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+>>> Tabs - 10
+#	Foo
+<<<
+<h1>Foo</h1>
+>>> Tabs - 11
+*	*	*	
+<<<
+<hr />
