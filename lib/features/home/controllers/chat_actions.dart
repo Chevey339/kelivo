@@ -65,6 +65,7 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
+    required this.getTitleForLocale,
   });
 
   final HomeViewModel viewModel;
@@ -74,6 +75,7 @@ class ChatActions {
   final GenerationController generationController;
   final MessageGenerationService messageGenerationService;
   final BuildContext contextProvider;
+  final String Function(BuildContext context) getTitleForLocale;
 
   // ============================================================================
   // Callbacks for UI updates (set by HomeViewModel)
@@ -626,6 +628,9 @@ class ChatActions {
       regenAskUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
 
+    final shouldGenerateTitleOnRetry =
+        conversation.title == getTitleForLocale(contextProvider);
+
     await cancelStreaming(conversation);
 
     final completeMessages = chatController.messagesForCompleteHistoryContext(
@@ -777,7 +782,7 @@ class ChatActions {
       settings: settings,
       supportsReasoning: supportsReasoning,
       enableReasoning: enableReasoning,
-      generateTitleOnFinish: false,
+      generateTitleOnFinish: shouldGenerateTitleOnRetry,
     );
 
     await _executeGeneration(ctx);
