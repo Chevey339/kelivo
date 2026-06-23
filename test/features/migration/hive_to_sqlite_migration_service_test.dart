@@ -254,6 +254,114 @@ void main() {
     );
   });
 
+  test('migrates chat data across multiple message batches', () async {
+    const messageCount = 130;
+    final baseTime = DateTime(2024, 2, 1, 9);
+    final conversation = Conversation(
+      id: 'conversation-many',
+      title: 'Large Migration Source',
+      createdAt: baseTime,
+      updatedAt: baseTime.add(const Duration(hours: 1)),
+      assistantId: 'assistant-many',
+      mcpServerIds: ['filesystem', 'search'],
+      truncateIndex: 12,
+      versionSelections: {'group-12': 1},
+      summary: 'large summary',
+      lastSummarizedMessageCount: 64,
+      chatSuggestions: ['next'],
+    );
+    final messages = [
+      for (var i = 0; i < messageCount; i++)
+        ChatMessage(
+          id: 'message-$i',
+          role: i.isEven ? 'user' : 'assistant',
+          content: 'message content $i',
+          conversationId: conversation.id,
+          timestamp: baseTime.add(Duration(minutes: i)),
+          modelId: i.isOdd ? 'model-$i' : null,
+          providerId: i.isOdd ? 'provider' : null,
+          groupId: 'group-$i',
+          version: i % 3,
+          promptTokens: i,
+          completionTokens: i + 1,
+        ),
+    ];
+    conversation.messageIds.addAll(messages.map((message) => message.id));
+
+    _registerHiveAdapters();
+    Hive.init(tempDir.path);
+    final conversations = await Hive.openBox<Conversation>('conversations');
+    final messagesBox = await Hive.openBox<ChatMessage>('messages');
+    final toolEvents = await Hive.openBox<dynamic>('tool_events_v1');
+    await conversations.put(conversation.id, conversation);
+    for (final message in messages) {
+      await messagesBox.put(message.id, message);
+    }
+    await toolEvents.put('message-129', [
+      {
+        'id': 'tool-large',
+        'name': 'batch-check',
+        'content': 'last batch result',
+      },
+    ]);
+    await toolEvents.put('sig_message-129', 'last-batch-signature');
+    await conversations.close();
+    await messagesBox.close();
+    await toolEvents.close();
+    await Hive.close();
+
+    final decision = await HiveToSqliteMigrationService.check();
+    expect(decision.needsMigration, isTrue);
+
+    final service = HiveToSqliteMigrationService(decision);
+    final statuses = <HiveToSqliteMigrationStatus>[];
+    final sub = service.statusStream.listen(statuses.add);
+    addTearDown(sub.cancel);
+    await service.migrate(backupFile: File('${tempDir.path}/backup.zip'));
+    await service.dispose();
+
+    expect(
+      statuses
+          .where(
+            (status) =>
+                status.stage == HiveToSqliteMigrationStage.migrating &&
+                status.detail == 'messages',
+          )
+          .length,
+      greaterThanOrEqualTo(2),
+    );
+
+    final chatService = ChatService();
+    await chatService.init();
+    addTearDown(chatService.close);
+
+    final migratedConversation = chatService.getConversation(conversation.id);
+    expect(migratedConversation, isNotNull);
+    expect(migratedConversation!.mcpServerIds, ['filesystem', 'search']);
+    expect(migratedConversation.truncateIndex, 12);
+    expect(migratedConversation.versionSelections, {'group-12': 1});
+    expect(migratedConversation.summary, 'large summary');
+    expect(migratedConversation.lastSummarizedMessageCount, 64);
+    expect(migratedConversation.chatSuggestions, ['next']);
+
+    final migratedMessages = chatService.getMessages(conversation.id);
+    expect(migratedMessages, hasLength(messageCount));
+    expect(migratedMessages.first.id, 'message-0');
+    expect(migratedMessages[127].id, 'message-127');
+    expect(migratedMessages.last.id, 'message-129');
+    expect(migratedMessages.last.timestamp, messages.last.timestamp);
+    expect(migratedMessages.last.modelId, messages.last.modelId);
+    expect(migratedMessages.last.promptTokens, messages.last.promptTokens);
+    expect(
+      chatService.getToolEvents('message-129').single['name'],
+      'batch-check',
+    );
+    expect(
+      chatService.getGeminiThoughtSignature('message-129'),
+      'last-batch-signature',
+    );
+  });
+
   test(
     'does not show empty resource directories in initial backup items',
     () async {
