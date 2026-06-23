@@ -5383,6 +5383,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
 
   @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
   String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
 
   @override
@@ -10820,6 +10823,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
 
   @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
   String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
 
   @override
@@ -16255,6 +16261,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationBackupReadyDetail => '備份 ZIP 已準備好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在儲存備份 ZIP';
 
   @override
   String get migrationBackupFileSavedTitle => '備份 ZIP 已保存';

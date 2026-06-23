@@ -208,6 +208,11 @@ void main() {
     );
 
     await service.migrate(backupFile: backupFile);
+    final firstMigrationStatus = statuses.firstWhere(
+      (status) => status.stage == HiveToSqliteMigrationStage.migrating,
+    );
+    expect(firstMigrationStatus.detail, 'schema');
+    expect(firstMigrationStatus.progress, 0);
     await service.dispose();
 
     final afterMigration = await HiveToSqliteMigrationService.check();

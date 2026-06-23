@@ -2411,6 +2411,7 @@
   "migrationMigratingToolEventsDetail": "Migrating tool records",
   "migrationMigratingValidateDetail": "Validating migrated data",
   "migrationBackupReadyDetail": "Backup ZIP is ready",
+  "migrationSavingBackupZipDetail": "Saving backup ZIP",
   "migrationBackupFileSavedTitle": "Backup ZIP saved",
   "migrationChecklistBackupFiles": "Export Hive backup ZIP",
   "migrationChecklistPrepareSqlite": "Prepare SQLite database",

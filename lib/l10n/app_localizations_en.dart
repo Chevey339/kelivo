@@ -5602,6 +5602,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get migrationBackupReadyDetail => 'Backup ZIP is ready';
 
   @override
+  String get migrationSavingBackupZipDetail => 'Saving backup ZIP';
+
+  @override
   String get migrationBackupFileSavedTitle => 'Backup ZIP saved';
 
   @override

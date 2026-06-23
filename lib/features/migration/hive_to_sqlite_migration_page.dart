@@ -91,6 +91,16 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   Future<File?> _createAndSaveMobileBackup() async {
     final backupFile = await widget.service.backupToTemporaryFile();
     try {
+      if (mounted) {
+        setState(() {
+          _status = _status.copyWith(
+            stage: HiveToSqliteMigrationStage.backingUp,
+            progress: 0,
+            detail: 'saving_zip',
+            backupPath: null,
+          );
+        });
+      }
       final saved = await NativeFileSave.saveFileFromPath(
         sourcePath: backupFile.path,
         fileName: p.basename(backupFile.path),
@@ -286,9 +296,11 @@ class _ProgressStep extends StatelessWidget {
               ? _migratingDetail(l10n, status)
               : status.stage == HiveToSqliteMigrationStage.backupReady
               ? l10n.migrationBackupReadyDetail
+              : status.detail == 'saving_zip'
+              ? l10n.migrationSavingBackupZipDetail
               : l10n.migrationBackingUpDetail(status.detail),
           progress: status.progress,
-          showPercent: status.progress > 0,
+          showPercent: status.progress > 0 && status.detail != 'saving_zip',
         ),
         const SizedBox(height: 14),
         _ChecklistCard(
