@@ -148,10 +148,15 @@ class DataSync {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json
       final settingsJson = await _exportSettingsJson();
+      final map = jsonDecode(settingsJson) as Map<String, dynamic>;
+      map['backup_reminder_last_backup_at_v1'] = DateTime.now()
+          .toIso8601String();
+      final patchedJson = jsonEncode(map);
+
       settingsTmp = await _writeTempText(
         workDir,
         '_bk_settings.json',
-        settingsJson,
+        patchedJson,
       );
 
       // chats.json — stream to file to avoid huge string in memory

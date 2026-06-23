@@ -109,6 +109,52 @@ void main() {
       },
     );
 
+    test(
+      'settings.json in backup ZIP contains current backup_reminder_last_backup_at_v1',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'backup_reminder_last_backup_at_v1': '2020-01-01T00:00:00.000',
+          'other_setting': 'should still be present',
+        });
+
+        final sync = DataSync(chatService: ChatService());
+        final before = DateTime.now();
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+        final after = DateTime.now();
+
+        final input = InputFileStream(backupFile.path);
+        try {
+          final archive = ZipDecoder().decodeStream(input);
+          final settingsEntry = archive.findFile('settings.json');
+          expect(settingsEntry, isNotNull);
+
+          final rawBytes = settingsEntry!.readBytes();
+          final content = jsonDecode(utf8.decode(rawBytes!)) as Map;
+          final ts = content['backup_reminder_last_backup_at_v1'] as String;
+          final parsed = DateTime.parse(ts);
+
+          expect(
+            parsed.isAfter(before) || parsed.isAtSameMomentAs(before),
+            isTrue,
+            reason: 'timestamp should be >= backup start time',
+          );
+          expect(
+            parsed.isBefore(after) || parsed.isAtSameMomentAs(after),
+            isTrue,
+            reason: 'timestamp should be <= backup end time',
+          );
+
+          expect(content['other_setting'], 'should still be present');
+        } finally {
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
     test('restores managed font files in overwrite and merge modes', () async {
       final sourceDir = Directory('${root.path}/source_fonts');
       await sourceDir.create(recursive: true);
