@@ -158,6 +158,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubChatToolEvents => '工具事件';
 
   @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
+
+  @override
   String get storageSpaceSubAssistantAvatars => '头像';
 
   @override
@@ -5598,6 +5607,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSubChatToolEvents => '工具事件';
 
   @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
+
+  @override
   String get storageSpaceSubAssistantAvatars => '头像';
 
   @override
@@ -11036,6 +11054,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天資料庫';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '寫入日誌';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '頭像';

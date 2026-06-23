@@ -134,6 +134,12 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubChatConversations;
       case 'tool_events_v1':
         return l10n.storageSpaceSubChatToolEvents;
+      case 'sqlite_database':
+        return l10n.storageSpaceSubChatDatabase;
+      case 'sqlite_wal':
+        return l10n.storageSpaceSubChatWriteAheadLog;
+      case 'sqlite_shm':
+        return l10n.storageSpaceSubChatSharedMemory;
       case 'avatars':
         return l10n.storageSpaceSubAssistantAvatars;
       case 'images':

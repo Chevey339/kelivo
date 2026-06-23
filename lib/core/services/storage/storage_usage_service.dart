@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import '../../database/app_database.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
@@ -94,11 +95,29 @@ abstract final class StorageUsageService {
         lower.endsWith('.ico');
   }
 
-  static String _basenameNoExt(String name) {
-    final base = p.basename(name);
-    final dot = base.lastIndexOf('.');
-    if (dot <= 0) return base;
-    return base.substring(0, dot);
+  static String? _chatDatabaseSubcategoryId(String name) {
+    switch (name.toLowerCase()) {
+      case AppDatabase.databaseFileName:
+        return 'sqlite_database';
+      case '${AppDatabase.databaseFileName}-wal':
+        return 'sqlite_wal';
+      case '${AppDatabase.databaseFileName}-shm':
+        return 'sqlite_shm';
+      default:
+        return null;
+    }
+  }
+
+  static String _chatDatabaseFileName(String subcategoryId) {
+    switch (subcategoryId) {
+      case 'sqlite_wal':
+        return '${AppDatabase.databaseFileName}-wal';
+      case 'sqlite_shm':
+        return '${AppDatabase.databaseFileName}-shm';
+      case 'sqlite_database':
+      default:
+        return AppDatabase.databaseFileName;
+    }
   }
 
   static Future<StorageUsageReport> computeReport() async {
@@ -109,9 +128,9 @@ abstract final class StorageUsageService {
     };
 
     final chatSubs = <String, _MutableStats>{
-      'messages': _MutableStats(),
-      'conversations': _MutableStats(),
-      'tool_events_v1': _MutableStats(),
+      'sqlite_database': _MutableStats(),
+      'sqlite_wal': _MutableStats(),
+      'sqlite_shm': _MutableStats(),
     };
 
     final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
@@ -165,16 +184,15 @@ abstract final class StorageUsageService {
           continue;
         }
 
-        // Root-level files are mostly Hive boxes / preferences.
+        // Root-level chat data is stored by Drift in the SQLite database file
+        // family. Legacy Hive boxes are migration inputs only and should not
+        // affect the steady-state chat records size.
         if (parts.length == 1) {
           final name = parts.first;
-          final lower = name.toLowerCase();
-          final isHive = lower.endsWith('.hive') || lower.endsWith('.lock');
-          if (isHive) {
+          final chatSubId = _chatDatabaseSubcategoryId(name);
+          if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
-            final box = _basenameNoExt(name);
-            final sub = chatSubs[box];
-            if (sub != null) sub.add(bytes);
+            chatSubs[chatSubId]!.add(bytes);
           } else {
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
           }
@@ -283,7 +301,7 @@ abstract final class StorageUsageService {
               StorageUsageSubcategory(
                 id: e.key,
                 stats: e.value.toStats(),
-                path: p.join(root.path, '${e.key}.hive'),
+                path: p.join(root.path, _chatDatabaseFileName(e.key)),
               ),
         ],
       ),
