@@ -5665,6 +5665,69 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hermesTerminalThemeLight => '浅色';
+
+  @override
+  String get hermesBillingTitle => '积分与账单';
+
+  @override
+  String get hermesBillingCredits => '积分';
+
+  @override
+  String get hermesBillingCreditsRemaining => '剩余积分';
+
+  @override
+  String get hermesBillingPurchase => '购买积分';
+
+  @override
+  String get hermesBillingAutoReload => '自动充值';
+
+  @override
+  String get hermesBillingAutoReloadOn => '开启';
+
+  @override
+  String get hermesBillingAutoReloadOff => '关闭';
+
+  @override
+  String get hermesBillingThreshold => '余额低于时自动充值';
+
+  @override
+  String get hermesBillingPackages => '可用套餐';
+
+  @override
+  String get hermesBillingCharge => '购买';
+
+  @override
+  String get hermesBillingChargePending => '处理中…';
+
+  @override
+  String get hermesBillingChargeSuccess => '购买成功';
+
+  @override
+  String get hermesBillingChargeFailed => '购买失败';
+
+  @override
+  String get hermesBillingClose => '关闭';
+
+  @override
+  String get hermesBillingEmpty => '暂无可用套餐';
+
+  @override
+  String get hermesSessionExport => '导出';
+
+  @override
+  String get hermesSessionExportMarkdown => '导出为 Markdown';
+
+  @override
+  String get hermesSessionExportText => '导出为文本';
+
+  @override
+  String get hermesSessionExporting => '导出中…';
+
+  @override
+  String get hermesSessionExportSuccess => '会话已导出';
+
+  @override
+  String get hermesSessionExportFailed => '导出失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11328,6 +11391,69 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get hermesTerminalThemeLight => '浅色';
+
+  @override
+  String get hermesBillingTitle => '积分与账单';
+
+  @override
+  String get hermesBillingCredits => '积分';
+
+  @override
+  String get hermesBillingCreditsRemaining => '剩余积分';
+
+  @override
+  String get hermesBillingPurchase => '购买积分';
+
+  @override
+  String get hermesBillingAutoReload => '自动充值';
+
+  @override
+  String get hermesBillingAutoReloadOn => '开启';
+
+  @override
+  String get hermesBillingAutoReloadOff => '关闭';
+
+  @override
+  String get hermesBillingThreshold => '余额低于时自动充值';
+
+  @override
+  String get hermesBillingPackages => '可用套餐';
+
+  @override
+  String get hermesBillingCharge => '购买';
+
+  @override
+  String get hermesBillingChargePending => '处理中…';
+
+  @override
+  String get hermesBillingChargeSuccess => '购买成功';
+
+  @override
+  String get hermesBillingChargeFailed => '购买失败';
+
+  @override
+  String get hermesBillingClose => '关闭';
+
+  @override
+  String get hermesBillingEmpty => '暂无可用套餐';
+
+  @override
+  String get hermesSessionExport => '导出';
+
+  @override
+  String get hermesSessionExportMarkdown => '导出为 Markdown';
+
+  @override
+  String get hermesSessionExportText => '导出为文本';
+
+  @override
+  String get hermesSessionExporting => '导出中…';
+
+  @override
+  String get hermesSessionExportSuccess => '会话已导出';
+
+  @override
+  String get hermesSessionExportFailed => '导出失败';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16991,4 +17117,67 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get hermesTerminalThemeLight => '淺色';
+
+  @override
+  String get hermesBillingTitle => '積分與帳單';
+
+  @override
+  String get hermesBillingCredits => '積分';
+
+  @override
+  String get hermesBillingCreditsRemaining => '剩餘積分';
+
+  @override
+  String get hermesBillingPurchase => '購買積分';
+
+  @override
+  String get hermesBillingAutoReload => '自動儲值';
+
+  @override
+  String get hermesBillingAutoReloadOn => '開啟';
+
+  @override
+  String get hermesBillingAutoReloadOff => '關閉';
+
+  @override
+  String get hermesBillingThreshold => '餘額低於時自動儲值';
+
+  @override
+  String get hermesBillingPackages => '可用套餐';
+
+  @override
+  String get hermesBillingCharge => '購買';
+
+  @override
+  String get hermesBillingChargePending => '處理中…';
+
+  @override
+  String get hermesBillingChargeSuccess => '購買成功';
+
+  @override
+  String get hermesBillingChargeFailed => '購買失敗';
+
+  @override
+  String get hermesBillingClose => '關閉';
+
+  @override
+  String get hermesBillingEmpty => '暫無可用套餐';
+
+  @override
+  String get hermesSessionExport => '導出';
+
+  @override
+  String get hermesSessionExportMarkdown => '導出為 Markdown';
+
+  @override
+  String get hermesSessionExportText => '導出為文字';
+
+  @override
+  String get hermesSessionExporting => '導出中…';
+
+  @override
+  String get hermesSessionExportSuccess => '對話已導出';
+
+  @override
+  String get hermesSessionExportFailed => '導出失敗';
 }

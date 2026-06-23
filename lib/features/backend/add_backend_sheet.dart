@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:web_socket_channel/web_socket_channel.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/ios_form_text_field.dart';
-import '../../hermes/hermes_backend_qr.dart';
 import '../../hermes/hermes_backend_discovery.dart';
 
 typedef BackendSavedCallback =
@@ -205,6 +209,26 @@ class _AddBackendSheetState extends State<AddBackendSheet>
               const SizedBox(width: 12),
               Expanded(
                 child: IosCardPress(
+                  onTap: _isTesting ? null : _fetchSpaToken,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  baseColor: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Center(
+                    child: Text(
+                      '抓取 Token',
+                      style: TextStyle(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: IosCardPress(
                   onTap: _save,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   baseColor: Theme.of(context).colorScheme.primary,
@@ -283,17 +307,149 @@ class _AddBackendSheetState extends State<AddBackendSheet>
     );
   }
 
-  Future<void> _testConnection() async {
+  /// Fetch the SPA-injected session token from `<base>/`.
+  ///
+  /// Hermes Dashboard (when not in gated OAuth mode) injects
+  /// `window.__HERMES_SESSION_TOKEN__` into the served HTML so the browser
+  /// client can authenticate `/api/ws` via `?token=<value>`. Native clients
+  /// need the same value; this helper pulls it from the dashboard HTML and
+  /// populates the token field so the user doesn't have to dig through
+  /// "View Source".
+  ///
+  /// Only runs when the token field is currently empty and the URL parses
+  /// as http(s):// — does not touch the UI if the user has already typed
+  /// something.
+  Future<void> _fetchSpaToken() async {
+    final rawUrl = _urlController.text.trim();
+    if (rawUrl.isEmpty) {
+      _toast('请先填写服务器地址');
+      return;
+    }
+    if (_tokenController.text.trim().isNotEmpty) {
+      _toast('Token 已填写，无需抓取');
+      return;
+    }
+
+    // Translate ws://host:port → http://host:port/
+    final httpUrl = rawUrl
+        .replaceFirst(RegExp(r'^ws://'), 'http://')
+        .replaceFirst(RegExp(r'^wss://'), 'https://')
+        .replaceFirst(RegExp(r'/api/ws/?$'), '');
+    final probeUrl = httpUrl.endsWith('/') ? httpUrl : '$httpUrl/';
+
     setState(() {
       _isTesting = true;
       _testResult = null;
     });
-    await Future.delayed(const Duration(seconds: 1));
+
+    String? token;
+    String? errMsg;
+    try {
+      final resp = await http
+          .get(Uri.parse(probeUrl), headers: const {'Accept': 'text/html'})
+          .timeout(const Duration(seconds: 5));
+      if (resp.statusCode != 200) {
+        errMsg = 'HTTP ${resp.statusCode} from $probeUrl';
+      } else {
+        final body = resp.body;
+        final m = RegExp(
+          "__HERMES_SESSION_TOKEN__\\s*=\\s*[\"']([^\"']+)[\"']",
+        ).firstMatch(body);
+        if (m != null) {
+          token = m.group(1);
+        } else {
+          errMsg = 'SPA HTML 中未找到 __HERMES_SESSION_TOKEN__';
+        }
+      }
+    } catch (e) {
+      errMsg = '请求失败: $e';
+    }
+
+    if (!mounted) return;
     setState(() {
       _isTesting = false;
-      _testResult = 'Connection test — wiring in Phase 0.5';
-      _testSuccess = false;
+      if (token != null) {
+        _tokenController.text = token;
+        _testResult = '已从 Dashboard 抓取 Token';
+        _testSuccess = true;
+      } else {
+        _testResult = errMsg ?? '未知错误';
+        _testSuccess = false;
+      }
     });
+  }
+
+  /// Real WebSocket handshake probe: connects with `?token=<value>` and waits
+  /// for the server's `gateway.ready` event (or a close). Surfaces the actual
+  /// server reason on failure so the user knows whether it was auth, network,
+  /// or something else.
+  Future<void> _testConnection() async {
+    final rawUrl = _urlController.text.trim();
+    if (rawUrl.isEmpty) {
+      _toast('请先填写服务器地址');
+      return;
+    }
+
+    final token = _tokenController.text.trim();
+    final authMode = _authMode;
+
+    setState(() {
+      _isTesting = true;
+      _testResult = null;
+    });
+
+    String result = '';
+    bool success = false;
+    var attempt = 0;
+    try {
+      // Build the same URL HermesGateway._wsConnect builds, but inline here
+      // so we can await the first event without touching provider state.
+      String wsUrl = '';
+      if (authMode == 'loopback' || (authMode == 'auto' && token.isNotEmpty)) {
+        if (token.isEmpty) {
+          result = 'loopback 模式需要 Token';
+        } else {
+          wsUrl = '$rawUrl/api/ws?token=$token';
+        }
+      } else if (authMode == 'gated') {
+        result = 'gated 模式暂未在测试中支持';
+      } else {
+        wsUrl = '$rawUrl/api/ws';
+      }
+
+      if (result.isNotEmpty) return;
+
+      final channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      attempt = 1;
+      // Wait up to 5s for either a message or a close.
+      final readyOrClose = await channel.stream.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final preview = readyOrClose.toString();
+      if (preview.contains('"gateway.ready"')) {
+        result = '连接成功（已收到 gateway.ready）';
+        success = true;
+      } else {
+        result =
+            '已连接但首帧非 ready: ${preview.length > 80 ? '${preview.substring(0, 80)}…' : preview}';
+      }
+      await channel.sink.close();
+    } on TimeoutException {
+      result = attempt == 0 ? '连接超时（5s 未收到任何响应）' : '已连上但 5s 内未收到消息';
+    } catch (e) {
+      result = '失败: $e';
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isTesting = false;
+      _testResult = result;
+      _testSuccess = success;
+    });
+  }
+
+  void _toast(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _scanQr() async {
@@ -306,13 +462,28 @@ class _AddBackendSheetState extends State<AddBackendSheet>
   void _save() {
     final name = _nameController.text.trim();
     final url = _urlController.text.trim();
-    if (name.isEmpty || url.isEmpty) return;
+    if (name.isEmpty) {
+      _toast('请填写后端名称');
+      return;
+    }
+    if (url.isEmpty) {
+      _toast('请填写服务器地址（如 ws://192.168.31.199:9119）');
+      return;
+    }
+    if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+      _toast('服务器地址必须以 ws:// 或 wss:// 开头');
+      return;
+    }
 
     widget.onSaved(
       name,
       url,
-      _tokenController.text.isNotEmpty ? _tokenController.text : null,
-      _profileController.text.isNotEmpty ? _profileController.text : null,
+      _tokenController.text.trim().isNotEmpty
+          ? _tokenController.text.trim()
+          : null,
+      _profileController.text.trim().isNotEmpty
+          ? _profileController.text.trim()
+          : null,
       _authMode,
     );
     Navigator.of(context).pop();

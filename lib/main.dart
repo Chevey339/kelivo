@@ -51,6 +51,7 @@ import 'dart:io'
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
@@ -86,6 +87,18 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Initialize Hive (required by HermesConfig for persisting backend list).
+      // Failure is logged but never blocks startup — the connection gate will
+      // simply show an empty-state instead of crashing with a red screen.
+      try {
+        await Hive.initFlutter();
+      } catch (e, st) {
+        debugPrint('[HermesConfig] Hive.initFlutter failed: $e\n$st');
+      }
+      // Construct + initialize HermesGatewayProvider BEFORE runApp so that the
+      // very first widget built (ConnectionGate) sees a fully initialised
+      // HermesConfig and never hits `Bad state: HermesConfig not initialized`.
+      await _initHermesGateway();
       // Start app (Flutter log capture is toggleable and off by default)
       runApp(const MyApp());
     },
@@ -96,6 +109,25 @@ Future<void> main() async {
       },
     ),
   );
+}
+
+// `_hermesGatewayProvider` holds a single HermesGatewayProvider instance that is
+// constructed in `main()` AFTER `Hive.initFlutter()` completes, so that
+// `HermesGatewayProvider.init()` can safely call `HermesConfig.init()` without
+// hitting `Bad state: HermesConfig not initialized`. This instance is shared
+// with `MyApp` so that `ConnectionGate` (the very first widget built) never sees
+// an uninitialised `HermesConfig`.
+late final HermesGatewayProvider _hermesGatewayProvider;
+
+Future<void> _initHermesGateway() async {
+  _hermesGatewayProvider = HermesGatewayProvider();
+  try {
+    await _hermesGatewayProvider.init();
+  } catch (e, st) {
+    // Never crash the app on startup over a Hermes init failure — the
+    // connection gate will surface the error and the user can retry.
+    debugPrint('[HermesGateway] init failed: $e\n$st');
+  }
 }
 
 Future<void> _initDesktopWindow() async {
@@ -164,8 +196,12 @@ class MyApp extends StatelessWidget {
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),
-        // Hermes gateway — owns WS connection lifecycle
-        ChangeNotifierProvider(create: (_) => HermesGatewayProvider()),
+        // Hermes gateway — owns WS connection lifecycle. The instance is
+        // created and `.init()`-ed in `main()` so that ConnectionGate (the
+        // first widget built) never sees an uninitialised HermesConfig.
+        ChangeNotifierProvider<HermesGatewayProvider>.value(
+          value: _hermesGatewayProvider,
+        ),
       ],
       child: Builder(
         builder: (context) {

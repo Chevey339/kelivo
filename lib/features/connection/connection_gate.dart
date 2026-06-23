@@ -36,6 +36,14 @@ class ConnectionGate extends StatelessWidget {
           return child;
         }
 
+        // Still initializing (Hive box loading) — show a transient loading
+        // gate and DO NOT touch `provider.config.backends`, which would throw
+        // a red-screen `Bad state: HermesConfig not initialized` if init has
+        // not yet completed (e.g. on first frame of cold start).
+        if (state == HermesConnectionState.initializing) {
+          return _ConnectingGate(l10n: l10n, backendUrl: '');
+        }
+
         // No backends configured — show add-backend prompt
         if (provider.config.backends.isEmpty) {
           return _NoBackendGate(l10n: l10n, provider: provider);

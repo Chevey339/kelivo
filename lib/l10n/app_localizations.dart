@@ -10855,6 +10855,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Light'**
   String get hermesTerminalThemeLight;
+
+  /// No description provided for @hermesBillingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits & Billing'**
+  String get hermesBillingTitle;
+
+  /// No description provided for @hermesBillingCredits.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits'**
+  String get hermesBillingCredits;
+
+  /// No description provided for @hermesBillingCreditsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Credits Remaining'**
+  String get hermesBillingCreditsRemaining;
+
+  /// No description provided for @hermesBillingPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase Credits'**
+  String get hermesBillingPurchase;
+
+  /// No description provided for @hermesBillingAutoReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-reload'**
+  String get hermesBillingAutoReload;
+
+  /// No description provided for @hermesBillingAutoReloadOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get hermesBillingAutoReloadOn;
+
+  /// No description provided for @hermesBillingAutoReloadOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get hermesBillingAutoReloadOff;
+
+  /// No description provided for @hermesBillingThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload when below'**
+  String get hermesBillingThreshold;
+
+  /// No description provided for @hermesBillingPackages.
+  ///
+  /// In en, this message translates to:
+  /// **'Available Packages'**
+  String get hermesBillingPackages;
+
+  /// No description provided for @hermesBillingCharge.
+  ///
+  /// In en, this message translates to:
+  /// **'Buy'**
+  String get hermesBillingCharge;
+
+  /// No description provided for @hermesBillingChargePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get hermesBillingChargePending;
+
+  /// No description provided for @hermesBillingChargeSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase successful'**
+  String get hermesBillingChargeSuccess;
+
+  /// No description provided for @hermesBillingChargeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase failed'**
+  String get hermesBillingChargeFailed;
+
+  /// No description provided for @hermesBillingClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get hermesBillingClose;
+
+  /// No description provided for @hermesBillingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No packages available'**
+  String get hermesBillingEmpty;
+
+  /// No description provided for @hermesSessionExport.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get hermesSessionExport;
+
+  /// No description provided for @hermesSessionExportMarkdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Markdown'**
+  String get hermesSessionExportMarkdown;
+
+  /// No description provided for @hermesSessionExportText.
+  ///
+  /// In en, this message translates to:
+  /// **'Export as Text'**
+  String get hermesSessionExportText;
+
+  /// No description provided for @hermesSessionExporting.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting…'**
+  String get hermesSessionExporting;
+
+  /// No description provided for @hermesSessionExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Session exported'**
+  String get hermesSessionExportSuccess;
+
+  /// No description provided for @hermesSessionExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed'**
+  String get hermesSessionExportFailed;
 }
 
 class _AppLocalizationsDelegate

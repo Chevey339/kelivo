@@ -217,10 +217,16 @@ class HermesGatewayProvider extends ChangeNotifier {
   /// Initialize Hive config and load persisted backends.
   Future<void> init() async {
     await _config.init();
-    // Auto-connect to last active backend if any
+    // Auto-connect to last active backend if any. When no backend has been
+    // configured yet, transition out of `initializing` so that
+    // `ConnectionGate` can render the "no backend" empty state instead of
+    // being stuck on a perpetual connecting spinner.
     final active = _config.activeBackend;
     if (active != null) {
       await connectBackend(active.id);
+    } else {
+      _state = HermesConnectionState.disconnected;
+      notifyListeners();
     }
   }
 
