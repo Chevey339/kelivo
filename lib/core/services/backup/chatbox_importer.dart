@@ -305,7 +305,7 @@ class ChatboxImporter {
       await chatService.clearAllData();
     }
 
-    final existingConvs = chatService.getAllConversations();
+    final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {

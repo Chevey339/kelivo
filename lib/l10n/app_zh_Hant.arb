@@ -1955,5 +1955,56 @@
         "type": "int"
       }
     }
-  }
+  },
+  "migrationIntroTitle": "升級聊天記錄儲存",
+  "migrationIntroSubtitle": "Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。",
+  "migrationBackupNote": "遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。",
+  "migrationPerformanceNote": "遷移後，啟動、歷史載入和搜尋都會使用 SQLite 索引，長對話會更流暢。",
+  "migrationSourceDatabaseLabel": "Hive",
+  "migrationTargetDatabaseLabel": "SQLite",
+  "migrationChooseFolderButton": "選擇資料夾並備份",
+  "migrationSaveBackupButton": "儲存備份 ZIP",
+  "migrationBackingUpTitle": "正在備份",
+  "migrationBackingUpSubtitle": "正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。",
+  "migrationMigratingTitle": "正在遷移到 SQLite",
+  "migrationMigratingSubtitle": "正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。",
+  "migrationBackingUpDetail": "正在備份 {fileName}",
+  "@migrationBackingUpDetail": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "migrationMigratingDetail": "已遷移 {count} 條訊息",
+  "@migrationMigratingDetail": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "migrationMigratingPrepareDetail": "正在準備 SQLite 資料庫",
+  "migrationMigratingToolEventsDetail": "正在遷移工具呼叫記錄",
+  "migrationMigratingValidateDetail": "正在校驗遷移資料",
+  "migrationBackupReadyDetail": "備份 ZIP 已準備好",
+  "migrationBackupFileSavedTitle": "備份 ZIP 已保存",
+  "migrationChecklistBackupFiles": "匯出 Hive 備份 ZIP",
+  "migrationChecklistPrepareSqlite": "準備 SQLite 資料庫",
+  "migrationChecklistMigrateMessages": "遷移對話和訊息",
+  "migrationChecklistMigrateToolEvents": "遷移工具呼叫記錄",
+  "migrationChecklistValidate": "校驗遷移資料",
+  "migrationStepBackup": "備份",
+  "migrationStepMigrate": "遷移",
+  "migrationStepComplete": "完成",
+  "migrationCompleteTitle": "升級完成",
+  "migrationCompleteSubtitle": "你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。",
+  "migrationConversationCount": "對話",
+  "migrationMessageCount": "訊息",
+  "migrationRestartButton": "重啟 Kelivo",
+  "migrationFailedTitle": "遷移失敗",
+  "migrationFailedSubtitle": "原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。",
+  "migrationUnknownError": "未知遷移錯誤。",
+  "migrationFailureLogTitle": "失敗日誌",
+  "migrationRetryButton": "重試遷移"
 }

@@ -5537,4 +5537,127 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get migrationIntroTitle => 'Upgrade Chat Storage';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
+
+  @override
+  String get migrationBackupNote =>
+      'Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.';
+
+  @override
+  String get migrationPerformanceNote =>
+      'After migration, startup, history loading, and search use SQLite indexes for smoother long-chat performance.';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => 'Choose Folder and Back Up';
+
+  @override
+  String get migrationSaveBackupButton => 'Save Backup ZIP';
+
+  @override
+  String get migrationBackingUpTitle => 'Backing Up';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      'Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.';
+
+  @override
+  String get migrationMigratingTitle => 'Migrating to SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      'Writing conversations and messages in batches so large histories do not overload memory.';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return 'Backing up $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return 'Migrated $count messages';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => 'Preparing SQLite database';
+
+  @override
+  String get migrationMigratingToolEventsDetail => 'Migrating tool records';
+
+  @override
+  String get migrationMigratingValidateDetail => 'Validating migrated data';
+
+  @override
+  String get migrationBackupReadyDetail => 'Backup ZIP is ready';
+
+  @override
+  String get migrationBackupFileSavedTitle => 'Backup ZIP saved';
+
+  @override
+  String get migrationChecklistBackupFiles => 'Export Hive backup ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => 'Prepare SQLite database';
+
+  @override
+  String get migrationChecklistMigrateMessages =>
+      'Migrate conversations and messages';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => 'Migrate tool records';
+
+  @override
+  String get migrationChecklistValidate => 'Validate migrated data';
+
+  @override
+  String get migrationStepBackup => 'Backup';
+
+  @override
+  String get migrationStepMigrate => 'Migrate';
+
+  @override
+  String get migrationStepComplete => 'Done';
+
+  @override
+  String get migrationCompleteTitle => 'Upgrade Complete';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      'Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.';
+
+  @override
+  String get migrationConversationCount => 'Conversations';
+
+  @override
+  String get migrationMessageCount => 'Messages';
+
+  @override
+  String get migrationRestartButton => 'Restart Kelivo';
+
+  @override
+  String get migrationFailedTitle => 'Migration Failed';
+
+  @override
+  String get migrationFailedSubtitle =>
+      'The original Hive data and your backup are still intact. Review the reason below, then retry.';
+
+  @override
+  String get migrationUnknownError => 'Unknown migration error.';
+
+  @override
+  String get migrationFailureLogTitle => 'Failure log';
+
+  @override
+  String get migrationRetryButton => 'Retry Migration';
 }

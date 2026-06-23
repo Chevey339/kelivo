@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart'
 import 'dart:async';
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
+import 'features/migration/hive_to_sqlite_migration_page.dart';
+import 'features/migration/hive_to_sqlite_migration_service.dart';
 import 'desktop/desktop_home_page.dart';
 import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
@@ -79,6 +81,15 @@ Future<void> main() async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
+      final migrationDecision = await HiveToSqliteMigrationService.check();
+      if (migrationDecision.needsMigration) {
+        runApp(
+          MigrationApp(
+            service: HiveToSqliteMigrationService(migrationDecision),
+          ),
+        );
+        return;
+      }
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
@@ -108,6 +119,26 @@ Future<void> _initDesktopWindow() async {
 }
 
 // Removed eager system font preloading to reduce memory footprint at launch.
+
+class MigrationApp extends StatelessWidget {
+  const MigrationApp({super.key, required this.service});
+
+  final HiveToSqliteMigrationService service;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: HiveToSqliteMigrationPage(service: service),
+    );
+  }
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
