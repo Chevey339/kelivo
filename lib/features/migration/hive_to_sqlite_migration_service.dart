@@ -366,7 +366,12 @@ class HiveToSqliteMigrationService {
         _conversationBoxName,
       );
       messagesBox = await Hive.openLazyBox<ChatMessage>(_messagesBoxName);
-      toolEventsBox = await Hive.openLazyBox<dynamic>(_toolEventsBoxName);
+      final hasToolEventsBox = decision.hiveFiles.any(
+        (file) => p.basename(file.path) == 'tool_events_v1.hive',
+      );
+      if (hasToolEventsBox) {
+        toolEventsBox = await Hive.openLazyBox<dynamic>(_toolEventsBoxName);
+      }
 
       final tempFile = File('${decision.sqliteFile.path}.migrating');
       await _deleteSqliteFamily(tempFile);
@@ -397,7 +402,7 @@ class HiveToSqliteMigrationService {
 
       await repo.clearAllData();
       for (final conversation in conversations) {
-        await repo.putConversation(conversation);
+        var needsConversationInsert = true;
         var order = 0;
         for (
           var start = 0;
@@ -407,24 +412,34 @@ class HiveToSqliteMigrationService {
           final end = (start + _messageBatchSize)
               .clamp(start, conversation.messageIds.length)
               .toInt();
-          final batch = <ChatMessage>[];
+          final batch = <({ChatMessage message, int messageOrder})>[];
+          final toolEventsByMessageId = <String, List<Map<String, dynamic>>>{};
+          final geminiSignaturesByMessageId = <String, String>{};
           for (var i = start; i < end; i++) {
             final message = await messagesBox.get(conversation.messageIds[i]);
             if (message == null) continue;
-            batch.add(message);
-          }
-          for (final message in batch) {
-            await repo.putMessage(message, messageOrder: order);
+            batch.add((message: message, messageOrder: order));
             order++;
-            final events = await _toolEventsFor(toolEventsBox, message.id);
-            if (events.isNotEmpty) {
-              await repo.setToolEvents(message.id, events);
-            }
-            final signature = await _signatureFor(toolEventsBox, message.id);
-            if (signature != null) {
-              await repo.setGeminiThoughtSignature(message.id, signature);
+            if (toolEventsBox != null) {
+              final events = await _toolEventsFor(toolEventsBox, message.id);
+              if (events.isNotEmpty) {
+                toolEventsByMessageId[message.id] = events;
+              }
+              final signature = await _signatureFor(toolEventsBox, message.id);
+              if (signature != null) {
+                geminiSignaturesByMessageId[message.id] = signature;
+              }
             }
           }
+          await repo.putMigrationBatch(
+            conversations: needsConversationInsert
+                ? [conversation]
+                : const <Conversation>[],
+            messages: batch,
+            toolEventsByMessageId: toolEventsByMessageId,
+            geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+          );
+          needsConversationInsert = false;
           migratedMessages += batch.length;
           final messageProgress = totalMessages == 0
               ? 0.9
@@ -441,6 +456,14 @@ class HiveToSqliteMigrationService {
           );
           await Future<void>.delayed(Duration.zero);
         }
+        if (needsConversationInsert) {
+          await repo.putMigrationBatch(
+            conversations: [conversation],
+            messages: const <({ChatMessage message, int messageOrder})>[],
+            toolEventsByMessageId: const <String, List<Map<String, dynamic>>>{},
+            geminiSignaturesByMessageId: const <String, String>{},
+          );
+        }
       }
 
       _emit(
@@ -453,9 +476,11 @@ class HiveToSqliteMigrationService {
         conversations: conversations.length,
         messages: migratedMessages,
       );
-      final active = await toolEventsBox.get(_activeStreamingKey);
-      if (active is List && active.isNotEmpty) {
-        await repo.setActiveStreamingIds(active.map((e) => '$e').toList());
+      if (toolEventsBox != null) {
+        final active = await toolEventsBox.get(_activeStreamingKey);
+        if (active is List && active.isNotEmpty) {
+          await repo.setActiveStreamingIds(active.map((e) => '$e').toList());
+        }
       }
       _emit(
         HiveToSqliteMigrationStage.migrating,
