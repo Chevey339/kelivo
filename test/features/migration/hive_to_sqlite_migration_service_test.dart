@@ -77,6 +77,8 @@ void main() {
       content: 'hello from sqlite',
       conversationId: conversation.id,
       timestamp: DateTime(2024, 1, 1, 10, 1),
+      reasoningStartAt: DateTime(2024, 1, 1, 10, 1, 2),
+      reasoningFinishedAt: DateTime(2024, 1, 1, 10, 1, 3),
       modelId: 'model-a',
       providerId: 'provider-a',
       promptTokens: 3,
@@ -222,11 +224,26 @@ void main() {
     await chatService.init();
     addTearDown(chatService.close);
 
+    final migratedConversation = chatService.getConversation(conversation.id);
+    expect(migratedConversation, isNotNull);
+    expect(migratedConversation!.createdAt, conversation.createdAt);
+    expect(migratedConversation.updatedAt, conversation.updatedAt);
     expect(chatService.getMessageCount(conversation.id), 2);
-    expect(chatService.getMessages(conversation.id).map((m) => m.content), [
+    final migratedMessages = chatService.getMessages(conversation.id);
+    expect(migratedMessages.map((m) => m.content), [
       'hello from hive',
       'hello from sqlite',
     ]);
+    expect(migratedMessages[0].timestamp, userMessage.timestamp);
+    expect(migratedMessages[1].timestamp, assistantMessage.timestamp);
+    expect(
+      migratedMessages[1].reasoningStartAt,
+      assistantMessage.reasoningStartAt,
+    );
+    expect(
+      migratedMessages[1].reasoningFinishedAt,
+      assistantMessage.reasoningFinishedAt,
+    );
     expect(
       chatService.getToolEvents(assistantMessage.id).single['name'],
       'search',
