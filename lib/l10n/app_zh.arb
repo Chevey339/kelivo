@@ -838,6 +838,8 @@
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarImageMode": "绘图模式",
   "chatInputBarDisableImageModeTooltip": "关闭绘图模式",
+  "chatInputBarImageWarning": "将忽略图片",
+  "chatInputBarDisableImageWarningTooltip": "忽略",
   "chatInputBarQueuedPending": "排队中",
   "chatInputBarQueuedCancel": "取消排队",
   "chatInputBarInsertNewline": "换行",

@@ -514,7 +514,7 @@ class ChatApiService {
     return out;
   }
 
-  static bool _supportsImageInput(ProviderConfig config, String modelId) {
+  static bool supportsImageInput(ProviderConfig config, String modelId) {
     return _effectiveModelInfo(config, modelId).input.contains(Modality.image);
   }
 
@@ -587,7 +587,7 @@ class ChatApiService {
     final stripUnsupportedImageInputs =
         !ocrActive &&
         !useOpenAIImagesApi &&
-        !_supportsImageInput(config, modelId);
+        !supportsImageInput(config, modelId);
     final safeMessages = stripUnsupportedImageInputs
         ? await _stripImageInputsFromMessages(unicodeSafeMessages)
         : unicodeSafeMessages;
