@@ -2555,6 +2555,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
 
   @override
+  String get chatInputBarImageWarning => 'Images will be ignored';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => 'Dismiss';
+
+  @override
   String get chatInputBarQueuedPending => 'Queued to send';
 
   @override
