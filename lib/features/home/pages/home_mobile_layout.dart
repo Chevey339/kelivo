@@ -21,6 +21,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../models/workspace_button_config.dart';
 
 /// Mobile layout scaffold for the home page
 /// This widget handles only the structural layout - AppBar, drawer, body structure
@@ -51,6 +52,7 @@ class HomeMobileScaffold extends StatelessWidget {
     required this.onEnterGlobalSearch,
     required this.onExitGlobalSearch,
     required this.onOpenGlobalSearchResult,
+    this.workspaceButtonConfig,
     this.appBarOverride,
     required this.body,
   });
@@ -79,6 +81,10 @@ class HomeMobileScaffold extends StatelessWidget {
   final VoidCallback onExitGlobalSearch;
   final Future<void> Function(String conversationId, String messageId)
   onOpenGlobalSearchResult;
+
+  /// Workspace button state and actions for the current conversation.
+  /// When null, the button is not rendered (no conversation or temporary).
+  final WorkspaceButtonConfig? workspaceButtonConfig;
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
@@ -134,6 +140,7 @@ class HomeMobileScaffold extends StatelessWidget {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, ColorScheme cs) {
+    final l10n = AppLocalizations.of(context)!;
     final isDesktopPlatform =
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.windows ||
@@ -256,6 +263,18 @@ class HomeMobileScaffold extends StatelessWidget {
               ],
             ),
       actions: [
+        if (workspaceButtonConfig != null)
+          IosIconButton(
+            size: 20,
+            minSize: 44,
+            color: workspaceButtonConfig!.isEnabled ? Colors.blue : null,
+            semanticLabel: workspaceButtonConfig!.isEnabled
+                ? l10n.workspaceArtifactsTooltip
+                : l10n.workspaceEnableTitle,
+            onTap: workspaceButtonConfig!.onPrimaryAction,
+            onLongPress: workspaceButtonConfig!.onDisableWithConfirm,
+            icon: Lucide.FileText,
+          ),
         IosIconButton(
           size: 20,
           minSize: 44,

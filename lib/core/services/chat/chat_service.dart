@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../workspace/workspace_service.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
@@ -340,6 +341,17 @@ class ChatService extends ChangeNotifier {
 
   Future<void> deleteConversation(String id) async {
     if (!_initialized) return;
+
+    // Clean up the conversation workspace directory before deleting the
+    // conversation record. deleteWorkspace is idempotent (no-op when the
+    // directory is missing), so this is safe regardless of workspaceEnabled.
+    // This is intentionally unconditional (defensive): if workspaceEnabled is
+    // out of sync with the filesystem, we still remove a stale directory.
+    try {
+      await WorkspaceService.deleteWorkspace(id);
+    } catch (_) {
+      // Workspace cleanup is best-effort; do not block conversation deletion.
+    }
 
     final deleted =
         await _deleteDraftConversation(id) ||
@@ -828,6 +840,26 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) return;
 
     conversation.isPinned = !conversation.isPinned;
+    await conversation.save();
+    notifyListeners();
+  }
+
+  /// Updates [Conversation.workspaceEnabled] for [id] and persists it.
+  /// Callers are responsible for any filesystem side effects (creating or
+  /// deleting the workspace directory) via [WorkspaceService].
+  Future<void> setWorkspaceEnabled(String id, bool enabled) async {
+    if (!_initialized) return;
+
+    if (_draftConversations.containsKey(id)) {
+      final draft = _draftConversations[id]!;
+      draft.workspaceEnabled = enabled;
+      notifyListeners();
+      return;
+    }
+    final conversation = _conversationsBox.get(id);
+    if (conversation == null) return;
+
+    conversation.workspaceEnabled = enabled;
     await conversation.save();
     notifyListeners();
   }

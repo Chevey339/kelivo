@@ -1,10 +1,35 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path/path.dart' as p;
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/services/skills/skill_service.dart';
 import 'package:Kelivo/features/home/services/local_tools_service.dart';
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -21,12 +46,21 @@ void main() {
       ],
     );
 
-    setUp(() {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_local_tools_test_',
+      );
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      Hive.init(tempDir.path);
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
     });
 
-    tearDown(() {
+    tearDown(() async {
+      await Hive.close();
+      await tempDir.delete(recursive: true);
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(SystemChannels.platform, null);
     });
@@ -90,16 +124,16 @@ void main() {
 
     test(
       'builds enabled local tool definitions only when model supports tools',
-      () {
-        final disabled = LocalToolsService.buildToolDefinitions(
+      () async {
+        final disabled = await LocalToolsService.buildToolDefinitions(
           assistant: const Assistant(id: 'a2', name: 'Assistant'),
           supportsTools: true,
         );
-        final unsupported = LocalToolsService.buildToolDefinitions(
+        final unsupported = await LocalToolsService.buildToolDefinitions(
           assistant: localToolsAssistant,
           supportsTools: false,
         );
-        final enabled = LocalToolsService.buildToolDefinitions(
+        final enabled = await LocalToolsService.buildToolDefinitions(
           assistant: localToolsAssistant,
           supportsTools: true,
         );
@@ -277,6 +311,142 @@ void main() {
           localToolsAssistant,
         ),
         isNull,
+      );
+    });
+
+    group('skill tools', () {
+      const skillName = 'test-skill';
+      late Conversation conversation;
+
+      setUp(() async {
+        final root = await SkillService.instance.getSkillsRoot();
+        final skillDir = Directory(p.join(root, skillName));
+        await skillDir.create(recursive: true);
+        await File(p.join(skillDir.path, 'SKILL.md')).writeAsString('''
+---
+name: $skillName
+description: A test skill for local tool tests.
+---
+
+# Test Skill
+
+This is the skill content.
+''');
+        await File(
+          p.join(skillDir.path, 'references', 'guide.md'),
+        ).create(recursive: true).then((f) => f.writeAsString('Guide content'));
+
+        // Register the skill as globally enabled.
+        final box = await Hive.openBox<String>('skills');
+        await box.put(
+          skillName,
+          jsonEncode({
+            'name': skillName,
+            'description': 'A test skill for local tool tests.',
+            'directoryPath': skillDir.path,
+            'globalEnabled': true,
+            'createdAt': DateTime.now().toIso8601String(),
+          }),
+        );
+
+        conversation = Conversation(
+          id: 'c1',
+          title: 'Test',
+          enabledSkillNames: const [skillName],
+        );
+      });
+
+      tearDown(() async {
+        final box = Hive.box<String>('skills');
+        await box.delete(skillName);
+      });
+
+      test('use_skill returns SKILL.md content for active skill', () async {
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.useSkill,
+          const {'skill_name': skillName},
+          localToolsAssistant,
+          conversation: conversation,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['skill_name'], skillName);
+        expect(payload['content'], contains('This is the skill content'));
+      });
+
+      test('use_skill rejects missing skill_name', () async {
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.useSkill,
+          const {},
+          localToolsAssistant,
+          conversation: conversation,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['error'], 'missing_skill_name');
+      });
+
+      test('use_skill rejects skill not enabled for conversation', () async {
+        final otherConvo = Conversation(
+          id: 'c2',
+          title: 'Other',
+          enabledSkillNames: const ['other-skill'],
+        );
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.useSkill,
+          const {'skill_name': skillName},
+          localToolsAssistant,
+          conversation: otherConvo,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['error'], 'skill_not_enabled');
+      });
+
+      test('read_skill_resource returns resource content', () async {
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.readSkillResource,
+          const {'skill_name': skillName, 'path': 'references/guide.md'},
+          localToolsAssistant,
+          conversation: conversation,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['skill_name'], skillName);
+        expect(payload['path'], 'references/guide.md');
+        expect(payload['content'], 'Guide content');
+      });
+
+      test('read_skill_resource rejects scripts path', () async {
+        final result = await LocalToolsService.tryHandleToolCall(
+          LocalToolNames.readSkillResource,
+          const {'skill_name': skillName, 'path': 'scripts/run.sh'},
+          localToolsAssistant,
+          conversation: conversation,
+        );
+
+        expect(result, isNotNull);
+        final payload = jsonDecode(result!) as Map<String, dynamic>;
+        expect(payload['error'], 'resource_not_found');
+      });
+
+      test(
+        'buildToolDefinitions injects skill tools when skills are active',
+        () async {
+          final tools = await LocalToolsService.buildToolDefinitions(
+            assistant: localToolsAssistant,
+            supportsTools: true,
+            conversation: conversation,
+          );
+
+          final names = tools.map((t) => t['function']['name'] as String);
+          expect(names, contains(LocalToolNames.useSkill));
+          expect(names, contains(LocalToolNames.readSkillResource));
+        },
       );
     });
   });

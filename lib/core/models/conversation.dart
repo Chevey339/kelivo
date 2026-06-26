@@ -51,6 +51,15 @@ class Conversation extends HiveObject {
   @HiveField(12)
   List<String> chatSuggestions;
 
+  // Whether the workspace is enabled for this conversation.
+  @HiveField(13)
+  bool workspaceEnabled;
+
+  // Per-conversation enabled skill names. Empty list means all globalEnabled
+  // skills are used.
+  @HiveField(14)
+  List<String> enabledSkillNames;
+
   Conversation({
     String? id,
     required this.title,
@@ -65,6 +74,8 @@ class Conversation extends HiveObject {
     this.summary,
     int? lastSummarizedMessageCount,
     List<String>? chatSuggestions,
+    this.workspaceEnabled = false,
+    List<String>? enabledSkillNames,
   }) : id = id ?? const Uuid().v4(),
        createdAt = createdAt ?? DateTime.now(),
        updatedAt = updatedAt ?? DateTime.now(),
@@ -73,7 +84,8 @@ class Conversation extends HiveObject {
        truncateIndex = truncateIndex ?? -1,
        versionSelections = versionSelections ?? <String, int>{},
        lastSummarizedMessageCount = lastSummarizedMessageCount ?? 0,
-       chatSuggestions = chatSuggestions ?? [];
+       chatSuggestions = chatSuggestions ?? [],
+       enabledSkillNames = enabledSkillNames ?? const <String>[];
 
   Conversation copyWith({
     String? id,
@@ -89,6 +101,8 @@ class Conversation extends HiveObject {
     String? summary,
     int? lastSummarizedMessageCount,
     List<String>? chatSuggestions,
+    bool? workspaceEnabled,
+    List<String>? enabledSkillNames,
     bool clearSummary = false,
   }) {
     return Conversation(
@@ -106,6 +120,8 @@ class Conversation extends HiveObject {
       lastSummarizedMessageCount:
           lastSummarizedMessageCount ?? this.lastSummarizedMessageCount,
       chatSuggestions: chatSuggestions ?? this.chatSuggestions,
+      workspaceEnabled: workspaceEnabled ?? this.workspaceEnabled,
+      enabledSkillNames: enabledSkillNames ?? this.enabledSkillNames,
     );
   }
 
@@ -124,6 +140,8 @@ class Conversation extends HiveObject {
       'summary': summary,
       'lastSummarizedMessageCount': lastSummarizedMessageCount,
       'chatSuggestions': chatSuggestions,
+      'workspaceEnabled': workspaceEnabled,
+      'enabledSkillNames': enabledSkillNames,
     };
   }
 
@@ -149,6 +167,10 @@ class Conversation extends HiveObject {
           json['lastSummarizedMessageCount'] as int? ?? 0,
       chatSuggestions:
           (json['chatSuggestions'] as List?)?.cast<String>() ??
+          const <String>[],
+      workspaceEnabled: json['workspaceEnabled'] as bool? ?? false,
+      enabledSkillNames:
+          (json['enabledSkillNames'] as List?)?.cast<String>() ??
           const <String>[],
     );
   }

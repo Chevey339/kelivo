@@ -51,6 +51,7 @@ import 'setting/tts_services_pane.dart';
 import 'setting/quick_phrases_pane.dart';
 import 'setting/instruction_injection_pane.dart';
 import 'setting/world_book_pane.dart';
+import 'setting/skills_pane.dart';
 import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
@@ -94,6 +95,7 @@ enum _SettingsMenuItem {
   quickPhrases,
   instructionInjection,
   worldBook,
+  skills,
   tts,
   networkProxy,
   backup,
@@ -229,6 +231,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopWorldBookPane(
                             key: ValueKey('worldBook'),
                           );
+                        case _SettingsMenuItem.skills:
+                          return const DesktopSkillsPane(
+                            key: ValueKey('skills'),
+                          );
                         case _SettingsMenuItem.tts:
                           return const DesktopTtsServicesPane(
                             key: ValueKey('tts'),
@@ -300,6 +306,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.worldBook,
         lucide.Lucide.BookOpen,
         l10n.settingsPageWorldBook,
+      ),
+      (
+        _SettingsMenuItem.skills,
+        lucide.Lucide.package,
+        l10n.settingsSkillsTitle,
       ),
       (_SettingsMenuItem.tts, lucide.Lucide.Volume2, l10n.settingsPageTts),
       (

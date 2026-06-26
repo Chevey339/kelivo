@@ -2378,5 +2378,125 @@
         "type": "int"
       }
     }
-  }
+  },
+  "workspaceEnableTitle": "Enable Workspace",
+  "workspaceDisableTitle": "Close Workspace",
+  "workspaceEnableFailed": "Failed to enable workspace",
+  "workspaceEnabledMessage": "Workspace enabled",
+  "workspaceDisableConfirmTitle": "Close Workspace",
+  "workspaceDisableConfirmContent": "Closing the workspace will permanently delete all files inside, and the AI will lose file operation capabilities. Continue?",
+  "workspaceDisableConfirmCancel": "Cancel",
+  "workspaceDisableConfirmDelete": "Close and Delete",
+  "workspaceDisableFailed": "Failed to close workspace",
+  "workspaceDisabledMessage": "Workspace closed",
+  "workspaceArtifactsTooltip": "Artifacts",
+  "workspaceArtifactsLabel": "Artifacts",
+  "workspaceBrowserTitleSuffix": " - Artifacts",
+  "workspaceBrowserBackTooltip": "Back",
+  "workspaceBrowserRefreshTooltip": "Refresh",
+  "workspaceBrowserClearTooltip": "Clear workspace",
+  "workspaceClearConfirmTitle": "Clear Workspace",
+  "workspaceClearConfirmContent": "This will permanently delete all files in the workspace. Continue?",
+  "workspaceClearedMessage": "Workspace cleared",
+  "workspaceBrowserLoadFailed": "Failed to load: {error}",
+  "@workspaceBrowserLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceBrowserEmpty": "Workspace is empty, waiting for AI to create files",
+  "workspaceBrowserEmptyFolder": "Empty folder",
+  "workspaceFilePreviewBackTooltip": "Back",
+  "workspaceFilePreviewDownloadTooltip": "Download",
+  "workspaceFilePreviewInvalidPath": "Invalid path",
+  "workspaceFilePreviewImageLoadFailed": "Failed to load image",
+  "workspaceFilePreviewUnsupported": "Preview not supported for this file format ({ext})\nSize: {size}",
+  "@workspaceFilePreviewUnsupported": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewReadFailed": "Failed to read: {error}",
+  "@workspaceFilePreviewReadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewEmpty": "File is empty",
+  "workspaceFilePreviewSaveDialogTitle": "Save to…",
+  "workspaceFilePreviewSaveFailed": "Failed to save: {error}",
+  "@workspaceFilePreviewSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewSaveSuccess": "Saved",
+  "workspaceFilePreviewFileNotFound": "File does not exist",
+  "workspaceFilePreviewShareFailed": "Failed to share: {error}",
+  "@workspaceFilePreviewShareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSkillsTitle": "Skills",
+  "skillsPageTitle": "Skills",
+  "skillsBackTooltip": "Back",
+  "skillsImportTooltip": "Import",
+  "skillsImportMd": "Import SKILL.md",
+  "skillsImportZip": "Import zip",
+  "skillsImportSuccess": "Skill imported: {name}",
+  "@skillsImportSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportErrorDialogTitle": "Import failed",
+  "skillsImportErrorDialogClose": "Close",
+  "skillsDeleteConfirmTitle": "Delete Skill",
+  "skillsDeleteConfirmMessage": "Delete Skill '{name}'? This action cannot be undone.",
+  "@skillsDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsDeleteConfirmCancel": "Cancel",
+  "skillsDeleteConfirmDelete": "Delete",
+  "skillsDeletedSnackbar": "Deleted: {name}",
+  "@skillsDeletedSnackbar": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsEmptyState": "No Skills yet, tap the top-right to import",
+  "skillsDetailEmptyMd": "SKILL.md is empty or failed to load",
+  "skillsMetaName": "Name",
+  "skillsMetaVersion": "Version",
+  "skillsMetaLicense": "License",
+  "skillsMetaCompatibility": "Compatibility",
+  "skillsMetaAllowedTools": "Allowed Tools",
+  "skillsMetaEnabled": "Status",
+  "skillsMetaEnabledValue": "Enabled",
+  "skillsMetaDisabledValue": "Disabled",
+  "skillsListDeleteTooltip": "Delete",
+  "skillsListSlidableDelete": "Delete",
+  "skillsDetailDeleteButton": "Delete"
 }

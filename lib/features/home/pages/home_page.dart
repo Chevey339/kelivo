@@ -61,6 +61,9 @@ import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
 import '../controllers/home_view_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
+import '../../workspace/pages/workspace_browser_page.dart';
+import '../../../core/services/workspace/workspace_service.dart';
+import '../models/workspace_button_config.dart';
 import 'home_mobile_layout.dart';
 import 'home_desktop_layout.dart';
 
@@ -678,7 +681,93 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
+      workspaceButtonConfig: _workspaceButtonConfig(),
       body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
+    );
+  }
+
+  /// Returns the workspace button config for the current conversation, or null
+  /// when the button should be hidden (no conversation or temporary conversation).
+  WorkspaceButtonConfig? _workspaceButtonConfig() {
+    final convo = _controller.currentConversation;
+    if (convo == null || _controller.isTemporaryConversation) return null;
+
+    final conversationId = convo.id;
+    final openBrowser = () {
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => WorkspaceBrowserPage(
+            conversationId: conversationId,
+            conversationTitle: convo.title,
+          ),
+        ),
+      );
+    };
+    final enableWorkspace = () async {
+      try {
+        await WorkspaceService.ensureWorkspace(conversationId);
+      } catch (_) {
+        if (!context.mounted) return;
+        showAppSnackBar(
+          context,
+          message: AppLocalizations.of(context)!.workspaceEnableFailed,
+          type: NotificationType.error,
+        );
+        return;
+      }
+      await _controller.chatService.setWorkspaceEnabled(conversationId, true);
+      if (!context.mounted) return;
+      setState(() {});
+    };
+    final disableWorkspace = () async {
+      final l10n = AppLocalizations.of(context)!;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(l10n.workspaceDisableConfirmTitle),
+          content: Text(l10n.workspaceDisableConfirmContent),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.workspaceDisableConfirmCancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: Text(l10n.workspaceDisableConfirmDelete),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      if (!context.mounted) return;
+      try {
+        await WorkspaceService.deleteWorkspace(conversationId);
+      } catch (_) {
+        if (!context.mounted) return;
+        showAppSnackBar(
+          context,
+          message: l10n.workspaceDisableFailed,
+          type: NotificationType.error,
+        );
+        return;
+      }
+      await _controller.chatService.setWorkspaceEnabled(conversationId, false);
+      if (!context.mounted) return;
+      setState(() {});
+    };
+
+    if (!convo.workspaceEnabled) {
+      return WorkspaceButtonConfig(
+        isEnabled: false,
+        onPrimaryAction: enableWorkspace,
+      );
+    }
+
+    return WorkspaceButtonConfig(
+      isEnabled: true,
+      onPrimaryAction: openBrowser,
+      onDisableWithConfirm: disableWorkspace,
     );
   }
 
@@ -808,6 +897,7 @@ class _HomePageState extends State<HomePage>
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
       onRightSidebarWidthChangeEnd: _controller.saveRightSidebarWidth,
       buildAssistantBackground: _buildAssistantBackground,
+      workspaceButtonConfig: _workspaceButtonConfig(),
       appBarOverride: _controller.selecting
           ? ChatSelectionAppBar(
               selectedCount: _controller.selectedCount,
