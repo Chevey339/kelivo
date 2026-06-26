@@ -5537,4 +5537,206 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get workspaceEnableTitle => 'Enable Workspace';
+
+  @override
+  String get workspaceDisableTitle => 'Close Workspace';
+
+  @override
+  String get workspaceEnableFailed => 'Failed to enable workspace';
+
+  @override
+  String get workspaceEnabledMessage => 'Workspace enabled';
+
+  @override
+  String get workspaceDisableConfirmTitle => 'Close Workspace';
+
+  @override
+  String get workspaceDisableConfirmContent =>
+      'Closing the workspace will permanently delete all files inside, and the AI will lose file operation capabilities. Continue?';
+
+  @override
+  String get workspaceDisableConfirmCancel => 'Cancel';
+
+  @override
+  String get workspaceDisableConfirmDelete => 'Close and Delete';
+
+  @override
+  String get workspaceDisableFailed => 'Failed to close workspace';
+
+  @override
+  String get workspaceDisabledMessage => 'Workspace closed';
+
+  @override
+  String get workspaceArtifactsTooltip => 'Artifacts';
+
+  @override
+  String get workspaceArtifactsLabel => 'Artifacts';
+
+  @override
+  String get workspaceBrowserTitleSuffix => ' - Artifacts';
+
+  @override
+  String get workspaceBrowserBackTooltip => 'Back';
+
+  @override
+  String get workspaceBrowserRefreshTooltip => 'Refresh';
+
+  @override
+  String get workspaceBrowserClearTooltip => 'Clear workspace';
+
+  @override
+  String get workspaceClearConfirmTitle => 'Clear Workspace';
+
+  @override
+  String get workspaceClearConfirmContent =>
+      'This will permanently delete all files in the workspace. Continue?';
+
+  @override
+  String get workspaceClearedMessage => 'Workspace cleared';
+
+  @override
+  String workspaceBrowserLoadFailed(String error) {
+    return 'Failed to load: $error';
+  }
+
+  @override
+  String get workspaceBrowserEmpty =>
+      'Workspace is empty, waiting for AI to create files';
+
+  @override
+  String get workspaceBrowserEmptyFolder => 'Empty folder';
+
+  @override
+  String get workspaceFilePreviewBackTooltip => 'Back';
+
+  @override
+  String get workspaceFilePreviewDownloadTooltip => 'Download';
+
+  @override
+  String get workspaceFilePreviewInvalidPath => 'Invalid path';
+
+  @override
+  String get workspaceFilePreviewImageLoadFailed => 'Failed to load image';
+
+  @override
+  String workspaceFilePreviewUnsupported(String ext, String size) {
+    return 'Preview not supported for this file format ($ext)\nSize: $size';
+  }
+
+  @override
+  String workspaceFilePreviewReadFailed(String error) {
+    return 'Failed to read: $error';
+  }
+
+  @override
+  String get workspaceFilePreviewEmpty => 'File is empty';
+
+  @override
+  String get workspaceFilePreviewSaveDialogTitle => 'Save to…';
+
+  @override
+  String workspaceFilePreviewSaveFailed(String error) {
+    return 'Failed to save: $error';
+  }
+
+  @override
+  String get workspaceFilePreviewSaveSuccess => 'Saved';
+
+  @override
+  String get workspaceFilePreviewFileNotFound => 'File does not exist';
+
+  @override
+  String workspaceFilePreviewShareFailed(String error) {
+    return 'Failed to share: $error';
+  }
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get skillsPageTitle => 'Skills';
+
+  @override
+  String get skillsBackTooltip => 'Back';
+
+  @override
+  String get skillsImportTooltip => 'Import';
+
+  @override
+  String get skillsImportMd => 'Import SKILL.md';
+
+  @override
+  String get skillsImportZip => 'Import zip';
+
+  @override
+  String skillsImportSuccess(String name) {
+    return 'Skill imported: $name';
+  }
+
+  @override
+  String get skillsImportErrorDialogTitle => 'Import failed';
+
+  @override
+  String get skillsImportErrorDialogClose => 'Close';
+
+  @override
+  String get skillsDeleteConfirmTitle => 'Delete Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return 'Delete Skill \'$name\'? This action cannot be undone.';
+  }
+
+  @override
+  String get skillsDeleteConfirmCancel => 'Cancel';
+
+  @override
+  String get skillsDeleteConfirmDelete => 'Delete';
+
+  @override
+  String skillsDeletedSnackbar(String name) {
+    return 'Deleted: $name';
+  }
+
+  @override
+  String get skillsEmptyState => 'No Skills yet, tap the top-right to import';
+
+  @override
+  String get skillsDetailEmptyMd => 'SKILL.md is empty or failed to load';
+
+  @override
+  String get skillsMetaName => 'Name';
+
+  @override
+  String get skillsMetaVersion => 'Version';
+
+  @override
+  String get skillsMetaLicense => 'License';
+
+  @override
+  String get skillsMetaCompatibility => 'Compatibility';
+
+  @override
+  String get skillsMetaAllowedTools => 'Allowed Tools';
+
+  @override
+  String get skillsMetaEnabled => 'Status';
+
+  @override
+  String get skillsMetaEnabledValue => 'Enabled';
+
+  @override
+  String get skillsMetaDisabledValue => 'Disabled';
+
+  @override
+  String get skillsListDeleteTooltip => 'Delete';
+
+  @override
+  String get skillsListSlidableDelete => 'Delete';
+
+  @override
+  String get skillsDetailDeleteButton => 'Delete';
 }
