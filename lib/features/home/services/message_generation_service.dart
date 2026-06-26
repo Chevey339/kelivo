@@ -161,6 +161,10 @@ class MessageGenerationService {
     // (same keyword trigger range as before OCR-after-trim). Document/OCR work
     // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    await messageBuilderService.injectSkillPrompts(
+      apiMessages,
+      currentConversation: currentConversation,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -201,12 +205,13 @@ class MessageGenerationService {
     messageBuilderService.stripInternalRevisionIds(apiMessages);
 
     // Prepare tools
-    final toolDefs = generationController.buildToolDefinitions(
+    final toolDefs = await generationController.buildToolDefinitions(
       settings,
       assistant,
       providerKey,
       modelId,
       hasBuiltInSearch,
+      conversation: currentConversation,
     );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
@@ -214,6 +219,7 @@ class MessageGenerationService {
             assistant,
             approvalService: approvalService,
             askUserService: askUserService,
+            conversation: currentConversation,
             conversationId: currentConversation?.id,
           )
         : null;

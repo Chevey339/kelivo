@@ -18,6 +18,7 @@ import 'theme/theme_factory.dart';
 import 'theme/palettes.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
+import 'core/services/skills/skill_service.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -74,6 +75,7 @@ final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
 bool _didEnsureAssistants = false; // ensure defaults after l10n ready
+const String _defaultSkillsImportedKey = 'default_skills_imported_v1';
 
 Future<void> main() async {
   await runZoned(
@@ -851,6 +853,19 @@ class MyApp extends StatelessWidget {
                       } catch (_) {}
                     });
                   }
+
+                  // Install bundled default skills (e.g. conducting-deep-research) on first launch
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    try {
+                      final prefs = await SharedPreferences.getInstance();
+                      if (prefs.getBool(_defaultSkillsImportedKey) != true) {
+                        final result = await SkillService.instance
+                            .installBundledDefaults();
+                        debugPrint(result);
+                        await prefs.setBool(_defaultSkillsImportedKey, true);
+                      }
+                    } catch (_) {}
+                  });
 
                   // Desktop tray + close behaviour (minimize to tray) sync
                   final l10n = AppLocalizations.of(ctx);
