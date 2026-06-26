@@ -693,7 +693,7 @@ class _HomePageState extends State<HomePage>
     if (convo == null || _controller.isTemporaryConversation) return null;
 
     final conversationId = convo.id;
-    final openBrowser = () {
+    void openBrowser() {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => WorkspaceBrowserPage(
@@ -702,12 +702,12 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       );
-    };
-    final enableWorkspace = () async {
+    }
+    Future<void> enableWorkspace() async {
       try {
         await WorkspaceService.ensureWorkspace(conversationId);
       } catch (_) {
-        if (!context.mounted) return;
+        if (!mounted) return;
         showAppSnackBar(
           context,
           message: AppLocalizations.of(context)!.workspaceEnableFailed,
@@ -716,10 +716,10 @@ class _HomePageState extends State<HomePage>
         return;
       }
       await _controller.chatService.setWorkspaceEnabled(conversationId, true);
-      if (!context.mounted) return;
+      if (!mounted) return;
       setState(() {});
-    };
-    final disableWorkspace = () async {
+    }
+    Future<void> disableWorkspace() async {
       final l10n = AppLocalizations.of(context)!;
       final confirmed = await showDialog<bool>(
         context: context,
@@ -740,11 +740,11 @@ class _HomePageState extends State<HomePage>
         ),
       );
       if (confirmed != true) return;
-      if (!context.mounted) return;
+      if (!mounted) return;
       try {
         await WorkspaceService.deleteWorkspace(conversationId);
       } catch (_) {
-        if (!context.mounted) return;
+        if (!mounted) return;
         showAppSnackBar(
           context,
           message: l10n.workspaceDisableFailed,
@@ -753,9 +753,9 @@ class _HomePageState extends State<HomePage>
         return;
       }
       await _controller.chatService.setWorkspaceEnabled(conversationId, false);
-      if (!context.mounted) return;
+      if (!mounted) return;
       setState(() {});
-    };
+    }
 
     if (!convo.workspaceEnabled) {
       return WorkspaceButtonConfig(

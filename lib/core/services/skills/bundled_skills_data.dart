@@ -1,10 +1,10 @@
-/// Built-in default skills that ship with the application.
-///
-/// Each entry is a (directory name, file name → content) mapping.
-/// These are installed on first app startup and behave like any other skill
-/// (fully deletable by the user).
-///
-/// To add a new default skill, add an entry to [bundledDefaultSkills].
+// Built-in default skills that ship with the application.
+//
+// Each entry is a (directory name, file name → content) mapping.
+// These are installed on first app startup and behave like any other skill
+// (fully deletable by the user).
+//
+// To add a new default skill, add an entry to [bundledDefaultSkills].
 // ignore_for_file: lines_longer_than_80_chars
 
 /// Represents a bundled skill's file tree: skillName → { filePath → content }.
