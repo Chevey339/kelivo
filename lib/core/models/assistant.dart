@@ -16,7 +16,9 @@ class Assistant {
   ];
 
   /// Default prompt for guiding the model on how to actively record user info.
-  static const String defaultMemoryRecordPrompt = '''在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
+  static const String defaultMemoryRecordPrompt = '''请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
+
+在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
 - 用户昵称/姓名
 - 年龄/性别/兴趣爱好
 - 计划事项等
