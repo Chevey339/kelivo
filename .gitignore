@@ -7,6 +7,7 @@
 .atom/
 .build/
 .claude/
+.trae/
 .buildlog/
 .history
 .svn/

@@ -277,6 +277,8 @@ class HomePageController extends ChangeNotifier {
   bool get isTemporaryConversation =>
       _chatService.isTemporaryConversation(currentConversation?.id);
 
+  ChatService get chatService => _chatService;
+
   bool get canToggleTemporaryConversation =>
       currentConversation != null && messages.isEmpty;
 
