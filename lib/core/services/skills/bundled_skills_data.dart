@@ -12,440 +12,365 @@ typedef BundledSkill = (String name, Map<String, String> files);
 
 /// The list of all built-in default skills.
 const List<BundledSkill> bundledDefaultSkills = [
-  conductingDeepResearch,
+  brainstorm,
 ];
 
 // ---------------------------------------------------------------------------
-// Skill: conducting-deep-research
+// Skill: brainstorm
 // ---------------------------------------------------------------------------
 
-const conductingDeepResearch = (
-  'conducting-deep-research',
+const brainstorm = (
+  'brainstorm',
   {
     'SKILL.md': r'''---
-name: conducting-deep-research
-description: Conducts comprehensive deep research on any topic using iterative search, multi-draft synthesis, cross-source verification, and structured report generation. Uses web search and a file system to create and maintain working documents throughout the research lifecycle. Use when the user needs thorough, evidence-grounded research, literature reviews, investigative reports, or policy analysis.
+name: brainstorm
+description: Guide users through structured creative thinking and brainstorming sessions. Use when users say "I need ideas", "help me think", "give me some inspiration", "I'm stuck", "brainstorm with me", or any scenario involving creative ideation, problem-solving, planning, naming, or exploring possibilities.
 ---
 
-# Conducting Deep Research
+# Brainstorming & Creative Ideation
 
-You are an expert research agent with access to web search tools and a file system. Your workflow mirrors that of a professional researcher: plan, investigate, draft, verify, structure, report, and re-verify. You create files at each stage to track progress, maintain an audit trail, and iteratively refine the final output.
+## Overview
 
-Copy this checklist and track your progress:
+This skill transforms the conversation into a structured creative thinking session. It uses proven ideation frameworks to help users move from vague curiosity to concrete, actionable ideas through guided dialogue.
 
-```
-Research Progress:
-- [ ] Phase 1 — Planning: Create research plan
-- [ ] Phase 2 — Investigation: Search and collect sources
-- [ ] Phase 3 — Drafting: Write initial synthesis
-- [ ] Phase 4 — Cross-Verification: Fact-check sources
-- [ ] Phase 5 — Outline: Build report framework
-- [ ] Phase 6 — Report: Generate final report
-- [ ] Phase 7 — Final Check: Re-verify everything
-```
+**Core design pattern**: Inversion + Pipeline hybrid
+- **Inversion** — First, ask clarifying questions before jumping into solutions
+- **Pipeline** — Then, guide the user through progressive stages: Diverge → Explore → Converge → Execute
 
 ---
 
-## Phase 1: Planning
+## Workflow
 
-**Goal:** Understand the topic, define research questions, and create a search strategy.
+### Phase 1: Context Gathering (Inversion)
 
-### Step 1.1 — Analyze the request
+Before generating any ideas, gather context. Ask **one question at a time** — wait for the user's response before proceeding. This creates a natural conversational rhythm.
 
-Read the user's research topic carefully. Identify:
+| Step | Question |
+|------|----------|
+| Q1 | "What's the goal or problem you're trying to solve? What does success look like?" |
+| Q2 | "Who is this for? (specific audience, yourself, or a general idea?)" |
+| Q3 | "Do you have any constraints? (budget, time, resources, technical limits?)" |
+| Q4 | "What have you already tried or considered?" |
+| Q5 | "What's your preferred style? (practical & grounded, wild & exploratory, or balanced?)" |
 
-- **Core subject:** What is the main topic?
-- **Scope:** What are the boundaries (time period, geography, domain)?
-- **Key questions:** What specific questions need answers?
-- **Intended audience:** Who will read the report (academic, executive, general)?
-- **Depth:** Is this a quick brief, a comprehensive review, or a deep investigative report?
-
-### Step 1.2 — Create the research plan file
-
-Create `research-plan.md` in the working directory with this structure:
-
-```markdown
-# Research Plan: [Topic]
-
-## Research Questions
-1. [Primary question]
-2. [Secondary question]
-3. [Tertiary question]
-
-## Key Search Areas
-- [Area 1]
-- [Area 2]
-- [Area 3]
-
-## Search Strategy
-- Initial queries: [3-5 broad search terms]
-- Deep-dive queries: [Specific queries for each area]
-- Verification queries: [Queries designed to check facts]
-
-## Target Sources
-- [Type of sources to prioritize, e.g., academic papers, news, official data]
-```
-
-Update `research-plan.md` as the research evolves — mark off completed items.
+> **Important**: Do NOT ask all questions at once. One at a time. Adapt and follow up naturally based on their answers.
 
 ---
 
-## Phase 2: Investigation
+### Phase 2: Framework Selection
 
-**Goal:** Execute the search strategy, collect sources, and record findings.
+Based on the user's responses, select the most appropriate framework:
 
-### Step 2.1 — Conduct initial broad search
+| If the user needs to... | Recommended Framework | Reference |
+|-------------------------|----------------------|-----------|
+| Improve an existing idea/product/service | **SCAMPER** | `references/scamper.md` |
+| Examine a decision from all angles | **Six Thinking Hats** | `references/six-thinking-hats.md` |
+| Break out of a mental rut | **Reverse Thinking** | `references/reverse-thinking.md` |
+| Solve a human-centered problem | **Design Thinking** | `references/design-thinking.md` |
+| Explore a broad topic with many branches | **Mind Mapping** | `references/mind-mapping.md` |
 
-Run 3-5 broad search queries to map the landscape. For each query:
-
-1. Execute the web search
-2. Read the top results
-3. Note key findings, statistics, claims, and citations
-
-### Step 2.2 — Conduct deep-dive searches
-
-For each key area identified in the research plan, run 2-3 specific searches. Prioritize:
-
-- Primary sources (official data, original research papers)
-- Authoritative secondary sources (reputable analyses, reviews)
-- Diverse perspectives (including dissenting or contrarian views)
-
-### Step 2.3 — Create the sources brief
-
-Create `sources-brief.md` to track what you've found:
-
-```markdown
-# Sources Brief: [Topic]
-
-## Key Sources Found
-
-### Source 1: [Title]
-- **URL:** [Link]
-- **Type:** [Academic/News/Official/Other]
-- **Key Claims:** [Summary]
-- **Reliability Notes:** [Any concerns about bias, currency, methodology]
-
-### Source 2: [Title]
-...
-```
-
-Add sources as you find them. Include at minimum: title, URL, type, key claims, and a brief reliability assessment.
+If unsure, default to **SCAMPER** — it's the most versatile and widely applicable.
 
 ---
 
-## Phase 3: Drafting
+### Phase 3: Divergent Thinking (Ideation)
 
-**Goal:** Synthesize findings into a coherent first draft.
+Guide the user through the chosen framework. Follow these rules:
 
-### Step 3.1 — Review all collected material
+1. **Quantity over quality** — Encourage as many ideas as possible without judgment
+2. **Build on each other** — Use the user's previous ideas as springboards
+3. **No bad ideas** — Explicitly welcome wild or impractical ideas at this stage
+4. **Keep a running list** — Summarize ideas generated so far
 
-Read through your `research-plan.md` and `sources-brief.md`. Identify:
-
-- **Key themes** that emerge across sources
-- **Points of consensus** (where sources agree)
-- **Points of disagreement** (where sources conflict)
-- **Gaps** (questions that remain unanswered)
-
-### Step 3.2 — Write the draft
-
-Create `draft-report.md` with an initial synthesis:
-
-```markdown
-# Draft Report: [Topic]
-
-## Executive Summary
-[1-2 paragraph overview of key findings]
-
-## Key Themes
-
-### Theme 1: [Name]
-- Evidence from sources: [citations]
-- Conflicting views: [if any]
-
-### Theme 2: [Name]
-...
-
-## Preliminary Conclusions
-[Initial conclusions based on available evidence]
-
-## Gaps and Uncertainties
-- [What is still unknown or unclear]
-
-## Sources Referenced
-- [List of sources used]
-```
-
-The draft does not need to be perfectly polished. It is a working document.
+Load the relevant reference file from `references/` and follow its prompts step by step.
 
 ---
 
-## Phase 4: Cross-Verification
+### Phase 4: Convergent Thinking (Filtering)
 
-**Goal:** Critically evaluate all sources and claims. Identify weaknesses.
+After generating sufficient ideas (typically 8–15+), help the user narrow down:
 
-### Step 4.1 — Create the verification file
-
-Create `cross-verification.md`:
-
-```markdown
-# Cross-Verification: [Topic]
-
-## Claims Audit
-
-### Claim 1: [Specific claim from draft]
-- **Sources supporting:** [list]
-- **Sources contradicting:** [list]
-- **Confidence:** [High/Medium/Low]
-- **Notes:** [Methodological concerns, bias, currency issues]
-
-### Claim 2: [Specific claim]
-...
-
-## Source Quality Assessment
-
-### Source 1: [Title]
-- **Recency:** [Date published]
-- **Authority:** [Is the source an expert or official body?]
-- **Bias:** [Any detected bias or conflicts of interest]
-- **Methodology:** [Sound/questionable/unclear]
-- **Verdict:** [Trustworthy/Use with caution/Unreliable]
-
-### Source 2: [Title]
-...
-
-## Verification Searches
-Run targeted searches specifically designed to verify or refute key claims. Document the results here.
-```
-
-### Step 4.2 — Run verification searches
-
-For each major claim with Medium or Low confidence, run a verification search. Update the verification file with results.
-
-### Step 4.3 — Assess source quality
-
-For each key source, assess recency, authority, bias, and methodology. Flag any unreliable sources.
-
-**Detailed methodology for source assessment:** See [research-methodology.md](research-methodology.md)
+1. **Cluster** similar ideas into themes/categories
+2. **Evaluate** each cluster against the user's goals and constraints (from Phase 1)
+3. **Ask the user to pick 2–3 favorites** and explain why they stand out
+4. **For each favorite, discuss:**
+   - What would it take to make this happen?
+   - What's the biggest risk or challenge?
+   - What's the simplest first step?
 
 ---
 
-## Phase 5: Outline
+### Phase 5: Actionable Output
 
-**Goal:** Design the structure of the final report.
+Summarize the session with a clear, structured output:
 
-### Step 5.1 — Create the report outline
+```
+## Brainstorming Summary
 
-Create `report-outline.md`:
+**Goal**: [restate the user's goal]
 
-```markdown
-# Report Outline: [Topic]
+### Top Ideas
 
-## Proposed Structure
+1. **[Idea Name]**
+   - Why it works: [1 sentence]
+   - First step: [1 actionable step]
+   - Confidence: High / Medium / Needs more thought
 
-1. **Title**
-2. **Executive Summary**
-3. **Introduction**
-   - Context and background
-   - Research questions
-   - Methodology note
-4. **Section 1: [Main theme]**
-   - Sub-topic A
-   - Sub-topic B
-5. **Section 2: [Main theme]**
+2. [Idea 2]
    ...
-6. **Cross-Cutting Analysis**
-   - Points of consensus
-   - Points of disagreement
-7. **Conclusions and Recommendations**
-8. **References**
-9. **Appendix: Methodology and Search Strategy**
-```
 
-Adjust the structure based on what the research has revealed.
-
----
-
-## Phase 6: Report
-
-**Goal:** Produce the complete, polished final report.
-
-### Step 6.1 — Write the final report
-
-Create `final-report.md` — the finished product. Use the outline as your guide and the draft as your raw material. Requirements:
-
-- **Format:** Professional markdown
-- **Citations:** Every factual claim must include a citation to its source. Use inline citation markers like `[Source: Title](URL)` or numbered references.
-- **Balance:** Present multiple perspectives where disagreements exist
-- **Clarity:** Write for the intended audience identified in Phase 1
-- **Transparency:** Acknowledge limitations and uncertainties
-
-**Report template options:** See [report-templates.md](report-templates.md) for academic, executive, and investigative templates.
-
----
-
-## Phase 7: Final Check
-
-**Goal:** Re-verify the final report before delivery.
-
-### Step 7.1 — Create the final verification log
-
-Append to `cross-verification.md` or create a new section:
-
-```markdown
-## Final Verification
-
-### Citation Audit
-- [ ] Every factual claim has a source citation
-- [ ] All URLs are correctly formatted
-- [ ] Sources are correctly attributed
-
-### Fact-Check Pass
-Re-verify the 3-5 most critical claims in the report with fresh searches.
-
-### Completeness Check
-- [ ] All research questions from Phase 1 are addressed
-- [ ] Gaps identified in the draft are noted in the report
-- [ ] The report has an introduction, body, and conclusion
-- [ ] Contradictory evidence is acknowledged
-```
-
-### Step 7.2 — Conduct final checks
-
-1. **Re-search** the most significant claims to confirm they remain current
-2. **Audit citations** — every claim should trace to a source
-3. **Check completeness** — does the report answer the original research questions?
-
-### Step 7.3 — Report summary
-
-Upon completion, present a brief summary to the user:
-
-```
-## Research Complete
-
-**Topic:** [Topic]
-**Sources consulted:** [Number]
-**Report length:** [Approximate word count]
-**Confidence level:** [High/Medium — and why]
-**Key limitation:** [If any significant gap remains]
-
-The final report is in `final-report.md`.
-All working documents are preserved:
-- `research-plan.md`
-- `sources-brief.md`
-- `draft-report.md`
-- `cross-verification.md`
-- `report-outline.md`
+### If You Want More...
+- Try combining [Idea 1] with [Idea 3]
+- Flip the problem around: what if [opposite scenario]?
 ```
 
 ---
 
-## Working Principles
+## Tone & Style Guidelines
 
-### Be iterative
-Research is not linear. If new searches reveal contradictions, update earlier files. The checklist is a guide, not a cage.
-
-### Be transparent
-Document uncertainty. If a claim cannot be confidently verified, say so. If sources disagree, present both sides.
-
-### Be thorough
-Do not stop at the first answer. Search for counterarguments. Look for sources that challenge your emerging conclusions.
-
-### Be efficient
-Do not over-search. Once you have sufficient high-quality sources to support each section of the outline, move to drafting. You can always search more during verification.
-
-### Use progressive disclosure
-The files `research-methodology.md`, `report-templates.md`, and `verification-protocol.md` contain detailed reference material. Read them when you need deeper guidance on methodology, templates, or verification standards.
+- **Be encouraging and curious** — "That's interesting! What if we took that further?"
+- **Use analogies and examples** to spark the user's imagination
+- **Pace yourself** — don't overwhelm with too many options at once
+- **Match the user's energy** — serious when they're serious, playful when they're playful
+- **Celebrate small wins** — when the user says "ooh that's good!", build on that energy
+- **Use emojis sparingly** — a warm tone is more important than decorations
 
 ---
 
-## Related Files
+## When NOT to use this skill
 
-- **Research methodology details:** See [research-methodology.md](research-methodology.md)
-- **Report templates:** See [report-templates.md](report-templates.md)
-- **Verification standards:** See [verification-protocol.md](verification-protocol.md)
+- The user has a simple factual question ("What's the capital of France?")
+- The user wants a direct answer or specific data
+- The user is frustrated and needs quick help, not exploration
+- The user explicitly says "just tell me the answer"
+
+---
+
+## Example Session Opener
+
+> **User**: "I want to start a side business but have no idea what to do."
+>
+> **AI**: "That's a great place to start! Let me ask you a couple of things to help narrow it down.
+>
+> First up — what kind of skills or interests do you already have? Things you genuinely enjoy doing or are good at?"
+>
+> *[Then proceed to Phase 2 based on the answer]*
 ''',
-    'research-methodology.md': r'''# Research Methodology Reference
+    'references/scamper.md': r'''# SCAMPER Framework
 
-## Source Quality Framework
+SCAMPER is a creative thinking technique that helps generate ideas by asking seven types of questions about an existing product, service, or concept.
 
-### The CRAAP Test
-Use this framework to evaluate each source:
+## The Seven Techniques
 
-| Criterion | Questions to Ask |
-|-----------|------------------|
-| **Currency** | When was this published? Has it been updated? Is the information still current for your topic? |
-| **Relevance** | Does this directly address your research question? Who is the intended audience? |
-| **Authority** | Who is the author/publisher? What are their credentials? Are they qualified on this topic? |
-| **Accuracy** | Is the information supported by evidence? Can it be verified elsewhere? |
-| **Purpose** | Why does this source exist? Is it to inform, persuade, sell, or entertain? Are there biases? |
+### S — Substitute
+- What can be substituted?
+- Can we replace X with something else?
+- What if we used a different material, person, process, or place?
 
-### Source Tier System
+### C — Combine
+- What can be combined?
+- Can we merge two ideas, products, or features?
+- What if we combined this with something completely unrelated?
 
-| Tier | Description | Examples |
-|------|-------------|----------|
-| **Tier 1** | Peer-reviewed, primary research | Academic journals, official government data |
-| **Tier 2** | Authoritative secondary sources | Major news organizations, expert analyses, institutional reports |
-| **Tier 3** | Useful but lower authority | Blog posts, opinion pieces, non-expert commentary |
-| **Tier 4** | Unreliable | Unsubstantiated claims, anonymous sources, known misinformation |
+### A — Adapt
+- What can be adapted from other domains?
+- Is there something similar we can learn from?
+- How would a different industry solve this?
 
-### Handling Disagreements Between Sources
+### M — Modify / Magnify
+- What can be modified?
+- What if we made it bigger, smaller, stronger, lighter?
+- Can we change its shape, color, or form?
 
-When sources conflict:
-1. Check the **evidence base** — does one source cite data and the other not?
-2. Check **recency** — newer data may supersede older findings
-3. Check for **methodological differences** — different methods may produce different results
-4. Check **funding and bias** — who paid for each study?
-5. Present both views in the report with an assessment of each
+### P — Put to Other Uses
+- How else can this be used?
+- Who else might find this useful?
+- What if we used it in a completely different context?
 
-## Search Strategy Patterns
+### E — Eliminate
+- What can be removed or simplified?
+- What happens if we take away X?
+- What's the absolute minimum viable version?
 
-### Broad-to-Narrow
-Start with general queries to map the landscape, then progressively narrow.
+### R — Reverse / Rearrange
+- What if we did the opposite?
+- Can we change the order or sequence?
+- What if we turned it upside down?
 
-**Example:**
-1. "AI regulation overview 2025" (broad)
-2. "EU AI Act implementation status 2025" (narrower)
-3. "EU AI Act compliance costs small business 2025" (specific)
+## How to Apply
 
-### Snowball Method
-Use one good source to find more:
-- Check its references/citations
-- Search for the authors' other work
-- Search for related papers that cite this one
-
-### Adversarial Search
-Deliberately search for arguments against your emerging conclusions:
-- "[claim] criticism"
-- "[claim] counterargument"
-- "[claim] debate"
+1. Start with the user's existing idea/concept as the baseline
+2. Walk through each relevant technique one at a time
+3. Don't rush through all seven — pick the 3-4 most relevant based on context
+4. For each technique, let the user respond before moving on
 ''',
-    'verification-protocol.md': r'''# Verification Protocol
+    'references/six-thinking-hats.md': r'''# Six Thinking Hats Framework
 
-## Claim Confidence Levels
+The Six Thinking Hats method, developed by Edward de Bono, helps examine a problem from six distinct perspectives. Each "hat" represents a different mode of thinking.
 
-| Level | Meaning |
-|-------|---------|
-| **High** | Multiple reliable, independent sources agree. No significant controversy. |
-| **Medium** | Supported by some sources but with caveats. Some disagreement exists. |
-| **Low** | Single source only. Questionable methodology. Significant disagreement. |
-| **Unverified** | Claimed but not yet checked against any source. |
+## The Six Hats
 
-## Cross-Verification Checklist
+### Blue Hat — Process & Overview
+- What's the big picture?
+- What do we want to achieve?
+- What's the agenda for this thinking session?
 
-For each major claim in the report:
+### White Hat — Facts & Data
+- What information do we have?
+- What information is missing?
+- What are the objective, verifiable facts?
 
-1. **Triangulation** — Can this claim be confirmed by at least two independent sources?
-2. **Recency check** — Is the supporting source current enough for this claim?
-3. **Context check** — Is the claim being quoted in context, or cherry-picked?
-4. **Numerical sanity check** — If numbers are cited, are they plausible?
-5. **Original source check** — If a news article cites a study, read the actual study
+### Red Hat — Feelings & Intuition
+- What's your gut feeling about this?
+- What emotions come up?
+- No need to justify — just express feelings.
 
-## Citation Standards
+### Black Hat — Caution & Risks
+- What could go wrong?
+- What are the potential problems?
+- What are the weaknesses or pitfalls?
 
-- Every factual assertion must cite a source
-- Citations should include: source title or author, publication, date, and URL
-- Direct quotes must be in quotation marks with page/paragraph reference when possible
-- Statistics must include the original source, not just a secondary mention
+### Yellow Hat — Optimism & Benefits
+- What are the positive aspects?
+- Why might this work?
+- What are the hidden opportunities?
+
+### Green Hat — Creativity & New Ideas
+- What new ideas can we explore?
+- What are alternative approaches?
+- What if anything were possible?
+
+## How to Facilitate
+
+1. Start with **Blue Hat** to set the agenda
+2. Guide the user through each hat **one at a time**
+3. Common sequence: Blue -> White -> Red -> Black -> Yellow -> Green -> Blue
+4. End with **Blue Hat** again to summarize and decide next steps
+5. Allow the user to fully explore each perspective before switching
+''',
+    'references/reverse-thinking.md': r'''# Reverse Thinking Framework
+
+Reverse Thinking (also called inversion) helps break mental blocks by approaching the problem from the opposite direction.
+
+## Core Technique
+
+Instead of asking "How do I achieve X?", ask these inverted questions:
+
+| Traditional Question | Reverse Question |
+|--------------------|-----------------|
+| "How do I succeed?" | "How would I guarantee failure?" |
+| "What should I do?" | "What should I avoid at all costs?" |
+| "What's the best approach?" | "What's the worst possible approach?" |
+
+## Application Steps
+
+### Step 1: Define the Problem
+Restate the user's goal clearly in one sentence.
+
+### Step 2: Flip It
+Ask: "What if we wanted the exact opposite outcome?"
+
+### Step 3: Generate Opposite Ideas
+- What would create the opposite result?
+- What actions would guarantee disaster?
+- List all the ways to make it fail
+
+### Step 4: Invert Again
+Take each "disaster idea" and flip it into a positive solution.
+
+### Step 5: Synthesize
+Combine the inverted ideas with conventional approaches.
+
+## Conversation Flow Example
+
+> **AI**: "Instead of asking 'how do I get more users?', let's flip it. How would you drive away every single user?"
+>
+> **User**: "Make the app slow and confusing..."
+>
+> **AI**: "Great! So the inverted solution would be: make it fast and intuitive. What else?"
+''',
+    'references/design-thinking.md': r'''# Design Thinking Framework
+
+Design Thinking is a human-centered approach to creative problem-solving with five phases.
+
+## The Five Phases
+
+### Phase 1: Empathize — Understand the User
+- Who are the people affected by this problem?
+- What do they feel, need, and experience?
+- What would a day in their life look like?
+
+### Phase 2: Define — Frame the Problem
+- Restate the problem from the user's perspective
+- Use the format: "How might we... [solve this]?"
+- What's the core challenge beneath the surface?
+
+### Phase 3: Ideate — Generate Solutions
+- Use SCAMPER or other techniques to brainstorm
+- Encourage wild ideas (they often lead to practical ones)
+- Aim for quantity — 10+ ideas before filtering
+
+### Phase 4: Prototype — Create Simple Versions
+- What's the simplest version of this idea?
+- How can we test the core assumption with minimal effort?
+- What would a rough draft or mockup look like?
+
+### Phase 5: Test — Learn and Iterate
+- How would we know if this works?
+- What's the smallest experiment we can run?
+- What did we learn that changes our approach?
+
+## Adapting for Chat Sessions
+
+In a conversation setting, focus on **Phases 1-3** (Empathize -> Define -> Ideate), as Phases 4-5 typically require real-world execution. End the session with actionable next steps the user can take on their own.
+''',
+    'references/mind-mapping.md': r'''# Mind Mapping Framework
+
+Mind Mapping helps explore a topic by branching out from a central concept into related subtopics and details. It's ideal for broad, open-ended topics.
+
+## How to Facilitate
+
+### Step 1: Central Topic
+Start with the user's core idea or question as the center.
+
+> "What's the central topic we're exploring?"
+
+### Step 2: Main Branches
+Ask: "What are the main categories or aspects of this topic?"
+- Aim for 5-7 main branches
+- Use keywords, not full sentences
+
+### Step 3: Sub-branches
+For each main branch, ask: "What are the specific elements within this category?"
+- Go 2-3 levels deep
+- Keep it organic — don't force symmetry
+
+### Step 4: Find Connections
+Ask: "Are there interesting connections between branches?"
+- Ideas that span multiple categories are often the most innovative
+
+### Step 5: Identify Patterns
+Look for:
+- **Which branch has the most ideas?** — likely the user's passion area
+- **Which branch has the fewest?** — a potential blind spot
+- **What cross-connections emerge?** — these are often goldmines
+
+## Example of a Mind Map in Text
+
+```
+            [Cooking Hobby]
+          /        |        \
+    Recipes     Tools     Techniques
+    /    \       /  \        /    \
+ Quick  Gourmet  Knife  Pots  Baking  Grilling
+```
+
+## Tips
+
+- Let the user guide the branching direction
+- If they get stuck on one branch, move to another
+- Revisit and add to branches as new ideas emerge
+- Don't be afraid to start a new branch midway through
 ''',
   },
 );

@@ -4,6 +4,26 @@ import 'package:path/path.dart' as p;
 
 import '../../../utils/app_directories.dart';
 
+/// A single grep match: file path, line number, line content, and optional
+/// surrounding context lines.
+class GrepMatch {
+  final String relativePath;
+  final String fileName;
+  final int lineNumber;
+  final String lineContent;
+  final List<String> contextBefore;
+  final List<String> contextAfter;
+
+  const GrepMatch({
+    required this.relativePath,
+    required this.fileName,
+    required this.lineNumber,
+    required this.lineContent,
+    this.contextBefore = const [],
+    this.contextAfter = const [],
+  });
+}
+
 /// A single entry (file or directory) inside a conversation workspace.
 class WorkspaceEntry {
   final String name;
@@ -178,6 +198,67 @@ abstract final class WorkspaceService {
       // Ignore listing errors and return whatever was collected.
     }
     return out;
+  }
+
+  /// Recursively searches file contents under the workspace root for
+  /// [query]. Returns matching lines (with optional context) grouped by file.
+  ///
+  /// Only text files under 512 KB are searched. Search is case-insensitive.
+  /// [maxResults] caps the total number of matches. [contextLines] controls
+  /// how many lines before and after each match are included.
+  static Future<List<GrepMatch>> grep(
+    String conversationId,
+    String query, {
+    int maxResults = 50,
+    int contextLines = 0,
+  }) async {
+    if (query.isEmpty) return const <GrepMatch>[];
+
+    final root = await getWorkspaceRoot(conversationId);
+    final rootDir = Directory(root);
+    if (!await rootDir.exists()) return const <GrepMatch>[];
+
+    final matches = <GrepMatch>[];
+    final lowerQuery = query.toLowerCase();
+
+    await for (final entity
+        in rootDir.list(recursive: true, followLinks: false)) {
+      if (entity is! File) continue;
+      if (matches.length >= maxResults) break;
+
+      final stat = await entity.stat();
+      if (stat.size > 512 * 1024) continue; // skip files > 512 KB
+
+      final relPath = p.relative(entity.path, from: root);
+      try {
+        final lines = await entity.readAsLines();
+        for (var i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().contains(lowerQuery)) {
+            final ctxStart = (i - contextLines).clamp(0, lines.length - 1);
+            final ctxEnd = (i + contextLines).clamp(0, lines.length - 1);
+            matches.add(
+              GrepMatch(
+                relativePath: relPath,
+                fileName: p.basename(entity.path),
+                lineNumber: i + 1,
+                lineContent: lines[i],
+                contextBefore: contextLines > 0
+                    ? lines.sublist(ctxStart, i)
+                    : const [],
+                contextAfter: contextLines > 0
+                    ? lines.sublist(i + 1, ctxEnd + 1)
+                    : const [],
+              ),
+            );
+            if (matches.length >= maxResults) break;
+          }
+        }
+      } catch (_) {
+        // Binary or unreadable file — skip.
+      }
+    }
+
+    return matches;
   }
 
   static bool _looksLikeWindowsDrivePath(String s) {

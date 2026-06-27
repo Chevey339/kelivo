@@ -660,13 +660,11 @@ class MessageBuilderService {
     if (activeSkills.isEmpty) return;
 
     final buffer = StringBuffer();
-    buffer.writeln('\n# Available Skills');
-    buffer.writeln(
-      'The following skills are available. Call `use_skill` with the skill_name when relevant:',
-    );
+    buffer.writeln('\n<available_skills>');
     for (final skill in activeSkills) {
-      buffer.writeln('- **${skill.name}**: ${skill.description}');
+      buffer.writeln('- ${skill.name}: ${skill.description}');
     }
+    buffer.write('</available_skills>');
 
     _appendToSystemMessage(apiMessages, buffer.toString());
   }
