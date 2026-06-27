@@ -481,6 +481,15 @@ class SkillService {
         }
         final result = await importFromSkillMd(skillMdPath);
         if (result.success) {
+          // Copy additional files (references, assets, etc.) that
+          // importFromSkillMd (single-file importer) does not handle.
+          final targetDirPath = await _skillDirPath(name);
+          for (final entry in files.entries) {
+            if (entry.key == 'SKILL.md') continue;
+            final targetPath = p.join(targetDirPath, entry.key);
+            await File(targetPath).parent.create(recursive: true);
+            await File(targetPath).writeAsString(entry.value);
+          }
           imported++;
         } else {
           skipped++;

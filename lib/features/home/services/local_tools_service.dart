@@ -177,7 +177,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.workspaceFile,
           'description':
-              'Manage files in the conversation workspace. Actions: write (create/overwrite file), edit (string replace), create_dir, delete (recursive), move, read, list. All paths are relative to the workspace root. Path traversal (..) is blocked.',
+              'Manage files in the conversation workspace. Actions: write (create/overwrite file), edit (string replace), create_dir, delete (recursive), move, read, list, search (grep file contents recursively). All paths are relative to the workspace root. Path traversal (..) is blocked.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -191,6 +191,7 @@ class LocalToolsService {
                   'move',
                   'read',
                   'list',
+                  'search',
                 ],
               },
               'path': {
@@ -216,6 +217,21 @@ class LocalToolsService {
               'to': {
                 'type': 'string',
                 'description': 'For move: destination path.',
+              },
+              'query': {
+                'type': 'string',
+                'description':
+                    'For search: text to find (case-insensitive). Required for search action.',
+              },
+              'max_results': {
+                'type': 'integer',
+                'description':
+                    'For search: max number of matches to return (default 50, max 200).',
+              },
+              'context_lines': {
+                'type': 'integer',
+                'description':
+                    'For search: number of context lines to include before and after each match (default 0).',
               },
             },
             'required': ['action', 'path'],
@@ -260,7 +276,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.useSkill,
           'description':
-              'Load the full SKILL.md of an available skill when the task matches the skill description.',
+              'Load the full SKILL.md of an available skill when the user\'s request matches the skill\'s purpose. Call this first before read_skill_resource.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -278,7 +294,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.readSkillResource,
           'description':
-              'Read an asset/reference file from an available skill directory. Paths under scripts/ are forbidden.',
+              'Read an asset/reference file (e.g. references/*.md) from a skill directory whose SKILL.md has already been loaded. Paths under scripts/ are forbidden.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -557,6 +573,8 @@ class LocalToolsService {
         return _handleWorkspaceFileRead(conversationId, path);
       case 'list':
         return _handleWorkspaceFileList(conversationId, path);
+      case 'search':
+        return _handleWorkspaceFileSearch(conversationId, args);
       default:
         return jsonEncode({
           'error': 'unknown_action',
@@ -859,6 +877,50 @@ class LocalToolsService {
               'relativePath': e.relativePath,
               'isDir': e.isDir,
               'size': e.size,
+            },
+          )
+          .toList(),
+    });
+  }
+
+  static Future<String> _handleWorkspaceFileSearch(
+    String conversationId,
+    Map<String, dynamic> args,
+  ) async {
+    final query = (args['query'] ?? '').toString().trim();
+    if (query.isEmpty) {
+      return jsonEncode({
+        'error': 'invalid_query',
+        'message': 'query is required for search action',
+      });
+    }
+    var maxResults = 50;
+    if (args['max_results'] != null) {
+      maxResults = (args['max_results'] as num).toInt().clamp(1, 200);
+    }
+    var contextLines = 0;
+    if (args['context_lines'] != null) {
+      contextLines = (args['context_lines'] as num).toInt().clamp(0, 50);
+    }
+    final matches = await WorkspaceService.grep(
+      conversationId,
+      query,
+      maxResults: maxResults,
+      contextLines: contextLines,
+    );
+    return jsonEncode({
+      'query': query,
+      'matchCount': matches.length,
+      'matches': matches
+          .map(
+            (m) => {
+              'file': m.relativePath,
+              'line': m.lineNumber,
+              'content': m.lineContent,
+              if (m.contextBefore.isNotEmpty)
+                'contextBefore': m.contextBefore,
+              if (m.contextAfter.isNotEmpty)
+                'contextAfter': m.contextAfter,
             },
           )
           .toList(),

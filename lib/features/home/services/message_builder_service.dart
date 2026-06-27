@@ -546,13 +546,11 @@ class MessageBuilderService {
     if (systemIndex < 0) return;
 
     final buffer = StringBuffer();
-    buffer.writeln('\n# Available Skills');
-    buffer.writeln(
-      'The following skills are available. Call `use_skill` with the skill_name when relevant:',
-    );
+    buffer.writeln('\n<available_skills>');
     for (final skill in activeSkills) {
-      buffer.writeln('- **${skill.name}**: ${skill.description}');
+      buffer.writeln('- ${skill.name}: ${skill.description}');
     }
+    buffer.write('</available_skills>');
 
     apiMessages[systemIndex]['content'] =
         (apiMessages[systemIndex]['content'] ?? '').toString() +
