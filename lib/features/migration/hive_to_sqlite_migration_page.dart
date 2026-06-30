@@ -299,6 +299,7 @@ class _ProgressStep extends StatelessWidget {
               : status.detail == 'saving_zip'
               ? l10n.migrationSavingBackupZipDetail
               : l10n.migrationBackingUpDetail(status.detail),
+          animateLabel: inMigration,
           progress: status.progress,
           showPercent: status.progress > 0 && status.detail != 'saving_zip',
         ),
@@ -633,11 +634,13 @@ class _ProgressBlock extends StatefulWidget {
   const _ProgressBlock({
     required this.label,
     required this.progress,
+    this.animateLabel = true,
     this.showPercent = true,
   });
 
   final String label;
   final double progress;
+  final bool animateLabel;
   final bool showPercent;
 
   @override
@@ -725,14 +728,27 @@ class _ProgressBlockState extends State<_ProgressBlock> {
         Row(
           children: [
             Expanded(
-              child: ReelText(
-                _displayLabel,
-                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                options: const ReelTextOptions(
-                  direction: ReelTextDirection.up,
-                  duration: Duration(milliseconds: 320),
-                ),
-              ),
+              child: widget.animateLabel
+                  ? ReelText(
+                      _displayLabel,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      options: const ReelTextOptions(
+                        direction: ReelTextDirection.up,
+                        duration: Duration(milliseconds: 320),
+                      ),
+                    )
+                  : Text(
+                      _displayLabel,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
             ),
             if (widget.showPercent)
               ReelText(

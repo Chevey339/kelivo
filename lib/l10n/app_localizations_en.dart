@@ -5586,7 +5586,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationMigratingSubtitle =>
-      'Writing conversations and messages in batches so large histories do not overload memory.';
+      'Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.';
 
   @override
   String migrationBackingUpDetail(String fileName) {

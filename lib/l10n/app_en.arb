@@ -2393,7 +2393,7 @@
   "migrationBackingUpTitle": "Backing Up",
   "migrationBackingUpSubtitle": "Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.",
   "migrationMigratingTitle": "Migrating to SQLite",
-  "migrationMigratingSubtitle": "Writing conversations and messages in batches so large histories do not overload memory.",
+  "migrationMigratingSubtitle": "Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.",
   "migrationBackingUpDetail": "Backing up {fileName}",
   "@migrationBackingUpDetail": {
     "placeholders": {
