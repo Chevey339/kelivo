@@ -1970,7 +1970,7 @@
   "migrationBackingUpTitle": "正在備份",
   "migrationBackingUpSubtitle": "正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。",
   "migrationMigratingTitle": "正在遷移到 SQLite",
-  "migrationMigratingSubtitle": "正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。",
+  "migrationMigratingSubtitle": "正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。",
   "migrationBackingUpDetail": "正在備份 {fileName}",
   "@migrationBackingUpDetail": {
     "placeholders": {

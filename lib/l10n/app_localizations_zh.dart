@@ -5367,7 +5367,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationMigratingTitle => '正在迁移到 SQLite';
 
   @override
-  String get migrationMigratingSubtitle => '正在分批写入会话和消息，避免超大聊天记录占满内存。';
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -10816,7 +10817,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationMigratingTitle => '正在迁移到 SQLite';
 
   @override
-  String get migrationMigratingSubtitle => '正在分批写入会话和消息，避免超大聊天记录占满内存。';
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
@@ -16265,7 +16267,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get migrationMigratingTitle => '正在遷移到 SQLite';
 
   @override
-  String get migrationMigratingSubtitle => '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。';
+  String get migrationMigratingSubtitle =>
+      '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。';
 
   @override
   String migrationBackingUpDetail(String fileName) {
