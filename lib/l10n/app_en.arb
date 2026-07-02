@@ -1099,6 +1099,8 @@
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarImageMode": "Image mode",
   "chatInputBarDisableImageModeTooltip": "Turn off image mode",
+  "chatInputBarImageWarning": "Images will be ignored",
+  "chatInputBarDisableImageWarningTooltip": "Dismiss",
   "chatInputBarQueuedPending": "Queued to send",
   "chatInputBarQueuedCancel": "Cancel Queue",
   "chatInputBarInsertNewline": "Newline",

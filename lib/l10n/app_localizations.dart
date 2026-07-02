@@ -4823,6 +4823,18 @@ abstract class AppLocalizations {
   /// **'Turn off image mode'**
   String get chatInputBarDisableImageModeTooltip;
 
+  /// No description provided for @chatInputBarImageWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Images will be ignored'**
+  String get chatInputBarImageWarning;
+
+  /// No description provided for @chatInputBarDisableImageWarningTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get chatInputBarDisableImageWarningTooltip;
+
   /// No description provided for @chatInputBarQueuedPending.
   ///
   /// In en, this message translates to:
