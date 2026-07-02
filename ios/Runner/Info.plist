@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Kelivo</string>
+	<string>Cuplivo</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -21,7 +21,7 @@
 		<string>zh-Hant</string>
 	</array>
 	<key>CFBundleName</key>
-	<string>kelivo</string>
+	<string>cuplivo</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -32,8 +32,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>psyche.kelivo.background-generation.refresh</string>
-		<string>psyche.kelivo.background-generation.processing</string>
+		<string>com.cup11.cuplivo.background-generation.refresh</string>
+		<string>com.cup11.cuplivo.background-generation.processing</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
