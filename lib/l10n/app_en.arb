@@ -2383,5 +2383,21 @@
         "type": "int"
       }
     }
+  },
+  "titlePresetStandard": "Standard (Default)",
+  "@titlePresetStandard": {
+    "description": "Title preset option: standard (no emoji)"
+  },
+  "titlePresetEmoji": "Add Emoji",
+  "@titlePresetEmoji": {
+    "description": "Title preset option: emoji"
+  },
+  "titlePresetCustom": "Custom",
+  "@titlePresetCustom": {
+    "description": "Title preset label when custom prompt doesn't match any preset"
+  },
+  "titlePresetUnsavedHint": "Change or select a preset, then tap Save to apply",
+  "@titlePresetUnsavedHint": {
+    "description": "Hint shown in title prompt editor reminding user to save after changing preset"
   }
 }

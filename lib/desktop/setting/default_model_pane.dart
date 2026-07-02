@@ -5,6 +5,8 @@ import '../../l10n/app_localizations.dart';
 import '../../core/providers/settings_provider.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../core/prompts/title_presets.dart';
+import '../widgets/preset_dropdown.dart';
 import '../../features/model/widgets/model_select_sheet.dart';
 import '../../features/model/utils/ocr_model_capability.dart';
 import '../../utils/brand_assets.dart';
@@ -325,12 +327,42 @@ class DesktopDefaultModelPane extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        l10n.defaultModelPagePromptLabel,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: AppFontWeights.semibold,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              l10n.defaultModelPagePromptLabel,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: AppFontWeights.semibold,
+                              ),
+                            ),
+                          ),
+                          ListenableBuilder(
+                            listenable: ctrl,
+                            builder: (context, _) {
+                              final activeId = TitlePresets.detect(ctrl.text);
+                              return PresetDropdown<String>(
+                                value: activeId,
+                                customLabel: l10n.titlePresetCustom,
+                                options: [
+                                  DesktopSelectOption(
+                                    value: 'standard',
+                                    label: l10n.titlePresetStandard,
+                                  ),
+                                  DesktopSelectOption(
+                                    value: 'emoji',
+                                    label: l10n.titlePresetEmoji,
+                                  ),
+                                ],
+                                onSelected: (v) {
+                                  final p = TitlePresets.byId(v);
+                                  if (p != null) ctrl.text = p.prompt;
+                                },
+                              );
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       _promptEditor(
@@ -341,6 +373,14 @@ class DesktopDefaultModelPane extends StatelessWidget {
                       const SizedBox(height: 6),
                       Text(
                         l10n.defaultModelPageTitleVars('{content}', '{locale}'),
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.6),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.titlePresetUnsavedHint,
                         style: TextStyle(
                           color: cs.onSurface.withValues(alpha: 0.6),
                           fontSize: 12,

@@ -10219,6 +10219,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// Title preset option: standard (no emoji)
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get titlePresetStandard;
+
+  /// Title preset option: emoji
+  ///
+  /// In en, this message translates to:
+  /// **'Add Emoji'**
+  String get titlePresetEmoji;
+
+  /// Title preset label when custom prompt doesn't match any preset
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get titlePresetCustom;
+
+  /// Hint shown in title prompt editor reminding user to save after changing preset
+  ///
+  /// In en, this message translates to:
+  /// **'Change or select a preset, then tap Save to apply'**
+  String get titlePresetUnsavedHint;
 }
 
 class _AppLocalizationsDelegate

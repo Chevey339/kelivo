@@ -5552,4 +5552,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get titlePresetStandard => 'Standard (Default)';
+
+  @override
+  String get titlePresetEmoji => 'Add Emoji';
+
+  @override
+  String get titlePresetCustom => 'Custom';
+
+  @override
+  String get titlePresetUnsavedHint =>
+      'Change or select a preset, then tap Save to apply';
 }

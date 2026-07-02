@@ -5335,6 +5335,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get titlePresetStandard => '标准（默认）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定义';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10668,6 +10680,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get titlePresetStandard => '标准（默认）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定义';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16001,4 +16025,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get titlePresetStandard => '標準（預設）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定義';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
 }
