@@ -628,7 +628,7 @@ jobs:
           Name:           cuplivo
           Version:        ${VERSION_NUMBER}
           Release:        1%{?dist}
-Summary: Cuplivo Application
+          Summary:        Cuplivo Application
           License:        MIT
           Source0:        %{name}-%{version}.tar.gz
           BuildArch:      x86_64
