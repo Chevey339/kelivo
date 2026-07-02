@@ -18,4 +18,73 @@ void main() {
       },
     );
   });
+
+  group('fromGeminiUsageMetadata', () {
+    test('null input returns zero TokenUsage', () {
+      final result = TokenUsage.fromGeminiUsageMetadata(null);
+
+      expect(result.promptTokens, 0);
+      expect(result.completionTokens, 0);
+      expect(result.cachedTokens, 0);
+      expect(result.totalTokens, 0);
+    });
+
+    test('empty map returns zero TokenUsage', () {
+      final result = TokenUsage.fromGeminiUsageMetadata(<String, dynamic>{});
+
+      expect(result.promptTokens, 0);
+      expect(result.completionTokens, 0);
+      expect(result.cachedTokens, 0);
+      expect(result.totalTokens, 0);
+    });
+
+    test('all fields present with cachedContentTokenCount > 0', () {
+      final result = TokenUsage.fromGeminiUsageMetadata({
+        'promptTokenCount': 100,
+        'candidatesTokenCount': 50,
+        'cachedContentTokenCount': 42,
+        'totalTokenCount': 192,
+      });
+
+      expect(result.promptTokens, 100);
+      expect(result.completionTokens, 50);
+      expect(result.cachedTokens, 42);
+      expect(result.totalTokens, 192);
+    });
+
+    test('cachedContentTokenCount is 0', () {
+      final result = TokenUsage.fromGeminiUsageMetadata({
+        'promptTokenCount': 100,
+        'candidatesTokenCount': 50,
+        'cachedContentTokenCount': 0,
+        'totalTokenCount': 150,
+      });
+
+      expect(result.cachedTokens, 0);
+    });
+
+    test('cachedContentTokenCount is missing', () {
+      final result = TokenUsage.fromGeminiUsageMetadata({
+        'promptTokenCount': 100,
+        'candidatesTokenCount': 50,
+        'totalTokenCount': 150,
+      });
+
+      expect(result.cachedTokens, 0);
+    });
+
+    test('all fields are zero', () {
+      final result = TokenUsage.fromGeminiUsageMetadata({
+        'promptTokenCount': 0,
+        'candidatesTokenCount': 0,
+        'cachedContentTokenCount': 0,
+        'totalTokenCount': 0,
+      });
+
+      expect(result.promptTokens, 0);
+      expect(result.completionTokens, 0);
+      expect(result.cachedTokens, 0);
+      expect(result.totalTokens, 0);
+    });
+  });
 }
