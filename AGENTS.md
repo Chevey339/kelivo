@@ -27,7 +27,7 @@
   - All other generated logic must go through commands, not manual edits
   - `.dart_tool/**`
   - `build/**`
-- The package name is `Kelivo`. Existing imports use `package:Kelivo/...` everywhere. Do not "normalize" the package name.
+- The package name is `Cuplivo`. Existing imports use `package:Cuplivo/...` everywhere. Do not "normalize" the package name.
 - Top-level platform entry is `_selectHome()` in `lib/main.dart`:
   - macOS / Windows / Linux -> `DesktopHomePage`
   - Android / iOS -> `HomePage`

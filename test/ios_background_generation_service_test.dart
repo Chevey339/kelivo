@@ -3,7 +3,7 @@ import 'dart:io' show Platform;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/services/ios_background_generation.dart';
+import 'package:Cuplivo/core/services/ios_background_generation.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

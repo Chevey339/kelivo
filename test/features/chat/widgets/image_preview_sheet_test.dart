@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:Kelivo/features/chat/widgets/image_preview_sheet.dart';
+import 'package:Cuplivo/features/chat/widgets/image_preview_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';

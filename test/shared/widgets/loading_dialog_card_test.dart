@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/shared/widgets/loading_dialog_card.dart';
+import 'package:Cuplivo/shared/widgets/loading_dialog_card.dart';
 
 void main() {
   group('LoadingDialogCard', () {

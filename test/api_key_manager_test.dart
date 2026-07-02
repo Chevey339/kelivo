@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/models/api_keys.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/api_key_manager.dart';
+import 'package:Cuplivo/core/models/api_keys.dart';
+import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/core/services/api_key_manager.dart';
 
 ApiKeyConfig _key(String id, String value) {
   return ApiKeyConfig(id: id, key: value, createdAt: 1, updatedAt: 1);

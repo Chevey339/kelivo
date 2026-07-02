@@ -7013,7 +7013,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo'**
+  /// **'Cuplivo'**
   String get aboutPageAppName;
 
   /// No description provided for @aboutPageAppDescription.

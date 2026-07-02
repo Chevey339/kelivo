@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/features/chat/widgets/chat_suggestion_bubbles.dart';
+import 'package:Cuplivo/features/chat/widgets/chat_suggestion_bubbles.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

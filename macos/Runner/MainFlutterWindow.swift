@@ -3,7 +3,7 @@ import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
   // Use Cocoa autosave to persist and restore window frame precisely on macOS.
-  private let autosaveName = NSWindow.FrameAutosaveName("KelivoMainWindowFrame")
+  private let autosaveName = NSWindow.FrameAutosaveName("CuplivoMainWindowFrame")
 
   // Minimum reasonable content size to ensure the window is visible and usable.
   private let minContentSize = NSSize(width: 960, height: 640)

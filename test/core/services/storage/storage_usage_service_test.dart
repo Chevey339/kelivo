@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:path/path.dart' as p;
 
-import 'package:Kelivo/core/database/app_database.dart';
-import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
+import 'package:Cuplivo/core/database/app_database.dart';
+import 'package:Cuplivo/core/services/storage/storage_usage_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);

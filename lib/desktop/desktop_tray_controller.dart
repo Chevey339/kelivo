@@ -101,7 +101,7 @@ class DesktopTrayController with TrayListener, WindowListener {
     // consistent with Gopeed and skip it there.
     if (platform != TargetPlatform.linux) {
       try {
-        await trayManager.setToolTip('Kelivo');
+        await trayManager.setToolTip('Cuplivo');
       } catch (_) {}
     }
     try {

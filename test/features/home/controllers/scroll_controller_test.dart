@@ -1,4 +1,4 @@
-import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
+import 'package:Cuplivo/features/home/controllers/scroll_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';

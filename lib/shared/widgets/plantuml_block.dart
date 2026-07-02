@@ -1,6 +1,6 @@
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';

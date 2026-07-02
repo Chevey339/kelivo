@@ -1,5 +1,5 @@
-import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
-import 'package:Kelivo/core/services/tts/tts_text_chunker.dart';
+import 'package:Cuplivo/core/services/tts/tts_playback_models.dart';
+import 'package:Cuplivo/core/services/tts/tts_text_chunker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

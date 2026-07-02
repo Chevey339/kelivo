@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/models/quick_phrase.dart';
 import '../icons/lucide_adapter.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
 
 Future<QuickPhrase?> showDesktopQuickPhrasePopover(
   BuildContext context, {

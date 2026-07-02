@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
-import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/features/stats/models/stats_models.dart';
-import 'package:Kelivo/features/stats/pages/stats_page.dart';
-import 'package:Kelivo/features/stats/widgets/stats_heatmap.dart';
-import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/core/providers/settings_provider.dart';
+import 'package:Cuplivo/features/stats/models/stats_models.dart';
+import 'package:Cuplivo/features/stats/pages/stats_page.dart';
+import 'package:Cuplivo/features/stats/widgets/stats_heatmap.dart';
+import 'package:Cuplivo/l10n/app_localizations.dart';
 
 Widget _harness(StatsSnapshot snapshot) {
   return ChangeNotifierProvider(

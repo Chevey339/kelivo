@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Cuplivo/core/providers/assistant_provider.dart';
 
 Future<AssistantProvider> _createLoadedAssistantProvider({
   required List<Map<String, Object?>> assistants,

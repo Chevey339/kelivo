@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/features/settings/services/debug_conversation_factory.dart';
+import 'package:Cuplivo/features/settings/services/debug_conversation_factory.dart';
 
 void main() {
   group('DebugConversationFactory', () {

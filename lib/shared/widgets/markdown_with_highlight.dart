@@ -29,14 +29,14 @@ import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
 import 'tabbed_preview_block.dart';
 import 'package:path/path.dart' as p;
-import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
+import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
-import 'package:Kelivo/desktop/html_preview_dialog.dart';
+import 'package:Cuplivo/desktop/html_preview_dialog.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.

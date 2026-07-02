@@ -10,7 +10,7 @@ import '../../model/widgets/model_select_sheet.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
 
 class MultiKeyManagerPage extends StatefulWidget {
   const MultiKeyManagerPage({

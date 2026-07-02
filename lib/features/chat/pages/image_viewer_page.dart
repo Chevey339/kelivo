@@ -19,7 +19,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/clipboard_images.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../l10n/app_localizations.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
 
 class ImageViewerPage extends StatefulWidget {
   const ImageViewerPage({

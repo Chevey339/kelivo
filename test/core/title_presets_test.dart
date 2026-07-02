@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/core/prompts/title_presets.dart';
-import 'package:Kelivo/core/prompts/constants/title_prompts.dart';
+import 'package:Cuplivo/core/prompts/title_presets.dart';
+import 'package:Cuplivo/core/prompts/constants/title_prompts.dart';
 
 void main() {
   group('TitlePresets.detect', () {
@@ -8,10 +8,13 @@ void main() {
       expect(TitlePresets.detect(defaultTitlePrompt), 'standard');
     });
 
-    test('returns "standard" for defaultTitlePrompt with trailing whitespace', () {
-      expect(TitlePresets.detect('$defaultTitlePrompt\n'), 'standard');
-      expect(TitlePresets.detect('  $defaultTitlePrompt  '), 'standard');
-    });
+    test(
+      'returns "standard" for defaultTitlePrompt with trailing whitespace',
+      () {
+        expect(TitlePresets.detect('$defaultTitlePrompt\n'), 'standard');
+        expect(TitlePresets.detect('  $defaultTitlePrompt  '), 'standard');
+      },
+    );
 
     test('returns "emoji" for exact emojiTitlePrompt', () {
       expect(TitlePresets.detect(emojiTitlePrompt), 'emoji');

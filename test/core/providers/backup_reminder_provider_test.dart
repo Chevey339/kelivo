@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:Kelivo/core/providers/backup_reminder_provider.dart';
+import 'package:Cuplivo/core/providers/backup_reminder_provider.dart';
 
 Future<BackupReminderProvider> _loadProvider() async {
   final provider = BackupReminderProvider(autoLoad: false);

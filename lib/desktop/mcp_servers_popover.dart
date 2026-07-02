@@ -7,7 +7,7 @@ import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import '../core/providers/mcp_provider.dart';
 import '../core/providers/assistant_provider.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
 
 Future<void> showDesktopMcpServersPopover(
   BuildContext context, {

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/providers/model_provider.dart';
+import 'package:Cuplivo/core/providers/model_provider.dart';
 
 void main() {
   group('ModelRegistry.infer — Qwen 3.x vision detection', () {
@@ -76,10 +76,7 @@ void main() {
   group('ModelRegistry.infer — existing 1.x doubao still works', () {
     test('doubao-pro-1.6 keeps vision, tool, and reasoning', () {
       final info = ModelRegistry.infer(
-        ModelInfo(
-          id: 'doubao-pro-1.6',
-          displayName: 'doubao-pro-1.6',
-        ),
+        ModelInfo(id: 'doubao-pro-1.6', displayName: 'doubao-pro-1.6'),
       );
       expect(info.input, contains(Modality.image));
       expect(info.abilities, contains(ModelAbility.tool));
@@ -88,10 +85,7 @@ void main() {
 
     test('doubao-seed-1.8 keeps vision, tool, and reasoning', () {
       final info = ModelRegistry.infer(
-        ModelInfo(
-          id: 'doubao-seed-1.8',
-          displayName: 'doubao-seed-1.8',
-        ),
+        ModelInfo(id: 'doubao-seed-1.8', displayName: 'doubao-seed-1.8'),
       );
       expect(info.input, contains(Modality.image));
       expect(info.abilities, contains(ModelAbility.tool));

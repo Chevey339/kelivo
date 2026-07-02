@@ -1,7 +1,7 @@
 import 'dart:ui' show PointerDeviceKind;
 
-import 'package:Kelivo/features/home/widgets/scroll_nav_buttons.dart';
-import 'package:Kelivo/icons/lucide_adapter.dart';
+import 'package:Cuplivo/features/home/widgets/scroll_nav_buttons.dart';
+import 'package:Cuplivo/icons/lucide_adapter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
