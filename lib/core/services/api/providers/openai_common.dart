@@ -3090,6 +3090,71 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               finishReason = 'tool_calls';
             }
           }
+          // Server-executed tool events (root-level extension field).
+          // Gateways/bridges that run tools on the server side (agent proxies,
+          // Claude Code bridges, middleware layers) can emit
+          //   {"server_tool_event": {"type": "tool_use"|"tool_result", ...}}
+          // alongside normal deltas so tool activity renders as native tool
+          // cards and splits thinking segments, instead of being glued into
+          // reasoning_content as plain text.
+          // Unlike root-level tool_calls above (a request for the CLIENT to
+          // execute a tool), these events are purely presentational: they do
+          // NOT trigger client-side tool execution and do NOT alter
+          // finish_reason. Unknown/absent field costs nothing.
+          final serverToolEvent = json['server_tool_event'] as Map<String, dynamic>?;
+          if (serverToolEvent != null && config.useResponseApi != true) {
+            final evType = (serverToolEvent['type'] ?? '').toString();
+            if (evType == 'tool_use') {
+              final evId = (serverToolEvent['id'] ?? 'srv_call').toString();
+              final evName = (serverToolEvent['name'] ?? 'tool').toString();
+              final evInputRaw =
+                  serverToolEvent['input'] ?? serverToolEvent['input_preview'];
+              Map<String, dynamic> evArgs;
+              try {
+                if (evInputRaw is String && evInputRaw.isNotEmpty) {
+                  evArgs = (jsonDecode(evInputRaw) as Map).cast<String, dynamic>();
+                } else if (evInputRaw is Map) {
+                  evArgs = evInputRaw.cast<String, dynamic>();
+                } else {
+                  evArgs = const <String, dynamic>{};
+                }
+              } catch (_) {
+                evArgs = const <String, dynamic>{};
+              }
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: totalTokens,
+                toolCalls: [
+                  ToolCallInfo(id: evId, name: evName, arguments: evArgs),
+                ],
+              );
+            } else if (evType == 'tool_result') {
+              final evId = (serverToolEvent['id'] ?? '').toString();
+              final evName = (serverToolEvent['name'] ?? '').toString();
+              final evContent = (serverToolEvent['content_preview'] ??
+                      serverToolEvent['content'] ??
+                      '')
+                  .toString();
+              final evIsError = serverToolEvent['is_error'] == true;
+              yield ChatStreamChunk(
+                content: '',
+                isDone: false,
+                totalTokens: totalTokens,
+                toolResults: [
+                  ToolResultInfo(
+                    id: evId,
+                    name: evName,
+                    arguments: const <String, dynamic>{},
+                    content: evContent,
+                    metadata: evIsError
+                        ? const <String, dynamic>{'is_error': true}
+                        : null,
+                  ),
+                ],
+              );
+            }
+          }
           usage = _mergeOpenAICompatibleUsage(usage, json['usage']);
           if (usage != null) totalTokens = usage.totalTokens;
         }
