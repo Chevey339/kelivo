@@ -59,8 +59,6 @@ dependencies:
   jose: ^0.3.4
   reorderable_grid_view: ^2.2.8
   flutter_slidable: ^3.0.1
-  hive: ^2.2.3
-  hive_flutter: ^1.1.0
   url_launcher: ^6.3.2
   package_info_plus: ^8.3.1
   gpt_markdown: #^1.1.7

@@ -270,10 +270,7 @@ class _TokenDisplayWidgetState extends State<TokenDisplayWidget>
       return CompositedTransformTarget(link: _layerLink, child: label);
     }
 
-    Widget child = CompositedTransformTarget(
-      link: _layerLink,
-      child: label,
-    );
+    Widget child = CompositedTransformTarget(link: _layerLink, child: label);
 
     if (_isDesktop) {
       child = MouseRegion(
@@ -323,12 +320,11 @@ class _AnimatedPopupContent extends StatelessWidget {
     final begin = Offset(0, showBelow ? -0.15 : 0.15);
 
     Widget content = SlideTransition(
-      position:
-          Tween<Offset>(begin: begin, end: Offset.zero).animate(animation),
-      child: FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
+      position: Tween<Offset>(
+        begin: begin,
+        end: Offset.zero,
+      ).animate(animation),
+      child: FadeTransition(opacity: animation, child: child),
     );
 
     if (isDesktop) {

@@ -2381,57 +2381,5 @@
         "type": "int"
       }
     }
-  },
-  "migrationIntroTitle": "Upgrade Chat Storage",
-  "migrationIntroSubtitle": "Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.",
-  "migrationBackupNote": "Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.",
-  "migrationPerformanceNote": "After migration, startup, history loading, and search use SQLite indexes for smoother long-chat performance.",
-  "migrationSourceDatabaseLabel": "Hive",
-  "migrationTargetDatabaseLabel": "SQLite",
-  "migrationChooseFolderButton": "Choose Folder and Back Up",
-  "migrationSaveBackupButton": "Save Backup ZIP",
-  "migrationBackingUpTitle": "Backing Up",
-  "migrationBackingUpSubtitle": "Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.",
-  "migrationMigratingTitle": "Migrating to SQLite",
-  "migrationMigratingSubtitle": "Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.",
-  "migrationBackingUpDetail": "Backing up {fileName}",
-  "@migrationBackingUpDetail": {
-    "placeholders": {
-      "fileName": {
-        "type": "String"
-      }
-    }
-  },
-  "migrationMigratingDetail": "Migrated {count} messages",
-  "@migrationMigratingDetail": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "migrationMigratingPrepareDetail": "Preparing SQLite database",
-  "migrationMigratingToolEventsDetail": "Migrating tool records",
-  "migrationMigratingValidateDetail": "Validating migrated data",
-  "migrationBackupReadyDetail": "Backup ZIP is ready",
-  "migrationSavingBackupZipDetail": "Saving backup ZIP",
-  "migrationBackupFileSavedTitle": "Backup ZIP saved",
-  "migrationChecklistBackupFiles": "Export Hive backup ZIP",
-  "migrationChecklistPrepareSqlite": "Prepare SQLite database",
-  "migrationChecklistMigrateMessages": "Migrate conversations and messages",
-  "migrationChecklistMigrateToolEvents": "Migrate tool records",
-  "migrationChecklistValidate": "Validate migrated data",
-  "migrationStepBackup": "Backup",
-  "migrationStepMigrate": "Migrate",
-  "migrationStepComplete": "Done",
-  "migrationCompleteTitle": "Upgrade Complete",
-  "migrationCompleteSubtitle": "Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.",
-  "migrationConversationCount": "Conversations",
-  "migrationMessageCount": "Messages",
-  "migrationRestartButton": "Restart Kelivo",
-  "migrationFailedTitle": "Migration Failed",
-  "migrationFailedSubtitle": "The original Hive data and your backup are still intact. Review the reason below, then retry.",
-  "migrationUnknownError": "Unknown migration error.",
-  "migrationFailureLogTitle": "Failure log",
-  "migrationRetryButton": "Retry Migration"
+  }
 }

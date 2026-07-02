@@ -101,12 +101,6 @@ flutter gen-l10n
 
 ### 3.2 Generated Code Must Be Maintained Via Commands
 
-- After modifying Hive models, `@HiveType`, `@HiveField`, or `part '*.g.dart'` references, run:
-
-```bash
-dart run build_runner build --delete-conflicting-outputs
-```
-
 - Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files.
 
 ### 3.3 Format Code Before Finishing
@@ -135,7 +129,6 @@ flutter test
 | Change Type | Required Action |
 | --- | --- |
 | ARB / localization | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze` |
-| Hive model / generated code | `dart run build_runner build --delete-conflicting-outputs`, then run related tests |
 | `pubspec.yaml` / dependencies | `flutter pub get`, then `flutter analyze` and related tests |
 | `.github/workflows/**` / build scripts | Check ALL similar workflow files, not just one |
 | Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly |
@@ -256,7 +249,6 @@ flutter test
 - All new user-visible text uses `AppLocalizations`.
 - All 4 ARB files have been updated in sync.
 - `flutter gen-l10n` has been executed and generated files match ARB content.
-- If Hive models were touched, `build_runner` has been executed.
 - `dart format` has been executed.
 - `flutter analyze` has been executed.
 - Related `flutter test` has been executed. If no related tests exist, create and run them following official testing standards.

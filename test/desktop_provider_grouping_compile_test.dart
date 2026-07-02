@@ -7,4 +7,3 @@ void main() {
     expect(DesktopSettingsPage, isNotNull);
   });
 }
-

@@ -54,7 +54,7 @@ class DesktopWindowController with WindowListener {
     final savedPos = await _sizeMgr.getPosition();
     final wasMax = await _sizeMgr.getWindowMaximized();
 
-    if (defaultTargetPlatform == TargetPlatform.windows){
+    if (defaultTargetPlatform == TargetPlatform.windows) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
       doWhenWindowReady(() async {
         appWindow.minSize = options.minimumSize;
@@ -83,11 +83,8 @@ class DesktopWindowController with WindowListener {
             await windowManager.setPosition(savedPos);
           } catch (_) {}
         }
-      });      
+      });
     }
-
-
-    
   }
 
   void _attachListeners() {
