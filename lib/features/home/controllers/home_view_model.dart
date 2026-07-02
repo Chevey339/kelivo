@@ -171,6 +171,7 @@ class HomeViewModel extends ChangeNotifier {
       messageGenerationService: _messageGenerationService,
       contextProvider: _contextProvider,
       viewModel: this,
+      getTitleForLocale: getTitleForLocale,
     );
 
     // Wire up callbacks
