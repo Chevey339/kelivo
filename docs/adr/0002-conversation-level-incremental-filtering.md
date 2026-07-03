@@ -40,5 +40,5 @@
 
 - `_exportChatsToFile()` 加一行 `.where()` 过滤即可，零侵入现有主流程
 - 设置、导入端、合并逻辑零改动（导出的 chats.json 格式与全量完全一致）
-- 恢复端通过 `_incr` 后缀防呆检测，强制走 merge 模式即可
+- 恢复端通过 `cuplivo_incr_` 前缀防呆检测，强制走 merge 模式即可
 - 已知缺口文档化在 CONTEXT.md 中，方便后续改 Message-Level 时定位

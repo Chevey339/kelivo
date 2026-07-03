@@ -60,6 +60,27 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> incrementalBackup(DateTime since, bool includeSettings) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    try {
+      await _dataSync.backupToWebDav(
+        _cfg,
+        since: since,
+        includeSettings: includeSettings,
+      );
+      _message = 'Backup uploaded';
+      return true;
+    } catch (e) {
+      _message = e.toString();
+      return false;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
@@ -88,6 +109,12 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
+  Future<File> incrementalExportToFile(DateTime since, bool includeSettings) =>
+      _dataSync.exportToFile(
+        _cfg,
+        since: since,
+        includeSettings: includeSettings,
+      );
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,

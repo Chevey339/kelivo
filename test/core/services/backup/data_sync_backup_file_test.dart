@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:archive/archive_io.dart';
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
+import 'package:path/path.dart' as p;
+// ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -317,5 +319,75 @@ void main() {
       expect(await File('${tmpDir.path}/restore_source.zip').exists(), isFalse);
       expect(await tmpDir.list().toList(), isEmpty);
     });
+
+    test(
+      'incremental: since param produces cuplivo_incr_ prefix and includeSettings=false excludes settings.json',
+      () async {
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          since: DateTime.now().subtract(const Duration(days: 30)),
+          includeSettings: false,
+        );
+
+        expect(p.basename(backupFile.path).startsWith('cuplivo_incr_'), isTrue);
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          expect(archive.findFile('settings.json'), isNull);
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test(
+      'incremental: no since param produces normal filename without cuplivo_incr_',
+      () async {
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        expect(
+          p.basename(backupFile.path).startsWith('cuplivo_incr_'),
+          isFalse,
+        );
+        expect(
+          p.basename(backupFile.path),
+          matches(RegExp(r'kelivo_backup_\d{8}T\d{6}\.\d{6}\.zip')),
+        );
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+      },
+    );
+
+    test(
+      'incremental: cuplivo_incr_ filename forces merge mode on restore',
+      () async {
+        final zipFile = File(
+          '${root.path}/cuplivo_incr_20260703-123456-123456_20260701-000000.zip',
+        );
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        final settingsTmp = File('${root.path}/tmp_settings.json');
+        await settingsTmp.writeAsString('{}');
+        encoder.addFileSync(settingsTmp, 'settings.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        // Should not throw: overwrite mode is silently degraded to merge
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.overwrite,
+        );
+      },
+    );
   });
 }

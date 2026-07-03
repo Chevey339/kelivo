@@ -1682,6 +1682,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Import from Chatbox';
 
   @override
+  String get backupPageIncrementalTitle => 'Incremental Backup';
+
+  @override
+  String get backupPageIncrementalDescription =>
+      'Export only chats since a chosen date. Attachments are excluded.';
+
+  @override
+  String get backupPageIncrementalStartDate => 'Start Date';
+
+  @override
+  String get backupPageIncrementalLastBackup => 'Use last backup date';
+
+  @override
+  String get backupPageIncrementalIncludeSettings => 'Include Settings';
+
+  @override
+  String get backupPageIncrementalUpload => 'Upload Incremental';
+
+  @override
+  String get backupPageIncrementalUpdateBackupTime => 'Update last backup time';
+
+  @override
   String get backupReminderSectionTitle => 'Backup Reminder';
 
   @override

@@ -20,6 +20,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../utils/platform_utils.dart';
@@ -593,6 +594,67 @@ class _BackupPageState extends State<BackupPage> {
                                           onRestore: (item) async {
                                             Navigator.of(ctx).pop();
                                             if (!context.mounted) return;
+
+                                            if (item.displayName.startsWith(
+                                              'cuplivo_incr_',
+                                            )) {
+                                              try {
+                                                await _runWithImportingOverlay(
+                                                  context,
+                                                  () => vm.restoreFromItem(
+                                                    item,
+                                                    mode: RestoreMode.merge,
+                                                  ),
+                                                );
+                                              } catch (e) {
+                                                if (!context.mounted) return;
+                                                showAppSnackBar(
+                                                  context,
+                                                  message: e.toString(),
+                                                  type: NotificationType.error,
+                                                );
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
+                                              final msg = vm.message;
+                                              if (msg != null &&
+                                                  msg != 'Restored') {
+                                                showAppSnackBar(
+                                                  context,
+                                                  message: msg,
+                                                  type: NotificationType.error,
+                                                );
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
+                                              await showDialog(
+                                                context: context,
+                                                barrierDismissible: false,
+                                                builder: (dctx) => AlertDialog(
+                                                  title: Text(
+                                                    l10n.backupPageRestartRequired,
+                                                  ),
+                                                  content: Text(
+                                                    l10n.backupPageRestartContent,
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () async {
+                                                        Navigator.of(
+                                                          dctx,
+                                                        ).pop();
+                                                        PlatformUtils.restartApp();
+                                                      },
+                                                      child: Text(
+                                                        l10n.backupPageOK,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              return;
+                                            }
+
                                             final mode =
                                                 await _chooseImportModeDialog(
                                                   context,
@@ -673,12 +735,66 @@ class _BackupPageState extends State<BackupPage> {
                                   },
                                   onRestore: (item) async {
                                     Navigator.of(ctx).pop();
-
                                     if (!context.mounted) return;
+
+                                    if (item.displayName.startsWith(
+                                      'cuplivo_incr_',
+                                    )) {
+                                      try {
+                                        await _runWithImportingOverlay(
+                                          context,
+                                          () => vm.restoreFromItem(
+                                            item,
+                                            mode: RestoreMode.merge,
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        if (!context.mounted) return;
+                                        showAppSnackBar(
+                                          context,
+                                          message: e.toString(),
+                                          type: NotificationType.error,
+                                        );
+                                        return;
+                                      }
+                                      if (!context.mounted) return;
+                                      final msg = vm.message;
+                                      if (msg != null && msg != 'Restored') {
+                                        showAppSnackBar(
+                                          context,
+                                          message: msg,
+                                          type: NotificationType.error,
+                                        );
+                                        return;
+                                      }
+                                      if (!context.mounted) return;
+                                      await showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (dctx) => AlertDialog(
+                                          title: Text(
+                                            l10n.backupPageRestartRequired,
+                                          ),
+                                          content: Text(
+                                            l10n.backupPageRestartContent,
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () async {
+                                                Navigator.of(dctx).pop();
+                                                PlatformUtils.restartApp();
+                                              },
+                                              child: Text(l10n.backupPageOK),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+
                                     final mode = await _chooseImportModeDialog(
                                       context,
                                     );
-
                                     if (mode == null) return;
                                     if (!context.mounted) return;
 
@@ -762,6 +878,39 @@ class _BackupPageState extends State<BackupPage> {
                                 message: message,
                                 type: NotificationType.info,
                               );
+                            },
+                    ),
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.Upload,
+                      label: l10n.backupPageIncrementalTitle,
+                      onTap: vm.busy
+                          ? null
+                          : () async {
+                              final result =
+                                  await IncrementalBackupDialog.showSheet(
+                                    context,
+                                    lastBackupTime: context
+                                        .read<BackupReminderProvider>()
+                                        .lastBackupAt,
+                                  );
+                              if (result == null || !context.mounted) return;
+                              final (since, includeSettings, updateBackupTime) =
+                                  result;
+                              final success = await _runWithExportingOverlay(
+                                context,
+                                () => vm.incrementalBackup(
+                                  since,
+                                  includeSettings,
+                                ),
+                              );
+                              if (!context.mounted) return;
+                              if (success && updateBackupTime) {
+                                await context
+                                    .read<BackupReminderProvider>()
+                                    .recordBackupCompleted();
+                              }
                             },
                     ),
                   ],
@@ -1025,6 +1174,67 @@ class _BackupPageState extends State<BackupPage> {
                                           onRestore: (item) async {
                                             Navigator.of(ctx).pop();
                                             if (!context.mounted) return;
+
+                                            if (item.displayName.startsWith(
+                                              'cuplivo_incr_',
+                                            )) {
+                                              try {
+                                                await _runWithImportingOverlay(
+                                                  context,
+                                                  () => s3Vm.restoreFromItem(
+                                                    item,
+                                                    mode: RestoreMode.merge,
+                                                  ),
+                                                );
+                                              } catch (e) {
+                                                if (!context.mounted) return;
+                                                showAppSnackBar(
+                                                  context,
+                                                  message: e.toString(),
+                                                  type: NotificationType.error,
+                                                );
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
+                                              final msg = s3Vm.message;
+                                              if (msg != null &&
+                                                  msg != 'Restored') {
+                                                showAppSnackBar(
+                                                  context,
+                                                  message: msg,
+                                                  type: NotificationType.error,
+                                                );
+                                                return;
+                                              }
+                                              if (!context.mounted) return;
+                                              await showDialog(
+                                                context: context,
+                                                barrierDismissible: false,
+                                                builder: (dctx) => AlertDialog(
+                                                  title: Text(
+                                                    l10n.backupPageRestartRequired,
+                                                  ),
+                                                  content: Text(
+                                                    l10n.backupPageRestartContent,
+                                                  ),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () async {
+                                                        Navigator.of(
+                                                          dctx,
+                                                        ).pop();
+                                                        PlatformUtils.restartApp();
+                                                      },
+                                                      child: Text(
+                                                        l10n.backupPageOK,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                              return;
+                                            }
+
                                             final mode =
                                                 await _chooseImportModeDialog(
                                                   context,
@@ -1106,6 +1316,62 @@ class _BackupPageState extends State<BackupPage> {
                                     Navigator.of(ctx).pop();
 
                                     if (!context.mounted) return;
+
+                                    if (item.displayName.startsWith(
+                                      'cuplivo_incr_',
+                                    )) {
+                                      try {
+                                        await _runWithImportingOverlay(
+                                          context,
+                                          () => s3Vm.restoreFromItem(
+                                            item,
+                                            mode: RestoreMode.merge,
+                                          ),
+                                        );
+                                      } catch (e) {
+                                        if (!context.mounted) return;
+                                        showAppSnackBar(
+                                          context,
+                                          message: e.toString(),
+                                          type: NotificationType.error,
+                                        );
+                                        return;
+                                      }
+                                      if (!context.mounted) return;
+                                      final msg = s3Vm.message;
+                                      if (msg != null && msg != 'Restored') {
+                                        showAppSnackBar(
+                                          context,
+                                          message: msg,
+                                          type: NotificationType.error,
+                                        );
+                                        return;
+                                      }
+                                      if (!context.mounted) return;
+                                      await showDialog(
+                                        context: context,
+                                        barrierDismissible: false,
+                                        builder: (dctx) => AlertDialog(
+                                          title: Text(
+                                            l10n.backupPageRestartRequired,
+                                          ),
+                                          content: Text(
+                                            l10n.backupPageRestartContent,
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () async {
+                                                Navigator.of(dctx).pop();
+                                                PlatformUtils.restartApp();
+                                              },
+                                              child: Text(l10n.backupPageOK),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      return;
+                                    }
+
                                     final mode = await _chooseImportModeDialog(
                                       context,
                                     );
@@ -1192,6 +1458,39 @@ class _BackupPageState extends State<BackupPage> {
                                 message: message,
                                 type: NotificationType.info,
                               );
+                            },
+                    ),
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.Upload,
+                      label: l10n.backupPageIncrementalTitle,
+                      onTap: s3Vm.busy
+                          ? null
+                          : () async {
+                              final result =
+                                  await IncrementalBackupDialog.showSheet(
+                                    context,
+                                    lastBackupTime: context
+                                        .read<BackupReminderProvider>()
+                                        .lastBackupAt,
+                                  );
+                              if (result == null || !context.mounted) return;
+                              final (since, includeSettings, updateBackupTime) =
+                                  result;
+                              final success = await _runWithExportingOverlay(
+                                context,
+                                () => s3Vm.incrementalBackup(
+                                  since,
+                                  includeSettings,
+                                ),
+                              );
+                              if (!context.mounted) return;
+                              if (success && updateBackupTime) {
+                                await context
+                                    .read<BackupReminderProvider>()
+                                    .recordBackupCompleted();
+                              }
                             },
                     ),
                   ],
