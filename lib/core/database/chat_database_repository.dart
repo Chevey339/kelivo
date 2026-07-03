@@ -527,6 +527,73 @@ class ChatDatabaseRepository {
     });
   }
 
+  Future<void> putRestoreBatch({
+    required List<Conversation> conversations,
+    required Map<String, List<ChatMessage>> messagesByConversation,
+    required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
+    required Map<String, String> geminiSignaturesByMessageId,
+  }) async {
+    if (conversations.isEmpty &&
+        messagesByConversation.values.every((l) => l.isEmpty) &&
+        toolEventsByMessageId.isEmpty &&
+        geminiSignaturesByMessageId.isEmpty) {
+      return;
+    }
+
+    await _db.transaction(() async {
+      await _db.batch((batch) {
+        for (final conversation in conversations) {
+          batch.insert(
+            _db.conversationRows,
+            _conversationCompanion(conversation),
+            mode: InsertMode.insertOrReplace,
+          );
+          for (var i = 0; i < conversation.mcpServerIds.length; i++) {
+            batch.insert(
+              _db.conversationMcpServerRows,
+              ConversationMcpServerRowsCompanion.insert(
+                conversationId: conversation.id,
+                serverId: conversation.mcpServerIds[i],
+                ordinal: i,
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        }
+        for (final entry in messagesByConversation.entries) {
+          final messages = entry.value;
+          for (var i = 0; i < messages.length; i++) {
+            batch.insert(
+              _db.messageRows,
+              _messageCompanion(messages[i], i),
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+        }
+        for (final entry in toolEventsByMessageId.entries) {
+          batch.insert(
+            _db.toolEventRows,
+            ToolEventRowsCompanion.insert(
+              messageId: entry.key,
+              eventsJson: jsonEncode(entry.value),
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+        for (final entry in geminiSignaturesByMessageId.entries) {
+          batch.insert(
+            _db.geminiThoughtSignatureRows,
+            GeminiThoughtSignatureRowsCompanion.insert(
+              messageId: entry.key,
+              signature: entry.value,
+            ),
+            mode: InsertMode.insertOrReplace,
+          );
+        }
+      });
+    });
+  }
+
   Future<void> updateMessage(ChatMessage message) async {
     final existing = await (_db.select(
       _db.messageRows,
