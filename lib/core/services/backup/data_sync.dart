@@ -134,16 +134,14 @@ class DataSync {
 
   Future<File> prepareBackupFile(
     WebDavConfig cfg, {
-    DateTime? since,
-    bool includeSettings = true,
-    bool includeFiles = true,
+    IncrementalBackupConfig? incremental,
   }) async {
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
     final now = DateTime.now();
-    final isIncremental = since != null;
+    final isIncremental = incremental != null;
     final baseName = isIncremental
-        ? _incrementalBaseName(now, since)
+        ? _incrementalBaseName(now, incremental.since)
         : 'kelivo_backup_${_isoCompact(now)}';
     final workDir = Directory(p.join(tmp.path, baseName));
     await workDir.create(recursive: true);
@@ -156,8 +154,8 @@ class DataSync {
     File? chatsTmp;
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
-      // settings.json
-      if (includeSettings) {
+      // settings.json — full backup always includes settings
+      if (incremental == null || incremental.includeSettings) {
         final settingsJson = await _exportSettingsJson();
         settingsTmp = await _writeTempText(
           workDir,
@@ -168,7 +166,7 @@ class DataSync {
 
       // chats.json — stream to file to avoid huge string in memory
       if (cfg.includeChats) {
-        chatsTmp = await _exportChatsToFile(workDir, since: since);
+        chatsTmp = await _exportChatsToFile(workDir, incremental: incremental);
       }
 
       // Resolve directory paths (need AppDirectories on main isolate)
@@ -179,17 +177,18 @@ class DataSync {
       final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
       final effectiveIncludeFiles = isIncremental
-          ? includeFiles
+          ? incremental.includeFiles
           : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      final packSince = incremental?.since;
       await Isolate.run(() {
         _packZipSync(
           outPath: outPath,
           settingsPath: settingsPath,
           chatsPath: chatsPath,
           includeFiles: effectiveIncludeFiles,
-          since: since,
+          since: packSince,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -349,6 +348,7 @@ class DataSync {
     writer.addFile(file, _zipEntryName(entryName));
   }
 
+  /// Add all files from [srcDirPath] into the zip under [zipPrefix].
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
@@ -443,16 +443,9 @@ class DataSync {
 
   Future<void> backupToWebDav(
     WebDavConfig cfg, {
-    DateTime? since,
-    bool includeSettings = true,
-    bool includeFiles = true,
+    IncrementalBackupConfig? incremental,
   }) async {
-    final file = await prepareBackupFile(
-      cfg,
-      since: since,
-      includeSettings: includeSettings,
-      includeFiles: includeFiles,
-    );
+    final file = await prepareBackupFile(cfg, incremental: incremental);
     try {
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
@@ -546,8 +539,8 @@ class DataSync {
 
       // If mtime is null, try to extract from filename
       if (mtime == null) {
-        // Try full backup format: kelivo_backup_2026-07-03T12-34-56.123456.zip
-        final fullMatch = RegExp(
+        // Try old full backup format: kelivo_backup_2026-07-03T12-34-56.123456.zip
+        var fullMatch = RegExp(
           r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.zip',
         ).firstMatch(name);
         if (fullMatch != null) {
@@ -561,17 +554,27 @@ class DataSync {
             mtime = DateTime.parse(timestamp);
           } catch (_) {}
         } else {
-          // Try incremental format: cuplivo_incr_20260703-123456-123456_20260701-000000.zip
-          final incrMatch = RegExp(
-            r'cuplivo_incr_(\d{8})-(\d{6})-(\d{6})_\d{8}-\d{6}\.zip',
+          // Try new full backup format: kelivo_backup_20260703T123456.123456.zip
+          fullMatch = RegExp(
+            r'kelivo_backup_(\d{8}T\d{6}\.\d+)\.zip',
           ).firstMatch(name);
-          if (incrMatch != null) {
+          if (fullMatch != null) {
             try {
-              final raw =
-                  '${incrMatch.group(1)}T${incrMatch.group(2)}.${incrMatch.group(3)}';
-              // raw = 20260703T123456.123456
-              mtime = DateTime.parse(raw);
+              mtime = DateTime.parse(fullMatch.group(1)!);
             } catch (_) {}
+          } else {
+            // Try incremental format: cuplivo_incr_20260703-123456-123456_20260701-000000.zip
+            final incrMatch = RegExp(
+              r'cuplivo_incr_(\d{8})-(\d{6})-(\d{6})_\d{8}-\d{6}\.zip',
+            ).firstMatch(name);
+            if (incrMatch != null) {
+              try {
+                final raw =
+                    '${incrMatch.group(1)}T${incrMatch.group(2)}.${incrMatch.group(3)}';
+                // raw = 20260703T123456.123456
+                mtime = DateTime.parse(raw);
+              } catch (_) {}
+            }
           }
         }
       }
@@ -638,15 +641,8 @@ class DataSync {
 
   Future<File> exportToFile(
     WebDavConfig cfg, {
-    DateTime? since,
-    bool includeSettings = true,
-    bool includeFiles = true,
-  }) => prepareBackupFile(
-    cfg,
-    since: since,
-    includeSettings: includeSettings,
-    includeFiles: includeFiles,
-  );
+    IncrementalBackupConfig? incremental,
+  }) => prepareBackupFile(cfg, incremental: incremental);
 
   Future<void> restoreFromLocalFile(
     File file,
@@ -701,13 +697,15 @@ class DataSync {
   /// Analyze incremental scope for preview purposes — scans conversations and
   /// files to produce metadata counts and representative titles.
   /// Does not modify any state; safe to call repeatedly.
-  Future<IncrementalScope> analyzeIncrementalScope({
-    required DateTime since,
-    bool includeFiles = true,
-  }) async {
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) async {
     if (!chatService.initialized) await chatService.init();
 
     final allConvs = chatService.getAllCompleteConversations();
+    final since = config.since;
+    final sinceCheck = config.sinceCheck;
+    final includeFiles = config.includeFiles;
 
     final newConvs = <Conversation>[];
     final updatedConvs = <Conversation>[];
@@ -715,7 +713,7 @@ class DataSync {
     int updatedMsgCount = 0;
 
     for (final c in allConvs) {
-      if (c.createdAt.isAfter(since) || c.createdAt.isAtSameMomentAs(since)) {
+      if (sinceCheck(c.createdAt)) {
         final msgs = chatService.getMessages(c.id);
         newMsgCount += msgs.length;
         newConvs.add(c);
@@ -723,11 +721,7 @@ class DataSync {
           c.updatedAt.isAtSameMomentAs(since)) {
         final filtered = chatService
             .getMessages(c.id)
-            .where(
-              (m) =>
-                  m.timestamp.isAfter(since) ||
-                  m.timestamp.isAtSameMomentAs(since),
-            );
+            .where((m) => sinceCheck(m.timestamp));
         final count = filtered.length;
         if (count > 0) {
           updatedMsgCount += count;
@@ -793,27 +787,26 @@ class DataSync {
   /// in-memory String.  Uses IOSink for low memory overhead.
   Future<File> _exportChatsToFile(
     Directory directory, {
-    DateTime? since,
+    IncrementalBackupConfig? incremental,
   }) async {
     if (!chatService.initialized) {
       await chatService.init();
     }
     var conversations = chatService.getAllCompleteConversations();
-    if (since != null) {
+    if (incremental != null) {
+      final sinceCheck = incremental.sinceCheck;
+      final since = incremental.since;
       // Message-level filtering with updatedAt pre-check optimization.
       // Conversations created after since always qualify.
       // Conversations with updatedAt before since have no activity.
       // Remaining conversations need message-level check.
       conversations = conversations.where((c) {
-        if (c.createdAt.isAfter(since) || c.createdAt.isAtSameMomentAs(since)) {
+        if (sinceCheck(c.createdAt)) {
           return true;
         }
         if (c.updatedAt.isBefore(since)) return false;
         final msgs = chatService.getMessages(c.id);
-        return msgs.any(
-          (m) =>
-              m.timestamp.isAfter(since) || m.timestamp.isAtSameMomentAs(since),
-        );
+        return msgs.any((m) => sinceCheck(m.timestamp));
       }).toList();
     }
     final file = File(p.join(directory.path, '_bk_chats.json'));
@@ -839,13 +832,9 @@ class DataSync {
       bool firstMsg = true;
       for (final c in conversations) {
         var msgs = chatService.getMessages(c.id);
-        if (since != null && c.createdAt.isBefore(since)) {
+        if (incremental != null && c.createdAt.isBefore(incremental.since)) {
           msgs = msgs
-              .where(
-                (m) =>
-                    m.timestamp.isAfter(since) ||
-                    m.timestamp.isAtSameMomentAs(since),
-              )
+              .where((m) => incremental.sinceCheck(m.timestamp))
               .toList();
         }
         for (final m in msgs) {

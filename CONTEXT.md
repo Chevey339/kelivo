@@ -56,18 +56,11 @@
 - **Date source**: `BackupReminderProvider.lastBackupTime` for the [↻] shortcut. If null, fallback to 30 days ago. User can always override via `showDatePicker()`.
 - **`includeSettings`**: Default `true`. Not yet persisted (planned for a future PR).
 - **`includeFiles`**: Default follows the config's `includeFiles` toggle. Files are filtered by `lastModifiedSync() >= since`. Not persisted.
-- **Architecture**: Incremental backup is NOT a mode toggle on full backup — it's a separate independent action. `BackupProvider.incrementalBackup(since, includeSettings, includeFiles)` and `S3BackupProvider.incrementalBackup(since, includeSettings, includeFiles)` are new methods that don't modify existing `backup()`.
+- **Architecture**: Incremental backup is NOT a mode toggle on full backup — it's a separate independent action. `BackupProvider.incrementalBackup(IncrementalBackupConfig)` and `S3BackupProvider.incrementalBackup(IncrementalBackupConfig)` are new methods that don't modify existing `backup()`.
 - **UI placement**: Desktop & Mobile. Each target (WebDAV, S3, Local) gets its own incremental section within its existing card, with date picker + [↻] shortcut + settings toggle + includeFiles toggle + separate action button.
 - **User-visible behaviors**:
   - Export filename always starts with `cuplivo_incr_`
   - Export includes settings if `includeSettings=true`, includes files if `includeFiles=true` (filtered by mtime)
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
-
-## Planned but Deferred In-Box
-
-Features agreed to be valuable but intentionally deferred:
-
-- **`includeSettings` persistence** — remember the last toggle value across sessions via SharedPreferences
-- **Conversation title reference in date picker** — show recent conversation titles as date reference points during `since` selection
 

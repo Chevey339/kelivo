@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/models/incremental_backup.dart';
+import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import '../widgets/ios_switch.dart';
+import '../widgets/ios_tactile.dart';
 
 class IncrementalBackupDialog {
   static Future<IncrementalBackupConfig?> show(
     BuildContext context, {
     DateTime? lastBackupTime,
     bool initialIncludeFiles = true,
-    Future<IncrementalScope> Function({
-      required DateTime since,
-      bool includeFiles,
-    })?
-    analyzer,
+    Future<IncrementalScope> Function(IncrementalBackupConfig config)? analyzer,
   }) {
     return showDialog<IncrementalBackupConfig>(
       context: context,
@@ -31,11 +30,7 @@ class IncrementalBackupDialog {
     BuildContext context, {
     DateTime? lastBackupTime,
     bool initialIncludeFiles = true,
-    Future<IncrementalScope> Function({
-      required DateTime since,
-      bool includeFiles,
-    })?
-    analyzer,
+    Future<IncrementalScope> Function(IncrementalBackupConfig config)? analyzer,
   }) {
     return showModalBottomSheet<IncrementalBackupConfig>(
       context: context,
@@ -67,10 +62,7 @@ class _IncrementalBackupDialogBody extends StatefulWidget {
   final DateTime? lastBackupTime;
   final bool initialIncludeFiles;
   final bool isSheet;
-  final Future<IncrementalScope> Function({
-    required DateTime since,
-    bool includeFiles,
-  })?
+  final Future<IncrementalScope> Function(IncrementalBackupConfig config)?
   analyzer;
 
   @override
@@ -80,6 +72,9 @@ class _IncrementalBackupDialogBody extends StatefulWidget {
 
 class _IncrementalBackupDialogBodyState
     extends State<_IncrementalBackupDialogBody> {
+  static const _prefsIncludeSettingsKey = 'incr_include_settings_v1';
+  static const _prefsUpdateBackupTimeKey = 'incr_update_backup_time_v1';
+
   late DateTime _since;
   bool _includeSettings = true;
   late bool _includeFiles;
@@ -95,7 +90,14 @@ class _IncrementalBackupDialogBodyState
         widget.lastBackupTime ??
         DateTime.now().subtract(const Duration(days: 30));
     _includeFiles = widget.initialIncludeFiles;
+    _loadPersistence();
     if (widget.analyzer != null) _rerunAnalysis();
+  }
+
+  Future<void> _loadPersistence() async {
+    final prefs = SharedPreferencesAsync();
+    _includeSettings = await prefs.getBool(_prefsIncludeSettingsKey) ?? true;
+    _updateBackupTime = await prefs.getBool(_prefsUpdateBackupTimeKey) ?? true;
   }
 
   String _fmt(DateTime d) => d.toIso8601String().split('T')[0];
@@ -115,7 +117,9 @@ class _IncrementalBackupDialogBodyState
     setState(() => _analyzing = true);
     final gen = ++_gen;
     try {
-      final scope = await analyzer(since: _since, includeFiles: _includeFiles);
+      final scope = await analyzer(
+        IncrementalBackupConfig(since: _since, includeFiles: _includeFiles),
+      );
       if (gen != _gen || !mounted) return;
       setState(() {
         _scope = scope;
@@ -143,15 +147,21 @@ class _IncrementalBackupDialogBodyState
     }
   }
 
-  void _onConfirm() => Navigator.of(context).pop(
-    IncrementalBackupConfig(
-      since: _since,
-      includeSettings: _includeSettings,
-      includeFiles: _includeFiles,
-      updateBackupTime: _updateBackupTime,
-      scope: _scope,
-    ),
-  );
+  Future<void> _onConfirm() async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.setBool(_prefsIncludeSettingsKey, _includeSettings);
+    await prefs.setBool(_prefsUpdateBackupTimeKey, _updateBackupTime);
+    if (!mounted) return;
+    Navigator.of(context).pop(
+      IncrementalBackupConfig(
+        since: _since,
+        includeSettings: _includeSettings,
+        includeFiles: _includeFiles,
+        updateBackupTime: _updateBackupTime,
+        scope: _scope,
+      ),
+    );
+  }
 
   void _onCancel() => Navigator.of(context).pop();
 
@@ -369,10 +379,12 @@ class _IncrementalBackupDialogBodyState
             if (widget.lastBackupTime != null)
               Tooltip(
                 message: l10n.backupPageIncrementalLastBackup,
-                child: TextButton(
-                  onPressed: () =>
-                      setState(() => _since = widget.lastBackupTime!),
-                  child: const Text('↻'),
+                child: IosIconButton(
+                  icon: Lucide.RefreshCw,
+                  size: 18,
+                  minSize: 36,
+                  onTap: () => setState(() => _since = widget.lastBackupTime!),
+                  semanticLabel: l10n.backupPageIncrementalLastBackup,
                 ),
               ),
           ],

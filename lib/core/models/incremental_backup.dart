@@ -2,6 +2,8 @@ class ConvRange {
   final int count;
   final int messageCount;
   final String? oldestTitle;
+
+  /// Null when [count] <= 1.
   final String? newestTitle;
   const ConvRange({
     required this.count,
@@ -37,4 +39,8 @@ class IncrementalBackupConfig {
     this.updateBackupTime = true,
     this.scope,
   });
+
+  /// Returns true if [timestamp] is on or after [since].
+  bool sinceCheck(DateTime timestamp) =>
+      timestamp.isAfter(since) || timestamp.isAtSameMomentAs(since);
 }

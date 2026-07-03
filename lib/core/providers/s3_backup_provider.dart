@@ -107,19 +107,11 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<IncrementalScope> analyzeIncrementalScope({
-    required DateTime since,
-    bool includeFiles = true,
-  }) => _dataSync.analyzeIncrementalScope(
-    since: since,
-    includeFiles: includeFiles,
-  );
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) => _dataSync.analyzeIncrementalScope(config);
 
-  Future<bool> incrementalBackup(
-    DateTime since,
-    bool includeSettings, [
-    bool includeFiles = true,
-  ]) async {
+  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
     _busy = true;
     _message = null;
     notifyListeners();
@@ -127,9 +119,7 @@ class S3BackupProvider extends ChangeNotifier {
     try {
       file = await _dataSync.prepareBackupFile(
         _scopeAsWebdavConfig(),
-        since: since,
-        includeSettings: includeSettings,
-        includeFiles: includeFiles,
+        incremental: config,
       );
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';

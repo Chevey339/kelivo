@@ -12,6 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Cuplivo/core/models/backup.dart';
 import 'package:Cuplivo/core/models/chat_message.dart';
 import 'package:Cuplivo/core/models/conversation.dart';
+import 'package:Cuplivo/core/models/incremental_backup.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 
@@ -328,8 +329,10 @@ void main() {
         final sync = DataSync(chatService: ChatService());
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
-          since: DateTime.now().subtract(const Duration(days: 30)),
-          includeSettings: false,
+          incremental: IncrementalBackupConfig(
+            since: DateTime.now().subtract(const Duration(days: 30)),
+            includeSettings: false,
+          ),
         );
 
         expect(p.basename(backupFile.path).startsWith('cuplivo_incr_'), isTrue);
@@ -405,9 +408,10 @@ void main() {
       final sync = DataSync(chatService: ChatService());
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: true),
-        since: DateTime.now().subtract(const Duration(days: 30)),
-        includeSettings: true,
-        includeFiles: true,
+        incremental: IncrementalBackupConfig(
+          since: DateTime.now().subtract(const Duration(days: 30)),
+          includeFiles: true,
+        ),
       );
 
       final input = InputFileStream(backupFile.path);
@@ -433,9 +437,11 @@ void main() {
       final sync = DataSync(chatService: ChatService());
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: true),
-        since: DateTime.now().subtract(const Duration(days: 30)),
-        includeSettings: false,
-        includeFiles: false,
+        incremental: IncrementalBackupConfig(
+          since: DateTime.now().subtract(const Duration(days: 30)),
+          includeSettings: false,
+          includeFiles: false,
+        ),
       );
 
       final input = InputFileStream(backupFile.path);
@@ -490,9 +496,11 @@ void main() {
         final sync = DataSync(chatService: chatService);
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
-          since: since,
-          includeSettings: false,
-          includeFiles: false,
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
         );
 
         final input = InputFileStream(backupFile.path);
@@ -553,9 +561,11 @@ void main() {
         final sync = DataSync(chatService: chatService);
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: true, includeFiles: false),
-          since: since,
-          includeSettings: false,
-          includeFiles: false,
+          incremental: IncrementalBackupConfig(
+            since: since,
+            includeSettings: false,
+            includeFiles: false,
+          ),
         );
 
         final input = InputFileStream(backupFile.path);
@@ -668,8 +678,7 @@ void main() {
 
         final sync = DataSync(chatService: chatService);
         final scope = await sync.analyzeIncrementalScope(
-          since: since,
-          includeFiles: false,
+          IncrementalBackupConfig(since: since, includeFiles: false),
         );
 
         expect(scope.newConversations.count, 1);

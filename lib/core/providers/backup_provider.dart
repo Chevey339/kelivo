@@ -61,29 +61,16 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<IncrementalScope> analyzeIncrementalScope({
-    required DateTime since,
-    bool includeFiles = true,
-  }) => _dataSync.analyzeIncrementalScope(
-    since: since,
-    includeFiles: includeFiles,
-  );
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) => _dataSync.analyzeIncrementalScope(config);
 
-  Future<bool> incrementalBackup(
-    DateTime since,
-    bool includeSettings, [
-    bool includeFiles = true,
-  ]) async {
+  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
-      await _dataSync.backupToWebDav(
-        _cfg,
-        since: since,
-        includeSettings: includeSettings,
-        includeFiles: includeFiles,
-      );
+      await _dataSync.backupToWebDav(_cfg, incremental: config);
       _message = 'Backup uploaded';
       return true;
     } catch (e) {
@@ -123,16 +110,8 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
-  Future<File> incrementalExportToFile(
-    DateTime since,
-    bool includeSettings, [
-    bool includeFiles = true,
-  ]) => _dataSync.exportToFile(
-    _cfg,
-    since: since,
-    includeSettings: includeSettings,
-    includeFiles: includeFiles,
-  );
+  Future<File> incrementalExportToFile(IncrementalBackupConfig config) =>
+      _dataSync.exportToFile(_cfg, incremental: config);
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,

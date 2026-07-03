@@ -357,7 +357,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
-              _buildLocalBackupSliver(context, l10n, cs, busy),
+              _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
@@ -582,11 +582,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       return;
                                     }
                                     final success = await backupProvider
-                                        .incrementalBackup(
-                                          config.since,
-                                          config.includeSettings,
-                                          config.includeFiles,
-                                        );
+                                        .incrementalBackup(config);
                                     if (!context.mounted) return;
                                     if (success && config.updateBackupTime) {
                                       await context
@@ -894,11 +890,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       return;
                                     }
                                     final success = await s3BackupProvider
-                                        .incrementalBackup(
-                                          config.since,
-                                          config.includeSettings,
-                                          config.includeFiles,
-                                        );
+                                        .incrementalBackup(config);
                                     if (!context.mounted) return;
                                     if (success && config.updateBackupTime) {
                                       await context
@@ -932,7 +924,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     BuildContext context,
     AppLocalizations l10n,
     ColorScheme cs,
-    bool busy,
   ) {
     return SliverToBoxAdapter(
       child: _sectionCard(
