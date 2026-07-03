@@ -568,28 +568,25 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                         .read<BackupProvider>();
                                     await _saveConfig();
                                     if (!context.mounted) return;
-                                    final result =
+                                    final config =
                                         await IncrementalBackupDialog.show(
                                           context,
                                           lastBackupTime: context
                                               .read<BackupReminderProvider>()
                                               .lastBackupAt,
+                                          initialIncludeFiles: _includeFiles,
                                         );
-                                    if (result == null || !context.mounted) {
+                                    if (config == null || !context.mounted) {
                                       return;
                                     }
-                                    final (
-                                      since,
-                                      includeSettings,
-                                      updateBackupTime,
-                                    ) = result;
                                     final success = await backupProvider
                                         .incrementalBackup(
-                                          since,
-                                          includeSettings,
+                                          config.since,
+                                          config.includeSettings,
+                                          config.includeFiles,
                                         );
                                     if (!context.mounted) return;
-                                    if (success && updateBackupTime) {
+                                    if (success && config.updateBackupTime) {
                                       await context
                                           .read<BackupReminderProvider>()
                                           .recordBackupCompleted();
@@ -881,28 +878,25 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                         .read<S3BackupProvider>();
                                     await _saveS3Config();
                                     if (!context.mounted) return;
-                                    final result =
+                                    final config =
                                         await IncrementalBackupDialog.show(
                                           context,
                                           lastBackupTime: context
                                               .read<BackupReminderProvider>()
                                               .lastBackupAt,
+                                          initialIncludeFiles: _includeFiles,
                                         );
-                                    if (result == null || !context.mounted) {
+                                    if (config == null || !context.mounted) {
                                       return;
                                     }
-                                    final (
-                                      since,
-                                      includeSettings,
-                                      updateBackupTime,
-                                    ) = result;
                                     final success = await s3BackupProvider
                                         .incrementalBackup(
-                                          since,
-                                          includeSettings,
+                                          config.since,
+                                          config.includeSettings,
+                                          config.includeFiles,
                                         );
                                     if (!context.mounted) return;
-                                    if (success && updateBackupTime) {
+                                    if (success && config.updateBackupTime) {
                                       await context
                                           .read<BackupReminderProvider>()
                                           .recordBackupCompleted();

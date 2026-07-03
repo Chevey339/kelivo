@@ -1698,6 +1698,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageIncrementalIncludeSettings => 'Include Settings';
 
   @override
+  String get backupPageIncrementalIncludeFiles => 'Include Files';
+
+  @override
   String get backupPageIncrementalUpload => 'Upload Incremental';
 
   @override

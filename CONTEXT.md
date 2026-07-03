@@ -49,17 +49,18 @@
 
 ## Incremental Backup (Experimental)
 
-- **Data scope**: Chat data only (conversations + messages + toolEvents + geminiThoughtSigs). Attachments are never included in incremental mode.
+- **Data scope**: Chat data (conversations + messages + toolEvents + geminiThoughtSigs). Optionally includes files (upload/, images/, avatars/, fonts/) when `includeFiles=true`, filtered by mtime >= since.
 - **Filtering unit**: Conversation-level (`createdAt >= since`). Entire conversations that started before `since` are skipped, even if they have recent messages. This is a deliberate trade-off — see `docs/adr/0002-conversation-level-incremental-filtering.md`.
 - **File naming**: `cuplivo_incr_<export_ts_YYYYMMDD-HHmmss-ffffff>_<since_ts_YYYYMMDD-HHmmss>.zip`. The `cuplivo_incr_` prefix is the single identification mechanism for the restore path.
 - **Restore behavior**: `cuplivo_incr_` prefix detected → skip the "Overwrite/Merge" dialog entirely → force `RestoreMode.merge` at both UI and DataSync layers.
 - **Date source**: `BackupReminderProvider.lastBackupTime` for the [↻] shortcut. If null, fallback to 30 days ago. User can always override via `showDatePicker()`.
 - **`includeSettings`**: Default `true`. Not yet persisted (planned for a future PR).
-- **Architecture**: Incremental backup is NOT a mode toggle on full backup — it's a separate independent action. `BackupProvider.incrementalBackup(since, includeSettings)` and `S3BackupProvider.incrementalBackup(since, includeSettings)` are new methods that don't modify existing `backup()`.
-- **UI placement**: Desktop & Mobile. Each target (WebDAV, S3, Local) gets its own incremental section within its existing card, with date picker + [↻] shortcut + settings toggle + separate action button.
+- **`includeFiles`**: Default follows the config's `includeFiles` toggle. Files are filtered by `lastModifiedSync() >= since`. Not persisted.
+- **Architecture**: Incremental backup is NOT a mode toggle on full backup — it's a separate independent action. `BackupProvider.incrementalBackup(since, includeSettings, includeFiles)` and `S3BackupProvider.incrementalBackup(since, includeSettings, includeFiles)` are new methods that don't modify existing `backup()`.
+- **UI placement**: Desktop & Mobile. Each target (WebDAV, S3, Local) gets its own incremental section within its existing card, with date picker + [↻] shortcut + settings toggle + includeFiles toggle + separate action button.
 - **User-visible behaviors**:
   - Export filename always starts with `cuplivo_incr_`
-  - Export includes settings if `includeSettings=true` (never attachments)
+  - Export includes settings if `includeSettings=true`, includes files if `includeFiles=true` (filtered by mtime)
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
@@ -68,7 +69,6 @@
 Features agreed to be valuable but intentionally deferred:
 
 - **Message-level filtering** — instead of skipping entire conversations, filter individual messages by `timestamp >= since`
-- **Incremental with attachments** — scan exported messages' `[image:...]` / `[file:...]` tags to pack only referenced files
 - **`includeSettings` persistence** — remember the last toggle value across sessions via SharedPreferences
 - **Conversation title reference in date picker** — show recent conversation titles as date reference points during `since` selection
 

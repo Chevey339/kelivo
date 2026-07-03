@@ -1643,6 +1643,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageIncrementalIncludeSettings => '包含设置';
 
   @override
+  String get backupPageIncrementalIncludeFiles => '包含文件';
+
+  @override
   String get backupPageIncrementalUpload => '增量上传';
 
   @override
@@ -7009,6 +7012,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageIncrementalIncludeSettings => '包含设置';
 
   @override
+  String get backupPageIncrementalIncludeFiles => '包含文件';
+
+  @override
   String get backupPageIncrementalUpload => '增量上传';
 
   @override
@@ -12373,6 +12379,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageIncrementalIncludeSettings => '包含設定';
+
+  @override
+  String get backupPageIncrementalIncludeFiles => '包含檔案';
 
   @override
   String get backupPageIncrementalUpload => '增量上傳';

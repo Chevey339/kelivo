@@ -3269,6 +3269,12 @@ abstract class AppLocalizations {
   /// **'Include Settings'**
   String get backupPageIncrementalIncludeSettings;
 
+  /// No description provided for @backupPageIncrementalIncludeFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Include Files'**
+  String get backupPageIncrementalIncludeFiles;
+
   /// No description provided for @backupPageIncrementalUpload.
   ///
   /// In en, this message translates to:

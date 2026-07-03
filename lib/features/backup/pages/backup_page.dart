@@ -888,25 +888,25 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: vm.busy
                           ? null
                           : () async {
-                              final result =
+                              final config =
                                   await IncrementalBackupDialog.showSheet(
                                     context,
                                     lastBackupTime: context
                                         .read<BackupReminderProvider>()
                                         .lastBackupAt,
+                                    initialIncludeFiles: cfg.includeFiles,
                                   );
-                              if (result == null || !context.mounted) return;
-                              final (since, includeSettings, updateBackupTime) =
-                                  result;
+                              if (config == null || !context.mounted) return;
                               final success = await _runWithExportingOverlay(
                                 context,
                                 () => vm.incrementalBackup(
-                                  since,
-                                  includeSettings,
+                                  config.since,
+                                  config.includeSettings,
+                                  config.includeFiles,
                                 ),
                               );
                               if (!context.mounted) return;
-                              if (success && updateBackupTime) {
+                              if (success && config.updateBackupTime) {
                                 await context
                                     .read<BackupReminderProvider>()
                                     .recordBackupCompleted();
@@ -1468,25 +1468,25 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: s3Vm.busy
                           ? null
                           : () async {
-                              final result =
+                              final config =
                                   await IncrementalBackupDialog.showSheet(
                                     context,
                                     lastBackupTime: context
                                         .read<BackupReminderProvider>()
                                         .lastBackupAt,
+                                    initialIncludeFiles: s3Cfg.includeFiles,
                                   );
-                              if (result == null || !context.mounted) return;
-                              final (since, includeSettings, updateBackupTime) =
-                                  result;
+                              if (config == null || !context.mounted) return;
                               final success = await _runWithExportingOverlay(
                                 context,
                                 () => s3Vm.incrementalBackup(
-                                  since,
-                                  includeSettings,
+                                  config.since,
+                                  config.includeSettings,
+                                  config.includeFiles,
                                 ),
                               );
                               if (!context.mounted) return;
-                              if (success && updateBackupTime) {
+                              if (success && config.updateBackupTime) {
                                 await context
                                     .read<BackupReminderProvider>()
                                     .recordBackupCompleted();

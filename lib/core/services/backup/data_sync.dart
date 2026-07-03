@@ -135,6 +135,7 @@ class DataSync {
     WebDavConfig cfg, {
     DateTime? since,
     bool includeSettings = true,
+    bool includeFiles = true,
   }) async {
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
@@ -176,7 +177,9 @@ class DataSync {
       final fontsDirPath = (await _getFontsDir()).path;
       final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
-      final includeFiles = isIncremental ? false : cfg.includeFiles;
+      final effectiveIncludeFiles = isIncremental
+          ? includeFiles
+          : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
       await Isolate.run(() {
@@ -184,7 +187,8 @@ class DataSync {
           outPath: outPath,
           settingsPath: settingsPath,
           chatsPath: chatsPath,
-          includeFiles: includeFiles,
+          includeFiles: effectiveIncludeFiles,
+          since: since,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -306,6 +310,7 @@ class DataSync {
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
+    DateTime? since,
   }) {
     final writer = _StreamingZipWriter(outPath);
     try {
@@ -321,10 +326,10 @@ class DataSync {
 
       // files under upload/, images/, and avatars/
       if (includeFiles) {
-        _addDirectoryToZip(writer, uploadDirPath, 'upload');
-        _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
-        _addDirectoryToZip(writer, imagesDirPath, 'images');
-        _addDirectoryToZip(writer, fontsDirPath, 'fonts');
+        _addDirectoryToZip(writer, uploadDirPath, 'upload', since: since);
+        _addDirectoryToZip(writer, avatarsDirPath, 'avatars', since: since);
+        _addDirectoryToZip(writer, imagesDirPath, 'images', since: since);
+        _addDirectoryToZip(writer, fontsDirPath, 'fonts', since: since);
       }
 
       writer.closeSync();
@@ -343,17 +348,24 @@ class DataSync {
     writer.addFile(file, _zipEntryName(entryName));
   }
 
-  /// Add all files from [srcDirPath] into the zip under [zipPrefix].
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
-    String zipPrefix,
-  ) {
+    String zipPrefix, {
+    DateTime? since,
+  }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
     final entries = dir.listSync(recursive: true, followLinks: false);
     for (final ent in entries) {
       if (ent is File) {
+        if (since != null) {
+          try {
+            if (ent.lastModifiedSync().isBefore(since)) continue;
+          } catch (_) {
+            continue;
+          }
+        }
         final rel = p.relative(ent.path, from: srcDirPath);
         // ZIP entries must use forward slashes regardless of platform
         final relPosix = rel.replaceAll('\\', '/');
@@ -432,11 +444,13 @@ class DataSync {
     WebDavConfig cfg, {
     DateTime? since,
     bool includeSettings = true,
+    bool includeFiles = true,
   }) async {
     final file = await prepareBackupFile(
       cfg,
       since: since,
       includeSettings: includeSettings,
+      includeFiles: includeFiles,
     );
     try {
       await _ensureCollection(cfg);
@@ -625,7 +639,13 @@ class DataSync {
     WebDavConfig cfg, {
     DateTime? since,
     bool includeSettings = true,
-  }) => prepareBackupFile(cfg, since: since, includeSettings: includeSettings);
+    bool includeFiles = true,
+  }) => prepareBackupFile(
+    cfg,
+    since: since,
+    includeSettings: includeSettings,
+    includeFiles: includeFiles,
+  );
 
   Future<void> restoreFromLocalFile(
     File file,

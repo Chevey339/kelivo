@@ -555,6 +555,7 @@
   "backupPageIncrementalStartDate": "起始日期",
   "backupPageIncrementalLastBackup": "使用上次備份日期",
   "backupPageIncrementalIncludeSettings": "包含設定",
+  "backupPageIncrementalIncludeFiles": "包含檔案",
   "backupPageIncrementalUpload": "增量上傳",
   "backupPageIncrementalUpdateBackupTime": "更新上次備份日期",
   "backupReminderSectionTitle": "備份提醒",

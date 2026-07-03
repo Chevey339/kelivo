@@ -106,7 +106,11 @@ class S3BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> incrementalBackup(DateTime since, bool includeSettings) async {
+  Future<bool> incrementalBackup(
+    DateTime since,
+    bool includeSettings, [
+    bool includeFiles = true,
+  ]) async {
     _busy = true;
     _message = null;
     notifyListeners();
@@ -116,6 +120,7 @@ class S3BackupProvider extends ChangeNotifier {
         _scopeAsWebdavConfig(),
         since: since,
         includeSettings: includeSettings,
+        includeFiles: includeFiles,
       );
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';

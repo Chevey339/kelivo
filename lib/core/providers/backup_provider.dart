@@ -60,7 +60,11 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> incrementalBackup(DateTime since, bool includeSettings) async {
+  Future<bool> incrementalBackup(
+    DateTime since,
+    bool includeSettings, [
+    bool includeFiles = true,
+  ]) async {
     _busy = true;
     _message = null;
     notifyListeners();
@@ -69,6 +73,7 @@ class BackupProvider extends ChangeNotifier {
         _cfg,
         since: since,
         includeSettings: includeSettings,
+        includeFiles: includeFiles,
       );
       _message = 'Backup uploaded';
       return true;
@@ -109,12 +114,16 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
-  Future<File> incrementalExportToFile(DateTime since, bool includeSettings) =>
-      _dataSync.exportToFile(
-        _cfg,
-        since: since,
-        includeSettings: includeSettings,
-      );
+  Future<File> incrementalExportToFile(
+    DateTime since,
+    bool includeSettings, [
+    bool includeFiles = true,
+  ]) => _dataSync.exportToFile(
+    _cfg,
+    since: since,
+    includeSettings: includeSettings,
+    includeFiles: includeFiles,
+  );
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,

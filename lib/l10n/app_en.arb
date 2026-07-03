@@ -683,6 +683,7 @@
   "backupPageIncrementalStartDate": "Start Date",
   "backupPageIncrementalLastBackup": "Use last backup date",
   "backupPageIncrementalIncludeSettings": "Include Settings",
+  "backupPageIncrementalIncludeFiles": "Include Files",
   "backupPageIncrementalUpload": "Upload Incremental",
   "backupPageIncrementalUpdateBackupTime": "Update last backup time",
   "backupReminderSectionTitle": "Backup Reminder",

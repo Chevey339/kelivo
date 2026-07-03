@@ -389,5 +389,65 @@ void main() {
         );
       },
     );
+
+    test('incremental: includeFiles=true packs upload and fonts', () async {
+      final uploadDir = Directory('${root.path}/upload');
+      await uploadDir.create(recursive: true);
+      await File('${uploadDir.path}/doc.txt').writeAsString('hello');
+      final fontsDir = Directory('${root.path}/fonts');
+      await fontsDir.create(recursive: true);
+      await File(
+        '${fontsDir.path}/custom.ttf',
+      ).writeAsBytes(List<int>.filled(64, 9));
+
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        since: DateTime.now().subtract(const Duration(days: 30)),
+        includeSettings: true,
+        includeFiles: true,
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        expect(archive.findFile('settings.json'), isNotNull);
+        expect(archive.findFile('upload/doc.txt'), isNotNull);
+        expect(archive.findFile('fonts/custom.ttf'), isNotNull);
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
+
+    test('incremental: includeFiles=false excludes files', () async {
+      final uploadDir = Directory('${root.path}/upload');
+      await uploadDir.create(recursive: true);
+      await File('${uploadDir.path}/doc.txt').writeAsString('hello');
+
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        const WebDavConfig(includeChats: false, includeFiles: true),
+        since: DateTime.now().subtract(const Duration(days: 30)),
+        includeSettings: false,
+        includeFiles: false,
+      );
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        expect(archive.findFile('settings.json'), isNull);
+        expect(archive.findFile('upload/doc.txt'), isNull);
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+
+      await DataSync.cleanupTemporaryBackupFile(backupFile);
+    });
   });
 }
