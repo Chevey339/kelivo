@@ -503,7 +503,8 @@ void main() {
           expect(chatsEntry, isNotNull);
 
           final data =
-              jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[]))) as Map<String, dynamic>;
+              jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[])))
+                  as Map<String, dynamic>;
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
           final toolEvents = data['toolEvents'] as Map;
@@ -565,7 +566,8 @@ void main() {
           expect(chatsEntry, isNotNull);
 
           final data =
-              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[])) as Map<String, dynamic>;
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[]))
+                  as Map<String, dynamic>;
           final convs = data['conversations'] as List;
           final msgs = data['messages'] as List;
 
@@ -577,6 +579,107 @@ void main() {
         }
 
         await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: analyzeIncrementalScope returns correct counts',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final since = DateTime.now().subtract(const Duration(days: 30));
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final recentDate = DateTime.now().subtract(const Duration(days: 1));
+
+        // New conversation (created after since)
+        final newConv = Conversation(
+          id: 'new-conv',
+          title: 'New Chat',
+          createdAt: since.add(const Duration(hours: 1)),
+          updatedAt: since.add(const Duration(hours: 1)),
+          messageIds: ['msg-n1', 'msg-n2'],
+        );
+        await chatService.restoreConversation(newConv, [
+          ChatMessage(
+            id: 'msg-n1',
+            role: 'user',
+            content: 'hello',
+            timestamp: since.add(const Duration(hours: 1)),
+            conversationId: newConv.id,
+            isStreaming: false,
+          ),
+          ChatMessage(
+            id: 'msg-n2',
+            role: 'assistant',
+            content: 'hi',
+            timestamp: since.add(const Duration(hours: 2)),
+            conversationId: newConv.id,
+            isStreaming: false,
+          ),
+        ]);
+
+        // Old conversation with new message
+        final oldConv = Conversation(
+          id: 'old-conv',
+          title: 'Old Chat',
+          createdAt: oldDate,
+          updatedAt: recentDate,
+          messageIds: ['msg-o1', 'msg-o2'],
+        );
+        await chatService.restoreConversation(oldConv, [
+          ChatMessage(
+            id: 'msg-o1',
+            role: 'user',
+            content: 'old msg',
+            timestamp: oldDate,
+            conversationId: oldConv.id,
+            isStreaming: false,
+          ),
+          ChatMessage(
+            id: 'msg-o2',
+            role: 'user',
+            content: 'recent msg',
+            timestamp: recentDate,
+            conversationId: oldConv.id,
+            isStreaming: false,
+          ),
+        ]);
+
+        // Stale conversation (no new messages)
+        final staleConv = Conversation(
+          id: 'stale-conv',
+          title: 'Stale Chat',
+          createdAt: oldDate,
+          updatedAt: oldDate,
+          messageIds: ['msg-s1'],
+        );
+        await chatService.restoreConversation(staleConv, [
+          ChatMessage(
+            id: 'msg-s1',
+            role: 'user',
+            content: 'stale',
+            timestamp: oldDate,
+            conversationId: staleConv.id,
+            isStreaming: false,
+          ),
+        ]);
+
+        final sync = DataSync(chatService: chatService);
+        final scope = await sync.analyzeIncrementalScope(
+          since: since,
+          includeFiles: false,
+        );
+
+        expect(scope.newConversations.count, 1);
+        expect(scope.newConversations.messageCount, 2);
+        expect(scope.newConversations.oldestTitle, 'New Chat');
+        expect(scope.updatedConversations.count, 1);
+        expect(scope.updatedConversations.messageCount, 1);
+        expect(scope.updatedConversations.oldestTitle, 'Old Chat');
+        expect(scope.newFileCount, 0);
+
         await chatService.close();
       },
     );

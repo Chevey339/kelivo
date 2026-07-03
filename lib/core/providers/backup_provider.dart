@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../models/backup.dart';
+import '../models/incremental_backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
 
@@ -59,6 +60,14 @@ class BackupProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<IncrementalScope> analyzeIncrementalScope({
+    required DateTime since,
+    bool includeFiles = true,
+  }) => _dataSync.analyzeIncrementalScope(
+    since: since,
+    includeFiles: includeFiles,
+  );
 
   Future<bool> incrementalBackup(
     DateTime since,

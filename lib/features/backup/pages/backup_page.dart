@@ -895,6 +895,7 @@ class _BackupPageState extends State<BackupPage> {
                                         .read<BackupReminderProvider>()
                                         .lastBackupAt,
                                     initialIncludeFiles: cfg.includeFiles,
+                                    analyzer: vm.analyzeIncrementalScope,
                                   );
                               if (config == null || !context.mounted) return;
                               final success = await _runWithExportingOverlay(
@@ -1475,6 +1476,7 @@ class _BackupPageState extends State<BackupPage> {
                                         .read<BackupReminderProvider>()
                                         .lastBackupAt,
                                     initialIncludeFiles: s3Cfg.includeFiles,
+                                    analyzer: s3Vm.analyzeIncrementalScope,
                                   );
                               if (config == null || !context.mounted) return;
                               final success = await _runWithExportingOverlay(

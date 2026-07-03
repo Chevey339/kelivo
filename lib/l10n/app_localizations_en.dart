@@ -1707,6 +1707,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageIncrementalUpdateBackupTime => 'Update last backup time';
 
   @override
+  String get backupPageIncrementalPreviewTitle => 'Incremental Scope';
+
+  @override
+  String get backupPageIncrementalPreviewLoading => 'Analyzing…';
+
+  @override
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount) {
+    return '$count new convs · $msgCount new msgs';
+  }
+
+  @override
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount) {
+    return '$count updated convs · $msgCount new msgs';
+  }
+
+  @override
+  String backupPageIncrementalPreviewFiles(int count, String size) {
+    return '$count attachments ($size)';
+  }
+
+  @override
   String get backupReminderSectionTitle => 'Backup Reminder';
 
   @override

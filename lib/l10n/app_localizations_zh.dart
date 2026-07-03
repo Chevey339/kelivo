@@ -1652,6 +1652,27 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageIncrementalUpdateBackupTime => '更新上次备份日期';
 
   @override
+  String get backupPageIncrementalPreviewTitle => '增量范围';
+
+  @override
+  String get backupPageIncrementalPreviewLoading => '分析中…';
+
+  @override
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount) {
+    return '新对话 $count 个 · 新消息 $msgCount 条';
+  }
+
+  @override
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount) {
+    return '更新旧对话 $count 个 · 新消息 $msgCount 条';
+  }
+
+  @override
+  String backupPageIncrementalPreviewFiles(int count, String size) {
+    return '新附件 $count 个 ($size)';
+  }
+
+  @override
   String get backupReminderSectionTitle => '备份提醒';
 
   @override
@@ -7021,6 +7042,27 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageIncrementalUpdateBackupTime => '更新上次备份日期';
 
   @override
+  String get backupPageIncrementalPreviewTitle => '增量范围';
+
+  @override
+  String get backupPageIncrementalPreviewLoading => '分析中…';
+
+  @override
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount) {
+    return '新对话 $count 个 · 新消息 $msgCount 条';
+  }
+
+  @override
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount) {
+    return '更新旧对话 $count 个 · 新消息 $msgCount 条';
+  }
+
+  @override
+  String backupPageIncrementalPreviewFiles(int count, String size) {
+    return '新附件 $count 个 ($size)';
+  }
+
+  @override
   String get backupReminderSectionTitle => '备份提醒';
 
   @override
@@ -12388,6 +12430,27 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageIncrementalUpdateBackupTime => '更新上次備份日期';
+
+  @override
+  String get backupPageIncrementalPreviewTitle => '增量範圍';
+
+  @override
+  String get backupPageIncrementalPreviewLoading => '分析中…';
+
+  @override
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount) {
+    return '新對話 $count 個 · 新訊息 $msgCount 條';
+  }
+
+  @override
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount) {
+    return '更新舊對話 $count 個 · 新訊息 $msgCount 條';
+  }
+
+  @override
+  String backupPageIncrementalPreviewFiles(int count, String size) {
+    return '新附件 $count 個 ($size)';
+  }
 
   @override
   String get backupReminderSectionTitle => '備份提醒';

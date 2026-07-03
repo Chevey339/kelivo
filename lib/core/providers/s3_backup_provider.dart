@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/backup.dart';
+import '../models/incremental_backup.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
 import '../services/chat/chat_service.dart';
@@ -105,6 +106,14 @@ class S3BackupProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<IncrementalScope> analyzeIncrementalScope({
+    required DateTime since,
+    bool includeFiles = true,
+  }) => _dataSync.analyzeIncrementalScope(
+    since: since,
+    includeFiles: includeFiles,
+  );
 
   Future<bool> incrementalBackup(
     DateTime since,

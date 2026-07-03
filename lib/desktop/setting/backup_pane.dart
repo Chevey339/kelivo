@@ -575,6 +575,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                               .read<BackupReminderProvider>()
                                               .lastBackupAt,
                                           initialIncludeFiles: _includeFiles,
+                                          analyzer: backupProvider
+                                              .analyzeIncrementalScope,
                                         );
                                     if (config == null || !context.mounted) {
                                       return;
@@ -885,6 +887,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                               .read<BackupReminderProvider>()
                                               .lastBackupAt,
                                           initialIncludeFiles: _includeFiles,
+                                          analyzer: s3BackupProvider
+                                              .analyzeIncrementalScope,
                                         );
                                     if (config == null || !context.mounted) {
                                       return;

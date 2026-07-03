@@ -14,6 +14,7 @@ import 'package:xml/xml.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 
@@ -697,6 +698,91 @@ class DataSync {
     return await AppDirectories.getFontsDirectory();
   }
 
+  /// Analyze incremental scope for preview purposes — scans conversations and
+  /// files to produce metadata counts and representative titles.
+  /// Does not modify any state; safe to call repeatedly.
+  Future<IncrementalScope> analyzeIncrementalScope({
+    required DateTime since,
+    bool includeFiles = true,
+  }) async {
+    if (!chatService.initialized) await chatService.init();
+
+    final allConvs = chatService.getAllCompleteConversations();
+
+    final newConvs = <Conversation>[];
+    final updatedConvs = <Conversation>[];
+    int newMsgCount = 0;
+    int updatedMsgCount = 0;
+
+    for (final c in allConvs) {
+      if (c.createdAt.isAfter(since) || c.createdAt.isAtSameMomentAs(since)) {
+        final msgs = chatService.getMessages(c.id);
+        newMsgCount += msgs.length;
+        newConvs.add(c);
+      } else if (c.updatedAt.isAfter(since) ||
+          c.updatedAt.isAtSameMomentAs(since)) {
+        final filtered = chatService
+            .getMessages(c.id)
+            .where(
+              (m) =>
+                  m.timestamp.isAfter(since) ||
+                  m.timestamp.isAtSameMomentAs(since),
+            );
+        final count = filtered.length;
+        if (count > 0) {
+          updatedMsgCount += count;
+          updatedConvs.add(c);
+        }
+      }
+    }
+
+    newConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    updatedConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    int fileCount = 0;
+    int totalBytes = 0;
+    if (includeFiles) {
+      final dirs = [
+        await _getUploadDir(),
+        await _getAvatarsDir(),
+        await _getImagesDir(),
+        await _getFontsDir(),
+      ];
+      for (final dir in dirs) {
+        if (!await dir.exists()) continue;
+        await for (final ent in dir.list(recursive: true, followLinks: false)) {
+          if (ent is File) {
+            try {
+              final mod = await ent.lastModified();
+              if (mod.isBefore(since)) continue;
+            } catch (_) {
+              continue;
+            }
+            fileCount++;
+            totalBytes += await ent.length();
+          }
+        }
+      }
+    }
+
+    return IncrementalScope(
+      newConversations: ConvRange(
+        count: newConvs.length,
+        messageCount: newMsgCount,
+        oldestTitle: newConvs.isNotEmpty ? newConvs.first.title : null,
+        newestTitle: newConvs.length > 1 ? newConvs.last.title : null,
+      ),
+      updatedConversations: ConvRange(
+        count: updatedConvs.length,
+        messageCount: updatedMsgCount,
+        oldestTitle: updatedConvs.isNotEmpty ? updatedConvs.first.title : null,
+        newestTitle: updatedConvs.length > 1 ? updatedConvs.last.title : null,
+      ),
+      newFileCount: fileCount,
+      totalFileSizeBytes: totalBytes,
+    );
+  }
+
   Future<String> _exportSettingsJson() async {
     final prefs = await SharedPreferencesAsync.instance;
     final map = await prefs.snapshot();
@@ -719,8 +805,7 @@ class DataSync {
       // Conversations with updatedAt before since have no activity.
       // Remaining conversations need message-level check.
       conversations = conversations.where((c) {
-        if (c.createdAt.isAfter(since) ||
-            c.createdAt.isAtSameMomentAs(since)) {
+        if (c.createdAt.isAfter(since) || c.createdAt.isAtSameMomentAs(since)) {
           return true;
         }
         if (c.updatedAt.isBefore(since)) return false;

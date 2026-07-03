@@ -686,6 +686,29 @@
   "backupPageIncrementalIncludeFiles": "Include Files",
   "backupPageIncrementalUpload": "Upload Incremental",
   "backupPageIncrementalUpdateBackupTime": "Update last backup time",
+  "backupPageIncrementalPreviewTitle": "Incremental Scope",
+  "backupPageIncrementalPreviewLoading": "Analyzing…",
+  "backupPageIncrementalPreviewNewConv": "{count} new convs · {msgCount} new msgs",
+  "@backupPageIncrementalPreviewNewConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewUpdatedConv": "{count} updated convs · {msgCount} new msgs",
+  "@backupPageIncrementalPreviewUpdatedConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewFiles": "{count} attachments ({size})",
+  "@backupPageIncrementalPreviewFiles": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
   "backupReminderSectionTitle": "Backup Reminder",
   "backupReminderEnableTitle": "Remind me to back up",
   "backupReminderFrequencyTitle": "Frequency",

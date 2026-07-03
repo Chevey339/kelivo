@@ -3287,6 +3287,36 @@ abstract class AppLocalizations {
   /// **'Update last backup time'**
   String get backupPageIncrementalUpdateBackupTime;
 
+  /// No description provided for @backupPageIncrementalPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental Scope'**
+  String get backupPageIncrementalPreviewTitle;
+
+  /// No description provided for @backupPageIncrementalPreviewLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing…'**
+  String get backupPageIncrementalPreviewLoading;
+
+  /// No description provided for @backupPageIncrementalPreviewNewConv.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new convs · {msgCount} new msgs'**
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount);
+
+  /// No description provided for @backupPageIncrementalPreviewUpdatedConv.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} updated convs · {msgCount} new msgs'**
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount);
+
+  /// No description provided for @backupPageIncrementalPreviewFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attachments ({size})'**
+  String backupPageIncrementalPreviewFiles(int count, String size);
+
   /// No description provided for @backupReminderSectionTitle.
   ///
   /// In en, this message translates to:

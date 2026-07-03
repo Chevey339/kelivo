@@ -591,6 +591,29 @@
   "backupPageIncrementalIncludeFiles": "包含文件",
   "backupPageIncrementalUpload": "增量上传",
   "backupPageIncrementalUpdateBackupTime": "更新上次备份日期",
+  "backupPageIncrementalPreviewTitle": "增量范围",
+  "backupPageIncrementalPreviewLoading": "分析中…",
+  "backupPageIncrementalPreviewNewConv": "新对话 {count} 个 · 新消息 {msgCount} 条",
+  "@backupPageIncrementalPreviewNewConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewUpdatedConv": "更新旧对话 {count} 个 · 新消息 {msgCount} 条",
+  "@backupPageIncrementalPreviewUpdatedConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewFiles": "新附件 {count} 个 ({size})",
+  "@backupPageIncrementalPreviewFiles": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
   "backupReminderSectionTitle": "备份提醒",
   "backupReminderEnableTitle": "定期提醒我备份",
   "backupReminderFrequencyTitle": "提醒频率",
