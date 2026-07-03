@@ -1686,7 +1686,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageIncrementalDescription =>
-      'Export only chats since a chosen date. Attachments are excluded.';
+      'Export only chats since a chosen date.';
 
   @override
   String get backupPageIncrementalStartDate => 'Start Date';

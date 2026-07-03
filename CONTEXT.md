@@ -50,7 +50,7 @@
 ## Incremental Backup (Experimental)
 
 - **Data scope**: Chat data (conversations + messages + toolEvents + geminiThoughtSigs). Optionally includes files (upload/, images/, avatars/, fonts/) when `includeFiles=true`, filtered by mtime >= since.
-- **Filtering unit**: Conversation-level (`createdAt >= since`). Entire conversations that started before `since` are skipped, even if they have recent messages. This is a deliberate trade-off — see `docs/adr/0002-conversation-level-incremental-filtering.md`.
+- **Filtering unit**: Message-level (`message.timestamp >= since`). Conversations created before `since` are still included if they have recent messages; only those messages are exported. Uses `updatedAt` as a fast pre-filter to skip inactive conversations. See `docs/adr/0002-conversation-level-incremental-filtering.md`.
 - **File naming**: `cuplivo_incr_<export_ts_YYYYMMDD-HHmmss-ffffff>_<since_ts_YYYYMMDD-HHmmss>.zip`. The `cuplivo_incr_` prefix is the single identification mechanism for the restore path.
 - **Restore behavior**: `cuplivo_incr_` prefix detected → skip the "Overwrite/Merge" dialog entirely → force `RestoreMode.merge` at both UI and DataSync layers.
 - **Date source**: `BackupReminderProvider.lastBackupTime` for the [↻] shortcut. If null, fallback to 30 days ago. User can always override via `showDatePicker()`.
@@ -68,7 +68,6 @@
 
 Features agreed to be valuable but intentionally deferred:
 
-- **Message-level filtering** — instead of skipping entire conversations, filter individual messages by `timestamp >= since`
 - **`includeSettings` persistence** — remember the last toggle value across sessions via SharedPreferences
 - **Conversation title reference in date picker** — show recent conversation titles as date reference points during `since` selection
 

@@ -679,7 +679,7 @@
   "backupPageImportFromCherryStudio": "Import from Cherry Studio",
   "backupPageImportFromChatbox": "Import from Chatbox",
   "backupPageIncrementalTitle": "Incremental Backup",
-  "backupPageIncrementalDescription": "Export only chats since a chosen date. Attachments are excluded.",
+  "backupPageIncrementalDescription": "Export only chats since a chosen date.",
   "backupPageIncrementalStartDate": "Start Date",
   "backupPageIncrementalLastBackup": "Use last backup date",
   "backupPageIncrementalIncludeSettings": "Include Settings",

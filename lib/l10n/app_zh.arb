@@ -540,7 +540,7 @@
   "backupPageImportFromCherryStudio": "从 Cherry Studio 导入",
   "backupPageImportFromChatbox": "从 Chatbox 导入",
   "backupPageIncrementalTitle": "增量备份",
-  "backupPageIncrementalDescription": "仅导出某个日期之后的聊天数据，不包含附件",
+  "backupPageIncrementalDescription": "仅导出某个日期之后的聊天数据。",
   "backupPageIncrementalStartDate": "起始日期",
   "backupPageIncrementalLastBackup": "使用上次备份日期",
   "backupPageIncrementalIncludeSettings": "包含设置",

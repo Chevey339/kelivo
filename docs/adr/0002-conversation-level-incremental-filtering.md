@@ -42,3 +42,36 @@
 - 设置、导入端、合并逻辑零改动（导出的 chats.json 格式与全量完全一致）
 - 恢复端通过 `cuplivo_incr_` 前缀防呆检测，强制走 merge 模式即可
 - 已知缺口文档化在 CONTEXT.md 中，方便后续改 Message-Level 时定位
+
+## 附录（2026-07-03）：升级为消息级过滤
+
+会话级过滤的缺点在实际使用中被验证：长命会话中的新消息被整条跳过。
+本 ADR 的方案 B（消息级过滤）已于 2026-07-03 实施。
+
+### 新增优化
+
+利用 `Conversation.updatedAt`（每次收到新消息时更新）做快速预检：
+- `updatedAt < since` → 无任何活动，直接跳过，无需查询消息
+- 将扫描范围从「所有旧会话」缩小到「有活动的旧会话」
+
+### 实现
+
+```dart
+// 过滤会话
+conversations = conversations.where((c) {
+  if (c.createdAt >= since) return true;
+  if (c.updatedAt.isBefore(since)) return false;
+  final msgs = chatService.getMessages(c.id);
+  return msgs.any((m) => m.timestamp >= since);
+}).toList();
+
+// 过滤消息（仅对 createdAt < since 的会话）
+if (c.createdAt.isBefore(since)) {
+  msgs = msgs.where((m) => m.timestamp >= since).toList();
+}
+```
+
+### 恢复端
+
+零改动。merge 模式按 message ID 去重，已有会话保留旧消息，
+新消息通过 `addMessageDirectly` 追加，最终会话完整。

@@ -10,6 +10,8 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Cuplivo/core/models/backup.dart';
+import 'package:Cuplivo/core/models/chat_message.dart';
+import 'package:Cuplivo/core/models/conversation.dart';
 import 'package:Cuplivo/core/services/backup/data_sync.dart';
 import 'package:Cuplivo/core/services/chat/chat_service.dart';
 
@@ -449,5 +451,134 @@ void main() {
 
       await DataSync.cleanupTemporaryBackupFile(backupFile);
     });
+
+    test(
+      'incremental: message-level filtering captures old conversation with new messages',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final recentDate = DateTime.now().subtract(const Duration(days: 1));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+
+        final conv = Conversation(
+          id: 'test-conv-1',
+          title: 'Old Conversation',
+          createdAt: oldDate,
+          updatedAt: recentDate,
+          messageIds: ['msg-old', 'msg-recent'],
+        );
+        final oldMsg = ChatMessage(
+          id: 'msg-old',
+          role: 'user',
+          content: 'old message',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+        );
+        final recentMsg = ChatMessage(
+          id: 'msg-recent',
+          role: 'assistant',
+          content: 'recent message',
+          timestamp: recentDate,
+          conversationId: conv.id,
+          isStreaming: false,
+        );
+        await chatService.restoreConversation(conv, [oldMsg, recentMsg]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          since: since,
+          includeSettings: false,
+          includeFiles: false,
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode((chatsEntry!.readBytes() ?? <int>[]))) as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+          final toolEvents = data['toolEvents'] as Map;
+
+          expect(convs, hasLength(1));
+          expect(convs[0]['id'], 'test-conv-1');
+          expect(msgs, hasLength(1));
+          expect(msgs[0]['id'], 'msg-recent');
+          expect(toolEvents, isEmpty);
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
+
+    test(
+      'incremental: message-level filtering skips old conversation with no new messages',
+      () async {
+        final chatService = ChatService();
+        await chatService.init();
+
+        final oldDate = DateTime.now().subtract(const Duration(days: 60));
+        final since = DateTime.now().subtract(const Duration(days: 30));
+
+        final conv = Conversation(
+          id: 'test-conv-2',
+          title: 'Stale Conversation',
+          createdAt: oldDate,
+          updatedAt: oldDate,
+          messageIds: ['msg-old-only'],
+        );
+        final oldMsg = ChatMessage(
+          id: 'msg-old-only',
+          role: 'user',
+          content: 'old message',
+          timestamp: oldDate,
+          conversationId: conv.id,
+          isStreaming: false,
+        );
+        await chatService.restoreConversation(conv, [oldMsg]);
+
+        final sync = DataSync(chatService: chatService);
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          since: since,
+          includeSettings: false,
+          includeFiles: false,
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final chatsEntry = archive.findFile('chats.json');
+          expect(chatsEntry, isNotNull);
+
+          final data =
+              jsonDecode(utf8.decode(chatsEntry!.readBytes() ?? <int>[])) as Map<String, dynamic>;
+          final convs = data['conversations'] as List;
+          final msgs = data['messages'] as List;
+
+          expect(convs, isEmpty);
+          expect(msgs, isEmpty);
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+        }
+
+        await DataSync.cleanupTemporaryBackupFile(backupFile);
+        await chatService.close();
+      },
+    );
   });
 }

@@ -714,13 +714,22 @@ class DataSync {
     }
     var conversations = chatService.getAllCompleteConversations();
     if (since != null) {
-      conversations = conversations
-          .where(
-            (c) =>
-                c.createdAt.isAfter(since) ||
-                c.createdAt.isAtSameMomentAs(since),
-          )
-          .toList();
+      // Message-level filtering with updatedAt pre-check optimization.
+      // Conversations created after since always qualify.
+      // Conversations with updatedAt before since have no activity.
+      // Remaining conversations need message-level check.
+      conversations = conversations.where((c) {
+        if (c.createdAt.isAfter(since) ||
+            c.createdAt.isAtSameMomentAs(since)) {
+          return true;
+        }
+        if (c.updatedAt.isBefore(since)) return false;
+        final msgs = chatService.getMessages(c.id);
+        return msgs.any(
+          (m) =>
+              m.timestamp.isAfter(since) || m.timestamp.isAtSameMomentAs(since),
+        );
+      }).toList();
     }
     final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
@@ -744,7 +753,16 @@ class DataSync {
       final geminiThoughtSigs = <String, String>{};
       bool firstMsg = true;
       for (final c in conversations) {
-        final msgs = chatService.getMessages(c.id);
+        var msgs = chatService.getMessages(c.id);
+        if (since != null && c.createdAt.isBefore(since)) {
+          msgs = msgs
+              .where(
+                (m) =>
+                    m.timestamp.isAfter(since) ||
+                    m.timestamp.isAtSameMomentAs(since),
+              )
+              .toList();
+        }
         for (final m in msgs) {
           if (!firstMsg) sink.write(',');
           firstMsg = false;

@@ -1631,7 +1631,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageIncrementalTitle => '增量备份';
 
   @override
-  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据，不包含附件';
+  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据。';
 
   @override
   String get backupPageIncrementalStartDate => '起始日期';
@@ -7000,7 +7000,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageIncrementalTitle => '增量备份';
 
   @override
-  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据，不包含附件';
+  String get backupPageIncrementalDescription => '仅导出某个日期之后的聊天数据。';
 
   @override
   String get backupPageIncrementalStartDate => '起始日期';
@@ -12369,7 +12369,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageIncrementalTitle => '增量備份';
 
   @override
-  String get backupPageIncrementalDescription => '僅匯出某個日期之後的聊天資料，不包含附件';
+  String get backupPageIncrementalDescription => '僅匯出某個日期之後的聊天資料。';
 
   @override
   String get backupPageIncrementalStartDate => '起始日期';

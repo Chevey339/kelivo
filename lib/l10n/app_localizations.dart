@@ -3248,7 +3248,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageIncrementalDescription.
   ///
   /// In en, this message translates to:
-  /// **'Export only chats since a chosen date. Attachments are excluded.'**
+  /// **'Export only chats since a chosen date.'**
   String get backupPageIncrementalDescription;
 
   /// No description provided for @backupPageIncrementalStartDate.
