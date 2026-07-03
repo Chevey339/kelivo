@@ -1840,26 +1840,31 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   String _localeToTag(Locale l) {
-    final lc = l.languageCode.toLowerCase();
-    if (lc == 'zh') {
-      final script = (l.scriptCode ?? '').toLowerCase();
-      if (script == 'hant') return 'zh_Hant';
-      return 'zh_CN';
-    }
-    return 'en_US';
+  final lc = l.languageCode.toLowerCase();
+  if (lc == 'zh') {
+    final script = (l.scriptCode ?? '').toLowerCase();
+    if (script == 'hant') return 'zh_Hant';
+    return 'zh_CN';
   }
+  if (lc == 'ru') {
+    return 'ru_RU';
+  }
+  return 'en_US';
+}
 
-  Locale _parseLocaleTag(String tag) {
-    switch (tag) {
-      case 'zh_CN':
-        return const Locale('zh', 'CN');
-      case 'zh_Hant':
-        return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
-      case 'en_US':
-      default:
-        return const Locale('en', 'US');
-    }
+Locale _parseLocaleTag(String tag) {
+  switch (tag) {
+    case 'zh_CN':
+      return const Locale('zh', 'CN');
+    case 'zh_Hant':
+      return const Locale.fromSubtags(languageCode: 'zh', scriptCode: 'Hant');
+    case 'ru_RU':
+      return const Locale('ru', 'RU');
+    case 'en_US':
+    default:
+      return const Locale('en', 'US');
   }
+}
 
   // ===== Backup & WebDAV settings =====
   WebDavConfig _webDavConfig = const WebDavConfig();
