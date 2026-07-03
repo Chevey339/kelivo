@@ -1063,30 +1063,17 @@ class DataSync {
                   .map((k, v) => MapEntry(k.toString(), v.toString()));
 
           if (mode == RestoreMode.overwrite) {
-            // Clear and restore via ChatService
             await chatService.clearAllData();
             final byConv = <String, List<ChatMessage>>{};
             for (final m in msgs) {
               (byConv[m.conversationId] ??= <ChatMessage>[]).add(m);
             }
-            for (final c in convs) {
-              final list = byConv[c.id] ?? const <ChatMessage>[];
-              await chatService.restoreConversation(c, list);
-            }
-            // Tool events
-            for (final entry in toolEvents.entries) {
-              try {
-                await chatService.setToolEvents(entry.key, entry.value);
-              } catch (_) {}
-            }
-            for (final entry in geminiThoughtSigs.entries) {
-              try {
-                await chatService.setGeminiThoughtSignature(
-                  entry.key,
-                  entry.value,
-                );
-              } catch (_) {}
-            }
+            await chatService.restoreConversationsBatch(
+              conversations: convs,
+              messagesByConversation: byConv,
+              toolEventsByMessageId: toolEvents,
+              geminiSignaturesByMessageId: geminiThoughtSigs,
+            );
           } else {
             // Merge mode: Add only non-existing conversations and messages
             final existingConvs = chatService.getAllCompleteConversations();
@@ -1107,13 +1094,25 @@ class DataSync {
               }
             }
 
-            // Restore non-existing conversations and their messages
+            // Batch-write new conversations; per-message for existing ones
+            final batchConvs = <Conversation>[];
+            final batchMsgs = <String, List<ChatMessage>>{};
+            final batchToolEvents = <String, List<Map<String, dynamic>>>{};
+            final batchGeminiSigs = <String, String>{};
             for (final c in convs) {
               if (!existingConvIds.contains(c.id)) {
+                batchConvs.add(c);
                 final list = byConv[c.id] ?? const <ChatMessage>[];
-                await chatService.restoreConversation(c, list);
+                batchMsgs[c.id] = list;
+                for (final msg in list) {
+                  if (toolEvents.containsKey(msg.id)) {
+                    batchToolEvents[msg.id] = toolEvents[msg.id]!;
+                  }
+                  if (geminiThoughtSigs.containsKey(msg.id)) {
+                    batchGeminiSigs[msg.id] = geminiThoughtSigs[msg.id]!;
+                  }
+                }
               } else if (byConv.containsKey(c.id)) {
-                // Conversation exists but has new messages
                 final newMessages = byConv[c.id]!;
                 for (final msg in newMessages) {
                   await chatService.addMessageDirectly(c.id, msg);
@@ -1121,8 +1120,20 @@ class DataSync {
               }
             }
 
-            // Merge tool events
+            if (batchConvs.isNotEmpty) {
+              await chatService.restoreConversationsBatch(
+                conversations: batchConvs,
+                messagesByConversation: batchMsgs,
+                toolEventsByMessageId: batchToolEvents,
+                geminiSignaturesByMessageId: batchGeminiSigs,
+              );
+            }
+
+            // Merge remaining tool events and signatures
+            // (entries belonging to batch-handled messages are safely skipped
+            //  since they already exist in DB)
             for (final entry in toolEvents.entries) {
+              if (batchToolEvents.containsKey(entry.key)) continue;
               final existing = chatService.getToolEvents(entry.key);
               if (existing.isEmpty) {
                 try {
@@ -1131,6 +1142,7 @@ class DataSync {
               }
             }
             for (final entry in geminiThoughtSigs.entries) {
+              if (batchGeminiSigs.containsKey(entry.key)) continue;
               final existingSig = chatService.getGeminiThoughtSignature(
                 entry.key,
               );

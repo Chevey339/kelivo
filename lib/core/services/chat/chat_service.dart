@@ -646,32 +646,36 @@ class ChatService extends ChangeNotifier {
     Conversation conversation,
     List<ChatMessage> messages,
   ) async {
-    if (!_initialized) await init();
-    // Ensure messageIds are in the same order
-    final ids = messages.map((m) => m.id).toList();
-    final restored = Conversation(
-      id: conversation.id,
-      title: conversation.title,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt,
-      messageIds: ids,
-      isPinned: conversation.isPinned,
-      mcpServerIds: List.of(conversation.mcpServerIds),
-      truncateIndex: conversation.truncateIndex,
-      assistantId: conversation.assistantId,
-      versionSelections: Map<String, int>.from(conversation.versionSelections),
-      summary: conversation.summary,
-      lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
-      chatSuggestions: List<String>.of(conversation.chatSuggestions),
+    await restoreConversationsBatch(
+      conversations: [conversation],
+      messagesByConversation: {conversation.id: messages},
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
     );
-    await _saveConversation(restored);
-    for (var i = 0; i < messages.length; i++) {
-      await _repo.putMessage(messages[i], messageOrder: i);
-    }
-    await _refreshConversation(restored.id);
+  }
 
-    // Update caches
-    _messagesCache[restored.id] = List.of(messages);
+  Future<void> restoreConversationsBatch({
+    required List<Conversation> conversations,
+    required Map<String, List<ChatMessage>> messagesByConversation,
+    required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
+    required Map<String, String> geminiSignaturesByMessageId,
+  }) async {
+    if (!_initialized) await init();
+
+    await _repo.putRestoreBatch(
+      conversations: conversations,
+      messagesByConversation: messagesByConversation,
+      toolEventsByMessageId: toolEventsByMessageId,
+      geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+    );
+
+    // Refresh caches from input data (no DB round-trips)
+    for (final c in conversations) {
+      final messages = messagesByConversation[c.id] ?? const <ChatMessage>[];
+      final ids = messages.map((m) => m.id).toList();
+      _conversationsCache[c.id] = c.copyWith(messageIds: ids);
+      _messagesCache[c.id] = List<ChatMessage>.of(messages);
+    }
 
     notifyListeners();
   }
