@@ -2559,7 +2559,7 @@ class SettingsProvider extends ChangeNotifier {
         try {
           final oldFile = File(old.avatarValue!);
           if ((oldFile.path.contains('/avatars/') ||
-                  oldFile.path.contains('\\\\avatars\\\\')) &&
+                  oldFile.path.contains('\\avatars\\')) &&
               await oldFile.exists()) {
             await oldFile.delete();
           }
@@ -2607,8 +2607,7 @@ class SettingsProvider extends ChangeNotifier {
     if (old.avatarType == 'file' && (old.avatarValue ?? '').isNotEmpty) {
       try {
         final f = File(old.avatarValue!);
-        if ((f.path.contains('/avatars/') ||
-                f.path.contains('\\\\avatars\\\\')) &&
+        if ((f.path.contains('/avatars/') || f.path.contains('\\avatars\\')) &&
             await f.exists()) {
           await f.delete();
         }

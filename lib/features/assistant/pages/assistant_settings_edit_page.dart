@@ -1519,9 +1519,18 @@ class _DesktopAssistantDialogShellState
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final a = context.watch<AssistantProvider>().getById(widget.assistantId);
-    final name =
-        a?.name ?? AppLocalizations.of(context)!.assistantEditPageTitle;
+    if (a == null) {
+      // Assistant was deleted while the dialog was open. Close the dialog and
+      // show a not-found placeholder instead of crashing on forced non-null
+      // access in the child panes (matches the mobile null guard above).
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+      return Center(child: Text(l10n.assistantEditPageNotFound));
+    }
+    final name = a.name;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

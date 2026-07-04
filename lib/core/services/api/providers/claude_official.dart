@@ -723,8 +723,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 }
               } else if (delta['type'] == 'thinking_delta') {
                 final idx = parseIndex(obj['index']);
-                final thinking =
-                    (delta['thinking'] ?? delta['text'] ?? '') as String;
+                final thinking = (delta['thinking'] ?? delta['text'] ?? '')
+                    .toString();
                 if (thinking.isNotEmpty) {
                   yield ChatStreamChunk(
                     content: '',
