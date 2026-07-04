@@ -2,14 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:Kelivo/core/providers/assistant_provider.dart';
-import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/features/search/services/global_session_search_service.dart';
+import 'package:Cuplivo/core/providers/assistant_provider.dart';
+import 'package:Cuplivo/core/services/chat/chat_service.dart';
+import 'package:Cuplivo/features/search/services/global_session_search_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -54,6 +53,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  final services = <ChatService>[];
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
@@ -63,17 +63,26 @@ void main() {
   });
 
   tearDown(() async {
-    await Hive.close();
+    for (final service in services) {
+      await service.close();
+    }
+    services.clear();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
   });
 
+  ChatService createService() {
+    final service = ChatService();
+    services.add(service);
+    return service;
+  }
+
   group('AssistantProvider cascade delete', () {
     test(
       'deletes conversations and messages owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -131,7 +140,7 @@ void main() {
     test(
       'deletes draft conversations owned by the deleted assistant',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,
@@ -158,7 +167,7 @@ void main() {
     test(
       'notifies once when deleting multiple assistant conversations',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
 
         final first = await chatService.createConversation(
@@ -201,7 +210,7 @@ void main() {
     test(
       'keeps conversations when deleting the last assistant is rejected',
       () async {
-        final chatService = ChatService();
+        final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
           chatService: chatService,

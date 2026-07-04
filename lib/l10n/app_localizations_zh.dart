@@ -158,6 +158,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSubChatToolEvents => '工具事件';
 
   @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
+
+  @override
   String get storageSpaceSubAssistantAvatars => '头像';
 
   @override
@@ -2463,6 +2472,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
 
   @override
+  String get chatInputBarImageWarning => '将忽略图片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
+
+  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -3596,7 +3611,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'Cuplivo';
 
   @override
   String get aboutPageAppDescription => '开源AI 助手';
@@ -5320,6 +5335,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get titlePresetStandard => '标准（默认）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定义';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5474,6 +5501,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -7781,6 +7817,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
 
   @override
+  String get chatInputBarImageWarning => '将忽略图片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
+
+  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -8914,7 +8956,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'Cuplivo';
 
   @override
   String get aboutPageAppDescription => '开源 AI 助手';
@@ -10638,6 +10680,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get titlePresetStandard => '标准（默认）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定义';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10792,6 +10846,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天資料庫';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '寫入日誌';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '頭像';
@@ -13098,6 +13161,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
 
   @override
+  String get chatInputBarImageWarning => '將忽略圖片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
+
+  @override
   String get chatInputBarQueuedPending => '排隊中';
 
   @override
@@ -14230,7 +14299,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get aboutPageEasterEggButton => '好的';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'Cuplivo';
 
   @override
   String get aboutPageAppDescription => '開源 AI 助理';
@@ -15956,4 +16025,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get titlePresetStandard => '標準（預設）';
+
+  @override
+  String get titlePresetEmoji => '添加 Emoji';
+
+  @override
+  String get titlePresetCustom => '自定義';
+
+  @override
+  String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
 }

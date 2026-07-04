@@ -4,8 +4,8 @@ import BackgroundTasks
 import UserNotifications
 import ActivityKit
 
-private let backgroundRefreshIdentifier = "psyche.kelivo.background-generation.refresh"
-private let backgroundProcessingIdentifier = "psyche.kelivo.background-generation.processing"
+private let backgroundRefreshIdentifier = "psyche.cuplivo.background-generation.refresh"
+private let backgroundProcessingIdentifier = "psyche.cuplivo.background-generation.processing"
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -122,7 +122,7 @@ private final class IosBackgroundGenerationHandler {
     if refreshEnabled { scheduleBackgroundTasks() }
     if args["liveActivityEnabled"] as? Bool ?? false {
       startLiveActivity(
-        title: args["title"] as? String ?? "Kelivo",
+        title: args["title"] as? String ?? "Cuplivo",
         detail: args["detail"] as? String ?? "",
         tokenCount: args["tokenCount"] as? Int ?? 0,
         tokenLabel: args["tokenLabel"] as? String ?? ""
@@ -143,7 +143,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func finish(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
-    let title = args["title"] as? String ?? "Kelivo"
+    let title = args["title"] as? String ?? "Cuplivo"
     let detail = args["detail"] as? String ?? ""
     finishLiveActivity(title: title, detail: detail)
     if notificationsEnabled { showCompletionNotification(title: title, body: detail) }
@@ -155,7 +155,7 @@ private final class IosBackgroundGenerationHandler {
   private func cancel(arguments: Any?, result: @escaping FlutterResult) {
     let args = arguments as? [String: Any] ?? [:]
     finishLiveActivity(
-      title: liveActivityDisplayTitle.isEmpty ? "Kelivo" : liveActivityDisplayTitle,
+      title: liveActivityDisplayTitle.isEmpty ? "Cuplivo" : liveActivityDisplayTitle,
       detail: args["detail"] as? String ?? ""
     )
     endBackgroundTask()
@@ -219,7 +219,7 @@ private final class IosBackgroundGenerationHandler {
 
   private func beginBackgroundTask() {
     if backgroundTask != .invalid { return }
-    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "KelivoBackgroundGeneration") { [weak self] in
+    backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "CuplivoBackgroundGeneration") { [weak self] in
       self?.endBackgroundTask()
     }
   }
@@ -236,7 +236,7 @@ private final class IosBackgroundGenerationHandler {
     do {
       try BGTaskScheduler.shared.submit(refresh)
     } catch {
-      NSLog("Kelivo background refresh schedule failed: \(error)")
+      NSLog("Cuplivo background refresh schedule failed: \(error)")
     }
 
     let processing = BGProcessingTaskRequest(identifier: backgroundProcessingIdentifier)
@@ -246,7 +246,7 @@ private final class IosBackgroundGenerationHandler {
     do {
       try BGTaskScheduler.shared.submit(processing)
     } catch {
-      NSLog("Kelivo background processing schedule failed: \(error)")
+      NSLog("Cuplivo background processing schedule failed: \(error)")
     }
   }
 
@@ -261,13 +261,13 @@ private final class IosBackgroundGenerationHandler {
     content.title = title
     content.body = body
     content.sound = .default
-    let request = UNNotificationRequest(identifier: "kelivo.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
+    let request = UNNotificationRequest(identifier: "cuplivo.background-generation.\(Date().timeIntervalSince1970)", content: content, trigger: nil)
     UNUserNotificationCenter.current().add(request)
   }
 
   private func isLiveActivityActive() -> Bool {
     if #available(iOS 16.1, *) {
-      return liveActivity as? Activity<KelivoGenerationActivityAttributes> != nil
+      return liveActivity as? Activity<CuplivoGenerationActivityAttributes> != nil
     }
     return false
   }
@@ -294,13 +294,13 @@ private final class IosBackgroundGenerationHandler {
       )
       do {
         if #available(iOS 16.2, *) {
-          liveActivity = try Activity<KelivoGenerationActivityAttributes>.request(attributes: KelivoGenerationActivityAttributes(title: title), content: ActivityContent(state: state, staleDate: nil), pushType: nil)
+          liveActivity = try Activity<CuplivoGenerationActivityAttributes>.request(attributes: CuplivoGenerationActivityAttributes(title: title), content: ActivityContent(state: state, staleDate: nil), pushType: nil)
         } else {
-          liveActivity = try Activity<KelivoGenerationActivityAttributes>.request(attributes: KelivoGenerationActivityAttributes(title: title), contentState: state, pushType: nil)
+          liveActivity = try Activity<CuplivoGenerationActivityAttributes>.request(attributes: CuplivoGenerationActivityAttributes(title: title), contentState: state, pushType: nil)
         }
         startLiveActivityRefreshTimer()
       } catch {
-        NSLog("Kelivo live activity start failed: \(error)")
+        NSLog("Cuplivo live activity start failed: \(error)")
         liveActivity = nil
       }
     }
@@ -335,7 +335,7 @@ private final class IosBackgroundGenerationHandler {
   }
 
   private func markLiveActivityFinished(title: String, detail: String) {
-    if #available(iOS 16.1, *), let activity = liveActivity as? Activity<KelivoGenerationActivityAttributes> {
+    if #available(iOS 16.1, *), let activity = liveActivity as? Activity<CuplivoGenerationActivityAttributes> {
       let finishedAt = Date()
       liveActivityDisplayTitle = title
       liveActivityDetail = detail
@@ -361,7 +361,7 @@ private final class IosBackgroundGenerationHandler {
   }
 
   private func endLiveActivity(detail: String) {
-    if #available(iOS 16.1, *), let activity = liveActivity as? Activity<KelivoGenerationActivityAttributes> {
+    if #available(iOS 16.1, *), let activity = liveActivity as? Activity<CuplivoGenerationActivityAttributes> {
       let state = liveActivityState(
         displayTitle: liveActivityDisplayTitle,
         detail: detail,
@@ -406,7 +406,7 @@ private final class IosBackgroundGenerationHandler {
   }
 
   private func refreshLiveActivity() {
-    guard #available(iOS 16.1, *), let activity = liveActivity as? Activity<KelivoGenerationActivityAttributes> else { return }
+    guard #available(iOS 16.1, *), let activity = liveActivity as? Activity<CuplivoGenerationActivityAttributes> else { return }
     guard !liveActivityFinished else { return }
     liveActivityWavePhase += 1
     let state = liveActivityState(
@@ -434,10 +434,10 @@ private final class IosBackgroundGenerationHandler {
     tokenLabel: String,
     finishedAt: Date?,
     isFinished: Bool
-  ) -> KelivoGenerationActivityAttributes.ContentState {
+  ) -> CuplivoGenerationActivityAttributes.ContentState {
     let startedAt = liveActivityStartedAt
     let effectiveFinishedAt = finishedAt ?? Date()
-    return KelivoGenerationActivityAttributes.ContentState(
+    return CuplivoGenerationActivityAttributes.ContentState(
       displayTitle: displayTitle,
       detail: detail,
       tokenCount: tokenCount,

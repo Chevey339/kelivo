@@ -179,7 +179,7 @@ class KelivoFetchMcpServerEngine {
           return _ok(
             id,
             result: {
-              'serverInfo': {'name': '@kelivo/fetch', 'version': '0.1.0'},
+              'serverInfo': {'name': '@kelivo/fetch', 'version': '1.2.0'},
               'protocolVersion': mcp.McpProtocol.defaultVersion,
               // Only tools capability is advertised for this minimal server
               'capabilities': {

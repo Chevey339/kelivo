@@ -77,6 +77,9 @@
   "storageSpaceSubChatMessages": "Messages",
   "storageSpaceSubChatConversations": "Conversations",
   "storageSpaceSubChatToolEvents": "Tool events",
+  "storageSpaceSubChatDatabase": "Chat database",
+  "storageSpaceSubChatWriteAheadLog": "Write-ahead log",
+  "storageSpaceSubChatSharedMemory": "Shared memory index",
   "storageSpaceSubAssistantAvatars": "Avatars",
   "storageSpaceSubAssistantImages": "Images",
   "storageSpaceSubCacheAvatars": "Avatar cache",
@@ -1096,6 +1099,8 @@
   "chatInputBarMoreTooltip": "Add",
   "chatInputBarImageMode": "Image mode",
   "chatInputBarDisableImageModeTooltip": "Turn off image mode",
+  "chatInputBarImageWarning": "Images will be ignored",
+  "chatInputBarDisableImageWarningTooltip": "Dismiss",
   "chatInputBarQueuedPending": "Queued to send",
   "chatInputBarQueuedCancel": "Cancel Queue",
   "chatInputBarInsertNewline": "Newline",
@@ -1570,7 +1575,7 @@
   "searchSettingsSheetNoServicesMessage": "No services. Add from Search Services.",
   "aboutPageEasterEggMessage": "Thanks for exploring! \n (No egg yet)",
   "aboutPageEasterEggButton": "Nice!",
-  "aboutPageAppName": "Kelivo",
+  "aboutPageAppName": "Cuplivo",
   "aboutPageAppDescription": "Open-source AI Assistant",
   "aboutPageNoQQGroup": "No QQ group yet",
   "aboutPageVersion": "Version",
@@ -2378,5 +2383,21 @@
         "type": "int"
       }
     }
+  },
+  "titlePresetStandard": "Standard (Default)",
+  "@titlePresetStandard": {
+    "description": "Title preset option: standard (no emoji)"
+  },
+  "titlePresetEmoji": "Add Emoji",
+  "@titlePresetEmoji": {
+    "description": "Title preset option: emoji"
+  },
+  "titlePresetCustom": "Custom",
+  "@titlePresetCustom": {
+    "description": "Title preset label when custom prompt doesn't match any preset"
+  },
+  "titlePresetUnsavedHint": "Change or select a preset, then tap Save to apply",
+  "@titlePresetUnsavedHint": {
+    "description": "Hint shown in title prompt editor reminding user to save after changing preset"
   }
 }

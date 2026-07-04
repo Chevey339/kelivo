@@ -162,6 +162,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceSubChatToolEvents => 'Tool events';
 
   @override
+  String get storageSpaceSubChatDatabase => 'Chat database';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => 'Write-ahead log';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => 'Shared memory index';
+
+  @override
   String get storageSpaceSubAssistantAvatars => 'Avatars';
 
   @override
@@ -2555,6 +2564,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatInputBarDisableImageModeTooltip => 'Turn off image mode';
 
   @override
+  String get chatInputBarImageWarning => 'Images will be ignored';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => 'Dismiss';
+
+  @override
   String get chatInputBarQueuedPending => 'Queued to send';
 
   @override
@@ -3731,7 +3746,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageEasterEggButton => 'Nice!';
 
   @override
-  String get aboutPageAppName => 'Kelivo';
+  String get aboutPageAppName => 'Cuplivo';
 
   @override
   String get aboutPageAppDescription => 'Open-source AI Assistant';
@@ -5537,4 +5552,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get titlePresetStandard => 'Standard (Default)';
+
+  @override
+  String get titlePresetEmoji => 'Add Emoji';
+
+  @override
+  String get titlePresetCustom => 'Custom';
+
+  @override
+  String get titlePresetUnsavedHint =>
+      'Change or select a preset, then tap Save to apply';
 }

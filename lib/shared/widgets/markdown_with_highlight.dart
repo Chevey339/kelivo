@@ -27,15 +27,16 @@ import 'mermaid_bridge.dart';
 import 'export_capture_scope.dart';
 import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
+import 'tabbed_preview_block.dart';
 import 'package:path/path.dart' as p;
-import 'package:Kelivo/l10n/app_localizations.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
+import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
-import 'package:Kelivo/desktop/html_preview_dialog.dart';
+import 'package:Cuplivo/desktop/html_preview_dialog.dart';
 
 // Inline math is parsed on the UI thread. Bound the lookahead window so a long
 // line with many unmatched openers cannot trigger repeated whole-line scans.
@@ -3531,7 +3532,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final mermaidColors = _MermaidBlockColors.resolve(isDark);
+    final mermaidColors = PreviewBlockColors.resolve(isDark);
 
     // Build theme variables mapping for Mermaid from Material ColorScheme
     String hex(Color c) {
@@ -3668,7 +3669,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              _MermaidTabButton(
+                              PreviewTabButton(
                                 label: l10n.mermaidImageTab,
                                 selected: _selectedTab == _MermaidTab.image,
                                 colors: mermaidColors,
@@ -3678,7 +3679,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                                   );
                                 },
                               ),
-                              _MermaidTabButton(
+                              PreviewTabButton(
                                 label: l10n.mermaidCodeTab,
                                 selected: _selectedTab == _MermaidTab.code,
                                 colors: mermaidColors,
@@ -3701,14 +3702,14 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _MermaidTextAction(
+                        PreviewTextAction(
                           icon: Lucide.Copy,
                           label: l10n.shareProviderSheetCopyButton,
                           colors: mermaidColors,
                           onTap: () => _copyMermaidCode(context),
                         ),
                         const SizedBox(width: 4),
-                        _MermaidTextAction(
+                        PreviewTextAction(
                           icon: Lucide.Download,
                           label: l10n.mermaidExportPng,
                           colors: mermaidColors,
@@ -3719,7 +3720,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
                               : () => _saveMermaidBytes(context, actionBytes),
                         ),
                         const SizedBox(width: 4),
-                        _MermaidTextAction(
+                        PreviewTextAction(
                           icon: Lucide.Maximize2,
                           label: l10n.mermaidFullScreen,
                           colors: mermaidColors,
@@ -3771,7 +3772,7 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   Widget _buildMermaidBody({
     required BuildContext context,
     required bool isDark,
-    required _MermaidBlockColors colors,
+    required PreviewBlockColors colors,
     required Uint8List? displayBytes,
     required String cacheKey,
     required bool showLoading,
@@ -4151,173 +4152,10 @@ class _MermaidBlockState extends State<_MermaidBlock> {
   }
 }
 
-class _MermaidBlockColors {
-  const _MermaidBlockColors({
-    required this.body,
-    required this.header,
-    required this.border,
-    required this.tabTrack,
-    required this.tabSelected,
-    required this.textPrimary,
-    required this.textSecondary,
-    required this.textTertiary,
-  });
-
-  final Color body;
-  final Color header;
-  final Color border;
-  final Color tabTrack;
-  final Color tabSelected;
-  final Color textPrimary;
-  final Color textSecondary;
-  final Color textTertiary;
-
-  static _MermaidBlockColors resolve(bool isDark) {
-    if (isDark) {
-      return const _MermaidBlockColors(
-        body: Color(0xFF212121),
-        header: Color(0xFF303030),
-        border: Color(0xFF383838),
-        tabTrack: Color(0xF2212121),
-        tabSelected: Color(0xFF333333),
-        textPrimary: Color(0xFFE6E6E6),
-        textSecondary: Color(0xFFA0A0A0),
-        textTertiary: Color(0xFF707070),
-      );
-    }
-
-    return const _MermaidBlockColors(
-      body: Color(0xFFF8F8F8),
-      header: Color(0xFFEDEDED),
-      border: Color(0xFFE0E0E0),
-      tabTrack: Color(0xCCD9D9D9),
-      tabSelected: Color(0xFFFFFFFF),
-      textPrimary: Color(0xFF261208),
-      textSecondary: Color(0xFF46352B),
-      textTertiary: Color(0xFF5B4C43),
-    );
-  }
-}
-
-class _MermaidTabButton extends StatefulWidget {
-  const _MermaidTabButton({
-    required this.label,
-    required this.selected,
-    required this.colors,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final _MermaidBlockColors colors;
-  final VoidCallback onTap;
-
-  @override
-  State<_MermaidTabButton> createState() => _MermaidTabButtonState();
-}
-
-class _MermaidTabButtonState extends State<_MermaidTabButton> {
-  bool _pressed = false;
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final baseColor = widget.selected
-        ? widget.colors.tabSelected
-        : Colors.transparent;
-    final hoverColor = Color.alphaBlend(
-      widget.colors.textPrimary.withValues(alpha: _pressed ? 0.10 : 0.06),
-      baseColor,
-    );
-    final bg = widget.selected || _pressed || _hovered
-        ? hoverColor
-        : Colors.transparent;
-
-    return Semantics(
-      button: true,
-      selected: widget.selected,
-      label: widget.label,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        onEnter: (_) => setState(() => _hovered = true),
-        onExit: (_) => setState(() {
-          _hovered = false;
-          _pressed = false;
-        }),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapCancel: () => setState(() => _pressed = false),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: SelectionContainer.disabled(
-              child: Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: widget.selected
-                      ? AppFontWeights.semibold
-                      : AppFontWeights.medium,
-                  color: widget.selected
-                      ? widget.colors.textPrimary
-                      : widget.colors.textSecondary,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MermaidTextAction extends StatelessWidget {
-  const _MermaidTextAction({
-    required this.icon,
-    required this.label,
-    required this.colors,
-    this.onTap,
-    this.enabled = true,
-  });
-
-  final IconData icon;
-  final String label;
-  final _MermaidBlockColors colors;
-  final VoidCallback? onTap;
-  final bool enabled;
-
-  @override
-  Widget build(BuildContext context) {
-    final active = enabled && onTap != null;
-    final color = colors.textSecondary.withValues(alpha: active ? 0.88 : 0.38);
-
-    return Tooltip(
-      message: label,
-      child: IosIconButton(
-        onTap: onTap,
-        enabled: active,
-        semanticLabel: label,
-        color: color,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        builder: (buttonColor) => Icon(icon, size: 14, color: buttonColor),
-      ),
-    );
-  }
-}
-
 class _MermaidLoadingView extends StatefulWidget {
   const _MermaidLoadingView({super.key, required this.colors});
 
-  final _MermaidBlockColors colors;
+  final PreviewBlockColors colors;
 
   @override
   State<_MermaidLoadingView> createState() => _MermaidLoadingViewState();
@@ -4375,7 +4213,7 @@ class _MermaidLoadingViewState extends State<_MermaidLoadingView>
 class _MermaidErrorView extends StatelessWidget {
   const _MermaidErrorView({super.key, required this.colors});
 
-  final _MermaidBlockColors colors;
+  final PreviewBlockColors colors;
 
   @override
   Widget build(BuildContext context) {

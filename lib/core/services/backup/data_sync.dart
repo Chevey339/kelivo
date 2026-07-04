@@ -606,7 +606,7 @@ class DataSync {
     if (!chatService.initialized) {
       await chatService.init();
     }
-    final conversations = chatService.getAllConversations();
+    final conversations = chatService.getAllCompleteConversations();
     final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
 
@@ -1089,7 +1089,7 @@ class DataSync {
             }
           } else {
             // Merge mode: Add only non-existing conversations and messages
-            final existingConvs = chatService.getAllConversations();
+            final existingConvs = chatService.getAllCompleteConversations();
             final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
             // Create a map of message IDs to avoid duplicates

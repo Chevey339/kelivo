@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.psyche" "\0"
-            VALUE "FileDescription", "kelivo" "\0"
+            VALUE "FileDescription", "cuplivo" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "kelivo" "\0"
+            VALUE "InternalName", "cuplivo" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.psyche. All rights reserved." "\0"
-            VALUE "OriginalFilename", "kelivo.exe" "\0"
-            VALUE "ProductName", "kelivo" "\0"
+            VALUE "OriginalFilename", "cuplivo.exe" "\0"
+            VALUE "ProductName", "cuplivo" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

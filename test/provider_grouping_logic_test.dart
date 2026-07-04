@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/models/provider_group.dart';
-import 'package:Kelivo/utils/provider_grouping_logic.dart';
+import 'package:Cuplivo/core/models/provider_group.dart';
+import 'package:Cuplivo/utils/provider_grouping_logic.dart';
 
 void main() {
   group('Provider grouping logic', () {

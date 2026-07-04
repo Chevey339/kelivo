@@ -264,7 +264,8 @@ class LocalToolsService {
     if (expression.isEmpty) {
       return jsonEncode({
         'error': 'empty_expression',
-        'message': 'Expression is empty. Please provide a mathematical expression in standard notation, e.g. "(15 + 3) * 2".',
+        'message':
+            'Expression is empty. Please provide a mathematical expression in standard notation, e.g. "(15 + 3) * 2".',
       });
     }
 
@@ -274,7 +275,8 @@ class LocalToolsService {
       if (!result.isFinite) {
         return jsonEncode({
           'error': 'math_error',
-          'message': 'The result is not a finite number. Please check your expression (e.g. division by zero).',
+          'message':
+              'The result is not a finite number. Please check your expression (e.g. division by zero).',
         });
       }
       return jsonEncode({
@@ -284,7 +286,8 @@ class LocalToolsService {
     } catch (e) {
       return jsonEncode({
         'error': 'parse_error',
-        'message': 'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
+        'message':
+            'Could not parse the expression. Use standard notation, e.g. "(15 + 3) * 2".',
         'detail': e.toString(),
       });
     }

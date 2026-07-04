@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/features/chat/utils/thinking_tag_parser.dart';
+import 'package:Cuplivo/features/chat/utils/thinking_tag_parser.dart';
 
 void main() {
   group('ThinkingTagParser', () {

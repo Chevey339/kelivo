@@ -19,6 +19,7 @@ class Lucide {
   static const IconData X = lucide.LucideIcons.x;
   static const IconData ArrowUp = lucide.LucideIcons.arrowUp;
   static const IconData ArrowLeft = lucide.LucideIcons.arrowLeft;
+  static const IconData ArrowRight = lucide.LucideIcons.arrowRight;
   static const IconData Camera = lucide.LucideIcons.camera;
   static const IconData Image = lucide.LucideIcons.image;
   static const IconData ImageDown = lucide.LucideIcons.imageDown;
@@ -101,6 +102,7 @@ class Lucide {
   static const IconData CircleX = lucide.LucideIcons.circleX;
   static const IconData Link2 = lucide.LucideIcons.link2;
   static const IconData Shield = lucide.LucideIcons.shield;
+  static const IconData TriangleAlert = lucide.LucideIcons.triangleAlert;
   static const IconData Compass = lucide.LucideIcons.compass;
   static const IconData ArrowDown = lucide.LucideIcons.arrowDown;
   static const IconData Edit2 = lucide.LucideIcons.squarePen;
@@ -177,6 +179,7 @@ class Lucide {
   static const IconData Maximize = lucide.LucideIcons.maximize;
   static const IconData Maximize2 = lucide.LucideIcons.maximize2;
   static const IconData FolderOpen = lucide.LucideIcons.folderOpen;
+  static const IconData FolderPlus = lucide.LucideIcons.folderPlus;
   static const IconData FileQuestion = lucide.LucideIcons.fileQuestionMark;
   static const IconData FileClock = lucide.LucideIcons.fileClock;
   static const IconData Folder = lucide.LucideIcons.folder;

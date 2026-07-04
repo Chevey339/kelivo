@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
+import 'package:Cuplivo/features/home/services/ask_user_interaction_service.dart';
 
 void main() {
   group('AskUserInteractionService', () {

@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image_lib;
 
-import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
+import 'package:Cuplivo/features/chat/widgets/message_export_sheet.dart';
 
 Uint8List _solidPng({
   required int width,

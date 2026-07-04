@@ -1,54 +1,37 @@
-import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 
-part 'conversation.g.dart';
-
-@HiveType(typeId: 1)
-class Conversation extends HiveObject {
-  @HiveField(0)
+class Conversation {
   final String id;
 
-  @HiveField(1)
   String title;
 
-  @HiveField(2)
   final DateTime createdAt;
 
-  @HiveField(3)
   DateTime updatedAt;
 
-  @HiveField(4)
   final List<String> messageIds;
 
-  @HiveField(5)
   bool isPinned;
 
   // Per-conversation enabled MCP servers (by server id)
-  @HiveField(6)
   List<String> mcpServerIds;
 
   // Owner assistant id; null for global/default
-  @HiveField(7)
   String? assistantId;
 
   // Truncate context starting at this index (-1 means no truncation)
-  @HiveField(8)
   int truncateIndex;
 
   // Selected version per message group (groupId -> selected version index)
-  @HiveField(9)
   Map<String, int> versionSelections;
 
   // LLM-generated conversation summary
-  @HiveField(10)
   String? summary;
 
   // Message count when summary was last generated (to avoid redundant updates)
-  @HiveField(11)
   int lastSummarizedMessageCount;
 
   // LLM-generated quick follow-up suggestions for the latest assistant reply.
-  @HiveField(12)
   List<String> chatSuggestions;
 
   Conversation({
@@ -133,7 +116,8 @@ class Conversation extends HiveObject {
       title: json['title'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
-      messageIds: (json['messageIds'] as List<dynamic>).cast<String>(),
+      messageIds:
+          (json['messageIds'] as List?)?.cast<String>() ?? const <String>[],
       isPinned: json['isPinned'] as bool? ?? false,
       mcpServerIds:
           (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],

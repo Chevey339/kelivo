@@ -813,7 +813,7 @@ class S3BackupClient {
       },
     );
     if (res.statusCode != 200) {
-      throw Exception('S3 test failed: ${_extractErrorMessage(manifestRes)}');
+      throw Exception('S3 test failed: ${_extractErrorMessage(res)}');
     }
   }
 

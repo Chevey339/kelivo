@@ -1,5 +1,5 @@
-import 'package:Kelivo/core/models/chat_input_data.dart';
-import 'package:Kelivo/features/home/services/message_generation_service.dart';
+import 'package:Cuplivo/core/models/chat_input_data.dart';
+import 'package:Cuplivo/features/home/services/message_generation_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

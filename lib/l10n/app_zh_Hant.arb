@@ -46,6 +46,9 @@
   "storageSpaceSubChatMessages": "訊息",
   "storageSpaceSubChatConversations": "對話",
   "storageSpaceSubChatToolEvents": "工具事件",
+  "storageSpaceSubChatDatabase": "聊天資料庫",
+  "storageSpaceSubChatWriteAheadLog": "寫入日誌",
+  "storageSpaceSubChatSharedMemory": "共享記憶體索引",
   "storageSpaceSubAssistantAvatars": "頭像",
   "storageSpaceSubAssistantImages": "圖片",
   "storageSpaceSubCacheAvatars": "頭像快取",
@@ -831,6 +834,8 @@
   "chatInputBarMoreTooltip": "更多",
   "chatInputBarImageMode": "繪圖模式",
   "chatInputBarDisableImageModeTooltip": "關閉繪圖模式",
+  "chatInputBarImageWarning": "將忽略圖片",
+  "chatInputBarDisableImageWarningTooltip": "忽略",
   "chatInputBarQueuedPending": "排隊中",
   "chatInputBarQueuedCancel": "取消排隊",
   "chatInputBarInsertNewline": "換行",
@@ -1209,7 +1214,7 @@
   "searchSettingsSheetNoServicesMessage": "暫無可用服務，請先在\"搜尋服務\"中新增",
   "aboutPageEasterEggMessage": "\n（好吧現在還沒彩蛋）",
   "aboutPageEasterEggButton": "好的",
-  "aboutPageAppName": "Kelivo",
+  "aboutPageAppName": "Cuplivo",
   "aboutPageAppDescription": "開源 AI 助理",
   "aboutPageNoQQGroup": "暫無QQ群",
   "aboutPageVersion": "版本",
@@ -1955,5 +1960,21 @@
         "type": "int"
       }
     }
+  },
+  "titlePresetStandard": "標準（預設）",
+  "@titlePresetStandard": {
+    "description": "標題預設選項：標準版（無 emoji）"
+  },
+  "titlePresetEmoji": "添加 Emoji",
+  "@titlePresetEmoji": {
+    "description": "標題預設選項：Emoji 版"
+  },
+  "titlePresetCustom": "自定義",
+  "@titlePresetCustom": {
+    "description": "當自定義提示詞不匹配任何預設時顯示的標籤"
+  },
+  "titlePresetUnsavedHint": "更改或選擇預設後，需點擊「儲存」方可生效",
+  "@titlePresetUnsavedHint": {
+    "description": "標題提示詞編輯器中提醒用戶在更改預設後儲存的提示"
   }
 }

@@ -1,4 +1,4 @@
-package com.psyche.kelivo
+package com.cup11.cuplivo
 
 import android.app.Activity
 import android.content.ActivityNotFoundException

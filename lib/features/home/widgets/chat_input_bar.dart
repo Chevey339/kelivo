@@ -27,7 +27,7 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Cuplivo/theme/app_font_weights.dart';
 
 class ChatInputBarController {
   _ChatInputBarState? _state;
@@ -181,6 +181,9 @@ class _ChatInputBarState extends State<ChatInputBar>
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
+  String? _imageWarningModelKey;
+  String? _lastImageWarningModelKey;
+  String? _dismissedImageWarningModelKey;
 
   bool get _composerLocked => widget.hasQueuedInput;
 
@@ -237,6 +240,32 @@ class _ChatInputBarState extends State<ChatInputBar>
     return supported;
   }
 
+  void _checkImageWarning(BuildContext context) {
+    if (widget.ocrActive || _images.isEmpty) {
+      _imageWarningModelKey = null;
+      return;
+    }
+    final settings = context.watch<SettingsProvider>();
+    final ap = context.watch<AssistantProvider>();
+    final a = ap.currentAssistant;
+    final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
+    final modelId = a?.chatModelId ?? settings.currentModelId;
+    if (providerKey == null || modelId == null) {
+      _imageWarningModelKey = null;
+      return;
+    }
+    final cfg = settings.getProviderConfig(providerKey);
+    final supported = ChatApiService.supportsImageInput(cfg, modelId);
+    final nextKey = supported
+        ? null
+        : '${widget.conversationId ?? ''}::$providerKey::$modelId';
+    if (nextKey != _lastImageWarningModelKey) {
+      _dismissedImageWarningModelKey = null;
+      _lastImageWarningModelKey = nextKey;
+    }
+    _imageWarningModelKey = nextKey;
+  }
+
   bool get _imageModeActive {
     final key = _imageModeModelKey;
     return key != null && key != _dismissedImageModeModelKey;
@@ -245,6 +274,11 @@ class _ChatInputBarState extends State<ChatInputBar>
   bool get _allowImagesApiRouting {
     final key = _imageModeModelKey;
     return key == null || key != _dismissedImageModeModelKey;
+  }
+
+  bool get _showImageWarning {
+    final key = _imageWarningModelKey;
+    return key != null && key != _dismissedImageWarningModelKey;
   }
 
   bool get _hasDraftMedia => _images.isNotEmpty || _docs.isNotEmpty;
@@ -1675,6 +1709,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final hasImages = _images.isNotEmpty;
     final hasDocs = _docs.isNotEmpty;
     _supportsImagesApiRouting(context);
+    _checkImageWarning(context);
     final size = MediaQuery.sizeOf(context);
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final bool isMobileLayout = size.width < AppBreakpoints.tablet;
@@ -2013,7 +2048,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                   PositionedDirectional(
                     top: -12,
                     start: AppSpacing.sm,
-                    child: _ImageModePill(
+                    child: _DismissiblePill(
+                      icon: Lucide.Brush,
                       label: AppLocalizations.of(
                         context,
                       )!.chatInputBarImageMode,
@@ -2027,6 +2063,29 @@ class _ChatInputBarState extends State<ChatInputBar>
                               if (key == null) return;
                               setState(() {
                                 _dismissedImageModeModelKey = key;
+                              });
+                            },
+                    ),
+                  )
+                else if (_showImageWarning)
+                  PositionedDirectional(
+                    top: -12,
+                    start: AppSpacing.sm,
+                    child: _DismissiblePill(
+                      icon: Lucide.ImageOff,
+                      label: AppLocalizations.of(
+                        context,
+                      )!.chatInputBarImageWarning,
+                      closeTooltip: AppLocalizations.of(
+                        context,
+                      )!.chatInputBarDisableImageWarningTooltip,
+                      onClose: _composerLocked
+                          ? null
+                          : () {
+                              final key = _imageWarningModelKey;
+                              if (key == null) return;
+                              setState(() {
+                                _dismissedImageWarningModelKey = key;
                               });
                             },
                     ),
@@ -2137,13 +2196,15 @@ class _QueuedInputBanner extends StatelessWidget {
   }
 }
 
-class _ImageModePill extends StatelessWidget {
-  const _ImageModePill({
+class _DismissiblePill extends StatelessWidget {
+  const _DismissiblePill({
+    required this.icon,
     required this.label,
     required this.closeTooltip,
     required this.onClose,
   });
 
+  final IconData icon;
   final String label;
   final String closeTooltip;
   final VoidCallback? onClose;
@@ -2183,7 +2244,7 @@ class _ImageModePill extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Lucide.Brush, size: 14, color: iconColor),
+                      Icon(icon, size: 14, color: iconColor),
                       const SizedBox(width: 5),
                       Flexible(
                         child: Text(

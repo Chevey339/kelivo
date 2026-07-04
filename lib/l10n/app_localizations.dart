@@ -382,6 +382,24 @@ abstract class AppLocalizations {
   /// **'Tool events'**
   String get storageSpaceSubChatToolEvents;
 
+  /// No description provided for @storageSpaceSubChatDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat database'**
+  String get storageSpaceSubChatDatabase;
+
+  /// No description provided for @storageSpaceSubChatWriteAheadLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Write-ahead log'**
+  String get storageSpaceSubChatWriteAheadLog;
+
+  /// No description provided for @storageSpaceSubChatSharedMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared memory index'**
+  String get storageSpaceSubChatSharedMemory;
+
   /// No description provided for @storageSpaceSubAssistantAvatars.
   ///
   /// In en, this message translates to:
@@ -4805,6 +4823,18 @@ abstract class AppLocalizations {
   /// **'Turn off image mode'**
   String get chatInputBarDisableImageModeTooltip;
 
+  /// No description provided for @chatInputBarImageWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Images will be ignored'**
+  String get chatInputBarImageWarning;
+
+  /// No description provided for @chatInputBarDisableImageWarningTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
+  String get chatInputBarDisableImageWarningTooltip;
+
   /// No description provided for @chatInputBarQueuedPending.
   ///
   /// In en, this message translates to:
@@ -6983,7 +7013,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutPageAppName.
   ///
   /// In en, this message translates to:
-  /// **'Kelivo'**
+  /// **'Cuplivo'**
   String get aboutPageAppName;
 
   /// No description provided for @aboutPageAppDescription.
@@ -10189,6 +10219,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// Title preset option: standard (no emoji)
+  ///
+  /// In en, this message translates to:
+  /// **'Standard (Default)'**
+  String get titlePresetStandard;
+
+  /// Title preset option: emoji
+  ///
+  /// In en, this message translates to:
+  /// **'Add Emoji'**
+  String get titlePresetEmoji;
+
+  /// Title preset label when custom prompt doesn't match any preset
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get titlePresetCustom;
+
+  /// Hint shown in title prompt editor reminding user to save after changing preset
+  ///
+  /// In en, this message translates to:
+  /// **'Change or select a preset, then tap Save to apply'**
+  String get titlePresetUnsavedHint;
 }
 
 class _AppLocalizationsDelegate

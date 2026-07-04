@@ -4,6 +4,8 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../core/prompts/title_presets.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../widgets/model_select_sheet.dart';
 import '../widgets/ocr_prompt_sheet.dart';
 import '../utils/ocr_model_capability.dart';
@@ -275,12 +277,64 @@ class DefaultModelPage extends StatelessWidget {
                       cs: cs,
                     ),
                     const SizedBox(height: 18),
-                    Text(
-                      l10n.defaultModelPagePromptLabel,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: AppFontWeights.semibold,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            l10n.defaultModelPagePromptLabel,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: AppFontWeights.semibold,
+                            ),
+                          ),
+                        ),
+                        ListenableBuilder(
+                          listenable: controller,
+                          builder: (context, _) {
+                            final activeId = TitlePresets.detect(
+                              controller.text,
+                            );
+                            final label = switch (activeId) {
+                              'standard' => l10n.titlePresetStandard,
+                              'emoji' => l10n.titlePresetEmoji,
+                              _ => l10n.titlePresetCustom,
+                            };
+                            return GestureDetector(
+                              onTap: () => _showTitlePresetSheet(
+                                context,
+                                controller,
+                                l10n,
+                                cs,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 11,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: cs.outlineVariant.withValues(
+                                      alpha: 0.18,
+                                    ),
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      label,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(Lucide.chevronDown, size: 16),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     TextField(
@@ -320,6 +374,14 @@ class DefaultModelPage extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.titlePresetUnsavedHint,
+                      style: TextStyle(
+                        color: cs.onSurface.withValues(alpha: 0.6),
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -351,6 +413,102 @@ class DefaultModelPage extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Future<void> _showTitlePresetSheet(
+    BuildContext context,
+    TextEditingController controller,
+    AppLocalizations l10n,
+    ColorScheme cs,
+  ) async {
+    final activeId = TitlePresets.detect(controller.text);
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: cs.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurface.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _presetOption(
+                  ctx,
+                  id: 'standard',
+                  label: l10n.titlePresetStandard,
+                  selected: activeId == 'standard',
+                  onTap: () => Navigator.of(ctx).pop('standard'),
+                ),
+                const SizedBox(height: 4),
+                _presetOption(
+                  ctx,
+                  id: 'emoji',
+                  label: l10n.titlePresetEmoji,
+                  selected: activeId == 'emoji',
+                  onTap: () => Navigator.of(ctx).pop('emoji'),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (result != null) {
+      final p = TitlePresets.byId(result);
+      if (p != null) controller.text = p.prompt;
+    }
+  }
+
+  Widget _presetOption(
+    BuildContext context, {
+    required String id,
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 48,
+      child: IosCardPress(
+        borderRadius: BorderRadius.circular(14),
+        baseColor: cs.surface,
+        duration: const Duration(milliseconds: 260),
+        onTap: () {
+          Haptics.light();
+          onTap();
+        },
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: AppFontWeights.medium,
+                ),
+              ),
+            ),
+            if (selected) Icon(Lucide.Check, size: 18, color: cs.primary),
+          ],
+        ),
+      ),
     );
   }
 

@@ -2,7 +2,7 @@ import ActivityKit
 import Foundation
 
 @available(iOS 16.1, *)
-struct KelivoGenerationActivityAttributes: ActivityAttributes {
+struct CuplivoGenerationActivityAttributes: ActivityAttributes {
   struct ContentState: Codable, Hashable {
     var displayTitle: String
     var detail: String

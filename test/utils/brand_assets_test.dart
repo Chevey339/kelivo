@@ -1,4 +1,4 @@
-import 'package:Kelivo/utils/brand_assets.dart';
+import 'package:Cuplivo/utils/brand_assets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

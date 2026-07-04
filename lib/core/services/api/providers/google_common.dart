@@ -559,17 +559,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       final obj = jsonDecode(txt) as Map<String, dynamic>;
       try {
         final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
-        if (u != null) {
-          final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
-          final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(
-            TokenUsage(
-              promptTokens: prompt,
-              completionTokens: completion,
-              cachedTokens: 0,
-            ),
-          );
-        }
+        totalUsage = (totalUsage ?? const TokenUsage()).merge(
+          TokenUsage.fromGeminiUsageMetadata(u),
+        );
       } catch (_) {}
       final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
       if (candidates.isEmpty) {
@@ -1151,11 +1143,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final um = obj['usageMetadata'];
           if (um is Map<String, dynamic>) {
             usage = (usage ?? const TokenUsage()).merge(
-              TokenUsage(
-                promptTokens: (um['promptTokenCount'] ?? 0) as int,
-                completionTokens: (um['candidatesTokenCount'] ?? 0) as int,
-                totalTokens: (um['totalTokenCount'] ?? 0) as int,
-              ),
+              TokenUsage.fromGeminiUsageMetadata(um),
             );
             totalTokens = usage.totalTokens;
           }

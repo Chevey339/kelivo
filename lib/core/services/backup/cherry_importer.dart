@@ -664,7 +664,7 @@ class CherryImporter {
         final uuidLike = RegExp(r'^[0-9a-fA-F-]{10,}$');
         for (final e in archive) {
           if (!e.isFile) continue;
-          final norm = e.name.replaceAll('\\\\', '/');
+          final norm = e.name.replaceAll('\\', '/');
           final base = p.basename(norm);
           // by basename
           byBase[base] = e;
@@ -713,7 +713,7 @@ class CherryImporter {
             final abs = ent.path;
             final base = p.basename(abs);
             byBase[base] = abs;
-            final l = abs.replaceAll('\\\\', '/').toLowerCase();
+            final l = abs.replaceAll('\\', '/').toLowerCase();
             int idx = l.indexOf('/data/files/');
             if (idx != -1) {
               final rel = l.substring(idx + 1);
@@ -786,7 +786,7 @@ class CherryImporter {
       try {
         final mp = (meta['path'] ?? '').toString();
         if (mp.isNotEmpty) {
-          String rel = mp.replaceAll('\\\\', '/').trim();
+          String rel = mp.replaceAll('\\', '/').trim();
           if (rel.startsWith('file://')) rel = rel.substring('file://'.length);
           if (rel.startsWith('/')) rel = rel.substring(1);
           final lowerRel = rel.toLowerCase();
@@ -958,7 +958,7 @@ class CherryImporter {
     if (!chatService.initialized) await chatService.init();
 
     // Build map of existing conv ids for merge
-    final existingConvs = chatService.getAllConversations();
+    final existingConvs = chatService.getAllCompleteConversations();
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
