@@ -60,7 +60,7 @@ class SearXNGSearchService extends SearchService<SearXNGOptions> {
       }
 
       final data = jsonDecode(response.body);
-      final results = (data['results'] as List)
+      final results = (data['results'] as List? ?? const <dynamic>[])
           .take(commonOptions.resultSize)
           .map((item) {
             return SearchResultItem(

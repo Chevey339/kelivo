@@ -116,7 +116,8 @@ class Conversation {
       title: json['title'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
-      messageIds: (json['messageIds'] as List<dynamic>).cast<String>(),
+      messageIds:
+          (json['messageIds'] as List?)?.cast<String>() ?? const <String>[],
       isPinned: json['isPinned'] as bool? ?? false,
       mcpServerIds:
           (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],

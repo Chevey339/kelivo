@@ -45,7 +45,9 @@ class TavilySearchService extends SearchService<TavilyOptions> {
       }
 
       final data = jsonDecode(response.body);
-      final results = (data['results'] as List).map((item) {
+      final results = (data['results'] as List? ?? const <dynamic>[]).map((
+        item,
+      ) {
         return SearchResultItem(
           title: item['title'] ?? '',
           url: item['url'] ?? '',

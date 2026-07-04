@@ -937,7 +937,7 @@ class ChatboxImporter {
   static String _inferModelIdFromChatboxMessage(Map<String, dynamic> msg) {
     final raw = (msg['model'] ?? '').toString().trim();
     if (raw.isEmpty) return '';
-    final m = RegExp(r'\\(([^)]+)\\)\\s*$').firstMatch(raw);
+    final m = RegExp(r'\(([^)]+)\)\s*$').firstMatch(raw);
     if (m != null) return (m.group(1) ?? '').trim();
     return raw;
   }
@@ -1014,7 +1014,7 @@ class ChatboxImporter {
       final hasKnownVersionSuffix =
           lower.endsWith('/v1') ||
           lower.endsWith('/v1beta') ||
-          RegExp(r'/api/v\\d+$').hasMatch(lower) ||
+          RegExp(r'/api/v\d+$').hasMatch(lower) ||
           lower.endsWith('/api/paas/v4') ||
           lower.endsWith('/compatible-mode/v1');
       if (path.isEmpty) {
@@ -1044,7 +1044,7 @@ class ChatboxImporter {
         host = '$host/v1';
       } else if (host.isNotEmpty &&
           !lower.endsWith('/v1') &&
-          !RegExp(r'/v\\d+$').hasMatch(lower)) {
+          !RegExp(r'/v\d+$').hasMatch(lower)) {
         host = '$host/v1';
       }
       return _NormalizedHostAndPath(apiHost: host, apiPath: '');
