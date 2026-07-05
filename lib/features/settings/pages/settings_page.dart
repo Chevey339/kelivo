@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/format.dart';
 import '../../../l10n/app_localizations.dart';
 import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
@@ -507,16 +508,6 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
     _future = StorageUsageService.computeReport();
   }
 
-  String _fmtBytes(int bytes) {
-    const kb = 1024;
-    const mb = kb * 1024;
-    const gb = mb * 1024;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-    return '$bytes B';
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -534,7 +525,7 @@ class _ChatStorageSummaryState extends State<_ChatStorageSummary> {
           return Text(l10n.settingsPageCalculating, style: style);
         }
         final count = data?.totalFiles ?? 0;
-        final size = _fmtBytes(data?.totalBytes ?? 0);
+        final size = formatBytes(data?.totalBytes ?? 0);
         return Text(l10n.settingsPageFilesCount(count, size), style: style);
       },
     );

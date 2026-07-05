@@ -11,6 +11,7 @@ import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../utils/format.dart';
 import '../../../utils/platform_utils.dart';
 import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
@@ -57,16 +58,6 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
       setState(() => _loading = false);
       return null;
     }
-  }
-
-  String _fmtBytes(int bytes) {
-    const kb = 1024;
-    const mb = kb * 1024;
-    const gb = mb * 1024;
-    if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-    if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-    if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(1)} KB';
-    return '$bytes B';
   }
 
   Color _barColorFor(StorageUsageCategoryKey key, ColorScheme cs) {
@@ -339,7 +330,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           title: title,
           categoryKey: key,
           initialReport: report,
-          fmtBytes: _fmtBytes,
+          fmtBytes: formatBytes,
           subTitleFor: (id) => _subTitleFor(id, l10n),
           refreshReport: _refreshReport,
         ),
@@ -461,7 +452,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
               Row(
                 children: [
                   Text(
-                    '${l10n.storageSpaceTotalLabel}: ${_fmtBytes(total)}',
+                    '${l10n.storageSpaceTotalLabel}: ${formatBytes(total)}',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: cs.onSurface.withValues(alpha: 0.7),
@@ -471,7 +462,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   if (clearable > 0) ...[
                     const SizedBox(width: 12),
                     Text(
-                      l10n.storageSpaceClearableLabel(_fmtBytes(clearable)),
+                      l10n.storageSpaceClearableLabel(formatBytes(clearable)),
                       style: TextStyle(
                         fontSize: 12.5,
                         color: cs.onSurface.withValues(alpha: 0.7),
@@ -492,7 +483,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         selected: _selected,
                         iconFor: _iconFor,
                         titleFor: (k) => _titleFor(k, l10n),
-                        fmtBytes: _fmtBytes,
+                        fmtBytes: formatBytes,
                         onSelect: (k) => setState(() => _selected = k),
                       ),
                     ),
@@ -504,7 +495,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                       child: _CategoryDetail(
                         category: selectedCat,
                         title: _titleFor(selectedCat.key, l10n),
-                        fmtBytes: _fmtBytes,
+                        fmtBytes: formatBytes,
                         subTitleFor: (id) => _subTitleFor(id, l10n),
                         clearing: _clearing,
                         onClearCache: _clearing ? null : _doClearCache,
@@ -564,7 +555,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _fmtBytes(total),
+                  formatBytes(total),
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: AppFontWeights.emphasis,
@@ -587,7 +578,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   const SizedBox(height: 10),
                   Text(
                     l10n.storageSpaceClearableHint(
-                      _fmtBytes(report.clearable.bytes),
+                      formatBytes(report.clearable.bytes),
                     ),
                     style: TextStyle(
                       fontSize: 12.5,
@@ -609,7 +600,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                   icon: _iconFor(report.categories[i].key),
                   label: _titleFor(report.categories[i].key, l10n),
                   detailText:
-                      '${_fmtBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
+                      '${formatBytes(report.categories[i].stats.bytes)} · ${l10n.storageSpaceFilesCount(report.categories[i].stats.fileCount)}',
                   onTap: () => _openCategoryDetail(report.categories[i].key),
                 ),
                 if (i != report.categories.length - 1) _iosDivider(context),
