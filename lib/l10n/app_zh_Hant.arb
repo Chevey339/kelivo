@@ -359,6 +359,7 @@
   "assistantEditVariableNickname": "使用者暱稱",
   "assistantEditVariableAssistantName": "助理名稱",
   "assistantEditVariableCurrentHour": "目前時間",
+  "assistantEditMemoryVariableHint": "包含時間變數會降低快取命中率。請根據需求平衡時間精度，也可以刪去變數，在訊息範本中插入訊息發送時間。",
   "assistantEditMessageTemplateTitle": "聊天內容範本",
   "assistantEditVariableRole": "角色",
   "assistantEditVariableMessage": "內容",

@@ -1259,6 +1259,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditVariableCurrentHour => '当前时间';
 
   @override
+  String get assistantEditMemoryVariableHint =>
+      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
+
+  @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
@@ -6586,6 +6590,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditVariableCurrentHour => '当前时间';
 
   @override
+  String get assistantEditMemoryVariableHint =>
+      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
+
+  @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
@@ -11911,6 +11919,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditVariableCurrentHour => '目前時間';
+
+  @override
+  String get assistantEditMemoryVariableHint =>
+      '包含時間變數會降低快取命中率。請根據需求平衡時間精度，也可以刪去變數，在訊息範本中插入訊息發送時間。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天內容範本';

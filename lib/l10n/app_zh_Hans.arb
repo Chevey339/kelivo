@@ -371,6 +371,7 @@
   "assistantEditVariableNickname": "用户昵称",
   "assistantEditVariableAssistantName": "助手名称",
   "assistantEditVariableCurrentHour": "当前时间",
+  "assistantEditMemoryVariableHint": "包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。",
   "assistantEditMessageTemplateTitle": "聊天内容模板",
   "assistantEditVariableRole": "角色",
   "assistantEditVariableMessage": "内容",

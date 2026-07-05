@@ -1305,6 +1305,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditVariableCurrentHour => 'Current Hour';
 
   @override
+  String get assistantEditMemoryVariableHint =>
+      'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.';
+
+  @override
   String get assistantEditMessageTemplateTitle => 'Message Template';
 
   @override

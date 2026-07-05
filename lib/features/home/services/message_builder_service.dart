@@ -538,7 +538,7 @@ class MessageBuilderService {
         final mp = contextProvider.read<MemoryProvider>();
         await mp.initialize();
         final mems = mp.getForAssistant(assistant!.id);
-        final currentHour = _formatCurrentHour(DateTime.now());
+        final now = DateTime.now();
         final buf = StringBuffer();
         buf.writeln('## Memories');
         buf.writeln(
@@ -555,19 +555,21 @@ class MessageBuilderService {
         // Fixed header for Memory Tool (always included)
         buf.writeln('''
 ## Memory Tool
-你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
-你可以使用 `create_memory`, `edit_memory`, `delete_memory` 工具创建、更新或删除记忆。
-- 如果记忆中没有相关信息，请使用 create_memory 创建一条新的记录。
-- 如果已有相关记录，请使用 edit_memory 更新内容。
-- 若记忆过时或无用，请使用 delete_memory 删除。
-这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
+You are a stateless language model without persistent memory. To retain information, use **memory tools**.
+You can use `create_memory`, `edit_memory`, and `delete_memory` tools to create, update, or delete memories.
+- If no relevant information exists in memories, use create_memory to create a new record.
+- If a relevant record already exists, use edit_memory to update its content.
+- If a memory is outdated or no longer useful, use delete_memory to remove it.
+These memories are automatically included in future conversation contexts within the <memories> tag.
 ''');
         // Customizable record prompt from assistant settings
         final recordPrompt =
             (assistant.memoryRecordPrompt.isNotEmpty
                     ? assistant.memoryRecordPrompt
                     : Assistant.defaultMemoryRecordPrompt)
-                .replaceAll('{current_hour}', currentHour);
+                .replaceAll('{current_hour}', _formatCurrentHour(now))
+                .replaceAll('{current_date}', _formatCurrentDate(now))
+                .replaceAll('{current_datetime}', _formatCurrentDatetime(now));
         buf.writeln(recordPrompt);
         _appendToSystemMessage(apiMessages, buf.toString());
       }
@@ -611,6 +613,21 @@ class MessageBuilderService {
         '${now.month.toString().padLeft(2, '0')}-'
         '${now.day.toString().padLeft(2, '0')} '
         '${now.hour.toString().padLeft(2, '0')} (hrs)';
+  }
+
+  String _formatCurrentDate(DateTime now) {
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')}';
+  }
+
+  String _formatCurrentDatetime(DateTime now) {
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')} '
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}:'
+        '${now.second.toString().padLeft(2, '0')}';
   }
 
   /// Inject search tool usage prompt into apiMessages.

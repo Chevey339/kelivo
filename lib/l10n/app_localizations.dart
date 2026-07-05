@@ -2513,6 +2513,12 @@ abstract class AppLocalizations {
   /// **'Current Hour'**
   String get assistantEditVariableCurrentHour;
 
+  /// No description provided for @assistantEditMemoryVariableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.'**
+  String get assistantEditMemoryVariableHint;
+
   /// No description provided for @assistantEditMessageTemplateTitle.
   ///
   /// In en, this message translates to:

@@ -471,11 +471,21 @@ class _MemoryTabState extends State<_MemoryTab> {
                 _VarExplainList(
                   items: [
                     (l10n.assistantEditVariableCurrentHour, '{current_hour}'),
+                    (l10n.assistantEditVariableDate, '{current_date}'),
+                    (l10n.assistantEditVariableDatetime, '{current_datetime}'),
                   ],
                   onTapVar: (v) {
                     _insertAtCursor(_memoryRecordCtrl, v);
                     Future.microtask(() => _memoryRecordFocus.requestFocus());
                   },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.assistantEditMemoryVariableHint,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
