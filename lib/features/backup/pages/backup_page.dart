@@ -21,21 +21,12 @@ import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/dialogs/incremental_backup_dialog.dart';
+import '../../../shared/dialogs/restart_required_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
+import '../../../utils/format.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/backup_reminder_helpers.dart';
-
-// File size formatter (B, KB, MB, GB)
-String _fmtBytes(int bytes) {
-  const kb = 1024;
-  const mb = kb * 1024;
-  const gb = mb * 1024;
-  if (bytes >= gb) return '${(bytes / gb).toStringAsFixed(2)} GB';
-  if (bytes >= mb) return '${(bytes / mb).toStringAsFixed(2)} MB';
-  if (bytes >= kb) return '${(bytes / kb).toStringAsFixed(2)} KB';
-  return '$bytes B';
-}
 
 class BackupPage extends StatefulWidget {
   const BackupPage({super.key});
@@ -221,7 +212,6 @@ class _BackupPageState extends State<BackupPage> {
   Future<void> _restoreIncrementalItem({
     required BuildContext context,
     required Future<void> Function() performRestore,
-    required String? Function() message,
   }) async {
     try {
       await _runWithImportingOverlay(context, performRestore);
@@ -235,29 +225,7 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    final msg = message();
-    if (msg != null && msg != 'Restored') {
-      showAppSnackBar(context, message: msg, type: NotificationType.error);
-      return;
-    }
-    if (!context.mounted) return;
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        title: Text(AppLocalizations.of(context)!.backupPageRestartRequired),
-        content: Text(AppLocalizations.of(context)!.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(AppLocalizations.of(context)!.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showRestartRequiredDialog(context);
   }
 
   @override
@@ -381,17 +349,14 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: vm.busy
                           ? null
                           : () async {
-                              await vm.test();
+                              final testOk = await vm.test();
                               if (!context.mounted) return;
-                              final rawMessage = vm.message;
-                              final message =
-                                  rawMessage ?? l10n.backupPageTestDone;
                               showAppSnackBar(
                                 context,
-                                message: message,
-                                type: rawMessage != null && rawMessage != 'OK'
-                                    ? NotificationType.error
-                                    : NotificationType.success,
+                                message: vm.message ?? l10n.backupPageTestDone,
+                                type: testOk
+                                    ? NotificationType.success
+                                    : NotificationType.error,
                               );
                             },
                     ),
@@ -408,23 +373,7 @@ class _BackupPageState extends State<BackupPage> {
                                 () => vm.listRemote(),
                               );
                               // 按时间倒序排列（最新的在前）
-                              list.sort((a, b) {
-                                // 优先使用 lastModified
-                                if (a.lastModified != null &&
-                                    b.lastModified != null) {
-                                  return b.lastModified!.compareTo(
-                                    a.lastModified!,
-                                  );
-                                }
-                                // 如果都没有 lastModified，按文件名倒序（文件名通常包含时间戳）
-                                if (a.lastModified == null &&
-                                    b.lastModified == null) {
-                                  return b.displayName.compareTo(a.displayName);
-                                }
-                                // 有 lastModified 的排在前面
-                                if (a.lastModified == null) return 1;
-                                return -1;
-                              });
+                              BackupFileItem.sortByNewest(list);
                               setState(() => _remote = list);
 
                               if (!context.mounted) return;
@@ -502,23 +451,7 @@ class _BackupPageState extends State<BackupPage> {
                                         ).pop();
                                       }
 
-                                      // Sort list
-                                      list.sort((a, b) {
-                                        if (a.lastModified != null &&
-                                            b.lastModified != null) {
-                                          return b.lastModified!.compareTo(
-                                            a.lastModified!,
-                                          );
-                                        }
-                                        if (a.lastModified == null &&
-                                            b.lastModified == null) {
-                                          return b.displayName.compareTo(
-                                            a.displayName,
-                                          );
-                                        }
-                                        if (a.lastModified == null) return 1;
-                                        return -1;
-                                      });
+                                      BackupFileItem.sortByNewest(list);
 
                                       if (mounted) {
                                         setState(() => _remote = list);
@@ -597,26 +530,9 @@ class _BackupPageState extends State<BackupPage> {
                                                     rootNavigator: true,
                                                   ).pop();
                                                 }
-                                                list.sort((a, b) {
-                                                  if (a.lastModified != null &&
-                                                      b.lastModified != null) {
-                                                    return b.lastModified!
-                                                        .compareTo(
-                                                          a.lastModified!,
-                                                        );
-                                                  }
-                                                  if (a.lastModified == null &&
-                                                      b.lastModified == null) {
-                                                    return b.displayName
-                                                        .compareTo(
-                                                          a.displayName,
-                                                        );
-                                                  }
-                                                  if (a.lastModified == null) {
-                                                    return 1;
-                                                  }
-                                                  return -1;
-                                                });
+                                                BackupFileItem.sortByNewest(
+                                                  list,
+                                                );
                                                 if (mounted) {
                                                   setState(
                                                     () => _remote = list,
@@ -647,7 +563,6 @@ class _BackupPageState extends State<BackupPage> {
                                                       item,
                                                       mode: RestoreMode.merge,
                                                     ),
-                                                message: () => vm.message,
                                               );
                                             }
 
@@ -675,44 +590,13 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            final msg = vm.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              showAppSnackBar(
-                                                context,
-                                                message: msg,
-                                                type: NotificationType.error,
-                                              );
-                                              return;
-                                            }
-                                            await showDialog(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder: (dctx) => AlertDialog(
-                                                title: Text(
-                                                  l10n.backupPageRestartRequired,
-                                                ),
-                                                content: Text(
-                                                  l10n.backupPageRestartContent,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () async {
-                                                      Navigator.of(dctx).pop();
-                                                      PlatformUtils.restartApp();
-                                                    },
-                                                    child: Text(
-                                                      l10n.backupPageOK,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                            await showRestartRequiredDialog(
+                                              context,
                                             );
                                           },
                                         ),
                                       );
                                     } catch (e) {
-                                      // If error, ensure loading dialog is closed
                                       if (context.mounted &&
                                           Navigator.canPop(context)) {
                                         Navigator.of(
@@ -743,7 +627,6 @@ class _BackupPageState extends State<BackupPage> {
                                               item,
                                               mode: RestoreMode.merge,
                                             ),
-                                        message: () => vm.message,
                                       );
                                     }
 
@@ -771,36 +654,7 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    final msg = vm.message;
-                                    if (msg != null && msg != 'Restored') {
-                                      showAppSnackBar(
-                                        context,
-                                        message: msg,
-                                        type: NotificationType.error,
-                                      );
-                                      return;
-                                    }
-                                    await showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dctx) => AlertDialog(
-                                        title: Text(
-                                          l10n.backupPageRestartRequired,
-                                        ),
-                                        content: Text(
-                                          l10n.backupPageRestartContent,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () async {
-                                              Navigator.of(dctx).pop();
-                                              PlatformUtils.restartApp();
-                                            },
-                                            child: Text(l10n.backupPageOK),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                    await showRestartRequiredDialog(context);
                                   },
                                 ),
                               );
@@ -896,17 +750,15 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: s3Vm.busy
                           ? null
                           : () async {
-                              await s3Vm.test();
+                              final testOk = await s3Vm.test();
                               if (!context.mounted) return;
-                              final rawMessage = s3Vm.message;
-                              final message =
-                                  rawMessage ?? l10n.backupPageTestDone;
                               showAppSnackBar(
                                 context,
-                                message: message,
-                                type: rawMessage != null && rawMessage != 'OK'
-                                    ? NotificationType.error
-                                    : NotificationType.success,
+                                message:
+                                    s3Vm.message ?? l10n.backupPageTestDone,
+                                type: testOk
+                                    ? NotificationType.success
+                                    : NotificationType.error,
                               );
                             },
                     ),
@@ -922,20 +774,7 @@ class _BackupPageState extends State<BackupPage> {
                                 context,
                                 () => s3Vm.listRemote(),
                               );
-                              list.sort((a, b) {
-                                if (a.lastModified != null &&
-                                    b.lastModified != null) {
-                                  return b.lastModified!.compareTo(
-                                    a.lastModified!,
-                                  );
-                                }
-                                if (a.lastModified == null &&
-                                    b.lastModified == null) {
-                                  return b.displayName.compareTo(a.displayName);
-                                }
-                                if (a.lastModified == null) return 1;
-                                return -1;
-                              });
+                              BackupFileItem.sortByNewest(list);
                               setState(() => _remoteS3 = list);
 
                               if (!context.mounted) return;
@@ -1007,22 +846,7 @@ class _BackupPageState extends State<BackupPage> {
                                           rootNavigator: true,
                                         ).pop();
                                       }
-                                      list.sort((a, b) {
-                                        if (a.lastModified != null &&
-                                            b.lastModified != null) {
-                                          return b.lastModified!.compareTo(
-                                            a.lastModified!,
-                                          );
-                                        }
-                                        if (a.lastModified == null &&
-                                            b.lastModified == null) {
-                                          return b.displayName.compareTo(
-                                            a.displayName,
-                                          );
-                                        }
-                                        if (a.lastModified == null) return 1;
-                                        return -1;
-                                      });
+                                      BackupFileItem.sortByNewest(list);
                                       if (mounted) {
                                         setState(() => _remoteS3 = list);
                                       }
@@ -1096,26 +920,9 @@ class _BackupPageState extends State<BackupPage> {
                                                     rootNavigator: true,
                                                   ).pop();
                                                 }
-                                                list.sort((a, b) {
-                                                  if (a.lastModified != null &&
-                                                      b.lastModified != null) {
-                                                    return b.lastModified!
-                                                        .compareTo(
-                                                          a.lastModified!,
-                                                        );
-                                                  }
-                                                  if (a.lastModified == null &&
-                                                      b.lastModified == null) {
-                                                    return b.displayName
-                                                        .compareTo(
-                                                          a.displayName,
-                                                        );
-                                                  }
-                                                  if (a.lastModified == null) {
-                                                    return 1;
-                                                  }
-                                                  return -1;
-                                                });
+                                                BackupFileItem.sortByNewest(
+                                                  list,
+                                                );
                                                 if (mounted) {
                                                   setState(
                                                     () => _remoteS3 = list,
@@ -1146,7 +953,6 @@ class _BackupPageState extends State<BackupPage> {
                                                       item,
                                                       mode: RestoreMode.merge,
                                                     ),
-                                                message: () => s3Vm.message,
                                               );
                                             }
 
@@ -1174,38 +980,8 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            final msg = s3Vm.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              showAppSnackBar(
-                                                context,
-                                                message: msg,
-                                                type: NotificationType.error,
-                                              );
-                                              return;
-                                            }
-                                            await showDialog(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder: (dctx) => AlertDialog(
-                                                title: Text(
-                                                  l10n.backupPageRestartRequired,
-                                                ),
-                                                content: Text(
-                                                  l10n.backupPageRestartContent,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () async {
-                                                      Navigator.of(dctx).pop();
-                                                      PlatformUtils.restartApp();
-                                                    },
-                                                    child: Text(
-                                                      l10n.backupPageOK,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                            await showRestartRequiredDialog(
+                                              context,
                                             );
                                           },
                                         ),
@@ -1242,7 +1018,6 @@ class _BackupPageState extends State<BackupPage> {
                                               item,
                                               mode: RestoreMode.merge,
                                             ),
-                                        message: () => s3Vm.message,
                                       );
                                     }
 
@@ -1270,36 +1045,7 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    final msg = s3Vm.message;
-                                    if (msg != null && msg != 'Restored') {
-                                      showAppSnackBar(
-                                        context,
-                                        message: msg,
-                                        type: NotificationType.error,
-                                      );
-                                      return;
-                                    }
-                                    await showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dctx) => AlertDialog(
-                                        title: Text(
-                                          l10n.backupPageRestartRequired,
-                                        ),
-                                        content: Text(
-                                          l10n.backupPageRestartContent,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () async {
-                                              Navigator.of(dctx).pop();
-                                              PlatformUtils.restartApp();
-                                            },
-                                            child: Text(l10n.backupPageOK),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                    await showRestartRequiredDialog(context);
                                   },
                                 ),
                               );
@@ -1602,7 +1348,6 @@ class _BackupPageState extends State<BackupPage> {
   }
 
   Future<void> _doImportLocal(BuildContext context, BackupProvider vm) async {
-    final l10n = AppLocalizations.of(context)!;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['zip'],
@@ -1615,27 +1360,22 @@ class _BackupPageState extends State<BackupPage> {
     if (mode == null) return;
     if (!context.mounted) return;
 
-    await _runWithImportingOverlay(
-      context,
-      () => vm.restoreFromLocalFile(File(path), mode: mode),
-    );
+    try {
+      await _runWithImportingOverlay(
+        context,
+        () => vm.restoreFromLocalFile(File(path), mode: mode),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    }
     if (!context.mounted) return;
-    await showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showRestartRequiredDialog(context);
   }
 
   Future<void> _showWebDavSettingsPage(
@@ -2446,7 +2186,7 @@ class _RemoteListSheet extends StatelessWidget {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          _fmtBytes(it.size),
+                                          formatBytes(it.size),
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: cs.onSurface.withValues(

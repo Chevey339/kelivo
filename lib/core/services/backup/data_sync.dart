@@ -364,7 +364,7 @@ class DataSync {
           try {
             if (ent.lastModifiedSync().isBefore(since)) continue;
           } catch (_) {
-            continue;
+            // Cannot read modification time — include conservatively
           }
         }
         final rel = p.relative(ent.path, from: srcDirPath);
@@ -750,7 +750,7 @@ class DataSync {
               final mod = await ent.lastModified();
               if (mod.isBefore(since)) continue;
             } catch (_) {
-              continue;
+              // Cannot read modification time — include conservatively
             }
             fileCount++;
             totalBytes += await ent.length();

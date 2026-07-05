@@ -195,4 +195,16 @@ class BackupFileItem {
     required this.size,
     required this.lastModified,
   });
+
+  static void sortByNewest(List<BackupFileItem> items) {
+    items.sort((a, b) {
+      if (a.lastModified != null && b.lastModified != null) {
+        return b.lastModified!.compareTo(a.lastModified!);
+      }
+      if (a.lastModified == null && b.lastModified == null) {
+        return b.displayName.compareTo(a.displayName);
+      }
+      return a.lastModified == null ? 1 : -1;
+    });
+  }
 }

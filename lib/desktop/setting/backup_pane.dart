@@ -18,6 +18,8 @@ import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../shared/dialogs/incremental_backup_dialog.dart';
+import '../../shared/dialogs/restart_required_dialog.dart';
+import '../../utils/format.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
@@ -223,27 +225,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       return;
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    // Inform restart requirement
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showRestartRequiredDialog(rootCtx);
   }
 
   @override
@@ -479,19 +461,16 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     final backupProvider = context
                                         .read<BackupProvider>();
                                     await _saveConfig();
-                                    await backupProvider.test();
+                                    final testOk = await backupProvider.test();
                                     if (!context.mounted) return;
-                                    final rawMessage = backupProvider.message;
-                                    final message =
-                                        rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
                                       context,
-                                      message: message,
-                                      type:
-                                          rawMessage != null &&
-                                              rawMessage != 'OK'
-                                          ? NotificationType.error
-                                          : NotificationType.success,
+                                      message:
+                                          backupProvider.message ??
+                                          l10n.backupPageTestDone,
+                                      type: testOk
+                                          ? NotificationType.success
+                                          : NotificationType.error,
                                     );
                                   },
                           ),
@@ -511,16 +490,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title:
                                           '${l10n.backupPageRemoteBackups} (WebDAV)',
                                       listRemote: backupProvider.listRemote,
-                                      restoreFromItem: (it, mode) async {
-                                        await backupProvider.restoreFromItem(
-                                          it,
-                                          mode: mode,
-                                        );
-                                        final msg = backupProvider.message;
-                                        if (msg != null && msg != 'Restored') {
-                                          throw Exception(msg);
-                                        }
-                                      },
+                                      restoreFromItem: (it, mode) =>
+                                          backupProvider.restoreFromItem(
+                                            it,
+                                            mode: mode,
+                                          ),
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -787,19 +761,17 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
                                     await _saveS3Config();
-                                    await s3BackupProvider.test();
+                                    final testOk = await s3BackupProvider
+                                        .test();
                                     if (!context.mounted) return;
-                                    final rawMessage = s3BackupProvider.message;
-                                    final message =
-                                        rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
                                       context,
-                                      message: message,
-                                      type:
-                                          rawMessage != null &&
-                                              rawMessage != 'OK'
-                                          ? NotificationType.error
-                                          : NotificationType.success,
+                                      message:
+                                          s3BackupProvider.message ??
+                                          l10n.backupPageTestDone,
+                                      type: testOk
+                                          ? NotificationType.success
+                                          : NotificationType.error,
                                     );
                                   },
                           ),
@@ -819,16 +791,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title:
                                           '${l10n.backupPageRemoteBackups} (S3)',
                                       listRemote: s3BackupProvider.listRemote,
-                                      restoreFromItem: (it, mode) async {
-                                        await s3BackupProvider.restoreFromItem(
-                                          it,
-                                          mode: mode,
-                                        );
-                                        final msg = s3BackupProvider.message;
-                                        if (msg != null && msg != 'Restored') {
-                                          throw Exception(msg);
-                                        }
-                                      },
+                                      restoreFromItem: (it, mode) =>
+                                          s3BackupProvider.restoreFromItem(
+                                            it,
+                                            mode: mode,
+                                          ),
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -1352,17 +1319,6 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
     final dateStr =
         widget.item.lastModified?.toLocal().toString().split('.').first ?? '';
 
-    String prettySize(int size) {
-      const units = ['B', 'KB', 'MB', 'GB'];
-      double s = size.toDouble();
-      int u = 0;
-      while (s >= 1024 && u < units.length - 1) {
-        s /= 1024;
-        u++;
-      }
-      return '${s.toStringAsFixed(s >= 10 || u == 0 ? 0 : 1)} ${units[u]}';
-    }
-
     return MouseRegion(
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
@@ -1394,7 +1350,7 @@ class _RemoteItemCardState extends State<_RemoteItemCard> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${prettySize(widget.item.size)}${dateStr.isNotEmpty ? ' · $dateStr' : ''}',
+                    '${formatBytes(widget.item.size)}${dateStr.isNotEmpty ? ' · $dateStr' : ''}',
                     style: TextStyle(
                       fontSize: 12.5,
                       color: cs.onSurface.withValues(alpha: 0.7),
@@ -1466,27 +1422,22 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     setState(() => _loading = true);
     try {
       final list = await widget.listRemote();
-      // Sort by newest first (desc by lastModified), mimic mobile behavior
-      list.sort((a, b) {
-        final aTime = a.lastModified;
-        final bTime = b.lastModified;
-        if (aTime != null && bTime != null) return bTime.compareTo(aTime);
-        if (aTime == null && bTime == null) {
-          return b.displayName.compareTo(a.displayName);
-        }
-        if (aTime == null) return 1; // items with time go first
-        return -1;
-      });
+      BackupFileItem.sortByNewest(list);
       if (mounted) {
         setState(() {
           _items = list;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _items = const [];
         });
+        showAppSnackBar(
+          context,
+          message: e.toString(),
+          type: NotificationType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -1510,27 +1461,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    final cs = Theme.of(rootCtx).colorScheme;
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showRestartRequiredDialog(rootCtx);
   }
 
   Future<void> _chooseRestoreModeAndRun(
@@ -1559,27 +1490,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    final cs = Theme.of(rootCtx).colorScheme;
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showRestartRequiredDialog(rootCtx);
   }
 
   @override
@@ -1703,20 +1614,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                 ); // Show loading inside dialog
                                 try {
                                   final next = await widget.deleteAndReload(it);
-                                  next.sort((a, b) {
-                                    final aTime = a.lastModified;
-                                    final bTime = b.lastModified;
-                                    if (aTime != null && bTime != null) {
-                                      return bTime.compareTo(aTime);
-                                    }
-                                    if (aTime == null && bTime == null) {
-                                      return b.displayName.compareTo(
-                                        a.displayName,
-                                      );
-                                    }
-                                    if (aTime == null) return 1;
-                                    return -1;
-                                  });
+                                  BackupFileItem.sortByNewest(next);
                                   if (mounted) setState(() => _items = next);
                                 } finally {
                                   if (mounted) setState(() => _loading = false);

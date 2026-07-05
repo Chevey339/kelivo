@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/models/incremental_backup.dart';
 import '../../icons/lucide_adapter.dart';
+import '../../utils/format.dart';
 import '../../l10n/app_localizations.dart';
 import '../../theme/app_font_weights.dart';
 import '../widgets/ios_switch.dart';
@@ -108,15 +109,6 @@ class _IncrementalBackupDialogBodyState
   }
 
   String _fmt(DateTime d) => d.toIso8601String().split('T')[0];
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
-  }
 
   Future<void> _rerunAnalysis() async {
     final analyzer = widget.analyzer;
@@ -324,7 +316,7 @@ class _IncrementalBackupDialogBodyState
           Text(
             l10n.backupPageIncrementalPreviewFiles(
               s.newFileCount,
-              _formatBytes(s.totalFileSizeBytes),
+              formatBytes(s.totalFileSizeBytes),
             ),
             style: TextStyle(
               fontSize: 12,
