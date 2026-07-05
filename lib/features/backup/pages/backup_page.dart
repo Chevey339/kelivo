@@ -211,11 +211,12 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<void> _restoreIncrementalItem({
     required BuildContext context,
-    required Future<void> Function() performRestore,
-    required String? Function() message,
+    required Future<bool> Function() performRestore,
   }) async {
     try {
-      await _runWithImportingOverlay(context, performRestore);
+      final ok = await _runWithImportingOverlay(context, performRestore);
+      if (!context.mounted) return;
+      if (!ok) return;
     } catch (e) {
       if (!context.mounted) return;
       showAppSnackBar(
@@ -223,12 +224,6 @@ class _BackupPageState extends State<BackupPage> {
         message: e.toString(),
         type: NotificationType.error,
       );
-      return;
-    }
-    if (!context.mounted) return;
-    final msg = message();
-    if (msg != null && msg != 'Restored') {
-      showAppSnackBar(context, message: msg, type: NotificationType.error);
       return;
     }
     if (!context.mounted) return;
@@ -356,17 +351,14 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: vm.busy
                           ? null
                           : () async {
-                              await vm.test();
+                              final testOk = await vm.test();
                               if (!context.mounted) return;
-                              final rawMessage = vm.message;
-                              final message =
-                                  rawMessage ?? l10n.backupPageTestDone;
                               showAppSnackBar(
                                 context,
-                                message: message,
-                                type: rawMessage != null && rawMessage != 'OK'
-                                    ? NotificationType.error
-                                    : NotificationType.success,
+                                message: vm.message ?? l10n.backupPageTestDone,
+                                type: testOk
+                                    ? NotificationType.success
+                                    : NotificationType.error,
                               );
                             },
                     ),
@@ -573,7 +565,6 @@ class _BackupPageState extends State<BackupPage> {
                                                       item,
                                                       mode: RestoreMode.merge,
                                                     ),
-                                                message: () => vm.message,
                                               );
                                             }
 
@@ -584,13 +575,18 @@ class _BackupPageState extends State<BackupPage> {
                                             if (mode == null) return;
                                             if (!context.mounted) return;
                                             try {
-                                              await _runWithImportingOverlay(
-                                                context,
-                                                () => vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                ),
-                                              );
+                                              final ok =
+                                                  await _runWithImportingOverlay<
+                                                    bool
+                                                  >(
+                                                    context,
+                                                    () => vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                    ),
+                                                  );
+                                              if (!context.mounted) return;
+                                              if (!ok) return;
                                             } catch (e) {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
@@ -601,16 +597,6 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            final msg = vm.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              showAppSnackBar(
-                                                context,
-                                                message: msg,
-                                                type: NotificationType.error,
-                                              );
-                                              return;
-                                            }
                                             await showRestartRequiredDialog(
                                               context,
                                             );
@@ -649,7 +635,6 @@ class _BackupPageState extends State<BackupPage> {
                                               item,
                                               mode: RestoreMode.merge,
                                             ),
-                                        message: () => vm.message,
                                       );
                                     }
 
@@ -660,13 +645,16 @@ class _BackupPageState extends State<BackupPage> {
                                     if (!context.mounted) return;
 
                                     try {
-                                      await _runWithImportingOverlay(
-                                        context,
-                                        () => vm.restoreFromItem(
-                                          item,
-                                          mode: mode,
-                                        ),
-                                      );
+                                      final ok =
+                                          await _runWithImportingOverlay<bool>(
+                                            context,
+                                            () => vm.restoreFromItem(
+                                              item,
+                                              mode: mode,
+                                            ),
+                                          );
+                                      if (!context.mounted) return;
+                                      if (!ok) return;
                                     } catch (e) {
                                       if (!context.mounted) return;
                                       showAppSnackBar(
@@ -677,15 +665,6 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    final msg = vm.message;
-                                    if (msg != null && msg != 'Restored') {
-                                      showAppSnackBar(
-                                        context,
-                                        message: msg,
-                                        type: NotificationType.error,
-                                      );
-                                      return;
-                                    }
                                     await showRestartRequiredDialog(context);
                                   },
                                 ),
@@ -782,17 +761,15 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: s3Vm.busy
                           ? null
                           : () async {
-                              await s3Vm.test();
+                              final testOk = await s3Vm.test();
                               if (!context.mounted) return;
-                              final rawMessage = s3Vm.message;
-                              final message =
-                                  rawMessage ?? l10n.backupPageTestDone;
                               showAppSnackBar(
                                 context,
-                                message: message,
-                                type: rawMessage != null && rawMessage != 'OK'
-                                    ? NotificationType.error
-                                    : NotificationType.success,
+                                message:
+                                    s3Vm.message ?? l10n.backupPageTestDone,
+                                type: testOk
+                                    ? NotificationType.success
+                                    : NotificationType.error,
                               );
                             },
                     ),
@@ -987,7 +964,6 @@ class _BackupPageState extends State<BackupPage> {
                                                       item,
                                                       mode: RestoreMode.merge,
                                                     ),
-                                                message: () => s3Vm.message,
                                               );
                                             }
 
@@ -998,13 +974,18 @@ class _BackupPageState extends State<BackupPage> {
                                             if (mode == null) return;
                                             if (!context.mounted) return;
                                             try {
-                                              await _runWithImportingOverlay(
-                                                context,
-                                                () => s3Vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                ),
-                                              );
+                                              final ok =
+                                                  await _runWithImportingOverlay<
+                                                    bool
+                                                  >(
+                                                    context,
+                                                    () => s3Vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                    ),
+                                                  );
+                                              if (!context.mounted) return;
+                                              if (!ok) return;
                                             } catch (e) {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
@@ -1015,16 +996,6 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            final msg = s3Vm.message;
-                                            if (msg != null &&
-                                                msg != 'Restored') {
-                                              showAppSnackBar(
-                                                context,
-                                                message: msg,
-                                                type: NotificationType.error,
-                                              );
-                                              return;
-                                            }
                                             await showRestartRequiredDialog(
                                               context,
                                             );
@@ -1063,7 +1034,6 @@ class _BackupPageState extends State<BackupPage> {
                                               item,
                                               mode: RestoreMode.merge,
                                             ),
-                                        message: () => s3Vm.message,
                                       );
                                     }
 
@@ -1074,13 +1044,16 @@ class _BackupPageState extends State<BackupPage> {
                                     if (!context.mounted) return;
 
                                     try {
-                                      await _runWithImportingOverlay(
-                                        context,
-                                        () => s3Vm.restoreFromItem(
-                                          item,
-                                          mode: mode,
-                                        ),
-                                      );
+                                      final ok =
+                                          await _runWithImportingOverlay<bool>(
+                                            context,
+                                            () => s3Vm.restoreFromItem(
+                                              item,
+                                              mode: mode,
+                                            ),
+                                          );
+                                      if (!context.mounted) return;
+                                      if (!ok) return;
                                     } catch (e) {
                                       if (!context.mounted) return;
                                       showAppSnackBar(
@@ -1091,15 +1064,6 @@ class _BackupPageState extends State<BackupPage> {
                                       return;
                                     }
                                     if (!context.mounted) return;
-                                    final msg = s3Vm.message;
-                                    if (msg != null && msg != 'Restored') {
-                                      showAppSnackBar(
-                                        context,
-                                        message: msg,
-                                        type: NotificationType.error,
-                                      );
-                                      return;
-                                    }
                                     await showRestartRequiredDialog(context);
                                   },
                                 ),

@@ -69,15 +69,16 @@ class S3BackupProvider extends ChangeNotifier {
     );
   }
 
-  Future<void> test() async {
+  Future<bool> test() async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
       await _client.test(_cfg);
-      _message = 'OK';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       _busy = false;
       notifyListeners();
@@ -140,7 +141,7 @@ class S3BackupProvider extends ChangeNotifier {
     return _client.listObjects(_cfg);
   }
 
-  Future<void> restoreFromItem(
+  Future<bool> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
@@ -159,9 +160,10 @@ class S3BackupProvider extends ChangeNotifier {
         _scopeAsWebdavConfig(),
         mode: mode,
       );
-      _message = 'Restored';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       try {
         if (file != null && await file.exists()) {

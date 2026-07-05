@@ -461,19 +461,16 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     final backupProvider = context
                                         .read<BackupProvider>();
                                     await _saveConfig();
-                                    await backupProvider.test();
+                                    final testOk = await backupProvider.test();
                                     if (!context.mounted) return;
-                                    final rawMessage = backupProvider.message;
-                                    final message =
-                                        rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
                                       context,
-                                      message: message,
-                                      type:
-                                          rawMessage != null &&
-                                              rawMessage != 'OK'
-                                          ? NotificationType.error
-                                          : NotificationType.success,
+                                      message:
+                                          backupProvider.message ??
+                                          l10n.backupPageTestDone,
+                                      type: testOk
+                                          ? NotificationType.success
+                                          : NotificationType.error,
                                     );
                                   },
                           ),
@@ -494,13 +491,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           '${l10n.backupPageRemoteBackups} (WebDAV)',
                                       listRemote: backupProvider.listRemote,
                                       restoreFromItem: (it, mode) async {
-                                        await backupProvider.restoreFromItem(
-                                          it,
-                                          mode: mode,
-                                        );
-                                        final msg = backupProvider.message;
-                                        if (msg != null && msg != 'Restored') {
-                                          throw Exception(msg);
+                                        final ok = await backupProvider
+                                            .restoreFromItem(it, mode: mode);
+                                        if (!ok) {
+                                          throw Exception(
+                                            backupProvider.message ??
+                                                'Restore failed',
+                                          );
                                         }
                                       },
                                       deleteAndReload:
@@ -769,19 +766,17 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                     final s3BackupProvider = context
                                         .read<S3BackupProvider>();
                                     await _saveS3Config();
-                                    await s3BackupProvider.test();
+                                    final testOk = await s3BackupProvider
+                                        .test();
                                     if (!context.mounted) return;
-                                    final rawMessage = s3BackupProvider.message;
-                                    final message =
-                                        rawMessage ?? l10n.backupPageTestDone;
                                     showAppSnackBar(
                                       context,
-                                      message: message,
-                                      type:
-                                          rawMessage != null &&
-                                              rawMessage != 'OK'
-                                          ? NotificationType.error
-                                          : NotificationType.success,
+                                      message:
+                                          s3BackupProvider.message ??
+                                          l10n.backupPageTestDone,
+                                      type: testOk
+                                          ? NotificationType.success
+                                          : NotificationType.error,
                                     );
                                   },
                           ),
@@ -802,13 +797,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           '${l10n.backupPageRemoteBackups} (S3)',
                                       listRemote: s3BackupProvider.listRemote,
                                       restoreFromItem: (it, mode) async {
-                                        await s3BackupProvider.restoreFromItem(
-                                          it,
-                                          mode: mode,
-                                        );
-                                        final msg = s3BackupProvider.message;
-                                        if (msg != null && msg != 'Restored') {
-                                          throw Exception(msg);
+                                        final ok = await s3BackupProvider
+                                            .restoreFromItem(it, mode: mode);
+                                        if (!ok) {
+                                          throw Exception(
+                                            s3BackupProvider.message ??
+                                                'Restore failed',
+                                          );
                                         }
                                       },
                                       deleteAndReload:
@@ -1470,6 +1465,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (!rootCtx.mounted) return;
     await showRestartRequiredDialog(rootCtx);
   }
 
@@ -1498,6 +1494,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    if (!rootCtx.mounted) return;
     await showRestartRequiredDialog(rootCtx);
   }
 

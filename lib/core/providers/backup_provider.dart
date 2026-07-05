@@ -29,15 +29,16 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> test() async {
+  Future<bool> test() async {
     _busy = true;
     _message = null;
     notifyListeners();
     try {
       await _dataSync.testWebdav(_cfg);
-      _message = 'OK';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       _busy = false;
       notifyListeners();
@@ -82,7 +83,7 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> restoreFromItem(
+  Future<bool> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
@@ -91,9 +92,10 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _dataSync.restoreFromWebDav(_cfg, item, mode: mode);
-      _message = 'Restored';
+      return true;
     } catch (e) {
       _message = e.toString();
+      return false;
     } finally {
       _busy = false;
       notifyListeners();
