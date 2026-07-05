@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.3.0] - 2026-07-05
+
+### 🚀 Features
+- Incremental backup with message-level filtering and scope preview
+- Incremental attachment export with mtime filtering
+- Persist includeSettings and updateBackupTime toggles across sessions
+
+### 🐛 Fixes
+- Fix multiple bugs across importers, models, API streaming, and desktop UI
+- Chatbox/cherry importer regex and path escaping on Windows
+- S3 client error response variable reference
+- ChatMessage groupId defaulting to null instead of generated id
+- Conversation fromJson crash on missing messageIds key
+- Settings avatar path double-backslash check on Windows
+- Emoji picker TextEditingController leak
+- Assistant settings edit page null guard in desktop dialog
+- Claude/OAI unsafe `as` casts causing silent chunk loss in streaming
+
+### ⚡ Performance
+- Batch insert restore data in single transaction
+
 ## [1.2.0] - 2026-07-02
 
 ### 🚀 Features
