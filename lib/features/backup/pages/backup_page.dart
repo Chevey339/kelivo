@@ -863,6 +863,15 @@ class _BackupPageState extends State<BackupPage> {
                                     .read<BackupReminderProvider>()
                                     .recordBackupCompleted();
                               }
+                              if (!context.mounted) return;
+                              final rawMessage = vm.message;
+                              final message =
+                                  rawMessage ?? l10n.backupPageBackupUploaded;
+                              showAppSnackBar(
+                                context,
+                                message: message,
+                                type: NotificationType.info,
+                              );
                             },
                     ),
                   ],
@@ -1353,6 +1362,15 @@ class _BackupPageState extends State<BackupPage> {
                                     .read<BackupReminderProvider>()
                                     .recordBackupCompleted();
                               }
+                              if (!context.mounted) return;
+                              final rawMessage = s3Vm.message;
+                              final message =
+                                  rawMessage ?? l10n.backupPageBackupUploaded;
+                              showAppSnackBar(
+                                context,
+                                message: message,
+                                type: NotificationType.info,
+                              );
                             },
                     ),
                   ],

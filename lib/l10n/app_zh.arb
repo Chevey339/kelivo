@@ -571,7 +571,6 @@
     }
   },
   "backupReminderSectionTitle": "备份提醒",
-  "backupReminderSectionTitle": "备份提醒",
   "backupReminderEnableTitle": "定期提醒我备份",
   "backupReminderFrequencyTitle": "提醒频率",
   "backupReminderTimeTitle": "提醒时间",

@@ -96,8 +96,15 @@ class _IncrementalBackupDialogBodyState
 
   Future<void> _loadPersistence() async {
     final prefs = SharedPreferencesAsync();
-    _includeSettings = await prefs.getBool(_prefsIncludeSettingsKey) ?? true;
-    _updateBackupTime = await prefs.getBool(_prefsUpdateBackupTimeKey) ?? true;
+    final includeSettings =
+        await prefs.getBool(_prefsIncludeSettingsKey) ?? true;
+    final updateBackupTime =
+        await prefs.getBool(_prefsUpdateBackupTimeKey) ?? true;
+    if (!mounted) return;
+    setState(() {
+      _includeSettings = includeSettings;
+      _updateBackupTime = updateBackupTime;
+    });
   }
 
   String _fmt(DateTime d) => d.toIso8601String().split('T')[0];
@@ -114,7 +121,10 @@ class _IncrementalBackupDialogBodyState
   Future<void> _rerunAnalysis() async {
     final analyzer = widget.analyzer;
     if (analyzer == null) return;
-    setState(() => _analyzing = true);
+    setState(() {
+      _analyzing = true;
+      _scope = null;
+    });
     final gen = ++_gen;
     try {
       final scope = await analyzer(
@@ -383,7 +393,10 @@ class _IncrementalBackupDialogBodyState
                   icon: Lucide.RefreshCw,
                   size: 18,
                   minSize: 36,
-                  onTap: () => setState(() => _since = widget.lastBackupTime!),
+                  onTap: () {
+                    setState(() => _since = widget.lastBackupTime!);
+                    _rerunAnalysis();
+                  },
                   semanticLabel: l10n.backupPageIncrementalLastBackup,
                 ),
               ),
