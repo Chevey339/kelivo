@@ -3239,6 +3239,84 @@ abstract class AppLocalizations {
   /// **'Import from Chatbox'**
   String get backupPageImportFromChatbox;
 
+  /// No description provided for @backupPageIncrementalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental Backup'**
+  String get backupPageIncrementalTitle;
+
+  /// No description provided for @backupPageIncrementalDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Export only chats since a chosen date.'**
+  String get backupPageIncrementalDescription;
+
+  /// No description provided for @backupPageIncrementalStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start Date'**
+  String get backupPageIncrementalStartDate;
+
+  /// No description provided for @backupPageIncrementalLastBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Use last backup date'**
+  String get backupPageIncrementalLastBackup;
+
+  /// No description provided for @backupPageIncrementalIncludeSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Include Settings'**
+  String get backupPageIncrementalIncludeSettings;
+
+  /// No description provided for @backupPageIncrementalIncludeFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Include Files'**
+  String get backupPageIncrementalIncludeFiles;
+
+  /// No description provided for @backupPageIncrementalUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload Incremental'**
+  String get backupPageIncrementalUpload;
+
+  /// No description provided for @backupPageIncrementalUpdateBackupTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Update last backup time'**
+  String get backupPageIncrementalUpdateBackupTime;
+
+  /// No description provided for @backupPageIncrementalPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Incremental Scope'**
+  String get backupPageIncrementalPreviewTitle;
+
+  /// No description provided for @backupPageIncrementalPreviewLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Analyzing…'**
+  String get backupPageIncrementalPreviewLoading;
+
+  /// No description provided for @backupPageIncrementalPreviewNewConv.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} new convs · {msgCount} new msgs'**
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount);
+
+  /// No description provided for @backupPageIncrementalPreviewUpdatedConv.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} updated convs · {msgCount} new msgs'**
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount);
+
+  /// No description provided for @backupPageIncrementalPreviewFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attachments ({size})'**
+  String backupPageIncrementalPreviewFiles(int count, String size);
+
   /// No description provided for @backupReminderSectionTitle.
   ///
   /// In en, this message translates to:

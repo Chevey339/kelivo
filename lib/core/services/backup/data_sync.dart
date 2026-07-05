@@ -14,6 +14,7 @@ import 'package:xml/xml.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
+import '../../models/incremental_backup.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 
@@ -131,14 +132,21 @@ class DataSync {
     }
   }
 
-  Future<File> prepareBackupFile(WebDavConfig cfg) async {
+  Future<File> prepareBackupFile(
+    WebDavConfig cfg, {
+    IncrementalBackupConfig? incremental,
+  }) async {
     final tmp = await _ensureTempDir();
     await _cleanupPreviousBackupTempFiles(tmp);
-    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final workDir = Directory(p.join(tmp.path, 'kelivo_backup_$timestamp'));
+    final now = DateTime.now();
+    final isIncremental = incremental != null;
+    final baseName = isIncremental
+        ? _incrementalBaseName(now, incremental.since)
+        : 'kelivo_backup_${_isoCompact(now)}';
+    final workDir = Directory(p.join(tmp.path, baseName));
     await workDir.create(recursive: true);
 
-    final outPath = p.join(workDir.path, 'kelivo_backup_$timestamp.zip');
+    final outPath = p.join(workDir.path, '$baseName.zip');
     final outFile = File(outPath);
     if (await outFile.exists()) await outFile.delete();
 
@@ -146,17 +154,19 @@ class DataSync {
     File? chatsTmp;
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
-      // settings.json
-      final settingsJson = await _exportSettingsJson();
-      settingsTmp = await _writeTempText(
-        workDir,
-        '_bk_settings.json',
-        settingsJson,
-      );
+      // settings.json — full backup always includes settings
+      if (incremental == null || incremental.includeSettings) {
+        final settingsJson = await _exportSettingsJson();
+        settingsTmp = await _writeTempText(
+          workDir,
+          '_bk_settings.json',
+          settingsJson,
+        );
+      }
 
       // chats.json — stream to file to avoid huge string in memory
       if (cfg.includeChats) {
-        chatsTmp = await _exportChatsToFile(workDir);
+        chatsTmp = await _exportChatsToFile(workDir, incremental: incremental);
       }
 
       // Resolve directory paths (need AppDirectories on main isolate)
@@ -164,17 +174,21 @@ class DataSync {
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
       final fontsDirPath = (await _getFontsDir()).path;
-      final settingsPath = settingsTmp.path;
+      final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
-      final includeFiles = cfg.includeFiles;
+      final effectiveIncludeFiles = isIncremental
+          ? incremental.includeFiles
+          : cfg.includeFiles;
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
+      final packSince = incremental?.since;
       await Isolate.run(() {
         _packZipSync(
           outPath: outPath,
           settingsPath: settingsPath,
           chatsPath: chatsPath,
-          includeFiles: includeFiles,
+          includeFiles: effectiveIncludeFiles,
+          since: packSince,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -193,6 +207,49 @@ class DataSync {
       await _deleteFileQuietly(chatsTmp);
     }
   }
+
+  /// Generate base name (without extension) for incremental backup files.
+  /// Format: cuplivo_incr_`export_ts`_`since_ts`
+  ///   export_ts = YYYYMMDD-HHmmss-ffffff (date-microseconds)
+  ///   since_ts  = YYYYMMDD-HHmmss          (date-seconds)
+  static String _incrementalBaseName(DateTime now, DateTime since) {
+    final e =
+        '${_fmtDigits(now.year, 4)}'
+        '${_fmtDigits(now.month, 2)}'
+        '${_fmtDigits(now.day, 2)}'
+        '-'
+        '${_fmtDigits(now.hour, 2)}'
+        '${_fmtDigits(now.minute, 2)}'
+        '${_fmtDigits(now.second, 2)}'
+        '-'
+        '${_fmtDigits(now.microsecond, 6)}';
+    final s =
+        '${_fmtDigits(since.year, 4)}'
+        '${_fmtDigits(since.month, 2)}'
+        '${_fmtDigits(since.day, 2)}'
+        '-'
+        '${_fmtDigits(since.hour, 2)}'
+        '${_fmtDigits(since.minute, 2)}'
+        '${_fmtDigits(since.second, 2)}';
+    return 'cuplivo_incr_${e}_$s';
+  }
+
+  /// Compact ISO-like timestamp without separators (for full backup).
+  /// Result: 20260703T123456.123456
+  static String _isoCompact(DateTime dt) {
+    return '${_fmtDigits(dt.year, 4)}'
+        '${_fmtDigits(dt.month, 2)}'
+        '${_fmtDigits(dt.day, 2)}'
+        'T'
+        '${_fmtDigits(dt.hour, 2)}'
+        '${_fmtDigits(dt.minute, 2)}'
+        '${_fmtDigits(dt.second, 2)}'
+        '.'
+        '${_fmtDigits(dt.microsecond, 6)}';
+  }
+
+  static String _fmtDigits(int n, int width) =>
+      n.toString().padLeft(width, '0');
 
   static Future<void> cleanupTemporaryBackupFile(File? file) async {
     if (file == null) return;
@@ -228,10 +285,13 @@ class DataSync {
       if (!await tmp.exists()) return;
       await for (final ent in tmp.list(followLinks: false)) {
         final name = p.basename(ent.path);
-        if (ent is Directory && name.startsWith('kelivo_backup_')) {
+        if (ent is Directory &&
+            (name.startsWith('kelivo_backup_') ||
+                name.startsWith('cuplivo_incr_'))) {
           await _deleteDirectoryQuietly(ent);
         } else if (ent is File &&
             ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
+                (name.startsWith('cuplivo_incr_') && name.endsWith('.zip')) ||
                 name == '_bk_settings.json' ||
                 name == '_bk_chats.json')) {
           await _deleteFileQuietly(ent);
@@ -243,18 +303,21 @@ class DataSync {
   /// Synchronous ZIP packing — runs inside an Isolate.
   static void _packZipSync({
     required String outPath,
-    required String settingsPath,
+    String? settingsPath,
     String? chatsPath,
     required bool includeFiles,
     required String uploadDirPath,
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
+    DateTime? since,
   }) {
     final writer = _StreamingZipWriter(outPath);
     try {
       // settings.json
-      _addFileToZip(writer, settingsPath, 'settings.json');
+      if (settingsPath != null) {
+        _addFileToZip(writer, settingsPath, 'settings.json');
+      }
 
       // chats.json
       if (chatsPath != null) {
@@ -263,10 +326,10 @@ class DataSync {
 
       // files under upload/, images/, and avatars/
       if (includeFiles) {
-        _addDirectoryToZip(writer, uploadDirPath, 'upload');
-        _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
-        _addDirectoryToZip(writer, imagesDirPath, 'images');
-        _addDirectoryToZip(writer, fontsDirPath, 'fonts');
+        _addDirectoryToZip(writer, uploadDirPath, 'upload', since: since);
+        _addDirectoryToZip(writer, avatarsDirPath, 'avatars', since: since);
+        _addDirectoryToZip(writer, imagesDirPath, 'images', since: since);
+        _addDirectoryToZip(writer, fontsDirPath, 'fonts', since: since);
       }
 
       writer.closeSync();
@@ -289,13 +352,21 @@ class DataSync {
   static void _addDirectoryToZip(
     _StreamingZipWriter writer,
     String srcDirPath,
-    String zipPrefix,
-  ) {
+    String zipPrefix, {
+    DateTime? since,
+  }) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
     final entries = dir.listSync(recursive: true, followLinks: false);
     for (final ent in entries) {
       if (ent is File) {
+        if (since != null) {
+          try {
+            if (ent.lastModifiedSync().isBefore(since)) continue;
+          } catch (_) {
+            continue;
+          }
+        }
         final rel = p.relative(ent.path, from: srcDirPath);
         // ZIP entries must use forward slashes regardless of platform
         final relPosix = rel.replaceAll('\\', '/');
@@ -370,8 +441,11 @@ class DataSync {
     }
   }
 
-  Future<void> backupToWebDav(WebDavConfig cfg) async {
-    final file = await prepareBackupFile(cfg);
+  Future<void> backupToWebDav(
+    WebDavConfig cfg, {
+    IncrementalBackupConfig? incremental,
+  }) async {
+    final file = await prepareBackupFile(cfg, incremental: incremental);
     try {
       await _ensureCollection(cfg);
       final target = _fileUri(cfg, p.basename(file.path));
@@ -463,15 +537,15 @@ class DataSync {
           ? disp.first.trim()
           : Uri.parse(href).pathSegments.last;
 
-      // If mtime is null, try to extract from filename (format: kelivo_backup_2025-01-19T12-34-56.123456.zip)
+      // If mtime is null, try to extract from filename
       if (mtime == null) {
-        final match = RegExp(
+        // Try old full backup format: kelivo_backup_2026-07-03T12-34-56.123456.zip
+        var fullMatch = RegExp(
           r'kelivo_backup_(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d+)\.zip',
         ).firstMatch(name);
-        if (match != null) {
+        if (fullMatch != null) {
           try {
-            // Replace hyphens in time part back to colons
-            final timestamp = match
+            final timestamp = fullMatch
                 .group(1)!
                 .replaceAll(
                   RegExp(r'T(\d{2})-(\d{2})-(\d{2})'),
@@ -479,6 +553,29 @@ class DataSync {
                 );
             mtime = DateTime.parse(timestamp);
           } catch (_) {}
+        } else {
+          // Try new full backup format: kelivo_backup_20260703T123456.123456.zip
+          fullMatch = RegExp(
+            r'kelivo_backup_(\d{8}T\d{6}\.\d+)\.zip',
+          ).firstMatch(name);
+          if (fullMatch != null) {
+            try {
+              mtime = DateTime.parse(fullMatch.group(1)!);
+            } catch (_) {}
+          } else {
+            // Try incremental format: cuplivo_incr_20260703-123456-123456_20260701-000000.zip
+            final incrMatch = RegExp(
+              r'cuplivo_incr_(\d{8})-(\d{6})-(\d{6})_\d{8}-\d{6}\.zip',
+            ).firstMatch(name);
+            if (incrMatch != null) {
+              try {
+                final raw =
+                    '${incrMatch.group(1)}T${incrMatch.group(2)}.${incrMatch.group(3)}';
+                // raw = 20260703T123456.123456
+                mtime = DateTime.parse(raw);
+              } catch (_) {}
+            }
+          }
         }
       }
 
@@ -542,7 +639,10 @@ class DataSync {
     }
   }
 
-  Future<File> exportToFile(WebDavConfig cfg) => prepareBackupFile(cfg);
+  Future<File> exportToFile(
+    WebDavConfig cfg, {
+    IncrementalBackupConfig? incremental,
+  }) => prepareBackupFile(cfg, incremental: incremental);
 
   Future<void> restoreFromLocalFile(
     File file,
@@ -594,6 +694,89 @@ class DataSync {
     return await AppDirectories.getFontsDirectory();
   }
 
+  /// Analyze incremental scope for preview purposes — scans conversations and
+  /// files to produce metadata counts and representative titles.
+  /// Does not modify any state; safe to call repeatedly.
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) async {
+    if (!chatService.initialized) await chatService.init();
+
+    final allConvs = chatService.getAllCompleteConversations();
+    final since = config.since;
+    final sinceCheck = config.sinceCheck;
+    final includeFiles = config.includeFiles;
+
+    final newConvs = <Conversation>[];
+    final updatedConvs = <Conversation>[];
+    int newMsgCount = 0;
+    int updatedMsgCount = 0;
+
+    for (final c in allConvs) {
+      if (sinceCheck(c.createdAt)) {
+        final msgs = chatService.getMessages(c.id);
+        newMsgCount += msgs.length;
+        newConvs.add(c);
+      } else if (c.updatedAt.isAfter(since) ||
+          c.updatedAt.isAtSameMomentAs(since)) {
+        final filtered = chatService
+            .getMessages(c.id)
+            .where((m) => sinceCheck(m.timestamp));
+        final count = filtered.length;
+        if (count > 0) {
+          updatedMsgCount += count;
+          updatedConvs.add(c);
+        }
+      }
+    }
+
+    newConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    updatedConvs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    int fileCount = 0;
+    int totalBytes = 0;
+    if (includeFiles) {
+      final dirs = [
+        await _getUploadDir(),
+        await _getAvatarsDir(),
+        await _getImagesDir(),
+        await _getFontsDir(),
+      ];
+      for (final dir in dirs) {
+        if (!await dir.exists()) continue;
+        await for (final ent in dir.list(recursive: true, followLinks: false)) {
+          if (ent is File) {
+            try {
+              final mod = await ent.lastModified();
+              if (mod.isBefore(since)) continue;
+            } catch (_) {
+              continue;
+            }
+            fileCount++;
+            totalBytes += await ent.length();
+          }
+        }
+      }
+    }
+
+    return IncrementalScope(
+      newConversations: ConvRange(
+        count: newConvs.length,
+        messageCount: newMsgCount,
+        oldestTitle: newConvs.isNotEmpty ? newConvs.first.title : null,
+        newestTitle: newConvs.length > 1 ? newConvs.last.title : null,
+      ),
+      updatedConversations: ConvRange(
+        count: updatedConvs.length,
+        messageCount: updatedMsgCount,
+        oldestTitle: updatedConvs.isNotEmpty ? updatedConvs.first.title : null,
+        newestTitle: updatedConvs.length > 1 ? updatedConvs.last.title : null,
+      ),
+      newFileCount: fileCount,
+      totalFileSizeBytes: totalBytes,
+    );
+  }
+
   Future<String> _exportSettingsJson() async {
     final prefs = await SharedPreferencesAsync.instance;
     final map = await prefs.snapshot();
@@ -602,11 +785,30 @@ class DataSync {
 
   /// Stream chat data to a temporary JSON file instead of building a huge
   /// in-memory String.  Uses IOSink for low memory overhead.
-  Future<File> _exportChatsToFile(Directory directory) async {
+  Future<File> _exportChatsToFile(
+    Directory directory, {
+    IncrementalBackupConfig? incremental,
+  }) async {
     if (!chatService.initialized) {
       await chatService.init();
     }
-    final conversations = chatService.getAllCompleteConversations();
+    var conversations = chatService.getAllCompleteConversations();
+    if (incremental != null) {
+      final sinceCheck = incremental.sinceCheck;
+      final since = incremental.since;
+      // Message-level filtering with updatedAt pre-check optimization.
+      // Conversations created after since always qualify.
+      // Conversations with updatedAt before since have no activity.
+      // Remaining conversations need message-level check.
+      conversations = conversations.where((c) {
+        if (sinceCheck(c.createdAt)) {
+          return true;
+        }
+        if (c.updatedAt.isBefore(since)) return false;
+        final msgs = chatService.getMessages(c.id);
+        return msgs.any((m) => sinceCheck(m.timestamp));
+      }).toList();
+    }
     final file = File(p.join(directory.path, '_bk_chats.json'));
     final sink = file.openWrite();
 
@@ -629,7 +831,12 @@ class DataSync {
       final geminiThoughtSigs = <String, String>{};
       bool firstMsg = true;
       for (final c in conversations) {
-        final msgs = chatService.getMessages(c.id);
+        var msgs = chatService.getMessages(c.id);
+        if (incremental != null && c.createdAt.isBefore(incremental.since)) {
+          msgs = msgs
+              .where((m) => incremental.sinceCheck(m.timestamp))
+              .toList();
+        }
         for (final m in msgs) {
           if (!firstMsg) sink.write(',');
           firstMsg = false;
@@ -669,6 +876,12 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
+    // Incremental backup detection: cuplivo_incr_ prefix forces merge mode
+    if (mode == RestoreMode.overwrite &&
+        p.basenameWithoutExtension(file.path).startsWith('cuplivo_incr_')) {
+      mode = RestoreMode.merge;
+    }
+
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).

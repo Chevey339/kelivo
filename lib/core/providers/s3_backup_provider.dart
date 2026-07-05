@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/backup.dart';
+import '../models/incremental_backup.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
 import '../services/chat/chat_service.dart';
@@ -93,6 +94,35 @@ class S3BackupProvider extends ChangeNotifier {
       final prefix = _normalizePrefix(_cfg.prefix);
       final key = '$prefix${p.basename(file.path)}';
       // Use file-stream upload to avoid loading entire ZIP into memory.
+      await _client.uploadFile(_cfg, key: key, file: file);
+      _message = 'Backup uploaded';
+      return true;
+    } catch (e) {
+      _message = e.toString();
+      return false;
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(file);
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) => _dataSync.analyzeIncrementalScope(config);
+
+  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? file;
+    try {
+      file = await _dataSync.prepareBackupFile(
+        _scopeAsWebdavConfig(),
+        incremental: config,
+      );
+      final prefix = _normalizePrefix(_cfg.prefix);
+      final key = '$prefix${p.basename(file.path)}';
       await _client.uploadFile(_cfg, key: key, file: file);
       _message = 'Backup uploaded';
       return true;

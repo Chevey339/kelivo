@@ -1682,6 +1682,52 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageImportFromChatbox => 'Import from Chatbox';
 
   @override
+  String get backupPageIncrementalTitle => 'Incremental Backup';
+
+  @override
+  String get backupPageIncrementalDescription =>
+      'Export only chats since a chosen date.';
+
+  @override
+  String get backupPageIncrementalStartDate => 'Start Date';
+
+  @override
+  String get backupPageIncrementalLastBackup => 'Use last backup date';
+
+  @override
+  String get backupPageIncrementalIncludeSettings => 'Include Settings';
+
+  @override
+  String get backupPageIncrementalIncludeFiles => 'Include Files';
+
+  @override
+  String get backupPageIncrementalUpload => 'Upload Incremental';
+
+  @override
+  String get backupPageIncrementalUpdateBackupTime => 'Update last backup time';
+
+  @override
+  String get backupPageIncrementalPreviewTitle => 'Incremental Scope';
+
+  @override
+  String get backupPageIncrementalPreviewLoading => 'Analyzing…';
+
+  @override
+  String backupPageIncrementalPreviewNewConv(int count, int msgCount) {
+    return '$count new convs · $msgCount new msgs';
+  }
+
+  @override
+  String backupPageIncrementalPreviewUpdatedConv(int count, int msgCount) {
+    return '$count updated convs · $msgCount new msgs';
+  }
+
+  @override
+  String backupPageIncrementalPreviewFiles(int count, String size) {
+    return '$count attachments ($size)';
+  }
+
+  @override
   String get backupReminderSectionTitle => 'Backup Reminder';
 
   @override

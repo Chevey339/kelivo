@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../models/backup.dart';
+import '../models/incremental_backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
 
@@ -60,6 +61,27 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
+  Future<IncrementalScope> analyzeIncrementalScope(
+    IncrementalBackupConfig config,
+  ) => _dataSync.analyzeIncrementalScope(config);
+
+  Future<bool> incrementalBackup(IncrementalBackupConfig config) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    try {
+      await _dataSync.backupToWebDav(_cfg, incremental: config);
+      _message = 'Backup uploaded';
+      return true;
+    } catch (e) {
+      _message = e.toString();
+      return false;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
@@ -88,6 +110,8 @@ class BackupProvider extends ChangeNotifier {
   }
 
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
+  Future<File> incrementalExportToFile(IncrementalBackupConfig config) =>
+      _dataSync.exportToFile(_cfg, incremental: config);
   Future<void> restoreFromLocalFile(
     File file, {
     RestoreMode mode = RestoreMode.overwrite,

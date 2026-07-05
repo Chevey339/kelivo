@@ -20,6 +20,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/dialogs/incremental_backup_dialog.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../utils/platform_utils.dart';
@@ -216,6 +217,48 @@ class _BackupPageState extends State<BackupPage> {
     BuildContext context,
     Future<T> Function() task,
   ) => _runWithLoadingOverlay(context, task);
+
+  Future<void> _restoreIncrementalItem({
+    required BuildContext context,
+    required Future<void> Function() performRestore,
+    required String? Function() message,
+  }) async {
+    try {
+      await _runWithImportingOverlay(context, performRestore);
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    final msg = message();
+    if (msg != null && msg != 'Restored') {
+      showAppSnackBar(context, message: msg, type: NotificationType.error);
+      return;
+    }
+    if (!context.mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dctx) => AlertDialog(
+        title: Text(AppLocalizations.of(context)!.backupPageRestartRequired),
+        content: Text(AppLocalizations.of(context)!.backupPageRestartContent),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(dctx).pop();
+              PlatformUtils.restartApp();
+            },
+            child: Text(AppLocalizations.of(context)!.backupPageOK),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -593,6 +636,21 @@ class _BackupPageState extends State<BackupPage> {
                                           onRestore: (item) async {
                                             Navigator.of(ctx).pop();
                                             if (!context.mounted) return;
+
+                                            if (item.displayName.startsWith(
+                                              'cuplivo_incr_',
+                                            )) {
+                                              return _restoreIncrementalItem(
+                                                context: context,
+                                                performRestore: () =>
+                                                    vm.restoreFromItem(
+                                                      item,
+                                                      mode: RestoreMode.merge,
+                                                    ),
+                                                message: () => vm.message,
+                                              );
+                                            }
+
                                             final mode =
                                                 await _chooseImportModeDialog(
                                                   context,
@@ -673,12 +731,25 @@ class _BackupPageState extends State<BackupPage> {
                                   },
                                   onRestore: (item) async {
                                     Navigator.of(ctx).pop();
-
                                     if (!context.mounted) return;
+
+                                    if (item.displayName.startsWith(
+                                      'cuplivo_incr_',
+                                    )) {
+                                      return _restoreIncrementalItem(
+                                        context: context,
+                                        performRestore: () =>
+                                            vm.restoreFromItem(
+                                              item,
+                                              mode: RestoreMode.merge,
+                                            ),
+                                        message: () => vm.message,
+                                      );
+                                    }
+
                                     final mode = await _chooseImportModeDialog(
                                       context,
                                     );
-
                                     if (mode == null) return;
                                     if (!context.mounted) return;
 
@@ -762,6 +833,36 @@ class _BackupPageState extends State<BackupPage> {
                                 message: message,
                                 type: NotificationType.info,
                               );
+                            },
+                    ),
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.Upload,
+                      label: l10n.backupPageIncrementalTitle,
+                      onTap: vm.busy
+                          ? null
+                          : () async {
+                              final config =
+                                  await IncrementalBackupDialog.showSheet(
+                                    context,
+                                    lastBackupTime: context
+                                        .read<BackupReminderProvider>()
+                                        .lastBackupAt,
+                                    initialIncludeFiles: cfg.includeFiles,
+                                    analyzer: vm.analyzeIncrementalScope,
+                                  );
+                              if (config == null || !context.mounted) return;
+                              final success = await _runWithExportingOverlay(
+                                context,
+                                () => vm.incrementalBackup(config),
+                              );
+                              if (!context.mounted) return;
+                              if (success && config.updateBackupTime) {
+                                await context
+                                    .read<BackupReminderProvider>()
+                                    .recordBackupCompleted();
+                              }
                             },
                     ),
                   ],
@@ -1025,6 +1126,21 @@ class _BackupPageState extends State<BackupPage> {
                                           onRestore: (item) async {
                                             Navigator.of(ctx).pop();
                                             if (!context.mounted) return;
+
+                                            if (item.displayName.startsWith(
+                                              'cuplivo_incr_',
+                                            )) {
+                                              return _restoreIncrementalItem(
+                                                context: context,
+                                                performRestore: () =>
+                                                    s3Vm.restoreFromItem(
+                                                      item,
+                                                      mode: RestoreMode.merge,
+                                                    ),
+                                                message: () => s3Vm.message,
+                                              );
+                                            }
+
                                             final mode =
                                                 await _chooseImportModeDialog(
                                                   context,
@@ -1106,6 +1222,21 @@ class _BackupPageState extends State<BackupPage> {
                                     Navigator.of(ctx).pop();
 
                                     if (!context.mounted) return;
+
+                                    if (item.displayName.startsWith(
+                                      'cuplivo_incr_',
+                                    )) {
+                                      return _restoreIncrementalItem(
+                                        context: context,
+                                        performRestore: () =>
+                                            s3Vm.restoreFromItem(
+                                              item,
+                                              mode: RestoreMode.merge,
+                                            ),
+                                        message: () => s3Vm.message,
+                                      );
+                                    }
+
                                     final mode = await _chooseImportModeDialog(
                                       context,
                                     );
@@ -1192,6 +1323,36 @@ class _BackupPageState extends State<BackupPage> {
                                 message: message,
                                 type: NotificationType.info,
                               );
+                            },
+                    ),
+                    _iosDivider(context),
+                    _iosNavRow(
+                      context,
+                      icon: Lucide.Upload,
+                      label: l10n.backupPageIncrementalTitle,
+                      onTap: s3Vm.busy
+                          ? null
+                          : () async {
+                              final config =
+                                  await IncrementalBackupDialog.showSheet(
+                                    context,
+                                    lastBackupTime: context
+                                        .read<BackupReminderProvider>()
+                                        .lastBackupAt,
+                                    initialIncludeFiles: s3Cfg.includeFiles,
+                                    analyzer: s3Vm.analyzeIncrementalScope,
+                                  );
+                              if (config == null || !context.mounted) return;
+                              final success = await _runWithExportingOverlay(
+                                context,
+                                () => s3Vm.incrementalBackup(config),
+                              );
+                              if (!context.mounted) return;
+                              if (success && config.updateBackupTime) {
+                                await context
+                                    .read<BackupReminderProvider>()
+                                    .recordBackupCompleted();
+                              }
                             },
                     ),
                   ],

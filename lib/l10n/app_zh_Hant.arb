@@ -550,6 +550,37 @@
   "backupPageLocalBackup": "本機備份",
   "backupPageImportFromCherryStudio": "從 Cherry Studio 匯入",
   "backupPageImportFromChatbox": "從 Chatbox 匯入",
+  "backupPageIncrementalTitle": "增量備份",
+  "backupPageIncrementalDescription": "僅匯出某個日期之後的聊天資料。",
+  "backupPageIncrementalStartDate": "起始日期",
+  "backupPageIncrementalLastBackup": "使用上次備份日期",
+  "backupPageIncrementalIncludeSettings": "包含設定",
+  "backupPageIncrementalIncludeFiles": "包含檔案",
+  "backupPageIncrementalUpload": "增量上傳",
+  "backupPageIncrementalUpdateBackupTime": "更新上次備份日期",
+  "backupPageIncrementalPreviewTitle": "增量範圍",
+  "backupPageIncrementalPreviewLoading": "分析中…",
+  "backupPageIncrementalPreviewNewConv": "新對話 {count} 個 · 新訊息 {msgCount} 條",
+  "@backupPageIncrementalPreviewNewConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewUpdatedConv": "更新舊對話 {count} 個 · 新訊息 {msgCount} 條",
+  "@backupPageIncrementalPreviewUpdatedConv": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "msgCount": { "type": "int" }
+    }
+  },
+  "backupPageIncrementalPreviewFiles": "新附件 {count} 個 ({size})",
+  "@backupPageIncrementalPreviewFiles": {
+    "placeholders": {
+      "count": { "type": "int" },
+      "size": { "type": "String" }
+    }
+  },
   "backupReminderSectionTitle": "備份提醒",
   "backupReminderEnableTitle": "定期提醒我備份",
   "backupReminderFrequencyTitle": "提醒頻率",
