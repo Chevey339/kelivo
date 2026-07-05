@@ -10,8 +10,11 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
+import '../../../core/services/memory_doc_store.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../search/services/global_session_search_service.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
@@ -186,6 +189,7 @@ class ToolHandlerService {
     // Memory tools
     if (assistant?.enableMemory == true && supportsTools) {
       toolDefs.addAll(_buildMemoryToolDefinitions());
+      toolDefs.addAll(_buildMemoryArchiveToolDefinitions());
     }
 
     // Local tools
@@ -260,6 +264,124 @@ class ToolHandlerService {
               'id': {
                 'type': 'integer',
                 'description': 'The id of the memory record',
+              },
+            },
+            'required': ['id'],
+          },
+        },
+      },
+    ];
+  }
+
+  /// Build memory archive tool definitions (past-chat search/read + long docs).
+  ///
+  /// These implement the catalog-then-fetch pattern: the system prompt only
+  /// carries titles/summaries, and the model pulls full text on demand.
+  List<Map<String, dynamic>> _buildMemoryArchiveToolDefinitions() {
+    return [
+      {
+        'type': 'function',
+        'function': {
+          'name': 'search_past_chats',
+          'description':
+              'Search all past conversations on this device by keywords. '
+              'Returns a catalog of matches (title, date, snippet, conversationId). '
+              'Follow up with read_chat before quoting any detail.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'query': {
+                'type': 'string',
+                'description':
+                    'Space-separated keywords. All keywords must appear in a conversation for it to match.',
+              },
+            },
+            'required': ['query'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'read_chat',
+          'description':
+              'Read the original messages of one past conversation by conversationId '
+              '(from search_past_chats). Returns the last part of the conversation.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'conversation_id': {
+                'type': 'string',
+                'description': 'The conversationId returned by search_past_chats',
+              },
+              'max_messages': {
+                'type': 'integer',
+                'description':
+                    'Maximum number of messages to return, counted from the end. Default 30.',
+              },
+            },
+            'required': ['conversation_id'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'read_memory_doc',
+          'description':
+              'Read the full text of one long-term memory doc listed in the '
+              '<memory_docs> catalog. Never pretend to know doc content from the catalog alone.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'id': {
+                'type': 'integer',
+                'description': 'The doc id from the <memory_docs> catalog',
+              },
+            },
+            'required': ['id'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'write_memory_doc',
+          'description':
+              'Save a long text as a long-term memory doc. Use when the user asks to '
+              'archive long content (notes, settings, excerpts). Only the title and summary '
+              'will appear in future context; full text stays retrievable via read_memory_doc.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'title': {
+                'type': 'string',
+                'description': 'A short distinctive title',
+              },
+              'summary': {
+                'type': 'string',
+                'description': 'One-sentence summary shown in the catalog',
+              },
+              'content': {
+                'type': 'string',
+                'description': 'The full text to archive',
+              },
+            },
+            'required': ['title', 'summary', 'content'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'delete_memory_doc',
+          'description': 'Delete an outdated long-term memory doc by id.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'id': {
+                'type': 'integer',
+                'description': 'The doc id from the <memory_docs> catalog',
               },
             },
             'required': ['id'],
@@ -362,6 +484,16 @@ class ToolHandlerService {
         final memoryResult = await _handleMemoryToolCall(name, args, assistant);
         if (memoryResult != null) {
           return memoryResult;
+        }
+
+        // Memory archive tools (past-chat search/read + long docs)
+        final archiveResult = await _handleMemoryArchiveToolCall(
+          name,
+          args,
+          assistant,
+        );
+        if (archiveResult != null) {
+          return archiveResult;
         }
 
         // Local tools
@@ -545,6 +677,180 @@ class ToolHandlerService {
         tool: name,
         instruction:
             'The memory tool failed. Retry only after correcting the parameters, or inform the user about the issue.',
+      );
+    }
+
+    return null;
+  }
+
+  static const Set<String> _memoryArchiveToolNames = {
+    'search_past_chats',
+    'read_chat',
+    'read_memory_doc',
+    'write_memory_doc',
+    'delete_memory_doc',
+  };
+
+  /// Handle memory archive tool calls (past-chat search/read + long docs).
+  ///
+  /// Returns null if the tool is not an archive tool or memory is not enabled.
+  Future<String?> _handleMemoryArchiveToolCall(
+    String name,
+    Map<String, dynamic> args,
+    Assistant? assistant,
+  ) async {
+    if (assistant?.enableMemory != true) return null;
+    if (!_memoryArchiveToolNames.contains(name)) return null;
+
+    try {
+      if (name == 'search_past_chats') {
+        final query = (args['query'] ?? '').toString().trim();
+        if (query.isEmpty) {
+          return _toolError(
+            error: 'invalid_query',
+            message: 'query must not be empty.',
+            tool: name,
+          );
+        }
+        final chatService = contextProvider.read<ChatService>();
+        final results = GlobalSessionSearchService.search(
+          chatService: chatService,
+          query: query,
+          limit: 8,
+        );
+        return jsonEncode({
+          'results': [
+            for (final r in results)
+              {
+                'conversation_id': r.conversationId,
+                'title': r.conversationTitle,
+                'date': r.updatedAt.toIso8601String().substring(0, 10),
+                'snippet': r.snippet,
+              },
+          ],
+          'note': results.isEmpty
+              ? 'No past conversation matched all keywords. Try fewer or different keywords.'
+              : 'Catalog entries only. Call read_chat with a conversation_id before quoting details.',
+        });
+      } else if (name == 'read_chat') {
+        final id = (args['conversation_id'] ?? '').toString().trim();
+        if (id.isEmpty) {
+          return _toolError(
+            error: 'invalid_conversation_id',
+            message: 'conversation_id must not be empty.',
+            tool: name,
+          );
+        }
+        final chatService = contextProvider.read<ChatService>();
+        final convo = chatService.getConversation(id);
+        if (convo == null) {
+          return _toolError(
+            error: 'conversation_not_found',
+            message: 'No conversation was found for id $id.',
+            tool: name,
+            instruction:
+                'Use a conversation_id returned by search_past_chats.',
+          );
+        }
+        final maxMessages = ((args['max_messages'] as num?)?.toInt() ?? 30)
+            .clamp(1, 100);
+        final visible = [
+          for (final m in chatService.getMessages(id))
+            if ((m.role == 'user' || m.role == 'assistant') &&
+                m.content.trim().isNotEmpty)
+              m,
+        ];
+        // Take messages from the end, bounded by count and a character budget.
+        const charBudget = 12000;
+        var used = 0;
+        final lines = <String>[];
+        for (final m in visible.reversed) {
+          if (lines.length >= maxMessages) break;
+          final line = '[${m.role}] ${m.content.trim()}';
+          if (lines.isNotEmpty && used + line.length > charBudget) break;
+          used += line.length;
+          lines.add(line);
+        }
+        final buf = StringBuffer()
+          ..writeln('Conversation: ${convo.title}')
+          ..writeln(
+            visible.length > lines.length
+                ? '(showing last ${lines.length} of ${visible.length} messages)'
+                : '(${lines.length} messages)',
+          );
+        for (final line in lines.reversed) {
+          buf.writeln(line);
+        }
+        return buf.toString();
+      } else if (name == 'read_memory_doc') {
+        final id = (args['id'] as num?)?.toInt() ?? -1;
+        if (id <= 0) {
+          return _toolError(
+            error: 'invalid_doc_id',
+            message: 'Doc id must be a positive integer.',
+            tool: name,
+          );
+        }
+        final doc = await MemoryDocStore.getById(id);
+        if (doc == null || doc.assistantId != assistant!.id) {
+          return _toolError(
+            error: 'doc_not_found',
+            message: 'No memory doc was found for id $id.',
+            tool: name,
+            instruction: 'Use an id listed in the <memory_docs> catalog.',
+          );
+        }
+        return '# ${doc.title}\n\n${doc.content}';
+      } else if (name == 'write_memory_doc') {
+        final title = (args['title'] ?? '').toString().trim();
+        final summary = (args['summary'] ?? '').toString().trim();
+        final content = (args['content'] ?? '').toString();
+        if (title.isEmpty || summary.isEmpty || content.trim().isEmpty) {
+          return _toolError(
+            error: 'invalid_doc_fields',
+            message: 'title, summary and content must all be non-empty.',
+            tool: name,
+          );
+        }
+        final doc = await MemoryDocStore.add(
+          assistantId: assistant!.id,
+          title: title,
+          summary: summary,
+          content: content,
+        );
+        return jsonEncode({
+          'id': doc.id,
+          'title': doc.title,
+          'chars': doc.content.length,
+        });
+      } else if (name == 'delete_memory_doc') {
+        final id = (args['id'] as num?)?.toInt() ?? -1;
+        if (id <= 0) {
+          return _toolError(
+            error: 'invalid_doc_id',
+            message: 'Doc id must be a positive integer.',
+            tool: name,
+          );
+        }
+        final doc = await MemoryDocStore.getById(id);
+        if (doc == null || doc.assistantId != assistant!.id) {
+          return _toolError(
+            error: 'doc_not_found',
+            message: 'No memory doc was found for id $id.',
+            tool: name,
+            instruction: 'Use an id listed in the <memory_docs> catalog.',
+          );
+        }
+        await MemoryDocStore.delete(id: id);
+        return 'deleted';
+      }
+    } catch (e) {
+      return _toolError(
+        error: 'memory_archive_execution_error',
+        message: e.toString(),
+        tool: name,
+        instruction:
+            'The memory archive tool failed. Retry only after correcting the parameters, or inform the user about the issue.',
       );
     }
 
