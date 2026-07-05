@@ -490,16 +490,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title:
                                           '${l10n.backupPageRemoteBackups} (WebDAV)',
                                       listRemote: backupProvider.listRemote,
-                                      restoreFromItem: (it, mode) async {
-                                        final ok = await backupProvider
-                                            .restoreFromItem(it, mode: mode);
-                                        if (!ok) {
-                                          throw Exception(
-                                            backupProvider.message ??
-                                                'Restore failed',
-                                          );
-                                        }
-                                      },
+                                      restoreFromItem: (it, mode) =>
+                                          backupProvider.restoreFromItem(
+                                            it,
+                                            mode: mode,
+                                          ),
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -796,16 +791,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                       title:
                                           '${l10n.backupPageRemoteBackups} (S3)',
                                       listRemote: s3BackupProvider.listRemote,
-                                      restoreFromItem: (it, mode) async {
-                                        final ok = await s3BackupProvider
-                                            .restoreFromItem(it, mode: mode);
-                                        if (!ok) {
-                                          throw Exception(
-                                            s3BackupProvider.message ??
-                                                'Restore failed',
-                                          );
-                                        }
-                                      },
+                                      restoreFromItem: (it, mode) =>
+                                          s3BackupProvider.restoreFromItem(
+                                            it,
+                                            mode: mode,
+                                          ),
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -1438,11 +1428,16 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
           _items = list;
         });
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
         setState(() {
           _items = const [];
         });
+        showAppSnackBar(
+          context,
+          message: e.toString(),
+          type: NotificationType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);

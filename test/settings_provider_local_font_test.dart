@@ -75,8 +75,12 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       final storedPath = prefs.getString('display_app_font_local_path_v1');
       expect(storedPath, isNotNull);
-      expect(storedPath, startsWith('${tempDir.path}/fonts/'));
-      expect(await File(storedPath!).exists(), isTrue);
+      final normalized = storedPath!.replaceAll('\\', '/');
+      expect(
+        normalized,
+        startsWith('${tempDir.path.replaceAll('\\', '/')}/fonts/'),
+      );
+      expect(await File(storedPath).exists(), isTrue);
       expect(storedPath, isNot(sourceFile.path));
       expect(prefs.getString('display_app_font_local_alias_v1'), isNotEmpty);
     });

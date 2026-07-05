@@ -83,7 +83,7 @@ class BackupProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> restoreFromItem(
+  Future<void> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
@@ -92,10 +92,9 @@ class BackupProvider extends ChangeNotifier {
     notifyListeners();
     try {
       await _dataSync.restoreFromWebDav(_cfg, item, mode: mode);
-      return true;
     } catch (e) {
       _message = e.toString();
-      return false;
+      rethrow;
     } finally {
       _busy = false;
       notifyListeners();

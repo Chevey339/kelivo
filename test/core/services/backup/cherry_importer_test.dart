@@ -41,9 +41,22 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
+  Future<void> retryDelete(Directory dir, {int attempts = 5}) async {
+    for (int i = 0; i < attempts; i++) {
+      try {
+        await dir.delete(recursive: true);
+        return;
+      } catch (_) {
+        if (i < attempts - 1) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
+      }
+    }
+  }
+
   tearDown(() async {
     if (await tempDir.exists()) {
-      await tempDir.delete(recursive: true);
+      await retryDelete(tempDir);
     }
   });
 

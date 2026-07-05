@@ -211,12 +211,10 @@ class _BackupPageState extends State<BackupPage> {
 
   Future<void> _restoreIncrementalItem({
     required BuildContext context,
-    required Future<bool> Function() performRestore,
+    required Future<void> Function() performRestore,
   }) async {
     try {
-      final ok = await _runWithImportingOverlay(context, performRestore);
-      if (!context.mounted) return;
-      if (!ok) return;
+      await _runWithImportingOverlay(context, performRestore);
     } catch (e) {
       if (!context.mounted) return;
       showAppSnackBar(
@@ -575,18 +573,13 @@ class _BackupPageState extends State<BackupPage> {
                                             if (mode == null) return;
                                             if (!context.mounted) return;
                                             try {
-                                              final ok =
-                                                  await _runWithImportingOverlay<
-                                                    bool
-                                                  >(
-                                                    context,
-                                                    () => vm.restoreFromItem(
-                                                      item,
-                                                      mode: mode,
-                                                    ),
-                                                  );
-                                              if (!context.mounted) return;
-                                              if (!ok) return;
+                                              await _runWithImportingOverlay(
+                                                context,
+                                                () => vm.restoreFromItem(
+                                                  item,
+                                                  mode: mode,
+                                                ),
+                                              );
                                             } catch (e) {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
@@ -604,7 +597,6 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
-                                      // If error, ensure loading dialog is closed
                                       if (context.mounted &&
                                           Navigator.canPop(context)) {
                                         Navigator.of(
@@ -645,16 +637,13 @@ class _BackupPageState extends State<BackupPage> {
                                     if (!context.mounted) return;
 
                                     try {
-                                      final ok =
-                                          await _runWithImportingOverlay<bool>(
-                                            context,
-                                            () => vm.restoreFromItem(
-                                              item,
-                                              mode: mode,
-                                            ),
-                                          );
-                                      if (!context.mounted) return;
-                                      if (!ok) return;
+                                      await _runWithImportingOverlay(
+                                        context,
+                                        () => vm.restoreFromItem(
+                                          item,
+                                          mode: mode,
+                                        ),
+                                      );
                                     } catch (e) {
                                       if (!context.mounted) return;
                                       showAppSnackBar(
@@ -974,18 +963,13 @@ class _BackupPageState extends State<BackupPage> {
                                             if (mode == null) return;
                                             if (!context.mounted) return;
                                             try {
-                                              final ok =
-                                                  await _runWithImportingOverlay<
-                                                    bool
-                                                  >(
-                                                    context,
-                                                    () => s3Vm.restoreFromItem(
-                                                      item,
-                                                      mode: mode,
-                                                    ),
-                                                  );
-                                              if (!context.mounted) return;
-                                              if (!ok) return;
+                                              await _runWithImportingOverlay(
+                                                context,
+                                                () => s3Vm.restoreFromItem(
+                                                  item,
+                                                  mode: mode,
+                                                ),
+                                              );
                                             } catch (e) {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
@@ -1044,16 +1028,13 @@ class _BackupPageState extends State<BackupPage> {
                                     if (!context.mounted) return;
 
                                     try {
-                                      final ok =
-                                          await _runWithImportingOverlay<bool>(
-                                            context,
-                                            () => s3Vm.restoreFromItem(
-                                              item,
-                                              mode: mode,
-                                            ),
-                                          );
-                                      if (!context.mounted) return;
-                                      if (!ok) return;
+                                      await _runWithImportingOverlay(
+                                        context,
+                                        () => s3Vm.restoreFromItem(
+                                          item,
+                                          mode: mode,
+                                        ),
+                                      );
                                     } catch (e) {
                                       if (!context.mounted) return;
                                       showAppSnackBar(

@@ -141,7 +141,7 @@ class S3BackupProvider extends ChangeNotifier {
     return _client.listObjects(_cfg);
   }
 
-  Future<bool> restoreFromItem(
+  Future<void> restoreFromItem(
     BackupFileItem item, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
@@ -160,10 +160,9 @@ class S3BackupProvider extends ChangeNotifier {
         _scopeAsWebdavConfig(),
         mode: mode,
       );
-      return true;
     } catch (e) {
       _message = e.toString();
-      return false;
+      rethrow;
     } finally {
       try {
         if (file != null && await file.exists()) {
