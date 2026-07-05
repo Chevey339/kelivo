@@ -14,6 +14,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
+import '../../../core/services/memory_doc_store.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/services/search/search_tool_service.dart';
@@ -538,7 +539,7 @@ class MessageBuilderService {
         final mp = contextProvider.read<MemoryProvider>();
         await mp.initialize();
         final mems = mp.getForAssistant(assistant!.id);
-        final currentHour = _formatCurrentHour(DateTime.now());
+        final currentDay = _formatCurrentDay(DateTime.now());
         final buf = StringBuffer();
         buf.writeln('## Memories');
         buf.writeln(
@@ -570,11 +571,25 @@ class MessageBuilderService {
 - 首次聊天时间
 - ...
 请主动调用工具记录，而不是需要用户要求。
-记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是$currentHour。
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且今天是$currentDay。
 无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
 相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
 你可以在和用户闲聊的时候暗示用户你能记住东西。
 ''');
+        final docs = await MemoryDocStore.getForAssistant(assistant!.id);
+        buf.writeln('''
+## Memory Archive
+除了上面的短记忆，你还有按需取用的长期资料和过往对话，当前上下文只包含目录：
+- 需要查找过往对话时，先用 `search_past_chats` 搜索，再用 `read_chat` 读取原文。
+- 需要长期资料内容时，用 `read_memory_doc` 读取全文；用户要求存档长内容时用 `write_memory_doc`（给出标题和一句话摘要），过时资料用 `delete_memory_doc` 删除。
+你现在只看到了目录和摘要；引用任何具体内容前必须先调用工具读取全文，不要凭目录假装读过正文。
+<memory_docs>''');
+        for (final d in docs) {
+          buf.writeln(
+            '<doc><id>${d.id}</id><title>${d.title}</title><chars>${d.content.length}</chars><summary>${d.summary}</summary></doc>',
+          );
+        }
+        buf.writeln('</memory_docs>');
         _appendToSystemMessage(apiMessages, buf.toString());
       }
       if (assistant?.enableRecentChatsReference == true) {
@@ -612,8 +627,10 @@ class MessageBuilderService {
     } catch (_) {}
   }
 
-  String _formatCurrentHour(DateTime now) {
-    return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
+  // Day granularity on purpose: this string lands in the system prompt, and
+  // an hourly timestamp would invalidate the provider prompt cache every hour.
+  String _formatCurrentDay(DateTime now) {
+    return '${now.year}年${now.month}月${now.day}日';
   }
 
   /// Inject search tool usage prompt into apiMessages.
