@@ -474,9 +474,6 @@ class _MemoryTabState extends State<_MemoryTab> {
                   ],
                   onTapVar: (v) {
                     _insertAtCursor(_memoryRecordCtrl, v);
-                    context.read<AssistantProvider>().updateAssistant(
-                      a.copyWith(memoryRecordPrompt: _memoryRecordCtrl.text),
-                    );
                     Future.microtask(() => _memoryRecordFocus.requestFocus());
                   },
                 ),

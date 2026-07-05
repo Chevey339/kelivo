@@ -563,10 +563,11 @@ class MessageBuilderService {
 这些记忆会自动包含在未来的对话上下文中，在<memories>标签内。
 ''');
         // Customizable record prompt from assistant settings
-        final recordPrompt = (assistant.memoryRecordPrompt.isNotEmpty
-                ? assistant.memoryRecordPrompt
-                : Assistant.defaultMemoryRecordPrompt)
-            .replaceAll('{current_hour}', currentHour);
+        final recordPrompt =
+            (assistant.memoryRecordPrompt.isNotEmpty
+                    ? assistant.memoryRecordPrompt
+                    : Assistant.defaultMemoryRecordPrompt)
+                .replaceAll('{current_hour}', currentHour);
         buf.writeln(recordPrompt);
         _appendToSystemMessage(apiMessages, buf.toString());
       }
@@ -606,7 +607,10 @@ class MessageBuilderService {
   }
 
   String _formatCurrentHour(DateTime now) {
-    return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}-'
+        '${now.day.toString().padLeft(2, '0')} '
+        '${now.hour.toString().padLeft(2, '0')} (hrs)';
   }
 
   /// Inject search tool usage prompt into apiMessages.
