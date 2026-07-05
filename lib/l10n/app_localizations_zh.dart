@@ -1265,6 +1265,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditVariableAssistantName => '助手名称';
 
   @override
+  String get assistantEditVariableCurrentHour => '当前时间';
+
+  @override
+  String get assistantEditMemoryVariableHint =>
+      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
+
+  @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
 
   @override
@@ -4678,6 +4685,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditMemoryDialogHint => '输入记忆内容';
 
   @override
+  String get assistantEditMemoryRecordPromptTitle => '记忆提示词';
+
+  @override
+  String get assistantEditMemoryRecordPromptHint => '编写提示词，指导助手如何主动记录用户信息...';
+
+  @override
   String get assistantEditAddQuickPhraseButton => '添加快捷短语';
 
   @override
@@ -6653,6 +6666,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get assistantEditVariableAssistantName => '助手名称';
+
+  @override
+  String get assistantEditVariableCurrentHour => '当前时间';
+
+  @override
+  String get assistantEditMemoryVariableHint =>
+      '包含时间变量会降低缓存命中率。请根据需求平衡时间精度，也可以删去变量，在消息模板中插入消息发送时间。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天内容模板';
@@ -10068,6 +10088,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditMemoryDialogHint => '输入记忆内容';
 
   @override
+  String get assistantEditMemoryRecordPromptTitle => '记忆提示词';
+
+  @override
+  String get assistantEditMemoryRecordPromptHint => '编写提示词，指导助手如何主动记录用户信息...';
+
+  @override
   String get assistantEditAddQuickPhraseButton => '添加快捷短语';
 
   @override
@@ -12043,6 +12069,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditVariableAssistantName => '助理名稱';
+
+  @override
+  String get assistantEditVariableCurrentHour => '目前時間';
+
+  @override
+  String get assistantEditMemoryVariableHint =>
+      '包含時間變數會降低快取命中率。請根據需求平衡時間精度，也可以刪去變數，在訊息範本中插入訊息發送時間。';
 
   @override
   String get assistantEditMessageTemplateTitle => '聊天內容範本';
@@ -15456,6 +15489,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemoryDialogHint => '輸入記憶內容';
+
+  @override
+  String get assistantEditMemoryRecordPromptTitle => '記憶提示詞';
+
+  @override
+  String get assistantEditMemoryRecordPromptHint => '編寫提示詞，指導助手如何主動記錄使用者資訊...';
 
   @override
   String get assistantEditAddQuickPhraseButton => '新增快捷片語';

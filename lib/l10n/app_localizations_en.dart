@@ -1311,6 +1311,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get assistantEditVariableAssistantName => 'Assistant Name';
 
   @override
+  String get assistantEditVariableCurrentHour => 'Current Hour';
+
+  @override
+  String get assistantEditMemoryVariableHint =>
+      'Including time variables reduces cache hit rate. Choose the precision that balances your needs, or remove variables and insert send time via message template.';
+
+  @override
   String get assistantEditMessageTemplateTitle => 'Message Template';
 
   @override
@@ -4870,6 +4877,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditMemoryDialogHint => 'Enter memory content';
+
+  @override
+  String get assistantEditMemoryRecordPromptTitle => 'Memory Prompt';
+
+  @override
+  String get assistantEditMemoryRecordPromptHint =>
+      'Write prompts to guide the assistant on how to actively record user information...';
 
   @override
   String get assistantEditAddQuickPhraseButton => 'Add Quick Phrase';

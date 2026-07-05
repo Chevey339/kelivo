@@ -15,6 +15,27 @@ class Assistant {
     50,
   ];
 
+  /// Default prompt for guiding the model on how to actively record user info.
+  static const String defaultMemoryRecordPrompt = '''Act as a proactive personal secretary. Automatically record and manage user information in your memory during conversations without waiting for explicit requests.
+
+**Information to Store**
+*   **User Profile:** Name/nickname, age, gender, interests, and hobbies.
+*   **Context:** Work-related details, plans/schedules, and chat style preferences.
+*   **Metadata:** Date of the first interaction and significant milestones.
+
+**Strict Prohibitions (Privacy)**
+Do **not** store sensitive information, including:
+*   Ethnicity, religion, or political affiliations.
+*   Sexual orientation or sexual life.
+*   Criminal records or sensitive health data.
+
+**Memory Management Rules**
+*   **Timestamps:** Always use absolute time formats for date-related info (Current time: {current_hour}).
+*   **Maintenance:** Merge similar/related information into a single entry; delete outdated or redundant records.
+*   **Discretion:** Do not notify the user when updating memory or display the memory content unless specifically asked.
+*   **Engagement:** Occasionally drop subtle hints during casual conversation to let the user know you remember their details.
+''';
+
   final String id;
   final String name;
   final String? avatar; // path/url/base64, null for initial-letter avatar
@@ -46,6 +67,7 @@ class Assistant {
   final bool enableRecentChatsReference; // include recent chat titles in prompt
   final int
   recentChatsSummaryMessageCount; // refresh summary after N new messages
+  final String memoryRecordPrompt; // custom prompt for active memory recording
   // Preset conversation messages (ordered)
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
@@ -77,6 +99,7 @@ class Assistant {
     this.enableMemory = false,
     this.enableRecentChatsReference = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
+    this.memoryRecordPrompt = defaultMemoryRecordPrompt,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -107,6 +130,7 @@ class Assistant {
     bool? enableMemory,
     bool? enableRecentChatsReference,
     int? recentChatsSummaryMessageCount,
+    String? memoryRecordPrompt,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -149,6 +173,7 @@ class Assistant {
           enableRecentChatsReference ?? this.enableRecentChatsReference,
       recentChatsSummaryMessageCount:
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
+      memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -180,6 +205,7 @@ class Assistant {
     'enableMemory': enableMemory,
     'enableRecentChatsReference': enableRecentChatsReference,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
+    'memoryRecordPrompt': memoryRecordPrompt,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
@@ -247,6 +273,7 @@ class Assistant {
       }
       return raw;
     })(),
+    memoryRecordPrompt: (json['memoryRecordPrompt'] as String?) ?? defaultMemoryRecordPrompt,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);
