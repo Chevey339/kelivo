@@ -1360,10 +1360,20 @@ class _BackupPageState extends State<BackupPage> {
     if (mode == null) return;
     if (!context.mounted) return;
 
-    await _runWithImportingOverlay(
-      context,
-      () => vm.restoreFromLocalFile(File(path), mode: mode),
-    );
+    try {
+      await _runWithImportingOverlay(
+        context,
+        () => vm.restoreFromLocalFile(File(path), mode: mode),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: e.toString(),
+        type: NotificationType.error,
+      );
+      return;
+    }
     if (!context.mounted) return;
     await showRestartRequiredDialog(context);
   }
