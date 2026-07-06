@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.4.0] - 2026-07-06
+
+### Added
+- Image compression: interactive compression with size overlay and quality dialog
+- Memory: record prompt editor in Memory tab
+
+### Changed
+- Backup: refactored shared code extraction (formatBytes, RestartRequiredDialog, etc.)
+
+### Fixed
+- Backup: import error feedback with try/catch wrapping
+- Backup: conservative file inclusion on stat error
+
 ## [1.3.0] - 2026-07-05
 
 ### 🚀 Features
