@@ -2434,5 +2434,62 @@
   "titlePresetUnsavedHint": "Change or select a preset, then tap Save to apply",
   "@titlePresetUnsavedHint": {
     "description": "Hint shown in title prompt editor reminding user to save after changing preset"
+  },
+  "imageCompressionDialogTitle": "Compress Image",
+  "@imageCompressionDialogTitle": {
+    "description": "Title for the image compression dialog"
+  },
+  "imageCompressionQuality": "Quality",
+  "@imageCompressionQuality": {
+    "description": "Label for the JPEG quality slider in image compression dialog"
+  },
+  "imageCompressionMaxDimension": "Max dimension",
+  "@imageCompressionMaxDimension": {
+    "description": "Label for the max dimension slider in image compression dialog"
+  },
+  "imageCompressionFormat": "Format",
+  "@imageCompressionFormat": {
+    "description": "Label for the format section in image compression dialog"
+  },
+  "imageCompressionKeepPng": "Keep transparency (PNG)",
+  "@imageCompressionKeepPng": {
+    "description": "Option to keep PNG format with alpha transparency during compression"
+  },
+  "imageCompressionConvertJpeg": "Convert to JPEG (white background)",
+  "@imageCompressionConvertJpeg": {
+    "description": "Option to convert to JPEG with white background when compressing"
+  },
+  "imageCompressionButton": "Compress",
+  "@imageCompressionButton": {
+    "description": "Button label to compress the current image"
+  },
+  "imageCompressionBatchButton": "Compress All",
+  "@imageCompressionBatchButton": {
+    "description": "Button label to compress all images with the same settings"
+  },
+  "imageCompressionDimensionOriginal": "Original",
+  "@imageCompressionDimensionOriginal": {
+    "description": "Label for the original size option in the max dimension shortcut chips"
+  },
+  "imageCompressionCancel": "Cancel",
+  "@imageCompressionCancel": {
+    "description": "Cancel button in the image compression dialog"
+  },
+  "imageCompressionSingleResult": "Compressed: {from} → {to} (-{pct}%)",
+  "@imageCompressionSingleResult": {
+    "description": "SnackBar message after compressing a single image, showing size reduction",
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "imageCompressionBatchResult": "Compressed all images, saved {saved} (-{pct}%)",
+  "@imageCompressionBatchResult": {
+    "description": "SnackBar message after compressing all images, showing total savings",
+    "placeholders": {
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
   }
 }

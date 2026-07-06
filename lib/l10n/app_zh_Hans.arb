@@ -2011,5 +2011,32 @@
   "titlePresetUnsavedHint": "更改或选择预设后，需点击「保存」方可生效",
   "@titlePresetUnsavedHint": {
     "description": "标题提示词编辑器中提醒用户在更改预设后保存的提示"
+  },
+  "imageCompressionDialogTitle": "压缩图片",
+  "imageCompressionQuality": "质量",
+  "imageCompressionMaxDimension": "长边尺寸",
+  "imageCompressionFormat": "格式",
+  "imageCompressionKeepPng": "保留透明度 (PNG)",
+  "imageCompressionConvertJpeg": "转为 JPEG（白色背景）",
+  "imageCompressionButton": "压缩",
+  "imageCompressionBatchButton": "全部压缩",
+  "imageCompressionDimensionOriginal": "原始",
+  "imageCompressionCancel": "取消",
+  "imageCompressionSingleResult": "压缩完成: {from} → {to} (-{pct}%)",
+  "@imageCompressionSingleResult": {
+    "description": "SnackBar 单图压缩完成后的体积变化提示",
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "imageCompressionBatchResult": "全部压缩完成，共节省 {saved} (-{pct}%)",
+  "@imageCompressionBatchResult": {
+    "description": "SnackBar 全部图片压缩完成后的节省提示",
+    "placeholders": {
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
   }
 }

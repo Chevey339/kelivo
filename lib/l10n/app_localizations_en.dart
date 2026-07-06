@@ -5625,4 +5625,45 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get titlePresetUnsavedHint =>
       'Change or select a preset, then tap Save to apply';
+
+  @override
+  String get imageCompressionDialogTitle => 'Compress Image';
+
+  @override
+  String get imageCompressionQuality => 'Quality';
+
+  @override
+  String get imageCompressionMaxDimension => 'Max dimension';
+
+  @override
+  String get imageCompressionFormat => 'Format';
+
+  @override
+  String get imageCompressionKeepPng => 'Keep transparency (PNG)';
+
+  @override
+  String get imageCompressionConvertJpeg =>
+      'Convert to JPEG (white background)';
+
+  @override
+  String get imageCompressionButton => 'Compress';
+
+  @override
+  String get imageCompressionBatchButton => 'Compress All';
+
+  @override
+  String get imageCompressionDimensionOriginal => 'Original';
+
+  @override
+  String get imageCompressionCancel => 'Cancel';
+
+  @override
+  String imageCompressionSingleResult(String from, String to, String pct) {
+    return 'Compressed: $from → $to (-$pct%)';
+  }
+
+  @override
+  String imageCompressionBatchResult(String saved, String pct) {
+    return 'Compressed all images, saved $saved (-$pct%)';
+  }
 }
