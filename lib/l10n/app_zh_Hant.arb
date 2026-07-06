@@ -2014,12 +2014,29 @@
   },
   "imageCompressionDialogTitle": "壓縮圖片",
   "imageCompressionQuality": "品質",
-  "imageCompressionMaxDimension": "最大尺寸",
+  "imageCompressionMaxDimension": "長邊尺寸",
   "imageCompressionFormat": "格式",
   "imageCompressionKeepPng": "保留透明度 (PNG)",
   "imageCompressionConvertJpeg": "轉為 JPEG（白色背景）",
   "imageCompressionButton": "壓縮",
   "imageCompressionBatchButton": "全部壓縮",
   "imageCompressionDimensionOriginal": "原始",
-  "imageCompressionCancel": "取消"
+  "imageCompressionCancel": "取消",
+  "imageCompressionSingleResult": "壓縮完成: {from} → {to} (-{pct}%)",
+  "@imageCompressionSingleResult": {
+    "description": "SnackBar 單圖壓縮完成後的體積變化提示",
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "imageCompressionBatchResult": "全部壓縮完成，共節省 {saved} (-{pct}%)",
+  "@imageCompressionBatchResult": {
+    "description": "SnackBar 全部圖片壓縮完成後的節省提示",
+    "placeholders": {
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  }
 }

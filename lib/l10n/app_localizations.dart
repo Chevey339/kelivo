@@ -10405,6 +10405,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel'**
   String get imageCompressionCancel;
+
+  /// SnackBar message after compressing a single image, showing size reduction
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed: {from} → {to} (-{pct}%)'**
+  String imageCompressionSingleResult(String from, String to, String pct);
+
+  /// SnackBar message after compressing all images, showing total savings
+  ///
+  /// In en, this message translates to:
+  /// **'Compressed all images, saved {saved} (-{pct}%)'**
+  String imageCompressionBatchResult(String saved, String pct);
 }
 
 class _AppLocalizationsDelegate

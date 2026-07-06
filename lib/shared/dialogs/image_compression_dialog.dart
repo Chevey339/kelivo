@@ -5,10 +5,9 @@ import 'package:flutter/material.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/format.dart';
-import '../../utils/png_alpha_detector.dart';
 import '../widgets/ios_tactile.dart';
 
-/// 压缩配置，由 [ImageCompressionDialog] 返回。
+/// Compression config returned by [ImageCompressionDialog].
 class CompressionConfig {
   final int quality;
   final int? maxDimension;
@@ -23,39 +22,50 @@ class CompressionConfig {
   });
 }
 
-/// 图片压缩对话框，遵循增量备份的「同一内容，不同外壳」模式。
+/// Image compression dialog. Follows the "same content, different shell" pattern.
 ///
-/// 使用 [show] 在桌面端显示居中 Dialog，[showSheet] 在移动端显示底部弹窗。
+/// Use [show] on desktop (centered Dialog) and [showSheet] on mobile (bottom sheet).
+/// Callback invoked when the user confirms compression.
+/// The dialog stays open with a spinner until the returned Future completes.
+typedef CompressionCallback = Future<void> Function(CompressionConfig config);
+
 class ImageCompressionDialog {
-  /// 桌面端：居中 Dialog
-  static Future<CompressionConfig?> show(
+  /// Desktop: centered Dialog
+  static Future<void> show(
     BuildContext context, {
     required String imagePath,
     required int totalImageCount,
     required int originalWidth,
     required int originalHeight,
+    required bool hasRealAlpha,
+    required CompressionCallback onCompress,
   }) {
-    return showDialog<CompressionConfig>(
+    return showDialog<void>(
       context: context,
+      barrierDismissible: false,
       builder: (_) => _ImageCompressionDialogBody(
         imagePath: imagePath,
         totalImageCount: totalImageCount,
         originalWidth: originalWidth,
         originalHeight: originalHeight,
+        hasRealAlpha: hasRealAlpha,
         isSheet: false,
+        onCompress: onCompress,
       ),
     );
   }
 
-  /// 移动端：底部弹窗
-  static Future<CompressionConfig?> showSheet(
+  /// Mobile: bottom sheet
+  static Future<void> showSheet(
     BuildContext context, {
     required String imagePath,
     required int totalImageCount,
     required int originalWidth,
     required int originalHeight,
+    required bool hasRealAlpha,
+    required CompressionCallback onCompress,
   }) {
-    return showModalBottomSheet<CompressionConfig>(
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -69,7 +79,9 @@ class ImageCompressionDialog {
           totalImageCount: totalImageCount,
           originalWidth: originalWidth,
           originalHeight: originalHeight,
+          hasRealAlpha: hasRealAlpha,
           isSheet: true,
+          onCompress: onCompress,
         ),
       ),
     );
@@ -82,6 +94,8 @@ class _ImageCompressionDialogBody extends StatefulWidget {
     required this.totalImageCount,
     required this.originalWidth,
     required this.originalHeight,
+    required this.hasRealAlpha,
+    required this.onCompress,
     this.isSheet = false,
   });
 
@@ -89,7 +103,9 @@ class _ImageCompressionDialogBody extends StatefulWidget {
   final int totalImageCount;
   final int originalWidth;
   final int originalHeight;
+  final bool hasRealAlpha;
   final bool isSheet;
+  final CompressionCallback onCompress;
 
   @override
   State<_ImageCompressionDialogBody> createState() =>
@@ -100,7 +116,6 @@ class _ImageCompressionDialogBodyState
     extends State<_ImageCompressionDialogBody> {
   static const int _minQuality = 30;
   static const int _maxQuality = 100;
-  static const int _minDimension = 320;
 
   late int _quality;
   late int _maxDimension;
@@ -108,7 +123,7 @@ class _ImageCompressionDialogBodyState
   bool _isCompressing = false;
 
   bool get _canBatch => widget.totalImageCount > 1;
-  bool get _hasAlpha => pngHasAlphaChannel(widget.imagePath);
+  bool get _hasAlpha => widget.hasRealAlpha;
   int get _imageSizeBytes {
     try {
       return File(widget.imagePath).lengthSync();
@@ -121,25 +136,36 @@ class _ImageCompressionDialogBodyState
       ? widget.originalWidth
       : widget.originalHeight;
 
+  /// Slider minimum: allow down to 1/4 of original, capped at 320px.
+  int get _sliderMin => (_maxDimensionUpper ~/ 4).clamp(1, 320);
+
   @override
   void initState() {
     super.initState();
-    _quality = _maxQuality;
+    _quality = 75;
     _maxDimension = _maxDimensionUpper;
-    _keepPng = true;
+    _keepPng = _hasAlpha;
   }
 
-  void _onConfirm({required bool compressAll}) {
+  Future<void> _onConfirm({required bool compressAll}) async {
     if (_isCompressing) return;
     setState(() => _isCompressing = true);
-    Navigator.of(context).pop(
-      CompressionConfig(
-        quality: _quality,
-        maxDimension: _maxDimension < _maxDimensionUpper ? _maxDimension : null,
-        keepPng: _keepPng,
-        compressAll: compressAll,
-      ),
-    );
+    try {
+      await widget.onCompress(
+        CompressionConfig(
+          quality: _quality,
+          maxDimension: _maxDimension < _maxDimensionUpper
+              ? _maxDimension
+              : null,
+          keepPng: _keepPng,
+          compressAll: compressAll,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+    }
   }
 
   @override
@@ -277,7 +303,7 @@ class _ImageCompressionDialogBodyState
             ),
             const Spacer(),
             Text(
-              '$_quality%',
+              (_hasAlpha && _keepPng) ? '—' : '$_quality%',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -302,7 +328,9 @@ class _ImageCompressionDialogBodyState
             min: _minQuality.toDouble(),
             max: _maxQuality.toDouble(),
             divisions: _maxQuality - _minQuality,
-            onChanged: (v) => setState(() => _quality = v.round()),
+            onChanged: (_hasAlpha && _keepPng)
+                ? null
+                : (v) => setState(() => _quality = v.round()),
           ),
         ),
       ],
@@ -311,10 +339,6 @@ class _ImageCompressionDialogBodyState
 
   Widget _buildDimensionSlider(ColorScheme cs, AppLocalizations l10n) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isMax = _maxDimension >= _maxDimensionUpper;
-    final label = isMax
-        ? l10n.imageCompressionDimensionOriginal
-        : '$_maxDimension px';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,7 +354,7 @@ class _ImageCompressionDialogBodyState
             ),
             const Spacer(),
             Text(
-              label,
+              '$_maxDimension px',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -352,16 +376,9 @@ class _ImageCompressionDialogBodyState
           ),
           child: Slider(
             value: _maxDimension.toDouble(),
-            min:
-                (_minDimension < _maxDimensionUpper
-                        ? _minDimension
-                        : _maxDimensionUpper)
-                    .toDouble(),
+            min: _sliderMin.toDouble(),
             max: _maxDimensionUpper.toDouble(),
-            divisions: ((_maxDimensionUpper - _minDimension) ~/ 64).clamp(
-              1,
-              100,
-            ),
+            divisions: ((_maxDimensionUpper - _sliderMin) ~/ 64).clamp(1, 100),
             onChanged: (v) => setState(() => _maxDimension = v.round()),
           ),
         ),
@@ -374,9 +391,23 @@ class _ImageCompressionDialogBodyState
               _maxDimensionUpper,
             ),
             const SizedBox(width: 6),
-            _dimensionChip(cs, '1/2', (_maxDimensionUpper / 2).round()),
+            _dimensionChip(
+              cs,
+              '1/2',
+              (_maxDimensionUpper / 2).round().clamp(
+                _sliderMin,
+                _maxDimensionUpper,
+              ),
+            ),
             const SizedBox(width: 6),
-            _dimensionChip(cs, '1/4', (_maxDimensionUpper / 4).round()),
+            _dimensionChip(
+              cs,
+              '1/4',
+              (_maxDimensionUpper / 4).round().clamp(
+                _sliderMin,
+                _maxDimensionUpper,
+              ),
+            ),
           ],
         ),
       ],
@@ -392,7 +423,9 @@ class _ImageCompressionDialogBodyState
       pressedScale: 0.96,
       borderRadius: BorderRadius.circular(6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      onTap: () => setState(() => _maxDimension = value),
+      onTap: () => setState(
+        () => _maxDimension = value.clamp(_sliderMin, _maxDimensionUpper),
+      ),
       child: Text(
         label,
         style: TextStyle(

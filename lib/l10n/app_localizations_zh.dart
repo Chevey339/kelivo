@@ -5413,7 +5413,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get imageCompressionQuality => '质量';
 
   @override
-  String get imageCompressionMaxDimension => '最大尺寸';
+  String get imageCompressionMaxDimension => '长边尺寸';
 
   @override
   String get imageCompressionFormat => '格式';
@@ -5435,6 +5435,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get imageCompressionCancel => '取消';
+
+  @override
+  String imageCompressionSingleResult(String from, String to, String pct) {
+    return '压缩完成: $from → $to (-$pct%)';
+  }
+
+  @override
+  String imageCompressionBatchResult(String saved, String pct) {
+    return '全部压缩完成，共节省 $saved (-$pct%)';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10846,7 +10856,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get imageCompressionQuality => '质量';
 
   @override
-  String get imageCompressionMaxDimension => '最大尺寸';
+  String get imageCompressionMaxDimension => '长边尺寸';
 
   @override
   String get imageCompressionFormat => '格式';
@@ -10868,6 +10878,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get imageCompressionCancel => '取消';
+
+  @override
+  String imageCompressionSingleResult(String from, String to, String pct) {
+    return '压缩完成: $from → $to (-$pct%)';
+  }
+
+  @override
+  String imageCompressionBatchResult(String saved, String pct) {
+    return '全部压缩完成，共节省 $saved (-$pct%)';
+  }
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16279,7 +16299,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get imageCompressionQuality => '品質';
 
   @override
-  String get imageCompressionMaxDimension => '最大尺寸';
+  String get imageCompressionMaxDimension => '長邊尺寸';
 
   @override
   String get imageCompressionFormat => '格式';
@@ -16301,4 +16321,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get imageCompressionCancel => '取消';
+
+  @override
+  String imageCompressionSingleResult(String from, String to, String pct) {
+    return '壓縮完成: $from → $to (-$pct%)';
+  }
+
+  @override
+  String imageCompressionBatchResult(String saved, String pct) {
+    return '全部壓縮完成，共節省 $saved (-$pct%)';
+  }
 }

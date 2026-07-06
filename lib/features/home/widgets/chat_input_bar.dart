@@ -24,9 +24,11 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/image_compressor.dart';
 import '../../../utils/format.dart';
+import 'package:image/image.dart' as img;
 import '../../../shared/dialogs/image_compression_dialog.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
@@ -294,6 +296,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     if (paths.isEmpty) return;
     setState(() {
       for (final p in paths) {
+        if (_images.contains(p)) continue;
         _images.add(p);
         _imageSizes[p] = _fileSize(p);
       }
@@ -308,11 +311,19 @@ class _ChatInputBarState extends State<ChatInputBar>
     }
   }
 
-  void _clearImages() {
-    setState(() {
+  /// Reset media fields. MUST be called inside a [setState] callback.
+  void _resetMedia({bool images = false, bool docs = false}) {
+    if (images) {
       _images.clear();
       _imageSizes.clear();
-    });
+    }
+    if (docs) {
+      _docs.clear();
+    }
+  }
+
+  void _clearImages() {
+    setState(() => _resetMedia(images: true));
   }
 
   void _addFiles(List<DocumentAttachment> docs) {
@@ -321,7 +332,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _clearFiles() {
-    setState(() => _docs.clear());
+    setState(() => _resetMedia(docs: true));
   }
 
   void _restoreInput(ChatInputData input) {
@@ -351,8 +362,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   void _clearDraft() {
     setState(() {
       _controller.clear();
-      _images.clear();
-      _docs.clear();
+      _resetMedia(images: true, docs: true);
     });
   }
 
@@ -373,40 +383,78 @@ class _ChatInputBarState extends State<ChatInputBar>
     final path = _images[idx];
     if (path.isEmpty) return;
     int w = 0, h = 0;
+    bool hasRealAlpha = false;
     try {
       final file = File(path);
-      final decoded = await decodeImageFromList(await file.readAsBytes());
+      final bytes = await file.readAsBytes();
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) return;
       w = decoded.width;
       h = decoded.height;
+      hasRealAlpha =
+          decoded.hasAlpha &&
+          decoded.any((px) => px.a < decoded.maxChannelValue);
     } catch (_) {}
     if (!mounted || w == 0 || h == 0) return;
-    final isMobile = MediaQuery.of(context).size.width < AppBreakpoints.tablet;
-    final config = isMobile
-        ? await ImageCompressionDialog.showSheet(
-            context,
-            imagePath: path,
-            totalImageCount: _images.length,
-            originalWidth: w,
-            originalHeight: h,
-          )
-        : await ImageCompressionDialog.show(
-            context,
-            imagePath: path,
-            totalImageCount: _images.length,
-            originalWidth: w,
-            originalHeight: h,
-          );
-    if (config == null || !mounted) return;
-    if (config.compressAll) {
-      await _compressAll(config);
+    if (MediaQuery.of(context).size.width < AppBreakpoints.tablet) {
+      await ImageCompressionDialog.showSheet(
+        context,
+        imagePath: path,
+        totalImageCount: _images.length,
+        originalWidth: w,
+        originalHeight: h,
+        hasRealAlpha: hasRealAlpha,
+        onCompress: (config) async {
+          if (config.compressAll) {
+            await _compressAll(config);
+          } else {
+            await _compressSingle(idx, config);
+          }
+        },
+      );
     } else {
-      await _compressSingle(idx, config);
+      await ImageCompressionDialog.show(
+        context,
+        imagePath: path,
+        totalImageCount: _images.length,
+        originalWidth: w,
+        originalHeight: h,
+        hasRealAlpha: hasRealAlpha,
+        onCompress: (config) async {
+          if (config.compressAll) {
+            await _compressAll(config);
+          } else {
+            await _compressSingle(idx, config);
+          }
+        },
+      );
     }
+  }
+
+  /// Apply a compression result to the image list and evict cache.
+  /// Returns the new file size (0 if the image was removed concurrently).
+  /// MUST be called inside a [setState] callback.
+  int _applyCompressionResult(String oldPath, String newPath) {
+    if (newPath == oldPath) {
+      final size = _fileSize(oldPath);
+      _imageSizes[oldPath] = size;
+      imageCache.evict(FileImage(File(oldPath)));
+      return size;
+    }
+    final idx = _images.indexOf(oldPath);
+    if (idx == -1) return 0;
+    final size = _fileSize(newPath);
+    _images[idx] = newPath;
+    _imageSizes[newPath] = size;
+    _imageSizes.remove(oldPath);
+    imageCache.evict(FileImage(File(oldPath)));
+    return size;
   }
 
   Future<void> _compressSingle(int idx, CompressionConfig config) async {
     if (idx >= _images.length) return;
     final oldPath = _images[idx];
+    final origBytes = _imageSizes[oldPath] ?? 0;
     final newPath = await ImageCompressor.compressIfNeeded(
       oldPath,
       enabled: true,
@@ -415,22 +463,21 @@ class _ChatInputBarState extends State<ChatInputBar>
       keepPng: config.keepPng,
     );
     if (!mounted) return;
-    if (newPath == oldPath) {
-      // Refresh thumbnail size display (compression may have changed the file even if same path)
-      _imageSizes[oldPath] = _fileSize(oldPath);
-      setState(() {});
-      return;
-    }
+    final currentIdx = _images.indexOf(oldPath);
+    if (currentIdx == -1 || currentIdx != idx) return;
     setState(() {
-      _images[idx] = newPath;
-      _imageSizes[newPath] = _fileSize(newPath);
-      _imageSizes.remove(oldPath);
+      _applyCompressionResult(oldPath, newPath);
     });
+    _maybeShowCompressionResult(context, origBytes, _imageSizes[newPath] ?? 0);
   }
 
   Future<void> _compressAll(CompressionConfig config) async {
-    for (int i = 0; i < _images.length; i++) {
-      final oldPath = _images[i];
+    int totalOrig = 0, totalNew = 0;
+    final snapshot = List<String>.of(_images);
+    final results = <({String oldPath, String newPath, int origBytes})>[];
+    for (final oldPath in snapshot) {
+      if (!_images.contains(oldPath)) continue;
+      final origBytes = _imageSizes[oldPath] ?? 0;
       final newPath = await ImageCompressor.compressIfNeeded(
         oldPath,
         enabled: true,
@@ -439,17 +486,49 @@ class _ChatInputBarState extends State<ChatInputBar>
         keepPng: config.keepPng,
       );
       if (!mounted) return;
-      if (newPath != oldPath) {
-        setState(() {
-          _images[i] = newPath;
-          _imageSizes[newPath] = _fileSize(newPath);
-          _imageSizes.remove(oldPath);
-        });
-      } else {
-        _imageSizes[oldPath] = _fileSize(oldPath);
-        setState(() {});
+      results.add((oldPath: oldPath, newPath: newPath, origBytes: origBytes));
+    }
+    setState(() {
+      for (final r in results) {
+        final newBytes = _applyCompressionResult(r.oldPath, r.newPath);
+        totalOrig += r.origBytes;
+        totalNew += newBytes;
+      }
+    });
+    if (!mounted) return;
+    final saved = totalOrig - totalNew;
+    if (saved > 0 && totalOrig > 0) {
+      final pct = (saved * 100 / totalOrig).round();
+      final l10n = AppLocalizations.of(context);
+      if (l10n != null) {
+        showAppSnackBar(
+          context,
+          message: l10n.imageCompressionBatchResult(formatBytes(saved), '$pct'),
+          type: NotificationType.success,
+        );
       }
     }
+  }
+
+  void _maybeShowCompressionResult(
+    BuildContext context,
+    int origBytes,
+    int newBytes,
+  ) {
+    if (origBytes <= 0 || newBytes <= 0 || origBytes <= newBytes) return;
+    final saved = origBytes - newBytes;
+    final pct = (saved * 100 / origBytes).round();
+    final l10n = AppLocalizations.of(context);
+    if (l10n == null) return;
+    showAppSnackBar(
+      context,
+      message: l10n.imageCompressionSingleResult(
+        formatBytes(origBytes),
+        formatBytes(newBytes),
+        '$pct',
+      ),
+      type: NotificationType.success,
+    );
   }
 
   @override
@@ -537,11 +616,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       if (!mounted) return;
       if (result == ChatInputSubmissionResult.sent ||
           result == ChatInputSubmissionResult.queued) {
-        _controller.clear();
-        _images.clear();
-        _imageSizes.clear();
-        _docs.clear();
-        setState(() {});
+        setState(() {
+          _controller.clear();
+          _resetMedia(images: true, docs: true);
+        });
         // Keep focus on desktop so user can continue typing
         try {
           if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {

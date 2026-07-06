@@ -8,15 +8,13 @@ import 'package:path/path.dart' as p;
 ///
 /// [ImageCompressor.compressIfNeeded] decodes the image, applies EXIF
 /// orientation, optionally resizes, and re-encodes it (JPEG, or PNG when
-/// transparency is preserved). The original file is replaced (deleted after
-/// the new file is written). Doing the work here shrinks both on-disk storage
-/// AND the base64 payload sent to the model.
+/// [keepPng] is true). The original file is replaced (deleted after the new
+/// file is written). Doing the work here shrinks both on-disk storage AND
+/// the base64 payload sent to the model.
 ///
-/// Format choice (in priority order):
-///   - [keepPng] = true: always output PNG (user explicitly chose to keep
-///     transparency).
-///   - Source image has genuinely transparent pixels: output PNG.
-///   - Everything else: output JPEG.
+/// Format choice is solely controlled by the [keepPng] parameter (user
+/// decision from the compression dialog). Alpha detection happens earlier
+/// during image load, not here.
 ///
 /// GIF / HEIC / HEIF are skipped entirely. Multi-frame images (animated WebP,
 /// APNG) are also left untouched.
@@ -172,23 +170,10 @@ _CompressResult? _runCompression(_CompressRequest req) {
       }
     }
 
-    // Determine format. Priority: user override (keepPng) > auto-detect.
-    bool keepPng = req.keepPng;
-    if (!keepPng && decoded.hasAlpha) {
-      // Only keep PNG when the image actually has transparent pixels. `hasAlpha`
-      // reports the presence of an alpha CHANNEL (numChannels == 2 || 4),
-      // so opaque RGBA PNGs (screenshots, most exports) would otherwise stay
-      // PNG and skip the much stronger JPEG compression. Scan for a real
-      // non-opaque pixel; early-out on the first one to bound the cost.
-      final num maxA = decoded.maxChannelValue;
-      for (final px in decoded) {
-        if (px.a < maxA) {
-          keepPng = true;
-          break;
-        }
-      }
-    }
-    if (keepPng) {
+    // Format choice: user override (keepPng) decides the output format.
+    // Alpha detection is done earlier by the dialog so this runs
+    // strictly in user-commanded mode.
+    if (req.keepPng) {
       final Uint8List png = img.encodePng(decoded, level: 6);
       return _CompressResult(bytes: png, isPng: true);
     } else {

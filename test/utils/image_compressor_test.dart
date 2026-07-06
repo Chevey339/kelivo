@@ -158,11 +158,12 @@ void main() {
         );
         final f = File('${tmpDir.path}/kelivo.png')
           ..writeAsBytesSync(await _kelivoPng.readAsBytes());
-        // kelivo.png has real transparency → compressor keeps PNG.
+        // kelivo.png has real transparency → keep PNG via explicit option.
         final result = await ImageCompressor.compressIfNeeded(
           f.path,
           enabled: true,
           quality: 50,
+          keepPng: true,
           minBytes: 0,
         );
         expect(p.extension(result).toLowerCase(), '.png');

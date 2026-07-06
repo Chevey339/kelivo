@@ -2474,5 +2474,22 @@
   "imageCompressionCancel": "Cancel",
   "@imageCompressionCancel": {
     "description": "Cancel button in the image compression dialog"
+  },
+  "imageCompressionSingleResult": "Compressed: {from} → {to} (-{pct}%)",
+  "@imageCompressionSingleResult": {
+    "description": "SnackBar message after compressing a single image, showing size reduction",
+    "placeholders": {
+      "from": { "type": "String" },
+      "to": { "type": "String" },
+      "pct": { "type": "String" }
+    }
+  },
+  "imageCompressionBatchResult": "Compressed all images, saved {saved} (-{pct}%)",
+  "@imageCompressionBatchResult": {
+    "description": "SnackBar message after compressing all images, showing total savings",
+    "placeholders": {
+      "saved": { "type": "String" },
+      "pct": { "type": "String" }
+    }
   }
 }

@@ -5656,4 +5656,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get imageCompressionCancel => 'Cancel';
+
+  @override
+  String imageCompressionSingleResult(String from, String to, String pct) {
+    return 'Compressed: $from → $to (-$pct%)';
+  }
+
+  @override
+  String imageCompressionBatchResult(String saved, String pct) {
+    return 'Compressed all images, saved $saved (-$pct%)';
+  }
 }
