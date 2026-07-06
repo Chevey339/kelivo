@@ -3840,6 +3840,16 @@ class AppLocalizationsZh extends AppLocalizations {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageEnableImageCompressionTitle => '图片压缩';
+
+  @override
+  String get displaySettingsPageEnableImageCompressionSubtitle =>
+      '保存和发送前自动压缩图片';
+
+  @override
+  String get displaySettingsPageImageCompressionQualityTitle => '图片质量';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -9243,6 +9253,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
+  String get displaySettingsPageEnableImageCompressionTitle => '图片压缩';
+
+  @override
+  String get displaySettingsPageEnableImageCompressionSubtitle =>
+      '保存和发送前自动压缩图片';
+
+  @override
+  String get displaySettingsPageImageCompressionQualityTitle => '图片质量';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -14642,6 +14662,16 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageEnableImageCropperSubtitle =>
       '從相簿或相機選擇圖片後，允許裁剪圖片';
+
+  @override
+  String get displaySettingsPageEnableImageCompressionTitle => '圖片壓縮';
+
+  @override
+  String get displaySettingsPageEnableImageCompressionSubtitle =>
+      '儲存與傳送前自動壓縮圖片';
+
+  @override
+  String get displaySettingsPageImageCompressionQualityTitle => '圖片品質';
 
   @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>

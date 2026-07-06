@@ -3992,6 +3992,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'Crop images after selecting from gallery or camera';
 
   @override
+  String get displaySettingsPageEnableImageCompressionTitle =>
+      'Image Compression';
+
+  @override
+  String get displaySettingsPageEnableImageCompressionSubtitle =>
+      'Compress images before saving and sending';
+
+  @override
+  String get displaySettingsPageImageCompressionQualityTitle => 'Image quality';
+
+  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       'Keep sidebar open when selecting assistant';
 

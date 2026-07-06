@@ -33,6 +33,7 @@ import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
 import '../../../icons/lucide_adapter.dart';
+import '../widgets/image_compression_top_banner.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
@@ -678,7 +679,7 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildMobileBody(context, cs)),
+      body: _wrapWithTopBanner(_wrapWithDropTarget(_buildMobileBody(context, cs))),
     );
   }
 
@@ -821,7 +822,7 @@ class _HomePageState extends State<HomePage>
               onInvertSelection: _controller.invertSelection,
             )
           : null,
-      body: _wrapWithDropTarget(_buildTabletBody(context, cs)),
+      body: _wrapWithTopBanner(_wrapWithDropTarget(_buildTabletBody(context, cs))),
     );
   }
 
@@ -1394,6 +1395,23 @@ class _HomePageState extends State<HomePage>
     if (selectedId != null && selectedId.isNotEmpty) {
       await _controller.scrollToMessageId(selectedId);
     }
+  }
+
+  Widget _wrapWithTopBanner(Widget child) {
+    return Stack(
+      children: [
+        Positioned.fill(child: child),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: const IgnorePointer(child: ImageCompressionTopBanner()),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _wrapWithDropTarget(Widget child) {
