@@ -1613,9 +1613,6 @@
   "displaySettingsPageEnableMathSubtitle": "渲染 LaTeX 数学公式（行内与块级）",
   "displaySettingsPageEnableImageCropperTitle": "启用图片裁剪",
   "displaySettingsPageEnableImageCropperSubtitle": "从相册或相机选择图片后，允许裁剪图片",
-  "displaySettingsPageEnableImageCompressionTitle": "图片压缩",
-  "displaySettingsPageEnableImageCompressionSubtitle": "保存和发送前自动压缩图片",
-  "displaySettingsPageImageCompressionQualityTitle": "图片质量",
   "displaySettingsPageMobileCodeBlockWrapTitle": "移动端代码块自动换行",
   "displaySettingsPageAutoCollapseCodeBlockTitle": "自动折叠代码块",
   "displaySettingsPageAutoCollapseCodeBlockLinesTitle": "超过多少行自动折叠",
@@ -2014,5 +2011,15 @@
   "titlePresetUnsavedHint": "更改或选择预设后，需点击「保存」方可生效",
   "@titlePresetUnsavedHint": {
     "description": "标题提示词编辑器中提醒用户在更改预设后保存的提示"
-  }
+  },
+  "imageCompressionDialogTitle": "压缩图片",
+  "imageCompressionQuality": "质量",
+  "imageCompressionMaxDimension": "最大尺寸",
+  "imageCompressionFormat": "格式",
+  "imageCompressionKeepPng": "保留透明度 (PNG)",
+  "imageCompressionConvertJpeg": "转为 JPEG（白色背景）",
+  "imageCompressionButton": "压缩",
+  "imageCompressionBatchButton": "全部压缩",
+  "imageCompressionDimensionOriginal": "原始",
+  "imageCompressionCancel": "取消"
 }

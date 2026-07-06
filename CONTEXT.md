@@ -64,3 +64,13 @@
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
+## Image Attachment Compression
+
+- **Trigger**: Per-image via clicking file size label below thumbnail; batch via dialog's "全部压缩" button. All ingress paths (gallery, camera, file picker, drag-and-drop, clipboard paste) treated identically.
+- **Dialog**: `ImageCompressionDialog` in `lib/shared/dialogs/image_compression_dialog.dart`. Follows incremental backup pattern: `show()` for desktop (centered Dialog), `showSheet()` for mobile (bottom sheet). Same content, different shell.
+- **Dialog controls**: Quality slider (30-100), max-dimension slider (320 to original long-edge, step 64px, shortcuts: 原始/1/2/1/4), format option (仅在有 alpha 通道的 PNG 时显示: "保留透明度 PNG" / "转为 JPEG 白色背景").
+- **Format detection**: `pngHasAlphaChannel()` in `lib/utils/png_alpha_detector.dart`. Reads PNG IHDR `colorType` byte at offset 25 in file (colorType 4 or 6 = has alpha). No full decode. Used by dialog to decide whether to show format options.
+- **Compression core**: `ImageCompressor.compressIfNeeded()` in `lib/utils/image_compressor.dart` (credit: Ankairis, PR #705). Decode/encode in background isolate via `compute()`. Parameters: `quality` (1-100), `maxDimension` (resize longest edge, maintain aspect ratio), `keepPng` (override format detection). Defensive: on exception or result≥original, return original path unchanged.
+- **File strategy**: Compressed result written to same dir, same basename, new extension (e.g. `photo.png` → `photo.jpg`). Original file deleted. `_images` path updated accordingly.
+- **UI**: File size shown as gradient overlay at bottom of each 64×64 thumbnail, with `Lucide.ImageDown` icon. Tappable → opens dialog. `_imageSizes` cache maintained alongside `_images` to avoid repeated disk reads.
+- **Compression progress**: Dialog buttons show loading spinner while compressing. Single "压缩" or "全部压缩" (后者仅在 totalImageCount > 1 时可用).

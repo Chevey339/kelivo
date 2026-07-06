@@ -3992,17 +3992,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Crop images after selecting from gallery or camera';
 
   @override
-  String get displaySettingsPageEnableImageCompressionTitle =>
-      'Image Compression';
-
-  @override
-  String get displaySettingsPageEnableImageCompressionSubtitle =>
-      'Compress images before saving and sending';
-
-  @override
-  String get displaySettingsPageImageCompressionQualityTitle => 'Image quality';
-
-  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       'Keep sidebar open when selecting assistant';
 
@@ -5636,4 +5625,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get titlePresetUnsavedHint =>
       'Change or select a preset, then tap Save to apply';
+
+  @override
+  String get imageCompressionDialogTitle => 'Compress Image';
+
+  @override
+  String get imageCompressionQuality => 'Quality';
+
+  @override
+  String get imageCompressionMaxDimension => 'Max dimension';
+
+  @override
+  String get imageCompressionFormat => 'Format';
+
+  @override
+  String get imageCompressionKeepPng => 'Keep transparency (PNG)';
+
+  @override
+  String get imageCompressionConvertJpeg =>
+      'Convert to JPEG (white background)';
+
+  @override
+  String get imageCompressionButton => 'Compress';
+
+  @override
+  String get imageCompressionBatchButton => 'Compress All';
+
+  @override
+  String get imageCompressionDimensionOriginal => 'Original';
+
+  @override
+  String get imageCompressionCancel => 'Cancel';
 }

@@ -7424,24 +7424,6 @@ abstract class AppLocalizations {
   /// **'Crop images after selecting from gallery or camera'**
   String get displaySettingsPageEnableImageCropperSubtitle;
 
-  /// Title for the image compression toggle on the display settings page
-  ///
-  /// In en, this message translates to:
-  /// **'Image Compression'**
-  String get displaySettingsPageEnableImageCompressionTitle;
-
-  /// Subtitle for the image compression toggle on the display settings page
-  ///
-  /// In en, this message translates to:
-  /// **'Compress images before saving and sending'**
-  String get displaySettingsPageEnableImageCompressionSubtitle;
-
-  /// Title for the JPEG quality slider in image compression settings
-  ///
-  /// In en, this message translates to:
-  /// **'Image quality'**
-  String get displaySettingsPageImageCompressionQualityTitle;
-
   /// No description provided for @displaySettingsPageKeepSidebarOpenOnAssistantTapTitle.
   ///
   /// In en, this message translates to:
@@ -10363,6 +10345,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Change or select a preset, then tap Save to apply'**
   String get titlePresetUnsavedHint;
+
+  /// Title for the image compression dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Compress Image'**
+  String get imageCompressionDialogTitle;
+
+  /// Label for the JPEG quality slider in image compression dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Quality'**
+  String get imageCompressionQuality;
+
+  /// Label for the max dimension slider in image compression dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Max dimension'**
+  String get imageCompressionMaxDimension;
+
+  /// Label for the format section in image compression dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Format'**
+  String get imageCompressionFormat;
+
+  /// Option to keep PNG format with alpha transparency during compression
+  ///
+  /// In en, this message translates to:
+  /// **'Keep transparency (PNG)'**
+  String get imageCompressionKeepPng;
+
+  /// Option to convert to JPEG with white background when compressing
+  ///
+  /// In en, this message translates to:
+  /// **'Convert to JPEG (white background)'**
+  String get imageCompressionConvertJpeg;
+
+  /// Button label to compress the current image
+  ///
+  /// In en, this message translates to:
+  /// **'Compress'**
+  String get imageCompressionButton;
+
+  /// Button label to compress all images with the same settings
+  ///
+  /// In en, this message translates to:
+  /// **'Compress All'**
+  String get imageCompressionBatchButton;
+
+  /// Label for the original size option in the max dimension shortcut chips
+  ///
+  /// In en, this message translates to:
+  /// **'Original'**
+  String get imageCompressionDimensionOriginal;
+
+  /// Cancel button in the image compression dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get imageCompressionCancel;
 }
 
 class _AppLocalizationsDelegate

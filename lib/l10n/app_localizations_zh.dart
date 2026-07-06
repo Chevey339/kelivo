@@ -3840,16 +3840,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
-  String get displaySettingsPageEnableImageCompressionTitle => '图片压缩';
-
-  @override
-  String get displaySettingsPageEnableImageCompressionSubtitle =>
-      '保存和发送前自动压缩图片';
-
-  @override
-  String get displaySettingsPageImageCompressionQualityTitle => '图片质量';
-
-  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -5415,6 +5405,36 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
+
+  @override
+  String get imageCompressionDialogTitle => '压缩图片';
+
+  @override
+  String get imageCompressionQuality => '质量';
+
+  @override
+  String get imageCompressionMaxDimension => '最大尺寸';
+
+  @override
+  String get imageCompressionFormat => '格式';
+
+  @override
+  String get imageCompressionKeepPng => '保留透明度 (PNG)';
+
+  @override
+  String get imageCompressionConvertJpeg => '转为 JPEG（白色背景）';
+
+  @override
+  String get imageCompressionButton => '压缩';
+
+  @override
+  String get imageCompressionBatchButton => '全部压缩';
+
+  @override
+  String get imageCompressionDimensionOriginal => '原始';
+
+  @override
+  String get imageCompressionCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -9253,16 +9273,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '从相册或相机选择图片后，允许裁剪图片';
 
   @override
-  String get displaySettingsPageEnableImageCompressionTitle => '图片压缩';
-
-  @override
-  String get displaySettingsPageEnableImageCompressionSubtitle =>
-      '保存和发送前自动压缩图片';
-
-  @override
-  String get displaySettingsPageImageCompressionQualityTitle => '图片质量';
-
-  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '点选助手时不自动关闭侧边栏';
 
@@ -10828,6 +10838,36 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get titlePresetUnsavedHint => '更改或选择预设后，需点击「保存」方可生效';
+
+  @override
+  String get imageCompressionDialogTitle => '压缩图片';
+
+  @override
+  String get imageCompressionQuality => '质量';
+
+  @override
+  String get imageCompressionMaxDimension => '最大尺寸';
+
+  @override
+  String get imageCompressionFormat => '格式';
+
+  @override
+  String get imageCompressionKeepPng => '保留透明度 (PNG)';
+
+  @override
+  String get imageCompressionConvertJpeg => '转为 JPEG（白色背景）';
+
+  @override
+  String get imageCompressionButton => '压缩';
+
+  @override
+  String get imageCompressionBatchButton => '全部压缩';
+
+  @override
+  String get imageCompressionDimensionOriginal => '原始';
+
+  @override
+  String get imageCompressionCancel => '取消';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -14664,16 +14704,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '從相簿或相機選擇圖片後，允許裁剪圖片';
 
   @override
-  String get displaySettingsPageEnableImageCompressionTitle => '圖片壓縮';
-
-  @override
-  String get displaySettingsPageEnableImageCompressionSubtitle =>
-      '儲存與傳送前自動壓縮圖片';
-
-  @override
-  String get displaySettingsPageImageCompressionQualityTitle => '圖片品質';
-
-  @override
   String get displaySettingsPageKeepSidebarOpenOnAssistantTapTitle =>
       '點選助手時不自動關閉側邊欄';
 
@@ -16241,4 +16271,34 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get titlePresetUnsavedHint => '更改或選擇預設後，需點擊「儲存」方可生效';
+
+  @override
+  String get imageCompressionDialogTitle => '壓縮圖片';
+
+  @override
+  String get imageCompressionQuality => '品質';
+
+  @override
+  String get imageCompressionMaxDimension => '最大尺寸';
+
+  @override
+  String get imageCompressionFormat => '格式';
+
+  @override
+  String get imageCompressionKeepPng => '保留透明度 (PNG)';
+
+  @override
+  String get imageCompressionConvertJpeg => '轉為 JPEG（白色背景）';
+
+  @override
+  String get imageCompressionButton => '壓縮';
+
+  @override
+  String get imageCompressionBatchButton => '全部壓縮';
+
+  @override
+  String get imageCompressionDimensionOriginal => '原始';
+
+  @override
+  String get imageCompressionCancel => '取消';
 }

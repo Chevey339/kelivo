@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/app_directories.dart';
@@ -14,8 +13,6 @@ import '../../../utils/file_import_helper.dart';
 import '../../../utils/platform_utils.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../core/models/chat_input_data.dart';
-import '../../../core/providers/settings_provider.dart';
-import '../../../core/services/image_compression_progress.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../widgets/chat_input_bar.dart';
 
@@ -46,32 +43,11 @@ class FileUploadService {
     final out = <String>[];
     final context = getContext();
     if (!context.mounted) return out;
-    final sp = context.read<SettingsProvider>();
-    final compress = sp.imageCompressionEnabled;
-    final prog = ImageCompressionProgress.instance;
-    if (compress) {
-      final imgCount = files
-          .where((f) => isImageExtension(f.name.isNotEmpty ? f.name : f.path))
-          .length;
-      if (imgCount > 0) prog.start(imgCount);
-    }
-    try {
-      for (final f in files) {
-        if (!context.mounted) break;
-        var savedPath = await FileImportHelper.copyXFile(f, dir, context);
-        if (savedPath != null) {
-          // 仅对图片在入库时进行压缩（替换原文件），文档不处理
-          if (compress && isImageExtension(savedPath)) {
-            savedPath = await prog.compressAndReport(
-              savedPath,
-              quality: sp.imageCompressionQuality,
-            );
-          }
-          out.add(savedPath);
-        }
+    for (final f in files) {
+      final savedPath = await FileImportHelper.copyXFile(f, dir, context);
+      if (savedPath != null) {
+        out.add(savedPath);
       }
-    } finally {
-      if (compress) prog.finishBatch();
     }
     return out;
   }

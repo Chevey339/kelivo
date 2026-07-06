@@ -311,19 +311,6 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
         ],
         const SizedBox(height: 8),
         _row(
-          icon: Lucide.ImageDown,
-          label: l10n.displaySettingsPageEnableImageCompressionTitle,
-          selected: settings.imageCompressionEnabled,
-          onTap: () async {
-            Haptics.light();
-            final sp = context.read<SettingsProvider>();
-            await sp.setImageCompressionEnabled(!sp.imageCompressionEnabled);
-            if (!context.mounted) return;
-            Navigator.of(context).maybePop();
-          },
-        ),
-        const SizedBox(height: 8),
-        _row(
           icon: Lucide.workflow,
           label: l10n.contextManagement,
           onTap: () {

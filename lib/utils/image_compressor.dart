@@ -4,42 +4,39 @@ import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 
-/// Auto image compression performed at STORAGE/INGESTION time.
+/// Image compression performed at STORAGE/INGESTION time.
 ///
-/// When an image is copied into the upload directory we run it through
-/// [ImageCompressor.compressIfNeeded], which decodes the image, applies any EXIF
-/// orientation, and re-encodes it (JPEG, or PNG when genuinely transparent).
-/// The original file is REPLACED in place (no original is kept). Doing the work
-/// here shrinks both on-disk storage AND the base64 payload sent to the model in
-/// a single place.
+/// [ImageCompressor.compressIfNeeded] decodes the image, applies EXIF
+/// orientation, optionally resizes, and re-encodes it (JPEG, or PNG when
+/// transparency is preserved). The original file is replaced (deleted after
+/// the new file is written). Doing the work here shrinks both on-disk storage
+/// AND the base64 payload sent to the model.
 ///
-/// Smart format choice:
-///   - A source image with at least one genuinely transparent pixel stays PNG
-///     (lossless, only resized) so transparency is preserved. Note an alpha
-///     CHANNEL alone is not enough: opaque RGBA PNGs are re-encoded as JPEG.
-///   - Everything else (jpg/jpeg, opaque png, webp, ...) is re-encoded as JPEG.
-///     PNG -> JPEG also changes the file extension, since MIME is inferred from
-///     the extension everywhere via `inferMediaMimeFromSource`.
+/// Format choice (in priority order):
+///   - [keepPng] = true: always output PNG (user explicitly chose to keep
+///     transparency).
+///   - Source image has genuinely transparent pixels: output PNG.
+///   - Everything else: output JPEG.
 ///
-/// GIF / HEIC / HEIF are skipped entirely (decode is unreliable for them).
-/// Multi-frame/animated images (e.g. animated WebP, APNG) are also left
-/// untouched so the animation is never flattened to a single still frame.
+/// GIF / HEIC / HEIF are skipped entirely. Multi-frame images (animated WebP,
+/// APNG) are also left untouched.
 ///
 /// All heavy decode/resize/encode work runs in a background isolate via
-/// [compute]; file IO happens on the calling thread. The method is defensive:
-/// on ANY failure, or when the result would not be smaller than the original,
-/// it returns [srcPath] unchanged and leaves the original file intact. It must
-/// never crash a send.
+/// [compute]. The method is defensive: on ANY failure, or when the result
+/// would not be smaller than the original, it returns [srcPath] unchanged.
 class ImageCompressor {
-  /// Compress [srcPath] in place per settings. Returns the path to USE afterwards
+  /// Compress [srcPath] per settings. Returns the path to use afterwards
   /// (differs from srcPath only when the extension changed, e.g. .png -> .jpg).
-  /// On ANY failure, or when compression is not beneficial (result >= original bytes),
-  /// returns srcPath unchanged and leaves the original file intact.
-  /// When it writes a new file with a DIFFERENT extension, it deletes the old file.
+  /// On ANY failure, or when compression is not beneficial (result >= original
+  /// bytes), returns srcPath unchanged and leaves the original file intact.
+  /// When it writes a new file with a DIFFERENT extension, it deletes the old.
   static Future<String> compressIfNeeded(
     String srcPath, {
     required bool enabled,
-    required int quality, // JPEG quality 1..100
+    required int quality, // JPEG quality 1..100, used only when output is JPEG
+    int?
+    maxDimension, // if set, longest edge resized to this value (aspect ratio preserved)
+    bool keepPng = false, // if true, skip format detection, always output PNG
     int minBytes = 60 * 1024, // skip files smaller than this (not worth it)
   }) async {
     if (!enabled) return srcPath;
@@ -62,6 +59,9 @@ class ImageCompressor {
 
       // Clamp quality into a sane range.
       final int q = quality.clamp(1, 100);
+      final int? dim = maxDimension != null && maxDimension > 0
+          ? maxDimension
+          : null;
 
       // Do the heavy lifting in a background isolate.
       final _CompressResult? result = await compute(
@@ -69,6 +69,8 @@ class ImageCompressor {
         _CompressRequest(
           bytes: original,
           quality: q,
+          maxDimension: dim,
+          keepPng: keepPng,
         ),
       );
 
@@ -120,10 +122,14 @@ class ImageCompressor {
 class _CompressRequest {
   final Uint8List bytes;
   final int quality;
+  final int? maxDimension;
+  final bool keepPng;
 
   const _CompressRequest({
     required this.bytes,
     required this.quality,
+    this.maxDimension,
+    this.keepPng = false,
   });
 }
 
@@ -150,22 +156,38 @@ _CompressResult? _runCompression(_CompressRequest req) {
     // Apply EXIF orientation before we strip metadata via re-encoding.
     decoded = img.bakeOrientation(decoded);
 
-    // Only keep PNG when the image actually has transparent pixels. `hasAlpha`
-    // merely reports the presence of an alpha CHANNEL (numChannels == 2 || 4),
-    // so opaque RGBA PNGs (screenshots, most exports) would otherwise stay PNG
-    // and skip the much stronger JPEG compression. Scan for a real non-opaque
-    // pixel; early-out on the first one to bound the cost.
-    bool reallyTransparent = false;
-    if (decoded.hasAlpha) {
+    // Resize if maxDimension is set (maintain aspect ratio).
+    final int maxDim = req.maxDimension ?? 0;
+    if (maxDim > 0) {
+      final int longEdge = decoded.width > decoded.height
+          ? decoded.width
+          : decoded.height;
+      if (longEdge > maxDim) {
+        decoded = img.copyResize(
+          decoded,
+          width: decoded.width > decoded.height ? maxDim : null,
+          height: decoded.height >= decoded.width ? maxDim : null,
+          interpolation: img.Interpolation.linear,
+        );
+      }
+    }
+
+    // Determine format. Priority: user override (keepPng) > auto-detect.
+    bool keepPng = req.keepPng;
+    if (!keepPng && decoded.hasAlpha) {
+      // Only keep PNG when the image actually has transparent pixels. `hasAlpha`
+      // reports the presence of an alpha CHANNEL (numChannels == 2 || 4),
+      // so opaque RGBA PNGs (screenshots, most exports) would otherwise stay
+      // PNG and skip the much stronger JPEG compression. Scan for a real
+      // non-opaque pixel; early-out on the first one to bound the cost.
       final num maxA = decoded.maxChannelValue;
       for (final px in decoded) {
         if (px.a < maxA) {
-          reallyTransparent = true;
+          keepPng = true;
           break;
         }
       }
     }
-    final bool keepPng = reallyTransparent;
     if (keepPng) {
       final Uint8List png = img.encodePng(decoded, level: 6);
       return _CompressResult(bytes: png, isPng: true);

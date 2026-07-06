@@ -16,7 +16,6 @@ import 'dart:async';
 import 'dart:io';
 import '../../../core/models/chat_input_data.dart';
 import '../../../utils/clipboard_images.dart';
-import '../../../core/services/image_compression_progress.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/search/search_service.dart';
@@ -26,6 +25,9 @@ import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/image_compressor.dart';
+import '../../../utils/format.dart';
+import '../../../shared/dialogs/image_compression_dialog.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import 'package:Cuplivo/theme/app_font_weights.dart';
@@ -161,6 +163,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   late TextEditingController _controller;
   bool _isExpanded = false; // Track expand/collapse state for input field
   final List<String> _images = <String>[]; // local file paths
+  final Map<String, int> _imageSizes = <String, int>{}; // path -> bytes
   final List<DocumentAttachment> _docs =
       <DocumentAttachment>[]; // files to upload
   final Map<LogicalKeyboardKey, Timer?> _repeatTimers = {};
@@ -289,11 +292,27 @@ class _ChatInputBarState extends State<ChatInputBar>
 
   void _addImages(List<String> paths) {
     if (paths.isEmpty) return;
-    setState(() => _images.addAll(paths));
+    setState(() {
+      for (final p in paths) {
+        _images.add(p);
+        _imageSizes[p] = _fileSize(p);
+      }
+    });
+  }
+
+  int _fileSize(String path) {
+    try {
+      return File(path).lengthSync();
+    } catch (_) {
+      return 0;
+    }
   }
 
   void _clearImages() {
-    setState(() => _images.clear());
+    setState(() {
+      _images.clear();
+      _imageSizes.clear();
+    });
   }
 
   void _addFiles(List<DocumentAttachment> docs) {
@@ -310,6 +329,10 @@ class _ChatInputBarState extends State<ChatInputBar>
       _images
         ..clear()
         ..addAll(input.imagePaths);
+      _imageSizes.clear();
+      for (final p in _images) {
+        _imageSizes[p] = _fileSize(p);
+      }
       _docs
         ..clear()
         ..addAll(input.documents);
@@ -334,11 +357,99 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _removeImageAt(int index) {
-    setState(() => _images.removeAt(index));
+    final path = _images[index];
+    setState(() {
+      _images.removeAt(index);
+      _imageSizes.remove(path);
+    });
   }
 
   void _removeDocumentAt(int index) {
     setState(() => _docs.removeAt(index));
+  }
+
+  Future<void> _openCompressionDialog(int idx) async {
+    if (idx >= _images.length) return;
+    final path = _images[idx];
+    if (path.isEmpty) return;
+    int w = 0, h = 0;
+    try {
+      final file = File(path);
+      final decoded = await decodeImageFromList(await file.readAsBytes());
+      w = decoded.width;
+      h = decoded.height;
+    } catch (_) {}
+    if (!mounted || w == 0 || h == 0) return;
+    final isMobile = MediaQuery.of(context).size.width < AppBreakpoints.tablet;
+    final config = isMobile
+        ? await ImageCompressionDialog.showSheet(
+            context,
+            imagePath: path,
+            totalImageCount: _images.length,
+            originalWidth: w,
+            originalHeight: h,
+          )
+        : await ImageCompressionDialog.show(
+            context,
+            imagePath: path,
+            totalImageCount: _images.length,
+            originalWidth: w,
+            originalHeight: h,
+          );
+    if (config == null || !mounted) return;
+    if (config.compressAll) {
+      await _compressAll(config);
+    } else {
+      await _compressSingle(idx, config);
+    }
+  }
+
+  Future<void> _compressSingle(int idx, CompressionConfig config) async {
+    if (idx >= _images.length) return;
+    final oldPath = _images[idx];
+    final newPath = await ImageCompressor.compressIfNeeded(
+      oldPath,
+      enabled: true,
+      quality: config.quality,
+      maxDimension: config.maxDimension,
+      keepPng: config.keepPng,
+    );
+    if (!mounted) return;
+    if (newPath == oldPath) {
+      // Refresh thumbnail size display (compression may have changed the file even if same path)
+      _imageSizes[oldPath] = _fileSize(oldPath);
+      setState(() {});
+      return;
+    }
+    setState(() {
+      _images[idx] = newPath;
+      _imageSizes[newPath] = _fileSize(newPath);
+      _imageSizes.remove(oldPath);
+    });
+  }
+
+  Future<void> _compressAll(CompressionConfig config) async {
+    for (int i = 0; i < _images.length; i++) {
+      final oldPath = _images[i];
+      final newPath = await ImageCompressor.compressIfNeeded(
+        oldPath,
+        enabled: true,
+        quality: config.quality,
+        maxDimension: config.maxDimension,
+        keepPng: config.keepPng,
+      );
+      if (!mounted) return;
+      if (newPath != oldPath) {
+        setState(() {
+          _images[i] = newPath;
+          _imageSizes[newPath] = _fileSize(newPath);
+          _imageSizes.remove(oldPath);
+        });
+      } else {
+        _imageSizes[oldPath] = _fileSize(oldPath);
+        setState(() {});
+      }
+    }
   }
 
   @override
@@ -428,6 +539,7 @@ class _ChatInputBarState extends State<ChatInputBar>
           result == ChatInputSubmissionResult.queued) {
         _controller.clear();
         _images.clear();
+        _imageSizes.clear();
         _docs.clear();
         setState(() {});
         // Keep focus on desktop so user can continue typing
@@ -778,8 +890,6 @@ class _ChatInputBarState extends State<ChatInputBar>
               destPath = p.join(dir.path, name);
             }
             await File(destPath).writeAsBytes(bytes, flush: true);
-            // 入库时压缩图片（替换原文件，可能改变扩展名）
-            destPath = await _compressOnIngestIfEnabled(destPath);
             return destPath;
           } catch (_) {
             return null;
@@ -941,8 +1051,7 @@ class _ChatInputBarState extends State<ChatInputBar>
         if (savedPath != null) {
           final savedName = p.basename(savedPath);
           if (_isImageExtension(savedName)) {
-            // Mirror copyPickedFiles: compress images on ingestion.
-            images.add(await _compressOnIngestIfEnabled(savedPath));
+            images.add(savedPath);
           } else {
             final mime = _inferMimeByExtension(savedName);
             docs.add(
@@ -1416,25 +1525,6 @@ class _ChatInputBarState extends State<ChatInputBar>
     );
   }
 
-  /// Compress an image at ingestion time if the user enabled it. Returns the
-  /// path to use afterwards (extension may change, e.g. png → jpg). No-op (and
-  /// returns [path] unchanged) when unmounted or compression is disabled.
-  Future<String> _compressOnIngestIfEnabled(String path) async {
-    if (!mounted) return path;
-    final sp = context.read<SettingsProvider>();
-    if (!sp.imageCompressionEnabled) return path;
-    final prog = ImageCompressionProgress.instance;
-    prog.start(1);
-    try {
-      return await prog.compressAndReport(
-        path,
-        quality: sp.imageCompressionQuality,
-      );
-    } finally {
-      prog.finishBatch();
-    }
-  }
-
   String _inferMimeByExtension(String name) {
     final mediaMime = inferMediaMimeFromSource(name);
     if (mediaMime.isNotEmpty) return mediaMime;
@@ -1505,8 +1595,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             try {
               await from.delete();
             } catch (_) {}
-            // 入库时压缩图片（与 saveImageBytes 路径保持一致）
-            out.add(await _compressOnIngestIfEnabled(destPath));
+            out.add(destPath);
           }
         } catch (_) {
           // skip single file errors
@@ -1592,6 +1681,7 @@ class _ChatInputBarState extends State<ChatInputBar>
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (context, idx) {
                   final path = _images[idx];
+                  final size = _imageSizes[path] ?? 0;
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -1617,6 +1707,51 @@ class _ChatInputBarState extends State<ChatInputBar>
                                   alpha: 0.45,
                                 ),
                               ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // File size overlay — tappable to open compression dialog
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: () => _openCompressionDialog(idx),
+                          child: Container(
+                            height: 18,
+                            decoration: BoxDecoration(
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(9),
+                                bottomRight: Radius.circular(9),
+                              ),
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.55),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Lucide.ImageDown,
+                                  size: 10,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  formatBytes(size),
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
