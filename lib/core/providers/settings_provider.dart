@@ -9,6 +9,8 @@ import 'package:uuid/uuid.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:path/path.dart' as p;
+import 'provider_kind.dart';
+export 'provider_kind.dart';
 import '../services/search/search_service.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
@@ -4502,7 +4504,9 @@ class _SocksProxyHttpOverrides extends HttpOverrides {
   }
 }
 
-enum ProviderKind { openai, google, claude }
+// ProviderKind now lives in provider_kind.dart and is re-exported below, so
+// pure/Flutter-free logic can depend on it. All existing importers of
+// settings_provider.dart keep seeing ProviderKind unchanged.
 
 // Background rendering mode for chat message bubbles
 enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
