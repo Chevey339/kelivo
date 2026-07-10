@@ -586,6 +586,12 @@ discovered
 7. restore gate 必须在第一次业务读取和 `runApp` 前把已验证的新 bundle 标记为 `committed`；只有 `committed` 或 `rolled_back` 才允许放行业务。`committed` 表示新 bundle 已成为唯一权威主数据，不得再自动回退 `.previous`。旧 bundle 的保留期、成功启动次数和最终清理由独立 acknowledgement/retention 记录管理，不能通过延迟 `committed` 表达。
 8. 任一步被 kill 后，下一次启动根据 receipt、DB UUID、hash 和校验结果选择唯一有效副本，绝不凭文件名猜测。receipt 损坏/缺失或同时存在多组 previous/candidate 时进入只读恢复，不自动挑选。
 
+`prepared → old_renamed` 必须先持久化 `previous.pending/manifest.json`，再开始移动任何 live 对象。该计划使用 canonical checksum，并绑定 run ID、prepared receipt checksum、candidate manifest SHA-256、selected components、旧 settings snapshot descriptor/fingerprint、DB 是否缺失或其 descriptor，以及 upload/images/avatars/fonts 每个根的“缺失/目录”状态和逐文件 descriptor。缺失、空目录和未选择是三种不同语义，不得合并。
+
+逐组件 rename 允许物理状态领先 receipt：kill 后同一对象必须能由计划证明恰好位于 live、`previous.pending`/`previous` 或 candidate 中的一个合法位置；重复副本、全部缺失、hash/type 不符或缺少有效计划时 fail-closed。完整 previous 验证后先执行 `previous.pending → previous` 并 fsync run 目录，最后才发布 `old_renamed`。
+
+settings 不是可跨平台 rename 的普通文件。当前兼容语义冻结为：保留 local-only keys；candidate 中的非 local-only keys 覆盖；secret-free restore 清除已知凭据族；candidate 缺失的其他普通 key 暂时保留。previous 只保存 touched keys 的原值/不存在 tombstone 和 before/target fingerprint，启动 gate 通过可重入 apply + reload/fingerprint 完成或回滚。严格删除 candidate 缺失的全部普通 key 必须等待 Kelivo managed-key registry，不能直接 `SharedPreferences.clear()`。previous settings 可能含旧凭据，必须限制权限、保留期和诊断导出范围。
+
 Windows 必须在关闭所有 Drift/raw handle 后测试 rename；POSIX 的单次 rename 原子性也不能替代跨两个 rename 的状态机和目录 fsync。
 
 ### 9.6 恢复与备份
