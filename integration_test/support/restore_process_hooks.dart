@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
@@ -8,10 +9,19 @@ import 'package:shared_preferences_platform_interface/types.dart';
 
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
+import 'package:Kelivo/core/services/backup/restore_settings_cold_ack.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
 enum RestoreProcessEntityKind { file, directory }
 
 enum RestoreReceiptDurabilityBoundary { tempDurable, published }
+
+enum RestoreColdAckDurabilityBoundary { tempDurable, published }
+
+enum RestoreTerminalWorkspaceSyncBoundary {
+  completedRunsRootDurable,
+  archivingMarkerRemovedDurable,
+}
 
 sealed class RestoreDurabilityObservation {
   const RestoreDurabilityObservation();
@@ -65,6 +75,52 @@ final class RestoreReceiptDurabilityObservation
   final RestoreReceiptState state;
   final String temporaryPath;
   final String? targetPath;
+}
+
+final class RestoreColdAckDurabilityObservation
+    extends RestoreDurabilityObservation {
+  const RestoreColdAckDurabilityObservation({
+    required this.boundary,
+    required this.runId,
+    required this.terminalReceiptChecksum,
+    required this.expected,
+    required this.processId,
+    required this.leaseInstanceId,
+    required this.ackChecksum,
+    required this.temporaryPath,
+    this.targetPath,
+  });
+
+  final RestoreColdAckDurabilityBoundary boundary;
+  final String runId;
+  final String terminalReceiptChecksum;
+  final RestoreSettingsColdAckExpected expected;
+  final int processId;
+  final String leaseInstanceId;
+  final String ackChecksum;
+  final String temporaryPath;
+  final String? targetPath;
+}
+
+final class RestoreTerminalWorkspaceSyncObservation
+    extends RestoreDurabilityObservation {
+  const RestoreTerminalWorkspaceSyncObservation({
+    required this.boundary,
+    required this.workspaceRootPath,
+    required this.publishingMarkerPath,
+    required this.archivingMarkerPath,
+    required this.activeRunPath,
+    required this.completedRunPath,
+    required this.fullBarrier,
+  });
+
+  final RestoreTerminalWorkspaceSyncBoundary boundary;
+  final String workspaceRootPath;
+  final String publishingMarkerPath;
+  final String archivingMarkerPath;
+  final String activeRunPath;
+  final String completedRunPath;
+  final bool fullBarrier;
 }
 
 abstract class RestoreDurabilityMatcher {
@@ -256,6 +312,194 @@ final class RestoreReceiptPublishedMatcher extends RestoreDurabilityMatcher {
   }
 }
 
+final class RestoreColdAckTempDurableMatcher extends RestoreDurabilityMatcher {
+  RestoreColdAckTempDurableMatcher({
+    required String runDirectoryPath,
+    required String terminalReceiptChecksum,
+    required RestoreSettingsColdAckExpected expected,
+    required int processId,
+    required String leaseInstanceId,
+  }) : _expectation = _RestoreColdAckExpectation(
+         runDirectoryPath: runDirectoryPath,
+         terminalReceiptChecksum: terminalReceiptChecksum,
+         expected: expected,
+         processId: processId,
+         leaseInstanceId: leaseInstanceId,
+       );
+
+  final _RestoreColdAckExpectation _expectation;
+
+  String get runDirectoryPath => _expectation.runDirectoryPath;
+  String get targetPath => _expectation.targetPath;
+
+  @override
+  Future<RestoreDurabilityObservation?> matchFileSync({
+    required File file,
+    required bool fullBarrier,
+  }) async {
+    if (!fullBarrier) return null;
+    final ack = await _expectation.readMatchingTemporary(file);
+    if (ack == null) return null;
+    return _expectation.observation(
+      ack: ack,
+      boundary: RestoreColdAckDurabilityBoundary.tempDurable,
+      temporaryPath: _normalizeObservedPath(file.path),
+    );
+  }
+}
+
+final class RestoreColdAckPublishedMatcher extends RestoreDurabilityMatcher {
+  RestoreColdAckPublishedMatcher({
+    required String runDirectoryPath,
+    required String terminalReceiptChecksum,
+    required RestoreSettingsColdAckExpected expected,
+    required int processId,
+    required String leaseInstanceId,
+  }) : _expectation = _RestoreColdAckExpectation(
+         runDirectoryPath: runDirectoryPath,
+         terminalReceiptChecksum: terminalReceiptChecksum,
+         expected: expected,
+         processId: processId,
+         leaseInstanceId: leaseInstanceId,
+       );
+
+  final _RestoreColdAckExpectation _expectation;
+
+  String get runDirectoryPath => _expectation.runDirectoryPath;
+  String get targetPath => _expectation.targetPath;
+
+  @override
+  Future<RestoreDurabilityObservation?> matchRename({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    if (source is! File ||
+        !p.equals(_normalizeObservedPath(targetPath), this.targetPath)) {
+      return null;
+    }
+    final ack = await _expectation.readMatchingTemporary(source);
+    if (ack == null) return null;
+    return _expectation.observation(
+      ack: ack,
+      boundary: RestoreColdAckDurabilityBoundary.published,
+      temporaryPath: _normalizeObservedPath(source.path),
+      targetPath: this.targetPath,
+    );
+  }
+}
+
+final class RestoreTerminalWorkspaceSyncMatcher
+    extends RestoreDurabilityMatcher {
+  factory RestoreTerminalWorkspaceSyncMatcher({
+    required String workspaceRootPath,
+    required String runId,
+    required RestoreTerminalWorkspaceSyncBoundary boundary,
+  }) {
+    return RestoreTerminalWorkspaceSyncMatcher._(
+      workspaceRootPath: _requireWorkspaceRootPath(workspaceRootPath),
+      runId: _requireRunId(runId),
+      boundary: boundary,
+    );
+  }
+
+  RestoreTerminalWorkspaceSyncMatcher._({
+    required this.workspaceRootPath,
+    required this.runId,
+    required this.boundary,
+  }) : publishingMarkerPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.publishingRunFileName,
+       ),
+       archivingMarkerPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.archivingRunFileName,
+       ),
+       activeRunPath = p.join(workspaceRootPath, 'run_$runId'),
+       completedRunPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.completedRunsDirectoryName,
+         'run_$runId',
+       );
+
+  final String workspaceRootPath;
+  final String runId;
+  final RestoreTerminalWorkspaceSyncBoundary boundary;
+  final String publishingMarkerPath;
+  final String archivingMarkerPath;
+  final String activeRunPath;
+  final String completedRunPath;
+
+  Directory get completedRunsRoot => Directory(
+    p.join(workspaceRootPath, RestoreWorkspaceLock.completedRunsDirectoryName),
+  );
+
+  @override
+  Future<RestoreDurabilityObservation?> matchDirectorySync({
+    required Directory directory,
+    required bool fullBarrier,
+  }) async {
+    if (!fullBarrier ||
+        !p.equals(_normalizeObservedPath(directory.path), workspaceRootPath) ||
+        !await _matchesExpectedTopology()) {
+      return null;
+    }
+    return RestoreTerminalWorkspaceSyncObservation(
+      boundary: boundary,
+      workspaceRootPath: workspaceRootPath,
+      publishingMarkerPath: publishingMarkerPath,
+      archivingMarkerPath: archivingMarkerPath,
+      activeRunPath: activeRunPath,
+      completedRunPath: completedRunPath,
+      fullBarrier: fullBarrier,
+    );
+  }
+
+  Future<bool> _matchesExpectedTopology() async {
+    final activeMarkerPath = p.join(
+      workspaceRootPath,
+      RestoreWorkspaceLock.activeRunFileName,
+    );
+    final discardingMarkerPath = p.join(
+      workspaceRootPath,
+      RestoreWorkspaceLock.discardingRunFileName,
+    );
+    final types = await Future.wait([
+      FileSystemEntity.type(workspaceRootPath, followLinks: false),
+      FileSystemEntity.type(completedRunsRoot.path, followLinks: false),
+      FileSystemEntity.type(activeMarkerPath, followLinks: false),
+      FileSystemEntity.type(discardingMarkerPath, followLinks: false),
+      FileSystemEntity.type(publishingMarkerPath, followLinks: false),
+      FileSystemEntity.type(archivingMarkerPath, followLinks: false),
+      FileSystemEntity.type(activeRunPath, followLinks: false),
+      FileSystemEntity.type(completedRunPath, followLinks: false),
+    ]);
+    if (types[0] != FileSystemEntityType.directory ||
+        types[1] != FileSystemEntityType.directory ||
+        types[2] != FileSystemEntityType.notFound ||
+        types[3] != FileSystemEntityType.notFound) {
+      return false;
+    }
+    return switch (boundary) {
+      RestoreTerminalWorkspaceSyncBoundary.completedRunsRootDurable =>
+        types[4] == FileSystemEntityType.file &&
+            types[5] == FileSystemEntityType.notFound &&
+            types[6] == FileSystemEntityType.directory &&
+            types[7] == FileSystemEntityType.notFound &&
+            await _markerContainsRunId(File(publishingMarkerPath)),
+      RestoreTerminalWorkspaceSyncBoundary.archivingMarkerRemovedDurable =>
+        types[4] == FileSystemEntityType.notFound &&
+            types[5] == FileSystemEntityType.notFound &&
+            types[6] == FileSystemEntityType.notFound &&
+            types[7] == FileSystemEntityType.directory,
+    };
+  }
+
+  Future<bool> _markerContainsRunId(File marker) async {
+    if (await marker.length() != runId.length) return false;
+    return await marker.readAsString() == runId;
+  }
+}
+
 final class OneShotBlockingRestoreDurability implements RestoreDurability {
   OneShotBlockingRestoreDurability({
     required this.delegate,
@@ -419,6 +663,177 @@ final class OneShotBlockingPreferencesStore
 final _receiptTemporaryPattern = RegExp(
   r'^receipt_([0-9]{16})\.json\.([1-9][0-9]*)_([1-9][0-9]*)\.tmp$',
 );
+final _coldAckTemporaryPattern = RegExp(
+  '^${RegExp.escape(RestoreSettingsColdAckStore.fileName)}\\.'
+  r'([1-9][0-9]*)_([1-9][0-9]*)_([0-9]+)\.tmp$',
+);
+final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
+final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
+
+final class _RestoreColdAckExpectation {
+  _RestoreColdAckExpectation({
+    required String runDirectoryPath,
+    required String terminalReceiptChecksum,
+    required this.expected,
+    required int processId,
+    required String leaseInstanceId,
+  }) : runDirectoryPath = _requireRunDirectoryPath(runDirectoryPath),
+       runId = _runIdFromRunDirectoryPath(runDirectoryPath),
+       terminalReceiptChecksum = _requireSha256(
+         terminalReceiptChecksum,
+         'terminalReceiptChecksum',
+       ),
+       processId = _requireProcessId(processId),
+       leaseInstanceId = _requireIdentifier(leaseInstanceId, 'leaseInstanceId');
+
+  final String runDirectoryPath;
+  final String runId;
+  final String terminalReceiptChecksum;
+  final RestoreSettingsColdAckExpected expected;
+  final int processId;
+  final String leaseInstanceId;
+
+  String get targetPath =>
+      p.join(runDirectoryPath, RestoreSettingsColdAckStore.fileName);
+
+  Future<RestoreSettingsColdAck?> readMatchingTemporary(File file) async {
+    final path = _normalizeObservedPath(file.path);
+    if (!p.equals(p.dirname(path), runDirectoryPath)) return null;
+    final match = _coldAckTemporaryPattern.firstMatch(p.basename(path));
+    if (match == null || int.tryParse(match[2]!) != processId) return null;
+    final ack = await _readCanonicalColdAck(file);
+    if (ack.runId != runId ||
+        ack.terminalReceiptChecksum != terminalReceiptChecksum ||
+        ack.expected != expected ||
+        ack.processId != processId ||
+        ack.leaseInstanceId != leaseInstanceId) {
+      return null;
+    }
+    return ack;
+  }
+
+  RestoreColdAckDurabilityObservation observation({
+    required RestoreSettingsColdAck ack,
+    required RestoreColdAckDurabilityBoundary boundary,
+    required String temporaryPath,
+    String? targetPath,
+  }) {
+    return RestoreColdAckDurabilityObservation(
+      boundary: boundary,
+      runId: ack.runId,
+      terminalReceiptChecksum: ack.terminalReceiptChecksum,
+      expected: ack.expected,
+      processId: ack.processId,
+      leaseInstanceId: ack.leaseInstanceId,
+      ackChecksum: ack.checksum,
+      temporaryPath: temporaryPath,
+      targetPath: targetPath,
+    );
+  }
+}
+
+Future<RestoreSettingsColdAck> _readCanonicalColdAck(File file) async {
+  if (await FileSystemEntity.type(file.path, followLinks: false) !=
+      FileSystemEntityType.file) {
+    throw const FormatException('restore_harness_cold_ack_temp_file');
+  }
+  const maximumBytes = 16 * 1024;
+  final expectedLength = await file.length();
+  if (expectedLength <= 0 || expectedLength > maximumBytes) {
+    throw const FormatException('restore_harness_cold_ack_temp_size');
+  }
+  final handle = await file.open(mode: FileMode.read);
+  final builder = BytesBuilder(copy: false);
+  try {
+    while (builder.length <= maximumBytes) {
+      final chunk = await handle.read(maximumBytes + 1 - builder.length);
+      if (chunk.isEmpty) break;
+      builder.add(chunk);
+    }
+  } finally {
+    await handle.close();
+  }
+  final bytes = builder.takeBytes();
+  if (bytes.length != expectedLength ||
+      bytes.length > maximumBytes ||
+      await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+    throw const FormatException('restore_harness_cold_ack_temp_changed');
+  }
+  final dynamic decoded;
+  try {
+    decoded = jsonDecode(utf8.decode(bytes));
+  } on FormatException {
+    throw const FormatException('restore_harness_cold_ack_temp_json');
+  }
+  if (decoded is! Map) {
+    throw const FormatException('restore_harness_cold_ack_temp_json');
+  }
+  final ack = RestoreSettingsColdAck.fromJson(decoded);
+  final canonical = utf8.encode(jsonEncode(ack.toJson()));
+  if (!_sameBytes(bytes, canonical)) {
+    throw const FormatException('restore_harness_cold_ack_temp_canonical');
+  }
+  return ack;
+}
+
+String _requireRunDirectoryPath(String path) {
+  final normalized = _requireAbsoluteNormalized(path, 'runDirectoryPath');
+  if (RegExp(r'^run_[a-f0-9]{32}$').firstMatch(p.basename(normalized)) ==
+      null) {
+    throw ArgumentError.value(path, 'runDirectoryPath');
+  }
+  return normalized;
+}
+
+String _runIdFromRunDirectoryPath(String path) {
+  final normalized = _requireRunDirectoryPath(path);
+  return p.basename(normalized).substring('run_'.length);
+}
+
+String _requireWorkspaceRootPath(String path) {
+  final normalized = _requireAbsoluteNormalized(path, 'workspaceRootPath');
+  if (p.basename(normalized) != RestoreWorkspaceLock.workspaceRootName) {
+    throw ArgumentError.value(path, 'workspaceRootPath');
+  }
+  return normalized;
+}
+
+String _requireRunId(String runId) {
+  if (!_runIdPattern.hasMatch(runId)) {
+    throw ArgumentError.value(runId, 'runId');
+  }
+  return runId;
+}
+
+String _requireSha256(String value, String name) {
+  if (!_sha256Pattern.hasMatch(value)) {
+    throw ArgumentError.value(value, name);
+  }
+  return value;
+}
+
+String _requireIdentifier(String value, String name) {
+  if (!_runIdPattern.hasMatch(value)) {
+    throw ArgumentError.value(value, name);
+  }
+  return value;
+}
+
+int _requireProcessId(int processId) {
+  if (processId <= 0) {
+    throw ArgumentError.value(processId, 'processId');
+  }
+  return processId;
+}
+
+bool _sameBytes(List<int> left, List<int> right) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
+}
 
 String _requireAbsoluteNormalized(String path, String name) {
   if (!p.isAbsolute(path) || p.normalize(path) != path) {
@@ -505,4 +920,44 @@ final class RejectingMutationPreferencesStore
   @override
   Future<bool> setValue(String valueType, String key, Object value) async =>
       _reject();
+}
+
+final class CountingMutationPreferencesStore
+    extends SharedPreferencesStorePlatform {
+  CountingMutationPreferencesStore(this.delegate);
+
+  final SharedPreferencesStorePlatform delegate;
+  int mutationAttempts = 0;
+
+  @override
+  Future<bool> clear() {
+    mutationAttempts++;
+    return delegate.clear();
+  }
+
+  @override
+  Future<bool> clearWithParameters(ClearParameters parameters) {
+    mutationAttempts++;
+    return delegate.clearWithParameters(parameters);
+  }
+
+  @override
+  Future<Map<String, Object>> getAll() => delegate.getAll();
+
+  @override
+  Future<Map<String, Object>> getAllWithParameters(
+    GetAllParameters parameters,
+  ) => delegate.getAllWithParameters(parameters);
+
+  @override
+  Future<bool> remove(String key) {
+    mutationAttempts++;
+    return delegate.remove(key);
+  }
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) {
+    mutationAttempts++;
+    return delegate.setValue(valueType, key, value);
+  }
 }

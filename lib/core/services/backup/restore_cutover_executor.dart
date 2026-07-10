@@ -56,6 +56,7 @@ final class RestoreCutoverExecutor {
     required SharedPreferences preferences,
     required RestoreWorkspaceLock workspaceLock,
     RestoreDurability? durability,
+    bool archived = false,
   }) {
     final resolvedDurability = durability ?? RestorePlatformDurability();
     return RestoreCutoverExecutor._(
@@ -64,6 +65,7 @@ final class RestoreCutoverExecutor {
       preferences: preferences,
       workspaceLock: workspaceLock,
       durability: resolvedDurability,
+      archived: archived,
     );
   }
 
@@ -73,11 +75,13 @@ final class RestoreCutoverExecutor {
     required SharedPreferences preferences,
     required this.workspaceLock,
     required this.durability,
+    required bool archived,
   }) : settingsStore = RestoreSettingsStore(preferences),
        receiptStore = RestoreReceiptStore(
          appDataDirectory: appDataDirectory,
          runId: runId,
          durability: durability,
+         archived: archived,
        ) {
     previousStore = RestorePreviousStore(
       runDirectory: receiptStore.runDirectory,

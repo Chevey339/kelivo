@@ -186,6 +186,104 @@ final class _ThrowAfterArchivingMarkerDurability implements RestoreDurability {
       delegate.syncFile(file, fullBarrier: fullBarrier);
 }
 
+/// Models a process/filesystem failure after the terminal run rename changed
+/// the visible namespace but before either parent-directory barrier completed.
+final class _InterruptAfterTerminalRunRawRenameDurability
+    implements RestoreDurability {
+  _InterruptAfterTerminalRunRawRenameDurability(
+    this.delegate, {
+    required Directory source,
+    required Directory target,
+  }) : sourcePath = p.normalize(p.absolute(source.path)),
+       targetPath = p.normalize(p.absolute(target.path));
+
+  final RestoreDurability delegate;
+  final String sourcePath;
+  final String targetPath;
+  var didInterrupt = false;
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    if (!didInterrupt &&
+        source is Directory &&
+        p.equals(p.normalize(p.absolute(source.path)), sourcePath) &&
+        p.equals(p.normalize(p.absolute(targetPath)), this.targetPath)) {
+      await source.rename(targetPath);
+      didInterrupt = true;
+      throw StateError('injected_terminal_run_raw_rename');
+    }
+    await delegate.renameAndSync(source: source, targetPath: targetPath);
+  }
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+
+  @override
+  Future<void> syncDirectory(Directory directory, {bool fullBarrier = false}) =>
+      delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) =>
+      delegate.syncFile(file, fullBarrier: fullBarrier);
+}
+
+final class _FailingArchiveParentSyncDurability implements RestoreDurability {
+  _FailingArchiveParentSyncDurability(
+    this.delegate, {
+    required Directory completedRunsRoot,
+    required Directory workspaceRoot,
+  }) : completedRunsRootPath = p.normalize(p.absolute(completedRunsRoot.path)),
+       workspaceRootPath = p.normalize(p.absolute(workspaceRoot.path));
+
+  final RestoreDurability delegate;
+  final String completedRunsRootPath;
+  final String workspaceRootPath;
+  final observedParentSyncs = <String>[];
+  var didFail = false;
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) => delegate.renameAndSync(source: source, targetPath: targetPath);
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+
+  @override
+  Future<void> syncDirectory(
+    Directory directory, {
+    bool fullBarrier = false,
+  }) async {
+    final path = p.normalize(p.absolute(directory.path));
+    if (fullBarrier &&
+        (p.equals(path, completedRunsRootPath) ||
+            p.equals(path, workspaceRootPath))) {
+      observedParentSyncs.add(path);
+      if (!didFail && p.equals(path, workspaceRootPath)) {
+        didFail = true;
+        throw StateError('injected_terminal_archive_source_parent_sync');
+      }
+    }
+    await delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+  }
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) =>
+      delegate.syncFile(file, fullBarrier: fullBarrier);
+}
+
 final class _ThrowAfterDiscardingMarkerDurability implements RestoreDurability {
   _ThrowAfterDiscardingMarkerDurability(this.delegate);
 
@@ -1208,6 +1306,258 @@ void main() {
       expect(pending?.runId, second.runId);
       expect(pending?.receipt.state, RestoreReceiptState.prepared);
     });
+
+    test(
+      'keeps terminal admission after the run rename but before its barriers',
+      () async {
+        SharedPreferences.setMockInitialValues({'theme': 'old'});
+        final preferences = await SharedPreferences.getInstance();
+        final bundle = await _createBundle(
+          root,
+          theme: 'new',
+          secretsIncluded: true,
+          directoryName: 'raw_terminal_archive_rename',
+        );
+        final prepared = await RestoreBundlePreparation.prepare(
+          appDataDirectory: root,
+          extractedDirectory: bundle.directory,
+          sourceManifestSha256: bundle.manifestSha256,
+          bundleIncludesChats: false,
+          bundleIncludesFiles: false,
+          restoreChats: false,
+          restoreFiles: false,
+          createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+        );
+
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+          ),
+          throwsA(isA<RestoreColdRestartRequired>()),
+        );
+        await simulateRestoreColdProcessBoundary(root);
+        final workspaceLock = RestoreWorkspaceLock(appDataDirectory: root);
+        final activeRun = Directory(
+          p.join(workspaceLock.workspaceRoot.path, 'run_${prepared.runId}'),
+        );
+        final completedRun = Directory(
+          p.join(workspaceLock.completedRunsRoot.path, 'run_${prepared.runId}'),
+        );
+        final durability = _InterruptAfterTerminalRunRawRenameDurability(
+          RestorePlatformDurability(),
+          source: activeRun,
+          target: completedRun,
+        );
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+            durability: durability,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_terminal_run_raw_rename',
+            ),
+          ),
+        );
+        expect(durability.didInterrupt, isTrue);
+        expect(await activeRun.exists(), isFalse);
+        expect(await completedRun.exists(), isTrue);
+        expect(
+          await File(
+            p.join(
+              workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunFileName,
+            ),
+          ).readAsString(),
+          prepared.runId,
+        );
+
+        final interrupted = await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        );
+        expect(interrupted, isNotNull);
+        expect(interrupted!.runId, prepared.runId);
+        expect(interrupted.receipt.state, RestoreReceiptState.committed);
+        expect(
+          interrupted.markerFileName,
+          RestoreWorkspaceLock.archivingRunFileName,
+        );
+
+        final syncFailure = _FailingArchiveParentSyncDurability(
+          RestorePlatformDurability(),
+          completedRunsRoot: workspaceLock.completedRunsRoot,
+          workspaceRoot: workspaceLock.workspaceRoot,
+        );
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+            durability: syncFailure,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_terminal_archive_source_parent_sync',
+            ),
+          ),
+        );
+        expect(syncFailure.didFail, isTrue);
+        expect(syncFailure.observedParentSyncs, [
+          p.normalize(p.absolute(workspaceLock.completedRunsRoot.path)),
+          p.normalize(p.absolute(workspaceLock.workspaceRoot.path)),
+        ]);
+        expect(
+          await File(
+            p.join(
+              workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunFileName,
+            ),
+          ).readAsString(),
+          prepared.runId,
+        );
+        expect(
+          (await RestoreStartupGate.inspect(
+            appDataDirectory: root,
+          ))?.runInCompletedDirectory,
+          isTrue,
+        );
+
+        final resumed = await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: root,
+          preferences: preferences,
+        );
+        expect(resumed?.state, RestoreReceiptState.committed);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+        expect(
+          (await RestoreReceiptStore(
+            appDataDirectory: root,
+            runId: prepared.runId,
+            archived: true,
+          ).readLatest())?.state,
+          RestoreReceiptState.committed,
+        );
+      },
+    );
+
+    test(
+      'reclaims a legacy markerless terminal run before archiving it',
+      () async {
+        SharedPreferences.setMockInitialValues({'theme': 'old'});
+        final preferences = await SharedPreferences.getInstance();
+        final bundle = await _createBundle(
+          root,
+          theme: 'new',
+          secretsIncluded: true,
+          directoryName: 'legacy_markerless_terminal',
+        );
+        final prepared = await RestoreBundlePreparation.prepare(
+          appDataDirectory: root,
+          extractedDirectory: bundle.directory,
+          sourceManifestSha256: bundle.manifestSha256,
+          bundleIncludesChats: false,
+          bundleIncludesFiles: false,
+          restoreChats: false,
+          restoreFiles: false,
+          createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+        );
+
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+          ),
+          throwsA(isA<RestoreColdRestartRequired>()),
+        );
+        await simulateRestoreColdProcessBoundary(root);
+
+        final workspaceLock = RestoreWorkspaceLock(appDataDirectory: root);
+        await workspaceLock.synchronized(() async {
+          final publishing = File(
+            p.join(
+              workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.publishingRunFileName,
+            ),
+          );
+          expect(await publishing.readAsString(), prepared.runId);
+          await publishing.delete();
+          await RestorePlatformDurability().syncDirectory(
+            workspaceLock.workspaceRoot,
+            fullBarrier: true,
+          );
+        });
+        final markerless = await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        );
+        expect(markerless?.runId, prepared.runId);
+        expect(markerless?.markerFileName, isNull);
+
+        final activeRun = Directory(
+          p.join(workspaceLock.workspaceRoot.path, 'run_${prepared.runId}'),
+        );
+        final completedRun = Directory(
+          p.join(workspaceLock.completedRunsRoot.path, 'run_${prepared.runId}'),
+        );
+        final durability = _InterruptAfterTerminalRunRawRenameDurability(
+          RestorePlatformDurability(),
+          source: activeRun,
+          target: completedRun,
+        );
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+            durability: durability,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_terminal_run_raw_rename',
+            ),
+          ),
+        );
+        expect(durability.didInterrupt, isTrue);
+        expect(await activeRun.exists(), isFalse);
+        expect(await completedRun.exists(), isTrue);
+        expect(
+          await File(
+            p.join(
+              workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunFileName,
+            ),
+          ).readAsString(),
+          prepared.runId,
+        );
+
+        final interrupted = await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        );
+        expect(interrupted?.runId, prepared.runId);
+        expect(
+          interrupted?.markerFileName,
+          RestoreWorkspaceLock.archivingRunFileName,
+        );
+        expect(interrupted?.runInCompletedDirectory, isTrue);
+
+        final resumed = await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: root,
+          preferences: preferences,
+        );
+        expect(resumed?.state, RestoreReceiptState.committed);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+      },
+    );
 
     for (final point in const [
       _LogicalCutoverInterruption.claimed,

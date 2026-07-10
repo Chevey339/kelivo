@@ -20,6 +20,7 @@ const _processTableTimeout = Duration(seconds: 10);
 const _ioCloseTimeout = Duration(seconds: 10);
 const _maximumProcessTableBytes = 8 * 1024 * 1024;
 final _identifierPattern = RegExp(r'^[a-f0-9]{32}$');
+final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
 final _hostProcessId = pid;
 final _processTableLinePattern = RegExp(
   r'^\s*([0-9]+)\s+'
@@ -52,53 +53,120 @@ enum _MatrixTier {
   }
 }
 
+enum _MatrixScenario { forward, terminal }
+
+final class _MatrixFailpoint {
+  const _MatrixFailpoint.forward(RestoreProcessFailpoint value)
+    : forward = value,
+      terminal = null,
+      scenario = _MatrixScenario.forward;
+
+  const _MatrixFailpoint.terminal(RestoreTerminalProcessFailpoint value)
+    : forward = null,
+      terminal = value,
+      scenario = _MatrixScenario.terminal;
+
+  final _MatrixScenario scenario;
+  final RestoreProcessFailpoint? forward;
+  final RestoreTerminalProcessFailpoint? terminal;
+
+  String get name => switch (scenario) {
+    _MatrixScenario.forward => forward!.name,
+    _MatrixScenario.terminal => terminal!.name,
+  };
+
+  String get scenarioName => switch (scenario) {
+    _MatrixScenario.forward => restoreHarnessScenario,
+    _MatrixScenario.terminal => restoreTerminalHarnessScenario,
+  };
+}
+
 final class _MatrixSelection {
-  const _MatrixSelection({
+  const _MatrixSelection.forward({
     required this.tier,
     this.singleFailpoint,
     this.startAt,
-  });
+  }) : scenario = _MatrixScenario.forward;
 
+  const _MatrixSelection.terminal({this.singleFailpoint})
+    : scenario = _MatrixScenario.terminal,
+      tier = _MatrixTier.full,
+      startAt = null;
+
+  final _MatrixScenario scenario;
   final _MatrixTier tier;
-  final RestoreProcessFailpoint? singleFailpoint;
+  final _MatrixFailpoint? singleFailpoint;
   final RestoreProcessFailpoint? startAt;
 
-  List<RestoreProcessFailpoint> get failpoints {
+  List<_MatrixFailpoint> get failpoints {
     if (singleFailpoint != null) return [singleFailpoint!];
+    if (scenario == _MatrixScenario.terminal) {
+      return [
+        for (final failpoint in RestoreTerminalProcessFailpoint.values)
+          _MatrixFailpoint.terminal(failpoint),
+      ];
+    }
     final all = tier.failpoints;
-    if (startAt == null) return all;
+    if (startAt == null) {
+      return [for (final failpoint in all) _MatrixFailpoint.forward(failpoint)];
+    }
     final index = all.indexOf(startAt!);
     if (index < 0) {
       throw StateError(
         'restore_harness_matrix_start_not_in_tier:${startAt!.name}',
       );
     }
-    return List.unmodifiable(all.sublist(index));
+    return List.unmodifiable([
+      for (final failpoint in all.sublist(index))
+        _MatrixFailpoint.forward(failpoint),
+    ]);
   }
 
   String get label => singleFailpoint != null
       ? 'failpoint=${singleFailpoint!.name}'
+      : scenario == _MatrixScenario.terminal
+      ? 'terminal'
       : startAt == null
       ? tier.name
       : '${tier.name}-from=${startAt!.name}';
 
+  String get scenarioName => switch (scenario) {
+    _MatrixScenario.forward => restoreHarnessScenario,
+    _MatrixScenario.terminal => restoreTerminalHarnessScenario,
+  };
+
   static _MatrixSelection parse(List<String> arguments) {
     if (arguments.isEmpty) {
-      return const _MatrixSelection(tier: _MatrixTier.core);
+      return const _MatrixSelection.forward(tier: _MatrixTier.core);
+    }
+    if (arguments.length == 1 && arguments.single == '--scenario=terminal') {
+      return const _MatrixSelection.terminal();
     }
     if (arguments.length == 1 && arguments.single.startsWith('--failpoint=')) {
-      return _MatrixSelection(
-        tier: _MatrixTier.full,
-        singleFailpoint: _parseFailpoint(
-          arguments.single.substring('--failpoint='.length),
-        ),
-      );
+      final name = arguments.single.substring('--failpoint='.length);
+      final forward = _tryParseForwardFailpoint(name);
+      final terminal = _tryParseTerminalFailpoint(name);
+      if ((forward == null) == (terminal == null)) {
+        throw ArgumentError.value(
+          name,
+          'failpoint',
+          'unknown or ambiguous restore process failpoint',
+        );
+      }
+      return forward != null
+          ? _MatrixSelection.forward(
+              tier: _MatrixTier.full,
+              singleFailpoint: _MatrixFailpoint.forward(forward),
+            )
+          : _MatrixSelection.terminal(
+              singleFailpoint: _MatrixFailpoint.terminal(terminal!),
+            );
     }
     if (arguments.length > 2 || arguments.toSet().length != arguments.length) {
       throw ArgumentError(
         'run_restore_process_harness accepts '
         '[--tier=smoke|core|full] [--from=<name>] '
-        'or --failpoint=<name>',
+        'or --scenario=terminal or --failpoint=<name>',
       );
     }
     _MatrixTier? tier;
@@ -109,36 +177,58 @@ final class _MatrixSelection {
         tier = _MatrixTier.parse([argument]);
       } else if (argument.startsWith('--from=')) {
         if (startAt != null) throw ArgumentError('duplicate from');
-        startAt = _parseFailpoint(argument.substring('--from='.length));
+        startAt = _parseForwardFailpoint(argument.substring('--from='.length));
       } else {
         throw ArgumentError.value(argument, 'argument');
       }
     }
-    return _MatrixSelection(tier: tier ?? _MatrixTier.core, startAt: startAt);
+    return _MatrixSelection.forward(
+      tier: tier ?? _MatrixTier.core,
+      startAt: startAt,
+    );
   }
 
-  static RestoreProcessFailpoint _parseFailpoint(String name) {
-    return RestoreProcessFailpoint.values.firstWhere(
-      (candidate) => candidate.name == name,
-      orElse: () => throw ArgumentError.value(
+  static RestoreProcessFailpoint _parseForwardFailpoint(String name) {
+    final failpoint = _tryParseForwardFailpoint(name);
+    if (failpoint == null) {
+      throw ArgumentError.value(
         name,
         'failpoint',
-        'unknown restore process failpoint',
-      ),
-    );
+        'unknown forward restore process failpoint',
+      );
+    }
+    return failpoint;
+  }
+
+  static RestoreProcessFailpoint? _tryParseForwardFailpoint(String name) {
+    for (final candidate in RestoreProcessFailpoint.values) {
+      if (candidate.name == name) return candidate;
+    }
+    return null;
+  }
+
+  static RestoreTerminalProcessFailpoint? _tryParseTerminalFailpoint(
+    String name,
+  ) {
+    for (final candidate in RestoreTerminalProcessFailpoint.values) {
+      if (candidate.name == name) return candidate;
+    }
+    return null;
   }
 }
 
 final class _MatrixCaseSummary {
   const _MatrixCaseSummary({
-    required this.failpoint,
+    required this.scenario,
+    required this.failpointName,
     required this.scenarioId,
     required this.runnerProcessIds,
     required this.elapsed,
     required this.passed,
   });
 
-  final RestoreProcessFailpoint failpoint;
+  final String scenario;
+  final String failpointName;
   final String scenarioId;
   final List<int> runnerProcessIds;
   final Duration elapsed;
@@ -321,21 +411,28 @@ final class _RestoreProcessHarnessHost {
   final Stopwatch _matrixStopwatch = Stopwatch();
   String? _scenarioId;
   Directory? _scenarioRoot;
-  RestoreProcessFailpoint? _failpoint;
+  _MatrixFailpoint? _failpoint;
   Stopwatch? _caseStopwatch;
 
   String get scenarioId =>
       _scenarioId ?? (throw StateError('restore_harness_case_scenario'));
   Directory get scenarioRoot =>
       _scenarioRoot ?? (throw StateError('restore_harness_case_root'));
-  RestoreProcessFailpoint get failpoint =>
+  _MatrixFailpoint get failpoint =>
       _failpoint ?? (throw StateError('restore_harness_case_failpoint'));
   Directory? get activeScenarioRoot => _scenarioRoot;
-  String get _preferencesPrefix => restoreProcessPreferencesPrefix(
-    matrixRunId: matrixRunId,
-    scenarioId: scenarioId,
-    failpoint: failpoint,
-  );
+  String get _preferencesPrefix => switch (failpoint.scenario) {
+    _MatrixScenario.forward => restoreProcessPreferencesPrefix(
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      failpoint: failpoint.forward!,
+    ),
+    _MatrixScenario.terminal => restoreTerminalProcessPreferencesPrefix(
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      failpoint: failpoint.terminal!,
+    ),
+  };
 
   Future<void> releaseHostLock() async {
     final hostLock = _hostLock;
@@ -344,7 +441,7 @@ final class _RestoreProcessHarnessHost {
     await _releaseHostLockHandle(hostLock);
   }
 
-  Future<void> _beginCase(RestoreProcessFailpoint selectedFailpoint) async {
+  Future<void> _beginCase(_MatrixFailpoint selectedFailpoint) async {
     if (_scenarioId != null ||
         _scenarioRoot != null ||
         _failpoint != null ||
@@ -398,6 +495,7 @@ final class _RestoreProcessHarnessHost {
   void writeMatrixSummary(IOSink sink) {
     sink.writeln(
       'Restore process matrix summary: selection=${selection.label} '
+      'scenario=${selection.scenarioName} '
       'matrixRunId=$matrixRunId cases=${_caseSummaries.length}/'
       '${selection.failpoints.length} elapsed='
       '${_formatDuration(_matrixStopwatch.elapsed)}',
@@ -405,7 +503,8 @@ final class _RestoreProcessHarnessHost {
     for (final summary in _caseSummaries) {
       sink.writeln(
         '${summary.passed ? 'PASS' : 'FAIL'} '
-        '${summary.failpoint.name} scenario=${summary.scenarioId} '
+        '${summary.failpointName} scenario=${summary.scenario} '
+        'scenarioId=${summary.scenarioId} '
         'elapsed=${_formatDuration(summary.elapsed)} '
         'runnerPids=${summary.runnerProcessIds.join(',')}',
       );
@@ -414,7 +513,10 @@ final class _RestoreProcessHarnessHost {
 
   Future<void> run() async {
     final failpoints = selection.failpoints;
-    if (failpoints.isEmpty || failpoints.toSet().length != failpoints.length) {
+    if (failpoints.isEmpty ||
+        failpoints.map((value) => value.name).toSet().length !=
+            failpoints.length ||
+        failpoints.any((value) => value.scenario != selection.scenario)) {
       throw StateError('restore_harness_matrix_failpoints');
     }
     stdout.writeln(
@@ -444,7 +546,8 @@ final class _RestoreProcessHarnessHost {
           final runnerProcessIds = _currentCaseRunnerProcessIds();
           _caseSummaries.add(
             _MatrixCaseSummary(
-              failpoint: selectedFailpoint,
+              scenario: selectedFailpoint.scenarioName,
+              failpointName: selectedFailpoint.name,
               scenarioId: scenarioId,
               runnerProcessIds: runnerProcessIds,
               elapsed: _caseStopwatch!.elapsed,
@@ -461,7 +564,8 @@ final class _RestoreProcessHarnessHost {
           _caseStopwatch!.stop();
           _caseSummaries.add(
             _MatrixCaseSummary(
-              failpoint: selectedFailpoint,
+              scenario: selectedFailpoint.scenarioName,
+              failpointName: selectedFailpoint.name,
               scenarioId: scenarioId,
               runnerProcessIds: _currentCaseRunnerProcessIds(),
               elapsed: _caseStopwatch!.elapsed,
@@ -487,20 +591,37 @@ final class _RestoreProcessHarnessHost {
   }
 
   Future<void> _runCasePhases() async {
+    switch (failpoint.scenario) {
+      case _MatrixScenario.forward:
+        await _runForwardCasePhases();
+      case _MatrixScenario.terminal:
+        await _runTerminalCasePhases();
+    }
+  }
+
+  Future<void> _runForwardCasePhases() async {
     final setup = await _runNormalPhase(
-      RestoreProcessHarnessPhase.setup,
+      await _writeForwardControl(RestoreProcessHarnessPhase.setup),
       _validateSetupEvent,
     );
     final runId = setup.requireString('runId');
 
-    final cutover = await _runCutoverPhase(runId);
+    final cutover = await _runKillPhase(
+      await _writeForwardControl(RestoreProcessHarnessPhase.cutoverKill),
+      (event, control, process) => _validateCutoverEvent(
+        event,
+        control as RestoreProcessHarnessControl,
+        process,
+        runId: runId,
+      ),
+    );
     final cutoverLeaseInstanceId = cutover.requireIdentifier('leaseInstanceId');
 
     final resume = await _runNormalPhase(
-      RestoreProcessHarnessPhase.resumeToColdAck,
+      await _writeForwardControl(RestoreProcessHarnessPhase.resumeToColdAck),
       (event, control, process) => _validateResumeEvent(
         event,
-        control,
+        control as RestoreProcessHarnessControl,
         process,
         runId: runId,
         cutoverLeaseInstanceId: cutoverLeaseInstanceId,
@@ -510,10 +631,10 @@ final class _RestoreProcessHarnessHost {
     final resumeLeaseInstanceId = resume.requireIdentifier('leaseInstanceId');
 
     await _runNormalPhase(
-      RestoreProcessHarnessPhase.coldFinalize,
+      await _writeForwardControl(RestoreProcessHarnessPhase.coldFinalize),
       (event, control, process) => _validateFinalizeEvent(
         event,
-        control,
+        control as RestoreProcessHarnessControl,
         process,
         runId: runId,
         resumeProcessId: resumeProcessId,
@@ -523,11 +644,129 @@ final class _RestoreProcessHarnessHost {
     );
   }
 
+  Future<void> _runTerminalCasePhases() async {
+    final terminalFailpoint = failpoint.terminal!;
+    final setup = await _runNormalPhase(
+      await _writeTerminalControl(RestoreTerminalProcessHarnessPhase.setup),
+      _validateSetupEvent,
+    );
+    final runId = setup.requireString('runId');
+
+    if (_isColdAckFailpoint(terminalFailpoint)) {
+      final killed = await _runKillPhase(
+        await _writeTerminalControl(
+          RestoreTerminalProcessHarnessPhase.commitToColdAck,
+        ),
+        (event, control, process) => _validateTerminalColdAckKillEvent(
+          event,
+          control as RestoreTerminalProcessHarnessControl,
+          process,
+          runId: runId,
+        ),
+      );
+      final killedLease = killed.requireIdentifier('leaseInstanceId');
+      final terminalReceiptChecksum = killed.requireSha256(
+        'terminalReceiptChecksum',
+      );
+      final recovery = await _runNormalPhase(
+        await _writeTerminalControl(
+          RestoreTerminalProcessHarnessPhase.recoverTerminal,
+        ),
+        (event, control, process) => _validateTerminalColdAckRecoveryEvent(
+          event,
+          control as RestoreTerminalProcessHarnessControl,
+          process,
+          runId: runId,
+          killedProcessId: killed.pid,
+          killedLeaseInstanceId: killedLease,
+          terminalReceiptChecksum: terminalReceiptChecksum,
+        ),
+      );
+      final recoveryLease = recovery.requireIdentifier('leaseInstanceId');
+      final expectedAckProcessId = recovery.requireProcessId('ackProcessId');
+      final expectedAckLease = recovery.requireIdentifier('ackLeaseInstanceId');
+      final recoveryOutcome = recovery.requireString('outcome');
+      await _runNormalPhase(
+        await _writeTerminalControl(
+          RestoreTerminalProcessHarnessPhase.verifyBusinessReady,
+        ),
+        (event, control, process) => _validateTerminalVerifyEvent(
+          event,
+          control as RestoreTerminalProcessHarnessControl,
+          process,
+          runId: runId,
+          expectedGateResult: recoveryOutcome == 'archived'
+              ? 'none'
+              : 'committed',
+          expectedAckProcessId: expectedAckProcessId,
+          expectedAckLeaseInstanceId: expectedAckLease,
+          priorLeaseInstanceIds: {killedLease, recoveryLease},
+        ),
+      );
+      return;
+    }
+
+    final arm = await _runNormalPhase(
+      await _writeTerminalControl(
+        RestoreTerminalProcessHarnessPhase.commitToColdAck,
+      ),
+      (event, control, process) => _validateTerminalArmEvent(
+        event,
+        control as RestoreTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+      ),
+    );
+    final armLease = arm.requireIdentifier('leaseInstanceId');
+    final ackProcessId = arm.requireProcessId('coldAckProcessId');
+    final ackLease = arm.requireIdentifier('coldAckLeaseInstanceId');
+    final terminalReceiptChecksum = arm.requireSha256(
+      'terminalReceiptChecksum',
+    );
+    final archiveKill = await _runKillPhase(
+      await _writeTerminalControl(
+        RestoreTerminalProcessHarnessPhase.recoverTerminal,
+      ),
+      (event, control, process) => _validateTerminalArchiveKillEvent(
+        event,
+        control as RestoreTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+        armProcessId: arm.pid,
+        armLeaseInstanceId: armLease,
+        terminalReceiptChecksum: terminalReceiptChecksum,
+      ),
+    );
+    final archiveKillLease = archiveKill.requireIdentifier('leaseInstanceId');
+    await _runNormalPhase(
+      await _writeTerminalControl(
+        RestoreTerminalProcessHarnessPhase.verifyBusinessReady,
+      ),
+      (event, control, process) => _validateTerminalVerifyEvent(
+        event,
+        control as RestoreTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+        expectedGateResult:
+            terminalFailpoint ==
+                RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable
+            ? 'none'
+            : 'committed',
+        expectedAckProcessId: ackProcessId,
+        expectedAckLeaseInstanceId: ackLease,
+        priorLeaseInstanceIds: {armLease, archiveKillLease},
+      ),
+    );
+  }
+
+  bool _isColdAckFailpoint(RestoreTerminalProcessFailpoint value) =>
+      value == RestoreTerminalProcessFailpoint.coldAckTempDurable ||
+      value == RestoreTerminalProcessFailpoint.coldAckPublished;
+
   Future<_HarnessEvent> _runNormalPhase(
-    RestoreProcessHarnessPhase phase,
+    RestoreHarnessControl control,
     _EventValidator validate,
   ) async {
-    final control = await _writeControl(phase);
     final process = await _startFlutter(control);
     final event = await _waitForEvent(control, process);
     final runner = await _recordRunnerProcess(event, process);
@@ -536,7 +775,7 @@ final class _RestoreProcessHarnessHost {
     final outerExitCode = await process.waitForExit(_phaseTimeout);
     if (outerExitCode != 0) {
       throw StateError(
-        'restore_harness_outer_exit:${phase.name}:$outerExitCode',
+        'restore_harness_outer_exit:${control.phaseName}:$outerExitCode',
       );
     }
     await _requireRunnerExited(runner);
@@ -544,12 +783,14 @@ final class _RestoreProcessHarnessHost {
     return event;
   }
 
-  Future<_HarnessEvent> _runCutoverPhase(String runId) async {
-    final control = await _writeControl(RestoreProcessHarnessPhase.cutoverKill);
+  Future<_HarnessEvent> _runKillPhase(
+    RestoreHarnessControl control,
+    _EventValidator validate,
+  ) async {
     final process = await _startFlutter(control);
     final event = await _waitForEvent(control, process);
     final runner = await _recordRunnerProcess(event, process);
-    _validateCutoverEvent(event, control, process, runId: runId);
+    validate(event, control, process);
 
     await _requireSameRunner(runner);
     if (!Process.killPid(event.pid, ProcessSignal.sigkill)) {
@@ -560,53 +801,69 @@ final class _RestoreProcessHarnessHost {
 
     final outerExitCode = await process.waitForExit(_killExitTimeout);
     if (outerExitCode == 0) {
-      throw StateError('restore_harness_cutover_outer_succeeded');
+      if (control is RestoreProcessHarnessControl) {
+        throw StateError('restore_harness_cutover_outer_succeeded');
+      }
+      throw StateError(
+        'restore_terminal_harness_kill_outer_succeeded:${control.phaseName}',
+      );
     }
     return event;
   }
 
-  Future<RestoreProcessHarnessControl> _writeControl(
+  Future<RestoreProcessHarnessControl> _writeForwardControl(
     RestoreProcessHarnessPhase phase,
   ) async {
-    final generation = phase.index + 1;
     final control = RestoreProcessHarnessControl(
-      generation: generation,
+      generation: phase.index + 1,
       matrixRunId: matrixRunId,
       scenarioId: scenarioId,
       phase: phase,
-      failpoint: failpoint,
+      failpoint: failpoint.forward!,
       scenarioRoot: scenarioRoot.path,
       preferencesPrefix: _preferencesPrefix,
     );
-    final controlFile = _controlFile(control);
-    await writeDurableHarnessJson(controlFile, control.toJson());
-    final persisted = RestoreProcessHarnessControl.fromJson(
-      await readHarnessJson(controlFile),
-    );
-    if (persisted.generation != control.generation ||
-        persisted.matrixRunId != control.matrixRunId ||
-        persisted.scenarioId != control.scenarioId ||
-        persisted.phase != control.phase ||
-        persisted.failpoint != control.failpoint ||
-        !p.equals(persisted.scenarioRoot, control.scenarioRoot) ||
-        persisted.preferencesPrefix != control.preferencesPrefix) {
-      throw StateError('restore_harness_control_readback');
-    }
-    return control;
+    return _persistControl(control);
   }
 
-  File _controlFile(RestoreProcessHarnessControl control) => File(
+  Future<RestoreTerminalProcessHarnessControl> _writeTerminalControl(
+    RestoreTerminalProcessHarnessPhase phase,
+  ) async {
+    final control = RestoreTerminalProcessHarnessControl(
+      generation: phase.index + 1,
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      phase: phase,
+      failpoint: failpoint.terminal!,
+      scenarioRoot: scenarioRoot.path,
+      preferencesPrefix: _preferencesPrefix,
+    );
+    return _persistControl(control);
+  }
+
+  Future<T> _persistControl<T extends RestoreHarnessControl>(T control) async {
+    final controlFile = _controlFile(control);
+    await writeDurableHarnessJson(controlFile, control.toJson());
+    final persisted = RestoreHarnessControl.fromJson(
+      await readHarnessJson(controlFile),
+    );
+    if (persisted is! T ||
+        jsonEncode(persisted.toJson()) != jsonEncode(control.toJson())) {
+      throw StateError('restore_harness_control_readback');
+    }
+    return persisted;
+  }
+
+  File _controlFile(RestoreHarnessControl control) => File(
     p.join(
       scenarioRoot.path,
       'control',
       '${control.generation.toString().padLeft(2, '0')}_'
-          '${control.phase.name}.json',
+          '${control.phaseName}.json',
     ),
   );
 
-  Future<_ManagedProcess> _startFlutter(
-    RestoreProcessHarnessControl control,
-  ) async {
+  Future<_ManagedProcess> _startFlutter(RestoreHarnessControl control) async {
     final runnerBaseline = {
       for (final runner in await _readRestoreHarnessProcesses())
         runner.identity,
@@ -630,18 +887,18 @@ final class _RestoreProcessHarnessHost {
       runInShell: false,
     );
     final managed = _ManagedProcess(
-      phase: control.phase,
+      phaseName: control.phaseName,
       command: ['flutter', ...arguments],
       process: process,
       runnerBaseline: runnerBaseline,
     );
     _processes.add(managed);
-    stdout.writeln('Started ${control.phase.name}: outer PID ${process.pid}');
+    stdout.writeln('Started ${control.phaseName}: outer PID ${process.pid}');
     return managed;
   }
 
   Future<_HarnessEvent> _waitForEvent(
-    RestoreProcessHarnessControl control,
+    RestoreHarnessControl control,
     _ManagedProcess process,
   ) async {
     final stopwatch = Stopwatch()..start();
@@ -656,7 +913,7 @@ final class _RestoreProcessHarnessHost {
         return _HarnessEvent.fromJson(await readHarnessJson(control.eventFile));
       }
       if (type != FileSystemEntityType.notFound) {
-        throw StateError('restore_harness_event_type:${control.phase.name}');
+        throw StateError('restore_harness_event_type:${control.phaseName}');
       }
       if (process.hasExited) {
         await Future<void>.delayed(const Duration(milliseconds: 100));
@@ -672,7 +929,7 @@ final class _RestoreProcessHarnessHost {
           );
         }
         throw StateError(
-          'restore_harness_event_missing:${control.phase.name}:'
+          'restore_harness_event_missing:${control.phaseName}:'
           '${process.completedExitCode}',
         );
       }
@@ -682,7 +939,7 @@ final class _RestoreProcessHarnessHost {
       ]);
     }
     throw TimeoutException(
-      'restore_harness_event_timeout:${control.phase.name}',
+      'restore_harness_event_timeout:${control.phaseName}',
       _phaseTimeout,
     );
   }
@@ -695,14 +952,14 @@ final class _RestoreProcessHarnessHost {
     if (candidates.length != 1) {
       throw StateError(
         'restore_harness_phase_runner_count:'
-        '${process.phase.name}:${candidates.length}',
+        '${process.phaseName}:${candidates.length}',
       );
     }
     final observed = candidates.single;
     final existing = process.discoveredRunner;
     if (existing != null && existing.identity != observed.identity) {
       throw StateError(
-        'restore_harness_phase_runner_changed:${process.phase.name}',
+        'restore_harness_phase_runner_changed:${process.phaseName}',
       );
     }
     process.discoveredRunner = observed;
@@ -711,7 +968,7 @@ final class _RestoreProcessHarnessHost {
 
   void _validateSetupEvent(
     _HarnessEvent event,
-    RestoreProcessHarnessControl control,
+    RestoreHarnessControl control,
     _ManagedProcess process,
   ) {
     event.requireCommon(
@@ -722,6 +979,344 @@ final class _RestoreProcessHarnessHost {
     );
     event.requireIdentifier('runId');
     event.requireExactString('receiptState', 'prepared');
+  }
+
+  void _validateTerminalArmEvent(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    if (_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_terminal_harness_arm_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'leaseInstanceId',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'committed');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (event.requireProcessId('coldAckProcessId') != event.pid) {
+      throw StateError('restore_terminal_harness_arm_ack_pid');
+    }
+    if (event.requireIdentifier('coldAckLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_terminal_harness_arm_ack_lease');
+    }
+    event.requireSha256('coldAckChecksum');
+    event.requireSha256('terminalReceiptChecksum');
+  }
+
+  void _validateTerminalColdAckKillEvent(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    if (!_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_terminal_harness_cold_ack_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: const {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'observedReceiptState',
+        'operationKind',
+        'terminalReceiptChecksum',
+        'expected',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'ackChecksum',
+        'temporaryPath',
+        'targetPath',
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireExactString('observedReceiptState', 'committed');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    _validateTerminalColdAckObservation(
+      event,
+      control,
+      runId: runId,
+      leaseInstanceId: leaseInstanceId,
+    );
+  }
+
+  void _validateTerminalColdAckObservation(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control, {
+    required String runId,
+    required String leaseInstanceId,
+  }) {
+    event.requireExactString('operationKind', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireSha256('terminalReceiptChecksum');
+    event.requireExactString('expected', 'target');
+    if (event.requireProcessId('ackProcessId') != event.pid) {
+      throw StateError('restore_terminal_harness_cold_ack_pid');
+    }
+    if (event.requireIdentifier('ackLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_terminal_harness_cold_ack_lease');
+    }
+    event.requireSha256('ackChecksum');
+
+    final runDirectory = p.join(
+      p.normalize(p.absolute(control.appDataDirectory.path)),
+      '.kelivo_restore',
+      'run_$runId',
+    );
+    const ackFileName = 'settings_cold_ack.json';
+    final temporaryPath = event.requirePath('temporaryPath');
+    final temporaryPattern = RegExp(
+      '^${RegExp.escape(ackFileName)}\\.'
+      '([1-9][0-9]*)_${event.pid}_([0-9]+)\\.tmp\$',
+    );
+    if (!p.equals(p.dirname(temporaryPath), runDirectory) ||
+        temporaryPattern.firstMatch(p.basename(temporaryPath)) == null) {
+      throw const FormatException('restore_terminal_harness_cold_ack_temp');
+    }
+    event.requirePath(
+      'targetPath',
+      expected: p.join(runDirectory, ackFileName),
+    );
+  }
+
+  void _validateTerminalColdAckRecoveryEvent(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int killedProcessId,
+    required String killedLeaseInstanceId,
+    required String terminalReceiptChecksum,
+  }) {
+    if (!_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_terminal_harness_recovery_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'outcome',
+        'leaseInstanceId',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'committed');
+    event.requireExactString(
+      'terminalReceiptChecksum',
+      terminalReceiptChecksum,
+    );
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == killedLeaseInstanceId) {
+      throw StateError('restore_terminal_harness_recovery_lease_reused');
+    }
+    final outcome = event.requireString('outcome');
+    final expectsColdRestart =
+        control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable;
+    if (outcome != (expectsColdRestart ? 'coldRestartRequired' : 'archived')) {
+      throw StateError('restore_terminal_harness_recovery_outcome');
+    }
+    final coldRestartRequired = outcome == 'coldRestartRequired';
+    final expectedAckProcessId = coldRestartRequired
+        ? event.pid
+        : killedProcessId;
+    final expectedAckLease = coldRestartRequired
+        ? leaseInstanceId
+        : killedLeaseInstanceId;
+    if (event.requireProcessId('ackProcessId') != expectedAckProcessId) {
+      throw StateError('restore_terminal_harness_recovery_ack_pid');
+    }
+    if (event.requireIdentifier('ackLeaseInstanceId') != expectedAckLease) {
+      throw StateError('restore_terminal_harness_recovery_ack_lease');
+    }
+    final mutationAttempts = event.requireInt('settingsMutationAttempts');
+    if (coldRestartRequired ? mutationAttempts < 1 : mutationAttempts != 0) {
+      throw StateError('restore_terminal_harness_recovery_settings_mutation');
+    }
+  }
+
+  void _validateTerminalArchiveKillEvent(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int armProcessId,
+    required String armLeaseInstanceId,
+    required String terminalReceiptChecksum,
+  }) {
+    if (_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_terminal_harness_archive_failpoint');
+    }
+    final observationKeys = switch (control.failpoint) {
+      RestoreTerminalProcessFailpoint.completedRunsRootDurable ||
+      RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable => const {
+        'operationKind',
+        'boundary',
+        'path',
+        'fullBarrier',
+      },
+      RestoreTerminalProcessFailpoint.archivingMarkerPublished ||
+      RestoreTerminalProcessFailpoint.terminalRunArchived => const {
+        'operationKind',
+        'sourcePath',
+        'targetPath',
+        'sourceKind',
+      },
+      RestoreTerminalProcessFailpoint.coldAckTempDurable ||
+      RestoreTerminalProcessFailpoint.coldAckPublished => throw StateError(
+        'restore_terminal_harness_archive_failpoint',
+      ),
+    };
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'observedReceiptState',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+        ...observationKeys,
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireExactString('observedReceiptState', 'committed');
+    event.requireExactString(
+      'terminalReceiptChecksum',
+      terminalReceiptChecksum,
+    );
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == armLeaseInstanceId) {
+      throw StateError('restore_terminal_harness_archive_lease_reused');
+    }
+    for (final key in const ['coldAckProcessId', 'ackProcessId']) {
+      if (event.requireProcessId(key) != armProcessId) {
+        throw StateError('restore_terminal_harness_archive_ack_pid:$key');
+      }
+    }
+    for (final key in const ['coldAckLeaseInstanceId', 'ackLeaseInstanceId']) {
+      if (event.requireIdentifier(key) != armLeaseInstanceId) {
+        throw StateError('restore_terminal_harness_archive_ack_lease:$key');
+      }
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError('restore_terminal_harness_archive_settings_mutation');
+    }
+    _validateTerminalArchiveObservation(event, control, runId: runId);
+  }
+
+  void _validateTerminalArchiveObservation(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control, {
+    required String runId,
+  }) {
+    final workspace = p.join(
+      p.normalize(p.absolute(control.appDataDirectory.path)),
+      '.kelivo_restore',
+    );
+    switch (control.failpoint) {
+      case RestoreTerminalProcessFailpoint.completedRunsRootDurable ||
+          RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable:
+        event.requireExactString('operationKind', 'terminalWorkspaceSyncAfter');
+        event.requireExactString('boundary', control.failpoint.name);
+        event.requirePath('path', expected: workspace);
+        if (!event.requireBool('fullBarrier')) {
+          throw const FormatException(
+            'restore_terminal_harness_workspace_barrier',
+          );
+        }
+      case RestoreTerminalProcessFailpoint.archivingMarkerPublished:
+        event.requireRenameObservation(
+          sourcePath: p.join(workspace, '.active_run.publishing'),
+          targetPath: p.join(workspace, '.active_run.archiving'),
+          sourceKind: 'file',
+        );
+      case RestoreTerminalProcessFailpoint.terminalRunArchived:
+        event.requireRenameObservation(
+          sourcePath: p.join(workspace, 'run_$runId'),
+          targetPath: p.join(workspace, 'completed', 'run_$runId'),
+          sourceKind: 'directory',
+        );
+      case RestoreTerminalProcessFailpoint.coldAckTempDurable ||
+          RestoreTerminalProcessFailpoint.coldAckPublished:
+        throw StateError('restore_terminal_harness_archive_observation');
+    }
+  }
+
+  void _validateTerminalVerifyEvent(
+    _HarnessEvent event,
+    RestoreTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required String expectedGateResult,
+    required int expectedAckProcessId,
+    required String expectedAckLeaseInstanceId,
+    required Set<String> priorLeaseInstanceIds,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'gateResult',
+        'observedAckProcessId',
+        'observedAckLeaseInstanceId',
+        'leaseInstanceId',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'committed');
+    event.requireExactString('gateResult', expectedGateResult);
+    if (event.requireProcessId('observedAckProcessId') !=
+        expectedAckProcessId) {
+      throw StateError('restore_terminal_harness_verify_ack_pid');
+    }
+    if (event.requireIdentifier('observedAckLeaseInstanceId') !=
+        expectedAckLeaseInstanceId) {
+      throw StateError('restore_terminal_harness_verify_ack_lease');
+    }
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (priorLeaseInstanceIds.length != 2 ||
+        priorLeaseInstanceIds.contains(leaseInstanceId) ||
+        leaseInstanceId == expectedAckLeaseInstanceId) {
+      throw StateError('restore_terminal_harness_verify_lease_reused');
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError('restore_terminal_harness_verify_settings_mutation');
+    }
   }
 
   void _validateCutoverEvent(
@@ -1211,7 +1806,7 @@ final class _RestoreProcessHarnessHost {
       );
     }
     for (final process in _processes) {
-      sink.writeln('\n[${process.phase.name}] ${process.command.join(' ')}');
+      sink.writeln('\n[${process.phaseName}] ${process.command.join(' ')}');
       sink.writeln('outer PID: ${process.process.pid}');
       sink.writeln('runner PID: ${process.runnerProcessId ?? 'unknown'}');
       sink.writeln('exit: ${process.completedExitCode ?? 'running'}');
@@ -1251,9 +1846,16 @@ final class _RestoreProcessHarnessHost {
 typedef _EventValidator =
     void Function(
       _HarnessEvent event,
-      RestoreProcessHarnessControl control,
+      RestoreHarnessControl control,
       _ManagedProcess process,
     );
+
+int _controlVersion(RestoreHarnessControl control) => switch (control) {
+  RestoreProcessHarnessControl() => RestoreProcessHarnessControl.version,
+  RestoreTerminalProcessHarnessControl() =>
+    RestoreTerminalProcessHarnessControl.version,
+  _ => throw StateError('restore_harness_control_runtime_type'),
+};
 
 final class _HarnessEvent {
   _HarnessEvent._(this.json, this.pid);
@@ -1287,7 +1889,7 @@ final class _HarnessEvent {
   }
 
   void requireCommon(
-    RestoreProcessHarnessControl control,
+    RestoreHarnessControl control,
     _ManagedProcess process, {
     required String expectedStatus,
     required Set<String> phaseSpecificKeys,
@@ -1296,25 +1898,25 @@ final class _HarnessEvent {
     if (json.length != expectedKeys.length ||
         !json.keys.toSet().containsAll(expectedKeys)) {
       throw FormatException(
-        'restore_harness_event_fields:${control.phase.name}',
+        'restore_harness_event_fields:${control.phaseName}',
       );
     }
     if (json['format'] != restoreHarnessFormat ||
-        json['version'] != RestoreProcessHarnessControl.version ||
+        json['version'] != _controlVersion(control) ||
         json['generation'] != control.generation ||
         json['matrixRunId'] != control.matrixRunId ||
-        json['scenario'] != restoreHarnessScenario ||
+        json['scenario'] != control.scenario ||
         json['scenarioId'] != control.scenarioId ||
-        json['phase'] != control.phase.name ||
-        json['failpoint'] != control.failpoint.name ||
+        json['phase'] != control.phaseName ||
+        json['failpoint'] != control.failpointName ||
         json['status'] != expectedStatus) {
       throw FormatException(
-        'restore_harness_event_binding:${control.phase.name}',
+        'restore_harness_event_binding:${control.phaseName}',
       );
     }
     if (pid == process.process.pid || pid == _hostProcessId) {
       throw FormatException(
-        'restore_harness_event_process:${control.phase.name}',
+        'restore_harness_event_process:${control.phaseName}',
       );
     }
   }
@@ -1345,6 +1947,22 @@ final class _HarnessEvent {
     final value = json[key];
     if (value is! int || value < 0) {
       throw FormatException('restore_harness_event_int:$key');
+    }
+    return value;
+  }
+
+  int requireProcessId(String key) {
+    final value = requireInt(key);
+    if (value <= 1) {
+      throw FormatException('restore_harness_event_process_id:$key');
+    }
+    return value;
+  }
+
+  String requireSha256(String key) {
+    final value = requireString(key);
+    if (!_sha256Pattern.hasMatch(value)) {
+      throw FormatException('restore_harness_event_sha256:$key');
     }
     return value;
   }
@@ -1434,7 +2052,7 @@ final class _HarnessEvent {
 
 final class _ManagedProcess {
   _ManagedProcess({
-    required this.phase,
+    required this.phaseName,
     required this.command,
     required this.process,
     required Set<_RunnerIdentity> runnerBaseline,
@@ -1461,7 +2079,7 @@ final class _ManagedProcess {
     });
   }
 
-  final RestoreProcessHarnessPhase phase;
+  final String phaseName;
   final List<String> command;
   final Process process;
   final Set<_RunnerIdentity> runnerBaseline;
@@ -1485,7 +2103,7 @@ final class _ManagedProcess {
     final result = await exited.timeout(
       timeout,
       onTimeout: () => throw TimeoutException(
-        'restore_harness_outer_timeout:${phase.name}',
+        'restore_harness_outer_timeout:$phaseName',
         timeout,
       ),
     );
@@ -1497,13 +2115,13 @@ final class _ManagedProcess {
     if (!hasExited && !process.kill(ProcessSignal.sigkill)) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       if (!hasExited) {
-        throw StateError('restore_harness_outer_kill:${phase.name}');
+        throw StateError('restore_harness_outer_kill:$phaseName');
       }
     }
     await exited.timeout(
       timeout,
       onTimeout: () => throw TimeoutException(
-        'restore_harness_outer_cleanup_timeout:${phase.name}',
+        'restore_harness_outer_cleanup_timeout:$phaseName',
         timeout,
       ),
     );

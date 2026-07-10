@@ -130,13 +130,13 @@ final class RestoreCompleteBundleFixtureState {
   }
 
   static Future<RestoreCompleteBundleFixtureState> read(
-    RestoreProcessHarnessControl control,
+    RestoreHarnessControl control,
   ) async {
     final state = RestoreCompleteBundleFixtureState.fromJson(
       await readHarnessJson(control.stateFile),
     );
     if (state.matrixRunId != control.matrixRunId ||
-        state.failpoint != control.failpoint.name) {
+        state.failpoint != control.failpointName) {
       throw StateError('restore_harness_state_binding');
     }
     return state;
@@ -144,7 +144,7 @@ final class RestoreCompleteBundleFixtureState {
 }
 
 Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
 ) async {
   final appData = control.appDataDirectory;
   final source = control.sourceDirectory;
@@ -249,7 +249,7 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
   );
   return RestoreCompleteBundleFixtureState(
     matrixRunId: control.matrixRunId,
-    failpoint: control.failpoint.name,
+    failpoint: control.failpointName,
     runId: prepared.runId,
     preparedReceiptChecksum: prepared.receipt.checksum,
     candidateManifestSha256: prepared.receipt.candidateManifestSha256,

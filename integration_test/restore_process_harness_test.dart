@@ -10,6 +10,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_platfor
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
+import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_store.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
@@ -34,28 +35,42 @@ void main() {
     if (!Platform.isMacOS) {
       throw UnsupportedError('restore_harness_macos_only');
     }
-    final control = await RestoreProcessHarnessControl.readFromEnvironment();
+    final control = await RestoreHarnessControl.readFromEnvironment();
     _requireControlSequence(control);
     await _requireRunnerBoundary(control);
     SharedPreferences.setPrefix(control.preferencesPrefix);
     final preferences = await SharedPreferences.getInstance();
     await preferences.reload();
 
-    switch (control.phase) {
-      case RestoreProcessHarnessPhase.setup:
-        await _runSetup(control, preferences);
-      case RestoreProcessHarnessPhase.cutoverKill:
-        await _runCutoverKill(control, preferences);
-      case RestoreProcessHarnessPhase.resumeToColdAck:
-        await _runResumeToColdAck(control, preferences);
-      case RestoreProcessHarnessPhase.coldFinalize:
-        await _runColdFinalize(control, preferences);
+    switch (control) {
+      case RestoreProcessHarnessControl():
+        switch (control.phase) {
+          case RestoreProcessHarnessPhase.setup:
+            await _runSetup(control, preferences);
+          case RestoreProcessHarnessPhase.cutoverKill:
+            await _runCutoverKill(control, preferences);
+          case RestoreProcessHarnessPhase.resumeToColdAck:
+            await _runResumeToColdAck(control, preferences);
+          case RestoreProcessHarnessPhase.coldFinalize:
+            await _runColdFinalize(control, preferences);
+        }
+      case RestoreTerminalProcessHarnessControl():
+        switch (control.phase) {
+          case RestoreTerminalProcessHarnessPhase.setup:
+            await _runSetup(control, preferences);
+          case RestoreTerminalProcessHarnessPhase.commitToColdAck:
+            await _runTerminalCommitToColdAck(control, preferences);
+          case RestoreTerminalProcessHarnessPhase.recoverTerminal:
+            await _runTerminalRecovery(control, preferences);
+          case RestoreTerminalProcessHarnessPhase.verifyBusinessReady:
+            await _runTerminalVerify(control, preferences);
+        }
     }
   });
 }
 
 Future<void> _runSetup(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   SharedPreferences preferences,
 ) async {
   await _requireMissing(control.stateFile, 'restore_harness_setup_state');
@@ -448,6 +463,769 @@ Future<void> _runColdFinalize(
   expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
 }
 
+Future<void> _runTerminalCommitToColdAck(
+  RestoreTerminalProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final setupEvent = await _readTerminalSetupEvent(control, state);
+  expect(setupEvent['pid'], isNot(pid));
+  _expectBeforePreferences(preferences, state);
+  final pending = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(pending?.runId, state.runId);
+  expect(pending?.markerFileName, RestoreWorkspaceLock.activeRunFileName);
+  expect(pending?.receipt.state, RestoreReceiptState.prepared);
+
+  final platformDurability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: platformDurability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(setupEvent['pid']));
+  if (_isTerminalColdAckFailpoint(control.failpoint)) {
+    try {
+      final terminal = await _convergeCommittedWithoutColdAck(
+        control: control,
+        state: state,
+        preferences: preferences,
+        durability: platformDurability,
+      );
+      final receiptStore = _activeReceiptStore(control, state);
+      final ackStore = RestoreSettingsColdAckStore(
+        runDirectory: receiptStore.runDirectory,
+        durability: platformDurability,
+      );
+      expect(await ackStore.read(), isNull);
+      final matcher = _terminalColdAckMatcher(
+        control: control,
+        state: state,
+        terminal: terminal,
+        lease: lease,
+      );
+      final durability = OneShotBlockingRestoreDurability(
+        delegate: platformDurability,
+        matcher: matcher,
+        onMatched: (observation) async {
+          final coldAck = observation as RestoreColdAckDurabilityObservation;
+          await preferences.reload();
+          _expectTargetPreferences(preferences, state);
+          final history = await receiptStore.readHistoryWhileWorkspaceLocked();
+          expect(history.last.state, RestoreReceiptState.committed);
+          expect(history.last.checksum, terminal.checksum);
+          expect(coldAck.terminalReceiptChecksum, terminal.checksum);
+          expect(coldAck.processId, lease.processId);
+          expect(coldAck.leaseInstanceId, lease.instanceId);
+          await _expectInstalledBundle(control, receiptStore, state);
+          await _expectTerminalColdAckCrashTopology(
+            control: control,
+            state: state,
+            terminal: terminal,
+            observation: coldAck,
+          );
+          await _publishEvent(control, {
+            'status': 'readyForKill',
+            'marker': control.failpoint.name,
+            'runId': state.runId,
+            'leaseInstanceId': lease.instanceId,
+            'observedReceiptState': history.last.state.name,
+            ..._durabilityObservationJson(coldAck),
+          });
+        },
+      );
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      throw StateError('restore_terminal_harness_ack_returned');
+    } finally {
+      await lease.close();
+    }
+  }
+
+  late final RestoreReceipt terminal;
+  late final RestoreSettingsColdAck coldAck;
+  try {
+    try {
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: platformDurability,
+      );
+      throw StateError('restore_terminal_harness_arm_returned');
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, RestoreReceiptState.committed);
+    }
+    final armed = await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    );
+    expect(armed?.runId, state.runId);
+    expect(armed?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+    expect(armed?.receipt.state, RestoreReceiptState.committed);
+    terminal = armed!.receipt;
+    final receiptStore = _activeReceiptStore(control, state);
+    final persistedAck = await RestoreSettingsColdAckStore(
+      runDirectory: receiptStore.runDirectory,
+      durability: platformDurability,
+    ).read();
+    expect(persistedAck, isNotNull);
+    coldAck = persistedAck!;
+    expect(coldAck.terminalReceiptChecksum, terminal.checksum);
+    expect(coldAck.expected, RestoreSettingsColdAckExpected.target);
+    expect(coldAck.processId, lease.processId);
+    expect(coldAck.leaseInstanceId, lease.instanceId);
+    await preferences.reload();
+    _expectTargetPreferences(preferences, state);
+    await _expectInstalledBundle(control, receiptStore, state);
+  } finally {
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+  await _publishEvent(control, {
+    'status': 'completed',
+    'runId': state.runId,
+    'receiptState': terminal.state.name,
+    'leaseInstanceId': coldAck.leaseInstanceId,
+    'coldAckProcessId': coldAck.processId,
+    'coldAckLeaseInstanceId': coldAck.leaseInstanceId,
+    'coldAckChecksum': coldAck.checksum,
+    'terminalReceiptChecksum': terminal.checksum,
+  });
+}
+
+Future<RestoreReceipt> _convergeCommittedWithoutColdAck({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required SharedPreferences preferences,
+  required RestoreDurability durability,
+}) async {
+  final workspaceLock = RestoreWorkspaceLock(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  return workspaceLock.synchronized(() async {
+    final executor = RestoreCutoverExecutor(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+      preferences: preferences,
+      workspaceLock: workspaceLock,
+      durability: durability,
+    );
+    final result = await executor.executeWhileWorkspaceLocked(
+      observedMarkerFileName: RestoreWorkspaceLock.activeRunFileName,
+    );
+    expect(result.state, RestoreReceiptState.committed);
+    return executor.revalidateTerminalWhileWorkspaceLocked(result);
+  });
+}
+
+RestoreDurabilityMatcher _terminalColdAckMatcher({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreReceipt terminal,
+  required RestoreBusinessLease lease,
+}) {
+  final runDirectory = _activeReceiptStore(control, state).runDirectory.path;
+  return switch (control.failpoint) {
+    RestoreTerminalProcessFailpoint.coldAckTempDurable =>
+      RestoreColdAckTempDurableMatcher(
+        runDirectoryPath: _absolutePath(runDirectory),
+        terminalReceiptChecksum: terminal.checksum,
+        expected: RestoreSettingsColdAckExpected.target,
+        processId: lease.processId,
+        leaseInstanceId: lease.instanceId,
+      ),
+    RestoreTerminalProcessFailpoint.coldAckPublished =>
+      RestoreColdAckPublishedMatcher(
+        runDirectoryPath: _absolutePath(runDirectory),
+        terminalReceiptChecksum: terminal.checksum,
+        expected: RestoreSettingsColdAckExpected.target,
+        processId: lease.processId,
+        leaseInstanceId: lease.instanceId,
+      ),
+    _ => throw StateError('restore_terminal_harness_ack_failpoint'),
+  };
+}
+
+bool _isTerminalColdAckFailpoint(RestoreTerminalProcessFailpoint failpoint) =>
+    failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable ||
+    failpoint == RestoreTerminalProcessFailpoint.coldAckPublished;
+
+Future<void> _runTerminalRecovery(
+  RestoreTerminalProcessHarnessControl control,
+  SharedPreferences preferences,
+) => _isTerminalColdAckFailpoint(control.failpoint)
+    ? _recoverTerminalColdAck(control, preferences)
+    : _runTerminalArchiveKill(control, preferences);
+
+Future<void> _recoverTerminalColdAck(
+  RestoreTerminalProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final killEvent = await _readTerminalCommitEvent(control, state);
+  expect(killEvent['pid'], isNot(pid));
+  await _expectTerminalColdAckTopologyFromEvent(
+    control: control,
+    state: state,
+    event: killEvent,
+  );
+  await preferences.reload();
+  _expectTargetPreferences(preferences, state);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(killEvent['pid']));
+  expect(lease.instanceId, isNot(killEvent['leaseInstanceId']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationCounter = CountingMutationPreferencesStore(preferenceDelegate);
+  RestoreReceipt? gateResult;
+  late final String outcome;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationCounter;
+    try {
+      gateResult = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      expect(gateResult?.state, RestoreReceiptState.committed);
+      outcome = 'archived';
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, RestoreReceiptState.committed);
+      outcome = 'coldRestartRequired';
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    if (control.failpoint ==
+        RestoreTerminalProcessFailpoint.coldAckTempDurable) {
+      expect(outcome, 'coldRestartRequired');
+      expect(mutationCounter.mutationAttempts, greaterThan(0));
+    } else {
+      expect(outcome, 'archived');
+      expect(mutationCounter.mutationAttempts, 0);
+    }
+
+    final archived = outcome == 'archived';
+    final store = RestoreReceiptStore(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+      archived: archived,
+    );
+    final ack = await RestoreSettingsColdAckStore(
+      runDirectory: store.runDirectory,
+      durability: durability,
+    ).read();
+    expect(ack, isNotNull);
+    expect(ack!.terminalReceiptChecksum, killEvent['terminalReceiptChecksum']);
+    expect(ack.expected, RestoreSettingsColdAckExpected.target);
+    if (outcome == 'coldRestartRequired') {
+      expect(ack.processId, lease.processId);
+      expect(ack.leaseInstanceId, lease.instanceId);
+      final pending = await RestoreStartupGate.inspect(
+        appDataDirectory: control.appDataDirectory,
+      );
+      expect(pending?.runId, state.runId);
+      expect(pending?.receipt.state, RestoreReceiptState.committed);
+      expect(
+        pending?.markerFileName,
+        RestoreWorkspaceLock.publishingRunFileName,
+      );
+      await _expectInstalledBundle(control, store, state);
+    } else {
+      expect(ack.processId, killEvent['ackProcessId']);
+      expect(ack.leaseInstanceId, killEvent['ackLeaseInstanceId']);
+      await _expectArchivedTerminalEvidence(
+        control: control,
+        state: state,
+        expectedAck: ack,
+      );
+    }
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': RestoreReceiptState.committed.name,
+      'outcome': outcome,
+      'leaseInstanceId': lease.instanceId,
+      'ackProcessId': ack.processId,
+      'ackLeaseInstanceId': ack.leaseInstanceId,
+      'terminalReceiptChecksum': ack.terminalReceiptChecksum,
+      'settingsMutationAttempts': mutationCounter.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+}
+
+Future<void> _runTerminalArchiveKill(
+  RestoreTerminalProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final armEvent = await _readTerminalCommitEvent(control, state);
+  expect(armEvent['pid'], isNot(pid));
+  final activeStore = _activeReceiptStore(control, state);
+  final pending = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(pending?.runId, state.runId);
+  expect(pending?.receipt.state, RestoreReceiptState.committed);
+  expect(pending?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+  final observedAck = await RestoreSettingsColdAckStore(
+    runDirectory: activeStore.runDirectory,
+  ).read();
+  expect(observedAck, isNotNull);
+  expect(observedAck!.checksum, armEvent['coldAckChecksum']);
+  expect(observedAck.processId, armEvent['coldAckProcessId']);
+  expect(observedAck.leaseInstanceId, armEvent['coldAckLeaseInstanceId']);
+  await preferences.reload();
+  _expectTargetPreferences(preferences, state);
+  await _expectInstalledBundle(control, activeStore, state);
+
+  final platformDurability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: platformDurability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(observedAck.processId));
+  expect(lease.instanceId, isNot(observedAck.leaseInstanceId));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  final matcher = _terminalArchiveMatcher(control, state);
+  final durability = OneShotBlockingRestoreDurability(
+    delegate: platformDurability,
+    matcher: matcher,
+    onMatched: (observation) async {
+      expect(mutationGuard.mutationAttempts, 0);
+      await preferences.reload();
+      _expectTargetPreferences(preferences, state);
+      await _expectTerminalArchiveCrashTopology(
+        control: control,
+        state: state,
+        expectedAck: observedAck,
+      );
+      await _publishEvent(control, {
+        'status': 'readyForKill',
+        'marker': control.failpoint.name,
+        'runId': state.runId,
+        'leaseInstanceId': lease.instanceId,
+        'observedReceiptState': RestoreReceiptState.committed.name,
+        'coldAckProcessId': observedAck.processId,
+        'coldAckLeaseInstanceId': observedAck.leaseInstanceId,
+        'ackProcessId': observedAck.processId,
+        'ackLeaseInstanceId': observedAck.leaseInstanceId,
+        'terminalReceiptChecksum': observedAck.terminalReceiptChecksum,
+        'settingsMutationAttempts': mutationGuard.mutationAttempts,
+        ..._durabilityObservationJson(observation),
+      });
+    },
+  );
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    await RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: control.appDataDirectory,
+      preferences: preferences,
+      businessLease: lease,
+      durability: durability,
+    );
+    throw StateError('restore_terminal_harness_archive_returned');
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+}
+
+RestoreDurabilityMatcher _terminalArchiveMatcher(
+  RestoreTerminalProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) {
+  final store = _activeReceiptStore(control, state);
+  final workspace = _absolutePath(store.workspaceRoot.path);
+  final activeRun = _absolutePath(store.runDirectory.path);
+  final completedRun = _absolutePath(
+    RestoreReceiptStore(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+      archived: true,
+    ).runDirectory.path,
+  );
+  return switch (control.failpoint) {
+    RestoreTerminalProcessFailpoint.completedRunsRootDurable =>
+      RestoreTerminalWorkspaceSyncMatcher(
+        workspaceRootPath: workspace,
+        runId: state.runId,
+        boundary: RestoreTerminalWorkspaceSyncBoundary.completedRunsRootDurable,
+      ),
+    RestoreTerminalProcessFailpoint.archivingMarkerPublished =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(
+          p.join(workspace, RestoreWorkspaceLock.publishingRunFileName),
+        ),
+        targetPath: _absolutePath(
+          p.join(workspace, RestoreWorkspaceLock.archivingRunFileName),
+        ),
+        sourceKind: RestoreProcessEntityKind.file,
+      ),
+    RestoreTerminalProcessFailpoint.terminalRunArchived =>
+      RestoreExactRenameMatcher(
+        sourcePath: activeRun,
+        targetPath: completedRun,
+        sourceKind: RestoreProcessEntityKind.directory,
+      ),
+    RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable =>
+      RestoreTerminalWorkspaceSyncMatcher(
+        workspaceRootPath: workspace,
+        runId: state.runId,
+        boundary:
+            RestoreTerminalWorkspaceSyncBoundary.archivingMarkerRemovedDurable,
+      ),
+    _ => throw StateError('restore_terminal_harness_archive_failpoint'),
+  };
+}
+
+Future<void> _runTerminalVerify(
+  RestoreTerminalProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final priorEvent = await _readTerminalRecoveryEvent(control, state);
+  expect(priorEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectTargetPreferences(preferences, state);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(priorEvent['pid']));
+  expect(lease.instanceId, isNot(priorEvent['leaseInstanceId']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  RestoreReceipt? gateResult;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    try {
+      gateResult = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    final expectNoGateResult =
+        (_isTerminalColdAckFailpoint(control.failpoint) &&
+            priorEvent['outcome'] == 'archived') ||
+        control.failpoint ==
+            RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable;
+    if (expectNoGateResult) {
+      expect(gateResult, isNull);
+    } else {
+      expect(gateResult?.state, RestoreReceiptState.committed);
+    }
+    expect(mutationGuard.mutationAttempts, 0);
+    final expectedAck = RestoreSettingsColdAck(
+      runId: state.runId,
+      terminalReceiptChecksum: priorEvent['terminalReceiptChecksum'] as String,
+      expected: RestoreSettingsColdAckExpected.target,
+      leaseInstanceId: priorEvent['ackLeaseInstanceId'] as String,
+      processId: priorEvent['ackProcessId'] as int,
+    );
+    final evidence = await _expectArchivedTerminalEvidence(
+      control: control,
+      state: state,
+      expectedAck: expectedAck,
+    );
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': evidence.terminal.state.name,
+      'gateResult': gateResult?.state.name ?? 'none',
+      'observedAckProcessId': evidence.ack.processId,
+      'observedAckLeaseInstanceId': evidence.ack.leaseInstanceId,
+      'leaseInstanceId': lease.instanceId,
+      'settingsMutationAttempts': mutationGuard.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+  for (final key in [
+    state.primaryPreferenceKey,
+    state.secondaryPreferenceKey,
+    state.secretPreferenceKey,
+  ]) {
+    if (preferences.containsKey(key) && !await preferences.remove(key)) {
+      throw StateError('restore_terminal_harness_preference_cleanup:$key');
+    }
+  }
+  await preferences.reload();
+  expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+}
+
+Future<void> _expectTerminalColdAckCrashTopology({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreReceipt terminal,
+  required RestoreColdAckDurabilityObservation observation,
+}) => _expectTerminalColdAckTopology(
+  control: control,
+  state: state,
+  boundary: observation.boundary,
+  terminalReceiptChecksum: terminal.checksum,
+  ackProcessId: observation.processId,
+  ackLeaseInstanceId: observation.leaseInstanceId,
+  ackChecksum: observation.ackChecksum,
+  temporaryPath: observation.temporaryPath,
+  targetPath:
+      observation.targetPath ??
+      p.join(
+        p.dirname(observation.temporaryPath),
+        RestoreSettingsColdAckStore.fileName,
+      ),
+);
+
+Future<void> _expectTerminalColdAckTopologyFromEvent({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required Map<String, dynamic> event,
+}) => _expectTerminalColdAckTopology(
+  control: control,
+  state: state,
+  boundary:
+      control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable
+      ? RestoreColdAckDurabilityBoundary.tempDurable
+      : RestoreColdAckDurabilityBoundary.published,
+  terminalReceiptChecksum: event['terminalReceiptChecksum'] as String,
+  ackProcessId: event['ackProcessId'] as int,
+  ackLeaseInstanceId: event['ackLeaseInstanceId'] as String,
+  ackChecksum: event['ackChecksum'] as String,
+  temporaryPath: event['temporaryPath'] as String,
+  targetPath: event['targetPath'] as String,
+);
+
+Future<void> _expectTerminalColdAckTopology({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreColdAckDurabilityBoundary boundary,
+  required String terminalReceiptChecksum,
+  required int ackProcessId,
+  required String ackLeaseInstanceId,
+  required String ackChecksum,
+  required String temporaryPath,
+  required String targetPath,
+}) async {
+  final store = _activeReceiptStore(control, state);
+  await _expectExactTerminalMarkers(
+    store.workspaceRoot,
+    runId: state.runId,
+    expectedMarker: RestoreWorkspaceLock.publishingRunFileName,
+  );
+  expect(await store.runDirectory.exists(), isTrue);
+  expect(
+    await RestoreReceiptStore(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+      archived: true,
+    ).runDirectory.exists(),
+    isFalse,
+  );
+  final history = await store.readHistoryWhileWorkspaceLocked();
+  expect(history.last.state, RestoreReceiptState.committed);
+  expect(history.last.checksum, terminalReceiptChecksum);
+  final ackTarget = File(
+    p.join(store.runDirectory.path, RestoreSettingsColdAckStore.fileName),
+  );
+  expect(_absolutePath(ackTarget.path), targetPath);
+  final temporaryFiles = <File>[];
+  await for (final entity in store.runDirectory.list(followLinks: false)) {
+    if (p
+        .basename(entity.path)
+        .startsWith('${RestoreSettingsColdAckStore.fileName}.')) {
+      expect(entity, isA<File>());
+      temporaryFiles.add(File(entity.path));
+    }
+  }
+  final RestoreSettingsColdAck ack;
+  switch (boundary) {
+    case RestoreColdAckDurabilityBoundary.tempDurable:
+      expect(await ackTarget.exists(), isFalse);
+      expect(temporaryFiles, hasLength(1));
+      expect(_absolutePath(temporaryFiles.single.path), temporaryPath);
+      final decoded = jsonDecode(await temporaryFiles.single.readAsString());
+      expect(decoded, isA<Map>());
+      ack = RestoreSettingsColdAck.fromJson(decoded as Map);
+    case RestoreColdAckDurabilityBoundary.published:
+      expect(temporaryFiles, isEmpty);
+      final persisted = await RestoreSettingsColdAckStore(
+        runDirectory: store.runDirectory,
+      ).read();
+      expect(persisted, isNotNull);
+      ack = persisted!;
+  }
+  expect(ack.runId, state.runId);
+  expect(ack.terminalReceiptChecksum, terminalReceiptChecksum);
+  expect(ack.expected, RestoreSettingsColdAckExpected.target);
+  expect(ack.processId, ackProcessId);
+  expect(ack.leaseInstanceId, ackLeaseInstanceId);
+  expect(ack.checksum, ackChecksum);
+  await _expectInstalledBundle(control, store, state);
+}
+
+Future<void> _expectTerminalArchiveCrashTopology({
+  required RestoreTerminalProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreSettingsColdAck expectedAck,
+}) async {
+  final runInCompleted =
+      control.failpoint ==
+          RestoreTerminalProcessFailpoint.terminalRunArchived ||
+      control.failpoint ==
+          RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable;
+  final store = RestoreReceiptStore(
+    appDataDirectory: control.appDataDirectory,
+    runId: state.runId,
+    archived: runInCompleted,
+  );
+  final expectedMarker = switch (control.failpoint) {
+    RestoreTerminalProcessFailpoint.completedRunsRootDurable =>
+      RestoreWorkspaceLock.publishingRunFileName,
+    RestoreTerminalProcessFailpoint.archivingMarkerPublished ||
+    RestoreTerminalProcessFailpoint.terminalRunArchived =>
+      RestoreWorkspaceLock.archivingRunFileName,
+    RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable => null,
+    _ => throw StateError('restore_terminal_harness_archive_topology'),
+  };
+  await _expectExactTerminalMarkers(
+    store.workspaceRoot,
+    runId: state.runId,
+    expectedMarker: expectedMarker,
+  );
+  final activeStore = _activeReceiptStore(control, state);
+  final archivedStore = RestoreReceiptStore(
+    appDataDirectory: control.appDataDirectory,
+    runId: state.runId,
+    archived: true,
+  );
+  expect(await activeStore.runDirectory.exists(), !runInCompleted);
+  expect(await archivedStore.runDirectory.exists(), runInCompleted);
+  expect(await archivedStore.runDirectory.parent.exists(), isTrue);
+  final history = await store.readHistoryWhileWorkspaceLocked();
+  expect(history.map((receipt) => receipt.state), [
+    RestoreReceiptState.prepared,
+    RestoreReceiptState.oldRenamed,
+    RestoreReceiptState.newInstalled,
+    RestoreReceiptState.verified,
+    RestoreReceiptState.committed,
+  ]);
+  final ack = await RestoreSettingsColdAckStore(
+    runDirectory: store.runDirectory,
+  ).read();
+  expect(ack?.checksum, expectedAck.checksum);
+  await _expectInstalledBundle(control, store, state);
+}
+
+Future<void> _expectExactTerminalMarkers(
+  Directory workspaceRoot, {
+  required String runId,
+  required String? expectedMarker,
+}) async {
+  for (final marker in const {
+    RestoreWorkspaceLock.activeRunFileName,
+    RestoreWorkspaceLock.publishingRunFileName,
+    RestoreWorkspaceLock.discardingRunFileName,
+    RestoreWorkspaceLock.archivingRunFileName,
+  }) {
+    final file = File(p.join(workspaceRoot.path, marker));
+    if (marker == expectedMarker) {
+      expect(await file.readAsString(), runId);
+    } else {
+      expect(await file.exists(), isFalse);
+    }
+  }
+}
+
+Future<({RestoreReceipt terminal, RestoreSettingsColdAck ack})>
+_expectArchivedTerminalEvidence({
+  required RestoreHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreSettingsColdAck expectedAck,
+}) async {
+  expect(
+    await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    ),
+    isNull,
+  );
+  final activeStore = _activeReceiptStore(control, state);
+  expect(await activeStore.runDirectory.exists(), isFalse);
+  final archivedStore = RestoreReceiptStore(
+    appDataDirectory: control.appDataDirectory,
+    runId: state.runId,
+    archived: true,
+  );
+  expect(await archivedStore.runDirectory.exists(), isTrue);
+  final history = await archivedStore.readHistory();
+  expect(history.map((receipt) => receipt.state), [
+    RestoreReceiptState.prepared,
+    RestoreReceiptState.oldRenamed,
+    RestoreReceiptState.newInstalled,
+    RestoreReceiptState.verified,
+    RestoreReceiptState.committed,
+  ]);
+  expect(history.first.checksum, state.preparedReceiptChecksum);
+  expect(history.first.candidateManifestSha256, state.candidateManifestSha256);
+  final terminal = history.last;
+  expect(terminal.selectedComponents, {
+    RestoreComponent.settings,
+    RestoreComponent.database,
+    RestoreComponent.assets,
+  });
+  final previousStore = RestorePreviousStore(
+    runDirectory: archivedStore.runDirectory,
+  );
+  final previous = await previousStore.readPrevious(
+    preparedReceipt: history.first,
+  );
+  await previousStore.validateComplete(previous);
+  expect(previous.manifestSha256, terminal.previousManifestSha256);
+  expect(jsonDecode(utf8.decode(previous.settingsSnapshotBytes)), {
+    state.primaryPreferenceKey: state.primaryOldPreferenceValue,
+    state.secondaryPreferenceKey: state.secondaryOldPreferenceValue,
+    state.secretPreferenceKey: state.secretOldPreferenceValue,
+  });
+  final ack = await RestoreSettingsColdAckStore(
+    runDirectory: archivedStore.runDirectory,
+  ).read();
+  expect(ack, isNotNull);
+  expect(ack!.runId, state.runId);
+  expect(ack.terminalReceiptChecksum, terminal.checksum);
+  expect(ack.expected, RestoreSettingsColdAckExpected.target);
+  expect(ack.processId, expectedAck.processId);
+  expect(ack.leaseInstanceId, expectedAck.leaseInstanceId);
+  await _expectFinalArchivedBundle(control, archivedStore, state);
+  return (terminal: terminal, ack: ack);
+}
+
 void _expectTargetPreferences(
   SharedPreferences preferences,
   RestoreCompleteBundleFixtureState state,
@@ -464,7 +1242,7 @@ void _expectTargetPreferences(
 }
 
 Future<RestoreCompleteBundleFixtureState> _readBoundState(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
 ) async {
   final state = await RestoreCompleteBundleFixtureState.read(control);
   _requireStateBinding(control, state);
@@ -472,12 +1250,12 @@ Future<RestoreCompleteBundleFixtureState> _readBoundState(
 }
 
 void _requireStateBinding(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestoreCompleteBundleFixtureState state,
 ) {
   final seed = _preferenceSeed(control);
   if (state.matrixRunId != control.matrixRunId ||
-      state.failpoint != control.failpoint.name ||
+      state.failpoint != control.failpointName ||
       state.primaryPreferenceKey != seed.keys.elementAt(0) ||
       state.primaryOldPreferenceValue != seed.values.elementAt(0) ||
       state.secondaryPreferenceKey != seed.keys.elementAt(1) ||
@@ -493,21 +1271,24 @@ void _requireStateBinding(
   }
 }
 
-Map<String, String> _preferenceSeed(RestoreProcessHarnessControl control) => {
+Map<String, String> _preferenceSeed(RestoreHarnessControl control) => {
   'restore_harness_${control.scenarioId}_primary': 'old-primary',
   'restore_harness_${control.scenarioId}_secondary': 'old-secondary',
   'restore_harness_${control.scenarioId}_secret_api_key': 'old-secret',
 };
 
-void _requireControlSequence(RestoreProcessHarnessControl control) {
-  if (control.generation != control.phase.index + 1) {
+void _requireControlSequence(RestoreHarnessControl control) {
+  final expectedGeneration = switch (control) {
+    RestoreProcessHarnessControl() => control.phase.index + 1,
+    RestoreTerminalProcessHarnessControl() => control.phase.index + 1,
+    _ => throw StateError('restore_harness_control_type'),
+  };
+  if (control.generation != expectedGeneration) {
     throw StateError('restore_harness_control_sequence');
   }
 }
 
-Future<void> _requireRunnerBoundary(
-  RestoreProcessHarnessControl control,
-) async {
+Future<void> _requireRunnerBoundary(RestoreHarnessControl control) async {
   final systemTemporary = p.normalize(
     p.absolute(await Directory.systemTemp.resolveSymbolicLinks()),
   );
@@ -522,7 +1303,7 @@ Future<void> _requireRunnerBoundary(
 }
 
 RestoreReceiptStore _activeReceiptStore(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestoreCompleteBundleFixtureState state,
 ) {
   return RestoreReceiptStore(
@@ -542,7 +1323,7 @@ File _candidateDatabase(RestoreReceiptStore store) => File(
   ),
 );
 
-File _liveDatabase(RestoreProcessHarnessControl control) =>
+File _liveDatabase(RestoreHarnessControl control) =>
     File(p.join(control.appDataDirectory.path, AppDatabase.databaseFileName));
 
 Directory _previousDirectory(RestoreReceiptStore store) => Directory(
@@ -764,6 +1545,31 @@ Map<String, dynamic> _durabilityObservationJson(
             p.dirname(observation.temporaryPath),
             'receipt_${observation.sequence.toString().padLeft(16, '0')}.json',
           ),
+    },
+    RestoreColdAckDurabilityObservation() => {
+      'operationKind': switch (observation.boundary) {
+        RestoreColdAckDurabilityBoundary.tempDurable => 'coldAckTempDurable',
+        RestoreColdAckDurabilityBoundary.published => 'coldAckPublished',
+      },
+      'runId': observation.runId,
+      'terminalReceiptChecksum': observation.terminalReceiptChecksum,
+      'expected': observation.expected.name,
+      'ackProcessId': observation.processId,
+      'ackLeaseInstanceId': observation.leaseInstanceId,
+      'ackChecksum': observation.ackChecksum,
+      'temporaryPath': observation.temporaryPath,
+      'targetPath':
+          observation.targetPath ??
+          p.join(
+            p.dirname(observation.temporaryPath),
+            RestoreSettingsColdAckStore.fileName,
+          ),
+    },
+    RestoreTerminalWorkspaceSyncObservation() => {
+      'operationKind': 'terminalWorkspaceSyncAfter',
+      'boundary': observation.boundary.name,
+      'path': observation.workspaceRootPath,
+      'fullBarrier': observation.fullBarrier,
     },
   };
 }
@@ -1158,7 +1964,7 @@ bool _hasReached(
 String _absolutePath(String path) => p.normalize(p.absolute(path));
 
 Future<void> _expectInitialAssets(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestoreReceiptStore store,
 ) async {
   final candidate = _candidateDirectory(store);
@@ -1177,7 +1983,7 @@ Future<void> _expectInitialAssets(
 }
 
 Future<void> _expectInstalledBundle(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestoreReceiptStore store,
   RestoreCompleteBundleFixtureState state,
 ) async {
@@ -1206,7 +2012,7 @@ Future<void> _expectInstalledBundle(
 }
 
 Future<void> _expectFinalArchivedBundle(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestoreReceiptStore archivedStore,
   RestoreCompleteBundleFixtureState state,
 ) async {
@@ -1262,6 +2068,295 @@ Future<Map<String, dynamic>> _readSetupEvent(
   }
   return event;
 }
+
+Future<Map<String, dynamic>> _readTerminalSetupEvent(
+  RestoreTerminalProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readTerminalPriorEvent(
+    control,
+    generation: 1,
+    phase: RestoreTerminalProcessHarnessPhase.setup,
+    phaseKeys: const {'runId', 'receiptState'},
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.prepared.name) {
+    throw const FormatException('restore_terminal_harness_setup_event');
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readTerminalCommitEvent(
+  RestoreTerminalProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  if (_isTerminalColdAckFailpoint(control.failpoint)) {
+    final event = await _readTerminalPriorEvent(
+      control,
+      generation: 2,
+      phase: RestoreTerminalProcessHarnessPhase.commitToColdAck,
+      phaseKeys: const {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'observedReceiptState',
+        'operationKind',
+        'terminalReceiptChecksum',
+        'expected',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'ackChecksum',
+        'temporaryPath',
+        'targetPath',
+      },
+    );
+    final expectedOperation =
+        control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable
+        ? 'coldAckTempDurable'
+        : 'coldAckPublished';
+    final temporaryPath = event['temporaryPath'];
+    final targetPath = event['targetPath'];
+    final runDirectory = _activeReceiptStore(control, state).runDirectory.path;
+    if (event['status'] != 'readyForKill' ||
+        event['marker'] != control.failpoint.name ||
+        event['runId'] != state.runId ||
+        !_isIdentifier(event['leaseInstanceId']) ||
+        event['observedReceiptState'] != RestoreReceiptState.committed.name ||
+        event['operationKind'] != expectedOperation ||
+        !_isSha256(event['terminalReceiptChecksum']) ||
+        event['expected'] != RestoreSettingsColdAckExpected.target.name ||
+        event['ackProcessId'] != event['pid'] ||
+        event['ackLeaseInstanceId'] != event['leaseInstanceId'] ||
+        !_isSha256(event['ackChecksum']) ||
+        temporaryPath is! String ||
+        targetPath is! String ||
+        !p.equals(p.dirname(temporaryPath), runDirectory) ||
+        !RegExp(
+          '^${RegExp.escape(RestoreSettingsColdAckStore.fileName)}\\.'
+          '[1-9][0-9]*_${event['pid']}_[0-9]+\\.tmp\$',
+        ).hasMatch(p.basename(temporaryPath)) ||
+        !p.equals(
+          targetPath,
+          p.join(runDirectory, RestoreSettingsColdAckStore.fileName),
+        )) {
+      throw const FormatException('restore_terminal_harness_commit_event');
+    }
+    return event;
+  }
+
+  final event = await _readTerminalPriorEvent(
+    control,
+    generation: 2,
+    phase: RestoreTerminalProcessHarnessPhase.commitToColdAck,
+    phaseKeys: const {
+      'runId',
+      'receiptState',
+      'leaseInstanceId',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'coldAckChecksum',
+      'terminalReceiptChecksum',
+    },
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.committed.name ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['coldAckProcessId'] != event['pid'] ||
+      event['coldAckLeaseInstanceId'] != event['leaseInstanceId'] ||
+      !_isSha256(event['coldAckChecksum']) ||
+      !_isSha256(event['terminalReceiptChecksum'])) {
+    throw const FormatException('restore_terminal_harness_commit_event');
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readTerminalRecoveryEvent(
+  RestoreTerminalProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final commitEvent = await _readTerminalCommitEvent(control, state);
+  if (_isTerminalColdAckFailpoint(control.failpoint)) {
+    final event = await _readTerminalPriorEvent(
+      control,
+      generation: 3,
+      phase: RestoreTerminalProcessHarnessPhase.recoverTerminal,
+      phaseKeys: const {
+        'runId',
+        'receiptState',
+        'outcome',
+        'leaseInstanceId',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+      },
+    );
+    final outcome = event['outcome'];
+    final mutationAttempts = event['settingsMutationAttempts'];
+    final expectsColdRestart =
+        control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable;
+    if (event['status'] != 'completed' ||
+        event['runId'] != state.runId ||
+        event['receiptState'] != RestoreReceiptState.committed.name ||
+        outcome != (expectsColdRestart ? 'coldRestartRequired' : 'archived') ||
+        !_isIdentifier(event['leaseInstanceId']) ||
+        !_isIdentifier(event['ackLeaseInstanceId']) ||
+        event['ackProcessId'] is! int ||
+        (event['ackProcessId'] as int) < 1 ||
+        event['terminalReceiptChecksum'] !=
+            commitEvent['terminalReceiptChecksum'] ||
+        mutationAttempts is! int ||
+        (expectsColdRestart ? mutationAttempts < 1 : mutationAttempts != 0)) {
+      throw const FormatException('restore_terminal_harness_recovery_event');
+    }
+    if (outcome == 'coldRestartRequired') {
+      if (event['ackProcessId'] != event['pid'] ||
+          event['ackLeaseInstanceId'] != event['leaseInstanceId']) {
+        throw const FormatException('restore_terminal_harness_recovery_ack');
+      }
+    } else if (event['ackProcessId'] != commitEvent['ackProcessId'] ||
+        event['ackLeaseInstanceId'] != commitEvent['ackLeaseInstanceId']) {
+      throw const FormatException('restore_terminal_harness_recovery_ack');
+    }
+    return event;
+  }
+
+  final observationKeys = switch (control.failpoint) {
+    RestoreTerminalProcessFailpoint.completedRunsRootDurable ||
+    RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable => const {
+      'operationKind',
+      'boundary',
+      'path',
+      'fullBarrier',
+    },
+    RestoreTerminalProcessFailpoint.archivingMarkerPublished ||
+    RestoreTerminalProcessFailpoint.terminalRunArchived => const {
+      'operationKind',
+      'sourcePath',
+      'targetPath',
+      'sourceKind',
+    },
+    _ => throw StateError('restore_terminal_harness_recovery_failpoint'),
+  };
+  final event = await _readTerminalPriorEvent(
+    control,
+    generation: 3,
+    phase: RestoreTerminalProcessHarnessPhase.recoverTerminal,
+    phaseKeys: {
+      'marker',
+      'runId',
+      'leaseInstanceId',
+      'observedReceiptState',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'ackProcessId',
+      'ackLeaseInstanceId',
+      'terminalReceiptChecksum',
+      'settingsMutationAttempts',
+      ...observationKeys,
+    },
+  );
+  if (event['status'] != 'readyForKill' ||
+      event['marker'] != control.failpoint.name ||
+      event['runId'] != state.runId ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['observedReceiptState'] != RestoreReceiptState.committed.name ||
+      event['coldAckProcessId'] != commitEvent['coldAckProcessId'] ||
+      event['coldAckLeaseInstanceId'] !=
+          commitEvent['coldAckLeaseInstanceId'] ||
+      event['ackProcessId'] != commitEvent['coldAckProcessId'] ||
+      event['ackLeaseInstanceId'] != commitEvent['coldAckLeaseInstanceId'] ||
+      event['terminalReceiptChecksum'] !=
+          commitEvent['terminalReceiptChecksum'] ||
+      event['settingsMutationAttempts'] != 0) {
+    throw const FormatException('restore_terminal_harness_recovery_event');
+  }
+  _validateTerminalArchiveObservation(control, state, event);
+  return event;
+}
+
+void _validateTerminalArchiveObservation(
+  RestoreTerminalProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  Map<String, dynamic> event,
+) {
+  final matcher = _terminalArchiveMatcher(control, state);
+  switch (control.failpoint) {
+    case RestoreTerminalProcessFailpoint.completedRunsRootDurable:
+    case RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable:
+      final expected = matcher as RestoreTerminalWorkspaceSyncMatcher;
+      if (event['operationKind'] != 'terminalWorkspaceSyncAfter' ||
+          event['boundary'] != control.failpoint.name ||
+          event['path'] != expected.workspaceRootPath ||
+          event['fullBarrier'] != true) {
+        throw const FormatException('restore_terminal_harness_workspace_sync');
+      }
+    case RestoreTerminalProcessFailpoint.archivingMarkerPublished:
+    case RestoreTerminalProcessFailpoint.terminalRunArchived:
+      final expected = matcher as RestoreExactRenameMatcher;
+      if (event['operationKind'] != 'renameAfter' ||
+          event['sourcePath'] != expected.sourcePath ||
+          event['targetPath'] != expected.targetPath ||
+          event['sourceKind'] != expected.sourceKind.name) {
+        throw const FormatException('restore_terminal_harness_rename');
+      }
+    case RestoreTerminalProcessFailpoint.coldAckTempDurable:
+    case RestoreTerminalProcessFailpoint.coldAckPublished:
+      throw StateError('restore_terminal_harness_archive_observation');
+  }
+}
+
+Future<Map<String, dynamic>> _readTerminalPriorEvent(
+  RestoreTerminalProcessHarnessControl control, {
+  required int generation,
+  required RestoreTerminalProcessHarnessPhase phase,
+  required Set<String> phaseKeys,
+}) async {
+  final eventFile = File(
+    p.join(
+      control.eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+  final event = await readHarnessJson(eventFile);
+  final expectedKeys = {
+    'format',
+    'version',
+    'generation',
+    'matrixRunId',
+    'scenario',
+    'scenarioId',
+    'phase',
+    'failpoint',
+    'pid',
+    'status',
+    ...phaseKeys,
+  };
+  if (event.length != expectedKeys.length ||
+      !event.keys.toSet().containsAll(expectedKeys) ||
+      event['format'] != restoreHarnessFormat ||
+      event['version'] != RestoreTerminalProcessHarnessControl.version ||
+      event['generation'] != generation ||
+      event['matrixRunId'] != control.matrixRunId ||
+      event['scenario'] != restoreTerminalHarnessScenario ||
+      event['scenarioId'] != control.scenarioId ||
+      event['phase'] != phase.name ||
+      event['failpoint'] != control.failpoint.name ||
+      event['pid'] is! int ||
+      (event['pid'] as int) < 1 ||
+      event['status'] is! String) {
+    throw const FormatException('restore_terminal_harness_event');
+  }
+  return event;
+}
+
+bool _isIdentifier(Object? value) =>
+    value is String && RegExp(_leaseInstancePattern).hasMatch(value);
+
+bool _isSha256(Object? value) =>
+    value is String && RegExp(r'^[a-f0-9]{64}$').hasMatch(value);
 
 Future<Map<String, dynamic>> _readCutoverEvent(
   RestoreProcessHarnessControl control,
@@ -1490,18 +2585,24 @@ Future<Map<String, dynamic>> _readPriorEvent(
 }
 
 Future<void> _publishEvent(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   Map<String, dynamic> phaseValues,
 ) {
+  final version = switch (control) {
+    RestoreProcessHarnessControl() => RestoreProcessHarnessControl.version,
+    RestoreTerminalProcessHarnessControl() =>
+      RestoreTerminalProcessHarnessControl.version,
+    _ => throw StateError('restore_harness_control_type'),
+  };
   return writeDurableHarnessJson(control.eventFile, {
     'format': restoreHarnessFormat,
-    'version': RestoreProcessHarnessControl.version,
+    'version': version,
     'generation': control.generation,
     'matrixRunId': control.matrixRunId,
-    'scenario': restoreHarnessScenario,
+    'scenario': control.scenario,
     'scenarioId': control.scenarioId,
-    'phase': control.phase.name,
-    'failpoint': control.failpoint.name,
+    'phase': control.phaseName,
+    'failpoint': control.failpointName,
     'pid': pid,
     ...phaseValues,
   });
@@ -1514,9 +2615,7 @@ Future<void> _requireMissing(FileSystemEntity entity, String error) async {
   }
 }
 
-Future<void> _expectNoLeaseOwnerFiles(
-  RestoreProcessHarnessControl control,
-) async {
+Future<void> _expectNoLeaseOwnerFiles(RestoreHarnessControl control) async {
   final leaseDirectory = Directory(
     p.join(
       control.appDataDirectory.path,

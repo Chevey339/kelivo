@@ -141,6 +141,132 @@ void main() {
     });
 
     test(
+      'rejects a publishing marker with an archived target without mutation',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        await lock.synchronized(() async {
+          final completedRun = Directory(
+            p.join(lock.completedRunsRoot.path, 'run_$runId'),
+          );
+          await completedRun.create(recursive: true);
+          final publishing = File(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.publishingRunFileName,
+            ),
+          );
+          await publishing.writeAsString(runId, flush: true);
+
+          await expectLater(
+            lock.archiveTerminalRunWhileWorkspaceLocked(
+              runId: runId,
+              observedMarkerFileName:
+                  RestoreWorkspaceLock.publishingRunFileName,
+            ),
+            throwsStateError,
+          );
+
+          expect(await publishing.readAsString(), runId);
+          expect(
+            await FileSystemEntity.type(
+              p.join(
+                lock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunFileName,
+              ),
+              followLinks: false,
+            ),
+            FileSystemEntityType.notFound,
+          );
+          expect(await completedRun.exists(), isTrue);
+        });
+      },
+    );
+
+    test(
+      'rejects simultaneous active and archived terminal runs without mutation',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        await lock.synchronized(() async {
+          final activeRun = Directory(
+            p.join(lock.workspaceRoot.path, 'run_$runId'),
+          );
+          await activeRun.create();
+          final completedRun = Directory(
+            p.join(lock.completedRunsRoot.path, 'run_$runId'),
+          );
+          await completedRun.create(recursive: true);
+          final publishing = File(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.publishingRunFileName,
+            ),
+          );
+          await publishing.writeAsString(runId, flush: true);
+
+          await expectLater(
+            lock.archiveTerminalRunWhileWorkspaceLocked(
+              runId: runId,
+              observedMarkerFileName:
+                  RestoreWorkspaceLock.publishingRunFileName,
+            ),
+            throwsStateError,
+          );
+
+          expect(await publishing.readAsString(), runId);
+          expect(await activeRun.exists(), isTrue);
+          expect(await completedRun.exists(), isTrue);
+          expect(await lock.completedRunsRoot.exists(), isTrue);
+          expect(
+            await FileSystemEntity.type(
+              p.join(
+                lock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunFileName,
+              ),
+              followLinks: false,
+            ),
+            FileSystemEntityType.notFound,
+          );
+        });
+      },
+    );
+
+    test(
+      'rejects a terminal run missing from active and completed without mutation',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        await lock.synchronized(() async {
+          final activeRun = Directory(
+            p.join(lock.workspaceRoot.path, 'run_$runId'),
+          );
+          final completedRun = Directory(
+            p.join(lock.completedRunsRoot.path, 'run_$runId'),
+          );
+          final archiving = File(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunFileName,
+            ),
+          );
+          await archiving.writeAsString(runId, flush: true);
+          expect(await lock.completedRunsRoot.exists(), isFalse);
+
+          await expectLater(
+            lock.archiveTerminalRunWhileWorkspaceLocked(
+              runId: runId,
+              observedMarkerFileName: RestoreWorkspaceLock.archivingRunFileName,
+            ),
+            throwsStateError,
+          );
+
+          expect(await archiving.readAsString(), runId);
+          expect(await activeRun.exists(), isFalse);
+          expect(await completedRun.exists(), isFalse);
+          expect(await lock.completedRunsRoot.exists(), isFalse);
+        });
+      },
+    );
+
+    test(
       'rejects a linked workspace root without running the action',
       () async {
         final linkedTarget = Directory(p.join(appDataDirectory.path, 'target'));

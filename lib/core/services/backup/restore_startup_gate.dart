@@ -26,11 +26,13 @@ final class PendingRestoreRun {
     required this.runId,
     required this.markerFileName,
     required this.receipt,
+    required this.runInCompletedDirectory,
   });
 
   final String runId;
   final String? markerFileName;
   final RestoreReceipt receipt;
+  final bool runInCompletedDirectory;
 }
 
 /// Recovers restore state before any business persistence is opened.
@@ -91,6 +93,7 @@ final class RestoreStartupGate {
     String? markerFileName;
     Directory? runDirectory;
     String? directoryRunId;
+    Directory? completedRunsRoot;
     await for (final entity in workspaceRoot.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -100,8 +103,12 @@ final class RestoreStartupGate {
       }
       if (name == RestoreWorkspaceLock.completedRunsDirectoryName &&
           type == FileSystemEntityType.directory) {
+        if (completedRunsRoot != null) {
+          throw StateError('restore_startup_workspace_entry');
+        }
+        completedRunsRoot = Directory(entity.path);
         await RestoreWorkspaceLock.validateCompletedRunsDirectory(
-          Directory(entity.path),
+          completedRunsRoot,
         );
         continue;
       }
@@ -124,20 +131,63 @@ final class RestoreStartupGate {
     }
 
     if (markerFile == null && runDirectory == null) return null;
-    if (runDirectory == null || directoryRunId == null) {
+    if (markerFile != null && markerFileName == null) {
       throw StateError('restore_startup_run_topology');
     }
-    final String runId;
-    if (markerFile != null) {
-      if (markerFileName == null) {
+
+    final markerRunId = markerFile == null
+        ? null
+        : await _readRunId(markerFile);
+    if (runDirectory == null || directoryRunId == null) {
+      if (markerFileName != RestoreWorkspaceLock.archivingRunFileName ||
+          markerRunId == null ||
+          completedRunsRoot == null) {
         throw StateError('restore_startup_run_topology');
       }
-      runId = await _readRunId(markerFile);
-      if (runId != directoryRunId) {
-        throw StateError('restore_startup_run_identity');
+      final archivedRunDirectory = Directory(
+        p.join(completedRunsRoot.path, 'run_$markerRunId'),
+      );
+      if (await FileSystemEntity.type(
+            archivedRunDirectory.path,
+            followLinks: false,
+          ) !=
+          FileSystemEntityType.directory) {
+        throw StateError('restore_startup_run_topology');
       }
-    } else {
-      runId = directoryRunId;
+      final store = RestoreReceiptStore(
+        appDataDirectory: appDataDirectory,
+        runId: markerRunId,
+        archived: true,
+      );
+      final receipt = await store.readLatestWhileWorkspaceLocked();
+      if (receipt == null ||
+          (receipt.state != RestoreReceiptState.committed &&
+              receipt.state != RestoreReceiptState.rolledBack)) {
+        throw StateError('restore_startup_receipt');
+      }
+      await _validateRunTopLevelTopology(
+        runDirectory: archivedRunDirectory,
+        receipt: receipt,
+      );
+      return PendingRestoreRun(
+        runId: markerRunId,
+        markerFileName: markerFileName,
+        receipt: receipt,
+        runInCompletedDirectory: true,
+      );
+    }
+
+    final runId = markerRunId ?? directoryRunId;
+    if (markerRunId != null && markerRunId != directoryRunId) {
+      throw StateError('restore_startup_run_identity');
+    }
+    if (completedRunsRoot != null &&
+        await FileSystemEntity.type(
+              p.join(completedRunsRoot.path, 'run_$runId'),
+              followLinks: false,
+            ) !=
+            FileSystemEntityType.notFound) {
+      throw StateError('restore_startup_run_topology');
     }
 
     final store = RestoreReceiptStore(
@@ -177,6 +227,7 @@ final class RestoreStartupGate {
       runId: runId,
       markerFileName: markerFileName,
       receipt: receipt,
+      runInCompletedDirectory: false,
     );
   }
 
@@ -245,11 +296,10 @@ final class RestoreStartupGate {
           preferences: preferences ?? await SharedPreferences.getInstance(),
           workspaceLock: workspaceLock,
           durability: resolvedDurability,
+          archived: pending.runInCompletedDirectory,
         );
         final coldAckStore = RestoreSettingsColdAckStore(
-          runDirectory: Directory(
-            p.join(workspaceLock.workspaceRoot.path, 'run_${pending.runId}'),
-          ),
+          runDirectory: executor.receiptStore.runDirectory,
           durability: resolvedDurability,
         );
         if (pending.receipt.state == RestoreReceiptState.committed ||
