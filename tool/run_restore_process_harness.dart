@@ -27,13 +27,129 @@ final _processTableLinePattern = RegExp(
   r'[0-9]{2}:[0-9]{2}:[0-9]{2}\s+[0-9]{4})\s+(.+?)\s*$',
 );
 
+enum _MatrixTier {
+  smoke,
+  core,
+  full;
+
+  List<RestoreProcessFailpoint> get failpoints => switch (this) {
+    smoke => restoreProcessSmokeFailpoints,
+    core => restoreProcessCoreFailpoints,
+    full => restoreProcessFullFailpoints,
+  };
+
+  static _MatrixTier parse(List<String> arguments) {
+    return switch (arguments.single) {
+      '--tier=smoke' => _MatrixTier.smoke,
+      '--tier=core' => _MatrixTier.core,
+      '--tier=full' => _MatrixTier.full,
+      _ => throw ArgumentError.value(
+        arguments.single,
+        'tier',
+        'expected --tier=smoke|core|full',
+      ),
+    };
+  }
+}
+
+final class _MatrixSelection {
+  const _MatrixSelection({
+    required this.tier,
+    this.singleFailpoint,
+    this.startAt,
+  });
+
+  final _MatrixTier tier;
+  final RestoreProcessFailpoint? singleFailpoint;
+  final RestoreProcessFailpoint? startAt;
+
+  List<RestoreProcessFailpoint> get failpoints {
+    if (singleFailpoint != null) return [singleFailpoint!];
+    final all = tier.failpoints;
+    if (startAt == null) return all;
+    final index = all.indexOf(startAt!);
+    if (index < 0) {
+      throw StateError(
+        'restore_harness_matrix_start_not_in_tier:${startAt!.name}',
+      );
+    }
+    return List.unmodifiable(all.sublist(index));
+  }
+
+  String get label => singleFailpoint != null
+      ? 'failpoint=${singleFailpoint!.name}'
+      : startAt == null
+      ? tier.name
+      : '${tier.name}-from=${startAt!.name}';
+
+  static _MatrixSelection parse(List<String> arguments) {
+    if (arguments.isEmpty) {
+      return const _MatrixSelection(tier: _MatrixTier.core);
+    }
+    if (arguments.length == 1 && arguments.single.startsWith('--failpoint=')) {
+      return _MatrixSelection(
+        tier: _MatrixTier.full,
+        singleFailpoint: _parseFailpoint(
+          arguments.single.substring('--failpoint='.length),
+        ),
+      );
+    }
+    if (arguments.length > 2 || arguments.toSet().length != arguments.length) {
+      throw ArgumentError(
+        'run_restore_process_harness accepts '
+        '[--tier=smoke|core|full] [--from=<name>] '
+        'or --failpoint=<name>',
+      );
+    }
+    _MatrixTier? tier;
+    RestoreProcessFailpoint? startAt;
+    for (final argument in arguments) {
+      if (argument.startsWith('--tier=')) {
+        if (tier != null) throw ArgumentError('duplicate tier');
+        tier = _MatrixTier.parse([argument]);
+      } else if (argument.startsWith('--from=')) {
+        if (startAt != null) throw ArgumentError('duplicate from');
+        startAt = _parseFailpoint(argument.substring('--from='.length));
+      } else {
+        throw ArgumentError.value(argument, 'argument');
+      }
+    }
+    return _MatrixSelection(tier: tier ?? _MatrixTier.core, startAt: startAt);
+  }
+
+  static RestoreProcessFailpoint _parseFailpoint(String name) {
+    return RestoreProcessFailpoint.values.firstWhere(
+      (candidate) => candidate.name == name,
+      orElse: () => throw ArgumentError.value(
+        name,
+        'failpoint',
+        'unknown restore process failpoint',
+      ),
+    );
+  }
+}
+
+final class _MatrixCaseSummary {
+  const _MatrixCaseSummary({
+    required this.failpoint,
+    required this.scenarioId,
+    required this.runnerProcessIds,
+    required this.elapsed,
+    required this.passed,
+  });
+
+  final RestoreProcessFailpoint failpoint;
+  final String scenarioId;
+  final List<int> runnerProcessIds;
+  final Duration elapsed;
+  final bool passed;
+}
+
 Future<void> main(List<String> arguments) async {
   _RestoreProcessHarnessHost? host;
   try {
-    if (arguments.isNotEmpty) {
-      throw ArgumentError('run_restore_process_harness takes no arguments');
-    }
-    host = await _RestoreProcessHarnessHost.create();
+    final selection = _MatrixSelection.parse(arguments);
+    host = await _RestoreProcessHarnessHost.create(selection);
     await host.run();
   } catch (error, stackTrace) {
     stderr.writeln('Restore process harness failed: $error');
@@ -43,9 +159,13 @@ Future<void> main(List<String> arguments) async {
       for (final cleanupError in cleanupErrors) {
         stderr.writeln('Cleanup failure: $cleanupError');
       }
-      stderr.writeln(
-        'Scenario retained for diagnosis: ${host.scenarioRoot.path}',
-      );
+      final retainedScenario = host.activeScenarioRoot;
+      if (retainedScenario != null) {
+        stderr.writeln(
+          'Scenario retained for diagnosis: ${retainedScenario.path}',
+        );
+      }
+      host.writeMatrixSummary(stderr);
       host.writeProcessDiagnostics(stderr);
     }
     exitCode = 1;
@@ -66,13 +186,15 @@ final class _RestoreProcessHarnessHost {
   _RestoreProcessHarnessHost._({
     required this.projectRoot,
     required this.containerTemporaryDirectory,
-    required this.scenarioId,
-    required this.scenarioRoot,
     required this.restoreHarnessExecutablePath,
+    required this.selection,
+    required this.matrixRunId,
     required this._hostLock,
   });
 
-  static Future<_RestoreProcessHarnessHost> create() async {
+  static Future<_RestoreProcessHarnessHost> create(
+    _MatrixSelection selection,
+  ) async {
     if (!Platform.isMacOS) {
       throw UnsupportedError('restore_process_harness_requires_macos');
     }
@@ -149,30 +271,6 @@ final class _RestoreProcessHarnessHost {
 
     final hostLock = await _acquireHostLock(containerTemporaryDirectory);
     try {
-      final scenarioId = _newScenarioId();
-      final scenarioRoot = Directory(
-        p.join(
-          containerTemporaryDirectory.path,
-          'kelivo_restore_process_$scenarioId',
-        ),
-      );
-      if (await FileSystemEntity.type(scenarioRoot.path, followLinks: false) !=
-          FileSystemEntityType.notFound) {
-        throw StateError('restore_harness_scenario_collision');
-      }
-      await scenarioRoot.create();
-      final canonicalScenarioRoot = Directory(
-        p.normalize(p.absolute(await scenarioRoot.resolveSymbolicLinks())),
-      );
-      if (!p.equals(canonicalScenarioRoot.path, scenarioRoot.path) ||
-          !p.isWithin(
-            containerTemporaryDirectory.path,
-            canonicalScenarioRoot.path,
-          ) ||
-          p.basename(canonicalScenarioRoot.path) !=
-              'kelivo_restore_process_$scenarioId') {
-        throw StateError('restore_harness_scenario_boundary');
-      }
       final restoreHarnessExecutablePath = p.normalize(
         p.absolute(
           p.join(
@@ -192,9 +290,9 @@ final class _RestoreProcessHarnessHost {
       return _RestoreProcessHarnessHost._(
         projectRoot: projectRoot,
         containerTemporaryDirectory: containerTemporaryDirectory,
-        scenarioId: scenarioId,
-        scenarioRoot: canonicalScenarioRoot,
         restoreHarnessExecutablePath: restoreHarnessExecutablePath,
+        selection: selection,
+        matrixRunId: _newIdentifier(),
         hostLock: hostLock,
       );
     } catch (error, stackTrace) {
@@ -212,15 +310,32 @@ final class _RestoreProcessHarnessHost {
 
   final Directory projectRoot;
   final Directory containerTemporaryDirectory;
-  final String scenarioId;
-  final Directory scenarioRoot;
   final String restoreHarnessExecutablePath;
+  final _MatrixSelection selection;
+  final String matrixRunId;
   RandomAccessFile? _hostLock;
   final List<_ManagedProcess> _processes = [];
   final Set<_RunnerIdentity> _activeRunnerIdentities = {};
   final Set<int> _observedRunnerProcessIds = {};
+  final List<_MatrixCaseSummary> _caseSummaries = [];
+  final Stopwatch _matrixStopwatch = Stopwatch();
+  String? _scenarioId;
+  Directory? _scenarioRoot;
+  RestoreProcessFailpoint? _failpoint;
+  Stopwatch? _caseStopwatch;
 
-  String get _preferencesPrefix => 'kelivo.restore.harness.$scenarioId.';
+  String get scenarioId =>
+      _scenarioId ?? (throw StateError('restore_harness_case_scenario'));
+  Directory get scenarioRoot =>
+      _scenarioRoot ?? (throw StateError('restore_harness_case_root'));
+  RestoreProcessFailpoint get failpoint =>
+      _failpoint ?? (throw StateError('restore_harness_case_failpoint'));
+  Directory? get activeScenarioRoot => _scenarioRoot;
+  String get _preferencesPrefix => restoreProcessPreferencesPrefix(
+    matrixRunId: matrixRunId,
+    scenarioId: scenarioId,
+    failpoint: failpoint,
+  );
 
   Future<void> releaseHostLock() async {
     final hostLock = _hostLock;
@@ -229,9 +344,149 @@ final class _RestoreProcessHarnessHost {
     await _releaseHostLockHandle(hostLock);
   }
 
-  Future<void> run() async {
-    stdout.writeln('Restore process harness scenario: ${scenarioRoot.path}');
+  Future<void> _beginCase(RestoreProcessFailpoint selectedFailpoint) async {
+    if (_scenarioId != null ||
+        _scenarioRoot != null ||
+        _failpoint != null ||
+        _processes.isNotEmpty ||
+        _activeRunnerIdentities.isNotEmpty ||
+        _observedRunnerProcessIds.isNotEmpty ||
+        _caseStopwatch != null) {
+      throw StateError('restore_harness_case_state_not_clear');
+    }
+    final nextScenarioId = _newIdentifier();
+    final candidate = Directory(
+      p.join(
+        containerTemporaryDirectory.path,
+        'kelivo_restore_process_$nextScenarioId',
+      ),
+    );
+    if (await FileSystemEntity.type(candidate.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('restore_harness_scenario_collision');
+    }
+    await candidate.create();
+    _scenarioId = nextScenarioId;
+    _scenarioRoot = candidate;
+    _failpoint = selectedFailpoint;
+    final canonical = Directory(
+      p.normalize(p.absolute(await candidate.resolveSymbolicLinks())),
+    );
+    if (!p.equals(canonical.path, candidate.path) ||
+        !p.isWithin(containerTemporaryDirectory.path, canonical.path) ||
+        p.basename(canonical.path) !=
+            'kelivo_restore_process_$nextScenarioId') {
+      throw StateError('restore_harness_scenario_boundary');
+    }
+    _scenarioRoot = canonical;
+  }
 
+  void _clearSuccessfulCase() {
+    if (_scenarioRoot == null ||
+        _processes.any((process) => !process.hasExited) ||
+        _activeRunnerIdentities.isNotEmpty) {
+      throw StateError('restore_harness_case_cleanup_incomplete');
+    }
+    _processes.clear();
+    _observedRunnerProcessIds.clear();
+    _scenarioId = null;
+    _scenarioRoot = null;
+    _failpoint = null;
+    _caseStopwatch = null;
+  }
+
+  void writeMatrixSummary(IOSink sink) {
+    sink.writeln(
+      'Restore process matrix summary: selection=${selection.label} '
+      'matrixRunId=$matrixRunId cases=${_caseSummaries.length}/'
+      '${selection.failpoints.length} elapsed='
+      '${_formatDuration(_matrixStopwatch.elapsed)}',
+    );
+    for (final summary in _caseSummaries) {
+      sink.writeln(
+        '${summary.passed ? 'PASS' : 'FAIL'} '
+        '${summary.failpoint.name} scenario=${summary.scenarioId} '
+        'elapsed=${_formatDuration(summary.elapsed)} '
+        'runnerPids=${summary.runnerProcessIds.join(',')}',
+      );
+    }
+  }
+
+  Future<void> run() async {
+    final failpoints = selection.failpoints;
+    if (failpoints.isEmpty || failpoints.toSet().length != failpoints.length) {
+      throw StateError('restore_harness_matrix_failpoints');
+    }
+    stdout.writeln(
+      'Restore process matrix ${selection.label}: $matrixRunId '
+      '(${failpoints.length} cases)',
+    );
+    _matrixStopwatch.start();
+    try {
+      for (var index = 0; index < failpoints.length; index++) {
+        final selectedFailpoint = failpoints[index];
+        await _beginCase(selectedFailpoint);
+        stdout.writeln(
+          '[${index + 1}/${failpoints.length}] ${selectedFailpoint.name}: '
+          '${scenarioRoot.path}',
+        );
+        _caseStopwatch = Stopwatch()..start();
+        try {
+          await _runCasePhases();
+          final cleanupErrors = await cleanOrphanProcesses();
+          if (cleanupErrors.isNotEmpty) {
+            throw StateError(
+              'restore_harness_process_cleanup:${cleanupErrors.join('|')}',
+            );
+          }
+          await _deleteSuccessfulScenario();
+          _caseStopwatch!.stop();
+          final runnerProcessIds = _currentCaseRunnerProcessIds();
+          _caseSummaries.add(
+            _MatrixCaseSummary(
+              failpoint: selectedFailpoint,
+              scenarioId: scenarioId,
+              runnerProcessIds: runnerProcessIds,
+              elapsed: _caseStopwatch!.elapsed,
+              passed: true,
+            ),
+          );
+          stdout.writeln(
+            '${selectedFailpoint.name} passed in '
+            '${_formatDuration(_caseStopwatch!.elapsed)}; Runner PIDs: '
+            '${runnerProcessIds.join(', ')}',
+          );
+          _clearSuccessfulCase();
+        } catch (error, stackTrace) {
+          _caseStopwatch!.stop();
+          _caseSummaries.add(
+            _MatrixCaseSummary(
+              failpoint: selectedFailpoint,
+              scenarioId: scenarioId,
+              runnerProcessIds: _currentCaseRunnerProcessIds(),
+              elapsed: _caseStopwatch!.elapsed,
+              passed: false,
+            ),
+          );
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+      }
+    } finally {
+      _matrixStopwatch.stop();
+    }
+    writeMatrixSummary(stdout);
+  }
+
+  List<int> _currentCaseRunnerProcessIds() {
+    final processIds = <int>{
+      ..._observedRunnerProcessIds,
+      for (final process in _processes)
+        if (process.runnerProcessId != null) process.runnerProcessId!,
+    };
+    return List.unmodifiable(processIds);
+  }
+
+  Future<void> _runCasePhases() async {
     final setup = await _runNormalPhase(
       RestoreProcessHarnessPhase.setup,
       _validateSetupEvent,
@@ -266,18 +521,6 @@ final class _RestoreProcessHarnessHost {
         cutoverLeaseInstanceId: cutoverLeaseInstanceId,
       ),
     );
-
-    final cleanupErrors = await cleanOrphanProcesses();
-    if (cleanupErrors.isNotEmpty) {
-      throw StateError(
-        'restore_harness_process_cleanup:${cleanupErrors.join('|')}',
-      );
-    }
-    await _deleteSuccessfulScenario();
-    stdout.writeln(
-      'Restore process harness passed; Runner PIDs: '
-      '${_observedRunnerProcessIds.join(', ')}',
-    );
   }
 
   Future<_HarnessEvent> _runNormalPhase(
@@ -287,8 +530,8 @@ final class _RestoreProcessHarnessHost {
     final control = await _writeControl(phase);
     final process = await _startFlutter(control);
     final event = await _waitForEvent(control, process);
-    validate(event, control, process);
     final runner = await _recordRunnerProcess(event, process);
+    validate(event, control, process);
 
     final outerExitCode = await process.waitForExit(_phaseTimeout);
     if (outerExitCode != 0) {
@@ -305,8 +548,8 @@ final class _RestoreProcessHarnessHost {
     final control = await _writeControl(RestoreProcessHarnessPhase.cutoverKill);
     final process = await _startFlutter(control);
     final event = await _waitForEvent(control, process);
-    _validateCutoverEvent(event, control, process, runId: runId);
     final runner = await _recordRunnerProcess(event, process);
+    _validateCutoverEvent(event, control, process, runId: runId);
 
     await _requireSameRunner(runner);
     if (!Process.killPid(event.pid, ProcessSignal.sigkill)) {
@@ -328,8 +571,10 @@ final class _RestoreProcessHarnessHost {
     final generation = phase.index + 1;
     final control = RestoreProcessHarnessControl(
       generation: generation,
+      matrixRunId: matrixRunId,
       scenarioId: scenarioId,
       phase: phase,
+      failpoint: failpoint,
       scenarioRoot: scenarioRoot.path,
       preferencesPrefix: _preferencesPrefix,
     );
@@ -339,8 +584,10 @@ final class _RestoreProcessHarnessHost {
       await readHarnessJson(controlFile),
     );
     if (persisted.generation != control.generation ||
+        persisted.matrixRunId != control.matrixRunId ||
         persisted.scenarioId != control.scenarioId ||
         persisted.phase != control.phase ||
+        persisted.failpoint != control.failpoint ||
         !p.equals(persisted.scenarioRoot, control.scenarioRoot) ||
         persisted.preferencesPrefix != control.preferencesPrefix) {
       throw StateError('restore_harness_control_readback');
@@ -405,6 +652,7 @@ final class _RestoreProcessHarnessHost {
         followLinks: false,
       );
       if (type == FileSystemEntityType.file) {
+        await _observePhaseRunner(process);
         return _HarnessEvent.fromJson(await readHarnessJson(control.eventFile));
       }
       if (type != FileSystemEntityType.notFound) {
@@ -418,6 +666,7 @@ final class _RestoreProcessHarnessHost {
               followLinks: false,
             ) ==
             FileSystemEntityType.file) {
+          await _observePhaseRunner(process);
           return _HarnessEvent.fromJson(
             await readHarnessJson(control.eventFile),
           );
@@ -481,30 +730,276 @@ final class _RestoreProcessHarnessHost {
     _ManagedProcess process, {
     required String runId,
   }) {
+    final observationKeys = switch (control.failpoint) {
+      RestoreProcessFailpoint.cutoverClaimPublished ||
+      RestoreProcessFailpoint.previousSettingsPublished ||
+      RestoreProcessFailpoint.previousManifestPublished ||
+      RestoreProcessFailpoint.previousUploadMoved ||
+      RestoreProcessFailpoint.previousImagesMoved ||
+      RestoreProcessFailpoint.previousAvatarsMoved ||
+      RestoreProcessFailpoint.previousFontsMoved ||
+      RestoreProcessFailpoint.previousDatabaseMoved ||
+      RestoreProcessFailpoint.previousPromoted ||
+      RestoreProcessFailpoint.candidateDatabaseMoved ||
+      RestoreProcessFailpoint.candidateUploadMoved ||
+      RestoreProcessFailpoint.candidateImagesMoved ||
+      RestoreProcessFailpoint.candidateAvatarsMoved ||
+      RestoreProcessFailpoint.candidateFontsMoved => const {
+        'operationKind',
+        'sourcePath',
+        'targetPath',
+        'sourceKind',
+      },
+      RestoreProcessFailpoint.liveDatabaseNormalized => const {
+        'operationKind',
+        'path',
+        'fullBarrier',
+      },
+      RestoreProcessFailpoint.oldRenamedReceiptTempDurable ||
+      RestoreProcessFailpoint.oldRenamedReceiptPublished ||
+      RestoreProcessFailpoint.newInstalledReceiptTempDurable ||
+      RestoreProcessFailpoint.newInstalledReceiptPublished ||
+      RestoreProcessFailpoint.verifiedReceiptTempDurable ||
+      RestoreProcessFailpoint.verifiedReceiptPublished ||
+      RestoreProcessFailpoint.committedReceiptTempDurable ||
+      RestoreProcessFailpoint.committedReceiptPublished => const {
+        'operationKind',
+        'receiptSequence',
+        'receiptState',
+        'temporaryPath',
+        'targetPath',
+      },
+      RestoreProcessFailpoint.settingsSecretRemoved ||
+      RestoreProcessFailpoint.settingsFirstSet => const {
+        'operationKind',
+        'preferenceKey',
+        'valueType',
+      },
+    };
     event.requireCommon(
       control,
       process,
       expectedStatus: 'readyForKill',
-      phaseSpecificKeys: const {
+      phaseSpecificKeys: {
         'marker',
         'runId',
         'leaseInstanceId',
-        'liveDatabasePath',
+        'observedReceiptState',
+        ...observationKeys,
       },
     );
-    event.requireExactString('marker', restoreHarnessScenario);
+    event.requireExactString('marker', control.failpoint.name);
     event.requireExactString('runId', runId);
     event.requireIdentifier('leaseInstanceId');
-    final expectedLiveDatabase = p.normalize(
-      p.absolute(p.join(control.appDataDirectory.path, 'kelivo.sqlite')),
+    event.requireExactString(
+      'observedReceiptState',
+      _expectedObservedReceiptState(control.failpoint),
     );
-    final actualLiveDatabase = event.requireString('liveDatabasePath');
-    if (!p.isAbsolute(actualLiveDatabase) ||
-        !p.equals(
-          p.normalize(p.absolute(actualLiveDatabase)),
-          expectedLiveDatabase,
-        )) {
-      throw StateError('restore_harness_event_live_database');
+    _validateCutoverObservation(event, control, runId: runId);
+  }
+
+  String _expectedObservedReceiptState(RestoreProcessFailpoint failpoint) {
+    return switch (failpoint) {
+      RestoreProcessFailpoint.cutoverClaimPublished ||
+      RestoreProcessFailpoint.liveDatabaseNormalized ||
+      RestoreProcessFailpoint.previousSettingsPublished ||
+      RestoreProcessFailpoint.previousManifestPublished ||
+      RestoreProcessFailpoint.previousUploadMoved ||
+      RestoreProcessFailpoint.previousImagesMoved ||
+      RestoreProcessFailpoint.previousAvatarsMoved ||
+      RestoreProcessFailpoint.previousFontsMoved ||
+      RestoreProcessFailpoint.previousDatabaseMoved ||
+      RestoreProcessFailpoint.previousPromoted ||
+      RestoreProcessFailpoint.oldRenamedReceiptTempDurable => 'prepared',
+      RestoreProcessFailpoint.oldRenamedReceiptPublished ||
+      RestoreProcessFailpoint.settingsSecretRemoved ||
+      RestoreProcessFailpoint.settingsFirstSet ||
+      RestoreProcessFailpoint.candidateDatabaseMoved ||
+      RestoreProcessFailpoint.candidateUploadMoved ||
+      RestoreProcessFailpoint.candidateImagesMoved ||
+      RestoreProcessFailpoint.candidateAvatarsMoved ||
+      RestoreProcessFailpoint.candidateFontsMoved ||
+      RestoreProcessFailpoint.newInstalledReceiptTempDurable => 'oldRenamed',
+      RestoreProcessFailpoint.newInstalledReceiptPublished ||
+      RestoreProcessFailpoint.verifiedReceiptTempDurable => 'newInstalled',
+      RestoreProcessFailpoint.verifiedReceiptPublished ||
+      RestoreProcessFailpoint.committedReceiptTempDurable => 'verified',
+      RestoreProcessFailpoint.committedReceiptPublished => 'committed',
+    };
+  }
+
+  void _validateCutoverObservation(
+    _HarnessEvent event,
+    RestoreProcessHarnessControl control, {
+    required String runId,
+  }) {
+    final appData = p.normalize(p.absolute(control.appDataDirectory.path));
+    final workspace = p.join(appData, '.kelivo_restore');
+    final runDirectory = p.join(workspace, 'run_$runId');
+    final previousPending = p.join(runDirectory, 'previous.pending');
+    final previous = p.join(runDirectory, 'previous');
+    final candidate = p.join(runDirectory, 'candidate');
+    final receipts = p.join(runDirectory, 'receipts');
+
+    switch (control.failpoint) {
+      case RestoreProcessFailpoint.cutoverClaimPublished:
+        event.requireRenameObservation(
+          sourcePath: p.join(workspace, '.active_run'),
+          targetPath: p.join(workspace, '.active_run.publishing'),
+          sourceKind: 'file',
+        );
+      case RestoreProcessFailpoint.liveDatabaseNormalized:
+        event.requireSyncObservation(
+          operationKind: 'directorySyncAfter',
+          path: appData,
+          fullBarrier: true,
+        );
+      case RestoreProcessFailpoint.previousSettingsPublished:
+        event.requireRenameObservation(
+          sourcePath: p.join(previousPending, 'settings.json.tmp'),
+          targetPath: p.join(previousPending, 'settings.json'),
+          sourceKind: 'file',
+        );
+      case RestoreProcessFailpoint.previousManifestPublished:
+        event.requireRenameObservation(
+          sourcePath: p.join(previousPending, 'manifest.json.tmp'),
+          targetPath: p.join(previousPending, 'manifest.json'),
+          sourceKind: 'file',
+        );
+      case RestoreProcessFailpoint.previousUploadMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, 'upload'),
+          targetPath: p.join(previousPending, 'upload'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.previousImagesMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, 'images'),
+          targetPath: p.join(previousPending, 'images'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.previousAvatarsMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, 'avatars'),
+          targetPath: p.join(previousPending, 'avatars'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.previousFontsMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, 'fonts'),
+          targetPath: p.join(previousPending, 'fonts'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.previousDatabaseMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, 'kelivo.sqlite'),
+          targetPath: p.join(previousPending, 'database', 'kelivo.sqlite'),
+          sourceKind: 'file',
+        );
+      case RestoreProcessFailpoint.previousPromoted:
+        event.requireRenameObservation(
+          sourcePath: previousPending,
+          targetPath: previous,
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.oldRenamedReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 2,
+          state: 'oldRenamed',
+          published: false,
+        );
+      case RestoreProcessFailpoint.oldRenamedReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 2,
+          state: 'oldRenamed',
+          published: true,
+        );
+      case RestoreProcessFailpoint.settingsSecretRemoved:
+        event.requirePreferenceObservation(
+          operationKind: 'preferenceRemoveAfter',
+          preferenceKey: 'restore_harness_${control.scenarioId}_secret_api_key',
+          valueType: '',
+        );
+      case RestoreProcessFailpoint.settingsFirstSet:
+        event.requirePreferenceObservation(
+          operationKind: 'preferenceSetAfter',
+          preferenceKey: 'restore_harness_${control.scenarioId}_primary',
+          valueType: 'String',
+        );
+      case RestoreProcessFailpoint.candidateDatabaseMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(candidate, 'database', 'kelivo.sqlite'),
+          targetPath: p.join(appData, 'kelivo.sqlite'),
+          sourceKind: 'file',
+        );
+      case RestoreProcessFailpoint.candidateUploadMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(candidate, 'upload'),
+          targetPath: p.join(appData, 'upload'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.candidateImagesMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(candidate, 'images'),
+          targetPath: p.join(appData, 'images'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.candidateAvatarsMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(candidate, 'avatars'),
+          targetPath: p.join(appData, 'avatars'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.candidateFontsMoved:
+        event.requireRenameObservation(
+          sourcePath: p.join(candidate, 'fonts'),
+          targetPath: p.join(appData, 'fonts'),
+          sourceKind: 'directory',
+        );
+      case RestoreProcessFailpoint.newInstalledReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 3,
+          state: 'newInstalled',
+          published: false,
+        );
+      case RestoreProcessFailpoint.newInstalledReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 3,
+          state: 'newInstalled',
+          published: true,
+        );
+      case RestoreProcessFailpoint.verifiedReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 4,
+          state: 'verified',
+          published: false,
+        );
+      case RestoreProcessFailpoint.verifiedReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 4,
+          state: 'verified',
+          published: true,
+        );
+      case RestoreProcessFailpoint.committedReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 5,
+          state: 'committed',
+          published: false,
+        );
+      case RestoreProcessFailpoint.committedReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 5,
+          state: 'committed',
+          published: true,
+        );
     }
   }
 
@@ -709,6 +1204,12 @@ final class _RestoreProcessHarnessHost {
   }
 
   void writeProcessDiagnostics(IOSink sink) {
+    if (_scenarioRoot != null && _failpoint != null) {
+      sink.writeln(
+        'Active matrix case: ${_failpoint!.name} '
+        'scenario=$scenarioId root=${scenarioRoot.path}',
+      );
+    }
     for (final process in _processes) {
       sink.writeln('\n[${process.phase.name}] ${process.command.join(' ')}');
       sink.writeln('outer PID: ${process.process.pid}');
@@ -761,9 +1262,11 @@ final class _HarnessEvent {
     'format',
     'version',
     'generation',
+    'matrixRunId',
     'scenario',
     'scenarioId',
     'phase',
+    'failpoint',
     'pid',
     'status',
   };
@@ -799,9 +1302,11 @@ final class _HarnessEvent {
     if (json['format'] != restoreHarnessFormat ||
         json['version'] != RestoreProcessHarnessControl.version ||
         json['generation'] != control.generation ||
+        json['matrixRunId'] != control.matrixRunId ||
         json['scenario'] != restoreHarnessScenario ||
         json['scenarioId'] != control.scenarioId ||
         json['phase'] != control.phase.name ||
+        json['failpoint'] != control.failpoint.name ||
         json['status'] != expectedStatus) {
       throw FormatException(
         'restore_harness_event_binding:${control.phase.name}',
@@ -842,6 +1347,88 @@ final class _HarnessEvent {
       throw FormatException('restore_harness_event_int:$key');
     }
     return value;
+  }
+
+  bool requireBool(String key) {
+    final value = json[key];
+    if (value is! bool) {
+      throw FormatException('restore_harness_event_bool:$key');
+    }
+    return value;
+  }
+
+  String requirePath(String key, {String? expected}) {
+    final value = requireString(key);
+    if (!p.isAbsolute(value) || p.normalize(p.absolute(value)) != value) {
+      throw FormatException('restore_harness_event_path:$key');
+    }
+    if (expected != null && !p.equals(value, expected)) {
+      throw FormatException('restore_harness_event_path_value:$key');
+    }
+    return value;
+  }
+
+  void requireRenameObservation({
+    required String sourcePath,
+    required String targetPath,
+    required String sourceKind,
+  }) {
+    requireExactString('operationKind', 'renameAfter');
+    requirePath('sourcePath', expected: sourcePath);
+    requirePath('targetPath', expected: targetPath);
+    requireExactString('sourceKind', sourceKind);
+  }
+
+  void requireSyncObservation({
+    required String operationKind,
+    required String path,
+    required bool fullBarrier,
+  }) {
+    requireExactString('operationKind', operationKind);
+    requirePath('path', expected: path);
+    if (requireBool('fullBarrier') != fullBarrier) {
+      throw const FormatException('restore_harness_event_full_barrier');
+    }
+  }
+
+  void requireReceiptObservation({
+    required String receiptDirectory,
+    required int sequence,
+    required String state,
+    required bool published,
+  }) {
+    requireExactString(
+      'operationKind',
+      published ? 'receiptPublished' : 'receiptTempDurable',
+    );
+    if (requireInt('receiptSequence') != sequence) {
+      throw const FormatException('restore_harness_event_receipt_sequence');
+    }
+    requireExactString('receiptState', state);
+    final receiptName = 'receipt_${sequence.toString().padLeft(16, '0')}.json';
+    requirePath('targetPath', expected: p.join(receiptDirectory, receiptName));
+    final temporaryPath = requirePath('temporaryPath');
+    final temporaryName = p.basename(temporaryPath);
+    final temporaryPattern = RegExp(
+      '^${RegExp.escape(receiptName)}\\.([1-9][0-9]*)_$pid\\.tmp\$',
+    );
+    if (!p.equals(p.dirname(temporaryPath), receiptDirectory) ||
+        temporaryPattern.firstMatch(temporaryName) == null) {
+      throw const FormatException('restore_harness_event_receipt_temporary');
+    }
+  }
+
+  void requirePreferenceObservation({
+    required String operationKind,
+    required String preferenceKey,
+    required String valueType,
+  }) {
+    requireExactString('operationKind', operationKind);
+    requireExactString('preferenceKey', preferenceKey);
+    final actualValueType = json['valueType'];
+    if (actualValueType is! String || actualValueType != valueType) {
+      throw const FormatException('restore_harness_event_value_type');
+    }
   }
 }
 
@@ -1047,13 +1634,16 @@ Future<void> _releaseHostLockHandle(RandomAccessFile handle) async {
   }
 }
 
-String _newScenarioId() {
+String _newIdentifier() {
   final random = Random.secure();
   return List<int>.generate(
     16,
     (_) => random.nextInt(256),
   ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
 }
+
+String _formatDuration(Duration duration) =>
+    '${(duration.inMicroseconds / Duration.microsecondsPerSecond).toStringAsFixed(3)}s';
 
 List<_RunnerProcessSnapshot> _parseProcessTable(String output) {
   final snapshots = <_RunnerProcessSnapshot>[];

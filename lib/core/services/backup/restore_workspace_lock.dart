@@ -33,6 +33,9 @@ final class RestoreWorkspaceLock {
   static final _initialReceiptTempPattern = RegExp(
     r'^receipt_0000000000000001\.json\.[0-9]+_[0-9]+\.tmp$',
   );
+  static final _receiptTempPattern = RegExp(
+    r'^receipt_[0-9]{16}\.json\.[0-9]+_[0-9]+\.tmp$',
+  );
   static final _coldAckTempPattern = RegExp(
     r'^settings_cold_ack\.json\.[0-9]+_[0-9]+_[0-9]+\.tmp$',
   );
@@ -371,6 +374,7 @@ final class RestoreWorkspaceLock {
     Directory receiptDirectory,
   ) async {
     var hasFinalReceipt = false;
+    var hasLaterReceiptTemp = false;
     await for (final entity in receiptDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -382,6 +386,13 @@ final class RestoreWorkspaceLock {
         continue;
       }
       if (_initialReceiptTempPattern.hasMatch(name)) continue;
+      if (_receiptTempPattern.hasMatch(name)) {
+        hasLaterReceiptTemp = true;
+        continue;
+      }
+      throw StateError('restore_workspace_unpublished_receipt_entry');
+    }
+    if (!hasFinalReceipt && hasLaterReceiptTemp) {
       throw StateError('restore_workspace_unpublished_receipt_entry');
     }
     return hasFinalReceipt;

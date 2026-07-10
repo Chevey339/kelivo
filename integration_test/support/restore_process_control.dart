@@ -7,7 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 
 const restoreHarnessControlDefine = 'KELIVO_RESTORE_HARNESS_CONTROL';
-const restoreHarnessScenario = 'candidateDatabaseRenamedToLive';
+const restoreHarnessScenario = 'forwardCutoverMatrix';
 const restoreHarnessFormat = 'kelivo.restore-process-harness';
 
 enum RestoreProcessHarnessPhase {
@@ -17,16 +17,82 @@ enum RestoreProcessHarnessPhase {
   coldFinalize,
 }
 
+enum RestoreProcessFailpoint {
+  cutoverClaimPublished,
+  liveDatabaseNormalized,
+  previousSettingsPublished,
+  previousManifestPublished,
+  previousUploadMoved,
+  previousImagesMoved,
+  previousAvatarsMoved,
+  previousFontsMoved,
+  previousDatabaseMoved,
+  previousPromoted,
+  oldRenamedReceiptTempDurable,
+  oldRenamedReceiptPublished,
+  settingsSecretRemoved,
+  settingsFirstSet,
+  candidateDatabaseMoved,
+  candidateUploadMoved,
+  candidateImagesMoved,
+  candidateAvatarsMoved,
+  candidateFontsMoved,
+  newInstalledReceiptTempDurable,
+  newInstalledReceiptPublished,
+  verifiedReceiptTempDurable,
+  verifiedReceiptPublished,
+  committedReceiptTempDurable,
+  committedReceiptPublished,
+}
+
+const restoreProcessSmokeFailpoints = <RestoreProcessFailpoint>[
+  RestoreProcessFailpoint.candidateDatabaseMoved,
+];
+
+const restoreProcessCoreFailpoints = <RestoreProcessFailpoint>[
+  RestoreProcessFailpoint.cutoverClaimPublished,
+  RestoreProcessFailpoint.liveDatabaseNormalized,
+  RestoreProcessFailpoint.previousSettingsPublished,
+  RestoreProcessFailpoint.previousManifestPublished,
+  RestoreProcessFailpoint.previousUploadMoved,
+  RestoreProcessFailpoint.previousDatabaseMoved,
+  RestoreProcessFailpoint.previousPromoted,
+  RestoreProcessFailpoint.oldRenamedReceiptTempDurable,
+  RestoreProcessFailpoint.oldRenamedReceiptPublished,
+  RestoreProcessFailpoint.settingsSecretRemoved,
+  RestoreProcessFailpoint.settingsFirstSet,
+  RestoreProcessFailpoint.candidateDatabaseMoved,
+  RestoreProcessFailpoint.candidateUploadMoved,
+  RestoreProcessFailpoint.candidateImagesMoved,
+  RestoreProcessFailpoint.candidateAvatarsMoved,
+  RestoreProcessFailpoint.candidateFontsMoved,
+  RestoreProcessFailpoint.newInstalledReceiptPublished,
+  RestoreProcessFailpoint.verifiedReceiptPublished,
+  RestoreProcessFailpoint.committedReceiptPublished,
+];
+
+const restoreProcessFullFailpoints = RestoreProcessFailpoint.values;
+
 final _scenarioIdPattern = RegExp(r'^[a-f0-9]{32}$');
-final _preferencePrefixPattern = RegExp(
-  r'^kelivo\.restore\.harness\.[a-f0-9]{32}\.$',
-);
+
+String restoreProcessPreferencesPrefix({
+  required String matrixRunId,
+  required String scenarioId,
+  required RestoreProcessFailpoint failpoint,
+}) {
+  _requireIdentifier(matrixRunId, 'matrixRunId');
+  _requireIdentifier(scenarioId, 'scenarioId');
+  return 'kelivo.restore.harness.$matrixRunId.$scenarioId.'
+      '${failpoint.name}.';
+}
 
 final class RestoreProcessHarnessControl {
   RestoreProcessHarnessControl({
     required this.generation,
+    required this.matrixRunId,
     required this.scenarioId,
     required this.phase,
+    required this.failpoint,
     required String scenarioRoot,
     required this.preferencesPrefix,
   }) : scenarioRoot = p.normalize(p.absolute(scenarioRoot)) {
@@ -37,24 +103,30 @@ final class RestoreProcessHarnessControl {
     if (generation != phase.index + 1) {
       throw ArgumentError.value(generation, 'generation');
     }
-    if (!_scenarioIdPattern.hasMatch(scenarioId)) {
-      throw ArgumentError.value(scenarioId, 'scenarioId');
-    }
+    _requireIdentifier(matrixRunId, 'matrixRunId');
+    _requireIdentifier(scenarioId, 'scenarioId');
     if (!p.isAbsolute(scenarioRoot) ||
-        p.normalize(scenarioRoot) != scenarioRoot) {
+        p.normalize(scenarioRoot) != scenarioRoot ||
+        p.basename(scenarioRoot) != 'kelivo_restore_process_$scenarioId') {
       throw ArgumentError.value(scenarioRoot, 'scenarioRoot');
     }
-    if (!_preferencePrefixPattern.hasMatch(preferencesPrefix) ||
-        preferencesPrefix != 'kelivo.restore.harness.$scenarioId.') {
+    if (preferencesPrefix !=
+        restoreProcessPreferencesPrefix(
+          matrixRunId: matrixRunId,
+          scenarioId: scenarioId,
+          failpoint: failpoint,
+        )) {
       throw ArgumentError.value(preferencesPrefix, 'preferencesPrefix');
     }
   }
 
-  static const version = 1;
+  static const version = 2;
 
   final int generation;
+  final String matrixRunId;
   final String scenarioId;
   final RestoreProcessHarnessPhase phase;
+  final RestoreProcessFailpoint failpoint;
   final String scenarioRoot;
   final String preferencesPrefix;
 
@@ -74,9 +146,11 @@ final class RestoreProcessHarnessControl {
     'format': restoreHarnessFormat,
     'version': version,
     'generation': generation,
+    'matrixRunId': matrixRunId,
     'scenario': restoreHarnessScenario,
     'scenarioId': scenarioId,
     'phase': phase.name,
+    'failpoint': failpoint.name,
     'scenarioRoot': scenarioRoot,
     'preferencesPrefix': preferencesPrefix,
   };
@@ -86,9 +160,11 @@ final class RestoreProcessHarnessControl {
       'format',
       'version',
       'generation',
+      'matrixRunId',
       'scenario',
       'scenarioId',
       'phase',
+      'failpoint',
       'scenarioRoot',
       'preferencesPrefix',
     };
@@ -102,8 +178,10 @@ final class RestoreProcessHarnessControl {
         json['version'] != version ||
         json['scenario'] != restoreHarnessScenario ||
         json['generation'] is! int ||
+        json['matrixRunId'] is! String ||
         json['scenarioId'] is! String ||
         json['phase'] is! String ||
+        json['failpoint'] is! String ||
         json['scenarioRoot'] is! String ||
         json['preferencesPrefix'] is! String) {
       throw const FormatException('restore_harness_control_types');
@@ -114,11 +192,19 @@ final class RestoreProcessHarnessControl {
       orElse: () =>
           throw const FormatException('restore_harness_control_phase'),
     );
+    final rawFailpoint = json['failpoint'] as String;
+    final failpoint = RestoreProcessFailpoint.values.firstWhere(
+      (candidate) => candidate.name == rawFailpoint,
+      orElse: () =>
+          throw const FormatException('restore_harness_control_failpoint'),
+    );
     try {
       return RestoreProcessHarnessControl(
         generation: json['generation'] as int,
+        matrixRunId: json['matrixRunId'] as String,
         scenarioId: json['scenarioId'] as String,
         phase: phase,
+        failpoint: failpoint,
         scenarioRoot: json['scenarioRoot'] as String,
         preferencesPrefix: json['preferencesPrefix'] as String,
       );
@@ -135,6 +221,12 @@ final class RestoreProcessHarnessControl {
     return RestoreProcessHarnessControl.fromJson(
       await readHarnessJson(File(controlPath)),
     );
+  }
+}
+
+void _requireIdentifier(String value, String name) {
+  if (!_scenarioIdPattern.hasMatch(value)) {
+    throw ArgumentError.value(value, name);
   }
 }
 

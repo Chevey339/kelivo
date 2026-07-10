@@ -672,6 +672,103 @@ void main() {
       expect(await runDirectory.exists(), isTrue);
     });
 
+    test('resumes a published run with a later exact receipt temp', () async {
+      SharedPreferences.setMockInitialValues({'theme': 'old'});
+      final preferences = await SharedPreferences.getInstance();
+      final bundle = await _createBundle(
+        root,
+        theme: 'new',
+        secretsIncluded: true,
+        directoryName: 'later_receipt_temp_bundle',
+      );
+      final prepared = await RestoreBundlePreparation.prepare(
+        appDataDirectory: root,
+        extractedDirectory: bundle.directory,
+        sourceManifestSha256: bundle.manifestSha256,
+        bundleIncludesChats: false,
+        bundleIncludesFiles: false,
+        restoreChats: false,
+        restoreFiles: false,
+        createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+      );
+      final store = RestoreReceiptStore(
+        appDataDirectory: root,
+        runId: prepared.runId,
+      );
+      final temporary = File(
+        p.join(
+          store.receiptDirectory.path,
+          'receipt_0000000000000002.json.123456_789.tmp',
+        ),
+      );
+      await temporary.writeAsString(
+        jsonEncode(
+          prepared.receipt
+              .advance(
+                RestoreReceiptState.oldRenamed,
+                previousManifestSha256:
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+                    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              )
+              .toJson(),
+        ),
+        flush: true,
+      );
+
+      await expectLater(
+        RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: root,
+          preferences: preferences,
+        ),
+        throwsA(isA<RestoreColdRestartRequired>()),
+      );
+      expect(await temporary.exists(), isTrue);
+      expect((await store.readHistory()).map((receipt) => receipt.state), [
+        RestoreReceiptState.prepared,
+        RestoreReceiptState.oldRenamed,
+        RestoreReceiptState.newInstalled,
+        RestoreReceiptState.verified,
+        RestoreReceiptState.committed,
+      ]);
+    });
+
+    test(
+      'never discards a later receipt temp without a final receipt',
+      () async {
+        const runId = 'edededededededededededededededed';
+        final runDirectory = await _createStrictUnpublishedRun(
+          root: root,
+          runId: runId,
+          markerFileName: RestoreWorkspaceLock.activeRunFileName,
+          includeReceiptTemp: false,
+        );
+        final temporary = File(
+          p.join(
+            runDirectory.path,
+            'receipts',
+            'receipt_0000000000000002.json.123456_789.tmp',
+          ),
+        );
+        await temporary.parent.create();
+        await temporary.writeAsString('{"partial":', flush: true);
+
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'restore_workspace_unpublished_receipt_entry',
+            ),
+          ),
+        );
+        expect(await temporary.exists(), isTrue);
+        expect(await runDirectory.exists(), isTrue);
+      },
+    );
+
     test('rejects a publishing marker without its run directory', () async {
       final workspace = Directory(
         p.join(root.path, RestoreWorkspaceLock.workspaceRootName),

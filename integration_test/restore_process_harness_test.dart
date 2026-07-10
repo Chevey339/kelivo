@@ -23,6 +23,8 @@ import 'support/restore_process_hooks.dart';
 
 const _leaseInstancePattern = r'^[a-f0-9]{32}$';
 
+enum _BundleLocation { live, candidate, previousPending, previous }
+
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -65,21 +67,28 @@ Future<void> _runSetup(
     control.sourceDirectory,
     'restore_harness_setup_source',
   );
-  final preferenceKey = 'restore_harness_${control.scenarioId}';
-  if (preferences.containsKey(preferenceKey)) {
-    throw StateError('restore_harness_setup_preference');
-  }
-  if (!await preferences.setString(preferenceKey, 'old')) {
-    throw StateError('restore_harness_setup_preference_write');
+  final preferenceSeed = _preferenceSeed(control);
+  for (final entry in preferenceSeed.entries) {
+    if (preferences.containsKey(entry.key)) {
+      throw StateError('restore_harness_setup_preference:${entry.key}');
+    }
+    if (!await preferences.setString(entry.key, entry.value)) {
+      throw StateError('restore_harness_setup_preference_write:${entry.key}');
+    }
   }
   await preferences.reload();
-  expect(preferences.getString(preferenceKey), 'old');
+  for (final entry in preferenceSeed.entries) {
+    expect(preferences.getString(entry.key), entry.value);
+  }
 
   final state = await prepareCompleteBundleFixture(control);
   _requireStateBinding(control, state);
-  expect(state.preferenceKey, preferenceKey);
-  expect(state.oldPreferenceValue, 'old');
-  expect(state.newPreferenceValue, 'new');
+  expect(state.primaryPreferenceKey, preferenceSeed.keys.elementAt(0));
+  expect(state.primaryOldPreferenceValue, preferenceSeed.values.elementAt(0));
+  expect(state.secondaryPreferenceKey, preferenceSeed.keys.elementAt(1));
+  expect(state.secondaryOldPreferenceValue, preferenceSeed.values.elementAt(1));
+  expect(state.secretPreferenceKey, preferenceSeed.keys.elementAt(2));
+  expect(state.secretOldPreferenceValue, preferenceSeed.values.elementAt(2));
 
   final pending = await RestoreStartupGate.inspect(
     appDataDirectory: control.appDataDirectory,
@@ -134,7 +143,7 @@ Future<void> _runCutoverKill(
   final state = await _readBoundState(control);
   final setupEvent = await _readSetupEvent(control, state);
   expect(setupEvent['pid'], isNot(pid));
-  expect(preferences.getString(state.preferenceKey), state.oldPreferenceValue);
+  _expectBeforePreferences(preferences, state);
   final pending = await RestoreStartupGate.inspect(
     appDataDirectory: control.appDataDirectory,
   );
@@ -145,74 +154,59 @@ Future<void> _runCutoverKill(
   expect(pending.receipt.checksum, state.preparedReceiptChecksum);
 
   final receiptStore = _activeReceiptStore(control, state);
-  final candidateDatabase = _candidateDatabase(receiptStore);
-  final liveDatabase = _liveDatabase(control);
-  late final RestoreBusinessLease lease;
-  final durability = BlockAfterCandidateDatabaseInstallDurability(
-    delegate: RestorePlatformDurability(),
-    candidateDatabasePath: candidateDatabase.path,
-    liveDatabasePath: liveDatabase.path,
-    onInstalled: () async {
-      await preferences.reload();
-      expect(
-        preferences.getString(state.preferenceKey),
-        state.newPreferenceValue,
-      );
-      expect(await candidateDatabase.exists(), isFalse);
-      expect(await harnessConversationIds(liveDatabase), [
-        state.newConversationId,
-      ]);
-      final history = await receiptStore.readHistoryWhileWorkspaceLocked();
-      expect(history.map((receipt) => receipt.state), [
-        RestoreReceiptState.prepared,
-        RestoreReceiptState.oldRenamed,
-      ]);
-      expect(history.first.checksum, state.preparedReceiptChecksum);
-      expect(
-        await File(
-          p.join(
-            receiptStore.workspaceRoot.path,
-            RestoreWorkspaceLock.publishingRunFileName,
-          ),
-        ).readAsString(),
-        state.runId,
-      );
-      expect(
-        await harnessConversationIds(
-          File(
-            p.join(
-              _previousDirectory(receiptStore).path,
-              'database',
-              AppDatabase.databaseFileName,
-            ),
-          ),
-        ),
-        [state.oldConversationId],
-      );
-      expect(
-        await File(
-          p.join(
-            receiptStore.runDirectory.path,
-            RestoreSettingsColdAckStore.fileName,
-          ),
-        ).exists(),
-        isFalse,
-      );
-      await _expectInterruptedAssetSplit(control, receiptStore);
-      await _publishEvent(control, {
-        'status': 'readyForKill',
-        'marker': restoreHarnessScenario,
-        'runId': state.runId,
-        'leaseInstanceId': lease.instanceId,
-        'liveDatabasePath': p.normalize(p.absolute(liveDatabase.path)),
-      });
-    },
-  );
-  lease = await RestoreBusinessLease.acquire(
+  final platformDurability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
     appDataDirectory: control.appDataDirectory,
-    durability: durability,
+    durability: platformDurability,
   );
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  Future<void> onReached(Map<String, dynamic> observation) async {
+    await preferences.reload();
+    await _expectForwardCrashTopology(
+      control: control,
+      state: state,
+      preferences: preferences,
+      receiptStore: receiptStore,
+    );
+    final history = await receiptStore.readHistoryWhileWorkspaceLocked();
+    await _publishEvent(control, {
+      'status': 'readyForKill',
+      'marker': control.failpoint.name,
+      'runId': state.runId,
+      'leaseInstanceId': lease.instanceId,
+      'observedReceiptState': history.last.state.name,
+      ...observation,
+    });
+  }
+
+  final matcher = _durabilityMatcher(control, state, receiptStore);
+  final RestoreDurability durability;
+  if (matcher == null) {
+    durability = platformDurability;
+  } else {
+    durability = OneShotBlockingRestoreDurability(
+      delegate: platformDurability,
+      matcher: matcher,
+      onMatched: (observation) =>
+          onReached(_durabilityObservationJson(observation)),
+    );
+  }
+  final settingsHook = _settingsFailpointStore(
+    control: control,
+    state: state,
+    delegate: preferenceDelegate,
+    onMatched: (observation) =>
+        onReached(_preferenceObservationJson(control, observation)),
+  );
+  if ((matcher == null) == (settingsHook == null)) {
+    throw StateError(
+      'restore_harness_failpoint_trigger:${control.failpoint.name}',
+    );
+  }
   try {
+    if (settingsHook != null) {
+      SharedPreferencesStorePlatform.instance = settingsHook;
+    }
     await RestoreStartupGate.recoverAndRequireBusinessReady(
       appDataDirectory: control.appDataDirectory,
       preferences: preferences,
@@ -221,6 +215,7 @@ Future<void> _runCutoverKill(
     );
     throw StateError('restore_harness_cutover_returned');
   } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
     await lease.close();
   }
 }
@@ -232,9 +227,14 @@ Future<void> _runResumeToColdAck(
   final state = await _readBoundState(control);
   final cutoverEvent = await _readCutoverEvent(control, state);
   expect(cutoverEvent['pid'], isNot(pid));
-  expect(preferences.getString(state.preferenceKey), state.newPreferenceValue);
 
   final receiptStore = _activeReceiptStore(control, state);
+  await _expectForwardCrashTopology(
+    control: control,
+    state: state,
+    preferences: preferences,
+    receiptStore: receiptStore,
+  );
   final pendingBefore = await RestoreStartupGate.inspect(
     appDataDirectory: control.appDataDirectory,
   );
@@ -244,12 +244,10 @@ Future<void> _runResumeToColdAck(
     pendingBefore.markerFileName,
     RestoreWorkspaceLock.publishingRunFileName,
   );
-  expect(pendingBefore.receipt.state, RestoreReceiptState.oldRenamed);
-  expect(await harnessConversationIds(_liveDatabase(control)), [
-    state.newConversationId,
-  ]);
-  expect(await _candidateDatabase(receiptStore).exists(), isFalse);
-  await _expectInterruptedAssetSplit(control, receiptStore);
+  expect(
+    pendingBefore.receipt.state,
+    _expectedPublishedReceiptState(control.failpoint),
+  );
 
   final durability = RestorePlatformDurability();
   final lease = await RestoreBusinessLease.acquire(
@@ -294,10 +292,7 @@ Future<void> _runResumeToColdAck(
     expect(coldAck.expected, RestoreSettingsColdAckExpected.target);
     expect(coldAck.processId, lease.processId);
     expect(coldAck.leaseInstanceId, lease.instanceId);
-    expect(
-      preferences.getString(state.preferenceKey),
-      state.newPreferenceValue,
-    );
+    _expectTargetPreferences(preferences, state);
     await _expectInstalledBundle(control, receiptStore, state);
   } finally {
     await lease.close();
@@ -322,7 +317,7 @@ Future<void> _runColdFinalize(
   final state = await _readBoundState(control);
   final resumeEvent = await _readResumeEvent(control, state);
   expect(resumeEvent['pid'], isNot(pid));
-  expect(preferences.getString(state.preferenceKey), state.newPreferenceValue);
+  _expectTargetPreferences(preferences, state);
 
   final activeStore = _activeReceiptStore(control, state);
   final pending = await RestoreStartupGate.inspect(
@@ -410,7 +405,9 @@ Future<void> _runColdFinalize(
     await previousStore.validateComplete(previous);
     expect(previous.manifestSha256, history.last.previousManifestSha256);
     expect(jsonDecode(utf8.decode(previous.settingsSnapshotBytes)), {
-      state.preferenceKey: state.oldPreferenceValue,
+      state.primaryPreferenceKey: state.primaryOldPreferenceValue,
+      state.secondaryPreferenceKey: state.secondaryOldPreferenceValue,
+      state.secretPreferenceKey: state.secretOldPreferenceValue,
     });
 
     final archivedAck = await RestoreSettingsColdAckStore(
@@ -419,10 +416,7 @@ Future<void> _runColdFinalize(
     expect(archivedAck, isNotNull);
     expect(archivedAck!.checksum, observedAck.checksum);
     await preferences.reload();
-    expect(
-      preferences.getString(state.preferenceKey),
-      state.newPreferenceValue,
-    );
+    _expectTargetPreferences(preferences, state);
     await _expectFinalArchivedBundle(control, archivedStore, state);
   } finally {
     SharedPreferencesStorePlatform.instance = preferenceDelegate;
@@ -439,11 +433,34 @@ Future<void> _runColdFinalize(
     'leaseInstanceId': lease.instanceId,
     'settingsMutationAttempts': mutationGuard.mutationAttempts,
   });
-  if (!await preferences.remove(state.preferenceKey)) {
-    throw StateError('restore_harness_preference_cleanup');
+  for (final key in [
+    state.primaryPreferenceKey,
+    state.secondaryPreferenceKey,
+    state.secretPreferenceKey,
+  ]) {
+    if (preferences.containsKey(key) && !await preferences.remove(key)) {
+      throw StateError('restore_harness_preference_cleanup:$key');
+    }
   }
   await preferences.reload();
-  expect(preferences.containsKey(state.preferenceKey), isFalse);
+  expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+}
+
+void _expectTargetPreferences(
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+) {
+  expect(
+    preferences.getString(state.primaryPreferenceKey),
+    state.primaryNewPreferenceValue,
+  );
+  expect(
+    preferences.getString(state.secondaryPreferenceKey),
+    state.secondaryNewPreferenceValue,
+  );
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
 }
 
 Future<RestoreCompleteBundleFixtureState> _readBoundState(
@@ -458,7 +475,15 @@ void _requireStateBinding(
   RestoreProcessHarnessControl control,
   RestoreCompleteBundleFixtureState state,
 ) {
-  if (state.preferenceKey != 'restore_harness_${control.scenarioId}' ||
+  final seed = _preferenceSeed(control);
+  if (state.matrixRunId != control.matrixRunId ||
+      state.failpoint != control.failpoint.name ||
+      state.primaryPreferenceKey != seed.keys.elementAt(0) ||
+      state.primaryOldPreferenceValue != seed.values.elementAt(0) ||
+      state.secondaryPreferenceKey != seed.keys.elementAt(1) ||
+      state.secondaryOldPreferenceValue != seed.values.elementAt(1) ||
+      state.secretPreferenceKey != seed.keys.elementAt(2) ||
+      state.secretOldPreferenceValue != seed.values.elementAt(2) ||
       state.oldConversationId != 'old-${control.scenarioId}' ||
       state.newConversationId != 'new-${control.scenarioId}' ||
       !RegExp(r'^[a-f0-9]{32}$').hasMatch(state.runId) ||
@@ -467,6 +492,12 @@ void _requireStateBinding(
     throw const FormatException('restore_harness_state_binding');
   }
 }
+
+Map<String, String> _preferenceSeed(RestoreProcessHarnessControl control) => {
+  'restore_harness_${control.scenarioId}_primary': 'old-primary',
+  'restore_harness_${control.scenarioId}_secondary': 'old-secondary',
+  'restore_harness_${control.scenarioId}_secret_api_key': 'old-secret',
+};
 
 void _requireControlSequence(RestoreProcessHarnessControl control) {
   if (control.generation != control.phase.index + 1) {
@@ -518,6 +549,614 @@ Directory _previousDirectory(RestoreReceiptStore store) => Directory(
   p.join(store.runDirectory.path, RestorePreviousStore.previousDirectoryName),
 );
 
+Directory _previousPendingDirectory(RestoreReceiptStore store) => Directory(
+  p.join(store.runDirectory.path, RestorePreviousStore.pendingDirectoryName),
+);
+
+RestoreDurabilityMatcher? _durabilityMatcher(
+  RestoreProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  RestoreReceiptStore receiptStore,
+) {
+  final candidate = _candidateDirectory(receiptStore);
+  final pending = _previousPendingDirectory(receiptStore);
+  final previous = _previousDirectory(receiptStore);
+  final liveDatabase = _liveDatabase(control);
+  return switch (control.failpoint) {
+    RestoreProcessFailpoint.cutoverClaimPublished => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(
+        p.join(
+          receiptStore.workspaceRoot.path,
+          RestoreWorkspaceLock.activeRunFileName,
+        ),
+      ),
+      targetPath: _absolutePath(
+        p.join(
+          receiptStore.workspaceRoot.path,
+          RestoreWorkspaceLock.publishingRunFileName,
+        ),
+      ),
+      sourceKind: RestoreProcessEntityKind.file,
+    ),
+    RestoreProcessFailpoint.liveDatabaseNormalized =>
+      RestoreExactDirectorySyncMatcher(
+        path: _absolutePath(control.appDataDirectory.path),
+        fullBarrier: true,
+      ),
+    RestoreProcessFailpoint.previousSettingsPublished =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(
+          p.join(pending.path, '${RestorePreviousStore.settingsFileName}.tmp'),
+        ),
+        targetPath: _absolutePath(
+          p.join(pending.path, RestorePreviousStore.settingsFileName),
+        ),
+        sourceKind: RestoreProcessEntityKind.file,
+      ),
+    RestoreProcessFailpoint.previousManifestPublished =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(
+          p.join(pending.path, '${RestorePreviousStore.manifestFileName}.tmp'),
+        ),
+        targetPath: _absolutePath(
+          p.join(pending.path, RestorePreviousStore.manifestFileName),
+        ),
+        sourceKind: RestoreProcessEntityKind.file,
+      ),
+    RestoreProcessFailpoint.previousUploadMoved ||
+    RestoreProcessFailpoint.previousImagesMoved ||
+    RestoreProcessFailpoint.previousAvatarsMoved ||
+    RestoreProcessFailpoint.previousFontsMoved => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(
+        p.join(
+          control.appDataDirectory.path,
+          _assetRootForFailpoint(control.failpoint),
+        ),
+      ),
+      targetPath: _absolutePath(
+        p.join(pending.path, _assetRootForFailpoint(control.failpoint)),
+      ),
+      sourceKind: RestoreProcessEntityKind.directory,
+    ),
+    RestoreProcessFailpoint.previousDatabaseMoved => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(liveDatabase.path),
+      targetPath: _absolutePath(
+        p.join(pending.path, 'database', AppDatabase.databaseFileName),
+      ),
+      sourceKind: RestoreProcessEntityKind.file,
+    ),
+    RestoreProcessFailpoint.previousPromoted => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(pending.path),
+      targetPath: _absolutePath(previous.path),
+      sourceKind: RestoreProcessEntityKind.directory,
+    ),
+    RestoreProcessFailpoint.oldRenamedReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 2,
+        state: RestoreReceiptState.oldRenamed,
+      ),
+    RestoreProcessFailpoint.oldRenamedReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 2,
+        state: RestoreReceiptState.oldRenamed,
+      ),
+    RestoreProcessFailpoint.settingsSecretRemoved ||
+    RestoreProcessFailpoint.settingsFirstSet => null,
+    RestoreProcessFailpoint.candidateDatabaseMoved => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(_candidateDatabase(receiptStore).path),
+      targetPath: _absolutePath(liveDatabase.path),
+      sourceKind: RestoreProcessEntityKind.file,
+    ),
+    RestoreProcessFailpoint.candidateUploadMoved ||
+    RestoreProcessFailpoint.candidateImagesMoved ||
+    RestoreProcessFailpoint.candidateAvatarsMoved ||
+    RestoreProcessFailpoint.candidateFontsMoved => RestoreExactRenameMatcher(
+      sourcePath: _absolutePath(
+        p.join(candidate.path, _assetRootForFailpoint(control.failpoint)),
+      ),
+      targetPath: _absolutePath(
+        p.join(
+          control.appDataDirectory.path,
+          _assetRootForFailpoint(control.failpoint),
+        ),
+      ),
+      sourceKind: RestoreProcessEntityKind.directory,
+    ),
+    RestoreProcessFailpoint.newInstalledReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 3,
+        state: RestoreReceiptState.newInstalled,
+      ),
+    RestoreProcessFailpoint.newInstalledReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 3,
+        state: RestoreReceiptState.newInstalled,
+      ),
+    RestoreProcessFailpoint.verifiedReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 4,
+        state: RestoreReceiptState.verified,
+      ),
+    RestoreProcessFailpoint.verifiedReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 4,
+        state: RestoreReceiptState.verified,
+      ),
+    RestoreProcessFailpoint.committedReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 5,
+        state: RestoreReceiptState.committed,
+      ),
+    RestoreProcessFailpoint.committedReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 5,
+        state: RestoreReceiptState.committed,
+      ),
+  };
+}
+
+OneShotBlockingPreferencesStore? _settingsFailpointStore({
+  required RestoreProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required SharedPreferencesStorePlatform delegate,
+  required Future<void> Function(
+    RestorePreferenceMutationObservation observation,
+  )
+  onMatched,
+}) {
+  return switch (control.failpoint) {
+    RestoreProcessFailpoint.settingsSecretRemoved =>
+      OneShotBlockingPreferencesStore(
+        delegate: delegate,
+        prefixedKey: '${control.preferencesPrefix}${state.secretPreferenceKey}',
+        mutationKind: RestorePreferenceMutationKind.remove,
+        onMatched: onMatched,
+      ),
+    RestoreProcessFailpoint.settingsFirstSet => OneShotBlockingPreferencesStore(
+      delegate: delegate,
+      prefixedKey: '${control.preferencesPrefix}${state.primaryPreferenceKey}',
+      mutationKind: RestorePreferenceMutationKind.set,
+      onMatched: onMatched,
+    ),
+    _ => null,
+  };
+}
+
+Map<String, dynamic> _durabilityObservationJson(
+  RestoreDurabilityObservation observation,
+) {
+  return switch (observation) {
+    RestoreRenameObservation() => {
+      'operationKind': 'renameAfter',
+      'sourcePath': observation.sourcePath,
+      'targetPath': observation.targetPath,
+      'sourceKind': observation.sourceKind.name,
+    },
+    RestoreFileSyncObservation() => {
+      'operationKind': 'fileSyncAfter',
+      'path': observation.path,
+      'fullBarrier': observation.fullBarrier,
+    },
+    RestoreDirectorySyncObservation() => {
+      'operationKind': 'directorySyncAfter',
+      'path': observation.path,
+      'fullBarrier': observation.fullBarrier,
+    },
+    RestoreReceiptDurabilityObservation() => {
+      'operationKind': switch (observation.boundary) {
+        RestoreReceiptDurabilityBoundary.tempDurable => 'receiptTempDurable',
+        RestoreReceiptDurabilityBoundary.published => 'receiptPublished',
+      },
+      'receiptSequence': observation.sequence,
+      'receiptState': observation.state.name,
+      'temporaryPath': observation.temporaryPath,
+      'targetPath':
+          observation.targetPath ??
+          p.join(
+            p.dirname(observation.temporaryPath),
+            'receipt_${observation.sequence.toString().padLeft(16, '0')}.json',
+          ),
+    },
+  };
+}
+
+Map<String, dynamic> _preferenceObservationJson(
+  RestoreProcessHarnessControl control,
+  RestorePreferenceMutationObservation observation,
+) {
+  if (!observation.prefixedKey.startsWith(control.preferencesPrefix)) {
+    throw StateError('restore_harness_settings_observation_prefix');
+  }
+  return {
+    'operationKind': switch (observation.kind) {
+      RestorePreferenceMutationKind.remove => 'preferenceRemoveAfter',
+      RestorePreferenceMutationKind.set => 'preferenceSetAfter',
+    },
+    'preferenceKey': observation.prefixedKey.substring(
+      control.preferencesPrefix.length,
+    ),
+    'valueType': observation.valueType ?? '',
+  };
+}
+
+Future<void> _expectForwardCrashTopology({
+  required RestoreProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required SharedPreferences preferences,
+  required RestoreReceiptStore receiptStore,
+}) async {
+  final expectedReceipt = _expectedPublishedReceiptState(control.failpoint);
+  final history = await receiptStore.readHistoryWhileWorkspaceLocked();
+  expect(
+    history.map((receipt) => receipt.state),
+    _receiptHistory(expectedReceipt),
+  );
+  expect(history.first.checksum, state.preparedReceiptChecksum);
+  expect(
+    await File(
+      p.join(
+        receiptStore.workspaceRoot.path,
+        RestoreWorkspaceLock.publishingRunFileName,
+      ),
+    ).readAsString(),
+    state.runId,
+  );
+  expect(
+    await File(
+      p.join(
+        receiptStore.runDirectory.path,
+        RestoreSettingsColdAckStore.fileName,
+      ),
+    ).exists(),
+    isFalse,
+  );
+  await _expectPreviousControlTopology(control.failpoint, receiptStore);
+  await _expectReceiptTemporaryTopology(control.failpoint, receiptStore);
+  await _expectCrashDatabases(control, state, receiptStore);
+  await _expectCrashAssets(control, receiptStore);
+  _expectCrashPreferences(preferences, state, control.failpoint);
+}
+
+RestoreReceiptState _expectedPublishedReceiptState(
+  RestoreProcessFailpoint failpoint,
+) {
+  if (_hasReached(
+    failpoint,
+    RestoreProcessFailpoint.committedReceiptPublished,
+  )) {
+    return RestoreReceiptState.committed;
+  }
+  if (_hasReached(
+    failpoint,
+    RestoreProcessFailpoint.verifiedReceiptPublished,
+  )) {
+    return RestoreReceiptState.verified;
+  }
+  if (_hasReached(
+    failpoint,
+    RestoreProcessFailpoint.newInstalledReceiptPublished,
+  )) {
+    return RestoreReceiptState.newInstalled;
+  }
+  if (_hasReached(
+    failpoint,
+    RestoreProcessFailpoint.oldRenamedReceiptPublished,
+  )) {
+    return RestoreReceiptState.oldRenamed;
+  }
+  return RestoreReceiptState.prepared;
+}
+
+Iterable<RestoreReceiptState> _receiptHistory(
+  RestoreReceiptState latest,
+) sync* {
+  yield RestoreReceiptState.prepared;
+  if (latest == RestoreReceiptState.prepared) return;
+  yield RestoreReceiptState.oldRenamed;
+  if (latest == RestoreReceiptState.oldRenamed) return;
+  yield RestoreReceiptState.newInstalled;
+  if (latest == RestoreReceiptState.newInstalled) return;
+  yield RestoreReceiptState.verified;
+  if (latest == RestoreReceiptState.verified) return;
+  yield RestoreReceiptState.committed;
+}
+
+Future<void> _expectPreviousControlTopology(
+  RestoreProcessFailpoint failpoint,
+  RestoreReceiptStore receiptStore,
+) async {
+  final pending = _previousPendingDirectory(receiptStore);
+  final previous = _previousDirectory(receiptStore);
+  if (_hasReached(failpoint, RestoreProcessFailpoint.previousPromoted)) {
+    expect(await pending.exists(), isFalse);
+    expect(await previous.exists(), isTrue);
+    expect(
+      await File(
+        p.join(previous.path, RestorePreviousStore.settingsFileName),
+      ).exists(),
+      isTrue,
+    );
+    expect(
+      await File(
+        p.join(previous.path, RestorePreviousStore.manifestFileName),
+      ).exists(),
+      isTrue,
+    );
+    return;
+  }
+  expect(await previous.exists(), isFalse);
+  if (!_hasReached(
+    failpoint,
+    RestoreProcessFailpoint.previousSettingsPublished,
+  )) {
+    expect(await pending.exists(), isFalse);
+    return;
+  }
+  expect(await pending.exists(), isTrue);
+  expect(
+    await File(
+      p.join(pending.path, RestorePreviousStore.settingsFileName),
+    ).exists(),
+    isTrue,
+  );
+  expect(
+    await File(
+      p.join(pending.path, RestorePreviousStore.manifestFileName),
+    ).exists(),
+    _hasReached(failpoint, RestoreProcessFailpoint.previousManifestPublished),
+  );
+}
+
+Future<void> _expectReceiptTemporaryTopology(
+  RestoreProcessFailpoint failpoint,
+  RestoreReceiptStore receiptStore,
+) async {
+  final expectation = switch (failpoint) {
+    RestoreProcessFailpoint.oldRenamedReceiptTempDurable => (
+      sequence: 2,
+      state: RestoreReceiptState.oldRenamed,
+    ),
+    RestoreProcessFailpoint.newInstalledReceiptTempDurable => (
+      sequence: 3,
+      state: RestoreReceiptState.newInstalled,
+    ),
+    RestoreProcessFailpoint.verifiedReceiptTempDurable => (
+      sequence: 4,
+      state: RestoreReceiptState.verified,
+    ),
+    RestoreProcessFailpoint.committedReceiptTempDurable => (
+      sequence: 5,
+      state: RestoreReceiptState.committed,
+    ),
+    _ => null,
+  };
+  final temporaryFiles = <File>[];
+  await for (final entity in receiptStore.receiptDirectory.list(
+    followLinks: false,
+  )) {
+    if (!p.basename(entity.path).endsWith('.tmp')) continue;
+    expect(entity, isA<File>());
+    temporaryFiles.add(File(entity.path));
+  }
+  if (expectation == null) {
+    expect(temporaryFiles, isEmpty);
+    return;
+  }
+  final targetName =
+      'receipt_${expectation.sequence.toString().padLeft(16, '0')}.json';
+  expect(
+    await File(p.join(receiptStore.receiptDirectory.path, targetName)).exists(),
+    isFalse,
+  );
+  expect(temporaryFiles, hasLength(1));
+  final temporary = temporaryFiles.single;
+  expect(p.basename(temporary.path), startsWith('$targetName.'));
+  final decoded = jsonDecode(await temporary.readAsString());
+  final receipt = RestoreReceipt.fromJson(decoded as Map);
+  expect(receipt.sequence, expectation.sequence);
+  expect(receipt.state, expectation.state);
+}
+
+Future<void> _expectCrashDatabases(
+  RestoreProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  RestoreReceiptStore receiptStore,
+) async {
+  final previousLocation =
+      _hasReached(control.failpoint, RestoreProcessFailpoint.previousPromoted)
+      ? _BundleLocation.previous
+      : _hasReached(
+          control.failpoint,
+          RestoreProcessFailpoint.previousDatabaseMoved,
+        )
+      ? _BundleLocation.previousPending
+      : _BundleLocation.live;
+  final candidateLocation =
+      _hasReached(
+        control.failpoint,
+        RestoreProcessFailpoint.candidateDatabaseMoved,
+      )
+      ? _BundleLocation.live
+      : _BundleLocation.candidate;
+  final paths = _databasePaths(control, receiptStore);
+  final expected = <String, String>{
+    paths[previousLocation]!: state.oldConversationId,
+    paths[candidateLocation]!: state.newConversationId,
+  };
+  expect(expected, hasLength(2));
+  for (final path in paths.values) {
+    final expectedId = expected[path];
+    final file = File(path);
+    if (expectedId == null) {
+      expect(await file.exists(), isFalse, reason: path);
+    } else {
+      expect(await harnessConversationIds(file), [expectedId], reason: path);
+    }
+  }
+}
+
+Map<_BundleLocation, String> _databasePaths(
+  RestoreProcessHarnessControl control,
+  RestoreReceiptStore receiptStore,
+) => {
+  _BundleLocation.live: _liveDatabase(control).path,
+  _BundleLocation.candidate: _candidateDatabase(receiptStore).path,
+  _BundleLocation.previousPending: p.join(
+    _previousPendingDirectory(receiptStore).path,
+    'database',
+    AppDatabase.databaseFileName,
+  ),
+  _BundleLocation.previous: p.join(
+    _previousDirectory(receiptStore).path,
+    'database',
+    AppDatabase.databaseFileName,
+  ),
+};
+
+Future<void> _expectCrashAssets(
+  RestoreProcessHarnessControl control,
+  RestoreReceiptStore receiptStore,
+) async {
+  for (final root in restoreHarnessAssetRoots) {
+    final previousLocation =
+        _hasReached(control.failpoint, RestoreProcessFailpoint.previousPromoted)
+        ? _BundleLocation.previous
+        : _hasReached(control.failpoint, _previousAssetFailpoint(root))
+        ? _BundleLocation.previousPending
+        : _BundleLocation.live;
+    final candidateLocation =
+        _hasReached(control.failpoint, _candidateAssetFailpoint(root))
+        ? _BundleLocation.live
+        : _BundleLocation.candidate;
+    final containers = _assetContainers(control, receiptStore);
+    final expected = <String, String>{
+      p.join(containers[previousLocation]!, root, 'old.txt'): 'old:$root',
+      p.join(containers[candidateLocation]!, root, 'new.txt'): 'new:$root',
+    };
+    expect(expected, hasLength(2));
+    for (final container in containers.values) {
+      for (final name in const ['old.txt', 'new.txt']) {
+        final path = p.join(container, root, name);
+        final expectedValue = expected[path];
+        final file = File(path);
+        if (expectedValue == null) {
+          expect(await file.exists(), isFalse, reason: path);
+        } else {
+          expect(await file.readAsString(), expectedValue, reason: path);
+        }
+      }
+    }
+  }
+}
+
+Map<_BundleLocation, String> _assetContainers(
+  RestoreProcessHarnessControl control,
+  RestoreReceiptStore receiptStore,
+) => {
+  _BundleLocation.live: control.appDataDirectory.path,
+  _BundleLocation.candidate: _candidateDirectory(receiptStore).path,
+  _BundleLocation.previousPending: _previousPendingDirectory(receiptStore).path,
+  _BundleLocation.previous: _previousDirectory(receiptStore).path,
+};
+
+void _expectCrashPreferences(
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+  RestoreProcessFailpoint failpoint,
+) {
+  if (!_hasReached(failpoint, RestoreProcessFailpoint.settingsSecretRemoved)) {
+    _expectBeforePreferences(preferences, state);
+    return;
+  }
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  if (failpoint == RestoreProcessFailpoint.settingsSecretRemoved) {
+    expect(
+      preferences.getString(state.primaryPreferenceKey),
+      state.primaryOldPreferenceValue,
+    );
+    expect(
+      preferences.getString(state.secondaryPreferenceKey),
+      state.secondaryOldPreferenceValue,
+    );
+    return;
+  }
+  if (failpoint == RestoreProcessFailpoint.settingsFirstSet) {
+    expect(
+      preferences.getString(state.primaryPreferenceKey),
+      state.primaryNewPreferenceValue,
+    );
+    expect(
+      preferences.getString(state.secondaryPreferenceKey),
+      state.secondaryOldPreferenceValue,
+    );
+    return;
+  }
+  _expectTargetPreferences(preferences, state);
+}
+
+void _expectBeforePreferences(
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+) {
+  expect(
+    preferences.getString(state.primaryPreferenceKey),
+    state.primaryOldPreferenceValue,
+  );
+  expect(
+    preferences.getString(state.secondaryPreferenceKey),
+    state.secondaryOldPreferenceValue,
+  );
+  expect(
+    preferences.getString(state.secretPreferenceKey),
+    state.secretOldPreferenceValue,
+  );
+}
+
+String _assetRootForFailpoint(RestoreProcessFailpoint failpoint) {
+  return switch (failpoint) {
+    RestoreProcessFailpoint.previousUploadMoved ||
+    RestoreProcessFailpoint.candidateUploadMoved => 'upload',
+    RestoreProcessFailpoint.previousImagesMoved ||
+    RestoreProcessFailpoint.candidateImagesMoved => 'images',
+    RestoreProcessFailpoint.previousAvatarsMoved ||
+    RestoreProcessFailpoint.candidateAvatarsMoved => 'avatars',
+    RestoreProcessFailpoint.previousFontsMoved ||
+    RestoreProcessFailpoint.candidateFontsMoved => 'fonts',
+    _ => throw StateError('restore_harness_asset_failpoint:${failpoint.name}'),
+  };
+}
+
+RestoreProcessFailpoint _previousAssetFailpoint(String root) => switch (root) {
+  'upload' => RestoreProcessFailpoint.previousUploadMoved,
+  'images' => RestoreProcessFailpoint.previousImagesMoved,
+  'avatars' => RestoreProcessFailpoint.previousAvatarsMoved,
+  'fonts' => RestoreProcessFailpoint.previousFontsMoved,
+  _ => throw StateError('restore_harness_asset_root:$root'),
+};
+
+RestoreProcessFailpoint _candidateAssetFailpoint(String root) => switch (root) {
+  'upload' => RestoreProcessFailpoint.candidateUploadMoved,
+  'images' => RestoreProcessFailpoint.candidateImagesMoved,
+  'avatars' => RestoreProcessFailpoint.candidateAvatarsMoved,
+  'fonts' => RestoreProcessFailpoint.candidateFontsMoved,
+  _ => throw StateError('restore_harness_asset_root:$root'),
+};
+
+bool _hasReached(
+  RestoreProcessFailpoint actual,
+  RestoreProcessFailpoint boundary,
+) => actual.index >= boundary.index;
+
+String _absolutePath(String path) => p.normalize(p.absolute(path));
+
 Future<void> _expectInitialAssets(
   RestoreProcessHarnessControl control,
   RestoreReceiptStore store,
@@ -533,31 +1172,6 @@ Future<void> _expectInitialAssets(
     expect(
       await File(p.join(candidate.path, root, 'new.txt')).readAsString(),
       'new:$root',
-    );
-  }
-}
-
-Future<void> _expectInterruptedAssetSplit(
-  RestoreProcessHarnessControl control,
-  RestoreReceiptStore store,
-) async {
-  final candidate = _candidateDirectory(store);
-  final previous = _previousDirectory(store);
-  for (final root in restoreHarnessAssetRoots) {
-    expect(
-      await FileSystemEntity.type(
-        p.join(control.appDataDirectory.path, root),
-        followLinks: false,
-      ),
-      FileSystemEntityType.notFound,
-    );
-    expect(
-      await File(p.join(candidate.path, root, 'new.txt')).readAsString(),
-      'new:$root',
-    );
-    expect(
-      await File(p.join(previous.path, root, 'old.txt')).readAsString(),
-      'old:$root',
     );
   }
 }
@@ -657,20 +1271,146 @@ Future<Map<String, dynamic>> _readCutoverEvent(
     control,
     generation: 2,
     phase: RestoreProcessHarnessPhase.cutoverKill,
-    phaseKeys: const {'marker', 'runId', 'leaseInstanceId', 'liveDatabasePath'},
+    phaseKeys: _killEventKeys(control.failpoint),
   );
   if (event['status'] != 'readyForKill' ||
-      event['marker'] != restoreHarnessScenario ||
+      event['marker'] != control.failpoint.name ||
       event['runId'] != state.runId ||
       event['leaseInstanceId'] is! String ||
       !RegExp(
         _leaseInstancePattern,
       ).hasMatch(event['leaseInstanceId'] as String) ||
-      event['liveDatabasePath'] !=
-          p.normalize(p.absolute(_liveDatabase(control).path))) {
+      event['observedReceiptState'] !=
+          _expectedPublishedReceiptState(control.failpoint).name) {
     throw const FormatException('restore_harness_cutover_event');
   }
+  _validateKillObservation(control, state, event);
   return event;
+}
+
+Set<String> _killEventKeys(RestoreProcessFailpoint failpoint) {
+  const common = {'marker', 'runId', 'leaseInstanceId', 'observedReceiptState'};
+  return switch (failpoint) {
+    RestoreProcessFailpoint.liveDatabaseNormalized => {
+      ...common,
+      'operationKind',
+      'path',
+      'fullBarrier',
+    },
+    RestoreProcessFailpoint.oldRenamedReceiptTempDurable ||
+    RestoreProcessFailpoint.oldRenamedReceiptPublished ||
+    RestoreProcessFailpoint.newInstalledReceiptTempDurable ||
+    RestoreProcessFailpoint.newInstalledReceiptPublished ||
+    RestoreProcessFailpoint.verifiedReceiptTempDurable ||
+    RestoreProcessFailpoint.verifiedReceiptPublished ||
+    RestoreProcessFailpoint.committedReceiptTempDurable ||
+    RestoreProcessFailpoint.committedReceiptPublished => {
+      ...common,
+      'operationKind',
+      'receiptSequence',
+      'receiptState',
+      'temporaryPath',
+      'targetPath',
+    },
+    RestoreProcessFailpoint.settingsSecretRemoved ||
+    RestoreProcessFailpoint.settingsFirstSet => {
+      ...common,
+      'operationKind',
+      'preferenceKey',
+      'valueType',
+    },
+    _ => {...common, 'operationKind', 'sourcePath', 'targetPath', 'sourceKind'},
+  };
+}
+
+void _validateKillObservation(
+  RestoreProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  Map<String, dynamic> event,
+) {
+  final receiptStore = _activeReceiptStore(control, state);
+  final matcher = _durabilityMatcher(control, state, receiptStore);
+  switch (control.failpoint) {
+    case RestoreProcessFailpoint.liveDatabaseNormalized:
+      final expected = matcher! as RestoreExactDirectorySyncMatcher;
+      if (event['operationKind'] != 'directorySyncAfter' ||
+          event['path'] != expected.path ||
+          event['fullBarrier'] != expected.fullBarrier) {
+        throw const FormatException('restore_harness_cutover_directory');
+      }
+    case RestoreProcessFailpoint.oldRenamedReceiptTempDurable:
+    case RestoreProcessFailpoint.newInstalledReceiptTempDurable:
+    case RestoreProcessFailpoint.verifiedReceiptTempDurable:
+    case RestoreProcessFailpoint.committedReceiptTempDurable:
+      final expected = matcher! as RestoreReceiptTempDurableMatcher;
+      _validateReceiptObservation(
+        event,
+        receiptDirectoryPath: expected.receiptDirectoryPath,
+        sequence: expected.sequence,
+        state: expected.state,
+        operationKind: 'receiptTempDurable',
+      );
+    case RestoreProcessFailpoint.oldRenamedReceiptPublished:
+    case RestoreProcessFailpoint.newInstalledReceiptPublished:
+    case RestoreProcessFailpoint.verifiedReceiptPublished:
+    case RestoreProcessFailpoint.committedReceiptPublished:
+      final expected = matcher! as RestoreReceiptPublishedMatcher;
+      _validateReceiptObservation(
+        event,
+        receiptDirectoryPath: expected.receiptDirectoryPath,
+        sequence: expected.sequence,
+        state: expected.state,
+        operationKind: 'receiptPublished',
+      );
+    case RestoreProcessFailpoint.settingsSecretRemoved:
+      if (event['operationKind'] != 'preferenceRemoveAfter' ||
+          event['preferenceKey'] != state.secretPreferenceKey ||
+          event['valueType'] != '') {
+        throw const FormatException('restore_harness_cutover_settings');
+      }
+    case RestoreProcessFailpoint.settingsFirstSet:
+      if (event['operationKind'] != 'preferenceSetAfter' ||
+          event['preferenceKey'] != state.primaryPreferenceKey ||
+          event['valueType'] != 'String') {
+        throw const FormatException('restore_harness_cutover_settings');
+      }
+    default:
+      final expected = matcher! as RestoreExactRenameMatcher;
+      if (event['operationKind'] != 'renameAfter' ||
+          event['sourcePath'] != expected.sourcePath ||
+          event['targetPath'] != expected.targetPath ||
+          event['sourceKind'] != expected.sourceKind.name) {
+        throw const FormatException('restore_harness_cutover_rename');
+      }
+  }
+}
+
+void _validateReceiptObservation(
+  Map<String, dynamic> event, {
+  required String receiptDirectoryPath,
+  required int sequence,
+  required RestoreReceiptState state,
+  required String operationKind,
+}) {
+  final targetPath = p.join(
+    receiptDirectoryPath,
+    'receipt_${sequence.toString().padLeft(16, '0')}.json',
+  );
+  final temporaryPath = event['temporaryPath'];
+  final processId = event['pid'];
+  final pattern = RegExp(
+    '^${RegExp.escape(p.basename(targetPath))}\\.[1-9][0-9]*_'
+    '${RegExp.escape('$processId')}\\.tmp\$',
+  );
+  if (event['operationKind'] != operationKind ||
+      event['receiptSequence'] != sequence ||
+      event['receiptState'] != state.name ||
+      temporaryPath is! String ||
+      !p.equals(p.dirname(temporaryPath), receiptDirectoryPath) ||
+      !pattern.hasMatch(p.basename(temporaryPath)) ||
+      event['targetPath'] != targetPath) {
+    throw const FormatException('restore_harness_cutover_receipt');
+  }
 }
 
 Future<Map<String, dynamic>> _readResumeEvent(
@@ -722,9 +1462,11 @@ Future<Map<String, dynamic>> _readPriorEvent(
     'format',
     'version',
     'generation',
+    'matrixRunId',
     'scenario',
     'scenarioId',
     'phase',
+    'failpoint',
     'pid',
     'status',
     ...phaseKeys,
@@ -734,9 +1476,11 @@ Future<Map<String, dynamic>> _readPriorEvent(
       event['format'] != restoreHarnessFormat ||
       event['version'] != RestoreProcessHarnessControl.version ||
       event['generation'] != generation ||
+      event['matrixRunId'] != control.matrixRunId ||
       event['scenario'] != restoreHarnessScenario ||
       event['scenarioId'] != control.scenarioId ||
       event['phase'] != phase.name ||
+      event['failpoint'] != control.failpoint.name ||
       event['pid'] is! int ||
       (event['pid'] as int) < 1 ||
       event['status'] is! String) {
@@ -753,9 +1497,11 @@ Future<void> _publishEvent(
     'format': restoreHarnessFormat,
     'version': RestoreProcessHarnessControl.version,
     'generation': control.generation,
+    'matrixRunId': control.matrixRunId,
     'scenario': restoreHarnessScenario,
     'scenarioId': control.scenarioId,
     'phase': control.phase.name,
+    'failpoint': control.failpoint.name,
     'pid': pid,
     ...phaseValues,
   });
