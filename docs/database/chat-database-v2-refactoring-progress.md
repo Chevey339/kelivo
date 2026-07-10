@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，提交 `df1dae8a`
 > - 最后更新：2026-07-09
-> - 当前结论：正常备份已切换为经自校验且排除应用已知认证凭据的 SQLite snapshot bundle；`1460a64c` 已加入 AppData 同卷 candidate staging，但 P0-02 仍缺 durable receipt、previous bundle、业务 gate 与启动恢复
+> - 当前结论：正常备份已切换为经自校验且排除应用已知认证凭据的 SQLite snapshot bundle；AppData 同卷 candidate staging 与 append-only restore receipt/journal 基础已落地，但 receipt 尚未接入 staging，目录 fsync、previous bundle、业务 gate 与启动恢复仍未实现
 
 ## 1. 文档使用规则
 
@@ -66,6 +66,7 @@
 | `flutter test` | `已完成` | 825 tests passed | 2026-07-09 | `1460a64c` 提交前当前工作区全量测试通过；最终 isolate 编排调整后相关定向用例再次通过 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
+| Restore receipt/journal 定向测试 | `已完成` | 13 tests passed | 2026-07-09 | 覆盖 canonical checksum、append-only sequence/hash chain、非法跳转、损坏/超限/缺口拒绝、链接目录拒绝、幂等重试和并发冲突序列化；不等于目录 fsync 或 kill 验证 |
 | 审计前生产工作区检查 | `已完成` | clean | 2026-07-09 | 文档创建前 `git status --short` 为空 |
 
 定向测试命令：
@@ -85,6 +86,8 @@ flutter test \
   test/core/services/backup/data_sync_backup_file_test.dart \
   test/shared_preferences_async_backup_filter_test.dart \
   test/features/migration/hive_to_sqlite_migration_service_test.dart
+
+flutter test test/core/services/backup/restore_receipt_test.dart
 ```
 
 ### 4.2 尚未执行
@@ -123,7 +126,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
-| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | `117f8386`、`900811ec`、`da9d2d13`、`1460a64c`（进行中） | v2 完整 bundle 已在后台 isolate 复制到 AppData 同卷 candidate，重写 post-normalization manifest，并用链接检查/rename probe 守住同卷；空资源根语义已锁定。当前仍立即应用并删除 workspace，DB/assets previous、durable receipt、启动 gate 和 kill 恢复未实现，整包仍可能形成混合状态 |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | `117f8386`、`900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`（进行中） | v2 完整 bundle 已在后台 isolate 复制到 AppData 同卷 candidate，重写 post-normalization manifest，并用链接检查/rename probe 守住同卷；空资源根语义已锁定。restore receipt 已有严格 canonical codec、checksum/hash chain、状态机、独占 final 创建、并发序列化和有界读取，但尚未由 staging 发布；当前仍立即应用并删除 workspace，目录 fsync、DB/assets previous、启动 gate 和 kill 恢复未实现，整包仍可能形成混合状态 |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`、`6c3618b8`（安全门） | 所有 v2 bundle merge（含 settings-only）在冲突/凭据语义完成前显式拒绝且不修改目标；hash 去重、remap、report 和事务化 merge 尚未实现 |
@@ -195,7 +198,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec`、`6c3618b8` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验、round trip 与应用已知认证凭据排除已实现；五平台/大数据 profile 与 Zip64 尚未完成 |
-| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | `900811ec`、`da9d2d13`、`1460a64c`（预检/补偿/同卷 staging） | v2 candidate 已完成 AppData 同卷复制校验、规范化 manifest、链接/跨卷拒绝与空 assets 根；当前成功/失败后仍清理 workspace，尚未写 prepared receipt 或转移到启动 gate |
+| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | `900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`（预检/补偿/同卷 staging/receipt foundation） | v2 candidate 已完成 AppData 同卷复制校验、规范化 manifest、链接/跨卷拒绝与空 assets 根；append-only receipt journal 已严格校验状态链且有界读取。当前成功/失败后仍清理 workspace，尚未写 prepared receipt、fsync 目录或转移到启动 gate |
 | OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再生成 JSON；旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `未开始` | current branch/total usage 定义和查询均明确 | — | — |
@@ -280,7 +283,7 @@ flutter test \
 | DB/WAL/SHM 损坏/缺失 | 进入只读恢复/诊断 | 不覆盖现场 | `未开始` | — |
 | `user_version` 高于二进制支持版本 | 只读/拒绝打开并要求升级 | 不执行任何写入或降级 | `未开始` | — |
 | ZIP/manifest/hash 损坏 | 拒绝恢复，live 不变 | staging | `未开始` | — |
-| Receipt 损坏/缺失/sequence 回退 | 进入只读恢复，不按文件名猜测 | 不开放混合 bundle | `未开始` | — |
+| Receipt 损坏/缺失/sequence 回退 | 进入只读恢复，不按文件名猜测 | 不开放混合 bundle | `进行中` | `7053ea5e` 已覆盖 checksum/hash-chain 损坏、缺口、超限、非法状态与链接目录的 fail-closed journal 读取；只读恢复入口、多个 run 仲裁和真实 kill 尚未实现 |
 | 多组 previous/candidate 同时存在 | 根据有效 manifest/receipt 诊断，无法唯一确定则阻塞 | 不自动删除任何候选 | `未开始` | — |
 | Duplicate ID/order/version | 确定性报告/隔离，不覆盖 | rejects 中的数据 | `未开始` | — |
 | Missing parent/selection | 阻止 active graph 切换 | rejects 中的数据 | `未开始` | — |
@@ -318,7 +321,7 @@ flutter test \
 | R-08 | Cache 只限制条目不限制字节再次 OOM | 高 | RSS/cache bytes telemetry | 所有 cache 字节 LRU | `未开始` |
 | R-09 | 普通备份继续泄露秘密 | 高 | ZIP 内容审计 | P0-08 + OPS-07 | `进行中`：应用已知认证凭据已排除；自由文本与 secure storage 边界待 OPS-07 |
 | R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿 | `进行中` |
-| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + 启动恢复 + 业务 gate | `进行中`：settings 普通异常补偿已覆盖；DB/assets 与 kill 窗口仍开放 |
+| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + 启动恢复 + 业务 gate | `进行中`：settings 普通异常补偿、同卷 candidate 和 receipt/journal 基础已覆盖；receipt 尚未接入，DB/assets 与 kill 窗口仍开放 |
 | R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
 | R-13 | 旧 `chats.json`/迁移 JSON 全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB legacy fixture 的 RSS/frame profile | 新备份改 SQLite snapshot；legacy adapter 使用 chunk reader 与增量导入 | `进行中` |
 | R-14 | ZIP32 与恢复展开边界导致超大备份失败或磁盘耗尽 | 中 | >4GiB compressed、8GiB 单项、16GiB 总展开 fixture | 当前显式拒绝超限并在写出时计数中止；后续评估 Zip64 和按可用磁盘预算 | `进行中` |
@@ -340,7 +343,7 @@ flutter test \
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 继续 `P0-02`：SQLite snapshot 和 settings/assets 在 app data 同卷 staging，加入 restore/quiesce gate、previous bundle、durable cutover receipt 与启动恢复。
+1. 继续 `P0-02`：把同卷 candidate 接入 prepared receipt，停止运行期在线覆盖与成功后清理；再加入 restore/quiesce gate、previous bundle、平台目录 fsync 与启动恢复。
 2. 推进 `P0-05`：实现 SQLite bundle merge 的 hash 去重、冲突 remap 与 report，再解除当前安全拒绝。
 3. 保留并隔离旧 `chats.json` adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 验证兼容，逐步把解析/导入改为有界内存。
 4. 启动 `P0-03`，并完成 PD-13 调查和 P0-09 fixture/性能基线。
@@ -357,3 +360,4 @@ flutter test \
 | 2026-07-09 | 普通 bundle 排除应用已知认证凭据；secret-free overwrite 清除目标旧凭据；旧 JSON 导入与迁移灾备保留历史设置兼容；v2 merge 在语义完成前安全拒绝 | P0-08、P0-05、OPS-01/07 | `6c3618b8` | Codex |
 | 2026-07-09 | 为 v2 overwrite 增加 settings touched-key 异常补偿；覆盖部分写入、DB 调用前失败、旧凭据恢复与无关并发 key 保留；冻结运行期 staging、下次启动 cutover 的实现落点 | P0-02、OPS-02 | `da9d2d13` | Codex |
 | 2026-07-09 | 将完整 v2 candidate 复制到 AppData 同卷并重写规范化 manifest；增加链接/junction 防护、跨目录 rename probe、空 assets 根 overwrite 语义，复制/hash 在后台 isolate 完成 | P0-02、OPS-02 | `1460a64c` | Codex |
+| 2026-07-09 | 固化 restore receipt canonical codec 与 append-only journal；加入 checksum/hash chain、严格状态跳转、独占 final 创建、有界读取、链接拒绝及进程内/跨进程写入序列化；目录 fsync 与 staging 集成继续后续工作 | P0-02、OPS-02 | `7053ea5e` | Codex |
