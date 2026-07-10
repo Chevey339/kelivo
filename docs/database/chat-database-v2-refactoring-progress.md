@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，提交 `df1dae8a`
 > - 最后更新：2026-07-09
-> - 当前结论：P0-01 已在 `117f8386` 完成；P0-02 已完成 payload/candidate 预检和 live SQLite 单事务替换，但 SQLite snapshot bundle staging/cutover/崩溃恢复尚未实现
+> - 当前结论：正常备份已在 `900811ec` 切换为经自校验的 SQLite snapshot bundle；P0-02 仍缺 settings/DB/assets 整包 staging、cutover receipt、业务 gate 与启动恢复
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 1 / 9 | `进行中` | P0-01 已完成；P0-02 已有预检、candidate 验证和 live DB 单事务替换，整包切换仍非原子 |
+| Phase 0：止血与基线 | 1 / 9 | `进行中` | P0-01 已完成；P0-02 已有严格 bundle 预检和 live DB 单事务替换，整包切换仍非原子 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | 受 PD-01/02/04 和 PD-13 影响 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -63,9 +63,9 @@
 | --- | --- | --- | --- | --- |
 | `flutter gen-l10n` + untranslated check | `已完成` | 生成成功；`desiredFileName.txt` 为 `{}` | 2026-07-09 | 四份 ARB 同步，恢复失败提示已本地化 |
 | `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前工作区静态分析通过 |
-| `flutter test` | `已完成` | 801 tests passed | 2026-07-09 | 当前工作区全量测试通过 |
+| `flutter test` | `已完成` | 813 tests passed | 2026-07-09 | `900811ec` 提交前当前工作区全量测试通过 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
-| P0-01/P0-02 恢复错误、payload/candidate、事务替换、设置与 receipt 定向测试 | `已完成` | 34 tests passed | 2026-07-09 | 覆盖 replacement/artifact/provider 失败、事务 rollback、候选拒绝/清理、设置预检、cache/stale streaming 失效、chat-only 文件保留和 migration receipt |
+| SQLite bundle/legacy/migration 灾备定向测试 | `已完成` | 41 tests passed | 2026-07-09 | 覆盖 snapshot round trip、WAL 独立性、manifest/hash/schema/count、路径碰撞、展开预算、future manifest 禁止降级、旧 JSON 导入和迁移灾备仍为 JSON |
 | 审计前生产工作区检查 | `已完成` | clean | 2026-07-09 | 文档创建前 `git status --short` 为空 |
 
 定向测试命令：
@@ -83,8 +83,8 @@ flutter test \
 
 flutter test \
   test/core/services/backup/data_sync_backup_file_test.dart \
-  test/core/database/chat_database_repository_clear_test.dart \
-  test/shared_preferences_async_backup_filter_test.dart
+  test/core/database/chat_database_repository_snapshot_test.dart \
+  test/features/migration/hive_to_sqlite_migration_service_test.dart
 ```
 
 ### 4.2 尚未执行
@@ -116,17 +116,17 @@ flutter test \
 | PD-11 | 聊天 DB 加密和秘密导出政策 | 独立评估；普通备份排除秘密是无需等待该决定的安全底线 | `未开始` | OPS-07 | — |
 | PD-12 | 损坏数据恢复体验 | 只读恢复页 + rejects/脱敏诊断包 | `未开始` | DB2-06、OPS-02 | — |
 | PD-13 | SQLite v1 是否已发布给真实用户 | 以发布事实为准；若已发布，v1 为主源 | `未开始` | P0-09、DB2-01、MSG-05 | — |
-| PD-14 | 正常完整备份的聊天主数据格式 | SQLite 一致快照 ZIP；不再写 `chats.json` | `已完成` | P0-02、OPS-01～03 | 2026-07-09 用户确认；旧 JSON 只读导入，迁移页灾难备份继续 JSON |
+| PD-14 | 正常完整备份的聊天主数据格式 | SQLite 一致快照 ZIP；不再写 `chats.json` | `已完成` | P0-02、OPS-01～03 | `4d810e21`；2026-07-09 用户确认，旧 JSON 只读导入，迁移页灾难备份继续 JSON |
 
 ## 6. Phase 0：止血与基线
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
-| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | 工作区未提交（进行中） | 已实现 settings/chat 预检、candidate SQLite 的 integrity/FK/checkpoint/reopen/count/order/MCP/artifact/marker 验证、候选清理、stale streaming 归一化、live 聊天表单事务替换、migration receipt 与 cache 失效；settings/assets staging、ZIP path/size/manifest/hash、业务 gate、cutover receipt 和启动恢复未实现，整包仍可能形成混合状态 |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | `117f8386`、`900811ec`（进行中） | 已实现 settings/chat 与 v2 manifest/hash/path/size/schema/count 预检、candidate 重开/integrity/FK、展开预算、stale streaming 归一化、live 聊天表单事务替换、migration receipt 与 cache 失效；settings/DB/assets 同卷 staging、业务 gate、previous bundle、cutover receipt 和启动恢复未实现，整包仍可能形成混合状态 |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
-| P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `未开始` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | — | — |
+| P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`（安全门） | 新 SQLite bundle 的 merge 在冲突策略完成前显式拒绝；hash 去重、remap、report 和事务化 merge 尚未实现 |
 | P0-06 | DB identity/installation receipt 与安全拒绝 | 无 | `未开始` | 既有 DB 缺失/损坏/版本过新时不自动创建或写入空库 | — | — |
 | P0-07 | sandbox path migration version 化 | 无 | `未开始` | 正常启动不扫描全库；migration 幂等且失败可见 | — | — |
 | P0-08 | 普通备份排除秘密 | 无 | `未开始` | ZIP 默认不含 API key/password/token；旧设置兼容明确 | — | — |
@@ -194,9 +194,9 @@ flutter test \
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | 工作区未提交（设计已冻结） | PD-14 已确认，等待实现与 round-trip fixture |
-| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `未开始` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | — | — |
-| OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`（legacy 严格预检起点） | 旧 `chats.json` 导入仍可用；Recovered/rejects 与流式 parser 未完成 |
+| OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验和 round trip 已实现；五平台/大数据 profile、Zip64 与秘密排除尚未完成 |
+| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | `900811ec`（预检/DB 事务切片） | v2 candidate 在 live 写入前完成严格校验，DB 表替换为单事务；整包 staging/swap/receipt/gate 未完成 |
+| OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再生成 JSON；旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `未开始` | current branch/total usage 定义和查询均明确 | — | — |
 | OPS-06 | Assets FK、尺寸、缩略图、延迟 GC | MSG-02、TL-06 | `未开始` | 删除消息不扫全库；资源 hash/reference 可验证 | — | — |
@@ -231,10 +231,10 @@ flutter test \
 | Hive → SQLite v2 | 必须 | `未开始` | 需要所有 adapter fixture、orphan/坏数据场景 |
 | SQLite v1 → SQLite v2 | 必须 | `未开始` | PD-13 确认后视为主迁移路径 |
 | 旧 ZIP/chats.json → v2 | 必须 | `进行中` | 当前接受缺少 `chats.json` 的 legacy settings-only 包，并严格拒绝引用缺失；无 manifest 时无法区分 settings-only 与截断包，受损 Hive 迁移备份仍缺 Recovered/rejects adapter 和真实 fixture |
-| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | PD-14 已冻结：ZIP 使用 `database/kelivo.sqlite` + manifest/settings/assets；实现与 round-trip fixture 进行中 |
-| 迁移页 JSON 灾难备份 | 必须 | `进行中` | 明确保留 JSON；允许旧路径较慢，但继续要求流式 ZIP、分批扫描、错误可见并尽力避免 OOM |
+| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | `900811ec` 已覆盖生成后自校验、overwrite round trip、hash/size/schema/count 拒绝；五平台和 crash cutover 尚未验证 |
+| 迁移页 JSON 灾难备份 | 必须 | `进行中` | `900811ec` 回归锁定仍含 `chats.json` 且不含 manifest/SQLite payload；受损 fixture、分批扫描和 OOM profile 尚未完成 |
 | Chatbox/Cherry import → v2 | 必须 | `未开始` | staging + ID conflict policy |
-| v2 full backup round trip | 必须 | `未开始` | branch/run/parts/assets 完整一致 |
+| v2 full backup round trip | 必须 | `进行中` | 当前 SQLite v1 conversation/message/artifact/assets round trip 已覆盖；未来 branch/run/parts schema 尚未实现 |
 | v2 portable export | 必须 | `未开始` | NDJSON/chunk，明确裁剪内容 |
 | v2 export → 旧应用 | 仅显式兼容导出 | `未开始` | 不伪装为旧格式 |
 | v2 schema 代码回滚 | 必须 | `未开始` | 回滚版本仍能读写当前 v2 schema |
@@ -321,6 +321,7 @@ flutter test \
 | R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + 启动恢复 + 业务 gate | `进行中` |
 | R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
 | R-13 | 旧 `chats.json`/迁移 JSON 全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB legacy fixture 的 RSS/frame profile | 新备份改 SQLite snapshot；legacy adapter 使用 chunk reader 与增量导入 | `进行中` |
+| R-14 | ZIP32 与恢复展开边界导致超大备份失败或磁盘耗尽 | 中 | >4GiB compressed、8GiB 单项、16GiB 总展开 fixture | 当前显式拒绝超限并在写出时计数中止；后续评估 Zip64 和按可用磁盘预算 | `进行中` |
 
 风险状态表示缓解工作状态，不代表风险是否已经发生。P0-01/P0-02 已开始降低部分风险，但尚未满足整包崩溃安全、旧数据恢复和有界内存验收。
 
@@ -339,11 +340,11 @@ flutter test \
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 落地 `PD-14/OPS-01`：普通备份用 SQLite Online Backup API 生成 `database/kelivo.sqlite`，写入版本化 manifest，停止生成 `chats.json`。
+1. 完成 `P0-08`：普通 SQLite bundle 的 settings snapshot 排除 API key/password/token，旧备份导入兼容不变。
 2. 继续 `P0-02`：SQLite snapshot 和 settings/assets 在 app data 同卷 staging，加入 restore/quiesce gate、previous bundle、durable cutover receipt 与启动恢复。
-3. 保留并隔离旧 `chats.json` adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 验证兼容，逐步把解析/导入改为有界内存。
-4. 启动 `P0-03`：先实现纯 Dart、按 generation 隔离的 latest-wins checkpoint writer 与 final barrier 测试。
-5. 完成 PD-13 调查和 P0-09 legacy fixture 清单，为 Database Kernel v2 做准备。
+3. 推进 `P0-05`：实现 SQLite bundle merge 的 hash 去重、冲突 remap 与 report，再解除当前安全拒绝。
+4. 保留并隔离旧 `chats.json` adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 验证兼容，逐步把解析/导入改为有界内存。
+5. 启动 `P0-03`，并完成 PD-13 调查和 P0-09 fixture/性能基线。
 
 ## 20. 变更日志
 
@@ -351,4 +352,6 @@ flutter test \
 | --- | --- | --- | --- | --- |
 | 2026-07-09 | 创建审计基线、重构方案和进度台账 | AUD-01～06、DOC-01 | `1a75f3da` | Codex |
 | 2026-07-09 | 实现恢复错误传播与本地化失败提示；推进 overwrite payload/candidate 预检和 live SQLite 单事务替换 | P0-01、P0-02 | `117f8386` | Codex |
-| 2026-07-09 | 冻结正常备份使用 SQLite snapshot ZIP、旧 JSON 只读导入、迁移页灾难备份继续 JSON 的格式边界 | PD-14、OPS-01～03 | 工作区未提交 | 用户 / Codex |
+| 2026-07-09 | 冻结正常备份使用 SQLite snapshot ZIP、旧 JSON 只读导入、迁移页灾难备份继续 JSON 的格式边界 | PD-14、OPS-01～03 | `4d810e21` | 用户 / Codex |
+| 2026-07-09 | 实现 SQLite Online Backup 一致快照及 WAL/sidecar、重开、integrity/FK/count 验证 | OPS-01、P0-02 | `e179737c` | Codex |
+| 2026-07-09 | 正常备份切换为 SQLite snapshot bundle；加入全 entry manifest/hash、自校验、严格新旧分发、DB overwrite round trip 与 ZIP 展开预算；迁移灾备继续 JSON | OPS-01～03、P0-02、P0-05 | `900811ec` | Codex |
