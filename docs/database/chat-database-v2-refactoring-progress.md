@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，提交 `df1dae8a`
 > - 最后更新：2026-07-09
-> - 当前结论：正常备份已切换为经自校验且排除应用已知认证凭据的 SQLite snapshot bundle；AppData 同卷 candidate 已加入共享 workspace lock、跨 isolate 原子 active-run/phase marker、单 run 仲裁和可重复整包复验，append-only restore receipt/journal 初始发布也会复验 candidate，但尚未接入实际恢复调用，目录 fsync、previous bundle、业务 gate 与启动恢复仍未实现
+> - 当前结论：正常备份已切换为经自校验且排除应用已知认证凭据的 SQLite snapshot bundle；AppData 同卷 candidate 已加入共享 workspace lock、跨 isolate 原子 active-run/phase marker、单 run 仲裁和可重复整包复验，并已有 staging→prepared receipt 的逻辑协调器；该协调器尚未接入实际 DataSync 恢复调用，目录 fsync、previous bundle、业务 gate 与启动恢复仍未实现
 
 ## 1. 文档使用规则
 
@@ -67,9 +67,10 @@
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
 | Restore receipt/journal 定向测试 | `已完成` | 24 tests passed | 2026-07-09 | 覆盖 canonical checksum、append-only sequence/hash chain、非法跳转、损坏/超限/缺口拒绝、链接目录拒绝、初始 run/marker/topology/candidate/selection 复验、prepared retry 残留拒绝，以及跨 worker-isolate publish/discard 互斥；不等于目录 fsync 或 kill 验证 |
-| Restore candidate/run identity + SQLite 只读复验 | `已完成` | 20 tests passed | 2026-07-09 | 15 个 staging 与 5 个 SQLite inspector 用例覆盖 run ID/固定路径/manifest hash、descriptor/manifest 篡改、canonical path、16 MiB settings 上限、settings 语义、DB、entry/hash、精确目录/空资源根、普通失败清理，以及 worker-isolate 单 run 仲裁；不等于 prepared workflow 或目录 durability |
+| Restore candidate/run identity + SQLite 只读复验 | `已完成` | 20 tests passed | 2026-07-09 | 15 个 staging 与 5 个 SQLite inspector 用例覆盖 run ID/固定路径/manifest hash、descriptor/manifest 篡改、canonical path、16 MiB settings 上限、settings 语义、DB、entry/hash、精确目录/空资源根、普通失败清理，以及 worker-isolate 单 run 仲裁；不等于 startup cutover 或目录 durability |
 | Restore workspace lock/admission | `已完成` | 6 tests passed | 2026-07-09 | 覆盖同 isolate FIFO、跨进程 advisory lock、action 异常释放、root/lock link 与错误类型拒绝；POSIX 同进程多 isolate 另由原子 `.active_run → .publishing/.discarding` rename claim、staging admission 与 publish/discard worker-isolate 用例约束 |
 | Restore admission/phase + DataSync 集成回归 | `已完成` | 89 tests passed | 2026-07-09 | `f33c9019` 提交前 workspace lock、staging、receipt、DataSync 四组定向用例通过；覆盖 worker-isolate staging/staging 与 publish/discard 竞态 |
+| Restore preparation 协调器 | `已完成` | 5 direct / 94 integrated tests passed | 2026-07-09 | `8b7d0e3a` 覆盖 staging→prepared receipt、请求组件与 bundle 能力取交集、完整 candidate 保留、发布前失败清理、发布开始后 fail-closed 保留及并发单 run 准入；`flutter analyze` 无问题；尚未接 DataSync、目录 fsync 或 startup gate |
 | Backup settings 纯校验器与现有恢复回归 | `已完成` | 56 tests passed | 2026-07-09 | 4 个纯校验器用例覆盖 legacy string-list 规范化、合法值、本地键跳过及非法结构拒绝；连同 v2/legacy restore 和凭据边界回归通过，为 candidate 与启动 gate 复用同一规则建立基础 |
 | 审计前生产工作区检查 | `已完成` | clean | 2026-07-09 | 文档创建前 `git status --short` 为空 |
 
@@ -103,6 +104,7 @@ flutter test \
   test/shared_preferences_async_backup_filter_test.dart
 
 flutter test \
+  test/core/services/backup/restore_bundle_preparation_test.dart \
   test/core/services/backup/restore_workspace_lock_test.dart \
   test/core/services/backup/restore_bundle_staging_test.dart \
   test/core/services/backup/restore_receipt_test.dart \
@@ -145,7 +147,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
-| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | `117f8386`、`900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`、`c28f74cc`、`22044e46`、`570b6b20`、`340a0b0a`、`b232ad8b`、`f33c9019`（进行中） | v2 完整 bundle 已在后台 isolate 复制到 AppData 同卷 `run_<id>/candidate`；workspace lock + 原子 `.active_run` marker 保证正常入口只容纳一个 run，原子 `.publishing/.discarding` phase claim 防止 POSIX 同进程 worker isolate 交叉删除已发布现场，任意已有/未知现场均保留并阻止新恢复；candidate 可重复复验 manifest、settings、SQLite、精确 files/directories/hash 和空资源根，initial/prepared-retry receipt 也执行对应整包与顶层 topology 复验。实际 DataSync 仍未发布 receipt，成功后仍立即应用并仲裁删除 workspace；目录 fsync、DB/assets previous、启动 gate 和 kill 恢复未实现，整包仍可能形成混合状态 |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | `117f8386`、`900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`、`c28f74cc`、`22044e46`、`570b6b20`、`340a0b0a`、`b232ad8b`、`f33c9019`、`8b7d0e3a`（进行中） | v2 完整 bundle 已在后台 isolate 复制到 AppData 同卷 `run_<id>/candidate`；workspace lock + 原子 `.active_run` marker 保证正常入口只容纳一个 run，原子 `.publishing/.discarding` phase claim 防止 POSIX 同进程 worker isolate 交叉删除已发布现场，任意已有/未知现场均保留并阻止新恢复；candidate 可重复复验 manifest、settings、SQLite、精确 files/directories/hash 和空资源根，initial/prepared-retry receipt 也执行对应整包与顶层 topology 复验；逻辑 preparation 协调器已把 staging、组件选择交集和 prepared receipt 发布串成单一流程，发布前失败清理、发布开始后保留现场。实际 DataSync 尚未调用该协调器，成功后仍立即应用并仲裁删除 workspace；目录 fsync、DB/assets previous、启动 gate 和 kill 恢复未实现，整包仍可能形成混合状态 |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`、`6c3618b8`（安全门） | 所有 v2 bundle merge（含 settings-only）在冲突/凭据语义完成前显式拒绝且不修改目标；hash 去重、remap、report 和事务化 merge 尚未实现 |
@@ -217,7 +219,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec`、`6c3618b8` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验、round trip 与应用已知认证凭据排除已实现；五平台/大数据 profile 与 Zip64 尚未完成 |
-| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | `900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`、`c28f74cc`、`22044e46`、`570b6b20`、`340a0b0a`、`b232ad8b`、`f33c9019`（预检/补偿/同卷 staging/receipt foundation/candidate validation/single-run admission/phase claim） | v2 candidate 已完成同卷复制、规范化 descriptor/hash、严格 run ID/路径、共享锁、跨 isolate 原子 active-run 与 publish/discard phase marker、全量可重复复验、链接/跨卷拒绝与空 assets 根；append-only receipt journal 已严格校验状态链，initial/prepared retry 均绑定完整 candidate 与精确 run topology。当前实际恢复成功/失败后仍仲裁清理 workspace，尚未写业务 prepared receipt、fsync 目录或转移到启动 gate |
+| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | `900811ec`、`da9d2d13`、`1460a64c`、`7053ea5e`、`c28f74cc`、`22044e46`、`570b6b20`、`340a0b0a`、`b232ad8b`、`f33c9019`、`8b7d0e3a`（预检/补偿/同卷 staging/receipt foundation/candidate validation/single-run admission/phase claim/logical preparation） | v2 candidate 已完成同卷复制、规范化 descriptor/hash、严格 run ID/路径、共享锁、跨 isolate 原子 active-run 与 publish/discard phase marker、全量可重复复验、链接/跨卷拒绝与空 assets 根；append-only receipt journal 已严格校验状态链，initial/prepared retry 均绑定完整 candidate 与精确 run topology；逻辑 preparation 协调器已按“请求 ∩ bundle 能力”发布 prepared receipt，并区分发布前清理与发布后保留。当前实际恢复仍立即写 live 并仲裁清理 workspace，尚未接入 preparation、fsync 目录或转移到启动 gate |
 | OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再生成 JSON；旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `未开始` | current branch/total usage 定义和查询均明确 | — | — |
@@ -362,7 +364,7 @@ flutter test \
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 继续 `P0-02`：把同卷 candidate 接入 prepared receipt，停止运行期在线覆盖与成功后清理；再加入 restore/quiesce gate、previous bundle、平台目录 fsync 与启动恢复。
+1. 继续 `P0-02`：实现最早启动 restore gate、previous bundle 与平台目录 fsync，再把 DataSync 接到已完成的 preparation 协调器，停止运行期在线覆盖与成功后清理。
 2. 推进 `P0-05`：实现 SQLite bundle merge 的 hash 去重、冲突 remap 与 report，再解除当前安全拒绝。
 3. 保留并隔离旧 `chats.json` adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 验证兼容，逐步把解析/导入改为有界内存。
 4. 启动 `P0-03`，并完成 PD-13 调查和 P0-09 fixture/性能基线。
@@ -386,3 +388,4 @@ flutter test \
 | 2026-07-09 | 在 candidate 返回前执行完整设置语义校验；非法结构在 receipt 发布前拒绝并清理本次 run，不再只检查 `settings.json` 可解析性 | P0-02、OPS-02 | `340a0b0a` | Codex |
 | 2026-07-09 | 提取共享 restore workspace lock，并用原子 `.active_run` marker 关闭 POSIX 同进程多 isolate admission 窗口；任意残留/未知 run fail closed；candidate 与初始 receipt 统一执行 manifest/settings/DB/entry/hash/精确目录复验，当前即时恢复 cleanup 改由仲裁执行 | P0-02、OPS-02 | `b232ad8b` | Codex |
 | 2026-07-09 | 用 `.active_run → .publishing/.discarding` 同目录原子 rename claim 串行化 POSIX 同进程 worker-isolate 的 publish/discard；prepared 幂等重试增加 candidate+receipts 精确 topology，拒绝 `previous` 等已开始切换残留；cleanup 失败仍保证尝试清理解压目录 | P0-02、OPS-02 | `f33c9019` | Codex |
+| 2026-07-09 | 增加 staging→prepared receipt 逻辑协调器；组件选择取用户请求与 bundle 能力交集，发布前失败清理、发布开始后 fail-closed 保留，并保持完整 candidate 供启动恢复；尚未接 DataSync、目录 fsync 或 startup gate | P0-02、OPS-02 | `8b7d0e3a` | Codex |
