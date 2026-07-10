@@ -35,10 +35,12 @@ import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
+import 'utils/app_directories.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -59,6 +61,10 @@ Future<void> main() async {
     () async {
       WidgetsFlutterBinding.ensureInitialized();
       FlutterLogger.installGlobalHandlers();
+      final appDataDirectory = await AppDirectories.getAppDataDirectory();
+      await RestoreStartupGate.requireBusinessReady(
+        appDataDirectory: appDataDirectory,
+      );
       try {
         final prefs = await SharedPreferences.getInstance();
         final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;

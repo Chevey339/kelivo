@@ -323,6 +323,14 @@ final class RestoreReceiptStore {
   Future<RestoreReceipt?> readLatest() =>
       _workspaceLock.synchronized(_readLatestUnlocked);
 
+  /// Reads the journal while the caller holds this app-data workspace lock.
+  ///
+  /// Startup inspection needs one stable lock scope across marker, run,
+  /// receipt, and candidate validation, so acquiring the same lock again here
+  /// would deadlock the process-local FIFO.
+  Future<RestoreReceipt?> readLatestWhileWorkspaceLocked() =>
+      _readLatestUnlocked();
+
   Future<void> publish(RestoreReceipt receipt) async {
     if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
     await _workspaceLock.withPublishingRun(
