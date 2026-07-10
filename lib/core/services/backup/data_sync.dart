@@ -20,6 +20,7 @@ import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_sanitizer.dart';
+import 'backup_settings_validator.dart';
 import 'restore_bundle_staging.dart';
 
 typedef _ParsedChatBackup = ({
@@ -1446,8 +1447,7 @@ class DataSync {
           jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
       final prefs = await SharedPreferencesAsync.instance;
       restorePreferences = prefs;
-      prefs._normalizeLegacyStringLists(settings);
-      prefs._validateRestore(settings);
+      BackupSettingsValidator.normalizeAndValidate(settings);
 
       var conversations = const <Conversation>[];
       var messages = const <ChatMessage>[];
@@ -1488,7 +1488,7 @@ class DataSync {
           } else {
             // For merge mode, intelligently merge settings
             final existing = await prefs.snapshot();
-            prefs._normalizeLegacyStringLists(existing);
+            BackupSettingsValidator.normalizeLegacyStringLists(existing);
             final pendingSettings = <String, dynamic>{};
 
             // Keys that should be merged as JSON arrays/objects
@@ -1764,7 +1764,7 @@ class DataSync {
               }
               // Skip existing non-mergeable keys to preserve user preferences
             }
-            prefs._validateRestore(pendingSettings);
+            BackupSettingsValidator.validate(pendingSettings);
             for (final entry in pendingSettings.entries) {
               await prefs.restoreSingle(entry.key, entry.value);
             }
@@ -2472,42 +2472,6 @@ class _StreamingZipWrittenFile {
 class SharedPreferencesAsync {
   SharedPreferencesAsync._();
   static SharedPreferencesAsync? _inst;
-  // Local-only UI state stays on device and is excluded from backups/restores.
-  static const _localOnlyKeys = {
-    'window_width_v1',
-    'window_height_v1',
-    'window_pos_x_v1',
-    'window_pos_y_v1',
-    'window_maximized_v1',
-    'display_chat_font_scale_v1',
-    'desktop_hotkeys_commands_v1',
-    'desktop_hotkeys_enabled_v1',
-  };
-  static const _jsonListKeys = {
-    'assistants_v1',
-    'assistant_memories_v1',
-    'mcp_servers_v1',
-    'provider_groups_v1',
-    'search_services_v1',
-    'assistant_tags_v1',
-  };
-  static const _jsonMapKeys = {
-    'provider_configs_v1',
-    'provider_group_map_v1',
-    'provider_group_collapsed_v1',
-    'assistant_tag_map_v1',
-    'assistant_tag_collapsed_v1',
-  };
-  static const _jsonMapOfMapKeys = {'provider_configs_v1'};
-  static const _jsonMapOfStringKeys = {
-    'provider_group_map_v1',
-    'assistant_tag_map_v1',
-  };
-  static const _jsonMapOfBoolKeys = {
-    'provider_group_collapsed_v1',
-    'assistant_tag_collapsed_v1',
-  };
-  static const _stringListKeys = {'pinned_models_v1', 'providers_order_v1'};
 
   static Future<SharedPreferencesAsync> get instance async {
     _inst ??= SharedPreferencesAsync._();
@@ -2519,7 +2483,7 @@ class SharedPreferencesAsync {
     final keys = prefs.getKeys();
     final map = <String, dynamic>{};
     for (final k in keys) {
-      if (_localOnlyKeys.contains(k)) continue;
+      if (BackupSettingsValidator.isLocalOnly(k)) continue;
       map[k] = prefs.get(k);
     }
     return map;
@@ -2550,7 +2514,7 @@ class SharedPreferencesAsync {
     // Until the global restore gate exists, compensation must not touch keys
     // that another provider may write while this restore is running.
     final touchedKeys = incoming.keys
-        .where((key) => !_localOnlyKeys.contains(key))
+        .where((key) => !BackupSettingsValidator.isLocalOnly(key))
         .toSet();
     if (clearKnownCredentials) {
       touchedKeys.addAll(
@@ -2569,7 +2533,7 @@ class SharedPreferencesAsync {
   Future<void> _restoreOverwriteRollbackSnapshot(
     _SettingsRollbackSnapshot snapshot,
   ) async {
-    _validateRestore(snapshot.existingValues);
+    BackupSettingsValidator.validate(snapshot.existingValues);
     final prefs = await SharedPreferences.getInstance();
     final currentKeys = prefs.getKeys();
     for (final key in snapshot.touchedKeys) {
@@ -2587,86 +2551,15 @@ class SharedPreferencesAsync {
     for (final entry in data.entries) {
       final k = entry.key;
       final v = entry.value;
-      if (_localOnlyKeys.contains(k)) continue;
+      if (BackupSettingsValidator.isLocalOnly(k)) continue;
       await _restoreValue(prefs, k, v);
     }
   }
 
   Future<void> restoreSingle(String key, dynamic value) async {
-    if (_localOnlyKeys.contains(key)) return;
+    if (BackupSettingsValidator.isLocalOnly(key)) return;
     final prefs = await SharedPreferences.getInstance();
     await _restoreValue(prefs, key, value);
-  }
-
-  void _validateRestore(Map<String, dynamic> data) {
-    for (final entry in data.entries) {
-      if (_localOnlyKeys.contains(entry.key)) continue;
-      _validateRestoreValue(entry.key, entry.value);
-    }
-  }
-
-  void _validateRestoreValue(String key, dynamic value) {
-    final supported =
-        value is bool ||
-        value is int ||
-        value is double ||
-        value is String ||
-        (value is List && value.every((item) => item is String));
-    if (!supported) {
-      throw FormatException(key);
-    }
-    if (_jsonListKeys.contains(key)) {
-      _validateJsonShape(key, value, expectList: true);
-    } else if (_jsonMapKeys.contains(key)) {
-      _validateJsonShape(key, value, expectList: false);
-    }
-  }
-
-  void _validateJsonShape(
-    String key,
-    dynamic value, {
-    required bool expectList,
-  }) {
-    if (value is! String) {
-      throw FormatException(key);
-    }
-    try {
-      final decoded = jsonDecode(value);
-      if (expectList) {
-        if (decoded is! List || decoded.any((entry) => entry is! Map)) {
-          throw FormatException(key);
-        }
-      } else if (decoded is! Map) {
-        throw FormatException(key);
-      } else if (_jsonMapOfMapKeys.contains(key) &&
-          decoded.values.any((entry) => entry is! Map)) {
-        throw FormatException(key);
-      } else if (_jsonMapOfStringKeys.contains(key) &&
-          decoded.values.any((entry) => entry is! String)) {
-        throw FormatException(key);
-      } else if (_jsonMapOfBoolKeys.contains(key) &&
-          decoded.values.any((entry) => entry is! bool)) {
-        throw FormatException(key);
-      }
-    } on FormatException {
-      throw FormatException(key);
-    }
-  }
-
-  void _normalizeLegacyStringLists(Map<String, dynamic> data) {
-    for (final key in _stringListKeys) {
-      final value = data[key];
-      if (value is! String) continue;
-      try {
-        final decoded = jsonDecode(value);
-        if (decoded is! List || decoded.any((item) => item is! String)) {
-          throw FormatException(key);
-        }
-        data[key] = decoded.cast<String>();
-      } on FormatException {
-        throw FormatException(key);
-      }
-    }
   }
 
   Future<void> _restoreValue(
@@ -2674,7 +2567,7 @@ class SharedPreferencesAsync {
     String key,
     dynamic value,
   ) async {
-    _validateRestoreValue(key, value);
+    BackupSettingsValidator.validateValue(key, value);
     final bool restored;
     if (value is bool) {
       restored = await prefs.setBool(key, value);
