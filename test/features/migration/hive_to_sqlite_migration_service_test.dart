@@ -149,6 +149,7 @@ void main() {
     expect(settingsEntry, isNotNull);
     final settingsJson = String.fromCharCodes(settingsEntry!.readBytes()!);
     expect(settingsJson, contains('provider_configs_v1'));
+    expect(settingsJson, contains('test-key'));
     expect(settingsJson, isNot(contains('display_chat_font_scale_v1')));
     final chatsEntry = archive.findFile('chats.json');
     expect(chatsEntry, isNotNull);

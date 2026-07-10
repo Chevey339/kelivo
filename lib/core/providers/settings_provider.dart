@@ -4510,6 +4510,8 @@ enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
 enum AndroidBackgroundChatMode { off, on, onNotify }
 
 class ProviderConfig {
+  static const _kelivoInPublicApiKey = 'kelivo';
+
   final String id;
   final bool enabled;
   final String name;
@@ -4735,7 +4737,7 @@ class ProviderConfig {
     id: json['id'] as String? ?? (json['name'] as String? ?? ''),
     enabled: json['enabled'] as bool? ?? true,
     name: json['name'] as String? ?? '',
-    apiKey: json['apiKey'] as String? ?? '',
+    apiKey: _apiKeyFromJson(json),
     baseUrl: json['baseUrl'] as String? ?? '',
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(
@@ -4783,6 +4785,13 @@ class ProviderConfig {
       json['claudePromptCachingTtl'] as String?,
     ),
   );
+
+  static String _apiKeyFromJson(Map<String, dynamic> json) {
+    final stored = json['apiKey'] as String? ?? '';
+    if (stored.isNotEmpty) return stored;
+    final id = json['id'] as String? ?? json['name'] as String? ?? '';
+    return id.trim().toLowerCase() == 'kelivoin' ? _kelivoInPublicApiKey : '';
+  }
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
     // If an explicit type is provided, use it
@@ -4905,7 +4914,7 @@ class ProviderConfig {
             id: key,
             enabled: defaultEnabled(key),
             name: displayName ?? key,
-            apiKey: 'kelivo',
+            apiKey: _kelivoInPublicApiKey,
             baseUrl: _defaultBase(key),
             providerType: ProviderKind.openai,
             chatPath:

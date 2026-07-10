@@ -19,6 +19,7 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
+import 'backup_settings_sanitizer.dart';
 
 typedef _ParsedChatBackup = ({
   List<Conversation> conversations,
@@ -28,6 +29,7 @@ typedef _ParsedChatBackup = ({
 });
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
+typedef _VersionedBackupInfo = ({bool includeChats, bool secretsIncluded});
 
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
@@ -880,7 +882,7 @@ class DataSync {
       'appVersion': appVersion,
       'includeChats': includeChats,
       'includeFiles': includeFiles,
-      'secretsIncluded': true,
+      'secretsIncluded': false,
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -897,7 +899,7 @@ class DataSync {
     });
   }
 
-  static Future<bool> _preflightVersionedBackup({
+  static Future<_VersionedBackupInfo> _preflightVersionedBackup({
     required String manifestPath,
     required String extractDirPath,
   }) async {
@@ -1024,7 +1026,10 @@ class DataSync {
       throw const FormatException('manifest_payload_kind');
     }
 
-    return includeChats;
+    return (
+      includeChats: includeChats,
+      secretsIncluded: manifest['secretsIncluded'] as bool,
+    );
   }
 
   static String _sha256FileSync(File file) {
@@ -1314,7 +1319,7 @@ class DataSync {
 
   Future<String> _exportSettingsJson() async {
     final prefs = await SharedPreferencesAsync.instance;
-    final map = await prefs.snapshot();
+    final map = await prefs.snapshotForRegularBackup();
     return jsonEncode(map);
   }
 
@@ -1344,26 +1349,25 @@ class DataSync {
       if (!await settingsFile.exists()) {
         throw const FormatException('settings.json');
       }
-      final bool? versionedIncludesChats;
+      final _VersionedBackupInfo? versionedBackup;
       if (await manifestFile.exists()) {
         final manifestPath = manifestFile.path;
         final extractDirPath = extractDir.path;
-        versionedIncludesChats = await Isolate.run(
+        versionedBackup = await Isolate.run(
           () => _preflightVersionedBackup(
             manifestPath: manifestPath,
             extractDirPath: extractDirPath,
           ),
         );
       } else {
-        versionedIncludesChats = null;
+        versionedBackup = null;
       }
+      final versionedIncludesChats = versionedBackup?.includeChats;
       final restoreChats =
           cfg.includeChats &&
           (versionedIncludesChats ?? await chatsFile.exists());
-      if (versionedIncludesChats != null &&
-          restoreChats &&
-          mode == RestoreMode.merge) {
-        throw UnsupportedError('sqlite_backup_merge_not_supported');
+      if (versionedIncludesChats != null && mode == RestoreMode.merge) {
+        throw UnsupportedError('versioned_backup_merge_not_supported');
       }
 
       final settings =
@@ -1397,6 +1401,9 @@ class DataSync {
         try {
           if (mode == RestoreMode.overwrite) {
             // For overwrite mode, restore all settings
+            if (versionedBackup?.secretsIncluded == false) {
+              await prefs._clearBeforeSecretFreeOverwrite();
+            }
             await prefs.restore(settings);
           } else {
             // For merge mode, intelligently merge settings
@@ -2400,6 +2407,22 @@ class SharedPreferencesAsync {
       map[k] = prefs.get(k);
     }
     return map;
+  }
+
+  /// Regular app backups exclude known authentication credentials.
+  /// Migration disaster backups intentionally keep using [snapshot].
+  Future<Map<String, dynamic>> snapshotForRegularBackup() async {
+    return BackupSettingsSanitizer.sanitize(await snapshot());
+  }
+
+  Future<void> _clearBeforeSecretFreeOverwrite() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where(
+      BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite,
+    );
+    for (final key in keys.toList(growable: false)) {
+      if (!await prefs.remove(key)) throw StateError(key);
+    }
   }
 
   Future<void> restore(Map<String, dynamic> data) async {

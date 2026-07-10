@@ -9,6 +9,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: depend_on_referenced_packages
+import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
@@ -34,6 +36,13 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
+}
+
+class _FailingRemovePreferencesStore extends InMemorySharedPreferencesStore {
+  _FailingRemovePreferencesStore(super.data) : super.withData();
+
+  @override
+  Future<bool> remove(String key) async => false;
 }
 
 class _FailingRestoreChatService extends ChatService {
@@ -332,6 +341,227 @@ void main() {
         expect(await backupFile.parent.exists(), isFalse);
       },
     );
+
+    test(
+      'normal backup excludes secrets and declares that in manifest',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'safe_setting_v1': 'safe-value',
+          'global_proxy_password_v1': 'normal-backup-proxy-secret',
+          'provider_configs_v1': jsonEncode({
+            'openai': {
+              'id': 'openai',
+              'name': 'Safe Provider',
+              'apiKey': 'normal-backup-api-secret',
+              'baseUrl': 'https://safe.example',
+            },
+          }),
+        });
+        final sync = DataSync(chatService: ChatService());
+
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final input = InputFileStream(backupFile.path);
+        Archive? archive;
+        try {
+          archive = ZipDecoder().decodeStream(input);
+          final manifestEntry = archive.findFile('manifest.json');
+          final settingsEntry = archive.findFile('settings.json');
+          expect(manifestEntry, isNotNull);
+          expect(settingsEntry, isNotNull);
+          final manifest =
+              jsonDecode(utf8.decode(manifestEntry!.readBytes()!))
+                  as Map<String, dynamic>;
+          final settingsBytes = settingsEntry!.readBytes()!;
+          final settings =
+              jsonDecode(utf8.decode(settingsBytes)) as Map<String, dynamic>;
+          expect(manifest['secretsIncluded'], isFalse);
+          expect(settings['safe_setting_v1'], 'safe-value');
+          expect(settings['global_proxy_password_v1'], '');
+          final providers =
+              jsonDecode(settings['provider_configs_v1'] as String) as Map;
+          final provider = providers['openai'] as Map;
+          expect(provider['name'], 'Safe Provider');
+          expect(provider['baseUrl'], 'https://safe.example');
+          expect(provider['apiKey'], '');
+          expect(
+            utf8.decode(settingsBytes),
+            isNot(contains('normal-backup-api-secret')),
+          );
+        } finally {
+          archive?.clearSync();
+          input.closeSync();
+          await DataSync.cleanupTemporaryBackupFile(backupFile);
+        }
+      },
+    );
+
+    test(
+      'secret-free overwrite clears a target credential absent from source',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'global_proxy_enabled_v1': true,
+          'global_proxy_host_v1': 'source.example',
+          'provider_configs_v1': jsonEncode({
+            'openai': {
+              'id': 'openai',
+              'name': 'Source Provider',
+              'apiKey': 'source-api-secret',
+              'baseUrl': 'https://source.example',
+            },
+          }),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+
+        SharedPreferences.setMockInitialValues({
+          'global_proxy_enabled_v1': false,
+          'global_proxy_host_v1': 'target.example',
+          'global_proxy_password_v1': 'target-proxy-secret',
+          'provider_configs_v1': jsonEncode({
+            'openai': {
+              'id': 'openai',
+              'name': 'Target Provider',
+              'apiKey': 'target-api-secret',
+              'baseUrl': 'https://target.example',
+            },
+          }),
+          'provider_configs_backup_v1': jsonEncode({
+            'old': {'apiKey': 'target-provider-backup-secret'},
+          }),
+          'search_services_v1': jsonEncode([
+            {'id': 'old-search', 'apiKey': 'target-search-secret'},
+          ]),
+          'tts_services_v1': jsonEncode([
+            {'id': 'old-tts', 'apiKey': 'target-tts-secret'},
+          ]),
+          'mcp_servers_v1': jsonEncode([
+            {
+              'id': 'old-mcp',
+              'headers': {'Authorization': 'target-mcp-secret'},
+            },
+          ]),
+          'assistants_v1': jsonEncode([
+            {
+              'id': 'old-assistant',
+              'customHeaders': [
+                {'name': 'Authorization', 'value': 'target-assistant-secret'},
+              ],
+            },
+          ]),
+          'webdav_config_v1': jsonEncode({'password': 'target-webdav-secret'}),
+          's3_config_v1': jsonEncode({'secretAccessKey': 'target-s3-secret'}),
+        });
+
+        await sync.restoreFromLocalFile(
+          backupFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('global_proxy_enabled_v1'), isTrue);
+        expect(prefs.getString('global_proxy_host_v1'), 'source.example');
+        expect(prefs.getString('global_proxy_password_v1'), '');
+        final providers =
+            jsonDecode(prefs.getString('provider_configs_v1')!) as Map;
+        final provider = providers['openai'] as Map;
+        expect(provider['name'], 'Source Provider');
+        expect(provider['apiKey'], '');
+        for (final key in [
+          'provider_configs_backup_v1',
+          'search_services_v1',
+          'tts_services_v1',
+          'mcp_servers_v1',
+          'assistants_v1',
+          'webdav_config_v1',
+          's3_config_v1',
+        ]) {
+          expect(prefs.containsKey(key), isFalse, reason: key);
+        }
+      },
+    );
+
+    test(
+      'secret-free settings bundle rejects merge without changing target',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': jsonEncode({
+            'openai': {
+              'id': 'openai',
+              'name': 'Source Provider',
+              'apiKey': 'source-api-secret',
+              'baseUrl': 'https://source.example',
+            },
+          }),
+        });
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+
+        final targetProviders = jsonEncode({
+          'openai': {
+            'id': 'openai',
+            'name': 'Target Provider',
+            'apiKey': 'target-api-secret',
+            'baseUrl': 'https://target.example',
+          },
+        });
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': targetProviders,
+        });
+
+        await expectLater(
+          sync.restoreFromLocalFile(
+            backupFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+            mode: RestoreMode.merge,
+          ),
+          throwsA(isA<UnsupportedError>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('provider_configs_v1'), targetProviders);
+      },
+    );
+
+    test('secret-free overwrite reports credential cleanup failure', () async {
+      SharedPreferences.setMockInitialValues({'source_setting': 'source'});
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        const WebDavConfig(includeChats: false, includeFiles: false),
+      );
+      addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+
+      SharedPreferences.setMockInitialValues({
+        'global_proxy_password_v1': 'target-proxy-secret',
+      });
+      SharedPreferencesStorePlatform.instance = _FailingRemovePreferencesStore({
+        'flutter.global_proxy_password_v1': 'target-proxy-secret',
+      });
+
+      await expectLater(
+        sync.restoreFromLocalFile(
+          backupFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      expect(
+        prefs.getString('global_proxy_password_v1'),
+        'target-proxy-secret',
+      );
+      expect(prefs.getString('source_setting'), isNull);
+    });
 
     test('writes a consistent SQLite snapshot instead of chats.json', () async {
       final chatService = ChatService();
@@ -1423,7 +1653,13 @@ void main() {
         SharedPreferences.setMockInitialValues({'restored_setting': 'old'});
         final settingsFile = File('${root.path}/settings_only.json');
         await settingsFile.writeAsString(
-          jsonEncode({'restored_setting': 'new'}),
+          jsonEncode({
+            'restored_setting': 'new',
+            'global_proxy_password_v1': 'legacy-proxy-secret',
+            'provider_configs_v1': jsonEncode({
+              'openai': {'id': 'openai', 'apiKey': 'legacy-api-secret'},
+            }),
+          }),
         );
 
         final zipFile = File('${root.path}/settings_only_restore.zip');
@@ -1443,6 +1679,14 @@ void main() {
         expect(chatService.cleared, isFalse);
         final prefs = await SharedPreferences.getInstance();
         expect(prefs.getString('restored_setting'), 'new');
+        expect(
+          prefs.getString('global_proxy_password_v1'),
+          'legacy-proxy-secret',
+        );
+        expect(
+          prefs.getString('provider_configs_v1'),
+          contains('legacy-api-secret'),
+        );
       },
     );
 
