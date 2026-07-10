@@ -1,19 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
+
+import 'restore_receipt.dart' show restoreWorkspaceRootName;
 
 typedef _StagedRestoreEntry = ({int bytes, String sha256});
 
 final class StagedRestoreBundle {
   const StagedRestoreBundle({
+    required this.runId,
     required this.workspace,
     required this.payloadDirectory,
+    required this.candidateManifestSha256,
   });
 
+  final String runId;
   final Directory workspace;
   final Directory payloadDirectory;
+  final String candidateManifestSha256;
 }
 
 /// Copies a validated v2 restore payload into the app-data filesystem.
@@ -23,7 +30,7 @@ final class StagedRestoreBundle {
 final class RestoreBundleStaging {
   RestoreBundleStaging._();
 
-  static const workspaceRootName = '.kelivo_restore';
+  static const workspaceRootName = restoreWorkspaceRootName;
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
 
   static Future<StagedRestoreBundle> create({
@@ -60,7 +67,9 @@ final class RestoreBundleStaging {
         workspaceRoot.path,
       );
     }
-    final workspace = await workspaceRoot.createTemp('restore_');
+    final allocation = await _createRunWorkspace(workspaceRoot);
+    final runId = allocation.runId;
+    final workspace = allocation.workspace;
     final payloadDirectory = Directory(p.join(workspace.path, 'candidate'));
     final stagedEntries = <String, _StagedRestoreEntry>{};
 
@@ -133,15 +142,56 @@ final class RestoreBundleStaging {
       if (reopenedManifest is! Map || reopenedManifest['entries'] is! Map) {
         throw const FormatException('restore_staging_manifest_reopen');
       }
+      final candidateManifestSha256 = await _sha256(stagedManifestFile);
 
       return StagedRestoreBundle(
+        runId: runId,
         workspace: workspace,
         payloadDirectory: payloadDirectory,
+        candidateManifestSha256: candidateManifestSha256,
       );
     } catch (_) {
       if (await workspace.exists()) await workspace.delete(recursive: true);
       rethrow;
     }
+  }
+
+  static Future<({String runId, Directory workspace})> _createRunWorkspace(
+    Directory workspaceRoot,
+  ) async {
+    for (var attempt = 0; attempt < 16; attempt++) {
+      final runId = _newRunId();
+      final workspace = Directory(p.join(workspaceRoot.path, 'run_$runId'));
+      if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        continue;
+      }
+      await workspace.create();
+      if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
+          FileSystemEntityType.directory) {
+        throw FileSystemException(
+          'Restore run workspace changed type',
+          workspace.path,
+        );
+      }
+      if (!await workspace.list(followLinks: false).isEmpty) {
+        throw FileSystemException(
+          'Restore run workspace is not empty',
+          workspace.path,
+        );
+      }
+      return (runId: runId, workspace: workspace);
+    }
+    throw StateError('restore_staging_run_id_collision');
+  }
+
+  static String _newRunId() {
+    final random = Random.secure();
+    final buffer = StringBuffer();
+    for (var index = 0; index < 16; index++) {
+      buffer.write(random.nextInt(256).toRadixString(16).padLeft(2, '0'));
+    }
+    return buffer.toString();
   }
 
   static Future<void> _copyAssetRoot({

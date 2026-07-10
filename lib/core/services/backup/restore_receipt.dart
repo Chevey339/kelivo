@@ -7,6 +7,8 @@ import 'package:path/path.dart' as p;
 
 enum RestoreComponent { settings, database, assets }
 
+const restoreWorkspaceRootName = '.kelivo_restore';
+
 enum RestoreReceiptState {
   prepared,
   oldRenamed,
@@ -299,7 +301,7 @@ final class RestoreReceiptStore {
     _validateRunId(runId, parsed: false);
   }
 
-  static const workspaceRootName = '.kelivo_restore';
+  static const workspaceRootName = restoreWorkspaceRootName;
   static final _localPublishTails = <String, Future<void>>{};
 
   final Directory appDataDirectory;
