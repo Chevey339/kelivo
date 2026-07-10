@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
@@ -278,6 +280,20 @@ void main() {
       );
     });
 
+    test('rejects a prepared retry after previous state appears', () async {
+      final first = prepared();
+      await store.publish(first);
+      await Directory(p.join(store.runDirectory.path, 'previous')).create();
+
+      await expectLater(store.publish(first), throwsStateError);
+
+      expect((await store.readLatest())?.checksum, first.checksum);
+      expect(
+        await Directory(p.join(store.runDirectory.path, 'previous')).exists(),
+        isTrue,
+      );
+    });
+
     test('serializes conflicting concurrent initial receipts', () async {
       Future<Object?> publishResult(RestoreReceipt receipt) async {
         try {
@@ -339,6 +355,24 @@ void main() {
       );
 
       expect(await store.receiptDirectory.exists(), isFalse);
+      expect(
+        await File(
+          p.join(
+            store.workspaceRoot.path,
+            RestoreWorkspaceLock.activeRunFileName,
+          ),
+        ).readAsString(),
+        _runId,
+      );
+      expect(
+        await File(
+          p.join(
+            store.workspaceRoot.path,
+            RestoreWorkspaceLock.publishingRunFileName,
+          ),
+        ).exists(),
+        isFalse,
+      );
     });
 
     test('rejects a receipt directory without a final record', () async {
@@ -419,6 +453,73 @@ void main() {
       await expectLater(store.publish(prepared()), throwsStateError);
 
       expect(await store.receiptDirectory.exists(), isFalse);
+    });
+
+    test('serializes publish and discard across worker isolates', () async {
+      final appDataPath = root.path;
+      final manifestSha256 = candidateManifestSha256;
+
+      final results = await Future.wait([
+        Isolate.run(() async {
+          try {
+            final workerStore = RestoreReceiptStore(
+              appDataDirectory: Directory(appDataPath),
+              runId: _runId,
+            );
+            await workerStore.publish(
+              _preparedReceiptForManifest(manifestSha256),
+            );
+            return true;
+          } catch (_) {
+            return false;
+          }
+        }),
+        Isolate.run(() async {
+          try {
+            await RestoreBundleStaging.discardUnpublished(
+              appDataDirectory: Directory(appDataPath),
+              runId: _runId,
+            );
+            return true;
+          } catch (_) {
+            return false;
+          }
+        }),
+      ]);
+
+      expect(results.where((result) => result), hasLength(1));
+      if (results.first) {
+        expect(await store.runDirectory.exists(), isTrue);
+        expect(
+          await File(
+            p.join(
+              store.receiptDirectory.path,
+              'receipt_0000000000000001.json',
+            ),
+          ).exists(),
+          isTrue,
+        );
+        expect(
+          await File(
+            p.join(
+              store.workspaceRoot.path,
+              RestoreWorkspaceLock.activeRunFileName,
+            ),
+          ).readAsString(),
+          _runId,
+        );
+      } else {
+        expect(await store.runDirectory.exists(), isFalse);
+        expect(
+          await File(
+            p.join(
+              store.workspaceRoot.path,
+              RestoreWorkspaceLock.activeRunFileName,
+            ),
+          ).exists(),
+          isFalse,
+        );
+      }
     });
   });
 }

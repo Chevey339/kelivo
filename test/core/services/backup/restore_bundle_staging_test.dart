@@ -271,6 +271,26 @@ void main() {
       );
 
       expect(await receipts.exists(), isTrue);
+      expect(
+        await File(
+          p.join(
+            root.path,
+            RestoreBundleStaging.workspaceRootName,
+            RestoreWorkspaceLock.activeRunFileName,
+          ),
+        ).readAsString(),
+        staged.runId,
+      );
+      expect(
+        await File(
+          p.join(
+            root.path,
+            RestoreBundleStaging.workspaceRootName,
+            RestoreWorkspaceLock.discardingRunFileName,
+          ),
+        ).exists(),
+        isFalse,
+      );
     });
 
     test('rejects a source entry changed after its descriptor froze', () async {

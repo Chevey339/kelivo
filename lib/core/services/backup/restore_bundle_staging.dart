@@ -296,62 +296,63 @@ final class RestoreBundleStaging {
     required RestoreWorkspaceLock workspaceLock,
     required Directory workspace,
   }) async {
-    await workspaceLock.synchronized(() async {
-      var foundWorkspace = false;
-      var foundActiveRun = false;
-      await for (final entity in workspaceLock.workspaceRoot.list(
-        followLinks: false,
-      )) {
-        final name = p.basename(entity.path);
-        final type = await FileSystemEntity.type(
-          entity.path,
+    final workspaceName = p.basename(workspace.path);
+    if (!RegExp(r'^run_[a-f0-9]{32}$').hasMatch(workspaceName)) {
+      throw StateError('restore_staging_discard_workspace');
+    }
+    final runId = workspaceName.substring('run_'.length);
+    await workspaceLock.withDiscardingRun(
+      runId: runId,
+      action: () async {
+        var foundWorkspace = false;
+        var foundDiscardingRun = false;
+        await for (final entity in workspaceLock.workspaceRoot.list(
           followLinks: false,
-        );
-        if (name == RestoreWorkspaceLock.lockFileName &&
-            type == FileSystemEntityType.file) {
-          continue;
+        )) {
+          final name = p.basename(entity.path);
+          final type = await FileSystemEntity.type(
+            entity.path,
+            followLinks: false,
+          );
+          if (name == RestoreWorkspaceLock.lockFileName &&
+              type == FileSystemEntityType.file) {
+            continue;
+          }
+          if (name == RestoreWorkspaceLock.discardingRunFileName &&
+              type == FileSystemEntityType.file &&
+              await _readActiveRunId(File(entity.path)) == runId &&
+              !foundDiscardingRun) {
+            foundDiscardingRun = true;
+            continue;
+          }
+          if (p.equals(entity.path, workspace.path) &&
+              type == FileSystemEntityType.directory &&
+              !foundWorkspace) {
+            foundWorkspace = true;
+            continue;
+          }
+          throw StateError('restore_staging_discard_workspace');
         }
-        if (name == RestoreWorkspaceLock.activeRunFileName &&
-            type == FileSystemEntityType.file &&
-            await _readActiveRunId(File(entity.path)) ==
-                p.basename(workspace.path).substring('run_'.length) &&
-            !foundActiveRun) {
-          foundActiveRun = true;
-          continue;
+        if (!foundWorkspace) {
+          throw StateError('restore_staging_discard_workspace');
         }
-        if (p.equals(entity.path, workspace.path) &&
-            type == FileSystemEntityType.directory &&
-            !foundWorkspace) {
-          foundWorkspace = true;
-          continue;
+        if (!foundDiscardingRun) {
+          throw StateError('restore_staging_discard_active_run');
         }
-        throw StateError('restore_staging_discard_workspace');
-      }
-      if (!foundWorkspace) {
-        throw StateError('restore_staging_discard_workspace');
-      }
-      if (!foundActiveRun) {
-        throw StateError('restore_staging_discard_active_run');
-      }
 
-      await for (final entity in workspace.list(followLinks: false)) {
-        final name = p.basename(entity.path);
-        final type = await FileSystemEntity.type(
-          entity.path,
-          followLinks: false,
-        );
-        if (name != 'candidate' || type != FileSystemEntityType.directory) {
-          throw StateError('restore_staging_discard_run');
+        await for (final entity in workspace.list(followLinks: false)) {
+          final name = p.basename(entity.path);
+          final type = await FileSystemEntity.type(
+            entity.path,
+            followLinks: false,
+          );
+          if (name != 'candidate' || type != FileSystemEntityType.directory) {
+            throw StateError('restore_staging_discard_run');
+          }
         }
-      }
-      await workspace.delete(recursive: true);
-      await File(
-        p.join(
-          workspaceLock.workspaceRoot.path,
-          RestoreWorkspaceLock.activeRunFileName,
-        ),
-      ).delete();
-    });
+        await workspace.delete(recursive: true);
+      },
+    );
   }
 
   static Future<({String runId, Directory workspace})> _createRunWorkspace(

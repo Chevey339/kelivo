@@ -9,12 +9,55 @@ final class RestoreWorkspaceLock {
   static const workspaceRootName = '.kelivo_restore';
   static const lockFileName = '.receipt.lock';
   static const activeRunFileName = '.active_run';
+  static const publishingRunFileName = '.active_run.publishing';
+  static const discardingRunFileName = '.active_run.discarding';
   static final _localTails = <String, Future<void>>{};
 
   final Directory appDataDirectory;
 
   Directory get workspaceRoot =>
       Directory(p.join(appDataDirectory.path, workspaceRootName));
+
+  Future<T> withPublishingRun<T>({
+    required String runId,
+    required Future<T> Function() action,
+  }) {
+    return synchronized(() async {
+      final claimed = await _claimRun(
+        runId: runId,
+        claimedFileName: publishingRunFileName,
+      );
+      try {
+        return await action();
+      } finally {
+        await _restoreClaim(runId: runId, claimed: claimed);
+      }
+    });
+  }
+
+  Future<T> withDiscardingRun<T>({
+    required String runId,
+    required Future<T> Function() action,
+  }) {
+    return synchronized(() async {
+      final claimed = await _claimRun(
+        runId: runId,
+        claimedFileName: discardingRunFileName,
+      );
+      var actionCompleted = false;
+      try {
+        final result = await action();
+        actionCompleted = true;
+        await claimed.delete();
+        return result;
+      } catch (_) {
+        if (!actionCompleted) {
+          await _restoreClaim(runId: runId, claimed: claimed);
+        }
+        rethrow;
+      }
+    });
+  }
 
   Future<T> synchronized<T>(Future<T> Function() action) async {
     final lockKey = p.normalize(p.absolute(workspaceRoot.path));
@@ -31,6 +74,52 @@ final class RestoreWorkspaceLock {
       if (identical(_localTails[lockKey], currentTail)) {
         _localTails.remove(lockKey);
       }
+    }
+  }
+
+  Future<File> _claimRun({
+    required String runId,
+    required String claimedFileName,
+  }) async {
+    _validateRunId(runId);
+    final active = File(p.join(workspaceRoot.path, activeRunFileName));
+    final claimed = File(p.join(workspaceRoot.path, claimedFileName));
+    await _requireRunFile(active, runId);
+    if (await FileSystemEntity.type(claimed.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('restore_workspace_claim');
+    }
+    await active.rename(claimed.path);
+    await _requireRunFile(claimed, runId);
+    return claimed;
+  }
+
+  Future<void> _restoreClaim({
+    required String runId,
+    required File claimed,
+  }) async {
+    final active = File(p.join(workspaceRoot.path, activeRunFileName));
+    await _requireRunFile(claimed, runId);
+    if (await FileSystemEntity.type(active.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('restore_workspace_claim_release');
+    }
+    await claimed.rename(active.path);
+    await _requireRunFile(active, runId);
+  }
+
+  static Future<void> _requireRunFile(File file, String runId) async {
+    if (await FileSystemEntity.type(file.path, followLinks: false) !=
+            FileSystemEntityType.file ||
+        await file.length() != 32 ||
+        await file.readAsString() != runId) {
+      throw StateError('restore_workspace_active_run');
+    }
+  }
+
+  static void _validateRunId(String runId) {
+    if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(runId)) {
+      throw ArgumentError.value(runId, 'runId');
     }
   }
 

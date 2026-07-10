@@ -2034,19 +2034,22 @@ class DataSync {
       }
       Error.throwWithStackTrace(error, stackTrace);
     } finally {
-      if (sameVolumeAppDataPath != null && sameVolumeRunId != null) {
-        final appDataPath = sameVolumeAppDataPath;
-        final runId = sameVolumeRunId;
-        await Isolate.run(
-          () => RestoreBundleStaging.discardUnpublished(
-            appDataDirectory: Directory(appDataPath),
-            runId: runId,
-          ),
-        );
-      } else {
-        await _deleteDirectoryQuietly(sameVolumeWorkspace);
+      try {
+        if (sameVolumeAppDataPath != null && sameVolumeRunId != null) {
+          final appDataPath = sameVolumeAppDataPath;
+          final runId = sameVolumeRunId;
+          await Isolate.run(
+            () => RestoreBundleStaging.discardUnpublished(
+              appDataDirectory: Directory(appDataPath),
+              runId: runId,
+            ),
+          );
+        } else {
+          await _deleteDirectoryQuietly(sameVolumeWorkspace);
+        }
+      } finally {
+        await _deleteDirectoryQuietly(extractDir);
       }
-      await _deleteDirectoryQuietly(extractDir);
     }
   }
 
