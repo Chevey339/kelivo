@@ -269,25 +269,25 @@ class KelivoFetchMcpServerEngine {
       {
         'name': 'fetch_html',
         'description':
-            'Fetch a web page from the given URL and return the full raw HTML source code as a string. Use this tool when you need to inspect the raw HTML structure of a page, parse specific HTML elements, extract data from non-standard HTML structures, or when other fetch formats (markdown, plain text) produce unsatisfactory results. The "url" parameter must be a valid HTTP or HTTPS URL. Optional "headers" parameter allows sending custom HTTP headers. The tool sends a standard browser User-Agent header. This tool returns the complete raw HTML, including script and style tags, which may contain large amounts of irrelevant markup. For most content extraction tasks, prefer fetch_markdown (cleaner output) or fetch_txt (plain text only). Do NOT use this tool for internal/private URLs or URLs requiring authentication. The response is capped at the full HTTP response body — extremely large pages may impact performance. Returns an error if the HTTP request fails (non-2xx status, network error, or invalid URL).',
+            'Fetch a web page and return the full raw HTML source. Use only when you need the raw HTML structure — parsing specific elements, extracting data from non-standard markup, or when markdown/plain-text conversion loses information. For most content extraction, prefer fetch_markdown. Do NOT use for login-walled or authenticated URLs.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_markdown',
         'description':
-            'Fetch a web page from the given URL and convert the HTML content into clean Markdown format. Use this tool as the preferred option for most web content retrieval tasks, because Markdown preserves document structure (headings, lists, links, code blocks, emphasis) while removing unnecessary HTML markup. Ideal for reading articles, documentation, blog posts, tutorials, and most standard web content. The "url" parameter must be a valid HTTP or HTTPS URL. Optional "headers" parameter allows sending custom HTTP headers. The tool sends a standard browser User-Agent header. Do NOT use this tool for pages that are primarily data tables, JSON endpoints, or non-HTML content — use fetch_json or fetch_txt instead. Do NOT use this tool for pages behind login walls or requiring authentication. The Markdown conversion is heuristic and may lose some formatting for complex layouts. Returns an error if the HTTP request fails.',
+            'Fetch a web page and return the content as clean Markdown. The preferred tool for most web content retrieval — articles, documentation, blog posts, tutorials. Do NOT use for pages that are primarily data tables, JSON endpoints, or non-HTML content (use fetch_json or fetch_txt instead), or for login-walled URLs.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_txt',
         'description':
-            'Fetch a web page from the given URL and return the content as plain text — HTML tags, scripts, and styles are stripped, and whitespace is normalized. Use this tool when you only need the readable textual content of a page without any formatting, markup, or structure. Best suited for: extracting the body text of simple pages, reading text-heavy but poorly-structured pages, obtaining clean input for text analysis or summarization, or when the Markdown conversion from fetch_markdown produces noise. The "url" parameter must be a valid HTTP or HTTPS URL. Optional "headers" parameter allows sending custom HTTP headers. The tool sends a standard browser User-Agent header. Do NOT use this tool when you need to preserve document structure (use fetch_markdown instead) or when you need raw HTML (use fetch_html). Returns an error if the HTTP request fails.',
+            'Fetch a web page and return plain text with HTML tags, scripts, and styles stripped. Use when you only need readable text without structure — text-heavy but poorly-formatted pages, or when fetch_markdown produces noise. Do NOT use when you need document structure (use fetch_markdown) or raw HTML (use fetch_html).',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_json',
         'description':
-            'Fetch a JSON document from the given URL and return the parsed, pretty-printed (indented with 2 spaces) JSON content as a string. Use this tool when: accessing a REST API endpoint, reading a JSON configuration file, fetching structured data from a public JSON feed, or examining the response of a JSON-based web service. The "url" parameter must be a valid HTTP or HTTPS URL pointing to a JSON resource. Optional "headers" parameter allows sending custom HTTP headers (e.g. Authorization, Accept). The tool sends a standard browser User-Agent header. The response is validated as valid JSON before returning; if the response body is not valid JSON, the tool returns an error with details. Do NOT use this tool for HTML pages, plain text, or non-JSON content — use the appropriate fetch tool (fetch_html, fetch_markdown, or fetch_txt) instead. Returns an error if the HTTP request fails or the response is not valid JSON.',
+            'Fetch a JSON document from a URL and return it as a pretty-printed JSON string. Use for REST API endpoints, JSON config files, public JSON feeds, or any JSON-based web service response. The response is validated as JSON; non-JSON responses return an error. Do NOT use for HTML, plain text, or non-JSON content.',
         'inputSchema': schema(),
       },
     ];

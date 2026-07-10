@@ -215,7 +215,7 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'create_memory',
-          'description': 'Create a new memory record for the current assistant. Memories are long-term information storage that persists across conversations, allowing the assistant to remember user preferences, personal details, plans, work-related facts, and other important context between sessions. Use this tool when you learn new information about the user that should be remembered for future conversations (e.g. user\'s name, age, hobbies, preferences, ongoing plans, work details). Actively record useful information without waiting for the user to ask — act like a personal secretary. Do NOT store sensitive information such as ethnicity, religion, sexual orientation, political views, criminal records, or any protected personal data. Do NOT create duplicate memories for the same fact; check existing memories first. Do NOT inform the user that you are creating a memory unless they explicitly ask. The "content" parameter must be a non-empty string describing the information to remember. Returns the created memory content on success.',
+          'description': 'Create a new long-term memory record that persists across conversations — for user preferences, personal details, plans, work facts, and other important context. Actively record useful information when you learn it, without waiting for the user to ask — act like a personal secretary. Do NOT store sensitive information (ethnicity, religion, sexual orientation, political views, criminal records, or other protected data). Do NOT create duplicate memories for the same fact; check existing memories first. Do NOT inform the user about the memory write unless they explicitly ask.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -232,7 +232,7 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'edit_memory',
-          'description': 'Update (overwrite) an existing memory record identified by its numeric "id". Use this tool when you find that a previously stored memory is outdated, incorrect, or needs supplementary details added. The "id" parameter must be a positive integer corresponding to an existing memory record shown in the <memories> context. The "content" parameter must be the new, complete text for the memory record. Only update the specific fact that changed; do not delete unrelated information. Do NOT use this tool to create new memories (use create_memory instead). If the specified id does not exist, the tool returns an error — in that case, use create_memory instead. Do NOT inform the user about the update unless they explicitly ask. Returns the updated memory content on success.',
+          'description': 'Update an existing memory record identified by its numeric "id" (shown in the <memories> context). Use when a stored memory is outdated, incorrect, or needs supplementary details. Only update the specific fact that changed; do not delete unrelated information. Do NOT use to create new memories (use create_memory instead). If the id does not exist, the tool returns an error — fall back to create_memory. Do NOT inform the user about the update unless they explicitly ask.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -253,7 +253,7 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'delete_memory',
-          'description': 'Delete a memory record identified by its numeric "id". Use this tool when a memory is no longer relevant, has become outdated, was incorrectly recorded, or contains duplicate information that should be consolidated. The "id" parameter must be a positive integer corresponding to an existing memory record shown in the <memories> context. Before deleting, consider whether the memory should instead be edited (use edit_memory) to correct or update the content. Do NOT delete memories that are still relevant or may be needed in the future. If the specified id does not exist, the tool returns an error — skip it silently. Do NOT inform the user about the deletion unless they explicitly ask. Returns "deleted" on success.',
+          'description': 'Delete a memory record identified by its numeric "id" (shown in the <memories> context). Use when a memory is no longer relevant, outdated, incorrectly recorded, or a duplicate. Before deleting, consider whether edit_memory is more appropriate. Do NOT delete memories that may still be useful. If the id does not exist, the tool returns an error — skip it silently. Do NOT inform the user about the deletion unless they explicitly ask.',
           'parameters': {
             'type': 'object',
             'properties': {
