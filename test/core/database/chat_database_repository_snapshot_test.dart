@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -133,6 +134,7 @@ void main() {
         messageContent: 'new content',
         isStreaming: true,
       );
+      await _deleteDatabaseSidecars(snapshotFile);
 
       final info = await ChatDatabaseRepository.prepareSnapshotForRestore(
         snapshotFile,
@@ -151,6 +153,68 @@ void main() {
         isFalse,
       );
       expect(await sourceRepository.isMigrationComplete(), isTrue);
+    });
+
+    test(
+      'inspects only normalized standalone snapshots without writing',
+      () async {
+        final snapshotFile = File('${directory.path}/inspection.sqlite');
+        await _createSnapshotFixture(
+          databaseFile: snapshotFile,
+          conversationId: 'inspection',
+          title: 'Inspection',
+          messageId: 'streaming-message',
+          messageContent: 'partial',
+          isStreaming: true,
+        );
+
+        await expectLater(
+          ChatDatabaseRepository.inspectPreparedSnapshot(snapshotFile),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'database_streaming_messages',
+            ),
+          ),
+        );
+
+        await ChatDatabaseRepository.prepareSnapshotForRestore(snapshotFile);
+        final before = (await sha256.bind(snapshotFile.openRead()).first)
+            .toString();
+
+        final info = await ChatDatabaseRepository.inspectPreparedSnapshot(
+          snapshotFile,
+        );
+
+        final after = (await sha256.bind(snapshotFile.openRead()).first)
+            .toString();
+        expect(info.conversationCount, 1);
+        expect(info.messageCount, 1);
+        expect(after, before);
+      },
+    );
+
+    test('rejects a prepared snapshot with a sidecar', () async {
+      final snapshotFile = File('${directory.path}/sidecar.sqlite');
+      await _createSnapshotFixture(
+        databaseFile: snapshotFile,
+        conversationId: 'sidecar',
+        title: 'Sidecar',
+      );
+      await ChatDatabaseRepository.prepareSnapshotForRestore(snapshotFile);
+      await File('${snapshotFile.path}-wal').writeAsBytes([1], flush: true);
+
+      await expectLater(
+        ChatDatabaseRepository.inspectPreparedSnapshot(snapshotFile),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'database_sidecar:-wal',
+          ),
+        ),
+      );
     });
   });
 }
@@ -202,6 +266,15 @@ Future<void> _createSnapshotFixture({
 
 Future<void> _deleteDatabaseFamily(File databaseFile) async {
   for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+    final file = File('${databaseFile.path}$suffix');
+    if (await file.exists()) {
+      await file.delete();
+    }
+  }
+}
+
+Future<void> _deleteDatabaseSidecars(File databaseFile) async {
+  for (final suffix in const ['-wal', '-shm', '-journal']) {
     final file = File('${databaseFile.path}$suffix');
     if (await file.exists()) {
       await file.delete();

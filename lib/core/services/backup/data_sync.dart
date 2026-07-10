@@ -34,6 +34,7 @@ typedef _VersionedBackupInfo = ({
   bool includeChats,
   bool includeFiles,
   bool secretsIncluded,
+  String normalizedManifestSha256,
 });
 typedef _SettingsRollbackSnapshot = ({
   Map<String, dynamic> existingValues,
@@ -1037,6 +1038,10 @@ class DataSync {
           databaseInfo.messageCount != messageCount) {
         throw const FormatException('manifest_database_metadata');
       }
+      entries[_databaseEntryName] = (
+        bytes: databaseFile.lengthSync(),
+        sha256: _sha256FileSync(databaseFile),
+      );
     } else if (payloadKind == 'settings-only') {
       if (includeChats ||
           entries.containsKey(_databaseEntryName) ||
@@ -1047,10 +1052,25 @@ class DataSync {
       throw const FormatException('manifest_payload_kind');
     }
 
+    final sortedEntryNames = entries.keys.toList()..sort();
+    manifest['entries'] = {
+      for (final name in sortedEntryNames)
+        name: {'bytes': entries[name]!.bytes, 'sha256': entries[name]!.sha256},
+    };
+    final normalizedManifestBytes = utf8.encode(jsonEncode(manifest));
+    if (normalizedManifestBytes.length > _maxManifestBytes) {
+      throw const FormatException('manifest_size');
+    }
+    final normalizedManifestSha256 = sha256
+        .convert(normalizedManifestBytes)
+        .toString();
+    manifestFile.writeAsBytesSync(normalizedManifestBytes, flush: true);
+
     return (
       includeChats: includeChats,
       includeFiles: includeFiles,
       secretsIncluded: manifest['secretsIncluded'] as bool,
+      normalizedManifestSha256: normalizedManifestSha256,
     );
   }
 
@@ -1401,12 +1421,14 @@ class DataSync {
         final extractedPath = extractDir.path;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
+        final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
         final stagedPaths = await Isolate.run(() async {
           final staged = await RestoreBundleStaging.create(
             appDataDirectory: Directory(appDataPath),
             extractedDirectory: Directory(extractedPath),
             includeChats: includeChats,
             includeFiles: includeFiles,
+            sourceManifestSha256: sourceManifestSha256,
           );
           return (
             workspacePath: staged.workspace.path,

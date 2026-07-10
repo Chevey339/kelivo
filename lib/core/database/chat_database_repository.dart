@@ -135,17 +135,74 @@ class ChatDatabaseRepository {
     }
 
     await _deleteDatabaseSidecars(snapshotFile);
-    final reopened = sqlite.sqlite3.open(snapshotFile.absolute.path);
-    try {
-      final reopenedInfo = _validateRawSnapshot(reopened);
-      if (reopenedInfo != initialInfo) {
-        throw StateError('snapshot_reopen_mismatch');
-      }
-    } finally {
-      reopened.close();
+    final reopenedInfo = await inspectPreparedSnapshot(snapshotFile);
+    if (reopenedInfo != initialInfo) {
+      throw StateError('snapshot_reopen_mismatch');
     }
-    await _deleteDatabaseSidecars(snapshotFile);
     return initialInfo;
+  }
+
+  static Future<ChatDatabaseSnapshotInfo> inspectPreparedSnapshot(
+    File snapshotFile,
+  ) async {
+    if (await FileSystemEntity.type(snapshotFile.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw FileSystemException(
+        'Snapshot database is not a regular file',
+        snapshotFile.path,
+      );
+    }
+    await _requireNoDatabaseSidecars(snapshotFile);
+
+    final database = sqlite.sqlite3.open(
+      snapshotFile.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    var inspectionCompleted = false;
+    try {
+      final info = _validateRawSnapshot(database);
+      if (info.schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
+      }
+      final streamingRows = database.select(
+        'SELECT COUNT(*) AS count FROM message_rows WHERE is_streaming != 0;',
+      );
+      if (streamingRows.single['count'] != 0) {
+        throw StateError('database_streaming_messages');
+      }
+      final activeStreamingRows = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?;',
+        [ChatStorageMetaKeys.activeStreamingIds],
+      );
+      if (activeStreamingRows.isNotEmpty) {
+        throw StateError('database_active_streaming_ids');
+      }
+      final migrationRows = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?;',
+        [ChatStorageMetaKeys.hiveMigrationComplete],
+      );
+      if (migrationRows.length != 1 ||
+          migrationRows.single['value'] != 'true') {
+        throw StateError('database_migration_receipt');
+      }
+      inspectionCompleted = true;
+      return info;
+    } finally {
+      database.close();
+      if (inspectionCompleted) {
+        await _requireNoDatabaseSidecars(snapshotFile);
+      }
+    }
+  }
+
+  static Future<void> _requireNoDatabaseSidecars(File databaseFile) async {
+    for (final suffix in const ['-wal', '-shm', '-journal']) {
+      final sidecar = File('${databaseFile.path}$suffix');
+      if (await FileSystemEntity.type(sidecar.path, followLinks: false) !=
+          FileSystemEntityType.notFound) {
+        throw StateError('database_sidecar:$suffix');
+      }
+    }
   }
 
   static ChatDatabaseSnapshotInfo _validateRawSnapshot(
