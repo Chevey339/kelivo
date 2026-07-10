@@ -611,7 +611,10 @@ class _BackupPageState extends State<BackupPage> {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
-                                                message: e.toString(),
+                                                message: l10n
+                                                    .backupPageRestoreFailedMessage(
+                                                      e.toString(),
+                                                    ),
                                                 type: NotificationType.error,
                                               );
                                               return;
@@ -1043,7 +1046,10 @@ class _BackupPageState extends State<BackupPage> {
                                               if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
-                                                message: e.toString(),
+                                                message: l10n
+                                                    .backupPageRestoreFailedMessage(
+                                                      e.toString(),
+                                                    ),
                                                 type: NotificationType.error,
                                               );
                                               return;
@@ -1436,10 +1442,20 @@ class _BackupPageState extends State<BackupPage> {
     if (mode == null) return;
     if (!context.mounted) return;
 
-    await _runWithImportingOverlay(
-      context,
-      () => vm.restoreFromLocalFile(File(path), mode: mode),
-    );
+    try {
+      await _runWithImportingOverlay(
+        context,
+        () => vm.restoreFromLocalFile(File(path), mode: mode),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.backupPageRestoreFailedMessage(error.toString()),
+        type: NotificationType.error,
+      );
+      return;
+    }
     if (!context.mounted) return;
     await showDialog(
       context: context,

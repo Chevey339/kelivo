@@ -507,6 +507,7 @@
   "backupPageTestConnection": "測試連線",
   "backupPageRestartRequired": "需要重啟應用程式",
   "backupPageRestartContent": "還原完成，需要重啟以完全生效。",
+  "backupPageRestoreFailedMessage": "還原失敗：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",
   "backupPageSelectImportMode": "選擇匯入模式",

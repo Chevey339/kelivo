@@ -1491,6 +1491,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
 
   @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
+
+  @override
   String get backupPageOK => '好的';
 
   @override
@@ -6941,6 +6946,11 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
 
   @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
+
+  @override
   String get backupPageOK => '好的';
 
   @override
@@ -12389,6 +12399,11 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageRestartContent => '還原完成，需要重啟以完全生效。';
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '還原失敗：$error';
+  }
 
   @override
   String get backupPageOK => '好的';

@@ -633,6 +633,14 @@
   "backupPageTestConnection": "Test",
   "backupPageRestartRequired": "Restart Required",
   "backupPageRestartContent": "Restore completed. Please restart the app.",
+  "backupPageRestoreFailedMessage": "Restore failed: {error}",
+  "@backupPageRestoreFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageOK": "OK",
   "backupPageCancel": "Cancel",
   "backupPageSelectImportMode": "Select Import Mode",

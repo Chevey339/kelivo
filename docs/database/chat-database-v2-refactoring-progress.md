@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，提交 `df1dae8a`
 > - 最后更新：2026-07-09
-> - 当前结论：架构审计已完成；生产重构实现尚未开始
+> - 当前结论：P0-01 代码与测试已实现，待 commit/PR 后完成；P0-02 已完成 payload/candidate 预检和 live SQLite 单事务替换，但 bundle staging/cutover/崩溃恢复尚未实现
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 0 / 9 | `未开始` | 尚无生产代码修改 |
+| Phase 0：止血与基线 | 0 / 9 | `进行中` | P0-01 实现与验证已通过但尚无 commit/PR；P0-02 已有预检、candidate 验证和 live DB 单事务替换，整包切换仍非原子 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | 受 PD-01/02/04 和 PD-13 影响 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -53,7 +53,7 @@
 | AUD-04 | Timeline、双向滑窗、锚点、Markdown、图片和 cache 审计 | `已完成` | 2026-07-09 | 只读审计，无提交 | 证明 extent-delta 在 prepend + trim 时少补偿，append + trim 时无补偿 |
 | AUD-05 | 当前测试覆盖与缺失故障场景审计 | `已完成` | 2026-07-09 | 只读审计，无提交 | 确认 repository 事务、fault injection、真实像素 anchor 等测试缺失 |
 | AUD-06 | 目标架构、迁移协议、阶段计划和初始 SLO 收敛 | `已完成` | 2026-07-09 | 只读审计，无提交 | 方案见同目录重构方案文档 |
-| DOC-01 | 创建正式重构方案与动态进度台账 | `已完成` | 2026-07-09 | 工作区未提交（本次交付） | 两文件 `git diff --no-index --check`；相对链接、工作项 ID、表格列和 Mermaid fence 已检查 |
+| DOC-01 | 创建正式重构方案与动态进度台账 | `已完成` | 2026-07-09 | `1a75f3da` | 两文件 `git diff --no-index --check`；相对链接、工作项 ID、表格列和 Mermaid fence 已检查 |
 
 ## 4. 当前验证基线
 
@@ -61,9 +61,11 @@
 
 | 验证 | 状态 | 结果 | 日期 | 说明 |
 | --- | --- | --- | --- | --- |
-| `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前基线静态分析通过 |
-| `flutter test` | `已完成` | 775 tests passed | 2026-07-09 | 全量测试通过 |
+| `flutter gen-l10n` + untranslated check | `已完成` | 生成成功；`desiredFileName.txt` 为 `{}` | 2026-07-09 | 四份 ARB 同步，恢复失败提示已本地化 |
+| `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前工作区静态分析通过 |
+| `flutter test` | `已完成` | 801 tests passed | 2026-07-09 | 当前工作区全量测试通过 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
+| P0-01/P0-02 恢复错误、payload/candidate、事务替换、设置与 receipt 定向测试 | `已完成` | 34 tests passed | 2026-07-09 | 覆盖 replacement/artifact/provider 失败、事务 rollback、候选拒绝/清理、设置预检、cache/stale streaming 失效、chat-only 文件保留和 migration receipt |
 | 审计前生产工作区检查 | `已完成` | clean | 2026-07-09 | 文档创建前 `git status --short` 为空 |
 
 定向测试命令：
@@ -78,14 +80,19 @@ flutter test \
   test/features/home/controllers/chat_actions_regeneration_context_test.dart \
   test/features/home/controllers/chat_actions_stream_subscription_test.dart \
   test/features/home/controllers/stream_controller_content_split_test.dart
+
+flutter test \
+  test/core/services/backup/data_sync_backup_file_test.dart \
+  test/core/database/chat_database_repository_clear_test.dart \
+  test/shared_preferences_async_backup_filter_test.dart
 ```
 
 ### 4.2 尚未执行
 
 | 验证 | 状态 | 未执行原因 | 风险 |
 | --- | --- | --- | --- |
-| 真实设备 profile 与 RSS/frame/DB/WAL 基线 | `未开始` | 本轮为只读架构审计 | 尚不能冻结性能 SLO 或 cache budget |
-| Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 尚未进入实施阶段 | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
+| 真实设备 profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 harness、参考设备和数据 seed 尚未建立 | 尚不能冻结性能 SLO 或 cache budget |
+| Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 本轮只运行当前 macOS 主机的根目录分析与单测，未运行五平台 runner | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
 | kill -9/断电/磁盘满/权限/锁库故障注入 | `未开始` | 尚无 failpoint harness | 当前测试不能证明迁移和恢复的崩溃安全性 |
 | 真实旧 Hive/SQLite v1/备份 fixture 全矩阵 | `未开始` | fixture 尚未整理 | 不能证明已发布数据可无损迁移 |
 | 稳定 slot + localDy 的 widget/integration test | `未开始` | 目标 timeline 尚未实现 | 当前列表跳动问题无自动化保护 |
@@ -114,8 +121,8 @@ flutter test \
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| P0-01 | 恢复错误向上传播，移除假成功 | 无 | `未开始` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | — | — |
-| P0-02 | overwrite staging restore | 无 | `未开始` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | — | — |
+| P0-01 | 恢复错误向上传播，移除假成功 | 无 | `进行中` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | 工作区未提交（待 commit/PR） | 代码与测试已实现；`flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 切换前失败不改 live；切换中断后重启只开放完整旧/新 bundle | 工作区未提交（进行中） | 已实现 settings/chat 预检、candidate SQLite 的 integrity/FK/checkpoint/reopen/count/order/MCP/artifact/marker 验证、候选清理、stale streaming 归一化、live 聊天表单事务替换、migration receipt 与 cache 失效；settings/assets staging、ZIP path/size/manifest/hash、业务 gate、cutover receipt 和启动恢复未实现，整包仍可能形成混合状态 |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `未开始` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | — | — |
@@ -222,7 +229,7 @@ flutter test \
 | --- | --- | --- | --- |
 | Hive → SQLite v2 | 必须 | `未开始` | 需要所有 adapter fixture、orphan/坏数据场景 |
 | SQLite v1 → SQLite v2 | 必须 | `未开始` | PD-13 确认后视为主迁移路径 |
-| 旧 ZIP/chats.json → v2 | 必须 | `未开始` | 需要格式版本、hash 和旧行为 fixture |
+| 旧 ZIP/chats.json → v2 | 必须 | `进行中` | 当前接受缺少 `chats.json` 的 legacy settings-only 包，并严格拒绝引用缺失；无 manifest 时无法区分 settings-only 与截断包，受损 Hive 迁移备份仍缺 Recovered/rejects adapter 和真实 fixture |
 | Chatbox/Cherry import → v2 | 必须 | `未开始` | staging + ID conflict policy |
 | v2 full backup round trip | 必须 | `未开始` | branch/run/parts/assets 完整一致 |
 | v2 portable export | 必须 | `未开始` | NDJSON/chunk，明确裁剪内容 |
@@ -247,7 +254,7 @@ flutter test \
 | D4 DB writes/s | 待定 | 当前逐 chunk，未量化 | ≤4 + final | 未测 | `未开始` | — |
 | D3 双向浏览 RSS | 待定 | 未测 | 回落且不单调增长 | 未测 | `未开始` | — |
 | D2 搜索 p95 | 待定 | 未测 | <150ms | 未测 | `未开始` | — |
-| Backup/restore extra RSS | 待定 | 未测 | O(chunk)，初始 <32MiB | 未测 | `未开始` | — |
+| Backup/restore extra RSS | 待定 | 未测 | O(chunk)，初始 <32MiB | 未测 | `进行中` | ZIP 提取已改为流式；`chats.json` 仍在 candidate isolate 与主 isolate 先后两次全量解码，未达到 O(chunk)，600–800MB 包仍有 OOM/卡顿风险 |
 | WAL peak/checkpoint p95 | 全平台 | 未测 | Phase 0 冻结 | 未测 | `未开始` | — |
 
 ## 15. 故障注入台账
@@ -255,7 +262,7 @@ flutter test \
 | Failpoint | 预期有效状态 | 允许损失边界 | 状态 | 实际结果/证据 |
 | --- | --- | --- | --- | --- |
 | Migration building kill | live 旧库完整 | candidate 未提交工作 | `未开始` | — |
-| Candidate validation failure | live 旧库完整 | 无用户数据损失 | `未开始` | — |
+| Candidate validation failure | live 旧库完整 | 无用户数据损失 | `进行中` | 已有非法引用/版本/候选拒绝并保持 live prefs/conversation 的单测；尚无完整 bundle 指纹、磁盘满或 kill 验证 |
 | Checkpoint/close/fsync kill | live 旧库完整 | candidate 可丢弃/重试 | `未开始` | — |
 | live→previous 后 kill | 启动按 receipt 恢复 previous 或继续安装 candidate | 无半库 | `未开始` | — |
 | candidate→live 后首次启动 kill | 校验 new 或回 previous | 尚未提交的 v2 尾部 | `未开始` | — |
@@ -307,9 +314,12 @@ flutter test \
 | R-07 | Graph ancestry 查询在超长会话退化 | 中 | D3 query plan/benchmark | parent 索引；必要时受控物化 view | `未开始` |
 | R-08 | Cache 只限制条目不限制字节再次 OOM | 高 | RSS/cache bytes telemetry | 所有 cache 字节 LRU | `未开始` |
 | R-09 | 普通备份继续泄露秘密 | 高 | ZIP 内容审计 | P0-08 + OPS-07 | `未开始` |
-| R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 先写最小失败用例，再修复 | `未开始` |
+| R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿 | `进行中` |
+| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + 启动恢复 + 业务 gate | `进行中` |
+| R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
+| R-13 | 大 `chats.json` 两次全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB fixture 的 RSS/frame profile | 版本化 NDJSON/chunk reader 与增量 candidate/live 导入 | `进行中` |
 
-风险状态表示缓解工作状态，不代表风险是否已经发生。当前缓解实现均尚未开始。
+风险状态表示缓解工作状态，不代表风险是否已经发生。P0-01/P0-02 已开始降低部分风险，但尚未满足整包崩溃安全、旧数据恢复和有界内存验收。
 
 ## 18. 当前阻塞与待输入
 
@@ -326,14 +336,14 @@ flutter test \
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 以 `P0-01` 为第一条 tracer bullet：写出“清库后第 N 条恢复失败仍返回成功”的失败测试。
-2. 让恢复错误完整向上传播，修复 provider 假成功。
-3. 为 `P0-02` 建最小 staging restore，证明切换前失败不改 live，切换中断后重启只开放完整旧/新 bundle。
-4. 并行建立 `P0-03` 长流 benchmark 与 checkpoint coalescer 测试。
-5. 完成 PD-13 调查和 P0-09 legacy fixture 清单，为 Database Kernel v2 做准备。
+1. 继续 `P0-02`：在 app data 同卷建立 settings/assets staging 与 previous bundle，并加入 restore/quiesce gate；当前临时 candidate 只用于预检，不能视为可安装 staging。
+2. 为 `P0-02` 增加 manifest/hash、durable cutover receipt 与启动恢复，覆盖 DB commit 前后和 settings/assets 每个切换 failpoint，并断言完整 bundle 指纹。
+3. 启动 `P0-03`：先实现纯 Dart、按 generation 隔离的 latest-wins checkpoint writer 与 final barrier 测试。
+4. 完成 PD-13 调查和 P0-09 legacy fixture 清单，为 Database Kernel v2 做准备。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
-| 2026-07-09 | 创建审计基线、重构方案和进度台账 | AUD-01～06、DOC-01 | 工作区未提交 | Codex |
+| 2026-07-09 | 创建审计基线、重构方案和进度台账 | AUD-01～06、DOC-01 | `1a75f3da` | Codex |
+| 2026-07-09 | 实现恢复错误传播与本地化失败提示；推进 overwrite payload/candidate 预检和 live SQLite 单事务替换；因尚无实施 commit/PR，两个工作项均保持进行中 | P0-01、P0-02 | 工作区未提交 | Codex |

@@ -2969,6 +2969,12 @@ abstract class AppLocalizations {
   /// **'Restore completed. Please restart the app.'**
   String get backupPageRestartContent;
 
+  /// No description provided for @backupPageRestoreFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String backupPageRestoreFailedMessage(String error);
+
   /// No description provided for @backupPageOK.
   ///
   /// In en, this message translates to:

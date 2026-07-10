@@ -494,6 +494,7 @@
   "backupPageTestConnection": "测试连接",
   "backupPageRestartRequired": "需要重启应用",
   "backupPageRestartContent": "恢复完成，需要重启以完全生效。",
+  "backupPageRestoreFailedMessage": "恢复失败：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",
   "backupPageSelectImportMode": "选择导入模式",

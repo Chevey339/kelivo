@@ -676,6 +676,42 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> replaceAllDataFromBackup({
+    required List<Conversation> conversations,
+    required List<ChatMessage> messages,
+    required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
+    required Map<String, String> geminiSignaturesByMessageId,
+  }) async {
+    if (!_initialized) await init();
+
+    final nextOrderByConversation = <String, int>{};
+    final orderedMessages = <({ChatMessage message, int messageOrder})>[];
+    for (final message in messages) {
+      final messageOrder = nextOrderByConversation.update(
+        message.conversationId,
+        (value) => value + 1,
+        ifAbsent: () => 0,
+      );
+      orderedMessages.add((message: message, messageOrder: messageOrder));
+    }
+
+    await _repo.replaceBackupData(
+      conversations: conversations,
+      messages: orderedMessages,
+      toolEventsByMessageId: toolEventsByMessageId,
+      geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+    );
+
+    _messagesCache.clear();
+    _draftConversations.clear();
+    _temporaryConversationIds.clear();
+    _temporaryToolEvents.clear();
+    _temporaryGeminiThoughtSigs.clear();
+    _currentConversationId = null;
+    await _loadConversationsCache();
+    notifyListeners();
+  }
+
   // Add a message directly to an existing conversation (for merge mode)
   Future<void> addMessageDirectly(
     String conversationId,
@@ -1524,8 +1560,8 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> clearAllData() async {
-    if (!_initialized) return;
+  Future<void> clearAllData({bool deleteUploads = true}) async {
+    if (!_initialized) await init();
 
     await _repo.clearAllData();
     _messagesCache.clear();
@@ -1535,13 +1571,12 @@ class ChatService extends ChangeNotifier {
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
     _currentConversationId = null;
-    // Remove uploads directory completely
-    try {
+    if (deleteUploads) {
       final uploadDir = await AppDirectories.getUploadDirectory();
       if (await uploadDir.exists()) {
         await uploadDir.delete(recursive: true);
       }
-    } catch (_) {}
+    }
     notifyListeners();
   }
 

@@ -86,5 +86,18 @@ void main() {
         'open_settings=0',
       ]);
     });
+
+    test('restore reports unsupported setting value types', () async {
+      SharedPreferences.setMockInitialValues({});
+
+      final prefs = await backup_sync.SharedPreferencesAsync.instance;
+
+      await expectLater(
+        prefs.restore({
+          'unsupported_setting': {'nested': true},
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
   });
 }

@@ -1542,6 +1542,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Restore completed. Please restart the app.';
 
   @override
+  String backupPageRestoreFailedMessage(String error) {
+    return 'Restore failed: $error';
+  }
+
+  @override
   String get backupPageOK => 'OK';
 
   @override

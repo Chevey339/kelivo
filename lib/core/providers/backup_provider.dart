@@ -72,6 +72,7 @@ class BackupProvider extends ChangeNotifier {
       _message = 'Restored';
     } catch (e) {
       _message = e.toString();
+      rethrow;
     } finally {
       _busy = false;
       notifyListeners();

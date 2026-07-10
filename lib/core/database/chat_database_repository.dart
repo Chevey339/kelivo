@@ -40,6 +40,25 @@ class ChatDatabaseRepository {
     await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
   }
 
+  Future<void> validateIntegrity() async {
+    final integrityRows = await _db
+        .customSelect('PRAGMA integrity_check')
+        .get();
+    final integrityValues = integrityRows
+        .expand((row) => row.data.values)
+        .map((value) => value.toString())
+        .toList(growable: false);
+    if (integrityValues.length != 1 || integrityValues.single != 'ok') {
+      throw StateError('integrity_check');
+    }
+    final foreignKeyRows = await _db
+        .customSelect('PRAGMA foreign_key_check')
+        .get();
+    if (foreignKeyRows.isNotEmpty) {
+      throw StateError('foreign_key_check');
+    }
+  }
+
   Future<List<Conversation>> getAllConversations() async {
     final rows =
         await (_db.select(_db.conversationRows)..orderBy([
@@ -477,53 +496,85 @@ class ChatDatabaseRepository {
     }
 
     await _db.transaction(() async {
-      await _db.batch((batch) {
-        for (final conversation in conversations) {
+      await _writeBackupData(
+        conversations: conversations,
+        messages: messages,
+        toolEventsByMessageId: toolEventsByMessageId,
+        geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+      );
+    });
+  }
+
+  Future<void> replaceBackupData({
+    required List<Conversation> conversations,
+    required List<({ChatMessage message, int messageOrder})> messages,
+    required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
+    required Map<String, String> geminiSignaturesByMessageId,
+  }) async {
+    await _db.transaction(() async {
+      await _clearChatRows();
+      await _writeBackupData(
+        conversations: conversations,
+        messages: messages,
+        toolEventsByMessageId: toolEventsByMessageId,
+        geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+      );
+      await _writeMigrationCompleteReceipt();
+    });
+  }
+
+  Future<void> _writeBackupData({
+    required List<Conversation> conversations,
+    required List<({ChatMessage message, int messageOrder})> messages,
+    required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
+    required Map<String, String> geminiSignaturesByMessageId,
+  }) async {
+    await _db.batch((batch) {
+      for (final conversation in conversations) {
+        batch.insert(
+          _db.conversationRows,
+          _conversationCompanion(conversation),
+          mode: InsertMode.insertOrReplace,
+        );
+        for (var i = 0; i < conversation.mcpServerIds.length; i++) {
           batch.insert(
-            _db.conversationRows,
-            _conversationCompanion(conversation),
-            mode: InsertMode.insertOrReplace,
-          );
-          for (var i = 0; i < conversation.mcpServerIds.length; i++) {
-            batch.insert(
-              _db.conversationMcpServerRows,
-              ConversationMcpServerRowsCompanion.insert(
-                conversationId: conversation.id,
-                serverId: conversation.mcpServerIds[i],
-                ordinal: i,
-              ),
-              mode: InsertMode.insertOrReplace,
-            );
-          }
-        }
-        for (final entry in messages) {
-          batch.insert(
-            _db.messageRows,
-            _messageCompanion(entry.message, entry.messageOrder),
-            mode: InsertMode.insertOrReplace,
-          );
-        }
-        for (final entry in toolEventsByMessageId.entries) {
-          batch.insert(
-            _db.toolEventRows,
-            ToolEventRowsCompanion.insert(
-              messageId: entry.key,
-              eventsJson: jsonEncode(entry.value),
+            _db.conversationMcpServerRows,
+            ConversationMcpServerRowsCompanion.insert(
+              conversationId: conversation.id,
+              serverId: conversation.mcpServerIds[i],
+              ordinal: i,
             ),
             mode: InsertMode.insertOrReplace,
           );
         }
-        for (final entry in geminiSignaturesByMessageId.entries) {
-          batch.insert(
-            _db.geminiThoughtSignatureRows,
-            GeminiThoughtSignatureRowsCompanion.insert(
-              messageId: entry.key,
-              signature: entry.value,
-            ),
-            mode: InsertMode.insertOrReplace,
-          );
-        }
-      });
+      }
+      for (final entry in messages) {
+        batch.insert(
+          _db.messageRows,
+          _messageCompanion(entry.message, entry.messageOrder),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+      for (final entry in toolEventsByMessageId.entries) {
+        batch.insert(
+          _db.toolEventRows,
+          ToolEventRowsCompanion.insert(
+            messageId: entry.key,
+            eventsJson: jsonEncode(entry.value),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+      for (final entry in geminiSignaturesByMessageId.entries) {
+        batch.insert(
+          _db.geminiThoughtSignatureRows,
+          GeminiThoughtSignatureRowsCompanion.insert(
+            messageId: entry.key,
+            signature: entry.value,
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
     });
   }
 
@@ -579,13 +630,19 @@ class ChatDatabaseRepository {
 
   Future<void> clearAllData() async {
     await _db.transaction(() async {
-      await _db.delete(_db.geminiThoughtSignatureRows).go();
-      await _db.delete(_db.toolEventRows).go();
-      await _db.delete(_db.conversationMcpServerRows).go();
-      await _db.delete(_db.messageRows).go();
-      await _db.delete(_db.conversationRows).go();
-      await _db.delete(_db.chatStorageMetaRows).go();
+      await _clearChatRows();
     });
+  }
+
+  Future<void> _clearChatRows() async {
+    await _db.delete(_db.geminiThoughtSignatureRows).go();
+    await _db.delete(_db.toolEventRows).go();
+    await _db.delete(_db.conversationMcpServerRows).go();
+    await _db.delete(_db.messageRows).go();
+    await _db.delete(_db.conversationRows).go();
+    await (_db.delete(
+      _db.chatStorageMetaRows,
+    )..where((t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds))).go();
   }
 
   Future<List<Map<String, dynamic>>> getToolEvents(String messageId) async {
@@ -719,6 +776,10 @@ class ChatDatabaseRepository {
   }
 
   Future<void> markMigrationComplete() async {
+    await _writeMigrationCompleteReceipt();
+  }
+
+  Future<void> _writeMigrationCompleteReceipt() async {
     await _db
         .into(_db.chatStorageMetaRows)
         .insertOnConflictUpdate(
