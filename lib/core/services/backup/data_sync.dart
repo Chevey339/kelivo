@@ -30,6 +30,22 @@ typedef _ParsedChatBackup = ({
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
 typedef _VersionedBackupInfo = ({bool includeChats, bool secretsIncluded});
+typedef _SettingsRollbackSnapshot = ({
+  Map<String, dynamic> existingValues,
+  Set<String> touchedKeys,
+});
+
+final class _RestoreRollbackException implements Exception {
+  const _RestoreRollbackException(this.restoreError, this.rollbackError);
+
+  final Object restoreError;
+  final Object rollbackError;
+
+  @override
+  String toString() =>
+      'Restore failed ($restoreError) and settings rollback failed '
+      '($rollbackError)';
+}
 
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
@@ -1337,6 +1353,9 @@ class DataSync {
     );
     await extractDir.create(recursive: true);
 
+    SharedPreferencesAsync? restorePreferences;
+    _SettingsRollbackSnapshot? settingsRollbackSnapshot;
+    var settingsMutationStarted = false;
     try {
       // Run ZIP extraction in an isolate to keep the UI responsive.
       await Isolate.run(() {
@@ -1373,6 +1392,7 @@ class DataSync {
       final settings =
           jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
       final prefs = await SharedPreferencesAsync.instance;
+      restorePreferences = prefs;
       prefs._normalizeLegacyStringLists(settings);
       prefs._validateRestore(settings);
 
@@ -1396,10 +1416,17 @@ class DataSync {
         geminiThoughtSigs = parsed.geminiThoughtSigs;
       }
 
+      settingsRollbackSnapshot = versionedBackup != null
+          ? await prefs._captureOverwriteRollbackSnapshot(
+              settings,
+              clearKnownCredentials: versionedBackup.secretsIncluded == false,
+            )
+          : null;
       // Restore settings
       if (await settingsFile.exists()) {
         try {
           if (mode == RestoreMode.overwrite) {
+            settingsMutationStarted = true;
             // For overwrite mode, restore all settings
             if (versionedBackup?.secretsIncluded == false) {
               await prefs._clearBeforeSecretFreeOverwrite();
@@ -1913,6 +1940,22 @@ class DataSync {
           }
         }
       }
+    } catch (error, stackTrace) {
+      if (restorePreferences != null &&
+          settingsRollbackSnapshot != null &&
+          settingsMutationStarted) {
+        try {
+          await restorePreferences._restoreOverwriteRollbackSnapshot(
+            settingsRollbackSnapshot,
+          );
+        } catch (rollbackError, rollbackStackTrace) {
+          Error.throwWithStackTrace(
+            _RestoreRollbackException(error, rollbackError),
+            rollbackStackTrace,
+          );
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
     } finally {
       await _deleteDirectoryQuietly(extractDir);
     }
@@ -2423,6 +2466,47 @@ class SharedPreferencesAsync {
     for (final key in keys.toList(growable: false)) {
       if (!await prefs.remove(key)) throw StateError(key);
     }
+  }
+
+  Future<_SettingsRollbackSnapshot> _captureOverwriteRollbackSnapshot(
+    Map<String, dynamic> incoming, {
+    required bool clearKnownCredentials,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existingKeys = prefs.getKeys();
+    // Until the global restore gate exists, compensation must not touch keys
+    // that another provider may write while this restore is running.
+    final touchedKeys = incoming.keys
+        .where((key) => !_localOnlyKeys.contains(key))
+        .toSet();
+    if (clearKnownCredentials) {
+      touchedKeys.addAll(
+        existingKeys.where(
+          BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite,
+        ),
+      );
+    }
+    final existingValues = <String, dynamic>{};
+    for (final key in touchedKeys) {
+      if (existingKeys.contains(key)) existingValues[key] = prefs.get(key);
+    }
+    return (existingValues: existingValues, touchedKeys: touchedKeys);
+  }
+
+  Future<void> _restoreOverwriteRollbackSnapshot(
+    _SettingsRollbackSnapshot snapshot,
+  ) async {
+    _validateRestore(snapshot.existingValues);
+    final prefs = await SharedPreferences.getInstance();
+    final currentKeys = prefs.getKeys();
+    for (final key in snapshot.touchedKeys) {
+      if (!snapshot.existingValues.containsKey(key) &&
+          currentKeys.contains(key) &&
+          !await prefs.remove(key)) {
+        throw StateError(key);
+      }
+    }
+    await restore(snapshot.existingValues);
   }
 
   Future<void> restore(Map<String, dynamic> data) async {

@@ -45,6 +45,21 @@ class _FailingRemovePreferencesStore extends InMemorySharedPreferencesStore {
   Future<bool> remove(String key) async => false;
 }
 
+class _FailingNthSetPreferencesStore extends InMemorySharedPreferencesStore {
+  _FailingNthSetPreferencesStore(super.data, {required this.failOnCall})
+    : super.withData();
+
+  final int failOnCall;
+  var _setCalls = 0;
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async {
+    _setCalls++;
+    if (_setCalls == failOnCall) return false;
+    return super.setValue(valueType, key, value);
+  }
+}
+
 class _FailingRestoreChatService extends ChatService {
   int replaceCalls = 0;
 
@@ -69,6 +84,15 @@ class _FailingArtifactChatService extends ChatService {
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
     throw StateError('tool events restore failed');
+  }
+}
+
+class _FailingSnapshotRestoreChatService extends ChatService {
+  @override
+  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('written_during_restore', 'keep-concurrent-write');
+    throw StateError('snapshot restore failed');
   }
 }
 
@@ -161,6 +185,7 @@ Future<File> _createSqliteBackupFixture({
   required String prefix,
   required Map<String, dynamic> settings,
   String? databaseSha256,
+  bool secretsIncluded = true,
 }) async {
   final databasePath = '${root.path}/${prefix}_database.sqlite';
   final snapshotInfo = await Isolate.run(() async {
@@ -209,7 +234,7 @@ Future<File> _createSqliteBackupFixture({
       'appVersion': '1.0.0-test+1',
       'includeChats': true,
       'includeFiles': false,
-      'secretsIncluded': true,
+      'secretsIncluded': secretsIncluded,
       'database': {
         'entry': 'database/kelivo.sqlite',
         'schemaVersion': snapshotInfo.schemaVersion,
@@ -743,6 +768,83 @@ void main() {
         chatService.getGeminiThoughtSignature('restored-message'),
         'signature',
       );
+    });
+
+    test('rolls back settings when a versioned SQLite restore fails', () async {
+      SharedPreferences.setMockInitialValues({
+        'preserved_setting': 'local',
+        'target_only_setting': 'keep',
+        'global_proxy_password_v1': 'local-secret',
+      });
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'settings_rollback',
+        settings: const {
+          'preserved_setting': 'imported',
+          'incoming_only_setting': 'remove-on-rollback',
+          'global_proxy_password_v1': '',
+        },
+        secretsIncluded: false,
+      );
+
+      await expectLater(
+        DataSync(
+          chatService: _FailingSnapshotRestoreChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'snapshot restore failed',
+          ),
+        ),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('preserved_setting'), 'local');
+      expect(prefs.getString('target_only_setting'), 'keep');
+      expect(prefs.getString('incoming_only_setting'), isNull);
+      expect(prefs.getString('global_proxy_password_v1'), 'local-secret');
+      expect(
+        prefs.getString('written_during_restore'),
+        'keep-concurrent-write',
+      );
+    });
+
+    test('rolls back a partial versioned settings write', () async {
+      SharedPreferences.setMockInitialValues({
+        'preserved_setting': 'local',
+        'target_only_setting': 'keep',
+      });
+      SharedPreferencesStorePlatform.instance = _FailingNthSetPreferencesStore({
+        'flutter.preserved_setting': 'local',
+        'flutter.target_only_setting': 'keep',
+      }, failOnCall: 2);
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'partial_settings_rollback',
+        settings: const {
+          'preserved_setting': 'imported',
+          'incoming_only_setting': 'remove-on-rollback',
+        },
+      );
+
+      await expectLater(
+        DataSync(chatService: ChatService()).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        ),
+        throwsA(isA<StateError>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.reload();
+      expect(prefs.getString('preserved_setting'), 'local');
+      expect(prefs.getString('target_only_setting'), 'keep');
+      expect(prefs.getString('incoming_only_setting'), isNull);
     });
 
     test(
