@@ -1381,6 +1381,8 @@ class DataSync {
     await extractDir.create(recursive: true);
 
     Directory? sameVolumeWorkspace;
+    String? sameVolumeAppDataPath;
+    String? sameVolumeRunId;
     SharedPreferencesAsync? restorePreferences;
     _SettingsRollbackSnapshot? settingsRollbackSnapshot;
     var settingsMutationStarted = false;
@@ -1432,10 +1434,13 @@ class DataSync {
             sourceManifestSha256: sourceManifestSha256,
           );
           return (
+            runId: staged.runId,
             workspacePath: staged.workspace.path,
             payloadPath: staged.payloadDirectory.path,
           );
         });
+        sameVolumeAppDataPath = appDataPath;
+        sameVolumeRunId = stagedPaths.runId;
         sameVolumeWorkspace = Directory(stagedPaths.workspacePath);
         restorePayloadDirectory = Directory(stagedPaths.payloadPath);
         settingsFile = File(
@@ -2029,7 +2034,18 @@ class DataSync {
       }
       Error.throwWithStackTrace(error, stackTrace);
     } finally {
-      await _deleteDirectoryQuietly(sameVolumeWorkspace);
+      if (sameVolumeAppDataPath != null && sameVolumeRunId != null) {
+        final appDataPath = sameVolumeAppDataPath;
+        final runId = sameVolumeRunId;
+        await Isolate.run(
+          () => RestoreBundleStaging.discardUnpublished(
+            appDataDirectory: Directory(appDataPath),
+            runId: runId,
+          ),
+        );
+      } else {
+        await _deleteDirectoryQuietly(sameVolumeWorkspace);
+      }
       await _deleteDirectoryQuietly(extractDir);
     }
   }

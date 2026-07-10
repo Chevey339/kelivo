@@ -8,9 +8,14 @@ import 'package:path/path.dart' as p;
 
 import '../../database/chat_database_repository.dart';
 import 'backup_settings_validator.dart';
-import 'restore_receipt.dart' show restoreWorkspaceRootName;
+import 'restore_workspace_lock.dart';
 
 typedef _StagedRestoreEntry = ({int bytes, String sha256});
+typedef ValidatedRestoreCandidate = ({
+  bool includeChats,
+  bool includeFiles,
+  String manifestSha256,
+});
 
 final class StagedRestoreBundle {
   const StagedRestoreBundle({
@@ -33,7 +38,9 @@ final class StagedRestoreBundle {
 final class RestoreBundleStaging {
   RestoreBundleStaging._();
 
-  static const workspaceRootName = restoreWorkspaceRootName;
+  static const workspaceRootName = RestoreWorkspaceLock.workspaceRootName;
+  static const _backupFormat = 'kelivo-backup';
+  static const _backupFormatVersion = 2;
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
   static const _databaseEntry = 'database/kelivo.sqlite';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
@@ -48,35 +55,13 @@ final class RestoreBundleStaging {
     required bool includeFiles,
     required String sourceManifestSha256,
   }) async {
-    final workspaceRoot = Directory(
-      p.join(appDataDirectory.path, workspaceRootName),
+    final workspaceLock = RestoreWorkspaceLock(
+      appDataDirectory: appDataDirectory,
     );
-    final existingRootType = await FileSystemEntity.type(
-      workspaceRoot.path,
-      followLinks: false,
-    );
-    if (existingRootType == FileSystemEntityType.link) {
-      throw FileSystemException(
-        'Restore staging root must not be a link',
-        workspaceRoot.path,
-      );
-    }
-    if (existingRootType != FileSystemEntityType.notFound &&
-        existingRootType != FileSystemEntityType.directory) {
-      throw FileSystemException(
-        'Restore staging root is not a directory',
-        workspaceRoot.path,
-      );
-    }
-    await workspaceRoot.create(recursive: true);
-    if (await FileSystemEntity.type(workspaceRoot.path, followLinks: false) !=
-        FileSystemEntityType.directory) {
-      throw FileSystemException(
-        'Restore staging root changed type',
-        workspaceRoot.path,
-      );
-    }
-    final allocation = await _createRunWorkspace(workspaceRoot);
+    final allocation = await workspaceLock.synchronized(() async {
+      await _requireAvailableWorkspace(workspaceLock.workspaceRoot);
+      return _createRunWorkspace(workspaceLock.workspaceRoot);
+    });
     final runId = allocation.runId;
     final workspace = allocation.workspace;
     final payloadDirectory = Directory(p.join(workspace.path, 'candidate'));
@@ -156,21 +141,6 @@ final class RestoreBundleStaging {
           !declaredEntries.keys.toSet().containsAll(stagedEntries.keys)) {
         throw const FormatException('restore_staging_entries');
       }
-      await _validateSettings(
-        File(p.join(payloadDirectory.path, settingsEntry)),
-      );
-      if (includeChats) {
-        final databaseInfo =
-            await ChatDatabaseRepository.inspectPreparedSnapshot(
-              File(
-                p.joinAll([
-                  payloadDirectory.path,
-                  ..._databaseEntry.split('/'),
-                ]),
-              ),
-            );
-        _validateDatabaseInfo(manifest['database'], databaseInfo);
-      }
       final sortedEntryNames = stagedEntries.keys.toList()..sort();
       manifest['entries'] = {
         for (final entryName in sortedEntryNames)
@@ -187,42 +157,201 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_manifest_size');
       }
       await stagedManifestFile.writeAsBytes(stagedManifestBytes, flush: true);
-      await _validateCandidateTopology(
-        payloadDirectory,
-        expectedFiles: {...stagedEntries.keys, 'manifest.json'},
-        includeChats: includeChats,
-        includeFiles: includeFiles,
+      final validated = await validateExistingCandidate(
+        candidateDirectory: payloadDirectory,
+        expectedManifestSha256: sha256.convert(stagedManifestBytes).toString(),
       );
-      await _validateCandidateEntries(payloadDirectory, stagedEntries);
-      final reopenedManifestBytes = await _readBoundedBytes(
-        stagedManifestFile,
-        maximumBytes: _maximumManifestBytes,
-        error: 'restore_staging_manifest_reopen',
-      );
-      if (!_sameBytes(reopenedManifestBytes, stagedManifestBytes)) {
-        throw const FormatException('restore_staging_manifest_reopen');
+      if (validated.includeChats != includeChats ||
+          validated.includeFiles != includeFiles) {
+        throw const FormatException('restore_staging_candidate_selection');
       }
-      final reopenedManifest = _decodeJsonMap(
-        reopenedManifestBytes,
-        error: 'restore_staging_manifest_reopen',
-      );
-      if (reopenedManifest['entries'] is! Map) {
-        throw const FormatException('restore_staging_manifest_reopen');
-      }
-      final candidateManifestSha256 = sha256
-          .convert(reopenedManifestBytes)
-          .toString();
 
       return StagedRestoreBundle(
         runId: runId,
         workspace: workspace,
         payloadDirectory: payloadDirectory,
-        candidateManifestSha256: candidateManifestSha256,
+        candidateManifestSha256: validated.manifestSha256,
       );
     } catch (_) {
-      if (await workspace.exists()) await workspace.delete(recursive: true);
+      await _discardUnpublishedWorkspace(
+        workspaceLock: workspaceLock,
+        workspace: workspace,
+      );
       rethrow;
     }
+  }
+
+  /// Reopens and fully validates a staged candidate without mutating it.
+  static Future<ValidatedRestoreCandidate> validateExistingCandidate({
+    required Directory candidateDirectory,
+    required String expectedManifestSha256,
+  }) async {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(expectedManifestSha256) ||
+        await FileSystemEntity.type(
+              candidateDirectory.path,
+              followLinks: false,
+            ) !=
+            FileSystemEntityType.directory) {
+      throw const FormatException('restore_staging_candidate');
+    }
+    final manifestFile = File(p.join(candidateDirectory.path, 'manifest.json'));
+    final manifestBytes = await _readBoundedBytes(
+      manifestFile,
+      maximumBytes: _maximumManifestBytes,
+      error: 'restore_staging_manifest_reopen',
+    );
+    final manifestSha256 = sha256.convert(manifestBytes).toString();
+    if (manifestSha256 != expectedManifestSha256) {
+      throw const FormatException('restore_staging_manifest_reopen');
+    }
+    final manifest = _decodeJsonMap(
+      manifestBytes,
+      error: 'restore_staging_manifest_reopen',
+    );
+    final includeChats = manifest['includeChats'];
+    final includeFiles = manifest['includeFiles'];
+    final payloadKind = manifest['payloadKind'];
+    if (manifest['format'] != _backupFormat ||
+        manifest['formatVersion'] != _backupFormatVersion ||
+        includeChats is! bool ||
+        includeFiles is! bool ||
+        payloadKind is! String ||
+        manifest['createdAtUtc'] is! String ||
+        manifest['appVersion'] is! String ||
+        manifest['secretsIncluded'] is! bool) {
+      throw const FormatException('restore_staging_manifest_fields');
+    }
+    final declaredEntries = _parseDeclaredEntries(
+      manifest,
+      includeChats: includeChats,
+      includeFiles: includeFiles,
+    );
+    final rawDatabase = manifest['database'];
+    if (includeChats) {
+      if (payloadKind != 'sqlite' || rawDatabase is! Map) {
+        throw const FormatException('restore_staging_database');
+      }
+    } else if (payloadKind != 'settings-only' || rawDatabase != null) {
+      throw const FormatException('restore_staging_database');
+    }
+
+    await _validateSettings(
+      File(p.join(candidateDirectory.path, 'settings.json')),
+    );
+    if (includeChats) {
+      final databaseInfo = await ChatDatabaseRepository.inspectPreparedSnapshot(
+        File(
+          p.joinAll([candidateDirectory.path, ..._databaseEntry.split('/')]),
+        ),
+      );
+      _validateDatabaseInfo(rawDatabase, databaseInfo);
+    }
+    await _validateCandidateTopology(
+      candidateDirectory,
+      expectedFiles: {...declaredEntries.keys, 'manifest.json'},
+      includeChats: includeChats,
+      includeFiles: includeFiles,
+    );
+    await _validateCandidateEntries(candidateDirectory, declaredEntries);
+    return (
+      includeChats: includeChats,
+      includeFiles: includeFiles,
+      manifestSha256: manifestSha256,
+    );
+  }
+
+  static Future<void> discardUnpublished({
+    required Directory appDataDirectory,
+    required String runId,
+  }) async {
+    if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(runId)) {
+      throw ArgumentError.value(runId, 'runId');
+    }
+    final workspaceLock = RestoreWorkspaceLock(
+      appDataDirectory: appDataDirectory,
+    );
+    await _discardUnpublishedWorkspace(
+      workspaceLock: workspaceLock,
+      workspace: Directory(
+        p.join(workspaceLock.workspaceRoot.path, 'run_$runId'),
+      ),
+    );
+  }
+
+  static Future<void> _requireAvailableWorkspace(
+    Directory workspaceRoot,
+  ) async {
+    await for (final entity in workspaceRoot.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (name == RestoreWorkspaceLock.lockFileName &&
+          type == FileSystemEntityType.file) {
+        continue;
+      }
+      throw StateError('restore_staging_workspace_not_empty');
+    }
+  }
+
+  static Future<void> _discardUnpublishedWorkspace({
+    required RestoreWorkspaceLock workspaceLock,
+    required Directory workspace,
+  }) async {
+    await workspaceLock.synchronized(() async {
+      var foundWorkspace = false;
+      var foundActiveRun = false;
+      await for (final entity in workspaceLock.workspaceRoot.list(
+        followLinks: false,
+      )) {
+        final name = p.basename(entity.path);
+        final type = await FileSystemEntity.type(
+          entity.path,
+          followLinks: false,
+        );
+        if (name == RestoreWorkspaceLock.lockFileName &&
+            type == FileSystemEntityType.file) {
+          continue;
+        }
+        if (name == RestoreWorkspaceLock.activeRunFileName &&
+            type == FileSystemEntityType.file &&
+            await _readActiveRunId(File(entity.path)) ==
+                p.basename(workspace.path).substring('run_'.length) &&
+            !foundActiveRun) {
+          foundActiveRun = true;
+          continue;
+        }
+        if (p.equals(entity.path, workspace.path) &&
+            type == FileSystemEntityType.directory &&
+            !foundWorkspace) {
+          foundWorkspace = true;
+          continue;
+        }
+        throw StateError('restore_staging_discard_workspace');
+      }
+      if (!foundWorkspace) {
+        throw StateError('restore_staging_discard_workspace');
+      }
+      if (!foundActiveRun) {
+        throw StateError('restore_staging_discard_active_run');
+      }
+
+      await for (final entity in workspace.list(followLinks: false)) {
+        final name = p.basename(entity.path);
+        final type = await FileSystemEntity.type(
+          entity.path,
+          followLinks: false,
+        );
+        if (name != 'candidate' || type != FileSystemEntityType.directory) {
+          throw StateError('restore_staging_discard_run');
+        }
+      }
+      await workspace.delete(recursive: true);
+      await File(
+        p.join(
+          workspaceLock.workspaceRoot.path,
+          RestoreWorkspaceLock.activeRunFileName,
+        ),
+      ).delete();
+    });
   }
 
   static Future<({String runId, Directory workspace})> _createRunWorkspace(
@@ -235,23 +364,62 @@ final class RestoreBundleStaging {
           FileSystemEntityType.notFound) {
         continue;
       }
-      await workspace.create();
-      if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
-          FileSystemEntityType.directory) {
-        throw FileSystemException(
-          'Restore run workspace changed type',
-          workspace.path,
-        );
+      final activeRunFile = File(
+        p.join(workspaceRoot.path, RestoreWorkspaceLock.activeRunFileName),
+      );
+      var ownsActiveRun = false;
+      try {
+        await activeRunFile.create(exclusive: true);
+        ownsActiveRun = true;
+        await activeRunFile.writeAsString(runId, flush: true);
+        if (await _readActiveRunId(activeRunFile) != runId) {
+          throw StateError('restore_staging_active_run');
+        }
+        await workspace.create();
+        if (await FileSystemEntity.type(workspace.path, followLinks: false) !=
+            FileSystemEntityType.directory) {
+          throw FileSystemException(
+            'Restore run workspace changed type',
+            workspace.path,
+          );
+        }
+        if (!await workspace.list(followLinks: false).isEmpty) {
+          throw FileSystemException(
+            'Restore run workspace is not empty',
+            workspace.path,
+          );
+        }
+        return (runId: runId, workspace: workspace);
+      } catch (_) {
+        if (await FileSystemEntity.type(workspace.path, followLinks: false) ==
+            FileSystemEntityType.directory) {
+          await workspace.delete(recursive: true);
+        }
+        if (ownsActiveRun &&
+            await FileSystemEntity.type(
+                  activeRunFile.path,
+                  followLinks: false,
+                ) ==
+                FileSystemEntityType.file) {
+          await activeRunFile.delete();
+        }
+        rethrow;
       }
-      if (!await workspace.list(followLinks: false).isEmpty) {
-        throw FileSystemException(
-          'Restore run workspace is not empty',
-          workspace.path,
-        );
-      }
-      return (runId: runId, workspace: workspace);
     }
     throw StateError('restore_staging_run_id_collision');
+  }
+
+  static Future<String> _readActiveRunId(File file) async {
+    if (await FileSystemEntity.type(file.path, followLinks: false) !=
+            FileSystemEntityType.file ||
+        await file.length() != 32) {
+      throw StateError('restore_staging_active_run');
+    }
+    final runId = await file.readAsString();
+    if (!RegExp(r'^[a-f0-9]{32}$').hasMatch(runId)) {
+      throw StateError('restore_staging_active_run');
+    }
+    return runId;
   }
 
   static String _newRunId() {
@@ -382,6 +550,15 @@ final class RestoreBundleStaging {
     required bool includeFiles,
   }) async {
     final actualFiles = <String>{};
+    final actualDirectories = <String>{};
+    final expectedDirectories = <String>{};
+    for (final file in expectedFiles) {
+      final segments = file.split('/');
+      for (var index = 1; index < segments.length; index++) {
+        expectedDirectories.add(segments.take(index).join('/'));
+      }
+    }
+    if (includeFiles) expectedDirectories.addAll(_assetRoots);
     await for (final entity in candidate.list(
       recursive: true,
       followLinks: false,
@@ -391,16 +568,10 @@ final class RestoreBundleStaging {
           .relative(entity.path, from: candidate.path)
           .replaceAll('\\', '/');
       if (type == FileSystemEntityType.directory) {
-        final allowedDirectory =
-            (includeChats && relativePath == 'database') ||
-            (includeFiles &&
-                _assetRoots.any(
-                  (root) =>
-                      relativePath == root || relativePath.startsWith('$root/'),
-                ));
-        if (!allowedDirectory) {
+        if (!expectedDirectories.contains(relativePath)) {
           throw const FormatException('restore_staging_candidate_directory');
         }
+        actualDirectories.add(relativePath);
         continue;
       }
       if (type != FileSystemEntityType.file) {
@@ -411,6 +582,11 @@ final class RestoreBundleStaging {
     if (actualFiles.length != expectedFiles.length ||
         !actualFiles.containsAll(expectedFiles)) {
       throw const FormatException('restore_staging_candidate_entries');
+    }
+    if (actualDirectories.length != expectedDirectories.length ||
+        !actualDirectories.containsAll(expectedDirectories) ||
+        (includeChats != expectedDirectories.contains('database'))) {
+      throw const FormatException('restore_staging_candidate_directories');
     }
   }
 
@@ -495,14 +671,6 @@ final class RestoreBundleStaging {
       throw FormatException(error);
     }
     return decoded.cast<String, dynamic>();
-  }
-
-  static bool _sameBytes(List<int> left, List<int> right) {
-    if (left.length != right.length) return false;
-    for (var index = 0; index < left.length; index++) {
-      if (left[index] != right[index]) return false;
-    }
-    return true;
   }
 
   static Future<void> _verifySameFilesystem(

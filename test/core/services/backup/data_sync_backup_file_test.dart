@@ -837,7 +837,7 @@ void main() {
             zipFile,
             const WebDavConfig(includeChats: false, includeFiles: false),
           ),
-          throwsA(isA<FileSystemException>()),
+          throwsStateError,
         );
 
         final prefs = await SharedPreferences.getInstance();

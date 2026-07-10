@@ -1,13 +1,15 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
+import 'restore_bundle_staging.dart';
+import 'restore_workspace_lock.dart';
+
 enum RestoreComponent { settings, database, assets }
 
-const restoreWorkspaceRootName = '.kelivo_restore';
+const restoreWorkspaceRootName = RestoreWorkspaceLock.workspaceRootName;
 
 enum RestoreReceiptState {
   prepared,
@@ -297,18 +299,20 @@ final class RestoreReceipt {
 }
 
 final class RestoreReceiptStore {
-  RestoreReceiptStore({required this.appDataDirectory, required this.runId}) {
+  RestoreReceiptStore({required this.appDataDirectory, required this.runId})
+    : _workspaceLock = RestoreWorkspaceLock(
+        appDataDirectory: appDataDirectory,
+      ) {
     _validateRunId(runId, parsed: false);
   }
 
   static const workspaceRootName = restoreWorkspaceRootName;
-  static final _localPublishTails = <String, Future<void>>{};
 
   final Directory appDataDirectory;
   final String runId;
+  final RestoreWorkspaceLock _workspaceLock;
 
-  Directory get workspaceRoot =>
-      Directory(p.join(appDataDirectory.path, workspaceRootName));
+  Directory get workspaceRoot => _workspaceLock.workspaceRoot;
 
   Directory get runDirectory =>
       Directory(p.join(workspaceRoot.path, 'run_$runId'));
@@ -316,13 +320,22 @@ final class RestoreReceiptStore {
   Directory get receiptDirectory =>
       Directory(p.join(runDirectory.path, 'receipts'));
 
-  Future<RestoreReceipt?> readLatest() => _readLatestUnlocked();
+  Future<RestoreReceipt?> readLatest() =>
+      _workspaceLock.synchronized(_readLatestUnlocked);
 
   Future<void> publish(RestoreReceipt receipt) async {
     if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
-    await _withPublishLock(() async {
+    await _workspaceLock.synchronized(() async {
+      await _requireExclusiveRunWorkspace();
+      final initialReceiptDirectoryType = await FileSystemEntity.type(
+        receiptDirectory.path,
+        followLinks: false,
+      );
       final latest = await _readLatestUnlocked();
       if (latest != null && latest.sequence == receipt.sequence) {
+        if (receipt.sequence == 1) {
+          await _validatePreparedCandidate(receipt);
+        }
         if (latest.checksum == receipt.checksum) return;
         throw StateError('restore_receipt_collision');
       }
@@ -331,11 +344,18 @@ final class RestoreReceiptStore {
             receipt.state != RestoreReceiptState.prepared) {
           throw StateError('restore_receipt_initial_sequence');
         }
+        if (initialReceiptDirectoryType != FileSystemEntityType.notFound) {
+          throw StateError('restore_receipt_initial_directory');
+        }
+        await _validateInitialRunTopology();
+        await _validatePreparedCandidate(receipt);
       } else {
         _validateContinuation(latest, receipt);
       }
 
-      await _ensureSafeDirectory(runDirectory);
+      if (!await _validateExistingDirectory(runDirectory)) {
+        throw StateError('restore_receipt_run_directory');
+      }
       await _ensureSafeDirectory(receiptDirectory);
       final target = File(
         p.join(receiptDirectory.path, _receiptFileName(receipt.sequence)),
@@ -373,6 +393,73 @@ final class RestoreReceiptStore {
         if (await temporary.exists()) await temporary.delete();
       }
     });
+  }
+
+  Future<void> _requireExclusiveRunWorkspace() async {
+    var foundRun = false;
+    var foundActiveRun = false;
+    await for (final entity in workspaceRoot.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (name == RestoreWorkspaceLock.lockFileName) {
+        if (type != FileSystemEntityType.file) {
+          throw StateError('restore_receipt_lock');
+        }
+        continue;
+      }
+      if (name == RestoreWorkspaceLock.activeRunFileName &&
+          type == FileSystemEntityType.file) {
+        final activeRunFile = File(entity.path);
+        if (foundActiveRun ||
+            await activeRunFile.length() != 32 ||
+            await activeRunFile.readAsString() != runId) {
+          throw StateError('restore_receipt_active_run');
+        }
+        foundActiveRun = true;
+        continue;
+      }
+      if (name == 'run_$runId' && type == FileSystemEntityType.directory) {
+        if (foundRun) throw StateError('restore_receipt_run_directory');
+        foundRun = true;
+        continue;
+      }
+      throw StateError('restore_receipt_workspace_entry');
+    }
+    if (!foundRun) throw StateError('restore_receipt_run_directory');
+    if (!foundActiveRun) throw StateError('restore_receipt_active_run');
+  }
+
+  Future<void> _validatePreparedCandidate(RestoreReceipt receipt) async {
+    final candidateDirectory = Directory(
+      p.join(runDirectory.path, 'candidate'),
+    );
+    final candidate = await RestoreBundleStaging.validateExistingCandidate(
+      candidateDirectory: candidateDirectory,
+      expectedManifestSha256: receipt.candidateManifestSha256,
+    );
+    if ((receipt.selectedComponents.contains(RestoreComponent.database) &&
+            !candidate.includeChats) ||
+        (receipt.selectedComponents.contains(RestoreComponent.assets) &&
+            !candidate.includeFiles)) {
+      throw StateError('restore_receipt_candidate_selection');
+    }
+  }
+
+  Future<void> _validateInitialRunTopology() async {
+    var foundCandidate = false;
+    await for (final entity in runDirectory.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      final type = await FileSystemEntity.type(entity.path, followLinks: false);
+      if (name == 'candidate' && type == FileSystemEntityType.directory) {
+        if (foundCandidate) {
+          throw StateError('restore_receipt_initial_run');
+        }
+        foundCandidate = true;
+        continue;
+      }
+      throw StateError('restore_receipt_initial_run');
+    }
+    if (!foundCandidate) throw StateError('restore_receipt_initial_run');
   }
 
   Future<RestoreReceipt?> _readLatestUnlocked() async {
@@ -447,50 +534,6 @@ final class RestoreReceiptStore {
         (previous.previousManifestSha256 == null &&
             next.state != RestoreReceiptState.oldRenamed)) {
       throw StateError('restore_receipt_chain');
-    }
-  }
-
-  Future<T> _withPublishLock<T>(Future<T> Function() action) async {
-    final lockKey = p.normalize(p.absolute(workspaceRoot.path));
-    final previousTail = _localPublishTails[lockKey] ?? Future.value();
-    final localRelease = Completer<void>();
-    final currentTail = localRelease.future;
-    _localPublishTails[lockKey] = currentTail;
-    await previousTail;
-    try {
-      return await _withFileLock(action);
-    } finally {
-      localRelease.complete();
-      if (identical(_localPublishTails[lockKey], currentTail)) {
-        _localPublishTails.remove(lockKey);
-      }
-    }
-  }
-
-  Future<T> _withFileLock<T>(Future<T> Function() action) async {
-    await _ensureSafeDirectory(workspaceRoot);
-    final lockFile = File(p.join(workspaceRoot.path, '.receipt.lock'));
-    final lockType = await FileSystemEntity.type(
-      lockFile.path,
-      followLinks: false,
-    );
-    if (lockType == FileSystemEntityType.link ||
-        (lockType != FileSystemEntityType.notFound &&
-            lockType != FileSystemEntityType.file)) {
-      throw StateError('restore_receipt_lock');
-    }
-    final handle = await lockFile.open(mode: FileMode.write);
-    var locked = false;
-    try {
-      await handle.lock(FileLock.blockingExclusive);
-      locked = true;
-      return await action();
-    } finally {
-      try {
-        if (locked) await handle.unlock();
-      } finally {
-        await handle.close();
-      }
     }
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -7,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' show SqliteException;
 
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
 Future<String> _manifestSha256(Directory extracted) async {
   return (await sha256
@@ -18,6 +20,7 @@ Future<String> _manifestSha256(Directory extracted) async {
 Future<Directory> _createExtractedBundle(
   Directory root, {
   bool includeDatabase = false,
+  bool includeFiles = false,
   bool includeSettings = true,
 }) async {
   final extracted = Directory(p.join(root.path, 'extracted'));
@@ -39,7 +42,7 @@ Future<Directory> _createExtractedBundle(
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': 'test',
       'includeChats': includeDatabase,
-      'includeFiles': false,
+      'includeFiles': includeFiles,
       'secretsIncluded': false,
       if (includeDatabase)
         'database': {
@@ -130,6 +133,144 @@ void main() {
             .toList(),
         isEmpty,
       );
+    });
+
+    test('blocks instead of deleting an existing orphan run', () async {
+      final workspaceRoot = Directory(
+        p.join(root.path, RestoreBundleStaging.workspaceRootName),
+      );
+      final orphan = Directory(
+        p.join(workspaceRoot.path, 'run_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+      );
+      await orphan.create(recursive: true);
+      final marker = File(p.join(orphan.path, 'unknown'));
+      await marker.writeAsString('preserve', flush: true);
+      final extracted = await _createExtractedBundle(root);
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: false,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        ),
+        throwsStateError,
+      );
+
+      expect(await marker.readAsString(), 'preserve');
+    });
+
+    test('admits at most one concurrent staging run', () async {
+      final extracted = await _createExtractedBundle(root);
+      final manifestSha256 = await _manifestSha256(extracted);
+
+      Future<Object> stage() async {
+        try {
+          return await RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: false,
+            includeFiles: false,
+            sourceManifestSha256: manifestSha256,
+          );
+        } catch (error) {
+          return error;
+        }
+      }
+
+      final results = await Future.wait([stage(), stage()]);
+
+      expect(results.whereType<StagedRestoreBundle>(), hasLength(1));
+      expect(results.whereType<StateError>(), hasLength(1));
+      final workspaceRoot = Directory(
+        p.join(root.path, RestoreBundleStaging.workspaceRootName),
+      );
+      expect(
+        await workspaceRoot
+            .list(followLinks: false)
+            .where((entry) => p.basename(entry.path).startsWith('run_'))
+            .toList(),
+        hasLength(1),
+      );
+    });
+
+    test('admits at most one run across worker isolates', () async {
+      final extracted = await _createExtractedBundle(root);
+      final manifestSha256 = await _manifestSha256(extracted);
+      final appDataPath = root.path;
+      final extractedPath = extracted.path;
+
+      Future<bool> stageInWorker() {
+        return Isolate.run(() async {
+          try {
+            await RestoreBundleStaging.create(
+              appDataDirectory: Directory(appDataPath),
+              extractedDirectory: Directory(extractedPath),
+              includeChats: false,
+              includeFiles: false,
+              sourceManifestSha256: manifestSha256,
+            );
+            return true;
+          } catch (_) {
+            return false;
+          }
+        });
+      }
+
+      final results = await Future.wait([stageInWorker(), stageInWorker()]);
+
+      expect(results.where((result) => result), hasLength(1));
+      expect(results.where((result) => !result), hasLength(1));
+      final activeRun = File(
+        p.join(
+          root.path,
+          RestoreBundleStaging.workspaceRootName,
+          RestoreWorkspaceLock.activeRunFileName,
+        ),
+      );
+      expect(await activeRun.length(), 32);
+    });
+
+    test('discards only a run that has not started publication', () async {
+      final extracted = await _createExtractedBundle(root);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: false,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+
+      await RestoreBundleStaging.discardUnpublished(
+        appDataDirectory: root,
+        runId: staged.runId,
+      );
+
+      expect(await staged.workspace.exists(), isFalse);
+    });
+
+    test('preserves a run once a receipt directory exists', () async {
+      final extracted = await _createExtractedBundle(root);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: false,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+      final receipts = Directory(p.join(staged.workspace.path, 'receipts'));
+      await receipts.create();
+
+      await expectLater(
+        RestoreBundleStaging.discardUnpublished(
+          appDataDirectory: root,
+          runId: staged.runId,
+        ),
+        throwsStateError,
+      );
+
+      expect(await receipts.exists(), isTrue);
     });
 
     test('rejects a source entry changed after its descriptor froze', () async {
@@ -250,6 +391,48 @@ void main() {
             .where((entry) => p.basename(entry.path).startsWith('run_'))
             .toList(),
         isEmpty,
+      );
+    });
+
+    test('requires every declared empty asset root on revalidation', () async {
+      final extracted = await _createExtractedBundle(root, includeFiles: true);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: false,
+        includeFiles: true,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+      await Directory(p.join(staged.payloadDirectory.path, 'fonts')).delete();
+
+      await expectLater(
+        RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: staged.candidateManifestSha256,
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects an extra empty candidate directory', () async {
+      final extracted = await _createExtractedBundle(root, includeFiles: true);
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: false,
+        includeFiles: true,
+        sourceManifestSha256: await _manifestSha256(extracted),
+      );
+      await Directory(
+        p.join(staged.payloadDirectory.path, 'upload', 'unexpected'),
+      ).create();
+
+      await expectLater(
+        RestoreBundleStaging.validateExistingCandidate(
+          candidateDirectory: staged.payloadDirectory,
+          expectedManifestSha256: staged.candidateManifestSha256,
+        ),
+        throwsA(isA<FormatException>()),
       );
     });
 
