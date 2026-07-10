@@ -96,6 +96,26 @@ class _FailingSnapshotRestoreChatService extends ChatService {
   }
 }
 
+class _RecordingSnapshotPathChatService extends ChatService {
+  String? snapshotPath;
+  String? stagedDatabaseSha256;
+  String? manifestDatabaseSha256;
+
+  @override
+  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
+    snapshotPath = snapshotFile.path;
+    stagedDatabaseSha256 = await _fileSha256(snapshotFile);
+    final manifestFile = File(
+      '${snapshotFile.parent.parent.path}/manifest.json',
+    );
+    final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+    manifestDatabaseSha256 =
+        ((manifest['entries'] as Map)['database/kelivo.sqlite']
+                as Map)['sha256']
+            as String;
+  }
+}
+
 class _RecordingClearChatService extends ChatService {
   bool cleared = false;
   bool replaced = false;
@@ -186,6 +206,7 @@ Future<File> _createSqliteBackupFixture({
   required Map<String, dynamic> settings,
   String? databaseSha256,
   bool secretsIncluded = true,
+  bool includeFiles = false,
 }) async {
   final databasePath = '${root.path}/${prefix}_database.sqlite';
   final snapshotInfo = await Isolate.run(() async {
@@ -233,7 +254,7 @@ Future<File> _createSqliteBackupFixture({
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': '1.0.0-test+1',
       'includeChats': true,
-      'includeFiles': false,
+      'includeFiles': includeFiles,
       'secretsIncluded': secretsIncluded,
       'database': {
         'entry': 'database/kelivo.sqlite',
@@ -768,6 +789,88 @@ void main() {
         chatService.getGeminiThoughtSignature('restored-message'),
         'signature',
       );
+    });
+
+    test('stages a versioned SQLite candidate under app data', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'same_volume_staging',
+        settings: const {},
+      );
+      final chatService = _RecordingSnapshotPathChatService();
+
+      await DataSync(chatService: chatService).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+      );
+
+      final stagedPath = File(chatService.snapshotPath!).absolute.path;
+      final stagingRoot = Directory(
+        '${root.path}/.kelivo_restore',
+      ).absolute.path;
+      expect(
+        stagedPath.startsWith('$stagingRoot${Platform.pathSeparator}'),
+        isTrue,
+      );
+      expect(
+        chatService.manifestDatabaseSha256,
+        chatService.stagedDatabaseSha256,
+      );
+      expect(await File(stagedPath).exists(), isFalse);
+    });
+
+    test(
+      'rejects a linked same-volume staging root before live writes',
+      () async {
+        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        final outside = Directory('${root.path}/outside_staging');
+        await outside.create(recursive: true);
+        await Link('${root.path}/.kelivo_restore').create(outside.path);
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'linked_staging_root',
+          settings: const {'preserved_setting': 'imported'},
+        );
+
+        await expectLater(
+          DataSync(chatService: ChatService()).restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          ),
+          throwsA(isA<FileSystemException>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('preserved_setting'), 'local');
+      },
+      skip: Platform.isWindows
+          ? 'Creating a symbolic link requires elevated Windows privileges.'
+          : false,
+    );
+
+    test('empty versioned asset roots clear old files on overwrite', () async {
+      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+        final directory = Directory('${root.path}/$rootName');
+        await directory.create(recursive: true);
+        await File('${directory.path}/old.bin').writeAsBytes([1, 2, 3]);
+      }
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'empty_asset_roots',
+        settings: const {},
+        includeFiles: true,
+      );
+
+      await DataSync(chatService: ChatService()).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: true),
+      );
+
+      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+        final directory = Directory('${root.path}/$rootName');
+        expect(await directory.exists(), isTrue, reason: rootName);
+        expect(await directory.list().toList(), isEmpty, reason: rootName);
+      }
     });
 
     test('rolls back settings when a versioned SQLite restore fails', () async {

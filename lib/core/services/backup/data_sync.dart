@@ -20,6 +20,7 @@ import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_sanitizer.dart';
+import 'restore_bundle_staging.dart';
 
 typedef _ParsedChatBackup = ({
   List<Conversation> conversations,
@@ -29,7 +30,11 @@ typedef _ParsedChatBackup = ({
 });
 
 typedef _BackupEntryMetadata = ({int bytes, String sha256});
-typedef _VersionedBackupInfo = ({bool includeChats, bool secretsIncluded});
+typedef _VersionedBackupInfo = ({
+  bool includeChats,
+  bool includeFiles,
+  bool secretsIncluded,
+});
 typedef _SettingsRollbackSnapshot = ({
   Map<String, dynamic> existingValues,
   Set<String> touchedKeys,
@@ -1044,6 +1049,7 @@ class DataSync {
 
     return (
       includeChats: includeChats,
+      includeFiles: includeFiles,
       secretsIncluded: manifest['secretsIncluded'] as bool,
     );
   }
@@ -1353,6 +1359,7 @@ class DataSync {
     );
     await extractDir.create(recursive: true);
 
+    Directory? sameVolumeWorkspace;
     SharedPreferencesAsync? restorePreferences;
     _SettingsRollbackSnapshot? settingsRollbackSnapshot;
     var settingsMutationStarted = false;
@@ -1363,7 +1370,8 @@ class DataSync {
       });
 
       final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
-      final settingsFile = File(p.join(extractDir.path, 'settings.json'));
+      var restorePayloadDirectory = extractDir;
+      var settingsFile = File(p.join(extractDir.path, 'settings.json'));
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
       if (!await settingsFile.exists()) {
         throw const FormatException('settings.json');
@@ -1387,6 +1395,29 @@ class DataSync {
           (versionedIncludesChats ?? await chatsFile.exists());
       if (versionedIncludesChats != null && mode == RestoreMode.merge) {
         throw UnsupportedError('versioned_backup_merge_not_supported');
+      }
+      if (versionedBackup != null) {
+        final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
+        final extractedPath = extractDir.path;
+        final includeChats = versionedBackup.includeChats;
+        final includeFiles = versionedBackup.includeFiles;
+        final stagedPaths = await Isolate.run(() async {
+          final staged = await RestoreBundleStaging.create(
+            appDataDirectory: Directory(appDataPath),
+            extractedDirectory: Directory(extractedPath),
+            includeChats: includeChats,
+            includeFiles: includeFiles,
+          );
+          return (
+            workspacePath: staged.workspace.path,
+            payloadPath: staged.payloadDirectory.path,
+          );
+        });
+        sameVolumeWorkspace = Directory(stagedPaths.workspacePath);
+        restorePayloadDirectory = Directory(stagedPaths.payloadPath);
+        settingsFile = File(
+          p.join(restorePayloadDirectory.path, 'settings.json'),
+        );
       }
 
       final settings =
@@ -1726,7 +1757,10 @@ class DataSync {
         try {
           if (versionedIncludesChats != null) {
             final snapshotFile = File(
-              p.joinAll([extractDir.path, ..._databaseEntryName.split('/')]),
+              p.joinAll([
+                restorePayloadDirectory.path,
+                ..._databaseEntryName.split('/'),
+              ]),
             );
             await chatService.restoreDatabaseSnapshot(snapshotFile);
           } else if (mode == RestoreMode.overwrite) {
@@ -1799,7 +1833,9 @@ class DataSync {
         if (mode == RestoreMode.overwrite) {
           // Overwrite mode: Delete existing directories and copy all
           // Restore upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+          final uploadSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'upload'),
+          );
           if (await uploadSrc.exists()) {
             final dst = await _getUploadDir();
             if (await dst.exists()) {
@@ -1816,7 +1852,9 @@ class DataSync {
           }
 
           // Restore images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+          final imagesSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'images'),
+          );
           if (await imagesSrc.exists()) {
             final dst = await _getImagesDir();
             if (await dst.exists()) {
@@ -1833,7 +1871,9 @@ class DataSync {
           }
 
           // Restore avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+          final avatarsSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'avatars'),
+          );
           if (await avatarsSrc.exists()) {
             final dst = await _getAvatarsDir();
             if (await dst.exists()) {
@@ -1850,7 +1890,9 @@ class DataSync {
           }
 
           // Restore managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          final fontsSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'fonts'),
+          );
           if (await fontsSrc.exists()) {
             final dst = await _getFontsDir();
             if (await dst.exists()) {
@@ -1868,7 +1910,9 @@ class DataSync {
         } else {
           // Merge mode: Only copy non-existing files
           // Merge upload directory
-          final uploadSrc = Directory(p.join(extractDir.path, 'upload'));
+          final uploadSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'upload'),
+          );
           if (await uploadSrc.exists()) {
             final dst = await _getUploadDir();
             if (!await dst.exists()) {
@@ -1886,7 +1930,9 @@ class DataSync {
           }
 
           // Merge images directory
-          final imagesSrc = Directory(p.join(extractDir.path, 'images'));
+          final imagesSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'images'),
+          );
           if (await imagesSrc.exists()) {
             final dst = await _getImagesDir();
             if (!await dst.exists()) {
@@ -1904,7 +1950,9 @@ class DataSync {
           }
 
           // Merge avatars directory
-          final avatarsSrc = Directory(p.join(extractDir.path, 'avatars'));
+          final avatarsSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'avatars'),
+          );
           if (await avatarsSrc.exists()) {
             final dst = await _getAvatarsDir();
             if (!await dst.exists()) {
@@ -1922,7 +1970,9 @@ class DataSync {
           }
 
           // Merge managed local fonts directory
-          final fontsSrc = Directory(p.join(extractDir.path, 'fonts'));
+          final fontsSrc = Directory(
+            p.join(restorePayloadDirectory.path, 'fonts'),
+          );
           if (await fontsSrc.exists()) {
             final dst = await _getFontsDir();
             if (!await dst.exists()) {
@@ -1957,6 +2007,7 @@ class DataSync {
       }
       Error.throwWithStackTrace(error, stackTrace);
     } finally {
+      await _deleteDirectoryQuietly(sameVolumeWorkspace);
       await _deleteDirectoryQuietly(extractDir);
     }
   }
