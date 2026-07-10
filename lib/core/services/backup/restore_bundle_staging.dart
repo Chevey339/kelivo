@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/chat_database_repository.dart';
+import 'backup_settings_validator.dart';
 import 'restore_receipt.dart' show restoreWorkspaceRootName;
 
 typedef _StagedRestoreEntry = ({int bytes, String sha256});
@@ -350,11 +351,12 @@ final class RestoreBundleStaging {
   }
 
   static Future<void> _validateSettings(File settingsFile) async {
-    await _readJsonMap(
+    final settings = await _readJsonMap(
       settingsFile,
       maximumBytes: _maximumSettingsBytes,
       error: 'restore_staging_settings',
     );
+    BackupSettingsValidator.normalizeAndValidate(settings);
   }
 
   static void _validateDatabaseInfo(

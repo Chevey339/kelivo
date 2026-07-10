@@ -212,6 +212,47 @@ void main() {
       );
     });
 
+    test('rejects invalid settings semantics before returning a run', () async {
+      final extracted = await _createExtractedBundle(root);
+      final settingsFile = File(p.join(extracted.path, 'settings.json'));
+      await settingsFile.writeAsString(
+        jsonEncode({
+          'assistants_v1': jsonEncode(['not-an-object']),
+        }),
+        flush: true,
+      );
+      final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+      final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+      final settingsMetadata =
+          (manifest['entries'] as Map)['settings.json'] as Map;
+      settingsMetadata['bytes'] = await settingsFile.length();
+      settingsMetadata['sha256'] =
+          (await sha256.bind(settingsFile.openRead()).first).toString();
+      await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: false,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      final workspaceRoot = Directory(
+        p.join(root.path, RestoreBundleStaging.workspaceRootName),
+      );
+      expect(
+        await workspaceRoot
+            .list(followLinks: false)
+            .where((entry) => p.basename(entry.path).startsWith('run_'))
+            .toList(),
+        isEmpty,
+      );
+    });
+
     test(
       'rejects a hash-valid payload that is not a SQLite database',
       () async {
