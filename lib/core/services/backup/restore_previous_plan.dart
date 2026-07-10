@@ -88,8 +88,14 @@ final class RestorePreviousSettingsPlan {
     if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
       throw const FormatException('restore_previous_settings_snapshot');
     }
-    final values = decoded.cast<String, dynamic>();
-    BackupSettingsValidator.validate(values);
+    final decodedValues = decoded.cast<String, dynamic>();
+    BackupSettingsValidator.validate(decodedValues);
+    final values = <String, dynamic>{
+      for (final entry in decodedValues.entries)
+        entry.key: entry.value is List
+            ? List<String>.unmodifiable((entry.value as List).cast<String>())
+            : entry.value,
+    };
     final expectedKeys = touchedKeys.difference(missingKeys);
     if (values.length != expectedKeys.length ||
         !values.keys.toSet().containsAll(expectedKeys) ||
@@ -102,6 +108,12 @@ final class RestorePreviousSettingsPlan {
   void validateTargetProjection(Map<String, dynamic> values) {
     if (fingerprintProjection(values, touchedKeys) != targetFingerprint) {
       throw const FormatException('restore_previous_settings_target');
+    }
+  }
+
+  void validateBeforeProjection(Map<String, dynamic> values) {
+    if (fingerprintProjection(values, touchedKeys) != beforeFingerprint) {
+      throw const FormatException('restore_previous_settings_before');
     }
   }
 
