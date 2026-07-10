@@ -8,6 +8,12 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import 'app_database.dart';
 
+typedef ChatDatabaseSnapshotInfo = ({
+  int schemaVersion,
+  int conversationCount,
+  int messageCount,
+});
+
 class ChatDatabaseRepository {
   ChatDatabaseRepository(this._db, [this._syncDb]);
 
@@ -25,6 +31,128 @@ class ChatDatabaseRepository {
     db.execute('PRAGMA foreign_keys = ON;');
     db.execute('PRAGMA busy_timeout = 5000;');
     return db;
+  }
+
+  static Future<ChatDatabaseSnapshotInfo> createConsistentSnapshot({
+    required File sourceFile,
+    required File destinationFile,
+  }) async {
+    final sourcePath = sourceFile.absolute.path;
+    final destinationPath = destinationFile.absolute.path;
+    if (sourcePath == destinationPath) {
+      throw ArgumentError.value(
+        destinationFile.path,
+        'destinationFile',
+        'must differ from sourceFile',
+      );
+    }
+    if (!await sourceFile.exists()) {
+      throw FileSystemException('Source database does not exist', sourcePath);
+    }
+
+    await destinationFile.parent.create(recursive: true);
+    await _deleteDatabaseFamily(destinationFile);
+
+    try {
+      late final ChatDatabaseSnapshotInfo initialInfo;
+      final source = sqlite.sqlite3.open(sourcePath);
+      try {
+        source.execute('PRAGMA query_only = ON;');
+        final destination = sqlite.sqlite3.open(destinationPath);
+        try {
+          final pageSizeRows = source.select('PRAGMA page_size;');
+          final pageSize = pageSizeRows.first.values.first as int;
+          final pagesPerStep = (8 * 1024 * 1024 ~/ pageSize).clamp(1, 1 << 20);
+          await source.backup(destination, nPage: pagesPerStep).drain<void>();
+          initialInfo = _validateRawSnapshot(destination);
+          destination.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+          destination.select('PRAGMA journal_mode = DELETE;');
+        } finally {
+          destination.close();
+        }
+      } finally {
+        source.close();
+      }
+
+      await _deleteDatabaseSidecars(destinationFile);
+      final reopened = sqlite.sqlite3.open(destinationPath);
+      try {
+        final reopenedInfo = _validateRawSnapshot(reopened);
+        if (reopenedInfo != initialInfo) {
+          throw StateError('snapshot_reopen_mismatch');
+        }
+      } finally {
+        reopened.close();
+      }
+      await _deleteDatabaseSidecars(destinationFile);
+      return initialInfo;
+    } catch (_) {
+      await _deleteDatabaseFamily(destinationFile);
+      rethrow;
+    }
+  }
+
+  static ChatDatabaseSnapshotInfo _validateRawSnapshot(
+    sqlite.Database database,
+  ) {
+    final integrityRows = database.select('PRAGMA integrity_check;');
+    if (integrityRows.length != 1 ||
+        integrityRows.single.values.single != 'ok') {
+      throw StateError('integrity_check');
+    }
+    if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
+      throw StateError('foreign_key_check');
+    }
+
+    const requiredTables = {
+      'conversation_rows',
+      'conversation_mcp_server_rows',
+      'message_rows',
+      'tool_event_rows',
+      'gemini_thought_signature_rows',
+      'chat_storage_meta_rows',
+    };
+    final tableRows = database.select(
+      "SELECT name FROM sqlite_master WHERE type = 'table';",
+    );
+    final tables = tableRows
+        .map((row) => row['name'])
+        .whereType<String>()
+        .toSet();
+    if (!tables.containsAll(requiredTables)) {
+      throw StateError('required_tables');
+    }
+
+    return (
+      schemaVersion: database.userVersion,
+      conversationCount: _rawTableCount(database, 'conversation_rows'),
+      messageCount: _rawTableCount(database, 'message_rows'),
+    );
+  }
+
+  static int _rawTableCount(sqlite.Database database, String table) {
+    return database
+            .select('SELECT COUNT(*) AS count FROM $table;')
+            .single['count']
+        as int;
+  }
+
+  static Future<void> _deleteDatabaseFamily(File databaseFile) async {
+    for (final suffix in const ['', '-wal', '-shm', '-journal']) {
+      final file = File('${databaseFile.path}$suffix');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
+  }
+
+  static Future<void> _deleteDatabaseSidecars(File databaseFile) async {
+    for (final suffix in const ['-wal', '-shm', '-journal']) {
+      final file = File('${databaseFile.path}$suffix');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
   }
 
   Future<void> close() async {
