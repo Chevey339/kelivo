@@ -30,8 +30,8 @@ final class _RestorePreparationCleanupException implements Exception {
 
 /// Stages and logically publishes a validated restore bundle for startup.
 ///
-/// Directory fsync and the startup cutover are separate protocol steps. A
-/// successful result owns its workspace until startup recovery finalizes it.
+/// A successful result owns its durably published workspace until the next
+/// startup gate finalizes and archives the run.
 final class RestoreBundlePreparation {
   RestoreBundlePreparation._();
 
@@ -48,18 +48,22 @@ final class RestoreBundlePreparation {
     StagedRestoreBundle? staged;
     var publicationStarted = false;
     try {
+      final selectedChats = restoreChats && bundleIncludesChats;
+      final selectedFiles = restoreFiles && bundleIncludesFiles;
       staged = await RestoreBundleStaging.create(
         appDataDirectory: appDataDirectory,
         extractedDirectory: extractedDirectory,
-        includeChats: bundleIncludesChats,
-        includeFiles: bundleIncludesFiles,
+        includeChats: selectedChats,
+        includeFiles: selectedFiles,
+        sourceIncludesChats: bundleIncludesChats,
+        sourceIncludesFiles: bundleIncludesFiles,
         sourceManifestSha256: sourceManifestSha256,
       );
       final receipt = RestoreReceipt.prepared(
         runId: staged.runId,
         createdAtUtc: createdAtUtc ?? DateTime.now().toUtc(),
-        restoreChats: restoreChats && bundleIncludesChats,
-        restoreFiles: restoreFiles && bundleIncludesFiles,
+        restoreChats: selectedChats,
+        restoreFiles: selectedFiles,
         candidateManifestSha256: staged.candidateManifestSha256,
       );
       final store = RestoreReceiptStore(

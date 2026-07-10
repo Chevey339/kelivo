@@ -2966,8 +2966,62 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageRestartContent.
   ///
   /// In en, this message translates to:
-  /// **'Restore completed. Please restart the app.'**
+  /// **'Restore is ready. Restart Kelivo to apply it safely.'**
   String get backupPageRestartContent;
+
+  /// No description provided for @restartAppFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo could not restart automatically. Fully close it, then open it again.'**
+  String get restartAppFailedMessage;
+
+  /// No description provided for @backupRestoreColdRestartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One more restart is required'**
+  String get backupRestoreColdRestartTitle;
+
+  /// No description provided for @backupRestoreColdRestartContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.'**
+  String get backupRestoreColdRestartContent;
+
+  /// No description provided for @backupRestoreColdRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Kelivo'**
+  String get backupRestoreColdRestartButton;
+
+  /// No description provided for @backupRestoreRolledBackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore was rolled back'**
+  String get backupRestoreRolledBackTitle;
+
+  /// No description provided for @backupRestoreRolledBackContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The restore could not be completed. Kelivo verified and kept your previous data.'**
+  String get backupRestoreRolledBackContent;
+
+  /// No description provided for @backupRestoreFailureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore requires attention'**
+  String get backupRestoreFailureTitle;
+
+  /// No description provided for @backupRestoreFailureContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
+  String get backupRestoreFailureContent;
+
+  /// No description provided for @backupRestoreFailureDiagnostic.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code: {code}'**
+  String backupRestoreFailureDiagnostic(String code);
 
   /// No description provided for @backupPageRestoreFailedMessage.
   ///
@@ -2996,7 +3050,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageSelectImportModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Choose how to import the backup data:'**
+  /// **'Choose a restore mode. The chat and file switches determine which components are included.'**
   String get backupPageSelectImportModeDescription;
 
   /// No description provided for @backupPageOverwriteMode.
@@ -3008,20 +3062,26 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageOverwriteModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Clear all local data and restore from backup'**
+  /// **'Replace the selected components; keep unselected components and unrelated local settings'**
   String get backupPageOverwriteModeDescription;
 
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
-  /// **'Smart Merge'**
+  /// **'Legacy JSON Merge'**
   String get backupPageMergeMode;
 
   /// No description provided for @backupPageMergeModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Add only non-existing data (intelligent deduplication)'**
+  /// **'Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.'**
   String get backupPageMergeModeDescription;
+
+  /// No description provided for @backupPageSqliteMergeUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.'**
+  String get backupPageSqliteMergeUnsupported;
 
   /// No description provided for @backupPageRestore.
   ///

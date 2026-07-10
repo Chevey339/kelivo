@@ -78,6 +78,18 @@ final class BackupSettingsSanitizer {
     return sanitized;
   }
 
+  /// Rejects a bundle that declares itself secret-free while still changing
+  /// under the normal-backup credential policy.
+  static void validateSecretFree(Map<String, dynamic> source) {
+    final sanitized = sanitize(source);
+    for (final key in _knownSecretPlaceholders.keys) {
+      if (!source.containsKey(key)) sanitized.remove(key);
+    }
+    if (!_jsonEquals(sanitized, source)) {
+      throw const FormatException('restore_settings_not_secret_free');
+    }
+  }
+
   static bool shouldClearBeforeSecretFreeOverwrite(String key) {
     final baseKey = _preferenceKeyBase(key);
     return _credentialJsonBaseKeys.contains(baseKey) ||
@@ -461,4 +473,25 @@ final class BackupSettingsSanitizer {
 
   static String _normalizeName(String value) =>
       value.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
+
+  static bool _jsonEquals(Object? left, Object? right) {
+    if (left is Map && right is Map) {
+      if (left.length != right.length ||
+          left.keys.any((key) => !right.containsKey(key))) {
+        return false;
+      }
+      return left.keys.every((key) => _jsonEquals(left[key], right[key]));
+    }
+    if (left is List && right is List) {
+      if (left.length != right.length) return false;
+      for (var index = 0; index < left.length; index++) {
+        if (!_jsonEquals(left[index], right[index])) return false;
+      }
+      return true;
+    }
+    if (left is num && right is num && left.runtimeType != right.runtimeType) {
+      return false;
+    }
+    return left == right;
+  }
 }

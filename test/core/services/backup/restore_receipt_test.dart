@@ -126,6 +126,31 @@ void main() {
         throwsStateError,
       );
     });
+
+    test('requires an explicit rollback intent before rolled back', () {
+      final oldRenamed = _withPrevious(_preparedReceipt());
+      final newInstalled = oldRenamed.advance(RestoreReceiptState.newInstalled);
+      final verified = newInstalled.advance(RestoreReceiptState.verified);
+
+      for (final source in [oldRenamed, newInstalled, verified]) {
+        expect(
+          () => source.advance(RestoreReceiptState.rolledBack),
+          throwsStateError,
+        );
+        final rollingBack = source.advance(RestoreReceiptState.rollingBack);
+        final rolledBack = rollingBack.advance(RestoreReceiptState.rolledBack);
+        expect(
+          RestoreReceipt.fromJson(rolledBack.toJson()).state,
+          RestoreReceiptState.rolledBack,
+        );
+      }
+      expect(
+        () => verified
+            .advance(RestoreReceiptState.committed)
+            .advance(RestoreReceiptState.rollingBack),
+        throwsStateError,
+      );
+    });
   });
 
   group('RestoreReceiptStore', () {
@@ -170,7 +195,83 @@ void main() {
         'receipt_0000000000000001.json',
         'receipt_0000000000000002.json',
       ]);
+      final history = await store.readHistory();
+      expect(history.map((receipt) => receipt.state), [
+        RestoreReceiptState.prepared,
+        RestoreReceiptState.oldRenamed,
+      ]);
     });
+
+    test('rejects candidate components not selected by the receipt', () async {
+      final candidate = Directory(p.join(store.runDirectory.path, 'candidate'));
+      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+        await Directory(p.join(candidate.path, rootName)).create();
+      }
+      final asset = File(p.join(candidate.path, 'upload', 'extra.txt'));
+      await asset.writeAsString('not selected', flush: true);
+      final settings = File(p.join(candidate.path, 'settings.json'));
+      final manifest = File(p.join(candidate.path, 'manifest.json'));
+      await manifest.writeAsString(
+        jsonEncode({
+          'format': 'kelivo-backup',
+          'formatVersion': 2,
+          'payloadKind': 'settings-only',
+          'createdAtUtc': '2026-07-09T00:00:00.000Z',
+          'appVersion': 'test',
+          'includeChats': false,
+          'includeFiles': true,
+          'secretsIncluded': false,
+          'entries': {
+            'settings.json': {
+              'bytes': await settings.length(),
+              'sha256': (await sha256.bind(settings.openRead()).first)
+                  .toString(),
+            },
+            'upload/extra.txt': {
+              'bytes': await asset.length(),
+              'sha256': (await sha256.bind(asset.openRead()).first).toString(),
+            },
+          },
+        }),
+        flush: true,
+      );
+      candidateManifestSha256 = (await sha256.bind(manifest.openRead()).first)
+          .toString();
+
+      await expectLater(
+        store.publish(prepared()),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'restore_receipt_candidate_selection',
+          ),
+        ),
+      );
+      expect(await store.readLatest(), isNull);
+    });
+
+    test(
+      'reads and publishes without reentering a held workspace lock',
+      () async {
+        final initial = prepared();
+        await store.publish(initial);
+        final workspaceLock = RestoreWorkspaceLock(appDataDirectory: root);
+
+        await workspaceLock.synchronized(() async {
+          await workspaceLock.claimCutoverRunWhileWorkspaceLocked(
+            runId: _runId,
+            observedMarkerFileName: RestoreWorkspaceLock.activeRunFileName,
+          );
+          expect(await store.readHistoryWhileWorkspaceLocked(), hasLength(1));
+          await store.publishWhileWorkspaceLocked(_withPrevious(initial));
+          expect(
+            (await store.readHistoryWhileWorkspaceLocked()).last.state,
+            RestoreReceiptState.oldRenamed,
+          );
+        });
+      },
+    );
 
     test('rejects sequence gaps instead of using an older state', () async {
       final first = prepared();
@@ -210,9 +311,31 @@ void main() {
       },
     );
 
+    test('accepts the longest rollback history', () async {
+      final first = prepared();
+      final second = _withPrevious(first);
+      final third = second.advance(RestoreReceiptState.newInstalled);
+      final fourth = third.advance(RestoreReceiptState.verified);
+      final fifth = fourth.advance(RestoreReceiptState.rollingBack);
+      final sixth = fifth.advance(RestoreReceiptState.rolledBack);
+
+      for (final receipt in [first, second, third, fourth, fifth, sixth]) {
+        await store.publish(receipt);
+      }
+
+      expect((await store.readHistory()).map((receipt) => receipt.state), [
+        RestoreReceiptState.prepared,
+        RestoreReceiptState.oldRenamed,
+        RestoreReceiptState.newInstalled,
+        RestoreReceiptState.verified,
+        RestoreReceiptState.rollingBack,
+        RestoreReceiptState.rolledBack,
+      ]);
+    });
+
     test('rejects more records than the state machine can produce', () async {
       await store.receiptDirectory.create(recursive: true);
-      for (var sequence = 1; sequence <= 6; sequence++) {
+      for (var sequence = 1; sequence <= 7; sequence++) {
         final digits = sequence.toString().padLeft(16, '0');
         await File(
           '${store.receiptDirectory.path}/receipt_$digits.json',
@@ -239,15 +362,47 @@ void main() {
       },
     );
 
-    test('ignores unpublished temp files', () async {
+    test('ignores only an exact unpublished receipt temp file', () async {
       final initial = prepared();
       await store.publish(initial);
       await File(
-        '${store.receiptDirectory.path}/orphan.json.tmp',
+        '${store.receiptDirectory.path}/receipt_0000000000000002.json.'
+        '1783612800000000_12345.tmp',
       ).writeAsString('partial', flush: true);
 
       final latest = await store.readLatest();
       expect(latest?.checksum, initial.checksum);
+    });
+
+    test('rejects unknown or malformed receipt temp files', () async {
+      final initial = prepared();
+      await store.publish(initial);
+      const invalidNames = [
+        'orphan.json.tmp',
+        'receipt_2.json.1783612800000000_12345.tmp',
+        'receipt_0000000000000002.json.timestamp_12345.tmp',
+        'receipt_0000000000000002.json.1783612800000000_pid.tmp',
+        'receipt_0000000000000007.json.1783612800000000_12345.tmp',
+      ];
+
+      for (final name in invalidNames) {
+        final temporary = File(p.join(store.receiptDirectory.path, name));
+        await temporary.writeAsString('partial', flush: true);
+
+        await expectLater(
+          store.readLatest(),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'restore_receipt_directory_entry',
+            ),
+          ),
+          reason: name,
+        );
+
+        await temporary.delete();
+      }
     });
 
     test(
@@ -375,12 +530,21 @@ void main() {
       );
     });
 
-    test('rejects a receipt directory without a final record', () async {
+    test('rejects an unknown temp in a receipt directory', () async {
       await store.receiptDirectory.create();
       final temporary = File(p.join(store.receiptDirectory.path, 'left.tmp'));
       await temporary.writeAsString('partial', flush: true);
 
-      await expectLater(store.publish(prepared()), throwsStateError);
+      await expectLater(
+        store.publish(prepared()),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'restore_receipt_directory_entry',
+          ),
+        ),
+      );
 
       expect(await temporary.exists(), isTrue);
     });

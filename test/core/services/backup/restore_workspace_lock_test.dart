@@ -98,6 +98,48 @@ void main() {
       expect(await lock.synchronized(() async => 'recovered'), 'recovered');
     });
 
+    test('claims and resumes the exact startup cutover marker', () async {
+      const runId = '0123456789abcdef0123456789abcdef';
+      await lock.synchronized(() async {
+        await Directory(p.join(lock.workspaceRoot.path, 'run_$runId')).create();
+        await File(
+          p.join(
+            lock.workspaceRoot.path,
+            RestoreWorkspaceLock.activeRunFileName,
+          ),
+        ).writeAsString(runId, flush: true);
+
+        await lock.claimCutoverRunWhileWorkspaceLocked(
+          runId: runId,
+          observedMarkerFileName: RestoreWorkspaceLock.activeRunFileName,
+        );
+        await lock.claimCutoverRunWhileWorkspaceLocked(
+          runId: runId,
+          observedMarkerFileName: RestoreWorkspaceLock.publishingRunFileName,
+        );
+
+        expect(
+          await File(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.publishingRunFileName,
+            ),
+          ).readAsString(),
+          runId,
+        );
+        expect(
+          await FileSystemEntity.type(
+            p.join(
+              lock.workspaceRoot.path,
+              RestoreWorkspaceLock.activeRunFileName,
+            ),
+            followLinks: false,
+          ),
+          FileSystemEntityType.notFound,
+        );
+      });
+    });
+
     test(
       'rejects a linked workspace root without running the action',
       () async {

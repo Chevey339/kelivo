@@ -140,5 +140,47 @@ void main() {
         throwsFormatException,
       );
     });
+
+    test('rebuilds the same transition from a durable previous plan', () {
+      final candidate = BackupSettingsSanitizer.sanitize({
+        'theme': 'new',
+        'provider_api_key_v1': 'candidate-secret',
+      });
+      final initial = RestoreSettingsTransition.build(
+        currentSettings: const {'theme': 'old', 'old_api_key_v1': 'old-secret'},
+        candidateSettings: candidate,
+        secretsIncluded: false,
+      );
+
+      final resumed = RestoreSettingsTransition.resume(
+        plan: initial.plan,
+        snapshotBytes: initial.snapshotBytes,
+        candidateSettings: candidate,
+        secretsIncluded: false,
+      );
+
+      expect(resumed.plan, same(initial.plan));
+      expect(resumed.snapshotBytes, initial.snapshotBytes);
+      expect(resumed.valuesToSet, initial.valuesToSet);
+      expect(resumed.keysToRemove, initial.keysToRemove);
+    });
+
+    test('rejects a resumed candidate that differs from the frozen target', () {
+      final initial = RestoreSettingsTransition.build(
+        currentSettings: const {'theme': 'old'},
+        candidateSettings: const {'theme': 'new'},
+        secretsIncluded: true,
+      );
+
+      expect(
+        () => RestoreSettingsTransition.resume(
+          plan: initial.plan,
+          snapshotBytes: initial.snapshotBytes,
+          candidateSettings: const {'theme': 'changed'},
+          secretsIncluded: true,
+        ),
+        throwsFormatException,
+      );
+    });
   });
 }

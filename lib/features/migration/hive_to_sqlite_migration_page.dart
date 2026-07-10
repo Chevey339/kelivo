@@ -11,6 +11,7 @@ import 'package:reel_text/reel_text.dart';
 import '../../core/services/native_file_save.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
+import '../../shared/widgets/restart_app_action.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/platform_utils.dart';
 import 'hive_to_sqlite_migration_service.dart';
@@ -210,7 +211,9 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.complete => _CompleteStep(
         key: key,
         status: _status,
-        onRestart: PlatformUtils.restartApp,
+        onRestart: () async {
+          await requestAppRestart(context, PlatformUtils.restartApp);
+        },
       ),
       HiveToSqliteMigrationStage.failed => _FailedStep(
         key: key,
@@ -393,7 +396,7 @@ class _CompleteStep extends StatelessWidget {
   });
 
   final HiveToSqliteMigrationStatus status;
-  final VoidCallback onRestart;
+  final Future<void> Function() onRestart;
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +440,7 @@ class _CompleteStep extends StatelessWidget {
         _PrimaryButton(
           icon: Lucide.RefreshCw,
           label: l10n.migrationRestartButton,
-          onPressed: onRestart,
+          onPressed: () => unawaited(onRestart()),
         ),
       ],
     );

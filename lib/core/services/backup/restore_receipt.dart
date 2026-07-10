@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'restore_bundle_staging.dart';
+import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 
 enum RestoreComponent { settings, database, assets }
@@ -16,6 +17,7 @@ enum RestoreReceiptState {
   oldRenamed,
   newInstalled,
   verified,
+  rollingBack,
   committed,
   rolledBack,
 }
@@ -27,8 +29,12 @@ const _componentOrder = [
 ];
 final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
 final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
+final _receiptFilePattern = RegExp(r'^receipt_([0-9]{16})\.json$');
+final _receiptTemporaryFilePattern = RegExp(
+  r'^receipt_([0-9]{16})\.json\.([1-9][0-9]*)_([1-9][0-9]*)\.tmp$',
+);
 const _maximumReceiptBytes = 64 * 1024;
-const _maximumReceiptCount = 5;
+const _maximumReceiptCount = 6;
 
 final class RestoreReceipt {
   RestoreReceipt._({
@@ -249,13 +255,15 @@ final class RestoreReceipt {
         nextState == RestoreReceiptState.oldRenamed,
       RestoreReceiptState.oldRenamed =>
         nextState == RestoreReceiptState.newInstalled ||
-            nextState == RestoreReceiptState.rolledBack,
+            nextState == RestoreReceiptState.rollingBack,
       RestoreReceiptState.newInstalled =>
         nextState == RestoreReceiptState.verified ||
-            nextState == RestoreReceiptState.rolledBack,
+            nextState == RestoreReceiptState.rollingBack,
       RestoreReceiptState.verified =>
         nextState == RestoreReceiptState.committed ||
-            nextState == RestoreReceiptState.rolledBack,
+            nextState == RestoreReceiptState.rollingBack,
+      RestoreReceiptState.rollingBack =>
+        nextState == RestoreReceiptState.rolledBack,
       RestoreReceiptState.committed || RestoreReceiptState.rolledBack => false,
     };
   }
@@ -299,10 +307,12 @@ final class RestoreReceipt {
 }
 
 final class RestoreReceiptStore {
-  RestoreReceiptStore({required this.appDataDirectory, required this.runId})
-    : _workspaceLock = RestoreWorkspaceLock(
-        appDataDirectory: appDataDirectory,
-      ) {
+  RestoreReceiptStore({
+    required this.appDataDirectory,
+    required this.runId,
+    this.archived = false,
+    RestoreDurability? durability,
+  }) : _durabilityOverride = durability {
     _validateRunId(runId, parsed: false);
   }
 
@@ -310,18 +320,35 @@ final class RestoreReceiptStore {
 
   final Directory appDataDirectory;
   final String runId;
-  final RestoreWorkspaceLock _workspaceLock;
+  final bool archived;
+  final RestoreDurability? _durabilityOverride;
+
+  RestoreDurability get durability =>
+      _durabilityOverride ?? RestorePlatformDurability();
+
+  RestoreWorkspaceLock get _workspaceLock => RestoreWorkspaceLock(
+    appDataDirectory: appDataDirectory,
+    durability: _durabilityOverride,
+  );
 
   Directory get workspaceRoot => _workspaceLock.workspaceRoot;
 
-  Directory get runDirectory =>
-      Directory(p.join(workspaceRoot.path, 'run_$runId'));
+  Directory get runDirectory => Directory(
+    p.joinAll([
+      workspaceRoot.path,
+      if (archived) RestoreWorkspaceLock.completedRunsDirectoryName,
+      'run_$runId',
+    ]),
+  );
 
   Directory get receiptDirectory =>
       Directory(p.join(runDirectory.path, 'receipts'));
 
   Future<RestoreReceipt?> readLatest() =>
       _workspaceLock.synchronized(_readLatestUnlocked);
+
+  Future<List<RestoreReceipt>> readHistory() =>
+      _workspaceLock.synchronized(_readHistoryUnlocked);
 
   /// Reads the journal while the caller holds this app-data workspace lock.
   ///
@@ -331,82 +358,110 @@ final class RestoreReceiptStore {
   Future<RestoreReceipt?> readLatestWhileWorkspaceLocked() =>
       _readLatestUnlocked();
 
+  Future<List<RestoreReceipt>> readHistoryWhileWorkspaceLocked() =>
+      _readHistoryUnlocked();
+
   Future<void> publish(RestoreReceipt receipt) async {
+    if (archived) throw StateError('restore_receipt_archived_publish');
     if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
     await _workspaceLock.withPublishingRun(
       runId: runId,
-      action: () async {
-        await _requireExclusiveRunWorkspace(
+      action: () => _publishUnlocked(
+        receipt,
+        activeRunFileName: RestoreWorkspaceLock.publishingRunFileName,
+      ),
+    );
+  }
+
+  Future<void> publishWhileWorkspaceLocked(RestoreReceipt receipt) => archived
+      ? Future<void>.error(StateError('restore_receipt_archived_publish'))
+      : _publishUnlocked(
+          receipt,
           activeRunFileName: RestoreWorkspaceLock.publishingRunFileName,
         );
-        final initialReceiptDirectoryType = await FileSystemEntity.type(
-          receiptDirectory.path,
-          followLinks: false,
-        );
-        final latest = await _readLatestUnlocked();
-        if (latest != null && latest.sequence == receipt.sequence) {
-          if (receipt.sequence == 1) {
-            await _validatePreparedRunTopology(expectReceipts: true);
-            await _validatePreparedCandidate(receipt);
-          }
-          if (latest.checksum == receipt.checksum) return;
-          throw StateError('restore_receipt_collision');
-        }
-        if (latest == null) {
-          if (receipt.sequence != 1 ||
-              receipt.state != RestoreReceiptState.prepared) {
-            throw StateError('restore_receipt_initial_sequence');
-          }
-          if (initialReceiptDirectoryType != FileSystemEntityType.notFound) {
-            throw StateError('restore_receipt_initial_directory');
-          }
-          await _validatePreparedRunTopology(expectReceipts: false);
-          await _validatePreparedCandidate(receipt);
-        } else {
-          _validateContinuation(latest, receipt);
-        }
 
-        if (!await _validateExistingDirectory(runDirectory)) {
-          throw StateError('restore_receipt_run_directory');
-        }
-        await _ensureSafeDirectory(receiptDirectory);
-        final target = File(
-          p.join(receiptDirectory.path, _receiptFileName(receipt.sequence)),
-        );
-        if (await FileSystemEntity.type(target.path, followLinks: false) !=
-            FileSystemEntityType.notFound) {
-          throw StateError('restore_receipt_collision');
-        }
-        final temporary = File(
-          '${target.path}.${DateTime.now().microsecondsSinceEpoch}_$pid.tmp',
-        );
-        try {
-          final encoded = utf8.encode(jsonEncode(receipt.toJson()));
-          if (encoded.length > _maximumReceiptBytes) {
-            throw StateError('restore_receipt_size');
-          }
-          await temporary.writeAsBytes(encoded, flush: true);
-          final staged = await _readReceiptFile(temporary);
-          if (staged.checksum != receipt.checksum) {
-            throw StateError('restore_receipt_staging');
-          }
-
-          // Reserve the final sequence atomically instead of renaming over an
-          // existing record. A crash during the following write deliberately
-          // leaves a corrupt final record so startup fails closed rather than
-          // falling back to an older state. Directory fsync remains part of the
-          // five-platform crash-durability acceptance work.
-          await target.create(exclusive: true);
-          await target.writeAsBytes(encoded, flush: true);
-          final published = await _readReceiptFile(target);
-          if (published.checksum != receipt.checksum) {
-            throw StateError('restore_receipt_publish');
-          }
-        } finally {
-          if (await temporary.exists()) await temporary.delete();
-        }
-      },
+  Future<void> _publishUnlocked(
+    RestoreReceipt receipt, {
+    required String activeRunFileName,
+  }) async {
+    if (receipt.runId != runId) throw StateError('restore_receipt_run_id');
+    await _requireExclusiveRunWorkspace(activeRunFileName: activeRunFileName);
+    final initialReceiptDirectoryType = await FileSystemEntity.type(
+      receiptDirectory.path,
+      followLinks: false,
     );
+    final latest = await _readLatestUnlocked();
+    if (latest != null && latest.sequence == receipt.sequence) {
+      if (receipt.sequence == 1) {
+        await _validatePreparedRunTopology(expectReceipts: true);
+        await _validatePreparedCandidate(receipt);
+      }
+      if (latest.checksum == receipt.checksum) return;
+      throw StateError('restore_receipt_collision');
+    }
+    if (latest == null) {
+      if (receipt.sequence != 1 ||
+          receipt.state != RestoreReceiptState.prepared) {
+        throw StateError('restore_receipt_initial_sequence');
+      }
+      if (initialReceiptDirectoryType != FileSystemEntityType.notFound) {
+        throw StateError('restore_receipt_initial_directory');
+      }
+      await _validatePreparedRunTopology(expectReceipts: false);
+      await _validatePreparedCandidate(receipt);
+    } else {
+      _validateContinuation(latest, receipt);
+    }
+
+    if (!await _validateExistingDirectory(runDirectory)) {
+      throw StateError('restore_receipt_run_directory');
+    }
+    await _ensureSafeDirectory(receiptDirectory);
+    final target = File(
+      p.join(receiptDirectory.path, _receiptFileName(receipt.sequence)),
+    );
+    if (await FileSystemEntity.type(target.path, followLinks: false) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('restore_receipt_collision');
+    }
+    final temporary = File(
+      p.join(
+        receiptDirectory.path,
+        _receiptTemporaryFileName(
+          sequence: receipt.sequence,
+          timestamp: DateTime.now().microsecondsSinceEpoch,
+          processId: pid,
+        ),
+      ),
+    );
+    try {
+      final encoded = utf8.encode(jsonEncode(receipt.toJson()));
+      if (encoded.length > _maximumReceiptBytes) {
+        throw StateError('restore_receipt_size');
+      }
+      await temporary.create(exclusive: true);
+      await durability.restrictFile(temporary);
+      await temporary.writeAsBytes(encoded, flush: true);
+      await durability.syncFile(temporary, fullBarrier: true);
+      final staged = await _readReceiptFile(temporary);
+      if (staged.checksum != receipt.checksum) {
+        throw StateError('restore_receipt_staging');
+      }
+      await durability.renameAndSync(
+        source: temporary,
+        targetPath: target.path,
+      );
+      final published = await _readReceiptFile(target);
+      if (published.checksum != receipt.checksum) {
+        throw StateError('restore_receipt_publish');
+      }
+    } finally {
+      if (await FileSystemEntity.type(temporary.path, followLinks: false) ==
+          FileSystemEntityType.file) {
+        await temporary.delete();
+        await durability.syncDirectory(receiptDirectory, fullBarrier: true);
+      }
+    }
   }
 
   Future<void> _requireExclusiveRunWorkspace({
@@ -421,6 +476,13 @@ final class RestoreReceiptStore {
         if (type != FileSystemEntityType.file) {
           throw StateError('restore_receipt_lock');
         }
+        continue;
+      }
+      if (name == RestoreWorkspaceLock.completedRunsDirectoryName &&
+          type == FileSystemEntityType.directory) {
+        await RestoreWorkspaceLock.validateCompletedRunsDirectory(
+          Directory(entity.path),
+        );
         continue;
       }
       if (name == activeRunFileName && type == FileSystemEntityType.file) {
@@ -452,10 +514,10 @@ final class RestoreReceiptStore {
       candidateDirectory: candidateDirectory,
       expectedManifestSha256: receipt.candidateManifestSha256,
     );
-    if ((receipt.selectedComponents.contains(RestoreComponent.database) &&
-            !candidate.includeChats) ||
-        (receipt.selectedComponents.contains(RestoreComponent.assets) &&
-            !candidate.includeFiles)) {
+    if (receipt.selectedComponents.contains(RestoreComponent.database) !=
+            candidate.includeChats ||
+        receipt.selectedComponents.contains(RestoreComponent.assets) !=
+            candidate.includeFiles) {
       throw StateError('restore_receipt_candidate_selection');
     }
   }
@@ -492,10 +554,15 @@ final class RestoreReceiptStore {
   }
 
   Future<RestoreReceipt?> _readLatestUnlocked() async {
+    final history = await _readHistoryUnlocked();
+    return history.isEmpty ? null : history.last;
+  }
+
+  Future<List<RestoreReceipt>> _readHistoryUnlocked() async {
     if (!await _validateExistingDirectory(workspaceRoot) ||
         !await _validateExistingDirectory(runDirectory) ||
         !await _validateExistingDirectory(receiptDirectory)) {
-      return null;
+      return const [];
     }
 
     final receiptFiles = <({File file, int sequence})>[];
@@ -505,10 +572,11 @@ final class RestoreReceiptStore {
         followLinks: false,
       );
       final name = p.basename(entity.path);
-      if (entityType == FileSystemEntityType.file && name.endsWith('.tmp')) {
+      if (entityType == FileSystemEntityType.file &&
+          _isReceiptTemporaryFileName(name)) {
         continue;
       }
-      final match = RegExp(r'^receipt_(\d{16})\.json$').firstMatch(name);
+      final match = _receiptFilePattern.firstMatch(name);
       if (entityType != FileSystemEntityType.file || match == null) {
         throw const FormatException('restore_receipt_directory_entry');
       }
@@ -520,9 +588,10 @@ final class RestoreReceiptStore {
         throw const FormatException('restore_receipt_count');
       }
     }
-    if (receiptFiles.isEmpty) return null;
+    if (receiptFiles.isEmpty) return const [];
     receiptFiles.sort((a, b) => a.sequence.compareTo(b.sequence));
 
+    final history = <RestoreReceipt>[];
     RestoreReceipt? previous;
     for (var index = 0; index < receiptFiles.length; index++) {
       final entry = receiptFiles[index];
@@ -542,9 +611,10 @@ final class RestoreReceiptStore {
       } else {
         _validateContinuation(previous, receipt);
       }
+      history.add(receipt);
       previous = receipt;
     }
-    return previous;
+    return List.unmodifiable(history);
   }
 
   void _validateContinuation(RestoreReceipt previous, RestoreReceipt next) {
@@ -566,7 +636,7 @@ final class RestoreReceiptStore {
     }
   }
 
-  static Future<void> _ensureSafeDirectory(Directory directory) async {
+  Future<void> _ensureSafeDirectory(Directory directory) async {
     final type = await FileSystemEntity.type(
       directory.path,
       followLinks: false,
@@ -578,6 +648,10 @@ final class RestoreReceiptStore {
     }
     if (type == FileSystemEntityType.notFound) {
       await directory.create(recursive: true);
+      await durability.restrictDirectory(directory);
+      await durability.syncDirectory(directory.parent, fullBarrier: true);
+    } else {
+      await durability.restrictDirectory(directory);
     }
     if (await FileSystemEntity.type(directory.path, followLinks: false) !=
         FileSystemEntityType.directory) {
@@ -601,6 +675,43 @@ final class RestoreReceiptStore {
     final digits = sequence.toString().padLeft(16, '0');
     if (digits.length != 16) throw StateError('restore_receipt_sequence');
     return 'receipt_$digits.json';
+  }
+
+  static String _receiptTemporaryFileName({
+    required int sequence,
+    required int timestamp,
+    required int processId,
+  }) {
+    if (sequence < 1 ||
+        sequence > _maximumReceiptCount ||
+        timestamp < 1 ||
+        processId < 1) {
+      throw StateError('restore_receipt_temp_identity');
+    }
+    return '${_receiptFileName(sequence)}.${timestamp}_$processId.tmp';
+  }
+
+  static bool _isReceiptTemporaryFileName(String name) {
+    final match = _receiptTemporaryFilePattern.firstMatch(name);
+    if (match == null) return false;
+    final sequence = int.tryParse(match[1]!);
+    final timestamp = int.tryParse(match[2]!);
+    final processId = int.tryParse(match[3]!);
+    if (sequence == null ||
+        sequence < 1 ||
+        sequence > _maximumReceiptCount ||
+        timestamp == null ||
+        timestamp < 1 ||
+        processId == null ||
+        processId < 1) {
+      return false;
+    }
+    return name ==
+        _receiptTemporaryFileName(
+          sequence: sequence,
+          timestamp: timestamp,
+          processId: processId,
+        );
   }
 }
 

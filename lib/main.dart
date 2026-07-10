@@ -35,18 +35,25 @@ import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
+import 'core/services/backup/restore_receipt.dart';
 import 'core/services/mcp/mcp_tool_service.dart';
 import 'core/services/logging/flutter_logger.dart';
 import 'features/home/services/ask_user_interaction_service.dart';
 import 'features/home/services/tool_approval_service.dart';
 import 'utils/app_directories.dart';
+import 'utils/platform_utils.dart';
 import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
+import 'shared/widgets/snackbar.dart';
+import 'shared/widgets/restore_failure_screen.dart';
+import 'shared/widgets/restore_cold_restart_screen.dart';
+import 'shared/widgets/restore_outcome_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
-    show Platform; // kept for global override usage inside provider
+    show Platform, stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -62,9 +69,32 @@ Future<void> main() async {
       WidgetsFlutterBinding.ensureInitialized();
       FlutterLogger.installGlobalHandlers();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
-      await RestoreStartupGate.requireBusinessReady(
-        appDataDirectory: appDataDirectory,
-      );
+      final RestoreReceipt? restoreOutcome;
+      try {
+        // The lease remains process-owned through its internal registry until
+        // process exit, preventing another instance from racing business I/O.
+        final businessLease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appDataDirectory,
+        );
+        restoreOutcome =
+            await RestoreStartupGate.recoverAndRequireBusinessReady(
+              appDataDirectory: appDataDirectory,
+              businessLease: businessLease,
+            );
+      } on RestoreColdRestartRequired {
+        await _initRestoreFailureWindow();
+        runApp(const _RestoreColdRestartApp());
+        return;
+      } catch (error, stackTrace) {
+        stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
+        await _initRestoreFailureWindow();
+        runApp(
+          _RestoreFailureApp(
+            diagnosticCode: restoreFailureDiagnosticCode(error),
+          ),
+        );
+        return;
+      }
       try {
         final prefs = await SharedPreferences.getInstance();
         final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
@@ -92,6 +122,7 @@ Future<void> main() async {
         runApp(
           MigrationApp(
             service: HiveToSqliteMigrationService(migrationDecision),
+            restoreOutcome: restoreOutcome?.state,
           ),
         );
         return;
@@ -99,7 +130,7 @@ Future<void> main() async {
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
-      runApp(const MyApp());
+      runApp(MyApp(restoreOutcome: restoreOutcome?.state));
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -108,6 +139,71 @@ Future<void> main() async {
       },
     ),
   );
+}
+
+Future<void> _initRestoreFailureWindow() async {
+  if (kIsWeb) return;
+  final isDesktop =
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux;
+  if (!isDesktop) return;
+  try {
+    await windowManager.ensureInitialized();
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      await windowManager.show();
+      await windowManager.focus();
+      return;
+    }
+    await windowManager.waitUntilReadyToShow(
+      const WindowOptions(title: 'Kelivo'),
+      () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  } catch (error) {
+    stderr.writeln('[RestoreFailureWindow] $error');
+  }
+}
+
+class _RestoreFailureApp extends StatelessWidget {
+  const _RestoreFailureApp({required this.diagnosticCode});
+
+  final String diagnosticCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: RestoreFailureScreen(diagnosticCode: diagnosticCode),
+    );
+  }
+}
+
+class _RestoreColdRestartApp extends StatelessWidget {
+  const _RestoreColdRestartApp();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = ThemePalettes.defaultPalette;
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Kelivo',
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      theme: buildLightThemeForScheme(palette.light),
+      darkTheme: buildDarkThemeForScheme(palette.dark),
+      home: const RestoreColdRestartScreen(restart: PlatformUtils.restartApp),
+    );
+  }
 }
 
 Future<void> _initDesktopWindow() async {
@@ -127,9 +223,10 @@ Future<void> _initDesktopWindow() async {
 // Removed eager system font preloading to reduce memory footprint at launch.
 
 class MigrationApp extends StatelessWidget {
-  const MigrationApp({super.key, required this.service});
+  const MigrationApp({super.key, required this.service, this.restoreOutcome});
 
   final HiveToSqliteMigrationService service;
+  final RestoreReceiptState? restoreOutcome;
 
   @override
   Widget build(BuildContext context) {
@@ -141,13 +238,20 @@ class MigrationApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: HiveToSqliteMigrationPage(service: service),
+      builder: (context, child) =>
+          AppSnackBarOverlay(child: child ?? const SizedBox.shrink()),
+      home: RestoreOutcomeNotice(
+        outcome: restoreOutcome,
+        child: HiveToSqliteMigrationPage(service: service),
+      ),
     );
   }
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.restoreOutcome});
+
+  final RestoreReceiptState? restoreOutcome;
 
   @override
   Widget build(BuildContext context) {
@@ -402,7 +506,10 @@ class MyApp extends StatelessWidget {
                 darkTheme: themedDark,
                 themeMode: settings.themeMode,
                 navigatorObservers: <NavigatorObserver>[routeObserver],
-                home: _selectHome(),
+                home: RestoreOutcomeNotice(
+                  outcome: restoreOutcome,
+                  child: _selectHome(),
+                ),
                 builder: (ctx, child) {
                   final bright = Theme.of(ctx).brightness;
                   final overlay = bright == Brightness.dark

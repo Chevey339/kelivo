@@ -32,8 +32,11 @@ abstract final class PlatformUtils {
   static bool get isIOS => Platform.isIOS;
 
   static Future<void> restartApp() async {
-    if (Platform.isAndroid) {
-      await Restart.restartApp();
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final result = await Restart.restartApp(mode: RestartMode.process);
+      if (!result.success) {
+        throw StateError('restart_app:${result.code ?? 'unknown'}');
+      }
     } else {
       exit(0);
     }

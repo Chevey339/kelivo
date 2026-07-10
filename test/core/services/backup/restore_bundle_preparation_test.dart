@@ -91,41 +91,47 @@ void main() {
       expect((await store.readLatest())?.checksum, prepared.receipt.checksum);
     });
 
-    test(
-      'records only requested components but retains the full bundle',
-      () async {
-        final bundle = await _createBundle(root, includeFiles: true);
+    test('stages only requested components from a larger bundle', () async {
+      final bundle = await _createBundle(root, includeFiles: true);
 
-        final prepared = await RestoreBundlePreparation.prepare(
-          appDataDirectory: root,
-          extractedDirectory: bundle.directory,
-          sourceManifestSha256: bundle.manifestSha256,
-          bundleIncludesChats: false,
-          bundleIncludesFiles: true,
-          restoreChats: true,
-          restoreFiles: false,
-          createdAtUtc: DateTime.utc(2026, 7, 9, 12),
-        );
+      final prepared = await RestoreBundlePreparation.prepare(
+        appDataDirectory: root,
+        extractedDirectory: bundle.directory,
+        sourceManifestSha256: bundle.manifestSha256,
+        bundleIncludesChats: false,
+        bundleIncludesFiles: true,
+        restoreChats: true,
+        restoreFiles: false,
+        createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+      );
 
-        expect(prepared.receipt.selectedComponents, {
-          RestoreComponent.settings,
-        });
+      expect(prepared.receipt.selectedComponents, {RestoreComponent.settings});
+      expect(
+        await File(
+          p.join(prepared.candidateDirectory.path, 'upload', 'note.txt'),
+        ).exists(),
+        isFalse,
+      );
+      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
         expect(
-          await File(
-            p.join(prepared.candidateDirectory.path, 'upload', 'note.txt'),
-          ).readAsString(),
-          'asset',
+          await Directory(
+            p.join(prepared.candidateDirectory.path, rootName),
+          ).exists(),
+          isFalse,
         );
-        for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
-          expect(
-            await Directory(
-              p.join(prepared.candidateDirectory.path, rootName),
-            ).exists(),
-            isTrue,
-          );
-        }
-      },
-    );
+      }
+      final candidateManifest =
+          jsonDecode(
+                await File(
+                  p.join(prepared.candidateDirectory.path, 'manifest.json'),
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(candidateManifest['includeFiles'], isFalse);
+      expect((candidateManifest['entries'] as Map<String, dynamic>).keys, [
+        'settings.json',
+      ]);
+    });
 
     test('records requested assets when the bundle includes files', () async {
       final bundle = await _createBundle(root, includeFiles: true);

@@ -1,10 +1,25 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'restore_bundle_staging.dart';
+import 'restore_business_lease.dart';
+import 'restore_cutover_executor.dart';
+import 'restore_durability.dart';
+import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
+import 'restore_settings_cold_ack.dart';
+import 'restore_settings_store.dart';
 import 'restore_workspace_lock.dart';
+
+/// A terminal restore is active but its settings still need proof from a new
+/// process. Business persistence must remain unopened when this is thrown.
+final class RestoreColdRestartRequired implements Exception {
+  const RestoreColdRestartRequired(this.state);
+
+  final RestoreReceiptState state;
+}
 
 final class PendingRestoreRun {
   const PendingRestoreRun({
@@ -14,15 +29,15 @@ final class PendingRestoreRun {
   });
 
   final String runId;
-  final String markerFileName;
+  final String? markerFileName;
   final RestoreReceipt receipt;
 }
 
-/// Inspects restore state before any business persistence is opened.
+/// Recovers restore state before any business persistence is opened.
 ///
-/// This admission slice deliberately blocks every published run. The cutover
-/// coordinator will replace that pending branch with deterministic recovery;
-/// until then no caller may mistake a staged bundle for a completed restore.
+/// Nonterminal runs converge under one workspace lock to committed or
+/// rolledBack. Terminal evidence is then archived outside active admission;
+/// malformed or ambiguous state remains fail-closed.
 final class RestoreStartupGate {
   RestoreStartupGate._();
 
@@ -31,14 +46,26 @@ final class RestoreStartupGate {
     RestoreWorkspaceLock.activeRunFileName,
     RestoreWorkspaceLock.publishingRunFileName,
     RestoreWorkspaceLock.discardingRunFileName,
+    RestoreWorkspaceLock.archivingRunFileName,
   };
+  static final _coldAckTemporaryPattern = RegExp(
+    r'^settings_cold_ack\.json\.[0-9]+_[0-9]+_[0-9]+\.tmp$',
+  );
 
   static Future<PendingRestoreRun?> inspect({
     required Directory appDataDirectory,
-  }) {
+  }) async {
     final workspaceLock = RestoreWorkspaceLock(
       appDataDirectory: appDataDirectory,
     );
+    final workspaceType = await FileSystemEntity.type(
+      workspaceLock.workspaceRoot.path,
+      followLinks: false,
+    );
+    if (workspaceType == FileSystemEntityType.notFound) return null;
+    if (workspaceType != FileSystemEntityType.directory) {
+      throw StateError('restore_startup_workspace_root');
+    }
     return workspaceLock.synchronized(
       () => _inspectLocked(
         appDataDirectory: appDataDirectory,
@@ -71,6 +98,13 @@ final class RestoreStartupGate {
           type == FileSystemEntityType.file) {
         continue;
       }
+      if (name == RestoreWorkspaceLock.completedRunsDirectoryName &&
+          type == FileSystemEntityType.directory) {
+        await RestoreWorkspaceLock.validateCompletedRunsDirectory(
+          Directory(entity.path),
+        );
+        continue;
+      }
       if (_markerFileNames.contains(name) &&
           type == FileSystemEntityType.file &&
           markerFile == null) {
@@ -90,15 +124,20 @@ final class RestoreStartupGate {
     }
 
     if (markerFile == null && runDirectory == null) return null;
-    if (markerFile == null ||
-        markerFileName == null ||
-        runDirectory == null ||
-        directoryRunId == null) {
+    if (runDirectory == null || directoryRunId == null) {
       throw StateError('restore_startup_run_topology');
     }
-    final runId = await _readRunId(markerFile);
-    if (runId != directoryRunId) {
-      throw StateError('restore_startup_run_identity');
+    final String runId;
+    if (markerFile != null) {
+      if (markerFileName == null) {
+        throw StateError('restore_startup_run_topology');
+      }
+      runId = await _readRunId(markerFile);
+      if (runId != directoryRunId) {
+        throw StateError('restore_startup_run_identity');
+      }
+    } else {
+      runId = directoryRunId;
     }
 
     final store = RestoreReceiptStore(
@@ -107,8 +146,32 @@ final class RestoreStartupGate {
     );
     final receipt = await store.readLatestWhileWorkspaceLocked();
     if (receipt == null) throw StateError('restore_startup_receipt');
+    final terminal =
+        receipt.state == RestoreReceiptState.committed ||
+        receipt.state == RestoreReceiptState.rolledBack;
+    if (markerFileName == null) {
+      if (!terminal) throw StateError('restore_startup_run_topology');
+    } else if (terminal) {
+      if (markerFileName != RestoreWorkspaceLock.publishingRunFileName &&
+          markerFileName != RestoreWorkspaceLock.archivingRunFileName) {
+        throw StateError('restore_startup_terminal_marker');
+      }
+    } else if (receipt.state == RestoreReceiptState.prepared) {
+      if (markerFileName == RestoreWorkspaceLock.archivingRunFileName) {
+        throw StateError('restore_startup_cutover_marker');
+      }
+    } else if (markerFileName != RestoreWorkspaceLock.publishingRunFileName) {
+      throw StateError('restore_startup_cutover_marker');
+    }
+    await _validateRunTopLevelTopology(
+      runDirectory: runDirectory,
+      receipt: receipt,
+    );
     if (receipt.state == RestoreReceiptState.prepared) {
-      await _validatePreparedRun(runDirectory: runDirectory, receipt: receipt);
+      await _validatePreparedCandidate(
+        runDirectory: runDirectory,
+        receipt: receipt,
+      );
     }
     return PendingRestoreRun(
       runId: runId,
@@ -117,13 +180,167 @@ final class RestoreStartupGate {
     );
   }
 
-  static Future<void> requireBusinessReady({
+  static Future<RestoreReceipt?> recoverAndRequireBusinessReady({
     required Directory appDataDirectory,
+    SharedPreferences? preferences,
+    RestoreBusinessLease? businessLease,
+    RestoreDurability? durability,
   }) async {
-    final pending = await inspect(appDataDirectory: appDataDirectory);
-    if (pending != null) {
-      throw StateError('restore_startup_pending:${pending.receipt.state.name}');
+    final resolvedDurability = durability ?? RestorePlatformDurability();
+    final ownedBusinessLease = businessLease == null
+        ? await RestoreBusinessLease.acquire(
+            appDataDirectory: appDataDirectory,
+            durability: resolvedDurability,
+          )
+        : null;
+    final effectiveBusinessLease = businessLease ?? ownedBusinessLease!;
+    final expectedLeasePath = p.normalize(
+      p.absolute(
+        p.join(
+          appDataDirectory.path,
+          RestoreBusinessLease.leaseDirectoryName,
+          RestoreBusinessLease.lockFileName,
+        ),
+      ),
+    );
+    if (effectiveBusinessLease.isClosed ||
+        !p.equals(effectiveBusinessLease.lockFile.path, expectedLeasePath)) {
+      await ownedBusinessLease?.close();
+      throw StateError('restore_startup_business_lease');
     }
+    final workspaceLock = RestoreWorkspaceLock(
+      appDataDirectory: appDataDirectory,
+      durability: resolvedDurability,
+    );
+    try {
+      final workspaceType = await FileSystemEntity.type(
+        workspaceLock.workspaceRoot.path,
+        followLinks: false,
+      );
+      if (workspaceType == FileSystemEntityType.notFound) return null;
+      if (workspaceType != FileSystemEntityType.directory) {
+        throw StateError('restore_startup_workspace_root');
+      }
+      return await workspaceLock.synchronized(() async {
+        final discardedUnpublished = await workspaceLock
+            .discardStrictlyUnpublishedRunWhileWorkspaceLocked();
+        if (discardedUnpublished) {
+          final remaining = await _inspectLocked(
+            appDataDirectory: appDataDirectory,
+            workspaceRoot: workspaceLock.workspaceRoot,
+          );
+          if (remaining != null) {
+            throw StateError('restore_startup_unpublished_discard');
+          }
+          return null;
+        }
+        final pending = await _inspectLocked(
+          appDataDirectory: appDataDirectory,
+          workspaceRoot: workspaceLock.workspaceRoot,
+        );
+        if (pending == null) return null;
+        final executor = RestoreCutoverExecutor(
+          appDataDirectory: appDataDirectory,
+          runId: pending.runId,
+          preferences: preferences ?? await SharedPreferences.getInstance(),
+          workspaceLock: workspaceLock,
+          durability: resolvedDurability,
+        );
+        final coldAckStore = RestoreSettingsColdAckStore(
+          runDirectory: Directory(
+            p.join(workspaceLock.workspaceRoot.path, 'run_${pending.runId}'),
+          ),
+          durability: resolvedDurability,
+        );
+        if (pending.receipt.state == RestoreReceiptState.committed ||
+            pending.receipt.state == RestoreReceiptState.rolledBack) {
+          final expected = _coldAckExpected(pending.receipt);
+          final coldAck = await coldAckStore.read();
+          if (coldAck == null) {
+            final terminal = await executor
+                .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+            await coldAckStore.writeOrReplace(
+              terminalReceiptChecksum: terminal.checksum,
+              expected: expected,
+              leaseInstanceId: effectiveBusinessLease.instanceId,
+              processId: effectiveBusinessLease.processId,
+            );
+            throw RestoreColdRestartRequired(terminal.state);
+          }
+          if (coldAck.terminalReceiptChecksum != pending.receipt.checksum ||
+              coldAck.expected != expected) {
+            throw StateError('restore_startup_cold_ack_binding');
+          }
+          if (coldAck.processId == effectiveBusinessLease.processId ||
+              coldAck.leaseInstanceId == effectiveBusinessLease.instanceId) {
+            throw RestoreColdRestartRequired(pending.receipt.state);
+          }
+          final settingsReadback = await executor
+              .inspectTerminalSettingsWhileWorkspaceLocked(pending.receipt);
+          if (settingsReadback ==
+              RestoreSettingsReadback.recoverableNeedsWrite) {
+            final terminal = await executor
+                .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
+            await coldAckStore.writeOrReplace(
+              terminalReceiptChecksum: terminal.checksum,
+              expected: expected,
+              leaseInstanceId: effectiveBusinessLease.instanceId,
+              processId: effectiveBusinessLease.processId,
+            );
+            throw RestoreColdRestartRequired(terminal.state);
+          }
+          final terminal = await executor
+              .revalidateTerminalWhileWorkspaceLocked(
+                pending.receipt,
+                repairSettings: false,
+              );
+          await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
+            runId: pending.runId,
+            observedMarkerFileName: pending.markerFileName,
+          );
+          return terminal;
+        }
+        final markerFileName = pending.markerFileName;
+        if (markerFileName == null) {
+          throw StateError('restore_startup_cutover_marker');
+        }
+        final result = await executor.executeWhileWorkspaceLocked(
+          observedMarkerFileName: markerFileName,
+        );
+        if (result.state != RestoreReceiptState.committed &&
+            result.state != RestoreReceiptState.rolledBack) {
+          throw StateError('restore_startup_not_terminal');
+        }
+        final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
+          result,
+        );
+        await coldAckStore.writeOrReplace(
+          terminalReceiptChecksum: terminal.checksum,
+          expected: _coldAckExpected(terminal),
+          leaseInstanceId: effectiveBusinessLease.instanceId,
+          processId: effectiveBusinessLease.processId,
+        );
+        throw RestoreColdRestartRequired(terminal.state);
+      });
+    } finally {
+      await ownedBusinessLease?.close();
+    }
+  }
+
+  static RestoreSettingsColdAckExpected _coldAckExpected(
+    RestoreReceipt receipt,
+  ) {
+    return switch (receipt.state) {
+      RestoreReceiptState.committed => RestoreSettingsColdAckExpected.target,
+      RestoreReceiptState.rolledBack => RestoreSettingsColdAckExpected.before,
+      RestoreReceiptState.prepared ||
+      RestoreReceiptState.oldRenamed ||
+      RestoreReceiptState.newInstalled ||
+      RestoreReceiptState.verified ||
+      RestoreReceiptState.rollingBack => throw StateError(
+        'restore_startup_cold_ack_state',
+      ),
+    };
   }
 
   static Future<String> _readRunId(File markerFile) async {
@@ -137,12 +354,17 @@ final class RestoreStartupGate {
     return runId;
   }
 
-  static Future<void> _validatePreparedRun({
+  static Future<void> _validateRunTopLevelTopology({
     required Directory runDirectory,
     required RestoreReceipt receipt,
   }) async {
     var foundCandidate = false;
     var foundReceipts = false;
+    var foundPreviousPending = false;
+    var foundPrevious = false;
+    final terminal =
+        receipt.state == RestoreReceiptState.committed ||
+        receipt.state == RestoreReceiptState.rolledBack;
     await for (final entity in runDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -158,20 +380,52 @@ final class RestoreStartupGate {
         foundReceipts = true;
         continue;
       }
-      throw StateError('restore_startup_prepared_topology');
+      if (name == RestorePreviousStore.pendingDirectoryName &&
+          type == FileSystemEntityType.directory &&
+          !foundPreviousPending) {
+        foundPreviousPending = true;
+        continue;
+      }
+      if (name == RestorePreviousStore.previousDirectoryName &&
+          type == FileSystemEntityType.directory &&
+          !foundPrevious) {
+        foundPrevious = true;
+        continue;
+      }
+      if (terminal &&
+          type == FileSystemEntityType.file &&
+          (name == RestoreSettingsColdAckStore.fileName ||
+              _coldAckTemporaryPattern.hasMatch(name))) {
+        continue;
+      }
+      throw StateError('restore_startup_run_entry');
     }
     if (!foundCandidate || !foundReceipts) {
-      throw StateError('restore_startup_prepared_topology');
+      throw StateError('restore_startup_run_topology');
     }
+    if (receipt.state == RestoreReceiptState.prepared) {
+      if (foundPreviousPending && foundPrevious) {
+        throw StateError('restore_startup_run_topology');
+      }
+      return;
+    }
+    if (foundPreviousPending || !foundPrevious) {
+      throw StateError('restore_startup_run_topology');
+    }
+  }
 
+  static Future<void> _validatePreparedCandidate({
+    required Directory runDirectory,
+    required RestoreReceipt receipt,
+  }) async {
     final candidate = await RestoreBundleStaging.validateExistingCandidate(
       candidateDirectory: Directory(p.join(runDirectory.path, 'candidate')),
       expectedManifestSha256: receipt.candidateManifestSha256,
     );
-    if ((receipt.selectedComponents.contains(RestoreComponent.database) &&
-            !candidate.includeChats) ||
-        (receipt.selectedComponents.contains(RestoreComponent.assets) &&
-            !candidate.includeFiles)) {
+    if (receipt.selectedComponents.contains(RestoreComponent.database) !=
+            candidate.includeChats ||
+        receipt.selectedComponents.contains(RestoreComponent.assets) !=
+            candidate.includeFiles) {
       throw StateError('restore_startup_candidate_selection');
     }
   }

@@ -6,6 +6,7 @@ import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +19,11 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/providers/backup_provider.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart';
+import 'package:Kelivo/core/services/backup/restore_receipt.dart';
+import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+
+import 'restore_cold_process_test_helper.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
@@ -98,21 +103,10 @@ class _FailingSnapshotRestoreChatService extends ChatService {
 
 class _RecordingSnapshotPathChatService extends ChatService {
   String? snapshotPath;
-  String? stagedDatabaseSha256;
-  String? manifestDatabaseSha256;
 
   @override
   Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
     snapshotPath = snapshotFile.path;
-    stagedDatabaseSha256 = await _fileSha256(snapshotFile);
-    final manifestFile = File(
-      '${snapshotFile.parent.parent.path}/manifest.json',
-    );
-    final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
-    manifestDatabaseSha256 =
-        ((manifest['entries'] as Map)['database/kelivo.sqlite']
-                as Map)['sha256']
-            as String;
   }
 }
 
@@ -177,6 +171,25 @@ Future<String> _fileSha256(File file) async {
   return (await sha256.bind(file.openRead()).first).toString();
 }
 
+Future<Directory> _singleRestoreRunDirectory(Directory appDataDirectory) async {
+  final workspace = Directory(
+    '${appDataDirectory.path}${Platform.pathSeparator}.kelivo_restore',
+  );
+  final runs = await workspace
+      .list(followLinks: false)
+      .where((entity) {
+        if (entity is! Directory) return false;
+        final name = entity.uri.pathSegments
+            .where((segment) => segment.isNotEmpty)
+            .last;
+        return RegExp(r'^run_[a-f0-9]{32}$').hasMatch(name);
+      })
+      .cast<Directory>()
+      .toList();
+  expect(runs, hasLength(1));
+  return runs.single;
+}
+
 Future<void> _overwriteCentralDirectoryUncompressedSize(
   File zipFile,
   int size,
@@ -207,7 +220,11 @@ Future<File> _createSqliteBackupFixture({
   String? databaseSha256,
   bool secretsIncluded = true,
   bool includeFiles = false,
+  String? assetContent,
 }) async {
+  if (assetContent != null && !includeFiles) {
+    throw ArgumentError.value(assetContent, 'assetContent');
+  }
   final databasePath = '${root.path}/${prefix}_database.sqlite';
   final snapshotInfo = await Isolate.run(() async {
     final databaseFile = File(databasePath);
@@ -245,6 +262,26 @@ Future<File> _createSqliteBackupFixture({
   final databaseFile = File(databasePath);
   final settingsFile = File('${root.path}/${prefix}_settings.json');
   await settingsFile.writeAsString(jsonEncode(settings));
+  final assetFile = assetContent == null
+      ? null
+      : await File(
+          '${root.path}/${prefix}_asset.txt',
+        ).writeAsString(assetContent, flush: true);
+  final entries = <String, Map<String, Object>>{
+    'settings.json': {
+      'bytes': await settingsFile.length(),
+      'sha256': await _fileSha256(settingsFile),
+    },
+    'database/kelivo.sqlite': {
+      'bytes': await databaseFile.length(),
+      'sha256': databaseSha256 ?? await _fileSha256(databaseFile),
+    },
+    if (assetFile != null)
+      'upload/fixture.txt': {
+        'bytes': await assetFile.length(),
+        'sha256': await _fileSha256(assetFile),
+      },
+  };
   final manifestFile = File('${root.path}/${prefix}_manifest.json');
   await manifestFile.writeAsString(
     jsonEncode({
@@ -262,16 +299,7 @@ Future<File> _createSqliteBackupFixture({
         'conversationCount': snapshotInfo.conversationCount,
         'messageCount': snapshotInfo.messageCount,
       },
-      'entries': {
-        'settings.json': {
-          'bytes': await settingsFile.length(),
-          'sha256': await _fileSha256(settingsFile),
-        },
-        'database/kelivo.sqlite': {
-          'bytes': await databaseFile.length(),
-          'sha256': databaseSha256 ?? await _fileSha256(databaseFile),
-        },
-      },
+      'entries': entries,
     }),
   );
   final zipFile = File('${root.path}/$prefix.zip');
@@ -280,8 +308,28 @@ Future<File> _createSqliteBackupFixture({
   encoder.addFileSync(manifestFile, 'manifest.json');
   encoder.addFileSync(settingsFile, 'settings.json');
   encoder.addFileSync(databaseFile, 'database/kelivo.sqlite');
+  if (assetFile != null) {
+    encoder.addFileSync(assetFile, 'upload/fixture.txt');
+  }
   encoder.closeSync();
   return zipFile;
+}
+
+Future<RestoreReceipt?> _recoverAcrossColdRestart({
+  required Directory appDataDirectory,
+  SharedPreferences? preferences,
+}) async {
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: appDataDirectory,
+        preferences: preferences,
+      );
+    } on RestoreColdRestartRequired {
+      await simulateRestoreColdProcessBoundary(appDataDirectory);
+    }
+  }
+  throw StateError('restore_test_cold_restart_limit');
 }
 
 void main() {
@@ -510,6 +558,18 @@ void main() {
         );
 
         final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('global_proxy_enabled_v1'), isFalse);
+        expect(prefs.getString('global_proxy_host_v1'), 'target.example');
+        expect(
+          prefs.getString('global_proxy_password_v1'),
+          'target-proxy-secret',
+        );
+
+        await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+          preferences: prefs,
+        );
+        await prefs.reload();
         expect(prefs.getBool('global_proxy_enabled_v1'), isTrue);
         expect(prefs.getString('global_proxy_host_v1'), 'source.example');
         expect(prefs.getString('global_proxy_password_v1'), '');
@@ -529,6 +589,45 @@ void main() {
         ]) {
           expect(prefs.containsKey(key), isFalse, reason: key);
         }
+      },
+    );
+
+    test(
+      'rejects a falsely declared secret-free bundle before prepared receipt',
+      () async {
+        final backupFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'false_secret_free',
+          settings: const {'global_proxy_password_v1': 'source-proxy-secret'},
+          secretsIncluded: false,
+        );
+        SharedPreferences.setMockInitialValues({
+          'global_proxy_password_v1': 'target-proxy-secret',
+        });
+
+        await expectLater(
+          DataSync(chatService: ChatService()).restoreFromLocalFile(
+            backupFile,
+            const WebDavConfig(includeChats: true, includeFiles: false),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'restore_settings_not_secret_free',
+            ),
+          ),
+        );
+
+        final preferences = await SharedPreferences.getInstance();
+        expect(
+          preferences.getString('global_proxy_password_v1'),
+          'target-proxy-secret',
+        );
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
       },
     );
 
@@ -569,7 +668,7 @@ void main() {
             const WebDavConfig(includeChats: false, includeFiles: false),
             mode: RestoreMode.merge,
           ),
-          throwsA(isA<UnsupportedError>()),
+          throwsA(isA<VersionedBackupMergeUnsupportedException>()),
         );
 
         final prefs = await SharedPreferences.getInstance();
@@ -577,37 +676,59 @@ void main() {
       },
     );
 
-    test('secret-free overwrite reports credential cleanup failure', () async {
-      SharedPreferences.setMockInitialValues({'source_setting': 'source'});
-      final sync = DataSync(chatService: ChatService());
-      final backupFile = await sync.prepareBackupFile(
-        const WebDavConfig(includeChats: false, includeFiles: false),
-      );
-      addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+    test(
+      'secret-free overwrite rolls back a credential cleanup failure',
+      () async {
+        SharedPreferences.setMockInitialValues({'source_setting': 'source'});
+        final sync = DataSync(chatService: ChatService());
+        final backupFile = await sync.prepareBackupFile(
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
-      SharedPreferences.setMockInitialValues({
-        'global_proxy_password_v1': 'target-proxy-secret',
-      });
-      SharedPreferencesStorePlatform.instance = _FailingRemovePreferencesStore({
-        'flutter.global_proxy_password_v1': 'target-proxy-secret',
-      });
+        final targetSearchServices = jsonEncode([
+          {'id': 'target', 'apiKey': 'target-search-secret'},
+        ]);
+        SharedPreferences.setMockInitialValues({
+          'search_services_v1': targetSearchServices,
+        });
+        SharedPreferencesStorePlatform.instance =
+            _FailingRemovePreferencesStore({
+              'flutter.search_services_v1': targetSearchServices,
+            });
 
-      await expectLater(
-        sync.restoreFromLocalFile(
+        await sync.restoreFromLocalFile(
           backupFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
-        throwsA(isA<StateError>()),
-      );
+        );
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.reload();
-      expect(
-        prefs.getString('global_proxy_password_v1'),
-        'target-proxy-secret',
-      );
-      expect(prefs.getString('source_setting'), isNull);
-    });
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.reload();
+        expect(prefs.getString('search_services_v1'), targetSearchServices);
+        expect(prefs.getString('source_setting'), isNull);
+
+        final result = await _recoverAcrossColdRestart(
+          appDataDirectory: root,
+          preferences: prefs,
+        );
+        expect(result?.state, RestoreReceiptState.rolledBack);
+
+        await prefs.reload();
+        expect(prefs.getString('search_services_v1'), targetSearchServices);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+        expect(
+          (await RestoreReceiptStore(
+            appDataDirectory: root,
+            runId: result!.runId,
+            archived: true,
+          ).readLatest())?.state,
+          RestoreReceiptState.rolledBack,
+        );
+      },
+    );
 
     test('writes a consistent SQLite snapshot instead of chats.json', () async {
       final chatService = ChatService();
@@ -688,7 +809,7 @@ void main() {
       }
     });
 
-    test('restores a versioned SQLite snapshot backup', () async {
+    test('restores a prepared SQLite snapshot on the next startup', () async {
       final sourceFile = File('${root.path}/source.sqlite');
       final sourceRepository = ChatDatabaseRepository.open(file: sourceFile);
       await sourceRepository.ensureReady();
@@ -772,6 +893,13 @@ void main() {
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
 
+      expect(chatService.getConversation(existing.id), isNotNull);
+      expect(chatService.getConversation('restored-conversation'), isNull);
+
+      await chatService.close();
+      await _recoverAcrossColdRestart(appDataDirectory: root);
+      await chatService.init();
+
       expect(chatService.getConversation(existing.id), isNull);
       expect(
         chatService.getConversation('restored-conversation')?.title,
@@ -791,7 +919,7 @@ void main() {
       );
     });
 
-    test('stages a versioned SQLite candidate under app data', () async {
+    test('retains a prepared SQLite candidate under app data', () async {
       final zipFile = await _createSqliteBackupFixture(
         root: root,
         prefix: 'same_volume_staging',
@@ -804,20 +932,81 @@ void main() {
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
 
-      final stagedPath = File(chatService.snapshotPath!).absolute.path;
-      final stagingRoot = Directory(
-        '${root.path}/.kelivo_restore',
-      ).absolute.path;
+      expect(chatService.snapshotPath, isNull);
+      final workspace = Directory('${root.path}/.kelivo_restore');
+      final runDirectory = await _singleRestoreRunDirectory(root);
+      final runId = await File('${workspace.path}/.active_run').readAsString();
       expect(
-        stagedPath.startsWith('$stagingRoot${Platform.pathSeparator}'),
+        runDirectory.path.endsWith('${Platform.pathSeparator}run_$runId'),
         isTrue,
       );
-      expect(
-        chatService.manifestDatabaseSha256,
-        chatService.stagedDatabaseSha256,
+      final candidateDatabase = File(
+        '${runDirectory.path}/candidate/database/kelivo.sqlite',
       );
-      expect(await File(stagedPath).exists(), isFalse);
+      final candidateManifest =
+          jsonDecode(
+                await File(
+                  '${runDirectory.path}/candidate/manifest.json',
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(
+        ((candidateManifest['entries'] as Map)['database/kelivo.sqlite']
+            as Map)['sha256'],
+        await _fileSha256(candidateDatabase),
+      );
+      final receipt = await RestoreReceiptStore(
+        appDataDirectory: root,
+        runId: runId,
+      ).readLatest();
+      expect(receipt?.state, RestoreReceiptState.prepared);
     });
+
+    test(
+      'does not retain unselected SQLite or assets in the candidate',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'selected_candidate_only',
+          settings: const {'theme': 'dark'},
+          includeFiles: true,
+          assetContent: 'private unselected asset',
+        );
+
+        await DataSync(chatService: ChatService()).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        final runDirectory = await _singleRestoreRunDirectory(root);
+        final candidate = Directory(p.join(runDirectory.path, 'candidate'));
+        final manifest =
+            jsonDecode(
+                  await File(
+                    p.join(candidate.path, 'manifest.json'),
+                  ).readAsString(),
+                )
+                as Map<String, dynamic>;
+        expect(manifest['payloadKind'], 'settings-only');
+        expect(manifest['includeChats'], isFalse);
+        expect(manifest['includeFiles'], isFalse);
+        expect(manifest['database'], isNull);
+        expect((manifest['entries'] as Map<String, dynamic>).keys, [
+          'settings.json',
+        ]);
+        expect(
+          await Directory(p.join(candidate.path, 'database')).exists(),
+          isFalse,
+        );
+        for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+          expect(
+            await Directory(p.join(candidate.path, rootName)).exists(),
+            isFalse,
+            reason: rootName,
+          );
+        }
+      },
+    );
 
     test(
       'rejects a linked same-volume staging root before live writes',
@@ -848,7 +1037,7 @@ void main() {
           : false,
     );
 
-    test('empty versioned asset roots clear old files on overwrite', () async {
+    test('empty versioned asset roots clear old files on startup', () async {
       for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
         final directory = Directory('${root.path}/$rootName');
         await directory.create(recursive: true);
@@ -867,55 +1056,109 @@ void main() {
       );
 
       for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
+        expect(
+          await File('${root.path}/$rootName/old.bin').exists(),
+          isTrue,
+          reason: rootName,
+        );
+      }
+
+      await _recoverAcrossColdRestart(appDataDirectory: root);
+
+      for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
         final directory = Directory('${root.path}/$rootName');
         expect(await directory.exists(), isTrue, reason: rootName);
         expect(await directory.list().toList(), isEmpty, reason: rootName);
       }
     });
 
-    test('rolls back settings when a versioned SQLite restore fails', () async {
-      SharedPreferences.setMockInitialValues({
-        'preserved_setting': 'local',
-        'target_only_setting': 'keep',
-        'global_proxy_password_v1': 'local-secret',
-      });
+    test('retains every selected SQLite and asset component', () async {
       final zipFile = await _createSqliteBackupFixture(
         root: root,
-        prefix: 'settings_rollback',
-        settings: const {
-          'preserved_setting': 'imported',
-          'incoming_only_setting': 'remove-on-rollback',
-          'global_proxy_password_v1': '',
-        },
-        secretsIncluded: false,
+        prefix: 'all_selected_candidate',
+        settings: const {'theme': 'dark'},
+        includeFiles: true,
+        assetContent: 'selected asset',
       );
 
-      await expectLater(
-        DataSync(
+      await DataSync(chatService: ChatService()).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: true),
+      );
+
+      final runDirectory = await _singleRestoreRunDirectory(root);
+      final candidate = Directory(p.join(runDirectory.path, 'candidate'));
+      final manifest =
+          jsonDecode(
+                await File(
+                  p.join(candidate.path, 'manifest.json'),
+                ).readAsString(),
+              )
+              as Map<String, dynamic>;
+      expect(manifest['payloadKind'], 'sqlite');
+      expect(manifest['includeChats'], isTrue);
+      expect(manifest['includeFiles'], isTrue);
+      expect(manifest['database'], isA<Map<String, dynamic>>());
+      expect(
+        (manifest['entries'] as Map<String, dynamic>).keys,
+        containsAll([
+          'settings.json',
+          'database/kelivo.sqlite',
+          'upload/fixture.txt',
+        ]),
+      );
+      expect(
+        await File(
+          p.join(candidate.path, 'database', 'kelivo.sqlite'),
+        ).exists(),
+        isTrue,
+      );
+      expect(
+        await File(
+          p.join(candidate.path, 'upload', 'fixture.txt'),
+        ).readAsString(),
+        'selected asset',
+      );
+    });
+
+    test(
+      'versioned preparation does not call the open live database service',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'preserved_setting': 'local',
+          'target_only_setting': 'keep',
+          'global_proxy_password_v1': 'local-secret',
+        });
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'settings_rollback',
+          settings: const {
+            'preserved_setting': 'imported',
+            'incoming_only_setting': 'remove-on-rollback',
+            'global_proxy_password_v1': '',
+          },
+          secretsIncluded: false,
+        );
+
+        await DataSync(
           chatService: _FailingSnapshotRestoreChatService(),
         ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'snapshot restore failed',
-          ),
-        ),
-      );
+        );
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'local');
-      expect(prefs.getString('target_only_setting'), 'keep');
-      expect(prefs.getString('incoming_only_setting'), isNull);
-      expect(prefs.getString('global_proxy_password_v1'), 'local-secret');
-      expect(
-        prefs.getString('written_during_restore'),
-        'keep-concurrent-write',
-      );
-    });
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('preserved_setting'), 'local');
+        expect(prefs.getString('target_only_setting'), 'keep');
+        expect(prefs.getString('incoming_only_setting'), isNull);
+        expect(prefs.getString('global_proxy_password_v1'), 'local-secret');
+        expect(prefs.getString('written_during_restore'), isNull);
+        final pending = await RestoreStartupGate.inspect(
+          appDataDirectory: root,
+        );
+        expect(pending?.receipt.state, RestoreReceiptState.prepared);
+      },
+    );
 
     test('rolls back a partial versioned settings write', () async {
       SharedPreferences.setMockInitialValues({
@@ -935,12 +1178,9 @@ void main() {
         },
       );
 
-      await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        ),
-        throwsA(isA<StateError>()),
+      await DataSync(chatService: ChatService()).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -948,6 +1188,26 @@ void main() {
       expect(prefs.getString('preserved_setting'), 'local');
       expect(prefs.getString('target_only_setting'), 'keep');
       expect(prefs.getString('incoming_only_setting'), isNull);
+
+      final result = await _recoverAcrossColdRestart(
+        appDataDirectory: root,
+        preferences: prefs,
+      );
+      expect(result?.state, RestoreReceiptState.rolledBack);
+
+      await prefs.reload();
+      expect(prefs.getString('preserved_setting'), 'local');
+      expect(prefs.getString('target_only_setting'), 'keep');
+      expect(prefs.getString('incoming_only_setting'), isNull);
+      expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
+      expect(
+        (await RestoreReceiptStore(
+          appDataDirectory: root,
+          runId: result!.runId,
+          archived: true,
+        ).readLatest())?.state,
+        RestoreReceiptState.rolledBack,
+      );
     });
 
     test(
@@ -1180,7 +1440,7 @@ void main() {
           const WebDavConfig(includeChats: true, includeFiles: false),
           mode: RestoreMode.merge,
         ),
-        throwsA(isA<UnsupportedError>()),
+        throwsA(isA<VersionedBackupMergeUnsupportedException>()),
       );
 
       final prefs = await SharedPreferences.getInstance();

@@ -33,7 +33,9 @@ void main() {
         secretsIncluded: false,
       );
 
+      await store.validateBefore(transition);
       await store.apply(transition);
+      await store.validateTarget(transition);
       await preferences.reload();
 
       expect(preferences.getString('theme'), 'new');
@@ -107,6 +109,57 @@ void main() {
 
       expect(preferences.getString('theme'), 'external');
     });
+
+    test('reports target, before, and recoverable partial readback', () async {
+      final transition = await store.buildTransition(
+        candidateSettings: const {'theme': 'new', 'new_key': true},
+        secretsIncluded: true,
+      );
+
+      expect(
+        await store.inspectReadback(
+          transition: transition,
+          expected: RestoreSettingsExpectedProjection.before,
+        ),
+        RestoreSettingsReadback.expected,
+      );
+      await preferences.setString('theme', 'new');
+      expect(
+        await store.inspectReadback(
+          transition: transition,
+          expected: RestoreSettingsExpectedProjection.target,
+        ),
+        RestoreSettingsReadback.recoverableNeedsWrite,
+      );
+      await store.apply(transition);
+      expect(
+        await store.inspectReadback(
+          transition: transition,
+          expected: RestoreSettingsExpectedProjection.target,
+        ),
+        RestoreSettingsReadback.expected,
+      );
+    });
+
+    test(
+      'readback rejects a divergent touched value without writing',
+      () async {
+        final transition = await store.buildTransition(
+          candidateSettings: const {'theme': 'new'},
+          secretsIncluded: true,
+        );
+        await preferences.setString('theme', 'external');
+
+        await expectLater(
+          store.inspectReadback(
+            transition: transition,
+            expected: RestoreSettingsExpectedProjection.target,
+          ),
+          throwsStateError,
+        );
+        expect(preferences.getString('theme'), 'external');
+      },
+    );
 
     test('returns defensive copies from fresh reads', () async {
       await preferences.setStringList('models', ['a']);

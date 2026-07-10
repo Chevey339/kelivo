@@ -1488,7 +1488,38 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '恢复已准备好。重启 Kelivo 后将安全应用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '还需要再重启一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1505,19 +1536,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '旧 JSON 智能合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription => '仅用于旧 JSON 备份；暂不支持合并 SQLite 备份。';
+
+  @override
+  String get backupPageSqliteMergeUnsupported =>
+      'SQLite 备份暂不支持合并。请选择“完整覆盖”，或仅对旧 JSON 备份使用“旧 JSON 智能合并”。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -6943,7 +6979,38 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '恢复已准备好。重启 Kelivo 后将安全应用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '还需要再重启一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -6960,19 +7027,24 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '旧 JSON 智能合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription => '仅用于旧 JSON 备份；暂不支持合并 SQLite 备份。';
+
+  @override
+  String get backupPageSqliteMergeUnsupported =>
+      'SQLite 备份暂不支持合并。请选择“完整覆盖”，或仅对旧 JSON 备份使用“旧 JSON 智能合并”。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -12398,7 +12470,38 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重啟應用程式';
 
   @override
-  String get backupPageRestartContent => '還原完成，需要重啟以完全生效。';
+  String get backupPageRestartContent => '還原已準備完成。重新啟動 Kelivo 後將安全套用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '還需要再重新啟動一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '還原已進入可恢復終態。請再重新啟動一次 Kelivo，以便從新程序重新驗證設定；確認前不會開啟聊天資料。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重新啟動 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '已保留原有資料';
+
+  @override
+  String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
+
+  @override
+  String get backupRestoreFailureTitle => '還原需要處理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '診斷碼：$code';
+  }
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -12415,19 +12518,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '選擇匯入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '請選擇如何匯入備份資料：';
+  String get backupPageSelectImportModeDescription =>
+      '請選擇還原方式。聊天與檔案開關決定本次還原的元件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆蓋';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有資料後恢復';
+  String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
 
   @override
-  String get backupPageMergeMode => '智能合併';
+  String get backupPageMergeMode => '舊 JSON 智慧合併';
 
   @override
-  String get backupPageMergeModeDescription => '僅添加不存在的資料（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '僅適用於舊 JSON 備份；暫不支援合併 SQLite 備份。';
+
+  @override
+  String get backupPageSqliteMergeUnsupported =>
+      'SQLite 備份暫不支援合併。請選擇「完整覆寫」，或只對舊 JSON 備份使用「舊 JSON 智慧合併」。';
 
   @override
   String get backupPageRestore => '還原';

@@ -4,6 +4,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'restore_settings_transition.dart';
 
+enum RestoreSettingsExpectedProjection { target, before }
+
+enum RestoreSettingsReadback { expected, recoverableNeedsWrite }
+
 /// Reload-verified access to the legacy SharedPreferences backend.
 ///
 /// SharedPreferences is not a cross-platform filesystem transaction. The
@@ -42,6 +46,72 @@ final class RestoreSettingsStore {
 
   Future<void> apply(RestoreSettingsTransition transition) =>
       _serialized(() => _applyUnlocked(transition));
+
+  Future<void> validateBefore(RestoreSettingsTransition transition) =>
+      _serialized(() async {
+        transition.plan.validateSnapshotBytes(transition.snapshotBytes);
+        await _preferences.reload();
+        transition.plan.validateBeforeProjection(
+          _readProjection(transition.plan.touchedKeys),
+        );
+      });
+
+  Future<void> validateTarget(RestoreSettingsTransition transition) =>
+      _serialized(() async {
+        transition.plan.validateSnapshotBytes(transition.snapshotBytes);
+        await _preferences.reload();
+        transition.plan.validateTargetProjection(
+          _readProjection(transition.plan.touchedKeys),
+        );
+      });
+
+  Future<void> validateRecoverable(RestoreSettingsTransition transition) =>
+      _serialized(() async {
+        final beforeValues = transition.plan.validateSnapshotBytes(
+          transition.snapshotBytes,
+        );
+        await _preferences.reload();
+        _requireRecoverableProjection(
+          current: _readProjection(transition.plan.touchedKeys),
+          before: beforeValues,
+          target: transition.valuesToSet,
+          touchedKeys: transition.plan.touchedKeys,
+        );
+      });
+
+  /// Reads the platform store without mutating it and determines whether the
+  /// requested terminal projection survived a process boundary.
+  ///
+  /// A recoverable before/target mixture may be converged by the caller, but
+  /// an unrelated value remains fail-closed.
+  Future<RestoreSettingsReadback> inspectReadback({
+    required RestoreSettingsTransition transition,
+    required RestoreSettingsExpectedProjection expected,
+  }) => _serialized(() async {
+    final beforeValues = transition.plan.validateSnapshotBytes(
+      transition.snapshotBytes,
+    );
+    await _preferences.reload();
+    final current = _readProjection(transition.plan.touchedKeys);
+    final expectedValues = switch (expected) {
+      RestoreSettingsExpectedProjection.target => transition.valuesToSet,
+      RestoreSettingsExpectedProjection.before => beforeValues,
+    };
+    if (_projectionMatches(
+      current,
+      expectedValues,
+      transition.plan.touchedKeys,
+    )) {
+      return RestoreSettingsReadback.expected;
+    }
+    _requireRecoverableProjection(
+      current: current,
+      before: beforeValues,
+      target: transition.valuesToSet,
+      touchedKeys: transition.plan.touchedKeys,
+    );
+    return RestoreSettingsReadback.recoverableNeedsWrite;
+  });
 
   Future<void> _applyUnlocked(RestoreSettingsTransition transition) async {
     final beforeValues = transition.plan.validateSnapshotBytes(
@@ -163,6 +233,17 @@ bool _entryMatches(
   if (left.containsKey(key) != right.containsKey(key)) return false;
   if (!left.containsKey(key)) return true;
   return _preferenceValuesEqual(left[key], right[key]);
+}
+
+bool _projectionMatches(
+  Map<String, dynamic> current,
+  Map<String, dynamic> expected,
+  Set<String> touchedKeys,
+) {
+  for (final key in touchedKeys) {
+    if (!_entryMatches(current, expected, key)) return false;
+  }
+  return true;
 }
 
 bool _preferenceValuesEqual(dynamic left, dynamic right) {

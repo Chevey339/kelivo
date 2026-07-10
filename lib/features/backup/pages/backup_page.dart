@@ -20,9 +20,11 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/backup/data_sync.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
+import '../../../shared/widgets/restart_app_action.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../utils/platform_utils.dart';
+import '../backup_restore_error_message.dart';
 import '../widgets/backup_reminder_helpers.dart';
 
 // File size formatter (B, KB, MB, GB)
@@ -613,7 +615,10 @@ class _BackupPageState extends State<BackupPage> {
                                                 context,
                                                 message: l10n
                                                     .backupPageRestoreFailedMessage(
-                                                      e.toString(),
+                                                      backupRestoreErrorMessage(
+                                                        l10n,
+                                                        e,
+                                                      ),
                                                     ),
                                                 type: NotificationType.error,
                                               );
@@ -643,8 +648,16 @@ class _BackupPageState extends State<BackupPage> {
                                                 actions: [
                                                   TextButton(
                                                     onPressed: () async {
-                                                      Navigator.of(dctx).pop();
-                                                      PlatformUtils.restartApp();
+                                                      if (await requestAppRestart(
+                                                            dctx,
+                                                            PlatformUtils
+                                                                .restartApp,
+                                                          ) &&
+                                                          dctx.mounted) {
+                                                        Navigator.of(
+                                                          dctx,
+                                                        ).pop();
+                                                      }
                                                     },
                                                     child: Text(
                                                       l10n.backupPageOK,
@@ -697,7 +710,10 @@ class _BackupPageState extends State<BackupPage> {
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
-                                        message: e.toString(),
+                                        message: backupRestoreErrorMessage(
+                                          l10n,
+                                          e,
+                                        ),
                                         type: NotificationType.error,
                                       );
                                       return;
@@ -725,8 +741,13 @@ class _BackupPageState extends State<BackupPage> {
                                         actions: [
                                           TextButton(
                                             onPressed: () async {
-                                              Navigator.of(dctx).pop();
-                                              PlatformUtils.restartApp();
+                                              if (await requestAppRestart(
+                                                    dctx,
+                                                    PlatformUtils.restartApp,
+                                                  ) &&
+                                                  dctx.mounted) {
+                                                Navigator.of(dctx).pop();
+                                              }
                                             },
                                             child: Text(l10n.backupPageOK),
                                           ),
@@ -1048,7 +1069,10 @@ class _BackupPageState extends State<BackupPage> {
                                                 context,
                                                 message: l10n
                                                     .backupPageRestoreFailedMessage(
-                                                      e.toString(),
+                                                      backupRestoreErrorMessage(
+                                                        l10n,
+                                                        e,
+                                                      ),
                                                     ),
                                                 type: NotificationType.error,
                                               );
@@ -1078,8 +1102,16 @@ class _BackupPageState extends State<BackupPage> {
                                                 actions: [
                                                   TextButton(
                                                     onPressed: () async {
-                                                      Navigator.of(dctx).pop();
-                                                      PlatformUtils.restartApp();
+                                                      if (await requestAppRestart(
+                                                            dctx,
+                                                            PlatformUtils
+                                                                .restartApp,
+                                                          ) &&
+                                                          dctx.mounted) {
+                                                        Navigator.of(
+                                                          dctx,
+                                                        ).pop();
+                                                      }
                                                     },
                                                     child: Text(
                                                       l10n.backupPageOK,
@@ -1130,7 +1162,10 @@ class _BackupPageState extends State<BackupPage> {
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
-                                        message: e.toString(),
+                                        message: backupRestoreErrorMessage(
+                                          l10n,
+                                          e,
+                                        ),
                                         type: NotificationType.error,
                                       );
                                       return;
@@ -1158,8 +1193,13 @@ class _BackupPageState extends State<BackupPage> {
                                         actions: [
                                           TextButton(
                                             onPressed: () async {
-                                              Navigator.of(dctx).pop();
-                                              PlatformUtils.restartApp();
+                                              if (await requestAppRestart(
+                                                    dctx,
+                                                    PlatformUtils.restartApp,
+                                                  ) &&
+                                                  dctx.mounted) {
+                                                Navigator.of(dctx).pop();
+                                              }
                                             },
                                             child: Text(l10n.backupPageOK),
                                           ),
@@ -1286,8 +1326,13 @@ class _BackupPageState extends State<BackupPage> {
                       actions: [
                         TextButton(
                           onPressed: () async {
-                            Navigator.of(dctx).pop();
-                            PlatformUtils.restartApp();
+                            if (await requestAppRestart(
+                                  dctx,
+                                  PlatformUtils.restartApp,
+                                ) &&
+                                dctx.mounted) {
+                              Navigator.of(dctx).pop();
+                            }
                           },
                           child: Text(l10n.backupPageOK),
                         ),
@@ -1351,8 +1396,13 @@ class _BackupPageState extends State<BackupPage> {
                       actions: [
                         TextButton(
                           onPressed: () async {
-                            Navigator.of(dctx).pop();
-                            PlatformUtils.restartApp();
+                            if (await requestAppRestart(
+                                  dctx,
+                                  PlatformUtils.restartApp,
+                                ) &&
+                                dctx.mounted) {
+                              Navigator.of(dctx).pop();
+                            }
                           },
                           child: Text(l10n.backupPageOK),
                         ),
@@ -1451,7 +1501,9 @@ class _BackupPageState extends State<BackupPage> {
       if (!context.mounted) return;
       showAppSnackBar(
         context,
-        message: l10n.backupPageRestoreFailedMessage(error.toString()),
+        message: l10n.backupPageRestoreFailedMessage(
+          backupRestoreErrorMessage(l10n, error),
+        ),
         type: NotificationType.error,
       );
       return;
@@ -1465,8 +1517,10 @@ class _BackupPageState extends State<BackupPage> {
         actions: [
           TextButton(
             onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
+              if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
+                  dctx.mounted) {
+                Navigator.of(dctx).pop();
+              }
             },
             child: Text(l10n.backupPageOK),
           ),

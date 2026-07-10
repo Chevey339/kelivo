@@ -493,16 +493,33 @@
   "backupPageTestDone": "测试完成",
   "backupPageTestConnection": "测试连接",
   "backupPageRestartRequired": "需要重启应用",
-  "backupPageRestartContent": "恢复完成，需要重启以完全生效。",
+  "backupPageRestartContent": "恢复已准备好。重启 Kelivo 后将安全应用。",
+  "restartAppFailedMessage": "Kelivo 无法自动重启，请完全关闭后重新打开。",
+  "backupRestoreColdRestartTitle": "还需要再重启一次",
+  "backupRestoreColdRestartContent": "恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。",
+  "backupRestoreColdRestartButton": "重启 Kelivo",
+  "backupRestoreRolledBackTitle": "恢复已回滚",
+  "backupRestoreRolledBackContent": "恢复未能完成。Kelivo 已验证并保留原有数据。",
+  "backupRestoreFailureTitle": "恢复需要处理",
+  "backupRestoreFailureContent": "Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。",
+  "backupRestoreFailureDiagnostic": "诊断码：{code}",
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageRestoreFailedMessage": "恢复失败：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",
   "backupPageSelectImportMode": "选择导入模式",
-  "backupPageSelectImportModeDescription": "请选择如何导入备份数据：",
+  "backupPageSelectImportModeDescription": "请选择恢复方式。聊天和文件开关决定本次恢复的组件。",
   "backupPageOverwriteMode": "完全覆盖",
-  "backupPageOverwriteModeDescription": "清空本地所有数据后恢复",
-  "backupPageMergeMode": "智能合并",
-  "backupPageMergeModeDescription": "仅添加不存在的数据（智能去重）",
+  "backupPageOverwriteModeDescription": "仅替换已选组件；保留未选组件及无关本地设置",
+  "backupPageMergeMode": "旧 JSON 智能合并",
+  "backupPageMergeModeDescription": "仅用于旧 JSON 备份；暂不支持合并 SQLite 备份。",
+  "backupPageSqliteMergeUnsupported": "SQLite 备份暂不支持合并。请选择“完整覆盖”，或仅对旧 JSON 备份使用“旧 JSON 智能合并”。",
   "backupPageRestore": "恢复",
   "backupPageBackupUploaded": "已上传备份",
   "backupPageBackup": "立即备份",

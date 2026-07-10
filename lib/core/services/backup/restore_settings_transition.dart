@@ -34,11 +34,7 @@ final class RestoreSettingsTransition {
     final candidate = Map<String, dynamic>.from(candidateSettings);
     BackupSettingsValidator.normalizeAndValidate(candidate);
     if (!secretsIncluded) {
-      final sanitized = BackupSettingsSanitizer.sanitize(candidate);
-      BackupSettingsValidator.normalizeAndValidate(sanitized);
-      if (!_jsonEquals(sanitized, candidate)) {
-        throw const FormatException('restore_settings_not_secret_free');
-      }
+      BackupSettingsSanitizer.validateSecretFree(candidate);
     }
 
     final candidateValues = <String, dynamic>{};
@@ -95,27 +91,33 @@ final class RestoreSettingsTransition {
       keysToRemove: keysToRemove,
     );
   }
-}
 
-bool _jsonEquals(Object? left, Object? right) {
-  if (left is Map && right is Map) {
-    if (left.length != right.length ||
-        left.keys.any((key) => !right.containsKey(key))) {
-      return false;
+  factory RestoreSettingsTransition.resume({
+    required RestorePreviousSettingsPlan plan,
+    required List<int> snapshotBytes,
+    required Map<String, dynamic> candidateSettings,
+    required bool secretsIncluded,
+  }) {
+    plan.validateSnapshotBytes(snapshotBytes);
+    final candidate = Map<String, dynamic>.from(candidateSettings);
+    BackupSettingsValidator.normalizeAndValidate(candidate);
+    if (!secretsIncluded) {
+      BackupSettingsSanitizer.validateSecretFree(candidate);
     }
-    return left.keys.every((key) => _jsonEquals(left[key], right[key]));
-  }
-  if (left is List && right is List) {
-    if (left.length != right.length) return false;
-    for (var index = 0; index < left.length; index++) {
-      if (!_jsonEquals(left[index], right[index])) return false;
+    final candidateValues = <String, dynamic>{};
+    for (final key in (candidate.keys.toList()..sort())) {
+      if (!BackupSettingsValidator.isLocalOnly(key)) {
+        candidateValues[key] = _freezePreferenceValue(candidate[key]);
+      }
     }
-    return true;
+    plan.validateTargetProjection(candidateValues);
+    return RestoreSettingsTransition._(
+      plan: plan,
+      snapshotBytes: snapshotBytes,
+      valuesToSet: candidateValues,
+      keysToRemove: plan.touchedKeys.difference(candidateValues.keys.toSet()),
+    );
   }
-  if (left is num && right is num && left.runtimeType != right.runtimeType) {
-    return false;
-  }
-  return left == right;
 }
 
 dynamic _freezePreferenceValue(dynamic value) {

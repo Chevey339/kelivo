@@ -14,10 +14,12 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
-import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../utils/platform_utils.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 
@@ -216,7 +218,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
@@ -235,8 +237,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
         actions: [
           TextButton(
             onPressed: () async {
-              Navigator.of(ctx).pop();
-              PlatformUtils.restartApp();
+              if (await requestAppRestart(ctx, PlatformUtils.restartApp) &&
+                  ctx.mounted) {
+                Navigator.of(ctx).pop();
+              }
             },
             child: Text(l10n.backupPageOK),
           ),
@@ -951,8 +955,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         actions: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.of(rootCtx).pop();
-                              PlatformUtils.restartApp();
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
                             },
                             child: Text(l10n.backupPageOK),
                           ),
@@ -1034,8 +1043,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         actions: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.of(rootCtx).pop();
-                              PlatformUtils.restartApp();
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
                             },
                             child: Text(l10n.backupPageOK),
                           ),
@@ -1426,7 +1440,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
@@ -1447,8 +1461,10 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
         actions: [
           TextButton(
             onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
+              if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
+                  dctx.mounted) {
+                Navigator.of(dctx).pop();
+              }
             },
             child: Text(l10n.backupPageOK),
           ),

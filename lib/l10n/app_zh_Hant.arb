@@ -506,16 +506,33 @@
   "backupPageTestDone": "測試完成",
   "backupPageTestConnection": "測試連線",
   "backupPageRestartRequired": "需要重啟應用程式",
-  "backupPageRestartContent": "還原完成，需要重啟以完全生效。",
+  "backupPageRestartContent": "還原已準備完成。重新啟動 Kelivo 後將安全套用。",
+  "restartAppFailedMessage": "Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。",
+  "backupRestoreColdRestartTitle": "還需要再重新啟動一次",
+  "backupRestoreColdRestartContent": "還原已進入可恢復終態。請再重新啟動一次 Kelivo，以便從新程序重新驗證設定；確認前不會開啟聊天資料。",
+  "backupRestoreColdRestartButton": "重新啟動 Kelivo",
+  "backupRestoreRolledBackTitle": "已保留原有資料",
+  "backupRestoreRolledBackContent": "還原未能完成。Kelivo 已驗證並保留先前的資料。",
+  "backupRestoreFailureTitle": "還原需要處理",
+  "backupRestoreFailureContent": "Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。",
+  "backupRestoreFailureDiagnostic": "診斷碼：{code}",
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageRestoreFailedMessage": "還原失敗：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",
   "backupPageSelectImportMode": "選擇匯入模式",
-  "backupPageSelectImportModeDescription": "請選擇如何匯入備份資料：",
+  "backupPageSelectImportModeDescription": "請選擇還原方式。聊天與檔案開關決定本次還原的元件。",
   "backupPageOverwriteMode": "完全覆蓋",
-  "backupPageOverwriteModeDescription": "清空本地所有資料後恢復",
-  "backupPageMergeMode": "智能合併",
-  "backupPageMergeModeDescription": "僅添加不存在的資料（智能去重）",
+  "backupPageOverwriteModeDescription": "僅替換已選元件；保留未選元件及無關的本機設定",
+  "backupPageMergeMode": "舊 JSON 智慧合併",
+  "backupPageMergeModeDescription": "僅適用於舊 JSON 備份；暫不支援合併 SQLite 備份。",
+  "backupPageSqliteMergeUnsupported": "SQLite 備份暫不支援合併。請選擇「完整覆寫」，或只對舊 JSON 備份使用「舊 JSON 智慧合併」。",
   "backupPageRestore": "還原",
   "backupPageBackupUploaded": "已上傳備份",
   "backupPageBackup": "立即備份",

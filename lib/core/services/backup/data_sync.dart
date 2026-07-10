@@ -21,7 +21,7 @@ import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_sanitizer.dart';
 import 'backup_settings_validator.dart';
-import 'restore_bundle_staging.dart';
+import 'restore_bundle_preparation.dart';
 
 typedef _ParsedChatBackup = ({
   List<Conversation> conversations,
@@ -37,21 +37,13 @@ typedef _VersionedBackupInfo = ({
   bool secretsIncluded,
   String normalizedManifestSha256,
 });
-typedef _SettingsRollbackSnapshot = ({
-  Map<String, dynamic> existingValues,
-  Set<String> touchedKeys,
-});
 
-final class _RestoreRollbackException implements Exception {
-  const _RestoreRollbackException(this.restoreError, this.rollbackError);
-
-  final Object restoreError;
-  final Object rollbackError;
+/// A versioned SQLite bundle cannot use the legacy JSON merge path.
+final class VersionedBackupMergeUnsupportedException implements Exception {
+  const VersionedBackupMergeUnsupportedException();
 
   @override
-  String toString() =>
-      'Restore failed ($restoreError) and settings rollback failed '
-      '($rollbackError)';
+  String toString() => 'VersionedBackupMergeUnsupportedException';
 }
 
 class DataSync {
@@ -1380,12 +1372,6 @@ class DataSync {
     );
     await extractDir.create(recursive: true);
 
-    Directory? sameVolumeWorkspace;
-    String? sameVolumeAppDataPath;
-    String? sameVolumeRunId;
-    SharedPreferencesAsync? restorePreferences;
-    _SettingsRollbackSnapshot? settingsRollbackSnapshot;
-    var settingsMutationStarted = false;
     try {
       // Run ZIP extraction in an isolate to keep the UI responsive.
       await Isolate.run(() {
@@ -1393,8 +1379,8 @@ class DataSync {
       });
 
       final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
-      var restorePayloadDirectory = extractDir;
-      var settingsFile = File(p.join(extractDir.path, 'settings.json'));
+      final restorePayloadDirectory = extractDir;
+      final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
       if (!await settingsFile.exists()) {
         throw const FormatException('settings.json');
@@ -1412,61 +1398,48 @@ class DataSync {
       } else {
         versionedBackup = null;
       }
-      final versionedIncludesChats = versionedBackup?.includeChats;
-      final restoreChats =
-          cfg.includeChats &&
-          (versionedIncludesChats ?? await chatsFile.exists());
-      if (versionedIncludesChats != null && mode == RestoreMode.merge) {
-        throw UnsupportedError('versioned_backup_merge_not_supported');
-      }
       if (versionedBackup != null) {
+        if (mode == RestoreMode.merge) {
+          throw const VersionedBackupMergeUnsupportedException();
+        }
         final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
         final extractedPath = extractDir.path;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
         final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
-        final stagedPaths = await Isolate.run(() async {
-          final staged = await RestoreBundleStaging.create(
+        final restoreChats = cfg.includeChats && includeChats;
+        final restoreFiles = cfg.includeFiles && includeFiles;
+        await Isolate.run(() async {
+          await RestoreBundlePreparation.prepare(
             appDataDirectory: Directory(appDataPath),
             extractedDirectory: Directory(extractedPath),
-            includeChats: includeChats,
-            includeFiles: includeFiles,
             sourceManifestSha256: sourceManifestSha256,
-          );
-          return (
-            runId: staged.runId,
-            workspacePath: staged.workspace.path,
-            payloadPath: staged.payloadDirectory.path,
+            bundleIncludesChats: includeChats,
+            bundleIncludesFiles: includeFiles,
+            restoreChats: restoreChats,
+            restoreFiles: restoreFiles,
           );
         });
-        sameVolumeAppDataPath = appDataPath;
-        sameVolumeRunId = stagedPaths.runId;
-        sameVolumeWorkspace = Directory(stagedPaths.workspacePath);
-        restorePayloadDirectory = Directory(stagedPaths.payloadPath);
-        settingsFile = File(
-          p.join(restorePayloadDirectory.path, 'settings.json'),
-        );
+        return;
       }
+      final restoreChats = cfg.includeChats && await chatsFile.exists();
 
       final settings =
           jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
       final prefs = await SharedPreferencesAsync.instance;
-      restorePreferences = prefs;
       BackupSettingsValidator.normalizeAndValidate(settings);
 
       var conversations = const <Conversation>[];
       var messages = const <ChatMessage>[];
       var toolEvents = const <String, List<Map<String, dynamic>>>{};
       var geminiThoughtSigs = const <String, String>{};
-      if (versionedIncludesChats == null &&
-          mode == RestoreMode.overwrite &&
-          restoreChats) {
+      if (mode == RestoreMode.overwrite && restoreChats) {
         await _validateOverwriteChatCandidate(
           stagingDirectory: extractDir,
           chatsFile: chatsFile,
         );
       }
-      if (versionedIncludesChats == null && restoreChats) {
+      if (restoreChats) {
         final parsed = await _parseChatBackup(chatsFile);
         conversations = parsed.conversations;
         messages = parsed.messages;
@@ -1474,21 +1447,11 @@ class DataSync {
         geminiThoughtSigs = parsed.geminiThoughtSigs;
       }
 
-      settingsRollbackSnapshot = versionedBackup != null
-          ? await prefs._captureOverwriteRollbackSnapshot(
-              settings,
-              clearKnownCredentials: versionedBackup.secretsIncluded == false,
-            )
-          : null;
       // Restore settings
       if (await settingsFile.exists()) {
         try {
           if (mode == RestoreMode.overwrite) {
-            settingsMutationStarted = true;
             // For overwrite mode, restore all settings
-            if (versionedBackup?.secretsIncluded == false) {
-              await prefs._clearBeforeSecretFreeOverwrite();
-            }
             await prefs.restore(settings);
           } else {
             // For merge mode, intelligently merge settings
@@ -1782,15 +1745,7 @@ class DataSync {
       // Restore chats
       if (restoreChats) {
         try {
-          if (versionedIncludesChats != null) {
-            final snapshotFile = File(
-              p.joinAll([
-                restorePayloadDirectory.path,
-                ..._databaseEntryName.split('/'),
-              ]),
-            );
-            await chatService.restoreDatabaseSnapshot(snapshotFile);
-          } else if (mode == RestoreMode.overwrite) {
+          if (mode == RestoreMode.overwrite) {
             await chatService.replaceAllDataFromBackup(
               conversations: conversations,
               messages: messages,
@@ -2017,39 +1972,8 @@ class DataSync {
           }
         }
       }
-    } catch (error, stackTrace) {
-      if (restorePreferences != null &&
-          settingsRollbackSnapshot != null &&
-          settingsMutationStarted) {
-        try {
-          await restorePreferences._restoreOverwriteRollbackSnapshot(
-            settingsRollbackSnapshot,
-          );
-        } catch (rollbackError, rollbackStackTrace) {
-          Error.throwWithStackTrace(
-            _RestoreRollbackException(error, rollbackError),
-            rollbackStackTrace,
-          );
-        }
-      }
-      Error.throwWithStackTrace(error, stackTrace);
     } finally {
-      try {
-        if (sameVolumeAppDataPath != null && sameVolumeRunId != null) {
-          final appDataPath = sameVolumeAppDataPath;
-          final runId = sameVolumeRunId;
-          await Isolate.run(
-            () => RestoreBundleStaging.discardUnpublished(
-              appDataDirectory: Directory(appDataPath),
-              runId: runId,
-            ),
-          );
-        } else {
-          await _deleteDirectoryQuietly(sameVolumeWorkspace);
-        }
-      } finally {
-        await _deleteDirectoryQuietly(extractDir);
-      }
+      await _deleteDirectoryQuietly(extractDir);
     }
   }
 
@@ -2512,57 +2436,6 @@ class SharedPreferencesAsync {
   /// Migration disaster backups intentionally keep using [snapshot].
   Future<Map<String, dynamic>> snapshotForRegularBackup() async {
     return BackupSettingsSanitizer.sanitize(await snapshot());
-  }
-
-  Future<void> _clearBeforeSecretFreeOverwrite() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys().where(
-      BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite,
-    );
-    for (final key in keys.toList(growable: false)) {
-      if (!await prefs.remove(key)) throw StateError(key);
-    }
-  }
-
-  Future<_SettingsRollbackSnapshot> _captureOverwriteRollbackSnapshot(
-    Map<String, dynamic> incoming, {
-    required bool clearKnownCredentials,
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final existingKeys = prefs.getKeys();
-    // Until the global restore gate exists, compensation must not touch keys
-    // that another provider may write while this restore is running.
-    final touchedKeys = incoming.keys
-        .where((key) => !BackupSettingsValidator.isLocalOnly(key))
-        .toSet();
-    if (clearKnownCredentials) {
-      touchedKeys.addAll(
-        existingKeys.where(
-          BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite,
-        ),
-      );
-    }
-    final existingValues = <String, dynamic>{};
-    for (final key in touchedKeys) {
-      if (existingKeys.contains(key)) existingValues[key] = prefs.get(key);
-    }
-    return (existingValues: existingValues, touchedKeys: touchedKeys);
-  }
-
-  Future<void> _restoreOverwriteRollbackSnapshot(
-    _SettingsRollbackSnapshot snapshot,
-  ) async {
-    BackupSettingsValidator.validate(snapshot.existingValues);
-    final prefs = await SharedPreferences.getInstance();
-    final currentKeys = prefs.getKeys();
-    for (final key in snapshot.touchedKeys) {
-      if (!snapshot.existingValues.containsKey(key) &&
-          currentKeys.contains(key) &&
-          !await prefs.remove(key)) {
-        throw StateError(key);
-      }
-    }
-    await restore(snapshot.existingValues);
   }
 
   Future<void> restore(Map<String, dynamic> data) async {

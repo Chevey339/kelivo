@@ -632,7 +632,23 @@
   "backupPageTestDone": "Test done",
   "backupPageTestConnection": "Test",
   "backupPageRestartRequired": "Restart Required",
-  "backupPageRestartContent": "Restore completed. Please restart the app.",
+  "backupPageRestartContent": "Restore is ready. Restart Kelivo to apply it safely.",
+  "restartAppFailedMessage": "Kelivo could not restart automatically. Fully close it, then open it again.",
+  "backupRestoreColdRestartTitle": "One more restart is required",
+  "backupRestoreColdRestartContent": "Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.",
+  "backupRestoreColdRestartButton": "Restart Kelivo",
+  "backupRestoreRolledBackTitle": "Restore was rolled back",
+  "backupRestoreRolledBackContent": "The restore could not be completed. Kelivo verified and kept your previous data.",
+  "backupRestoreFailureTitle": "Restore requires attention",
+  "backupRestoreFailureContent": "Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.",
+  "backupRestoreFailureDiagnostic": "Diagnostic code: {code}",
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
   "@backupPageRestoreFailedMessage": {
     "placeholders": {
@@ -644,11 +660,12 @@
   "backupPageOK": "OK",
   "backupPageCancel": "Cancel",
   "backupPageSelectImportMode": "Select Import Mode",
-  "backupPageSelectImportModeDescription": "Choose how to import the backup data:",
+  "backupPageSelectImportModeDescription": "Choose a restore mode. The chat and file switches determine which components are included.",
   "backupPageOverwriteMode": "Complete Overwrite",
-  "backupPageOverwriteModeDescription": "Clear all local data and restore from backup",
-  "backupPageMergeMode": "Smart Merge",
-  "backupPageMergeModeDescription": "Add only non-existing data (intelligent deduplication)",
+  "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
+  "backupPageMergeMode": "Legacy JSON Merge",
+  "backupPageMergeModeDescription": "Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.",
+  "backupPageSqliteMergeUnsupported": "SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.",
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",

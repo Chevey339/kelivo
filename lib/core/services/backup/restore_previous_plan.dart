@@ -11,7 +11,6 @@ const _componentOrder = [
   RestoreComponent.database,
   RestoreComponent.assets,
 ];
-const _assetRootNames = ['upload', 'images', 'avatars', 'fonts'];
 final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
 final _hashPattern = RegExp(r'^[a-f0-9]{64}$');
 
@@ -215,19 +214,21 @@ final class RestorePreviousDatabasePlan {
 }
 
 final class RestorePreviousAssetsPlan {
+  static const rootNames = ['upload', 'images', 'avatars', 'fonts'];
+
   RestorePreviousAssetsPlan({
     required Map<String, RestorePreviousAssetRootState> rootStates,
     required Map<String, RestoreFileDescriptor> entries,
   }) : rootStates = Map.unmodifiable({
-         for (final root in _assetRootNames)
+         for (final root in rootNames)
            if (rootStates.containsKey(root)) root: rootStates[root]!,
        }),
        entries = Map.unmodifiable({
          for (final name in (entries.keys.toList()..sort()))
            name: entries[name]!,
        }) {
-    if (rootStates.length != _assetRootNames.length ||
-        !_assetRootNames.every(rootStates.containsKey)) {
+    if (rootStates.length != rootNames.length ||
+        !rootNames.every(rootStates.containsKey)) {
       throw ArgumentError('restore_previous_asset_roots');
     }
     final foldedNames = <String>{};
@@ -246,7 +247,7 @@ final class RestorePreviousAssetsPlan {
   final Map<String, RestoreFileDescriptor> entries;
 
   Map<String, dynamic> toJson() => {
-    'roots': {for (final root in _assetRootNames) root: rootStates[root]!.name},
+    'roots': {for (final root in rootNames) root: rootStates[root]!.name},
     'entries': {
       for (final entry in entries.entries) entry.key: entry.value.toJson(),
     },
@@ -263,12 +264,12 @@ final class RestorePreviousAssetsPlan {
       throw const FormatException('restore_previous_assets');
     }
     if (rawRoots.keys.any((key) => key is! String) ||
-        rawRoots.length != _assetRootNames.length ||
-        !_assetRootNames.every(rawRoots.containsKey)) {
+        rawRoots.length != rootNames.length ||
+        !rootNames.every(rawRoots.containsKey)) {
       throw const FormatException('restore_previous_asset_roots');
     }
     final roots = <String, RestorePreviousAssetRootState>{};
-    for (final root in _assetRootNames) {
+    for (final root in rootNames) {
       final rawState = rawRoots[root];
       if (rawState is! String) {
         throw const FormatException('restore_previous_asset_roots');
@@ -552,7 +553,7 @@ String? _assetRootFor(String entryName) {
     return null;
   }
   final root = segments.first;
-  return _assetRootNames.contains(root) ? root : null;
+  return RestorePreviousAssetsPlan.rootNames.contains(root) ? root : null;
 }
 
 bool _sameComponents(Set<RestoreComponent> left, Set<RestoreComponent> right) =>

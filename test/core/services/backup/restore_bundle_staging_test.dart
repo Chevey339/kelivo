@@ -104,6 +104,23 @@ void main() {
         staged.candidateManifestSha256,
         (await sha256.bind(manifest.openRead()).first).toString(),
       );
+      final validated = await RestoreBundleStaging.validateExistingCandidate(
+        candidateDirectory: staged.payloadDirectory,
+        expectedManifestSha256: staged.candidateManifestSha256,
+      );
+      expect(validated.secretsIncluded, isFalse);
+      expect(validated.settings, {'theme': 'dark'});
+      expect(validated.entries.keys, ['settings.json']);
+      expect(validated.databaseInfo, isNull);
+      expect(
+        await root
+            .list(recursive: true, followLinks: false)
+            .where(
+              (entry) => p.basename(entry.path).startsWith('.restore_probe_'),
+            )
+            .toList(),
+        isEmpty,
+      );
     });
 
     test('removes its run workspace when candidate creation fails', () async {
@@ -331,6 +348,25 @@ void main() {
       );
     });
 
+    test('rejects unknown candidate manifest fields', () async {
+      final extracted = await _createExtractedBundle(root);
+      final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+      final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+      manifest['futureField'] = true;
+      await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: false,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
     test('rejects a non-canonical declared asset path', () async {
       final extracted = await _createExtractedBundle(root);
       final manifestFile = File(p.join(extracted.path, 'manifest.json'));
@@ -413,6 +449,54 @@ void main() {
         isEmpty,
       );
     });
+
+    test(
+      'rejects a falsely declared secret-free candidate before publication',
+      () async {
+        final extracted = await _createExtractedBundle(root);
+        final settingsFile = File(p.join(extracted.path, 'settings.json'));
+        await settingsFile.writeAsString(
+          jsonEncode({'global_proxy_password_v1': 'source-secret'}),
+          flush: true,
+        );
+        final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+        final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+        final settingsMetadata =
+            (manifest['entries'] as Map)['settings.json'] as Map;
+        settingsMetadata['bytes'] = await settingsFile.length();
+        settingsMetadata['sha256'] =
+            (await sha256.bind(settingsFile.openRead()).first).toString();
+        await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
+
+        await expectLater(
+          RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: false,
+            includeFiles: false,
+            sourceManifestSha256: await _manifestSha256(extracted),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'restore_settings_not_secret_free',
+            ),
+          ),
+        );
+
+        final workspaceRoot = Directory(
+          p.join(root.path, RestoreBundleStaging.workspaceRootName),
+        );
+        expect(
+          await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList(),
+          isEmpty,
+        );
+      },
+    );
 
     test('requires every declared empty asset root on revalidation', () async {
       final extracted = await _createExtractedBundle(root, includeFiles: true);

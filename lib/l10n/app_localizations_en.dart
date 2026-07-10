@@ -1539,7 +1539,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageRestartContent =>
-      'Restore completed. Please restart the app.';
+      'Restore is ready. Restart Kelivo to apply it safely.';
+
+  @override
+  String get restartAppFailedMessage =>
+      'Kelivo could not restart automatically. Fully close it, then open it again.';
+
+  @override
+  String get backupRestoreColdRestartTitle => 'One more restart is required';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.';
+
+  @override
+  String get backupRestoreColdRestartButton => 'Restart Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => 'Restore was rolled back';
+
+  @override
+  String get backupRestoreRolledBackContent =>
+      'The restore could not be completed. Kelivo verified and kept your previous data.';
+
+  @override
+  String get backupRestoreFailureTitle => 'Restore requires attention';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return 'Diagnostic code: $code';
+  }
 
   @override
   String backupPageRestoreFailedMessage(String error) {
@@ -1557,21 +1590,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      'Choose how to import the backup data:';
+      'Choose a restore mode. The chat and file switches determine which components are included.';
 
   @override
   String get backupPageOverwriteMode => 'Complete Overwrite';
 
   @override
   String get backupPageOverwriteModeDescription =>
-      'Clear all local data and restore from backup';
+      'Replace the selected components; keep unselected components and unrelated local settings';
 
   @override
-  String get backupPageMergeMode => 'Smart Merge';
+  String get backupPageMergeMode => 'Legacy JSON Merge';
 
   @override
   String get backupPageMergeModeDescription =>
-      'Add only non-existing data (intelligent deduplication)';
+      'Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.';
+
+  @override
+  String get backupPageSqliteMergeUnsupported =>
+      'SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.';
 
   @override
   String get backupPageRestore => 'Restore';
