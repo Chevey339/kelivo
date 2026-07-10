@@ -1,6 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
+
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
@@ -17,6 +19,7 @@ class ChatService extends ChangeNotifier {
   static const int defaultLoadedWindowMax = 360;
 
   late ChatDatabaseRepository _repo;
+  late File _databaseFile;
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -50,9 +53,8 @@ class ChatService extends ChangeNotifier {
     if (!await appDataDir.exists()) {
       await appDataDir.create(recursive: true);
     }
-    _repo = ChatDatabaseRepository.open(
-      file: File(p.join(appDataDir.path, AppDatabase.databaseFileName)),
-    );
+    _databaseFile = File(p.join(appDataDir.path, AppDatabase.databaseFileName));
+    _repo = ChatDatabaseRepository.open(file: _databaseFile);
     await _repo.ensureReady();
     await _loadConversationsCache();
 
@@ -702,6 +704,30 @@ class ChatService extends ChangeNotifier {
       geminiSignaturesByMessageId: geminiSignaturesByMessageId,
     );
 
+    await _resetAfterOverwriteRestore();
+  }
+
+  Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
+    File destinationFile,
+  ) async {
+    if (!_initialized) await init();
+    final sourcePath = _databaseFile.path;
+    final destinationPath = destinationFile.path;
+    return Isolate.run(
+      () => ChatDatabaseRepository.createConsistentSnapshot(
+        sourceFile: File(sourcePath),
+        destinationFile: File(destinationPath),
+      ),
+    );
+  }
+
+  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
+    if (!_initialized) await init();
+    await _repo.replaceBackupSnapshot(snapshotFile);
+    await _resetAfterOverwriteRestore();
+  }
+
+  Future<void> _resetAfterOverwriteRestore() async {
     _messagesCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();

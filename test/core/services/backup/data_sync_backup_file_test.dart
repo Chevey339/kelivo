@@ -1,12 +1,16 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -116,6 +120,115 @@ class _CandidateCleanupChatService extends ChatService {
   }
 }
 
+Future<String> _fileSha256(File file) async {
+  return (await sha256.bind(file.openRead()).first).toString();
+}
+
+Future<void> _overwriteCentralDirectoryUncompressedSize(
+  File zipFile,
+  int size,
+) async {
+  final bytes = await zipFile.readAsBytes();
+  const signature = [0x50, 0x4b, 0x01, 0x02];
+  var headerOffset = -1;
+  for (var i = bytes.length - signature.length; i >= 0; i--) {
+    if (bytes[i] == signature[0] &&
+        bytes[i + 1] == signature[1] &&
+        bytes[i + 2] == signature[2] &&
+        bytes[i + 3] == signature[3]) {
+      headerOffset = i;
+      break;
+    }
+  }
+  if (headerOffset < 0) throw StateError('central_directory');
+  for (var i = 0; i < 4; i++) {
+    bytes[headerOffset + 24 + i] = (size >> (8 * i)) & 0xff;
+  }
+  await zipFile.writeAsBytes(bytes, flush: true);
+}
+
+Future<File> _createSqliteBackupFixture({
+  required Directory root,
+  required String prefix,
+  required Map<String, dynamic> settings,
+  String? databaseSha256,
+}) async {
+  final databasePath = '${root.path}/${prefix}_database.sqlite';
+  final snapshotInfo = await Isolate.run(() async {
+    final databaseFile = File(databasePath);
+    final repository = ChatDatabaseRepository.open(file: databaseFile);
+    try {
+      await repository.ensureReady();
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'fixture-conversation',
+            title: 'Fixture',
+            messageIds: const ['fixture-message'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'fixture-message',
+              role: 'assistant',
+              content: 'fixture content',
+              conversationId: 'fixture-conversation',
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await repository.checkpoint();
+    } finally {
+      await repository.close();
+    }
+    return ChatDatabaseRepository.prepareSnapshotForRestore(databaseFile);
+  });
+  final databaseFile = File(databasePath);
+  final settingsFile = File('${root.path}/${prefix}_settings.json');
+  await settingsFile.writeAsString(jsonEncode(settings));
+  final manifestFile = File('${root.path}/${prefix}_manifest.json');
+  await manifestFile.writeAsString(
+    jsonEncode({
+      'format': 'kelivo-backup',
+      'formatVersion': 2,
+      'payloadKind': 'sqlite',
+      'createdAtUtc': '2026-07-09T00:00:00.000Z',
+      'appVersion': '1.0.0-test+1',
+      'includeChats': true,
+      'includeFiles': false,
+      'secretsIncluded': true,
+      'database': {
+        'entry': 'database/kelivo.sqlite',
+        'schemaVersion': snapshotInfo.schemaVersion,
+        'conversationCount': snapshotInfo.conversationCount,
+        'messageCount': snapshotInfo.messageCount,
+      },
+      'entries': {
+        'settings.json': {
+          'bytes': await settingsFile.length(),
+          'sha256': await _fileSha256(settingsFile),
+        },
+        'database/kelivo.sqlite': {
+          'bytes': await databaseFile.length(),
+          'sha256': databaseSha256 ?? await _fileSha256(databaseFile),
+        },
+      },
+    }),
+  );
+  final zipFile = File('${root.path}/$prefix.zip');
+  final encoder = ZipFileEncoder();
+  encoder.create(zipFile.path);
+  encoder.addFileSync(manifestFile, 'manifest.json');
+  encoder.addFileSync(settingsFile, 'settings.json');
+  encoder.addFileSync(databaseFile, 'database/kelivo.sqlite');
+  encoder.closeSync();
+  return zipFile;
+}
+
 void main() {
   group('DataSync backup file', () {
     late Directory root;
@@ -124,6 +237,13 @@ void main() {
     setUp(() async {
       root = await Directory.systemTemp.createTemp('kelivo_data_sync_test_');
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
+      PackageInfo.setMockInitialValues(
+        appName: 'Kelivo',
+        packageName: 'Kelivo',
+        version: '1.0.0-test',
+        buildNumber: '1',
+        buildSignature: 'test',
+      );
       SharedPreferences.setMockInitialValues({'backup_test_key': 'value'});
       validSettingsFile = File('${root.path}/valid_settings.json');
       await validSettingsFile.writeAsString('{}');
@@ -171,10 +291,12 @@ void main() {
         try {
           archive = ZipDecoder().decodeStream(input);
           final settingsEntry = archive.findFile('settings.json');
+          final manifestEntry = archive.findFile('manifest.json');
           final uploadEntry = archive.findFile('upload/large.bin');
           final fontEntry = archive.findFile('fonts/custom.ttf');
 
           expect(settingsEntry, isNotNull);
+          expect(manifestEntry, isNotNull);
           expect(uploadEntry, isNotNull);
           expect(fontEntry, isNotNull);
           expect(settingsEntry!.compression, CompressionType.deflate);
@@ -182,6 +304,18 @@ void main() {
           expect(fontEntry!.compression, CompressionType.deflate);
           expect(uploadEntry.readBytes(), List<int>.filled(1024 * 1024, 7));
           expect(fontEntry.readBytes(), List<int>.filled(256, 9));
+          final manifest =
+              jsonDecode(utf8.decode(manifestEntry!.readBytes()!))
+                  as Map<String, dynamic>;
+          final manifestEntries = manifest['entries'] as Map;
+          expect(
+            (manifestEntries['upload/large.bin'] as Map)['sha256'],
+            await _fileSha256(uploadFile),
+          );
+          expect(
+            (manifestEntries['fonts/custom.ttf'] as Map)['sha256'],
+            await _fileSha256(fontFile),
+          );
         } finally {
           archive?.clearSync();
           input.closeSync();
@@ -198,6 +332,427 @@ void main() {
         expect(await backupFile.parent.exists(), isFalse);
       },
     );
+
+    test('writes a consistent SQLite snapshot instead of chats.json', () async {
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+      await chatService.restoreConversation(
+        Conversation(
+          id: 'snapshot-conversation',
+          title: 'Snapshot',
+          messageIds: const ['snapshot-message'],
+        ),
+        [
+          ChatMessage(
+            id: 'snapshot-message',
+            role: 'assistant',
+            content: 'snapshot content',
+            conversationId: 'snapshot-conversation',
+          ),
+        ],
+      );
+
+      final backupFile = await DataSync(chatService: chatService)
+          .prepareBackupFile(
+            const WebDavConfig(includeChats: true, includeFiles: false),
+          );
+      addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
+
+      final input = InputFileStream(backupFile.path);
+      Archive? archive;
+      try {
+        archive = ZipDecoder().decodeStream(input);
+        final manifestEntry = archive.findFile('manifest.json');
+        final databaseEntry = archive.findFile('database/kelivo.sqlite');
+
+        expect(manifestEntry, isNotNull);
+        expect(databaseEntry, isNotNull);
+        expect(archive.findFile('chats.json'), isNull);
+
+        final snapshotFile = File('${root.path}/archived.sqlite');
+        await snapshotFile.writeAsBytes(databaseEntry!.readBytes()!);
+        final archivedHash = await _fileSha256(snapshotFile);
+        final archivedContent = await Isolate.run(() async {
+          final repository = ChatDatabaseRepository.open(file: snapshotFile);
+          try {
+            await repository.ensureReady();
+            await repository.validateIntegrity();
+            if (await repository.getConversation('snapshot-conversation') ==
+                null) {
+              throw StateError('snapshot-conversation');
+            }
+            return (await repository.getMessagesRange(
+              'snapshot-conversation',
+              start: 0,
+              limit: 1,
+            )).single.content;
+          } finally {
+            await repository.close();
+          }
+        });
+        expect(archivedContent, 'snapshot content');
+
+        final manifest =
+            jsonDecode(utf8.decode(manifestEntry!.readBytes()!))
+                as Map<String, dynamic>;
+        expect(manifest['format'], 'kelivo-backup');
+        expect(manifest['formatVersion'], 2);
+        expect(manifest['payloadKind'], 'sqlite');
+        expect(manifest['includeChats'], isTrue);
+        expect(manifest['appVersion'], '1.0.0-test+1');
+        expect(
+          ((manifest['entries'] as Map)['database/kelivo.sqlite']
+              as Map)['sha256'],
+          archivedHash,
+        );
+      } finally {
+        archive?.clearSync();
+        input.closeSync();
+      }
+    });
+
+    test('restores a versioned SQLite snapshot backup', () async {
+      final sourceFile = File('${root.path}/source.sqlite');
+      final sourceRepository = ChatDatabaseRepository.open(file: sourceFile);
+      await sourceRepository.ensureReady();
+      await sourceRepository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'restored-conversation',
+            title: 'Restored',
+            messageIds: const ['restored-message'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'restored-message',
+              role: 'assistant',
+              content: 'restored from sqlite',
+              conversationId: 'restored-conversation',
+              isStreaming: true,
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {
+          'restored-message': [
+            {'id': 'tool-event'},
+          ],
+        },
+        geminiSignaturesByMessageId: const {'restored-message': 'signature'},
+      );
+      await sourceRepository.markMigrationComplete();
+      await sourceRepository.checkpoint();
+      await sourceRepository.close();
+
+      final settingsFile = File('${root.path}/sqlite_settings.json');
+      await settingsFile.writeAsString('{}');
+      final manifestFile = File('${root.path}/sqlite_manifest.json');
+      await manifestFile.writeAsString(
+        jsonEncode({
+          'format': 'kelivo-backup',
+          'formatVersion': 2,
+          'payloadKind': 'sqlite',
+          'createdAtUtc': '2026-07-09T00:00:00.000Z',
+          'includeChats': true,
+          'includeFiles': false,
+          'appVersion': '1.0.0-test+1',
+          'secretsIncluded': true,
+          'database': {
+            'entry': 'database/kelivo.sqlite',
+            'schemaVersion': 1,
+            'conversationCount': 1,
+            'messageCount': 1,
+          },
+          'entries': {
+            'settings.json': {
+              'bytes': await settingsFile.length(),
+              'sha256': await _fileSha256(settingsFile),
+            },
+            'database/kelivo.sqlite': {
+              'bytes': await sourceFile.length(),
+              'sha256': await _fileSha256(sourceFile),
+            },
+          },
+        }),
+      );
+      final zipFile = File('${root.path}/sqlite_backup.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(manifestFile, 'manifest.json');
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.addFileSync(sourceFile, 'database/kelivo.sqlite');
+      encoder.closeSync();
+
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+      final existing = await chatService.createConversation(title: 'Existing');
+
+      await DataSync(chatService: chatService).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+      );
+
+      expect(chatService.getConversation(existing.id), isNull);
+      expect(
+        chatService.getConversation('restored-conversation')?.title,
+        'Restored',
+      );
+      final restoredMessage = chatService
+          .getMessages('restored-conversation')
+          .single;
+      expect(restoredMessage.content, 'restored from sqlite');
+      expect(restoredMessage.isStreaming, isFalse);
+      expect(chatService.getToolEvents('restored-message'), const [
+        {'id': 'tool-event'},
+      ]);
+      expect(
+        chatService.getGeminiThoughtSignature('restored-message'),
+        'signature',
+      );
+    });
+
+    test(
+      'rejects a SQLite manifest hash mismatch before changing live data',
+      () async {
+        final fixture = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'bad_hash',
+          settings: const {'preserved_setting': 'imported'},
+          databaseSha256: List.filled(64, '0').join(),
+        );
+        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+        final existing = await chatService.createConversation(title: 'Local');
+
+        await expectLater(
+          DataSync(chatService: chatService).restoreFromLocalFile(
+            fixture,
+            const WebDavConfig(includeChats: true, includeFiles: false),
+          ),
+          throwsA(isA<FormatException>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('preserved_setting'), 'local');
+        expect(chatService.getConversation(existing.id), isNotNull);
+        expect(chatService.getConversation('fixture-conversation'), isNull);
+      },
+    );
+
+    test(
+      'does not fall back to legacy JSON when a future manifest is present',
+      () async {
+        final settingsFile = File('${root.path}/future_manifest_settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({'preserved_setting': 'imported'}),
+        );
+        final chatsFile = File('${root.path}/future_manifest_chats.json');
+        await chatsFile.writeAsString(
+          jsonEncode({
+            'version': 1,
+            'conversations': [
+              Conversation(id: 'legacy-fallback', title: 'Legacy').toJson(),
+            ],
+            'messages': <Map<String, dynamic>>[],
+          }),
+        );
+        final manifestFile = File('${root.path}/future_manifest.json');
+        await manifestFile.writeAsString(
+          jsonEncode({
+            'format': 'kelivo-backup',
+            'formatVersion': 3,
+            'payloadKind': 'settings-only',
+            'createdAtUtc': '2026-07-09T00:00:00.000Z',
+            'appVersion': 'future',
+            'includeChats': false,
+            'includeFiles': false,
+            'secretsIncluded': true,
+            'entries': {
+              'settings.json': {
+                'bytes': await settingsFile.length(),
+                'sha256': await _fileSha256(settingsFile),
+              },
+            },
+          }),
+        );
+        final zipFile = File('${root.path}/future_manifest.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(manifestFile, 'manifest.json');
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.addFileSync(chatsFile, 'chats.json');
+        encoder.closeSync();
+
+        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+
+        await expectLater(
+          DataSync(chatService: chatService).restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: true, includeFiles: false),
+          ),
+          throwsA(isA<FormatException>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('preserved_setting'), 'local');
+        expect(chatService.getConversation('legacy-fallback'), isNull);
+      },
+    );
+
+    test('rejects case-folded duplicate ZIP paths before restoring', () async {
+      final firstSettings = File('${root.path}/duplicate_settings_one.json');
+      final secondSettings = File('${root.path}/duplicate_settings_two.json');
+      await firstSettings.writeAsString(
+        jsonEncode({'preserved_setting': 'first'}),
+      );
+      await secondSettings.writeAsString(
+        jsonEncode({'preserved_setting': 'second'}),
+      );
+      final zipFile = File('${root.path}/duplicate_paths.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(firstSettings, 'settings.json');
+      encoder.addFileSync(secondSettings, 'SETTINGS.JSON');
+      encoder.closeSync();
+      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+
+      await expectLater(
+        DataSync(chatService: ChatService()).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('preserved_setting'), 'local');
+    });
+
+    test(
+      'stops extraction when expanded bytes exceed the ZIP header',
+      () async {
+        final settingsFile = File('${root.path}/bounded_settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({'preserved_setting': 'imported'}),
+        );
+        final zipFile = File('${root.path}/bounded_restore.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+        await _overwriteCentralDirectoryUncompressedSize(zipFile, 1);
+        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+
+        await expectLater(
+          DataSync(chatService: ChatService()).restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          ),
+          throwsA(isA<FormatException>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getString('preserved_setting'), 'local');
+      },
+    );
+
+    test('bounds manifest expansion before parsing it', () async {
+      final manifestFile = File('${root.path}/bounded_manifest.json');
+      await manifestFile.writeAsString(
+        jsonEncode({
+          'format': 'kelivo-backup',
+          'formatVersion': 2,
+          'payloadKind': 'settings-only',
+          'createdAtUtc': '2026-07-09T00:00:00.000Z',
+          'appVersion': 'test',
+          'includeChats': false,
+          'includeFiles': false,
+          'secretsIncluded': true,
+          'entries': const <String, dynamic>{},
+        }),
+      );
+      final zipFile = File('${root.path}/bounded_manifest.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(manifestFile, 'manifest.json');
+      encoder.closeSync();
+      await _overwriteCentralDirectoryUncompressedSize(zipFile, 1);
+      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+
+      await expectLater(
+        DataSync(chatService: ChatService()).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('preserved_setting'), 'local');
+    });
+
+    test('rejects a SQLite payload without a manifest', () async {
+      final settingsFile = File('${root.path}/unversioned_db_settings.json');
+      final databaseFile = File('${root.path}/unversioned.sqlite');
+      await settingsFile.writeAsString(
+        jsonEncode({'preserved_setting': 'imported'}),
+      );
+      await databaseFile.writeAsBytes(const [1, 2, 3]);
+      final zipFile = File('${root.path}/unversioned_db.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.addFileSync(databaseFile, 'database/kelivo.sqlite');
+      encoder.closeSync();
+      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+
+      await expectLater(
+        DataSync(chatService: ChatService()).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('preserved_setting'), 'local');
+    });
+
+    test('rejects SQLite merge before changing live data', () async {
+      final fixture = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'merge_rejected',
+        settings: const {'preserved_setting': 'imported'},
+      );
+      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+      final existing = await chatService.createConversation(title: 'Local');
+
+      await expectLater(
+        DataSync(chatService: chatService).restoreFromLocalFile(
+          fixture,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          mode: RestoreMode.merge,
+        ),
+        throwsA(isA<UnsupportedError>()),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('preserved_setting'), 'local');
+      expect(chatService.getConversation(existing.id), isNotNull);
+      expect(chatService.getConversation('fixture-conversation'), isNull);
+    });
 
     test('restores managed font files in overwrite and merge modes', () async {
       final sourceDir = Directory('${root.path}/source_fonts');

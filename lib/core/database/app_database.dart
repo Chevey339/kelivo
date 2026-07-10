@@ -116,6 +116,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   static const databaseFileName = 'kelivo.sqlite';
+  static const currentSchemaVersion = 1;
 
   factory AppDatabase.open({File? file}) {
     final databaseFile = file;
@@ -146,7 +147,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => currentSchemaVersion;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

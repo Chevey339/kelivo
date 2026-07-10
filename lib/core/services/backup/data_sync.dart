@@ -5,7 +5,9 @@ import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -25,7 +27,22 @@ typedef _ParsedChatBackup = ({
   Map<String, String> geminiThoughtSigs,
 });
 
+typedef _BackupEntryMetadata = ({int bytes, String sha256});
+
 class DataSync {
+  static const _backupFormat = 'kelivo-backup';
+  static const _backupFormatVersion = 2;
+  static const _manifestEntryName = 'manifest.json';
+  static const _databaseEntryName = 'database/kelivo.sqlite';
+  // The ZIP writer supports up to 65,535 entries. A 16 MiB metadata cap keeps
+  // manifest parsing bounded while leaving room for that practical maximum.
+  static const _maxManifestBytes = 16 * 1024 * 1024;
+  // ZIP32 output is already limited to 4 GiB per entry. Restore also accepts
+  // older archives, so keep explicit, diagnosable bounds above that limit.
+  static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
+  static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
+  static const _maxRestoreEntries = 0xffff;
+
   final ChatService chatService;
   DataSync({required this.chatService});
 
@@ -150,44 +167,76 @@ class DataSync {
     final outFile = File(outPath);
     if (await outFile.exists()) await outFile.delete();
 
+    File? manifestTmp;
     File? settingsTmp;
-    File? chatsTmp;
+    File? databaseTmp;
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json
       final settingsJson = await _exportSettingsJson();
-      settingsTmp = await _writeTempText(
+      final settingsFile = await _writeTempText(
         workDir,
         '_bk_settings.json',
         settingsJson,
       );
+      settingsTmp = settingsFile;
 
-      // chats.json — stream to file to avoid huge string in memory
+      ChatDatabaseSnapshotInfo? snapshotInfo;
       if (cfg.includeChats) {
-        chatsTmp = await _exportChatsToFile(workDir);
+        final databaseFile = File(p.join(workDir.path, '_bk_kelivo.sqlite'));
+        databaseTmp = databaseFile;
+        snapshotInfo = await chatService.createBackupDatabaseSnapshot(
+          databaseFile,
+        );
       }
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appVersion = packageInfo.buildNumber.trim().isEmpty
+          ? packageInfo.version
+          : '${packageInfo.version}+${packageInfo.buildNumber}';
+      final manifestFile = File(p.join(workDir.path, '_bk_manifest.json'));
+      manifestTmp = manifestFile;
 
       // Resolve directory paths (need AppDirectories on main isolate)
       final uploadDirPath = (await _getUploadDir()).path;
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
       final fontsDirPath = (await _getFontsDir()).path;
-      final settingsPath = settingsTmp.path;
-      final chatsPath = chatsTmp?.path;
+      final manifestPath = manifestFile.path;
+      final settingsPath = settingsFile.path;
+      final databasePath = databaseTmp?.path;
       final includeFiles = cfg.includeFiles;
+      final verifyDirPath = p.join(workDir.path, '_verify');
 
       // --- Step 2: Run CPU-heavy ZIP packing in a separate isolate ---
-      await Isolate.run(() {
+      await Isolate.run(() async {
         _packZipSync(
           outPath: outPath,
+          manifestPath: manifestPath,
           settingsPath: settingsPath,
-          chatsPath: chatsPath,
+          databasePath: databasePath,
+          snapshotInfo: snapshotInfo,
+          includeChats: cfg.includeChats,
           includeFiles: includeFiles,
+          appVersion: appVersion,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
           fontsDirPath: fontsDirPath,
         );
+        final verifyDir = Directory(verifyDirPath);
+        try {
+          verifyDir.createSync(recursive: true);
+          _extractZipSync(outPath, verifyDirPath);
+          await _preflightVersionedBackup(
+            manifestPath: p.join(verifyDirPath, _manifestEntryName),
+            extractDirPath: verifyDirPath,
+          );
+        } finally {
+          if (verifyDir.existsSync()) {
+            verifyDir.deleteSync(recursive: true);
+          }
+        }
       });
 
       return outFile;
@@ -198,7 +247,8 @@ class DataSync {
       // Cleanup temp intermediate files. The final zip is returned to callers
       // and must be deleted by the upload/export caller after it is consumed.
       await _deleteFileQuietly(settingsTmp);
-      await _deleteFileQuietly(chatsTmp);
+      await _deleteFileQuietly(databaseTmp);
+      await _deleteFileQuietly(manifestTmp);
     }
   }
 
@@ -241,7 +291,9 @@ class DataSync {
         } else if (ent is File &&
             ((name.startsWith('kelivo_backup_') && name.endsWith('.zip')) ||
                 name == '_bk_settings.json' ||
-                name == '_bk_chats.json')) {
+                name == '_bk_chats.json' ||
+                name == '_bk_manifest.json' ||
+                name == '_bk_kelivo.sqlite')) {
           await _deleteFileQuietly(ent);
         }
       }
@@ -251,32 +303,84 @@ class DataSync {
   /// Synchronous ZIP packing — runs inside an Isolate.
   static void _packZipSync({
     required String outPath,
+    required String manifestPath,
     required String settingsPath,
-    String? chatsPath,
+    String? databasePath,
+    required ChatDatabaseSnapshotInfo? snapshotInfo,
+    required bool includeChats,
     required bool includeFiles,
+    required String appVersion,
     required String uploadDirPath,
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
   }) {
+    if (includeChats != (databasePath != null && snapshotInfo != null)) {
+      throw StateError('backup_database_component');
+    }
     final writer = _StreamingZipWriter(outPath);
     try {
-      // settings.json
-      _addFileToZip(writer, settingsPath, 'settings.json');
+      final entries = <String, _BackupEntryMetadata>{};
+      final collisionKeys = <String>{};
+      _addFileToZip(
+        writer,
+        settingsPath,
+        'settings.json',
+        entries,
+        collisionKeys,
+      );
 
-      // chats.json
-      if (chatsPath != null) {
-        _addFileToZip(writer, chatsPath, 'chats.json');
+      if (databasePath != null) {
+        _addFileToZip(
+          writer,
+          databasePath,
+          _databaseEntryName,
+          entries,
+          collisionKeys,
+        );
       }
 
-      // files under upload/, images/, and avatars/
       if (includeFiles) {
-        _addDirectoryToZip(writer, uploadDirPath, 'upload');
-        _addDirectoryToZip(writer, avatarsDirPath, 'avatars');
-        _addDirectoryToZip(writer, imagesDirPath, 'images');
-        _addDirectoryToZip(writer, fontsDirPath, 'fonts');
+        _addDirectoryToZip(
+          writer,
+          uploadDirPath,
+          'upload',
+          entries,
+          collisionKeys,
+        );
+        _addDirectoryToZip(
+          writer,
+          avatarsDirPath,
+          'avatars',
+          entries,
+          collisionKeys,
+        );
+        _addDirectoryToZip(
+          writer,
+          imagesDirPath,
+          'images',
+          entries,
+          collisionKeys,
+        );
+        _addDirectoryToZip(
+          writer,
+          fontsDirPath,
+          'fonts',
+          entries,
+          collisionKeys,
+        );
       }
 
+      final manifestJson = _buildBackupManifestJson(
+        entries: entries,
+        snapshotInfo: snapshotInfo,
+        includeChats: includeChats,
+        includeFiles: includeFiles,
+        appVersion: appVersion,
+      );
+      final manifestFile = File(manifestPath)
+        ..writeAsStringSync(manifestJson, flush: true);
+      writer.addFile(manifestFile, _manifestEntryName);
       writer.closeSync();
     } finally {
       writer.closeIfNeededSync();
@@ -287,10 +391,19 @@ class DataSync {
     _StreamingZipWriter writer,
     String filePath,
     String entryName,
+    Map<String, _BackupEntryMetadata> entries,
+    Set<String> collisionKeys,
   ) {
     final file = File(filePath);
-    if (!file.existsSync()) return;
-    writer.addFile(file, _zipEntryName(entryName));
+    if (!file.existsSync()) {
+      throw FileSystemException('Backup entry does not exist', filePath);
+    }
+    final canonicalName = _zipEntryName(entryName);
+    final collisionKey = canonicalName.toLowerCase();
+    if (!collisionKeys.add(collisionKey)) {
+      throw StateError('backup_entry_collision:$canonicalName');
+    }
+    entries[canonicalName] = writer.addFile(file, canonicalName);
   }
 
   /// Add all files from [srcDirPath] into the zip under [zipPrefix].
@@ -298,16 +411,24 @@ class DataSync {
     _StreamingZipWriter writer,
     String srcDirPath,
     String zipPrefix,
+    Map<String, _BackupEntryMetadata> entries,
+    Set<String> collisionKeys,
   ) {
     final dir = Directory(srcDirPath);
     if (!dir.existsSync()) return;
-    final entries = dir.listSync(recursive: true, followLinks: false);
-    for (final ent in entries) {
+    final fileSystemEntries = dir.listSync(recursive: true, followLinks: false);
+    for (final ent in fileSystemEntries) {
       if (ent is File) {
         final rel = p.relative(ent.path, from: srcDirPath);
         // ZIP entries must use forward slashes regardless of platform
         final relPosix = rel.replaceAll('\\', '/');
-        _addFileToZip(writer, ent.path, '$zipPrefix/$relPosix');
+        _addFileToZip(
+          writer,
+          ent.path,
+          '$zipPrefix/$relPosix',
+          entries,
+          collisionKeys,
+        );
       }
     }
   }
@@ -341,22 +462,106 @@ class DataSync {
   static void _extractZipSync(String zipPath, String extractDirPath) {
     final inputStream = InputFileStream(zipPath);
     try {
-      final archive = ZipDecoder().decodeStream(inputStream);
+      final rawEntryNames = <String>[];
+      final archive = ZipDecoder().decodeStream(
+        inputStream,
+        callback: (entry) => rawEntryNames.add(entry.name),
+      );
       try {
+        if (rawEntryNames.length > _maxRestoreEntries) {
+          throw const FormatException('zip_entry_count');
+        }
+        final seenNames = <String>{};
+        for (final rawName in rawEntryNames) {
+          final canonical = _validatedZipEntryName(rawName);
+          if (!seenNames.add(canonical.toLowerCase())) {
+            throw FormatException('duplicate_zip_entry:$canonical');
+          }
+        }
+
+        final archiveFiles = <String, ArchiveFile>{};
+        final allEntryNames = <String>[];
         for (final entry in archive) {
-          // Normalize entry name to use forward slashes and remove traversal
-          final normalized = entry.name.replaceAll('\\', '/');
-          final parts = normalized
-              .split('/')
-              .where((seg) => seg.isNotEmpty && seg != '.' && seg != '..')
-              .toList();
-          if (parts.isEmpty) continue;
+          if (entry.isSymbolicLink) {
+            throw FormatException('symbolic_link:${entry.name}');
+          }
+          final canonical = _validatedZipEntryName(entry.name);
+          allEntryNames.add(canonical);
+          if (entry.isFile) {
+            archiveFiles[canonical] = entry;
+          }
+        }
+        _validateZipPathPrefixes(allEntryNames, archiveFiles.keys);
+
+        final manifestEntry = archiveFiles[_manifestEntryName];
+        Map<String, int>? declaredEntrySizes;
+        if (manifestEntry != null) {
+          if (manifestEntry.size < 0 ||
+              manifestEntry.size > _maxManifestBytes) {
+            throw const FormatException('manifest_size');
+          }
+          final manifestPath = p.join(extractDirPath, _manifestEntryName);
+          final manifestOutput = _BoundedOutputFileStream(
+            manifestPath,
+            expectedBytes: manifestEntry.size,
+            maxEntryBytes: _maxManifestBytes,
+            budget: _ExtractionBudget(maxTotalBytes: _maxManifestBytes),
+          );
+          try {
+            manifestEntry.writeContent(manifestOutput);
+            manifestOutput.verifyComplete();
+          } finally {
+            manifestOutput.closeSync();
+          }
+          final manifestBytes = File(manifestPath).readAsBytesSync();
+          declaredEntrySizes = _declaredManifestEntrySizes(manifestBytes);
+          final actualEntries = archiveFiles.keys.toSet()
+            ..remove(_manifestEntryName);
+          if (actualEntries.length != declaredEntrySizes.length ||
+              !actualEntries.containsAll(declaredEntrySizes.keys)) {
+            throw const FormatException('manifest_entries');
+          }
+          for (final declaredEntry in declaredEntrySizes.entries) {
+            if (archiveFiles[declaredEntry.key]!.size != declaredEntry.value) {
+              throw FormatException('manifest_entry_size:${declaredEntry.key}');
+            }
+          }
+        } else if (archiveFiles.containsKey(_databaseEntryName)) {
+          throw const FormatException('database_manifest');
+        }
+
+        var declaredTotalBytes = 0;
+        for (final entry in archiveFiles.values) {
+          if (entry.size < 0 || entry.size > _maxRestoreEntryBytes) {
+            throw FormatException('zip_entry_size:${entry.name}');
+          }
+          declaredTotalBytes += entry.size;
+          if (declaredTotalBytes > _maxRestoreTotalBytes) {
+            throw const FormatException('zip_total_size');
+          }
+        }
+        final extractionBudget = _ExtractionBudget(
+          maxTotalBytes: _maxRestoreTotalBytes,
+        );
+        if (manifestEntry != null) {
+          extractionBudget.reserve(manifestEntry.size);
+        }
+        for (final entry in archive) {
+          final canonical = _validatedZipEntryName(entry.name);
+          if (canonical == _manifestEntryName) continue;
+          final parts = canonical.split('/');
           final outPath = p.joinAll([extractDirPath, ...parts]);
           if (entry.isFile) {
             File(outPath).parent.createSync(recursive: true);
-            final output = OutputFileStream(outPath);
+            final output = _BoundedOutputFileStream(
+              outPath,
+              expectedBytes: declaredEntrySizes?[canonical] ?? entry.size,
+              maxEntryBytes: _maxRestoreEntryBytes,
+              budget: extractionBudget,
+            );
             try {
               entry.writeContent(output);
+              output.verifyComplete();
             } finally {
               output.closeSync();
             }
@@ -376,6 +581,80 @@ class DataSync {
     } finally {
       inputStream.closeSync();
     }
+  }
+
+  static String _validatedZipEntryName(String rawName) {
+    if (rawName.isEmpty || rawName.contains('\u0000')) {
+      throw const FormatException('zip_entry_name');
+    }
+    final normalized = rawName.replaceAll('\\', '/');
+    if (normalized.startsWith('/') ||
+        normalized.startsWith('//') ||
+        RegExp(r'^[A-Za-z]:($|/)').hasMatch(normalized)) {
+      throw FormatException('absolute_zip_entry:$rawName');
+    }
+    final parts = normalized.split('/');
+    if (parts.isNotEmpty && parts.last.isEmpty) {
+      parts.removeLast();
+    }
+    if (parts.isEmpty ||
+        parts.any((part) => part.isEmpty || part == '.' || part == '..')) {
+      throw FormatException('invalid_zip_entry:$rawName');
+    }
+    return parts.join('/');
+  }
+
+  static void _validateZipPathPrefixes(
+    Iterable<String> allEntries,
+    Iterable<String> fileEntries,
+  ) {
+    final files = fileEntries.map((name) => name.toLowerCase()).toSet();
+    for (final entry in allEntries) {
+      final parts = entry.toLowerCase().split('/');
+      for (var i = 1; i < parts.length; i++) {
+        if (files.contains(parts.take(i).join('/'))) {
+          throw FormatException('zip_path_prefix:$entry');
+        }
+      }
+    }
+  }
+
+  static Map<String, int> _declaredManifestEntrySizes(List<int> manifestBytes) {
+    final decoded = jsonDecode(utf8.decode(manifestBytes));
+    if (decoded is! Map) {
+      throw const FormatException('manifest.json');
+    }
+    final manifest = decoded.cast<String, dynamic>();
+    if (manifest['format'] != _backupFormat ||
+        manifest['formatVersion'] != _backupFormatVersion) {
+      throw const FormatException('manifest_version');
+    }
+    final rawEntries = manifest['entries'];
+    if (rawEntries is! Map) {
+      throw const FormatException('manifest_entries');
+    }
+    final entries = <String, int>{};
+    final caseFolded = <String>{};
+    for (final rawEntry in rawEntries.entries) {
+      final rawName = rawEntry.key;
+      if (rawName is! String || rawEntry.value is! Map) {
+        throw const FormatException('manifest_entry_name');
+      }
+      final canonical = _validatedZipEntryName(rawName);
+      if (canonical != rawName || canonical == _manifestEntryName) {
+        throw FormatException('manifest_entry_name:$rawName');
+      }
+      if (!caseFolded.add(canonical.toLowerCase())) {
+        throw FormatException('manifest_entry_collision:$canonical');
+      }
+      final metadata = (rawEntry.value as Map).cast<String, dynamic>();
+      final bytes = metadata['bytes'];
+      if (bytes is! int || bytes < 0) {
+        throw FormatException('manifest_entry_size:$canonical');
+      }
+      entries[canonical] = bytes;
+    }
+    return entries;
   }
 
   Future<void> backupToWebDav(WebDavConfig cfg) async {
@@ -584,6 +863,190 @@ class DataSync {
     final f = File(p.join(directory.path, name));
     await f.writeAsString(content);
     return f;
+  }
+
+  static String _buildBackupManifestJson({
+    required Map<String, _BackupEntryMetadata> entries,
+    required ChatDatabaseSnapshotInfo? snapshotInfo,
+    required bool includeChats,
+    required bool includeFiles,
+    required String appVersion,
+  }) {
+    return jsonEncode({
+      'format': _backupFormat,
+      'formatVersion': _backupFormatVersion,
+      'payloadKind': includeChats ? 'sqlite' : 'settings-only',
+      'createdAtUtc': DateTime.now().toUtc().toIso8601String(),
+      'appVersion': appVersion,
+      'includeChats': includeChats,
+      'includeFiles': includeFiles,
+      'secretsIncluded': true,
+      if (snapshotInfo != null)
+        'database': {
+          'entry': _databaseEntryName,
+          'schemaVersion': snapshotInfo.schemaVersion,
+          'conversationCount': snapshotInfo.conversationCount,
+          'messageCount': snapshotInfo.messageCount,
+        },
+      'entries': entries.map(
+        (name, metadata) => MapEntry(name, {
+          'bytes': metadata.bytes,
+          'sha256': metadata.sha256,
+        }),
+      ),
+    });
+  }
+
+  static Future<bool> _preflightVersionedBackup({
+    required String manifestPath,
+    required String extractDirPath,
+  }) async {
+    final manifestFile = File(manifestPath);
+    if (!manifestFile.existsSync() ||
+        manifestFile.lengthSync() > _maxManifestBytes) {
+      throw const FormatException('manifest.json');
+    }
+    final decoded = jsonDecode(manifestFile.readAsStringSync());
+    if (decoded is! Map) {
+      throw const FormatException('manifest.json');
+    }
+    final manifest = decoded.cast<String, dynamic>();
+    if (manifest['format'] != _backupFormat ||
+        manifest['formatVersion'] != _backupFormatVersion) {
+      throw const FormatException('manifest_version');
+    }
+    final payloadKind = manifest['payloadKind'];
+    final includeChats = manifest['includeChats'];
+    final includeFiles = manifest['includeFiles'];
+    if (payloadKind is! String ||
+        includeChats is! bool ||
+        includeFiles is! bool ||
+        manifest['appVersion'] is! String ||
+        manifest['createdAtUtc'] is! String ||
+        manifest['secretsIncluded'] is! bool) {
+      throw const FormatException('manifest_fields');
+    }
+
+    final rawEntries = manifest['entries'];
+    if (rawEntries is! Map) {
+      throw const FormatException('manifest_entries');
+    }
+    final entries = <String, _BackupEntryMetadata>{};
+    for (final rawEntry in rawEntries.entries) {
+      if (rawEntry.key is! String || rawEntry.value is! Map) {
+        throw const FormatException('manifest_entry');
+      }
+      final name = rawEntry.key as String;
+      final canonical = _validatedZipEntryName(name);
+      if (canonical != name || canonical == _manifestEntryName) {
+        throw FormatException('manifest_entry_name:$name');
+      }
+      final metadata = (rawEntry.value as Map).cast<String, dynamic>();
+      final bytes = metadata['bytes'];
+      final digest = metadata['sha256'];
+      if (bytes is! int ||
+          bytes < 0 ||
+          digest is! String ||
+          !RegExp(r'^[0-9a-f]{64}$').hasMatch(digest)) {
+        throw FormatException('manifest_entry_metadata:$name');
+      }
+      entries[name] = (bytes: bytes, sha256: digest);
+    }
+    if (!entries.containsKey('settings.json')) {
+      throw const FormatException('settings.json');
+    }
+    for (final name in entries.keys) {
+      final knownEntry =
+          name == 'settings.json' ||
+          name == _databaseEntryName ||
+          name.startsWith('upload/') ||
+          name.startsWith('avatars/') ||
+          name.startsWith('images/') ||
+          name.startsWith('fonts/');
+      if (!knownEntry) {
+        throw FormatException('manifest_entry_scope:$name');
+      }
+      if (!includeFiles &&
+          (name.startsWith('upload/') ||
+              name.startsWith('avatars/') ||
+              name.startsWith('images/') ||
+              name.startsWith('fonts/'))) {
+        throw FormatException('manifest_files:$name');
+      }
+    }
+
+    for (final entry in entries.entries) {
+      final file = File(p.joinAll([extractDirPath, ...entry.key.split('/')]));
+      if (!file.existsSync() || file.lengthSync() != entry.value.bytes) {
+        throw FormatException('manifest_entry_size:${entry.key}');
+      }
+      if (_sha256FileSync(file) != entry.value.sha256) {
+        throw FormatException('manifest_entry_hash:${entry.key}');
+      }
+    }
+
+    final rawDatabase = manifest['database'];
+    if (payloadKind == 'sqlite') {
+      if (!includeChats ||
+          !entries.containsKey(_databaseEntryName) ||
+          rawDatabase is! Map) {
+        throw const FormatException('manifest_database');
+      }
+      final database = rawDatabase.cast<String, dynamic>();
+      final schemaVersion = database['schemaVersion'];
+      final conversationCount = database['conversationCount'];
+      final messageCount = database['messageCount'];
+      if (database['entry'] != _databaseEntryName ||
+          schemaVersion is! int ||
+          conversationCount is! int ||
+          conversationCount < 0 ||
+          messageCount is! int ||
+          messageCount < 0) {
+        throw const FormatException('manifest_database');
+      }
+      final databaseFile = File(
+        p.joinAll([extractDirPath, ..._databaseEntryName.split('/')]),
+      );
+      final databaseInfo =
+          await ChatDatabaseRepository.prepareSnapshotForRestore(databaseFile);
+      if (databaseInfo.schemaVersion != schemaVersion ||
+          databaseInfo.conversationCount != conversationCount ||
+          databaseInfo.messageCount != messageCount) {
+        throw const FormatException('manifest_database_metadata');
+      }
+    } else if (payloadKind == 'settings-only') {
+      if (includeChats ||
+          entries.containsKey(_databaseEntryName) ||
+          rawDatabase != null) {
+        throw const FormatException('manifest_database');
+      }
+    } else {
+      throw const FormatException('manifest_payload_kind');
+    }
+
+    return includeChats;
+  }
+
+  static String _sha256FileSync(File file) {
+    final digestSink = _DigestOutputSink();
+    final hashSink = sha256.startChunkedConversion(digestSink);
+    final input = file.openSync();
+    final buffer = Uint8List(1024 * 1024);
+    try {
+      while (true) {
+        final read = input.readIntoSync(buffer);
+        if (read == 0) break;
+        hashSink.add(Uint8List.sublistView(buffer, 0, read));
+      }
+      hashSink.close();
+    } finally {
+      input.closeSync();
+    }
+    final digest = digestSink.digest;
+    if (digest == null) {
+      throw StateError('sha256');
+    }
+    return digest.toString();
   }
 
   Future<Directory> _getUploadDir() async {
@@ -855,70 +1318,6 @@ class DataSync {
     return jsonEncode(map);
   }
 
-  /// Stream chat data to a temporary JSON file instead of building a huge
-  /// in-memory String.  Uses IOSink for low memory overhead.
-  Future<File> _exportChatsToFile(Directory directory) async {
-    if (!chatService.initialized) {
-      await chatService.init();
-    }
-    final conversations = chatService.getAllCompleteConversations();
-    final file = File(p.join(directory.path, '_bk_chats.json'));
-    final sink = file.openWrite();
-
-    try {
-      sink.write('{"version":1,');
-
-      // --- conversations ---
-      sink.write('"conversations":[');
-      for (int i = 0; i < conversations.length; i++) {
-        if (i > 0) sink.write(',');
-        sink.write(jsonEncode(conversations[i].toJson()));
-        // Yield periodically so the main isolate can process UI frames
-        if (i % 50 == 0) await Future<void>.delayed(Duration.zero);
-      }
-      sink.write('],');
-
-      // --- messages, toolEvents, geminiThoughtSigs ---
-      sink.write('"messages":[');
-      final toolEvents = <String, List<Map<String, dynamic>>>{};
-      final geminiThoughtSigs = <String, String>{};
-      bool firstMsg = true;
-      for (final c in conversations) {
-        final msgs = chatService.getMessages(c.id);
-        for (final m in msgs) {
-          if (!firstMsg) sink.write(',');
-          firstMsg = false;
-          sink.write(jsonEncode(m.toJson()));
-          if (m.role == 'assistant') {
-            final ev = chatService.getToolEvents(m.id);
-            if (ev.isNotEmpty) toolEvents[m.id] = ev;
-            final sig = chatService.getGeminiThoughtSignature(m.id);
-            if (sig != null && sig.isNotEmpty) geminiThoughtSigs[m.id] = sig;
-          }
-        }
-        // Yield after each conversation
-        await Future<void>.delayed(Duration.zero);
-      }
-      sink.write('],');
-
-      // --- toolEvents ---
-      sink.write('"toolEvents":');
-      sink.write(jsonEncode(toolEvents));
-      sink.write(',');
-
-      // --- geminiThoughtSigs ---
-      sink.write('"geminiThoughtSigs":');
-      sink.write(jsonEncode(geminiThoughtSigs));
-
-      sink.write('}');
-    } finally {
-      await sink.flush();
-      await sink.close();
-    }
-
-    return file;
-  }
-
   Future<void> _restoreFromBackupFile(
     File file,
     WebDavConfig cfg, {
@@ -939,12 +1338,33 @@ class DataSync {
         _extractZipSync(file.path, extractDir.path);
       });
 
+      final manifestFile = File(p.join(extractDir.path, _manifestEntryName));
       final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       final chatsFile = File(p.join(extractDir.path, 'chats.json'));
       if (!await settingsFile.exists()) {
         throw const FormatException('settings.json');
       }
-      final restoreChats = cfg.includeChats && await chatsFile.exists();
+      final bool? versionedIncludesChats;
+      if (await manifestFile.exists()) {
+        final manifestPath = manifestFile.path;
+        final extractDirPath = extractDir.path;
+        versionedIncludesChats = await Isolate.run(
+          () => _preflightVersionedBackup(
+            manifestPath: manifestPath,
+            extractDirPath: extractDirPath,
+          ),
+        );
+      } else {
+        versionedIncludesChats = null;
+      }
+      final restoreChats =
+          cfg.includeChats &&
+          (versionedIncludesChats ?? await chatsFile.exists());
+      if (versionedIncludesChats != null &&
+          restoreChats &&
+          mode == RestoreMode.merge) {
+        throw UnsupportedError('sqlite_backup_merge_not_supported');
+      }
 
       final settings =
           jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
@@ -956,13 +1376,15 @@ class DataSync {
       var messages = const <ChatMessage>[];
       var toolEvents = const <String, List<Map<String, dynamic>>>{};
       var geminiThoughtSigs = const <String, String>{};
-      if (mode == RestoreMode.overwrite && restoreChats) {
+      if (versionedIncludesChats == null &&
+          mode == RestoreMode.overwrite &&
+          restoreChats) {
         await _validateOverwriteChatCandidate(
           stagingDirectory: extractDir,
           chatsFile: chatsFile,
         );
       }
-      if (restoreChats) {
+      if (versionedIncludesChats == null && restoreChats) {
         final parsed = await _parseChatBackup(chatsFile);
         conversations = parsed.conversations;
         messages = parsed.messages;
@@ -1268,7 +1690,12 @@ class DataSync {
       // Restore chats
       if (restoreChats) {
         try {
-          if (mode == RestoreMode.overwrite) {
+          if (versionedIncludesChats != null) {
+            final snapshotFile = File(
+              p.joinAll([extractDir.path, ..._databaseEntryName.split('/')]),
+            );
+            await chatService.restoreDatabaseSnapshot(snapshotFile);
+          } else if (mode == RestoreMode.overwrite) {
             await chatService.replaceAllDataFromBackup(
               conversations: conversations,
               messages: messages,
@@ -1564,6 +1991,77 @@ class DataSync {
   }
 }
 
+class _ExtractionBudget {
+  _ExtractionBudget({required this.maxTotalBytes});
+
+  final int maxTotalBytes;
+  int _writtenBytes = 0;
+
+  void reserve(int bytes) {
+    if (bytes < 0 || _writtenBytes + bytes > maxTotalBytes) {
+      throw const FormatException('zip_total_size');
+    }
+    _writtenBytes += bytes;
+  }
+}
+
+class _BoundedOutputFileStream extends OutputFileStream {
+  _BoundedOutputFileStream(
+    String path, {
+    required this.expectedBytes,
+    required this.maxEntryBytes,
+    required this.budget,
+  }) : super.withFileHandle(FileHandle(path, mode: FileAccess.write));
+
+  final int expectedBytes;
+  final int maxEntryBytes;
+  final _ExtractionBudget budget;
+  int _entryBytes = 0;
+
+  void _reserve(int bytes) {
+    if (bytes < 0 ||
+        _entryBytes + bytes > expectedBytes ||
+        _entryBytes + bytes > maxEntryBytes) {
+      throw const FormatException('zip_entry_size');
+    }
+    budget.reserve(bytes);
+    _entryBytes += bytes;
+  }
+
+  @override
+  void writeByte(int value) {
+    _reserve(1);
+    super.writeByte(value);
+  }
+
+  @override
+  void writeBytes(List<int> bytes, {int? length}) {
+    final writeLength = length ?? bytes.length;
+    if (writeLength < 0 || writeLength > bytes.length) {
+      throw RangeError.range(writeLength, 0, bytes.length, 'length');
+    }
+    _reserve(writeLength);
+    super.writeBytes(bytes, length: writeLength);
+  }
+
+  @override
+  void writeStream(InputStream stream) {
+    const chunkSize = 1024 * 1024;
+    while (!stream.isEOS) {
+      final readSize = stream.length < chunkSize ? stream.length : chunkSize;
+      final bytes = stream.readBytes(readSize).toUint8List();
+      if (bytes.isEmpty) break;
+      writeBytes(bytes);
+    }
+  }
+
+  void verifyComplete() {
+    if (_entryBytes != expectedBytes) {
+      throw const FormatException('zip_entry_size');
+    }
+  }
+}
+
 class _StreamingZipWriter {
   _StreamingZipWriter(String outPath) : _output = OutputFileStream(outPath);
 
@@ -1583,11 +2081,13 @@ class _StreamingZipWriter {
   final List<_StreamingZipEntry> _entries = <_StreamingZipEntry>[];
   bool _closed = false;
 
-  void addFile(File file, String entryName) {
+  _BackupEntryMetadata addFile(File file, String entryName) {
     if (_closed) {
       throw StateError('Cannot add files after the ZIP writer is closed.');
     }
-    if (entryName.isEmpty) return;
+    if (entryName.isEmpty) {
+      throw ArgumentError.value(entryName, 'entryName', 'must not be empty');
+    }
 
     final stat = file.statSync();
     final uncompressedSize = stat.size;
@@ -1598,6 +2098,9 @@ class _StreamingZipWriter {
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
     final nameBytes = utf8.encode(entryName);
+    if (nameBytes.length > 0xffff) {
+      throw FileSystemException('ZIP entry name exceeds ZIP32 limit');
+    }
     final localHeaderOffset = _output.length;
 
     _writeLocalHeader(nameBytes: nameBytes, modTime: modTime, modDate: modDate);
@@ -1620,6 +2123,7 @@ class _StreamingZipWriter {
         mode: stat.mode,
       ),
     );
+    return (bytes: written.uncompressedSize, sha256: written.sha256);
   }
 
   void closeSync() {
@@ -1674,6 +2178,8 @@ class _StreamingZipWriter {
       level: ZLibOption.defaultLevel,
       raw: true,
     ).encoder.startChunkedConversion(compressedSink);
+    final digestSink = _DigestOutputSink();
+    final hashSink = sha256.startChunkedConversion(digestSink);
 
     final raf = file.openSync();
     final buffer = Uint8List(_chunkSize);
@@ -1686,8 +2192,10 @@ class _StreamingZipWriter {
         final chunk = Uint8List.sublistView(buffer, 0, read);
         crc32 = getCrc32(chunk, crc32);
         uncompressedSize += read;
+        hashSink.add(chunk);
         inputSink.add(chunk);
       }
+      hashSink.close();
       inputSink.close();
     } finally {
       raf.closeSync();
@@ -1697,6 +2205,7 @@ class _StreamingZipWriter {
       crc32: crc32,
       compressedSize: compressedSink.bytesWritten,
       uncompressedSize: uncompressedSize,
+      sha256: digestSink.digest?.toString() ?? (throw StateError('sha256')),
     );
   }
 
@@ -1785,6 +2294,21 @@ class _CountingOutputSink implements Sink<List<int>> {
   void close() {}
 }
 
+class _DigestOutputSink implements Sink<Digest> {
+  Digest? digest;
+
+  @override
+  void add(Digest data) {
+    if (digest != null) {
+      throw StateError('Digest sink received more than one value');
+    }
+    digest = data;
+  }
+
+  @override
+  void close() {}
+}
+
 class _StreamingZipEntry {
   const _StreamingZipEntry({
     required this.nameBytes,
@@ -1812,11 +2336,13 @@ class _StreamingZipWrittenFile {
     required this.crc32,
     required this.compressedSize,
     required this.uncompressedSize,
+    required this.sha256,
   });
 
   final int crc32;
   final int compressedSize;
   final int uncompressedSize;
+  final String sha256;
 }
 
 // ===== SharedPreferences async snapshot/restore helpers =====

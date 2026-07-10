@@ -136,6 +136,8 @@ void main() {
     final entryNames = archive.files.map((file) => file.name);
     expect(entryNames, contains('settings.json'));
     expect(entryNames, contains('chats.json'));
+    expect(entryNames, isNot(contains('manifest.json')));
+    expect(entryNames, isNot(contains('database/kelivo.sqlite')));
     expect(entryNames, contains('conversations.hive'));
     expect(entryNames, contains('messages.hive'));
     expect(entryNames, contains('tool_events_v1.hive'));

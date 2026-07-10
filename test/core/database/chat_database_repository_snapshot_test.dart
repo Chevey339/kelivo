@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 
@@ -115,6 +116,87 @@ void main() {
       );
       expect(await sourceRepository.isMigrationComplete(), isFalse);
     });
+
+    test('replaces live chat tables from a validated snapshot', () async {
+      await sourceRepository.putMigrationBatch(
+        conversations: [Conversation(id: 'old', title: 'Old')],
+        messages: const [],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      final snapshotFile = File('${directory.path}/replacement.sqlite');
+      await _createSnapshotFixture(
+        databaseFile: snapshotFile,
+        conversationId: 'new',
+        title: 'New',
+        messageId: 'new-message',
+        messageContent: 'new content',
+        isStreaming: true,
+      );
+
+      final info = await ChatDatabaseRepository.prepareSnapshotForRestore(
+        snapshotFile,
+      );
+      expect(info.conversationCount, 1);
+      await sourceRepository.replaceBackupSnapshot(snapshotFile);
+
+      expect(await sourceRepository.getConversation('old'), isNull);
+      expect(await sourceRepository.getConversation('new'), isNotNull);
+      expect(
+        (await sourceRepository.getMessagesRange(
+          'new',
+          start: 0,
+          limit: 1,
+        )).single.isStreaming,
+        isFalse,
+      );
+      expect(await sourceRepository.isMigrationComplete(), isTrue);
+    });
+  });
+}
+
+Future<void> _createSnapshotFixture({
+  required File databaseFile,
+  required String conversationId,
+  required String title,
+  String? messageId,
+  String? messageContent,
+  bool isStreaming = false,
+}) async {
+  final databasePath = databaseFile.path;
+  await Isolate.run(() async {
+    final repository = ChatDatabaseRepository.open(file: File(databasePath));
+    try {
+      await repository.ensureReady();
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: title,
+            messageIds: messageId == null ? const [] : [messageId],
+          ),
+        ],
+        messages: messageId == null
+            ? const []
+            : [
+                (
+                  message: ChatMessage(
+                    id: messageId,
+                    role: 'assistant',
+                    content: messageContent ?? '',
+                    conversationId: conversationId,
+                    isStreaming: isStreaming,
+                  ),
+                  messageOrder: 0,
+                ),
+              ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await repository.checkpoint();
+    } finally {
+      await repository.close();
+    }
   });
 }
 

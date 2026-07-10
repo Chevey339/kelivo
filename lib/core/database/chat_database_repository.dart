@@ -92,6 +92,62 @@ class ChatDatabaseRepository {
     }
   }
 
+  static Future<ChatDatabaseSnapshotInfo> prepareSnapshotForRestore(
+    File snapshotFile,
+  ) async {
+    if (!await snapshotFile.exists()) {
+      throw FileSystemException(
+        'Snapshot database does not exist',
+        snapshotFile.path,
+      );
+    }
+
+    final database = sqlite.sqlite3.open(snapshotFile.absolute.path);
+    late final ChatDatabaseSnapshotInfo initialInfo;
+    try {
+      initialInfo = _validateRawSnapshot(database);
+      if (initialInfo.schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
+      }
+      database.execute('BEGIN IMMEDIATE;');
+      try {
+        database.execute(
+          'UPDATE message_rows SET is_streaming = 0 '
+          'WHERE is_streaming != 0;',
+        );
+        database.execute('DELETE FROM chat_storage_meta_rows WHERE key = ?;', [
+          ChatStorageMetaKeys.activeStreamingIds,
+        ]);
+        database.execute(
+          'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) '
+          'VALUES (?, ?);',
+          [ChatStorageMetaKeys.hiveMigrationComplete, 'true'],
+        );
+        database.execute('COMMIT;');
+      } catch (_) {
+        database.execute('ROLLBACK;');
+        rethrow;
+      }
+      database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+      database.select('PRAGMA journal_mode = DELETE;');
+    } finally {
+      database.close();
+    }
+
+    await _deleteDatabaseSidecars(snapshotFile);
+    final reopened = sqlite.sqlite3.open(snapshotFile.absolute.path);
+    try {
+      final reopenedInfo = _validateRawSnapshot(reopened);
+      if (reopenedInfo != initialInfo) {
+        throw StateError('snapshot_reopen_mismatch');
+      }
+    } finally {
+      reopened.close();
+    }
+    await _deleteDatabaseSidecars(snapshotFile);
+    return initialInfo;
+  }
+
   static ChatDatabaseSnapshotInfo _validateRawSnapshot(
     sqlite.Database database,
   ) {
@@ -122,12 +178,103 @@ class ChatDatabaseRepository {
     if (!tables.containsAll(requiredTables)) {
       throw StateError('required_tables');
     }
+    _validateRawSchema(database);
 
     return (
       schemaVersion: database.userVersion,
       conversationCount: _rawTableCount(database, 'conversation_rows'),
       messageCount: _rawTableCount(database, 'message_rows'),
     );
+  }
+
+  static void _validateRawSchema(sqlite.Database database) {
+    const expectedColumns = <String, List<String>>{
+      'conversation_rows': [
+        'id',
+        'title',
+        'created_at',
+        'updated_at',
+        'is_pinned',
+        'assistant_id',
+        'truncate_index',
+        'version_selections_json',
+        'summary',
+        'last_summarized_message_count',
+        'chat_suggestions_json',
+      ],
+      'conversation_mcp_server_rows': [
+        'conversation_id',
+        'server_id',
+        'ordinal',
+      ],
+      'message_rows': [
+        'id',
+        'conversation_id',
+        'role',
+        'content',
+        'timestamp',
+        'model_id',
+        'provider_id',
+        'total_tokens',
+        'is_streaming',
+        'reasoning_text',
+        'reasoning_start_at',
+        'reasoning_finished_at',
+        'translation',
+        'reasoning_segments_json',
+        'group_id',
+        'version',
+        'prompt_tokens',
+        'completion_tokens',
+        'cached_tokens',
+        'duration_ms',
+        'message_order',
+      ],
+      'tool_event_rows': ['message_id', 'events_json'],
+      'gemini_thought_signature_rows': ['message_id', 'signature'],
+      'chat_storage_meta_rows': ['key', 'value'],
+    };
+    for (final entry in expectedColumns.entries) {
+      final actual = database
+          .select('PRAGMA table_info(${entry.key});')
+          .map((row) => row['name'])
+          .whereType<String>()
+          .toList(growable: false);
+      if (!_sameOrderedStrings(actual, entry.value)) {
+        throw StateError('table_schema:${entry.key}');
+      }
+    }
+
+    const expectedForeignKeys = <String, Set<String>>{
+      'conversation_mcp_server_rows': {
+        'conversation_id->conversation_rows.id:CASCADE',
+      },
+      'message_rows': {'conversation_id->conversation_rows.id:CASCADE'},
+      'tool_event_rows': {'message_id->message_rows.id:CASCADE'},
+      'gemini_thought_signature_rows': {'message_id->message_rows.id:CASCADE'},
+    };
+    for (final entry in expectedForeignKeys.entries) {
+      final actual = database
+          .select('PRAGMA foreign_key_list(${entry.key});')
+          .map(
+            (row) =>
+                '${row['from']}->${row['table']}.${row['to']}:'
+                '${row['on_delete']}',
+          )
+          .toSet();
+      if (actual.length != entry.value.length ||
+          !actual.containsAll(entry.value)) {
+        throw StateError('foreign_key_schema:${entry.key}');
+      }
+    }
+  }
+
+  static bool _sameOrderedStrings(List<String> actual, List<String> expected) {
+    if (actual.length != expected.length) return false;
+    for (var i = 0; i < actual.length; i++) {
+      if (actual[i] != expected[i]) return false;
+    }
+    return true;
   }
 
   static int _rawTableCount(sqlite.Database database, String table) {
@@ -649,6 +796,75 @@ class ChatDatabaseRepository {
       );
       await _writeMigrationCompleteReceipt();
     });
+  }
+
+  Future<void> replaceBackupSnapshot(File snapshotFile) async {
+    await _importBackupSnapshot(snapshotFile);
+  }
+
+  Future<void> _importBackupSnapshot(File snapshotFile) async {
+    if (!await snapshotFile.exists()) {
+      throw FileSystemException(
+        'Snapshot database does not exist',
+        snapshotFile.path,
+      );
+    }
+
+    var attached = false;
+    try {
+      await _db.customStatement('ATTACH DATABASE ? AS restore_source;', [
+        snapshotFile.absolute.path,
+      ]);
+      attached = true;
+      await _db.transaction(() async {
+        await _clearChatRows();
+        for (final table in const [
+          'conversation_rows',
+          'conversation_mcp_server_rows',
+          'message_rows',
+          'tool_event_rows',
+          'gemini_thought_signature_rows',
+        ]) {
+          await _db.customStatement(
+            'INSERT INTO main.$table '
+            'SELECT * FROM restore_source.$table;',
+          );
+        }
+        await _writeMigrationCompleteReceipt();
+        final foreignKeyFailures = await _db
+            .customSelect('PRAGMA foreign_key_check;')
+            .get();
+        if (foreignKeyFailures.isNotEmpty) {
+          throw StateError('foreign_key_check');
+        }
+        final sourceConversationCount = await _attachedTableCount(
+          'restore_source',
+          'conversation_rows',
+        );
+        final sourceMessageCount = await _attachedTableCount(
+          'restore_source',
+          'message_rows',
+        );
+        if (await _attachedTableCount('main', 'conversation_rows') !=
+                sourceConversationCount ||
+            await _attachedTableCount('main', 'message_rows') !=
+                sourceMessageCount) {
+          throw StateError('snapshot_import_count');
+        }
+      });
+    } finally {
+      if (attached) {
+        await _db.customStatement('DETACH DATABASE restore_source;');
+      }
+    }
+    await validateIntegrity();
+  }
+
+  Future<int> _attachedTableCount(String schema, String table) async {
+    final row = await _db
+        .customSelect('SELECT COUNT(*) AS count FROM $schema.$table;')
+        .getSingle();
+    return row.read<int>('count');
   }
 
   Future<void> _writeBackupData({
