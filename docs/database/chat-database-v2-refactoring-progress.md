@@ -1,9 +1,9 @@
 # Kelivo 聊天数据库与消息系统 v2 重构进度
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
-> - 追踪基线：分支 `sql`，本轮实现基线 `502130aa`
+> - 追踪基线：分支 `sql`，本轮实现基线 `64a8c22e`
 > - 最后更新：2026-07-09
-> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 已改为运行期只做同卷 durable preparation，且 candidate 只复制用户选择与 bundle 能力交集中的 DB/assets；下一次启动先持有进程级 business lease，再在首次业务持久化读取前完成 unpublished cleanup、WAL 归一化、previous 冻结、DB/settings/assets operation-ahead 切换、完整验证与显式 `rollingBack` 回滚。terminal settings 通过绑定 receipt/native PID/lease token 的 cold ack 保留 active admission，同 PID 或同 token 都不能自确认；Android 自动重启使用 process mode。当前 macOS 逻辑故障注入、真实子进程 lease 竞争/kill 与完整 bundle 集成回归已覆盖，但真实跨进程 settings readback、cutover 各落盘点 kill/断电、磁盘满/权限/锁库和 Android/iOS/Windows/Linux 仍未验收，因此 P0-02 保持进行中
+> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 已改为运行期只做同卷 durable preparation，且 candidate 只复制用户选择与 bundle 能力交集中的 DB/assets；下一次启动先持有进程级 business lease，再在首次业务持久化读取前完成 unpublished cleanup、WAL 归一化、previous 冻结、DB/settings/assets operation-ahead 切换、完整验证与显式 `rollingBack` 回滚。terminal settings 通过绑定 receipt/native PID/lease token 的 cold ack 保留 active admission，同 PID 或同 token 都不能自确认；Android 自动重启使用 process mode。macOS 专用真实 Runner harness 已在 candidate SQLite 耐久替换 live、`newInstalled` receipt 尚未发布的窗口执行外部 SIGKILL，随后由两个新 PID 从原生 SharedPreferences 前向恢复、冷读确认并归档，且 settings guard 证明 terminal admission 零写入；其余 receipt/full-barrier/DB 与各资源 rename、rollback/archive kill 点、真实断电、磁盘满/权限/锁库和 Android/iOS/Windows/Linux 仍未验收，因此 P0-02 保持进行中
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 2 / 9 | `进行中` | P0-01/P0-08 已完成；P0-02 overwrite 主链已联通 business lease、durable preparation、startup forward/rollback cutover、terminal revalidation/archive 与故障 UI，待 cutover 真实 kill 和五平台验收 |
+| Phase 0：止血与基线 | 2 / 9 | `进行中` | P0-01/P0-08 已完成；P0-02 overwrite 主链和首个 macOS 真实 cutover SIGKILL 闭环已通过，待其余故障点、资源故障和五平台验收 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | 受 PD-01/02/04 和 PD-13 影响 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -64,7 +64,7 @@
 | `flutter gen-l10n` + untranslated check | `已完成` | 生成成功；`desiredFileName.txt` 为 `{}` | 2026-07-09 | 四份 ARB 同步，恢复失败提示已本地化 |
 | `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前工作区静态分析通过 |
 | `flutter test` | `已完成` | 874 tests passed | 2026-07-09 | `b232ad8b` 提交前当前工作区全量测试通过 |
-| `flutter analyze` + `flutter test`（本轮 P0-02） | `已完成` | No issues found；1012 tests passed | 2026-07-09 | 当前 macOS 主机全量通过；不等于 Android/iOS/Windows/Linux 或真实 kill/断电验证 |
+| `flutter analyze` + `flutter test`（本轮 P0-02） | `已完成` | No issues found；1018 tests passed | 2026-07-09 | 当前 macOS 主机全量通过，含新增 6 项 harness 协议边界/失败用例；真实 SIGKILL 证据见下方独立宿主行，仍不等于硬件断电或其他平台验证 |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-09 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
@@ -78,8 +78,9 @@
 | Restore live SQLite normalization | `已完成` | 4 tests passed | 2026-07-09 | raw SQLite checkpoint/TRUNCATE、journal DELETE、sidecar 拒绝/消失、main/parent barrier；包含带 WAL committed row 的复制恢复用例，不通过普通业务 repository 执行迁移 |
 | Restore settings transition/store/cold ack | `已完成` | 纳入 246 项聚焦回归 | 2026-07-09 | 从 durable plan 重建 before/target、fresh reload、可恢复投影、apply/rollback/fingerprint；canonical cold ack 绑定 run/terminal receipt/expected/native PID/lease token，同 PID 或同 token 均不放行，替换丢失窗口安全回到“需冷启”；SharedPreferences 插件本身不宣称跨平台 fsync |
 | Restore operation-ahead mover / cutover integration | `已完成` | 4 mover + 5 full-bundle tests passed | 2026-07-09 | DB、四资源根和 settings 每项只接受 descriptor 可证明的位置；candidate 与 receipt 组件双向精确绑定；完整 SQLite/settings/assets 正向提交与“已安装后验证失败→rollingBack→rolledBack”均回读精确旧/新数据；cutover 原始错误会结构化记录，补偿回滚再次失败时同时保留两组错误/堆栈且 receipt 停在可续跑的 `rollingBack`；committed 等待 cold ack 时 DB/asset 篡改只 fail-closed、不回 previous |
-| Restore receipt/workspace protocol | `已完成` | 36 tests passed | 2026-07-09 | append-only receipt、6-record rollback chain、精确 receipt temp、candidate/receipt 双向组件绑定、共享锁、publishing/discarding/archiving claim、terminal 顶层白名单、evidence 归档和下一 run 准入；真实多进程 kill 与 Windows rename 仍待验证 |
-| Restore business lease / unpublished / terminal hardening | `已完成` | 246 focused tests passed | 2026-07-09 | 非阻塞进程/跨 isolate lease、真实子进程竞争与 kill 后重获；gate 在 lease 冲突时不触碰 prepared/live；strict no-receipt staging 耐久 discard；terminal cold ack 要求 native PID 与 token 均变化，需重写时继续阻止业务；fail-closed/rolled-back/cold-restart/restart-failure UI 均覆盖。真实跨进程 settings readback、cutover 每个落盘点 kill 与四个其他平台仍待验证 |
+| Restore receipt/workspace protocol | `已完成` | 36 tests passed | 2026-07-09 | append-only receipt、6-record rollback chain、精确 receipt temp、candidate/receipt 双向组件绑定、共享锁、publishing/discarding/archiving claim、terminal 顶层白名单、evidence 归档和下一 run 准入；1 个 macOS cutover SIGKILL 已跨进程重读完整 receipt chain，其余 receipt 发布点与 Windows rename 仍待验证 |
+| Restore business lease / unpublished / terminal hardening | `已完成` | 246 focused tests passed | 2026-07-09 | 非阻塞进程/跨 isolate lease、真实子进程竞争与 kill 后重获；gate 在 lease 冲突时不触碰 prepared/live；strict no-receipt staging 耐久 discard；terminal cold ack 要求 native PID 与 token 均变化，需重写时继续阻止业务；fail-closed/rolled-back/cold-restart/restart-failure UI 均覆盖。macOS 原生 settings 跨进程读回已由下方独立 harness 覆盖；其余 cutover 落盘点与四个其他平台仍待验证 |
+| macOS 真实 restore process SIGKILL harness | `已完成` | 1 standalone scenario；4 个真实 Runner PID；1 次外部 SIGKILL；6 项协议单测；并发第二宿主明确拒绝 | 2026-07-09 | 测试专用 sandbox bundle `com.psyche.kelivo.restoreharness` 与随机 preference prefix 隔离正式数据；宿主在 candidate DB→live durability 返回、receipt 仍为 `oldRenamed` 时只杀 event PID，且每次 signal 前复验精确 executable/PID/lstart；两个后续 Runner 分别前向收敛并写 cold ack、以 settings mutation guard=0 冷读归档；精确验证 prepared→oldRenamed→newInstalled→verified→committed、old/new DB、四资源根、previous settings/assets、WAL sidecar、PID/token 和 owner 清理。固定 advisory lock 阻止并发 harness 串用 Flutter build/temp；phase baseline 使 event 缺失/损坏时也只清理本轮新 Runner。该证据是 macOS 进程 SIGKILL，不是硬件断电或其他 kill 点/平台证明 |
 | Migration restart failure surface | `已完成` | 2 relevant widget tests passed | 2026-07-09 | 1 项真实点击 `MigrationApp` 完成页重启按钮并验证 Android process-mode channel、失败上报与本地化 snackbar，1 项 restart helper 验证失败后保留重试入口；不初始化业务 provider，也未为测试扩大生产 API |
 | DataSync v2/legacy backup-import regression | `已完成` | 47 tests passed | 2026-07-09 | v2 导入只 prepare，启动经 terminal+cold readback 后整体生效/回滚；selected-only/full-selected candidate、SQLite snapshot、空 assets roots、secret-free cleanup、ZIP 边界、v2 merge 安全拒绝及旧 JSON 导入全部通过 |
 | Backup settings 纯校验器与现有恢复回归 | `已完成` | 56 tests passed | 2026-07-09 | 4 个纯校验器用例覆盖 legacy string-list 规范化、合法值、本地键跳过及非法结构拒绝；连同 v2/legacy restore 和凭据边界回归通过，为 candidate 与启动 gate 复用同一规则建立基础 |
@@ -133,6 +134,13 @@ flutter test \
   test/shared/widgets/restore_failure_screen_test.dart \
   test/shared/widgets/restore_outcome_notice_test.dart \
   test/shared/widgets/restart_app_action_test.dart
+
+flutter test \
+  test/core/services/backup/restore_process_harness_support_test.dart
+
+# macOS only; standalone host acquires a single-instance lock and launches
+# four isolated RestoreHarness Runner processes.
+dart run tool/run_restore_process_harness.dart
 ```
 
 ### 4.2 尚未执行
@@ -141,7 +149,7 @@ flutter test \
 | --- | --- | --- | --- |
 | 真实设备 profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 harness、参考设备和数据 seed 尚未建立 | 尚不能冻结性能 SLO 或 cache budget |
 | Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 本轮只运行当前 macOS 主机的根目录分析与单测，未运行五平台 runner | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
-| kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | 已有同进程正向/回滚/rename-after failpoint，但尚无独立子进程强杀和资源故障 harness | 当前只能证明逻辑幂等与歧义时 fail-closed，不能宣称真实断电安全 |
+| kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | 已有同进程正向/回滚/rename-after failpoint，并完成 1 个 macOS 独立 Runner 强杀闭环；其余落盘点和资源故障尚未覆盖 | 已证明 candidate DB→live 后、`newInstalled` 前的真实进程 SIGKILL 可前向收敛；仍不能宣称任意阶段、真实断电或五平台安全 |
 | 真实旧 Hive/SQLite v1/备份 fixture 全矩阵 | `未开始` | fixture 尚未整理 | 不能证明已发布数据可无损迁移 |
 | 稳定 slot + localDy 的 widget/integration test | `未开始` | 目标 timeline 尚未实现 | 当前列表跳动问题无自动化保护 |
 
@@ -171,7 +179,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
-| P0-02 | overwrite staging restore | 无 | `进行中` | 运行期 durable prepare 不改 live；下次启动在业务放行前收敛为完整新 bundle 或经验证旧 bundle，并跨冷启动确认 settings | 既有提交 + 本里程碑提交 | DataSync v2 已停止运行期在线覆盖，只在后台 isolate 生成同卷 selected-only candidate + prepared receipt，未选 DB/assets 不二次复制或归档；main/gate 先持有进程级 business lease，严格清理可证明未发布且无 final receipt 的半成品，再冻结并复验 previous、无条件退出 live WAL mode、同步旧 assets、逐对象移动 DB/assets、可重入 apply settings，按 `prepared→oldRenamed→newInstalled→verified→committed` 前向收敛；失败经 `rollingBack→rolledBack` 恢复 previous。terminal 继续留在 active admission，canonical cold ack 绑定 native PID 与 lease token，同 PID/同 token 均不能自确认；下一真实进程从平台持久层精确读回 settings 后才归档放行，需重写则再次冷启动。当前 macOS 逻辑故障注入、真实 lease 竞争/kill、完整 bundle 与 DataSync/legacy 回归通过；真实跨进程 settings readback、cutover 各落盘点 kill -9/断电、磁盘满/权限/锁库及 Android/iOS/Windows/Linux 尚未验证，因此不提前 Done |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 运行期 durable prepare 不改 live；下次启动在业务放行前收敛为完整新 bundle 或经验证旧 bundle，并跨冷启动确认 settings | 既有提交 + 本里程碑提交 | DataSync v2 已停止运行期在线覆盖，只在后台 isolate 生成同卷 selected-only candidate + prepared receipt，未选 DB/assets 不二次复制或归档；main/gate 先持有进程级 business lease，严格清理可证明未发布且无 final receipt 的半成品，再冻结并复验 previous、无条件退出 live WAL mode、同步旧 assets、逐对象移动 DB/assets、可重入 apply settings，按 `prepared→oldRenamed→newInstalled→verified→committed` 前向收敛；失败经 `rollingBack→rolledBack` 恢复 previous。terminal 继续留在 active admission，canonical cold ack 绑定 native PID 与 lease token，同 PID/同 token 均不能自确认；下一真实进程从平台持久层精确读回 settings 后才归档放行，需重写则再次冷启动。macOS 真实 Runner 已在 candidate DB→live 后、`newInstalled` 前被外部 SIGKILL，随后两个新 PID 从原生 SharedPreferences 完成前向恢复、cold ack 与零写入归档，并回读完整 old/new bundle；其余落盘点/rollback/archive kill、断电、磁盘满/权限/锁库及 Android/iOS/Windows/Linux 尚未验证，因此不提前 Done |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`、`6c3618b8`（安全门） | 所有 v2 bundle merge（含 settings-only）在冲突/凭据语义完成前显式拒绝且不修改目标；hash 去重、remap、report 和事务化 merge 尚未实现 |
@@ -243,7 +251,7 @@ flutter test \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec`、`6c3618b8` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验、round trip 与应用已知认证凭据排除已实现；五平台/大数据 profile 与 Zip64 尚未完成 |
-| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交 | overwrite 主链已实现 selected-only candidate、candidate/receipt 双向绑定、business lease、strict secret-free/unknown-topology 校验、append-only receipt、bounded previous、平台 durability、WAL normalization、operation-ahead forward/rollback、PID+token cold ack/archive 和 DataSync/startup/failure/restart UI；Android 请求 process restart，重启失败保留重试入口。仍未完成真实跨进程 settings readback、cutover kill/断电与五平台验证；v2 merge 在 PD-09 完成前继续安全拒绝，不随 overwrite 路径提前 Done |
+| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交 | overwrite 主链已实现 selected-only candidate、candidate/receipt 双向绑定、business lease、strict secret-free/unknown-topology 校验、append-only receipt、bounded previous、平台 durability、WAL normalization、operation-ahead forward/rollback、PID+token cold ack/archive 和 DataSync/startup/failure/restart UI；Android 请求 process restart，重启失败保留重试入口。macOS 首个真实 cutover SIGKILL + 两次冷进程 readback 已通过；仍未完成其余 kill/断电点、资源故障与五平台验证。v2 merge 在 PD-09 完成前继续安全拒绝，不随 overwrite 路径提前 Done |
 | OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再生成 JSON；旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `未开始` | current branch/total usage 定义和查询均明确 | — | — |
@@ -279,7 +287,7 @@ flutter test \
 | Hive → SQLite v2 | 必须 | `未开始` | 需要所有 adapter fixture、orphan/坏数据场景 |
 | SQLite v1 → SQLite v2 | 必须 | `未开始` | PD-13 确认后视为主迁移路径 |
 | 旧 ZIP/chats.json → v2 | 必须 | `进行中` | 当前接受缺少 `chats.json` 的 legacy settings-only 包，并严格拒绝引用缺失；无 manifest 时无法区分 settings-only 与截断包，受损 Hive 迁移备份仍缺 Recovered/rejects adapter 和真实 fixture |
-| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | 已覆盖生成后自校验、hash/size/schema/count 拒绝、normalized candidate、运行期 prepare、下次启动完整 SQLite/settings/assets commit 或 rollback；真实 kill/断电和五平台尚未验证 |
+| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | 已覆盖生成后自校验、hash/size/schema/count 拒绝、normalized candidate、运行期 prepare、下次启动完整 SQLite/settings/assets commit 或 rollback；macOS candidate DB→live 后首个真实 SIGKILL 可恢复，其他 kill/断电点和五平台尚未验证 |
 | 迁移页 JSON 灾难备份 | 必须 | `进行中` | `900811ec` 回归锁定仍含 `chats.json` 且不含 manifest/SQLite payload；受损 fixture、分批扫描和 OOM profile 尚未完成 |
 | Chatbox/Cherry import → v2 | 必须 | `未开始` | staging + ID conflict policy |
 | v2 full backup round trip | 必须 | `进行中` | 当前 SQLite v1 conversation/message/artifact/assets round trip 已覆盖；未来 branch/run/parts schema 尚未实现 |
@@ -316,9 +324,9 @@ flutter test \
 | Candidate validation failure | live 旧库完整 | 无用户数据损失 | `进行中` | `22044e46` 已覆盖 descriptor/manifest 篡改、非 canonical path、settings 超限、非法 SQLite、sidecar、精确拓扑/逐项 hash，并保留 live；尚无磁盘满、目录 fsync 或 kill 验证 |
 | Checkpoint/close/fsync kill | live 旧库完整 | candidate 可丢弃/重试 | `未开始` | — |
 | live→previous 后 kill | 启动按 receipt 恢复 previous 或继续安装 candidate | 无半库 | `进行中` | previous plan/store 与逐 DB/root operation-ahead rename 已覆盖 rename 后抛异常和 8 个正向逻辑中断点；尚未运行独立进程 kill |
-| candidate→live 后首次启动 kill | 校验 new 或回 previous | 尚未提交的 v2 尾部 | `进行中` | 完整 SQLite/settings/assets commit、验证失败 rollback、3 个 rollback 逻辑中断点与 terminal archive 中断通过；尚未运行独立进程 kill |
+| candidate→live 后首次启动 kill | 校验 new 或回 previous | 尚未提交的 v2 尾部 | `进行中` | macOS 真实 Runner 在 candidate SQLite 耐久 rename 为 live、receipt 仍停 `oldRenamed` 时由宿主外部 SIGKILL；新进程确认 target settings/new DB/candidate assets/previous old bundle 后前向收敛，另一新进程零 settings 写入冷读归档。其他资源 rename、receipt/full-barrier、rollback/archive kill 与平台仍待覆盖 |
 | v2 已写新消息后代码回滚 | 使用 v2-compatible rollback | 最多一个未 checkpoint stream 尾部 | `未开始` | — |
-| Restore 任一阶段 kill | 破坏性切换前旧 live 不变；开始切换后 gate 收敛到完整 new 或经验证 old，绝不放行混合 | 无已放行业务写入 | `进行中` | 同进程 failpoint 覆盖 forward/rollback/terminal archive，未知位置 fail-closed；真实 kill/断电仍未验证 |
+| Restore 任一阶段 kill | 破坏性切换前旧 live 不变；开始切换后 gate 收敛到完整 new 或经验证 old，绝不放行混合 | 无已放行业务写入 | `进行中` | 同进程 failpoint 覆盖 forward/rollback/terminal archive，未知位置 fail-closed；另有 1 个 macOS candidate DB 安装窗口真实 SIGKILL 闭环。尚不能外推到任意阶段、硬件断电或其他平台 |
 | Streaming checkpoint 前 kill | 最后已提交 checkpoint 可读，run interrupted | 一个 checkpoint 窗口尾部 | `未开始` | — |
 | Final transaction 中 kill | 完整 streaming checkpoint 或完整 final | 无半 final 状态 | `未开始` | — |
 | Cancel/onDone/late chunk 竞态 | 唯一终态且不可回退 | 无已提交内容倒退 | `未开始` | — |
@@ -345,7 +353,7 @@ flutter test \
 | Online Backup API | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | WAL/FULL 实际 PRAGMA | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | File close/rename/fsync | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| Kill/restart recovery | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
+| Kill/restart recovery | 未开始 | 未开始 | 进行中：candidate DB→live 后 SIGKILL 闭环通过 | 未开始 | 未开始 |
 | Timeline profile/anchor | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Secure storage/backup boundary | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Build/package ABI | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
@@ -366,7 +374,7 @@ flutter test \
 | R-08 | Cache 只限制条目不限制字节再次 OOM | 高 | RSS/cache bytes telemetry | 所有 cache 字节 LRU | `未开始` |
 | R-09 | 普通备份继续泄露秘密 | 高 | ZIP 内容审计 | P0-08 + OPS-07 | `进行中`：应用已知认证凭据已排除；自由文本与 secure storage 边界待 OPS-07 |
 | R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿 | `进行中` |
-| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + business lease + 启动恢复 | `进行中`：v2 DataSync 已移除运行期在线覆盖；参与新协议的旧/第二业务进程由 lease 排除，unpublished/forward/rollingBack/terminal 主链已联通；settings 在 native PID 与 lease token 均变化后的冷读确认前持续阻止业务。PID 复用与同 PID stale owner 当前保守 fail-closed；真实 cutover kill/断电、五平台 durability 与升级时旧版本进程退出策略仍开放 |
+| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + business lease + 启动恢复 | `进行中`：v2 DataSync 已移除运行期在线覆盖；参与新协议的旧/第二业务进程由 lease 排除，unpublished/forward/rollingBack/terminal 主链已联通；settings 在 native PID 与 lease token 均变化后的冷读确认前持续阻止业务。PID 复用与同 PID stale owner 当前保守 fail-closed；macOS candidate DB 安装窗口真实 SIGKILL 已收敛，其余 cutover/断电、五平台 durability 与升级时旧版本进程退出策略仍开放 |
 | R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
 | R-13 | 旧 `chats.json`/迁移 JSON 全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB legacy fixture 的 RSS/frame profile | 新备份改 SQLite snapshot；legacy adapter 使用 chunk reader 与增量导入 | `进行中` |
 | R-14 | ZIP32 与恢复展开边界导致超大备份失败或磁盘耗尽 | 中 | >4GiB compressed、8GiB 单项、16GiB 总展开 fixture | 当前显式拒绝超限并在写出时计数中止；后续评估 Zip64 和按可用磁盘预算 | `进行中` |
@@ -389,7 +397,7 @@ flutter test \
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 收尾 `P0-02` 验收：在已通过真实 business-lease 子进程竞争/kill 的基础上，增加独立 cutover 子进程 kill/重启 harness，覆盖 receipt/full-barrier、每个 DB/root rename、settings partial apply/rollback 与 terminal archive；补磁盘满、只读目录、锁库，并在 Android/iOS/Windows/Linux runner 验证 durability ABI/rename。
+1. 继续收尾 `P0-02`：复用已通过的独立 macOS Runner/SIGKILL harness，扩展 receipt/full-barrier、live→previous、四个 asset root、settings partial apply/rollback 与 terminal archive kill 点；补磁盘满、只读目录、锁库，并在 Android/iOS/Windows/Linux runner 验证 durability ABI/rename。
 2. 按 PD-10/12 设计 completed evidence 的成功启动 acknowledgement、保留周期、脱敏诊断与可恢复清理；在此之前保留受限 evidence，不无记录删除 previous。
 3. 启动 `P0-03` 单 writer latest-wins checkpoint + final barrier；同时完成 PD-13 调查和 P0-09 fixture/性能基线。
 4. 保留旧 `chats.json` 只读 adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 做 OOM/坏数据回归。`P0-05` v2 merge 继续安全拒绝，待 PD-09 后单独实现 hash 去重、remap 与 report。
@@ -398,6 +406,7 @@ flutter test \
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-09 | 增加隔离正式数据的 macOS RestoreHarness bundle、四阶段真实 Runner 协议和独立宿主；在 candidate SQLite 耐久替换 live、`newInstalled` receipt 前复验 executable/PID/lstart 并执行外部 SIGKILL，再由两个新 PID 完成原生 SharedPreferences 读回、前向收敛、PID+token cold ack、settings 零写入归档；严格回读 DB/四资源根/previous/receipt/WAL/owner，以 phase baseline 安全清理未知 Runner，并用宿主单实例锁阻止 Flutter build/temp 串用 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-09 | 将 v2 overwrite 改为 selected-only durable preparation + 启动整包 cutover；实现 business lease、strict topology、bounded previous、WAL normalization、平台 durability、operation-ahead forward/rollingBack、PID+token cold ack/archive、恢复/冷重启/故障 UI 与 DataSync/main 接入；Android 使用 process restart 且失败保留重试；未选 DB/assets 不复制归档，伪 secret-free 在 receipt 前拒绝，旧 JSON 导入和迁移页 JSON 灾备保持兼容 | P0-02、OPS-02/03 | 本里程碑提交 | Codex |
 | 2026-07-09 | 创建审计基线、重构方案和进度台账 | AUD-01～06、DOC-01 | `1a75f3da` | Codex |
 | 2026-07-09 | 实现恢复错误传播与本地化失败提示；推进 overwrite payload/candidate 预检和 live SQLite 单事务替换 | P0-01、P0-02 | `117f8386` | Codex |

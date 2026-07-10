@@ -5,6 +5,7 @@ ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
   'Debug' => :debug,
+  'Debug-RestoreHarness' => :debug,
   'Profile' => :release,
   'Release' => :release,
 }

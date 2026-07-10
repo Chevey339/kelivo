@@ -121,6 +121,9 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  integration_test:
+    sdk: flutter
+  shared_preferences_platform_interface: ^2.4.2
   build_runner: ^2.4.0
   drift_dev: ^2.34.0
   flutter_launcher_icons: ^0.14.4
