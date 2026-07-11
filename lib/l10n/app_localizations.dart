@@ -10429,6 +10429,371 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tools'**
   String get settingsPageToolsSection;
+  /// No description provided for @workspaceEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Workspace'**
+  String get workspaceEnableTitle;
+
+  /// No description provided for @workspaceDisableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Workspace'**
+  String get workspaceDisableTitle;
+
+  /// No description provided for @workspaceEnableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to enable workspace'**
+  String get workspaceEnableFailed;
+
+  /// No description provided for @workspaceEnabledMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace enabled'**
+  String get workspaceEnabledMessage;
+
+  /// No description provided for @workspaceDisableConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Workspace'**
+  String get workspaceDisableConfirmTitle;
+
+  /// No description provided for @workspaceDisableConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing the workspace will permanently delete all files inside, and the AI will lose file operation capabilities. Continue?'**
+  String get workspaceDisableConfirmContent;
+
+  /// No description provided for @workspaceDisableConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get workspaceDisableConfirmCancel;
+
+  /// No description provided for @workspaceDisableConfirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Close and Delete'**
+  String get workspaceDisableConfirmDelete;
+
+  /// No description provided for @workspaceDisableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to close workspace'**
+  String get workspaceDisableFailed;
+
+  /// No description provided for @workspaceDisabledMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace closed'**
+  String get workspaceDisabledMessage;
+
+  /// No description provided for @workspaceArtifactsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifacts'**
+  String get workspaceArtifactsTooltip;
+
+  /// No description provided for @workspaceArtifactsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Artifacts'**
+  String get workspaceArtifactsLabel;
+
+  /// No description provided for @workspaceBrowserTitleSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **' - Artifacts'**
+  String get workspaceBrowserTitleSuffix;
+
+  /// No description provided for @workspaceBrowserBackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get workspaceBrowserBackTooltip;
+
+  /// No description provided for @workspaceBrowserRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get workspaceBrowserRefreshTooltip;
+
+  /// No description provided for @workspaceBrowserClearTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear workspace'**
+  String get workspaceBrowserClearTooltip;
+
+  /// No description provided for @workspaceClearConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Workspace'**
+  String get workspaceClearConfirmTitle;
+
+  /// No description provided for @workspaceClearConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'This will permanently delete all files in the workspace. Continue?'**
+  String get workspaceClearConfirmContent;
+
+  /// No description provided for @workspaceClearedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace cleared'**
+  String get workspaceClearedMessage;
+
+  /// No description provided for @workspaceBrowserLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load: {error}'**
+  String workspaceBrowserLoadFailed(String error);
+
+  /// No description provided for @workspaceBrowserEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace is empty, waiting for AI to create files'**
+  String get workspaceBrowserEmpty;
+
+  /// No description provided for @workspaceBrowserEmptyFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty folder'**
+  String get workspaceBrowserEmptyFolder;
+
+  /// No description provided for @workspaceFilePreviewBackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get workspaceFilePreviewBackTooltip;
+
+  /// No description provided for @workspaceFilePreviewDownloadTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get workspaceFilePreviewDownloadTooltip;
+
+  /// No description provided for @workspaceFilePreviewInvalidPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid path'**
+  String get workspaceFilePreviewInvalidPath;
+
+  /// No description provided for @workspaceFilePreviewImageLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load image'**
+  String get workspaceFilePreviewImageLoadFailed;
+
+  /// No description provided for @workspaceFilePreviewUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview not supported for this file format ({ext})\nSize: {size}'**
+  String workspaceFilePreviewUnsupported(String ext, String size);
+
+  /// No description provided for @workspaceFilePreviewReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to read: {error}'**
+  String workspaceFilePreviewReadFailed(String error);
+
+  /// No description provided for @workspaceFilePreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'File is empty'**
+  String get workspaceFilePreviewEmpty;
+
+  /// No description provided for @workspaceFilePreviewSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save to…'**
+  String get workspaceFilePreviewSaveDialogTitle;
+
+  /// No description provided for @workspaceFilePreviewSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save: {error}'**
+  String workspaceFilePreviewSaveFailed(String error);
+
+  /// No description provided for @workspaceFilePreviewSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get workspaceFilePreviewSaveSuccess;
+
+  /// No description provided for @workspaceFilePreviewFileNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'File does not exist'**
+  String get workspaceFilePreviewFileNotFound;
+
+  /// No description provided for @workspaceFilePreviewShareFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to share: {error}'**
+  String workspaceFilePreviewShareFailed(String error);
+
+  /// No description provided for @settingsSkillsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get settingsSkillsTitle;
+
+  /// No description provided for @skillsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get skillsPageTitle;
+
+  /// No description provided for @skillsBackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get skillsBackTooltip;
+
+  /// No description provided for @skillsImportTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import'**
+  String get skillsImportTooltip;
+
+  /// No description provided for @skillsImportMd.
+  ///
+  /// In en, this message translates to:
+  /// **'Import SKILL.md'**
+  String get skillsImportMd;
+
+  /// No description provided for @skillsImportZip.
+  ///
+  /// In en, this message translates to:
+  /// **'Import zip'**
+  String get skillsImportZip;
+
+  /// No description provided for @skillsImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill imported: {name}'**
+  String skillsImportSuccess(String name);
+
+  /// No description provided for @skillsImportErrorDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import failed'**
+  String get skillsImportErrorDialogTitle;
+
+  /// No description provided for @skillsImportErrorDialogClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get skillsImportErrorDialogClose;
+
+  /// No description provided for @skillsDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Skill'**
+  String get skillsDeleteConfirmTitle;
+
+  /// No description provided for @skillsDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Skill \'{name}\'? This action cannot be undone.'**
+  String skillsDeleteConfirmMessage(String name);
+
+  /// No description provided for @skillsDeleteConfirmCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get skillsDeleteConfirmCancel;
+
+  /// No description provided for @skillsDeleteConfirmDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsDeleteConfirmDelete;
+
+  /// No description provided for @skillsDeletedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted: {name}'**
+  String skillsDeletedSnackbar(String name);
+
+  /// No description provided for @skillsEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No Skills yet, tap the top-right to import'**
+  String get skillsEmptyState;
+
+  /// No description provided for @skillsDetailEmptyMd.
+  ///
+  /// In en, this message translates to:
+  /// **'SKILL.md is empty or failed to load'**
+  String get skillsDetailEmptyMd;
+
+  /// No description provided for @skillsMetaName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get skillsMetaName;
+
+  /// No description provided for @skillsMetaVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get skillsMetaVersion;
+
+  /// No description provided for @skillsMetaLicense.
+  ///
+  /// In en, this message translates to:
+  /// **'License'**
+  String get skillsMetaLicense;
+
+  /// No description provided for @skillsMetaCompatibility.
+  ///
+  /// In en, this message translates to:
+  /// **'Compatibility'**
+  String get skillsMetaCompatibility;
+
+  /// No description provided for @skillsMetaAllowedTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed Tools'**
+  String get skillsMetaAllowedTools;
+
+  /// No description provided for @skillsMetaEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get skillsMetaEnabled;
+
+  /// No description provided for @skillsMetaEnabledValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get skillsMetaEnabledValue;
+
+  /// No description provided for @skillsMetaDisabledValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get skillsMetaDisabledValue;
+
+  /// No description provided for @skillsListDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsListDeleteTooltip;
+
+  /// No description provided for @skillsListSlidableDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsListSlidableDelete;
+
+  /// No description provided for @skillsDetailDeleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsDetailDeleteButton;
 }
 
 class _AppLocalizationsDelegate

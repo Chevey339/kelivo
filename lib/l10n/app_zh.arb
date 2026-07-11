@@ -1997,4 +1997,124 @@
   "diagF1bSubtitle": "没有检测到具体的配置问题,但缓存命中率仍然很低。",
   "diagF1bSolution": "上游 provider 可能未启用 prompt cache,建议换到 OpenAI / Anthropic / Gemini 等明确支持的 provider。",
   "settingsPageToolsSection": "工具"
+  "workspaceEnableTitle": "开启工作区",
+  "workspaceDisableTitle": "关闭工作区",
+  "workspaceEnableFailed": "工作区开启失败",
+  "workspaceEnabledMessage": "工作区已开启",
+  "workspaceDisableConfirmTitle": "关闭工作区",
+  "workspaceDisableConfirmContent": "关闭工作区将永久删除工作区内所有文件，且 AI 将失去文件操作能力。确定继续？",
+  "workspaceDisableConfirmCancel": "取消",
+  "workspaceDisableConfirmDelete": "关闭并删除",
+  "workspaceDisableFailed": "工作区关闭失败",
+  "workspaceDisabledMessage": "工作区已关闭",
+  "workspaceArtifactsTooltip": "产物",
+  "workspaceArtifactsLabel": "产物",
+  "workspaceBrowserTitleSuffix": " - 产物",
+  "workspaceBrowserBackTooltip": "返回",
+  "workspaceBrowserRefreshTooltip": "刷新",
+  "workspaceBrowserClearTooltip": "清空工作区",
+  "workspaceClearConfirmTitle": "清空工作区",
+  "workspaceClearConfirmContent": "这将永久删除工作区中的所有文件，确定要清空吗？",
+  "workspaceClearedMessage": "工作区已清空",
+  "workspaceBrowserLoadFailed": "加载失败：{error}",
+  "@workspaceBrowserLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceBrowserEmpty": "工作区为空，等待 AI 创建文件",
+  "workspaceBrowserEmptyFolder": "空文件夹",
+  "workspaceFilePreviewBackTooltip": "返回",
+  "workspaceFilePreviewDownloadTooltip": "下载",
+  "workspaceFilePreviewInvalidPath": "路径无效",
+  "workspaceFilePreviewImageLoadFailed": "图片加载失败",
+  "workspaceFilePreviewUnsupported": "不支持预览此文件格式（{ext}）\n大小：{size}",
+  "@workspaceFilePreviewUnsupported": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewReadFailed": "读取失败：{error}",
+  "@workspaceFilePreviewReadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewEmpty": "文件为空",
+  "workspaceFilePreviewSaveDialogTitle": "保存到…",
+  "workspaceFilePreviewSaveFailed": "保存失败：{error}",
+  "@workspaceFilePreviewSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewSaveSuccess": "已保存",
+  "workspaceFilePreviewFileNotFound": "文件不存在",
+  "workspaceFilePreviewShareFailed": "分享失败：{error}",
+  "@workspaceFilePreviewShareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSkillsTitle": "Skills",
+  "skillsPageTitle": "Skills",
+  "skillsBackTooltip": "返回",
+  "skillsImportTooltip": "导入",
+  "skillsImportMd": "导入 SKILL.md",
+  "skillsImportZip": "导入 zip",
+  "skillsImportSuccess": "Skill 已导入：{name}",
+  "@skillsImportSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportErrorDialogTitle": "导入失败",
+  "skillsImportErrorDialogClose": "关闭",
+  "skillsDeleteConfirmTitle": "删除 Skill",
+  "skillsDeleteConfirmMessage": "确定删除 Skill '{name}'？该操作不可恢复。",
+  "@skillsDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsDeleteConfirmCancel": "取消",
+  "skillsDeleteConfirmDelete": "删除",
+  "skillsDeletedSnackbar": "已删除：{name}",
+  "@skillsDeletedSnackbar": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsEmptyState": "还没有 Skills，点击右上角导入",
+  "skillsDetailEmptyMd": "SKILL.md 内容为空或读取失败",
+  "skillsMetaName": "名称",
+  "skillsMetaVersion": "版本",
+  "skillsMetaLicense": "许可证",
+  "skillsMetaCompatibility": "兼容性",
+  "skillsMetaAllowedTools": "允许工具",
+  "skillsMetaEnabled": "启用状态",
+  "skillsMetaEnabledValue": "已启用",
+  "skillsMetaDisabledValue": "已停用",
+  "skillsListDeleteTooltip": "删除",
+  "skillsListSlidableDelete": "删除",
+  "skillsDetailDeleteButton": "删除"
 }

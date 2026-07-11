@@ -5450,6 +5450,204 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPageToolsSection => '工具';
+  String get workspaceEnableTitle => '开启工作区';
+
+  @override
+  String get workspaceDisableTitle => '关闭工作区';
+
+  @override
+  String get workspaceEnableFailed => '工作区开启失败';
+
+  @override
+  String get workspaceEnabledMessage => '工作区已开启';
+
+  @override
+  String get workspaceDisableConfirmTitle => '关闭工作区';
+
+  @override
+  String get workspaceDisableConfirmContent =>
+      '关闭工作区将永久删除工作区内所有文件，且 AI 将失去文件操作能力。确定继续？';
+
+  @override
+  String get workspaceDisableConfirmCancel => '取消';
+
+  @override
+  String get workspaceDisableConfirmDelete => '关闭并删除';
+
+  @override
+  String get workspaceDisableFailed => '工作区关闭失败';
+
+  @override
+  String get workspaceDisabledMessage => '工作区已关闭';
+
+  @override
+  String get workspaceArtifactsTooltip => '产物';
+
+  @override
+  String get workspaceArtifactsLabel => '产物';
+
+  @override
+  String get workspaceBrowserTitleSuffix => ' - 产物';
+
+  @override
+  String get workspaceBrowserBackTooltip => '返回';
+
+  @override
+  String get workspaceBrowserRefreshTooltip => '刷新';
+
+  @override
+  String get workspaceBrowserClearTooltip => '清空工作区';
+
+  @override
+  String get workspaceClearConfirmTitle => '清空工作区';
+
+  @override
+  String get workspaceClearConfirmContent => '这将永久删除工作区中的所有文件，确定要清空吗？';
+
+  @override
+  String get workspaceClearedMessage => '工作区已清空';
+
+  @override
+  String workspaceBrowserLoadFailed(String error) {
+    return '加载失败：$error';
+  }
+
+  @override
+  String get workspaceBrowserEmpty => '工作区为空，等待 AI 创建文件';
+
+  @override
+  String get workspaceBrowserEmptyFolder => '空文件夹';
+
+  @override
+  String get workspaceFilePreviewBackTooltip => '返回';
+
+  @override
+  String get workspaceFilePreviewDownloadTooltip => '下载';
+
+  @override
+  String get workspaceFilePreviewInvalidPath => '路径无效';
+
+  @override
+  String get workspaceFilePreviewImageLoadFailed => '图片加载失败';
+
+  @override
+  String workspaceFilePreviewUnsupported(String ext, String size) {
+    return '不支持预览此文件格式（$ext）\n大小：$size';
+  }
+
+  @override
+  String workspaceFilePreviewReadFailed(String error) {
+    return '读取失败：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewEmpty => '文件为空';
+
+  @override
+  String get workspaceFilePreviewSaveDialogTitle => '保存到…';
+
+  @override
+  String workspaceFilePreviewSaveFailed(String error) {
+    return '保存失败：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewSaveSuccess => '已保存';
+
+  @override
+  String get workspaceFilePreviewFileNotFound => '文件不存在';
+
+  @override
+  String workspaceFilePreviewShareFailed(String error) {
+    return '分享失败：$error';
+  }
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get skillsPageTitle => 'Skills';
+
+  @override
+  String get skillsBackTooltip => '返回';
+
+  @override
+  String get skillsImportTooltip => '导入';
+
+  @override
+  String get skillsImportMd => '导入 SKILL.md';
+
+  @override
+  String get skillsImportZip => '导入 zip';
+
+  @override
+  String skillsImportSuccess(String name) {
+    return 'Skill 已导入：$name';
+  }
+
+  @override
+  String get skillsImportErrorDialogTitle => '导入失败';
+
+  @override
+  String get skillsImportErrorDialogClose => '关闭';
+
+  @override
+  String get skillsDeleteConfirmTitle => '删除 Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '确定删除 Skill \'$name\'？该操作不可恢复。';
+  }
+
+  @override
+  String get skillsDeleteConfirmCancel => '取消';
+
+  @override
+  String get skillsDeleteConfirmDelete => '删除';
+
+  @override
+  String skillsDeletedSnackbar(String name) {
+    return '已删除：$name';
+  }
+
+  @override
+  String get skillsEmptyState => '还没有 Skills，点击右上角导入';
+
+  @override
+  String get skillsDetailEmptyMd => 'SKILL.md 内容为空或读取失败';
+
+  @override
+  String get skillsMetaName => '名称';
+
+  @override
+  String get skillsMetaVersion => '版本';
+
+  @override
+  String get skillsMetaLicense => '许可证';
+
+  @override
+  String get skillsMetaCompatibility => '兼容性';
+
+  @override
+  String get skillsMetaAllowedTools => '允许工具';
+
+  @override
+  String get skillsMetaEnabled => '启用状态';
+
+  @override
+  String get skillsMetaEnabledValue => '已启用';
+
+  @override
+  String get skillsMetaDisabledValue => '已停用';
+
+  @override
+  String get skillsListDeleteTooltip => '删除';
+
+  @override
+  String get skillsListSlidableDelete => '删除';
+
+  @override
+  String get skillsDetailDeleteButton => '删除';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10898,6 +11096,204 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageToolsSection => '工具';
+  String get workspaceEnableTitle => '开启工作区';
+
+  @override
+  String get workspaceDisableTitle => '关闭工作区';
+
+  @override
+  String get workspaceEnableFailed => '工作区开启失败';
+
+  @override
+  String get workspaceEnabledMessage => '工作区已开启';
+
+  @override
+  String get workspaceDisableConfirmTitle => '关闭工作区';
+
+  @override
+  String get workspaceDisableConfirmContent =>
+      '关闭工作区将永久删除工作区内所有文件，且 AI 将失去文件操作能力。确定继续？';
+
+  @override
+  String get workspaceDisableConfirmCancel => '取消';
+
+  @override
+  String get workspaceDisableConfirmDelete => '关闭并删除';
+
+  @override
+  String get workspaceDisableFailed => '工作区关闭失败';
+
+  @override
+  String get workspaceDisabledMessage => '工作区已关闭';
+
+  @override
+  String get workspaceArtifactsTooltip => '产物';
+
+  @override
+  String get workspaceArtifactsLabel => '产物';
+
+  @override
+  String get workspaceBrowserTitleSuffix => ' - 产物';
+
+  @override
+  String get workspaceBrowserBackTooltip => '返回';
+
+  @override
+  String get workspaceBrowserRefreshTooltip => '刷新';
+
+  @override
+  String get workspaceBrowserClearTooltip => '清空工作区';
+
+  @override
+  String get workspaceClearConfirmTitle => '清空工作区';
+
+  @override
+  String get workspaceClearConfirmContent => '这将永久删除工作区中的所有文件，确定要清空吗？';
+
+  @override
+  String get workspaceClearedMessage => '工作区已清空';
+
+  @override
+  String workspaceBrowserLoadFailed(String error) {
+    return '加载失败：$error';
+  }
+
+  @override
+  String get workspaceBrowserEmpty => '工作区为空，等待 AI 创建文件';
+
+  @override
+  String get workspaceBrowserEmptyFolder => '空文件夹';
+
+  @override
+  String get workspaceFilePreviewBackTooltip => '返回';
+
+  @override
+  String get workspaceFilePreviewDownloadTooltip => '下载';
+
+  @override
+  String get workspaceFilePreviewInvalidPath => '路径无效';
+
+  @override
+  String get workspaceFilePreviewImageLoadFailed => '图片加载失败';
+
+  @override
+  String workspaceFilePreviewUnsupported(String ext, String size) {
+    return '不支持预览此文件格式（$ext）\n大小：$size';
+  }
+
+  @override
+  String workspaceFilePreviewReadFailed(String error) {
+    return '读取失败：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewEmpty => '文件为空';
+
+  @override
+  String get workspaceFilePreviewSaveDialogTitle => '保存到…';
+
+  @override
+  String workspaceFilePreviewSaveFailed(String error) {
+    return '保存失败：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewSaveSuccess => '已保存';
+
+  @override
+  String get workspaceFilePreviewFileNotFound => '文件不存在';
+
+  @override
+  String workspaceFilePreviewShareFailed(String error) {
+    return '分享失败：$error';
+  }
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get skillsPageTitle => 'Skills';
+
+  @override
+  String get skillsBackTooltip => '返回';
+
+  @override
+  String get skillsImportTooltip => '导入';
+
+  @override
+  String get skillsImportMd => '导入 SKILL.md';
+
+  @override
+  String get skillsImportZip => '导入 zip';
+
+  @override
+  String skillsImportSuccess(String name) {
+    return 'Skill 已导入：$name';
+  }
+
+  @override
+  String get skillsImportErrorDialogTitle => '导入失败';
+
+  @override
+  String get skillsImportErrorDialogClose => '关闭';
+
+  @override
+  String get skillsDeleteConfirmTitle => '删除 Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '确定删除 Skill \'$name\'？该操作不可恢复。';
+  }
+
+  @override
+  String get skillsDeleteConfirmCancel => '取消';
+
+  @override
+  String get skillsDeleteConfirmDelete => '删除';
+
+  @override
+  String skillsDeletedSnackbar(String name) {
+    return '已删除：$name';
+  }
+
+  @override
+  String get skillsEmptyState => '还没有 Skills，点击右上角导入';
+
+  @override
+  String get skillsDetailEmptyMd => 'SKILL.md 内容为空或读取失败';
+
+  @override
+  String get skillsMetaName => '名称';
+
+  @override
+  String get skillsMetaVersion => '版本';
+
+  @override
+  String get skillsMetaLicense => '许可证';
+
+  @override
+  String get skillsMetaCompatibility => '兼容性';
+
+  @override
+  String get skillsMetaAllowedTools => '允许工具';
+
+  @override
+  String get skillsMetaEnabled => '启用状态';
+
+  @override
+  String get skillsMetaEnabledValue => '已启用';
+
+  @override
+  String get skillsMetaDisabledValue => '已停用';
+
+  @override
+  String get skillsListDeleteTooltip => '删除';
+
+  @override
+  String get skillsListSlidableDelete => '删除';
+
+  @override
+  String get skillsDetailDeleteButton => '删除';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16346,4 +16742,202 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageToolsSection => '工具';
+  String get workspaceEnableTitle => '啟用工作區';
+
+  @override
+  String get workspaceDisableTitle => '關閉工作區';
+
+  @override
+  String get workspaceEnableFailed => '工作區開啟失敗';
+
+  @override
+  String get workspaceEnabledMessage => '工作區已開啟';
+
+  @override
+  String get workspaceDisableConfirmTitle => '關閉工作區';
+
+  @override
+  String get workspaceDisableConfirmContent =>
+      '關閉工作區將永久刪除工作區內所有檔案，且 AI 將失去檔案操作能力。確定繼續？';
+
+  @override
+  String get workspaceDisableConfirmCancel => '取消';
+
+  @override
+  String get workspaceDisableConfirmDelete => '關閉並刪除';
+
+  @override
+  String get workspaceDisableFailed => '工作區關閉失敗';
+
+  @override
+  String get workspaceDisabledMessage => '工作區已關閉';
+
+  @override
+  String get workspaceArtifactsTooltip => '產物';
+
+  @override
+  String get workspaceArtifactsLabel => '產物';
+
+  @override
+  String get workspaceBrowserTitleSuffix => ' - 產物';
+
+  @override
+  String get workspaceBrowserBackTooltip => '返回';
+
+  @override
+  String get workspaceBrowserRefreshTooltip => '重新整理';
+
+  @override
+  String get workspaceBrowserClearTooltip => '清空工作區';
+
+  @override
+  String get workspaceClearConfirmTitle => '清空工作區';
+
+  @override
+  String get workspaceClearConfirmContent => '這將永久刪除工作區中的所有檔案，確定要清空嗎？';
+
+  @override
+  String get workspaceClearedMessage => '工作區已清空';
+
+  @override
+  String workspaceBrowserLoadFailed(String error) {
+    return '載入失敗：$error';
+  }
+
+  @override
+  String get workspaceBrowserEmpty => '工作區為空，等待 AI 建立檔案';
+
+  @override
+  String get workspaceBrowserEmptyFolder => '空資料夾';
+
+  @override
+  String get workspaceFilePreviewBackTooltip => '返回';
+
+  @override
+  String get workspaceFilePreviewDownloadTooltip => '下載';
+
+  @override
+  String get workspaceFilePreviewInvalidPath => '路徑無效';
+
+  @override
+  String get workspaceFilePreviewImageLoadFailed => '圖片載入失敗';
+
+  @override
+  String workspaceFilePreviewUnsupported(String ext, String size) {
+    return '不支援預覽此檔案格式（$ext）\n大小：$size';
+  }
+
+  @override
+  String workspaceFilePreviewReadFailed(String error) {
+    return '讀取失敗：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewEmpty => '檔案為空';
+
+  @override
+  String get workspaceFilePreviewSaveDialogTitle => '儲存到…';
+
+  @override
+  String workspaceFilePreviewSaveFailed(String error) {
+    return '儲存失敗：$error';
+  }
+
+  @override
+  String get workspaceFilePreviewSaveSuccess => '已儲存';
+
+  @override
+  String get workspaceFilePreviewFileNotFound => '檔案不存在';
+
+  @override
+  String workspaceFilePreviewShareFailed(String error) {
+    return '分享失敗：$error';
+  }
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get skillsPageTitle => 'Skills';
+
+  @override
+  String get skillsBackTooltip => '返回';
+
+  @override
+  String get skillsImportTooltip => '匯入';
+
+  @override
+  String get skillsImportMd => '匯入 SKILL.md';
+
+  @override
+  String get skillsImportZip => '匯入 zip';
+
+  @override
+  String skillsImportSuccess(String name) {
+    return 'Skill 已匯入：$name';
+  }
+
+  @override
+  String get skillsImportErrorDialogTitle => '匯入失敗';
+
+  @override
+  String get skillsImportErrorDialogClose => '關閉';
+
+  @override
+  String get skillsDeleteConfirmTitle => '刪除 Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '確定刪除 Skill \'$name\'？該操作不可恢復。';
+  }
+
+  @override
+  String get skillsDeleteConfirmCancel => '取消';
+
+  @override
+  String get skillsDeleteConfirmDelete => '刪除';
+
+  @override
+  String skillsDeletedSnackbar(String name) {
+    return '已刪除：$name';
+  }
+
+  @override
+  String get skillsEmptyState => '還沒有 Skills，點擊右上角匯入';
+
+  @override
+  String get skillsDetailEmptyMd => 'SKILL.md 內容為空或讀取失敗';
+
+  @override
+  String get skillsMetaName => '名稱';
+
+  @override
+  String get skillsMetaVersion => '版本';
+
+  @override
+  String get skillsMetaLicense => '許可證';
+
+  @override
+  String get skillsMetaCompatibility => '相容性';
+
+  @override
+  String get skillsMetaAllowedTools => '允許工具';
+
+  @override
+  String get skillsMetaEnabled => '啟用狀態';
+
+  @override
+  String get skillsMetaEnabledValue => '已啟用';
+
+  @override
+  String get skillsMetaDisabledValue => '已停用';
+
+  @override
+  String get skillsListDeleteTooltip => '刪除';
+
+  @override
+  String get skillsListSlidableDelete => '刪除';
+
+  @override
+  String get skillsDetailDeleteButton => '刪除';
 }
