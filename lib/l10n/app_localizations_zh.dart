@@ -5320,6 +5320,136 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get settingsPageDiagnostics => '缓存诊断';
+
+  @override
+  String get diagSelectTitle => '选择一条对话用于诊断';
+
+  @override
+  String get diagSelectEmpty => '暂无对话';
+
+  @override
+  String get diagSelectButton => '开始诊断';
+
+  @override
+  String get diagUntitled => '未命名';
+
+  @override
+  String get diagInsufficientBadge => '数据不足';
+
+  @override
+  String get diagResultTitle => '诊断结果';
+
+  @override
+  String diagSampleWindow(int assistant, int user) {
+    return '近 24 小时采样 $assistant 条助手 / $user 条用户消息';
+  }
+
+  @override
+  String get diagMetricTotal => '总 token';
+
+  @override
+  String get diagMetricCached => '已缓存';
+
+  @override
+  String get diagMetricUncached => '未缓存';
+
+  @override
+  String get diagAllGood => '未发现异常';
+
+  @override
+  String get diagSeverityUrgent => '紧急';
+
+  @override
+  String get diagSeverityRisk => '隐患';
+
+  @override
+  String get diagA1Title => '上下文超限';
+
+  @override
+  String get diagA1Subtitle =>
+      '本对话的用户消息数超过了助手设置的 contextMessageSize,旧消息被裁剪,导致前缀无法在多轮之间复用。';
+
+  @override
+  String get diagA1Solution =>
+      '把 contextMessageSize 调到无限(关闭 limitContextMessages,或把上限设得很大)。';
+
+  @override
+  String get diagA2Title => '系统提示里含时间变量';
+
+  @override
+  String get diagA2Subtitle =>
+      '系统提示中包含 cur_time / cur_datetime / cur_date 占位符,每次请求都会变,导致缓存失效。';
+
+  @override
+  String get diagA2Solution => '把时间占位符从系统提示里删掉,或挪到消息模板中 message 占位符的后面。';
+
+  @override
+  String get diagA3Title => '时间变量位于 message 之前';
+
+  @override
+  String get diagA3Subtitle =>
+      '消息模板把 time / date 占位符放在了 message 前面,导致用户消息附近的前缀每次都变化。';
+
+  @override
+  String get diagA3Solution => '把时间占位符挪到 message 之后,作为用户消息的后缀。';
+
+  @override
+  String get diagA4Title => '记忆功能破坏缓存';
+
+  @override
+  String get diagA4SubContent => '在采样窗口内记忆内容发生了变化,系统提示被重写。';
+
+  @override
+  String get diagA4SubHour => '记忆提示里写死了当前小时(currentHour),每小时都会变。';
+
+  @override
+  String get diagA4Solution =>
+      '把长期不变的内容挪到世界书(常驻);把当前小时从系统提示里删掉,改为在 message 后面注入。';
+
+  @override
+  String get diagA6Title => '世界书:非底部 + 高频触发';
+
+  @override
+  String get diagA6Subtitle => '被高频触发的世界书条目被插入到非底部位置,导致消息序列整体前移。';
+
+  @override
+  String get diagA6Solution =>
+      '把对应条目改为常驻(constantActive),或把插入位置改为 bottomOfChat。';
+
+  @override
+  String get diagT1Title => '工具 / MCP 输出 token 占比过高';
+
+  @override
+  String get diagT1Subtitle => '工具结果占用了超过 60% 的输入 token,留给缓存的前缀空间很小。';
+
+  @override
+  String get diagT1Solution => '关闭贡献最大的那个工具,或把它的触发范围收窄。';
+
+  @override
+  String get diagF1aTitle => '对话时间间距过长';
+
+  @override
+  String get diagF1aSubtitle =>
+      '超过一半的消息间隔超过 5 分钟,provider 的缓存 TTL 已经在两次请求之间过期。';
+
+  @override
+  String get diagF1aSolution => '这是正常现象。常见 TTL 只有 5 分钟左右,稀疏对话很难建立缓存。';
+
+  @override
+  String get diagF1bTitle => '上游问题';
+
+  @override
+  String get diagF1bSubtitle => '没有检测到具体的配置问题,但缓存命中率仍然很低。';
+
+  @override
+  String get diagF1bSolution =>
+      '上游 provider 可能未启用 prompt cache,建议换到 OpenAI / Anthropic / Gemini 等明确支持的 provider。';
+
+  @override
+  String get settingsPageToolsSection => '工具';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10638,6 +10768,136 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get settingsPageDiagnostics => '缓存诊断';
+
+  @override
+  String get diagSelectTitle => '选择一条对话用于诊断';
+
+  @override
+  String get diagSelectEmpty => '暂无对话';
+
+  @override
+  String get diagSelectButton => '开始诊断';
+
+  @override
+  String get diagUntitled => '未命名';
+
+  @override
+  String get diagInsufficientBadge => '数据不足';
+
+  @override
+  String get diagResultTitle => '诊断结果';
+
+  @override
+  String diagSampleWindow(int assistant, int user) {
+    return '近 24 小时采样 $assistant 条助手 / $user 条用户消息';
+  }
+
+  @override
+  String get diagMetricTotal => '总 token';
+
+  @override
+  String get diagMetricCached => '已缓存';
+
+  @override
+  String get diagMetricUncached => '未缓存';
+
+  @override
+  String get diagAllGood => '未发现异常';
+
+  @override
+  String get diagSeverityUrgent => '紧急';
+
+  @override
+  String get diagSeverityRisk => '隐患';
+
+  @override
+  String get diagA1Title => '上下文超限';
+
+  @override
+  String get diagA1Subtitle =>
+      '本对话的用户消息数超过了助手设置的 contextMessageSize,旧消息被裁剪,导致前缀无法在多轮之间复用。';
+
+  @override
+  String get diagA1Solution =>
+      '把 contextMessageSize 调到无限(关闭 limitContextMessages,或把上限设得很大)。';
+
+  @override
+  String get diagA2Title => '系统提示里含时间变量';
+
+  @override
+  String get diagA2Subtitle =>
+      '系统提示中包含 cur_time / cur_datetime / cur_date 占位符,每次请求都会变,导致缓存失效。';
+
+  @override
+  String get diagA2Solution => '把时间占位符从系统提示里删掉,或挪到消息模板中 message 占位符的后面。';
+
+  @override
+  String get diagA3Title => '时间变量位于 message 之前';
+
+  @override
+  String get diagA3Subtitle =>
+      '消息模板把 time / date 占位符放在了 message 前面,导致用户消息附近的前缀每次都变化。';
+
+  @override
+  String get diagA3Solution => '把时间占位符挪到 message 之后,作为用户消息的后缀。';
+
+  @override
+  String get diagA4Title => '记忆功能破坏缓存';
+
+  @override
+  String get diagA4SubContent => '在采样窗口内记忆内容发生了变化,系统提示被重写。';
+
+  @override
+  String get diagA4SubHour => '记忆提示里写死了当前小时(currentHour),每小时都会变。';
+
+  @override
+  String get diagA4Solution =>
+      '把长期不变的内容挪到世界书(常驻);把当前小时从系统提示里删掉,改为在 message 后面注入。';
+
+  @override
+  String get diagA6Title => '世界书:非底部 + 高频触发';
+
+  @override
+  String get diagA6Subtitle => '被高频触发的世界书条目被插入到非底部位置,导致消息序列整体前移。';
+
+  @override
+  String get diagA6Solution =>
+      '把对应条目改为常驻(constantActive),或把插入位置改为 bottomOfChat。';
+
+  @override
+  String get diagT1Title => '工具 / MCP 输出 token 占比过高';
+
+  @override
+  String get diagT1Subtitle => '工具结果占用了超过 60% 的输入 token,留给缓存的前缀空间很小。';
+
+  @override
+  String get diagT1Solution => '关闭贡献最大的那个工具,或把它的触发范围收窄。';
+
+  @override
+  String get diagF1aTitle => '对话时间间距过长';
+
+  @override
+  String get diagF1aSubtitle =>
+      '超过一半的消息间隔超过 5 分钟,provider 的缓存 TTL 已经在两次请求之间过期。';
+
+  @override
+  String get diagF1aSolution => '这是正常现象。常见 TTL 只有 5 分钟左右,稀疏对话很难建立缓存。';
+
+  @override
+  String get diagF1bTitle => '上游问题';
+
+  @override
+  String get diagF1bSubtitle => '没有检测到具体的配置问题,但缓存命中率仍然很低。';
+
+  @override
+  String get diagF1bSolution =>
+      '上游 provider 可能未启用 prompt cache,建议换到 OpenAI / Anthropic / Gemini 等明确支持的 provider。';
+
+  @override
+  String get settingsPageToolsSection => '工具';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -15956,4 +16216,134 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get settingsPageDiagnostics => '快取診斷';
+
+  @override
+  String get diagSelectTitle => '選擇一條對話用於診斷';
+
+  @override
+  String get diagSelectEmpty => '暫無對話';
+
+  @override
+  String get diagSelectButton => '開始診斷';
+
+  @override
+  String get diagUntitled => '未命名';
+
+  @override
+  String get diagInsufficientBadge => '資料不足';
+
+  @override
+  String get diagResultTitle => '診斷結果';
+
+  @override
+  String diagSampleWindow(int assistant, int user) {
+    return '近 24 小時取樣 $assistant 條助手 / $user 條使用者訊息';
+  }
+
+  @override
+  String get diagMetricTotal => '總 token';
+
+  @override
+  String get diagMetricCached => '已快取';
+
+  @override
+  String get diagMetricUncached => '未快取';
+
+  @override
+  String get diagAllGood => '未發現異常';
+
+  @override
+  String get diagSeverityUrgent => '緊急';
+
+  @override
+  String get diagSeverityRisk => '隱患';
+
+  @override
+  String get diagA1Title => '上下文超限';
+
+  @override
+  String get diagA1Subtitle =>
+      '本對話的使用者訊息數超過了助手設定的 contextMessageSize,舊訊息被裁剪,導致前綴無法在多輪之間複用。';
+
+  @override
+  String get diagA1Solution =>
+      '把 contextMessageSize 調到無限(關閉 limitContextMessages,或把上限設得很大)。';
+
+  @override
+  String get diagA2Title => '系統提示裡含時間變數';
+
+  @override
+  String get diagA2Subtitle =>
+      '系統提示中包含 cur_time / cur_datetime / cur_date 占位符,每次請求都會變,導致快取失效。';
+
+  @override
+  String get diagA2Solution => '把時間占位符從系統提示裡刪掉,或挪到訊息範本中 message 占位符的後面。';
+
+  @override
+  String get diagA3Title => '時間變數位於 message 之前';
+
+  @override
+  String get diagA3Subtitle =>
+      '訊息範本把 time / date 占位符放在了 message 前面,導致使用者訊息附近的前綴每次都變化。';
+
+  @override
+  String get diagA3Solution => '把時間占位符挪到 message 之後,作為使用者訊息的後綴。';
+
+  @override
+  String get diagA4Title => '記憶功能破壞快取';
+
+  @override
+  String get diagA4SubContent => '在取樣視窗內記憶內容發生了變化,系統提示被重寫。';
+
+  @override
+  String get diagA4SubHour => '記憶提示裡寫死了當前小時(currentHour),每小時都會變。';
+
+  @override
+  String get diagA4Solution =>
+      '把長期不變的內容挪到世界書(常駐);把當前小時從系統提示裡刪掉,改為在 message 後面注入。';
+
+  @override
+  String get diagA6Title => '世界書:非底部 + 高頻觸發';
+
+  @override
+  String get diagA6Subtitle => '被高頻觸發的世界書條目被插入到非底部位置,導致訊息序列整體前移。';
+
+  @override
+  String get diagA6Solution =>
+      '把對應條目改為常駐(constantActive),或把插入位置改為 bottomOfChat。';
+
+  @override
+  String get diagT1Title => '工具 / MCP 輸出 token 佔比過高';
+
+  @override
+  String get diagT1Subtitle => '工具結果佔用了超過 60% 的輸入 token,留給快取的前綴空間很小。';
+
+  @override
+  String get diagT1Solution => '關閉貢獻最大的那個工具,或把它的觸發範圍收窄。';
+
+  @override
+  String get diagF1aTitle => '對話時間間距過長';
+
+  @override
+  String get diagF1aSubtitle =>
+      '超過一半的訊息間隔超過 5 分鐘,provider 的快取 TTL 已經在兩次請求之間過期。';
+
+  @override
+  String get diagF1aSolution => '這是正常現象。常見 TTL 只有 5 分鐘左右,稀疏對話很難建立快取。';
+
+  @override
+  String get diagF1bTitle => '上游問題';
+
+  @override
+  String get diagF1bSubtitle => '沒有檢測到具體的設定問題,但快取命中率仍然很低。';
+
+  @override
+  String get diagF1bSolution =>
+      '上游 provider 可能未啟用 prompt cache,建議換到 OpenAI / Anthropic / Gemini 等明確支援的 provider。';
+
+  @override
+  String get settingsPageToolsSection => '工具';
 }
