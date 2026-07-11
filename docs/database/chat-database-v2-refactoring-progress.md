@@ -1,9 +1,9 @@
 # Kelivo 聊天数据库与消息系统 v2 重构进度
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
-> - 追踪基线：分支 `sql`，本轮实现基线 `874085a0`
-> - 最后更新：2026-07-09
-> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 已改为运行期同卷 durable preparation + 下次启动 operation-ahead 切换/回滚，terminal settings 用绑定 receipt/native PID/lease token 的 cold ack 保留 active admission。macOS forward control v2 已完成 25/25 强类型高层 failpoint、100 个成功 Runner phase、25 次外部 SIGKILL 和 13/13 support tests；独立 terminal control v1 又以一次完整运行完成 committed/target 的 6/6 cold-ack/archive 高层 failpoint、24 个成功 Runner phase、6 次外部 SIGKILL 和 13/13 support tests。ACK temp 被杀后 R3 必须幂等重应用 settings 并轮换 ACK，canonical ACK 已发布时 R3 必须零写直接归档；R4 始终零写验证最终业务就绪与 archived evidence。archive 已改为 operation-ahead archiving marker，修复 raw run rename 后 admission 可能过早释放的生产缺陷。累计证据为 124 个成功 Runner phase、31 次外部 SIGKILL，但仍不覆盖 pre-commit rollback、`rolledBack/before` terminal、显式 settings 部分态进程注入、raw rename/fsync/F_FULLFSYNC 子窗口、legacy marker create/write 子窗口、硬件断电、资源故障或其他平台，因此 P0-02 保持进行中
+> - 追踪基线：分支 `sql`，本轮实现基线 `207adbc5`
+> - 最后更新：2026-07-10
+> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 已改为运行期同卷 durable preparation + 下次启动 operation-ahead 切换/回滚，terminal settings 用绑定 receipt/native PID/lease token 的 cold ack 保留 active admission。macOS forward control v2 已完成 25/25 强类型高层 failpoint、100 个成功 Runner phase、25 次外部 SIGKILL；committed/target terminal control v1 已完成 6/6、24 phases、6 次 SIGKILL；新增 verified-origin rollback control v1 覆盖 18/18 高层边界、72 phases、18 次 SIGKILL。rollback 证据由中断前明确通过的前 12 点与从第 13 点开始的完整 6/6 续跑组成，不记作一次未中断的 18/18 full run；每点均由 R3 以新 PID/token 收敛到 `rolledBack/before` cold ACK，再由 settings 零写入的 R4 复验旧 bundle 回 live、新 bundle 回 candidate、previous 仅余 control evidence 并归档。累计证据为 196 个成功 Runner phase、49 次外部 SIGKILL。仍未覆盖 terminal cold-readback/repair 的显式 before/target 部分态、`rolledBack/before` terminal 六个独立 kill 点、verified-origin 之外的 rollback 起点、missing/empty/unselected previous 拓扑、raw rename/fsync/F_FULLFSYNC 子窗口、legacy marker create/write、硬件断电、资源故障或其他平台，因此 P0-02 保持进行中
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 2 / 9 | `进行中` | P0-01/P0-08 已完成；P0-02 overwrite 主链、macOS 25/25 forward 与 committed terminal 6/6 高层 SIGKILL 矩阵已通过，待 rollback/rolledBack、raw durability 子窗口、资源故障和五平台验收 |
+| Phase 0：止血与基线 | 2 / 9 | `进行中` | P0-01/P0-08 已完成；P0-02 overwrite 主链、macOS 25/25 forward、committed terminal 6/6 与 verified-origin rollback 18/18 高层 SIGKILL 矩阵已通过，待 rolledBack terminal、其余 rollback 拓扑、raw durability 子窗口、资源故障和五平台验收 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | 受 PD-01/02/04 和 PD-13 影响 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -64,8 +64,8 @@
 | `flutter gen-l10n` + untranslated check | `已完成` | 生成成功；`desiredFileName.txt` 为 `{}` | 2026-07-09 | 四份 ARB 同步，恢复失败提示已本地化 |
 | `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前工作区静态分析通过 |
 | `flutter test` | `已完成` | 874 tests passed | 2026-07-09 | `b232ad8b` 提交前当前工作区全量测试通过 |
-| `flutter analyze` + `flutter test`（本轮 P0-02） | `已完成` | No issues found；1045/1045 tests passed | 2026-07-09 | 当前 macOS 主机全量通过；真实 SIGKILL 矩阵证据见下方独立宿主行，仍不等于硬件断电或其他平台验证 |
-| `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-09 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
+| `flutter analyze` + `flutter test`（本轮 P0-02） | `已完成` | No issues found；1061/1061 tests passed | 2026-07-10 | 当前 macOS 主机全量通过；真实 SIGKILL 矩阵证据见下方独立宿主行，仍不等于硬件断电或其他平台验证 |
+| `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
 | Restore receipt/journal 定向测试 | `已完成` | 24 tests passed | 2026-07-09 | 覆盖 canonical checksum、append-only sequence/hash chain、非法跳转、损坏/超限/缺口拒绝、链接目录拒绝、初始 run/marker/topology/candidate/selection 复验、prepared retry 残留拒绝，以及跨 worker-isolate publish/discard 互斥；不等于目录 fsync 或 kill 验证 |
@@ -73,16 +73,18 @@
 | Restore workspace lock/admission | `已完成` | 10 tests passed | 2026-07-09 | 覆盖同 isolate FIFO、跨进程 advisory lock、action 异常释放、root/lock link 与错误类型拒绝；terminal archive 另覆盖 publishing+archived、active+completed、active/completed 均缺失三种无突变拒绝，实际 marker/source 校验发生在创建 `completed/` 前 |
 | Restore admission/phase + DataSync 集成回归 | `已完成` | 89 tests passed | 2026-07-09 | `f33c9019` 提交前 workspace lock、staging、receipt、DataSync 四组定向用例通过；覆盖 worker-isolate staging/staging 与 publish/discard 竞态 |
 | Restore preparation 协调器 | `已完成` | 5 direct / 47 DataSync tests passed | 2026-07-09 | staging→prepared receipt 已接入 DataSync v2 overwrite；方法返回时 live 设置/DB/assets 不变，只复制用户选择与 bundle 能力交集中的 DB/assets，candidate 与 receipt 组件精确相等；全选仍保留 SQLite 与真实 asset，旧 JSON 路径行为不变 |
-| Restore startup gate / terminal archive | `已完成` | 39 direct tests passed；纳入聚焦回归 | 2026-07-09 | 同一 workspace 锁内完成 inspect→claim→forward/rollback→cold readback→terminal archive；除既有正向/回滚中断外，新增验证 archiving marker 在 run move 与双 parent barrier 完成前持续占有 admission、`archiving + completed` 可从归档 evidence 续跑、legacy markerless active terminal 先重建 marker。deterministic adapter 覆盖 raw run rename 后中断与 completed→workspace parent sync 失败，但不等于外部 SIGKILL/断电证明 |
+| Restore startup gate / terminal archive | `已完成` | 40 direct tests passed；纳入聚焦回归 | 2026-07-10 | 同一 workspace 锁内完成 inspect→claim→forward/rollback→cold readback→terminal archive；除既有正向/回滚中断外，新增 verified canonical + durable `rollingBack` temp 的确定性回归，证明重复 verified failure 可严格沿 seq 1～6 收敛到 `rolledBack`，并保持 stale temp 与 canonical chain 绑定。archiving marker 在 run move 与双 parent barrier 完成前持续占有 admission，`archiving + completed` 可从归档 evidence 续跑；deterministic adapter 覆盖 raw run rename 后中断与 completed→workspace parent sync 失败，但不等于外部 SIGKILL/断电证明 |
 | Restore previous plan/builder/store + durability | `已完成` | 24 tests passed | 2026-07-09 | 7 plan、8 builder、5 store、4 当前 macOS durability 用例；有界流式 hash、精确 DB/assets topology、immutable previous control、0700/0600、POSIX directory fsync、Apple `F_FULLFSYNC` 与 Windows write-through 实现已接入；Windows/移动端/Linux 尚未运行 |
 | Restore live SQLite normalization | `已完成` | 4 tests passed | 2026-07-09 | raw SQLite checkpoint/TRUNCATE、journal DELETE、sidecar 拒绝/消失、main/parent barrier；包含带 WAL committed row 的复制恢复用例，不通过普通业务 repository 执行迁移 |
 | Restore settings transition/store/cold ack | `已完成` | 纳入 246 项聚焦回归 | 2026-07-09 | 从 durable plan 重建 before/target、fresh reload、可恢复投影、apply/rollback/fingerprint；canonical cold ack 绑定 run/terminal receipt/expected/native PID/lease token，同 PID 或同 token 均不放行，替换丢失窗口安全回到“需冷启”；SharedPreferences 插件本身不宣称跨平台 fsync |
 | Restore operation-ahead mover / cutover integration | `已完成` | 4 mover + 5 full-bundle tests passed | 2026-07-09 | DB、四资源根和 settings 每项只接受 descriptor 可证明的位置；candidate 与 receipt 组件双向精确绑定；完整 SQLite/settings/assets 正向提交与“已安装后验证失败→rollingBack→rolledBack”均回读精确旧/新数据；cutover 原始错误会结构化记录，补偿回滚再次失败时同时保留两组错误/堆栈且 receipt 停在可续跑的 `rollingBack`；committed 等待 cold ack 时 DB/asset 篡改只 fail-closed、不回 previous |
-| Restore receipt/workspace protocol | `已完成` | 纳入聚焦回归 | 2026-07-09 | append-only receipt、rollback chain、精确 receipt temp、candidate/receipt 双向绑定、共享锁、operation-ahead claim 与 terminal archive；forward 矩阵已对四种 receipt temp/final 共 8 点执行真实 SIGKILL，terminal 矩阵另覆盖 completed root、archiving marker/run/delete 四个 archive 点。unpublished later-temp 仲裁与 raw run rename admission 缺陷均已修复；`rollingBack/rolledBack` receipt temp/final publication、legacy marker create/write 与 Windows rename 仍待验证 |
-| Restore business lease / unpublished / terminal hardening | `已完成` | 纳入聚焦回归 | 2026-07-09 | 非阻塞进程/跨 isolate lease、真实子进程竞争与 kill 后重获；gate 在 lease 冲突时不触碰 prepared/live；terminal cold ack 要求 native PID 与 token 均变化。真实 cold-ack SIGKILL 证明 ACK temp 丢失时 R3 会幂等重应用 settings/轮换 ACK，canonical ACK 发布后 R3 零写直接归档；R4 始终零写验证最终业务就绪与 archived evidence。显式 before/target 部分态仍只有单元/逻辑故障证据；其他平台与 rolledBack terminal 待验证 |
+| Restore receipt/workspace protocol | `已完成` | 纳入聚焦回归 | 2026-07-10 | append-only receipt、rollback chain、精确 receipt temp、candidate/receipt 双向绑定、共享锁、operation-ahead claim 与 terminal archive；forward 矩阵对四种 receipt temp/final 共 8 点、rollback 矩阵对 `rollingBack/rolledBack` temp/final 共 4 点执行真实 SIGKILL，terminal 矩阵另覆盖 completed root、archiving marker/run/delete 四个 archive 点。unpublished later-temp 仲裁与 raw run rename admission 缺陷均已修复；legacy marker create/write、raw durability 与 Windows rename 仍待验证 |
+| Restore business lease / unpublished / terminal hardening | `已完成` | 纳入聚焦回归 | 2026-07-09 | 非阻塞进程/跨 isolate lease、真实子进程竞争与 kill 后重获；gate 在 lease 冲突时不触碰 prepared/live；terminal cold ack 要求 native PID 与 token 均变化。真实 cold-ack SIGKILL 证明 ACK temp 丢失时 R3 会幂等重应用 settings/轮换 ACK，canonical ACK 发布后 R3 零写直接归档；R4 始终零写验证最终业务就绪与 archived evidence。terminal cold-readback/repair 的显式 before/target 部分态仍只有单元/逻辑故障证据；其他平台与 `rolledBack/before` terminal 六个独立 kill 点待验证 |
 | macOS forward restore process SIGKILL harness | `已完成` | 25/25 强类型 failpoint；100 个成功 Runner phase；25 次外部 SIGKILL；13/13 support tests | 2026-07-09 | forward control v2 提供 smoke/core/full、`--failpoint` 与 `--from`；每 case 独立 scenario/prefix/AppData/run，由四个真实 Runner 完成 setup→kill→resume→cold finalize。25 个 case 来自跨 core 分段与 full-only targeted 成功运行，不记作一次单命令 full run；覆盖 claim、normalize final barrier、previous、DB/四 roots、四种 receipt temp/final、settings 部分态与 candidate 安装 |
-| macOS committed terminal restore SIGKILL harness | `已完成` | 6/6 强类型 failpoint；24 个成功 Runner phase；6 次外部 SIGKILL；13/13 support tests | 2026-07-09 | terminal control v1 的一次完整 `--scenario=terminal` 运行耗时 673.925 秒；每 case 独立 scenario/prefix/AppData/run，并由四个 Runner 完成 setup→commitToColdAck→recoverTerminal→verifyBusinessReady。cold ACK 两点在 R2 kill；archive 四点由 R2 正常发布 ACK、R3 kill、R4 恢复。覆盖 ACK temp/publish、completed root、archiving marker、terminal run archive、marker durable removal；最终严格回读 receipt/ACK/previous/settings/DB/assets/sidecar/PID/token。oracle 收紧后另以 exact case 重跑 ACK temp（118.264 秒，R3 重应用/轮换）和 ACK published（111.517 秒，R3 零写归档）均通过，重复运行不计入 6/24/6 主口径；R4 始终零写验证业务就绪与 archived evidence。高层 hook 不证明显式 settings 部分态、raw durability、硬件断电、rolledBack 或其他平台 |
+| macOS committed terminal restore SIGKILL harness | `已完成` | 6/6 强类型 failpoint；24 个成功 Runner phase；6 次外部 SIGKILL；13/13 support tests | 2026-07-09 | terminal control v1 的一次完整 `--scenario=terminal` 运行耗时 673.925 秒；每 case 独立 scenario/prefix/AppData/run，并由四个 Runner 完成 setup→commitToColdAck→recoverTerminal→verifyBusinessReady。cold ACK 两点在 R2 kill；archive 四点由 R2 正常发布 ACK、R3 kill、R4 恢复。覆盖 ACK temp/publish、completed root、archiving marker、terminal run archive、marker durable removal；最终严格回读 receipt/ACK/previous/settings/DB/assets/sidecar/PID/token。oracle 收紧后另以 exact case 重跑 ACK temp（118.264 秒，R3 重应用/轮换）和 ACK published（111.517 秒，R3 零写归档）均通过，重复运行不计入 6/24/6 主口径；R4 始终零写验证业务就绪与 archived evidence。高层 hook 不证明 terminal cold-readback/repair 的显式 before/target 部分态、raw durability、硬件断电、`rolledBack/before` terminal 六个独立 kill 点或其他平台 |
+| macOS verified-origin rollback restore SIGKILL harness | `已完成` | 18/18 强类型 failpoint；72 个成功 Runner phase；18 次外部 SIGKILL；15/15 control/hooks tests | 2026-07-10 | rollback control v1 的四阶段为 setup→triggerRollbackKill→recoverToColdAck→verifyBusinessReady；覆盖 `rollingBack` receipt temp/final、DB 反向移动与 previous/database parent barrier、四个资源根各自反向移动、settings first/secret/target-only tombstone、`rolledBack` receipt temp/final。首轮在第 13 点执行期间被交互中断，只有前 12 点具有明确 PASS；随后用 `--scenario=rollback --from=previousFontsRestoredToLive` 完整通过余下 6/6，因此按 12+6 分段证据记账，不宣称一次未中断 full。每点 R3 mutation>0 且用新 PID/token 到达 `rolledBack/before` ACK，R4 拒绝任何 settings mutation 并零写归档；`rollingBack` temp case 必须再次制造 verified failure，不能自然前向 commit。高层 hook 不证明 raw syscall、断电、missing/empty/unselected previous、其他 rollback 起点、rolledBack terminal 或其他平台 |
 | Restore terminal milestone 定向回归 | `已完成` | 89 tests passed | 2026-07-09 | workspace lock 10、startup gate 39、cold ACK 14、forward support 13、terminal control/hooks 13；覆盖 happy path、拓扑歧义、故障恢复、严格 schema/PID/token 绑定及 mutation guard/counter |
+| Restore rollback milestone 定向回归 | `已完成` | 68 tests passed | 2026-07-10 | rollback control/hooks 15、forward support 13、startup gate 40；覆盖四阶段/18 点严格 schema、exact-set failure、post-failure blockers、DB parent matcher、receipt/ACK sequence，以及 verified + stale rollingBack temp 的重复失败收敛。前向 smoke 在夹具 v3 首次复验时发现并修正 target-only oracle 的矛盾断言，随后通过；terminal `coldAckPublished` exact case 同步通过 |
 | Migration restart failure surface | `已完成` | 2 relevant widget tests passed | 2026-07-09 | 1 项真实点击 `MigrationApp` 完成页重启按钮并验证 Android process-mode channel、失败上报与本地化 snackbar，1 项 restart helper 验证失败后保留重试入口；不初始化业务 provider，也未为测试扩大生产 API |
 | DataSync v2/legacy backup-import regression | `已完成` | 47 tests passed | 2026-07-09 | v2 导入只 prepare，启动经 terminal+cold readback 后整体生效/回滚；selected-only/full-selected candidate、SQLite snapshot、空 assets roots、secret-free cleanup、ZIP 边界、v2 merge 安全拒绝及旧 JSON 导入全部通过 |
 | Backup settings 纯校验器与现有恢复回归 | `已完成` | 56 tests passed | 2026-07-09 | 4 个纯校验器用例覆盖 legacy string-list 规范化、合法值、本地键跳过及非法结构拒绝；连同 v2/legacy restore 和凭据边界回归通过，为 candidate 与启动 gate 复用同一规则建立基础 |
@@ -137,10 +139,18 @@ flutter test \
   test/shared/widgets/restore_outcome_notice_test.dart \
   test/shared/widgets/restart_app_action_test.dart
 
+# Terminal harness regression (26 tests: support 13 + control/hooks 13).
 flutter test \
   test/core/services/backup/restore_process_harness_support_test.dart \
   test/core/services/backup/restore_terminal_process_control_test.dart \
   test/core/services/backup/restore_terminal_process_hooks_test.dart
+
+# Rollback milestone regression (68 tests).
+flutter test \
+  test/core/services/backup/restore_rollback_process_control_test.dart \
+  test/core/services/backup/restore_rollback_process_hooks_test.dart \
+  test/core/services/backup/restore_process_harness_support_test.dart \
+  test/core/services/backup/restore_startup_gate_test.dart
 
 # macOS only; default is the core tier. Every selected failpoint gets an
 # independent scenario and four isolated RestoreHarness Runner processes.
@@ -154,6 +164,12 @@ dart run tool/run_restore_process_harness.dart \
 
 # macOS only; six isolated committed/target cold-ack and archive cases.
 dart run tool/run_restore_process_harness.dart --scenario=terminal
+
+# macOS only; 18 isolated verified-origin rollback cases. Resume accepts the
+# first remaining rollback failpoint after an interrupted host invocation.
+dart run tool/run_restore_process_harness.dart --scenario=rollback
+dart run tool/run_restore_process_harness.dart \
+  --scenario=rollback --from=previousFontsRestoredToLive
 ```
 
 ### 4.2 尚未执行
@@ -162,7 +178,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | --- | --- | --- | --- |
 | 真实设备 profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 harness、参考设备和数据 seed 尚未建立 | 尚不能冻结性能 SLO 或 cache budget |
 | Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 本轮只运行当前 macOS 主机的根目录分析与单测，未运行五平台 runner | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
-| kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | macOS 已完成 25 个 forward 与 6 个 committed terminal 独立 Runner SIGKILL case；pre-commit rollback、rolledBack terminal、raw rename/fsync/F_FULLFSYNC、legacy marker create/write 和资源故障尚未覆盖 | 已证明列明的高层 forward/cold-ack/archive durability 边界可跨真实进程 SIGKILL 收敛；仍不能宣称硬件断电、任意子步骤、rollback/rolledBack 或五平台安全 |
+| kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | macOS 已完成 25 个 forward、6 个 committed terminal 与 18 个 verified-origin rollback 独立 Runner SIGKILL case；rolledBack terminal、其余 rollback 拓扑、raw rename/fsync/F_FULLFSYNC、legacy marker create/write 和资源故障尚未覆盖 | 已证明列明的高层 forward/cold-ack/archive/rollback durability 边界可跨真实进程 SIGKILL 收敛；仍不能宣称硬件断电、任意子步骤、所有 rollback 拓扑或五平台安全 |
 | 真实旧 Hive/SQLite v1/备份 fixture 全矩阵 | `未开始` | fixture 尚未整理 | 不能证明已发布数据可无损迁移 |
 | 稳定 slot + localDy 的 widget/integration test | `未开始` | 目标 timeline 尚未实现 | 当前列表跳动问题无自动化保护 |
 
@@ -192,7 +208,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
-| P0-02 | overwrite staging restore | 无 | `进行中` | 运行期 durable prepare 不改 live；下次启动在业务放行前收敛为完整新 bundle 或经验证旧 bundle，并跨冷启动确认 settings | 既有提交 + 本里程碑提交 | DataSync v2 已停止运行期在线覆盖，只在后台 isolate 生成同卷 selected-only candidate + prepared receipt；main/gate 持有 business lease，经 operation-ahead forward/rollingBack、PID+token cold ack 和 terminal archive 收敛。macOS forward control v2 已完成 25/25、100 Runner phases、25 SIGKILL；committed terminal control v1 已完成 6/6、24 Runner phases、6 SIGKILL。ACK temp 丢失时 R3 重应用/轮换，ACK published 时 R3 零写归档，R4 最终零写验证；archive marker 保留到 run move+双 parent barrier 后，gate 可从 `archiving + completed` 续跑，修复 raw rename 后 admission 过早释放。仍未验证 pre-commit rollback、rolledBack terminal、显式 settings 部分态、raw/legacy marker durability、硬件断电、资源故障及 Android/iOS/Windows/Linux，因此不提前 Done |
+| P0-02 | overwrite staging restore | 无 | `进行中` | 运行期 durable prepare 不改 live；下次启动在业务放行前收敛为完整新 bundle 或经验证旧 bundle，并跨冷启动确认 settings | 既有提交 + 本里程碑提交 | DataSync v2 已停止运行期在线覆盖，只在后台 isolate 生成同卷 selected-only candidate + prepared receipt；main/gate 持有 business lease，经 operation-ahead forward/rollingBack、PID+token cold ack 和 terminal archive 收敛。macOS forward control v2 已完成 25/25、100 Runner phases、25 SIGKILL；committed terminal control v1 已完成 6/6、24 phases、6 SIGKILL；verified-origin rollback control v1 以 12+6 分段证据完成 18/18、72 phases、18 SIGKILL，包含 DB/四资源根/settings tombstone 与 `rollingBack/rolledBack` receipt temp/final。累计 196 phases/49 kills。仍未验证 rolledBack terminal、其余 rollback topology、raw/legacy marker durability、硬件断电、资源故障及 Android/iOS/Windows/Linux，因此不提前 Done |
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`、`6c3618b8`（安全门） | 所有 v2 bundle merge（含 settings-only）在冲突/凭据语义完成前显式拒绝且不修改目标；hash 去重、remap、report 和事务化 merge 尚未实现 |
@@ -264,8 +280,8 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec`、`6c3618b8` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验、round trip 与应用已知认证凭据排除已实现；五平台/大数据 profile 与 Zip64 尚未完成 |
-| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交 | overwrite 主链已实现 selected-only candidate、candidate/receipt 双向绑定、business lease、strict topology、append-only receipt、bounded previous、WAL normalization、operation-ahead forward/rollback、PID+token cold ack/archive 和 startup UI。macOS 已完成 25/25 forward 与 6/6 committed terminal 高层 SIGKILL，共 124 Runner phases/31 kills；archive admission raw-rename 缺陷已修复。仍未完成 pre-commit rollback、rolledBack terminal、raw/legacy marker durability 子窗口、硬件断电、资源故障与五平台验证；v2 merge 在 PD-09 完成前继续安全拒绝，不随 overwrite 路径提前 Done |
-| OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 JSON；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再生成 JSON；旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
+| OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交 | overwrite 主链已实现 selected-only candidate、candidate/receipt 双向绑定、business lease、strict topology、append-only receipt、bounded previous、WAL normalization、operation-ahead forward/rollback、PID+token cold ack/archive 和 startup UI。macOS 已完成 25/25 forward、6/6 committed terminal 与 18/18 verified-origin rollback 高层 SIGKILL，共 196 Runner phases/49 kills；rollback 为 12+6 分段证据，不记作一次未中断 full。仍未完成 rolledBack terminal、其余 rollback topology、raw/legacy marker durability 子窗口、硬件断电、资源故障与五平台验证；v2 merge 在 PD-09 完成前继续安全拒绝，不随 overwrite 路径提前 Done |
+| OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 `chats.json`；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再用 JSON 承载聊天主数据；manifest/settings 仍为 JSON，旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `未开始` | current branch/total usage 定义和查询均明确 | — | — |
 | OPS-06 | Assets FK、尺寸、缩略图、延迟 GC | MSG-02、TL-06 | `未开始` | 删除消息不扫全库；资源 hash/reference 可验证 | — | — |
@@ -300,7 +316,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | Hive → SQLite v2 | 必须 | `未开始` | 需要所有 adapter fixture、orphan/坏数据场景 |
 | SQLite v1 → SQLite v2 | 必须 | `未开始` | PD-13 确认后视为主迁移路径 |
 | 旧 ZIP/chats.json → v2 | 必须 | `进行中` | 当前接受缺少 `chats.json` 的 legacy settings-only 包，并严格拒绝引用缺失；无 manifest 时无法区分 settings-only 与截断包，受损 Hive 迁移备份仍缺 Recovered/rejects adapter 和真实 fixture |
-| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | 已覆盖生成后自校验、hash/size/schema/count 拒绝、normalized candidate、运行期 prepare、下次启动完整 SQLite/settings/assets commit 或 rollback；macOS 25 个 forward 与 6 个 committed terminal 高层 durability failpoint 均可从真实 SIGKILL 恢复，pre-commit rollback/rolledBack、raw 子窗口、硬件断电和五平台尚未验证 |
+| 默认 SQLite snapshot ZIP → 当前应用 | 必须 | `进行中` | 已覆盖生成后自校验、hash/size/schema/count 拒绝、normalized candidate、运行期 prepare、下次启动完整 SQLite/settings/assets commit 或 rollback；macOS 25 个 forward、6 个 committed terminal 与 18 个 verified-origin rollback 高层 durability failpoint 均可从真实 SIGKILL 恢复，rolledBack terminal、其余 rollback topology、raw 子窗口、硬件断电和五平台尚未验证 |
 | 迁移页 JSON 灾难备份 | 必须 | `进行中` | `900811ec` 回归锁定仍含 `chats.json` 且不含 manifest/SQLite payload；受损 fixture、分批扫描和 OOM profile 尚未完成 |
 | Chatbox/Cherry import → v2 | 必须 | `未开始` | staging + ID conflict policy |
 | v2 full backup round trip | 必须 | `进行中` | 当前 SQLite v1 conversation/message/artifact/assets round trip 已覆盖；未来 branch/run/parts schema 尚未实现 |
@@ -336,11 +352,11 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | Migration building kill | live 旧库完整 | candidate 未提交工作 | `未开始` | — |
 | Candidate validation failure | live 旧库完整 | 无用户数据损失 | `进行中` | `22044e46` 已覆盖 descriptor/manifest 篡改、非 canonical path、settings 超限、非法 SQLite、sidecar、精确拓扑/逐项 hash，并保留 live；尚无磁盘满、目录 fsync 或 kill 验证 |
 | Checkpoint/close/fsync kill | live 旧库完整 | candidate 可丢弃/重试 | `进行中` | macOS 已在 live DB normalization 的最终 durability barrier 后执行真实 SIGKILL 并恢复；checkpoint/close 各子步骤、`renameAndSync` 内部 raw rename/fsync 窗口、硬件断电和其他平台仍未覆盖 |
-| live→previous 后 kill | 启动按 receipt 恢复 previous 或继续安装 candidate | 无半库 | `进行中` | macOS 独立 case 已覆盖 previous settings/manifest 发布、live DB+upload/images/avatars/fonts→`previous.pending`、`previous.pending`→`previous` 和 `oldRenamed` receipt temp/final；每点 SIGKILL 后均由新 Runner 前向收敛。rollback、raw rename/fsync 子步骤与其他平台仍待验证 |
-| candidate→live 后首次启动 kill | 校验 new 或回 previous | 尚未提交的 v2 尾部 | `进行中` | macOS 独立 case 已覆盖 settings 部分态、candidate DB+四资源根安装，以及 `newInstalled/verified/committed` receipt temp/final；terminal 矩阵又覆盖 cold ACK temp/publish 与 archive 四点。pre-commit rollback、raw durability 子步骤与其他平台仍待覆盖 |
+| live→previous 后 kill | 启动按 receipt 恢复 previous 或继续安装 candidate | 无半库 | `进行中` | macOS forward case 已覆盖 previous settings/manifest 发布、live DB+upload/images/avatars/fonts→`previous.pending`、`previous.pending`→`previous` 和 `oldRenamed` receipt temp/final；verified-origin rollback 又覆盖旧 DB/四资源根从 previous 恢复 live、previous/database parent barrier 与旧 settings 恢复。missing/empty/unselected previous、raw rename/fsync 子步骤与其他平台仍待验证 |
+| candidate→live 后首次启动 kill | 校验 new 或回 previous | 尚未提交的 v2 尾部 | `进行中` | macOS forward case 已覆盖 settings 部分态、candidate DB+四资源根安装，以及 `newInstalled/verified/committed` receipt temp/final；verified-origin rollback 覆盖新 DB/四资源根退回 candidate、target-only tombstone 删除及 `rollingBack/rolledBack` receipt temp/final；terminal 矩阵另覆盖 committed/target cold ACK 与 archive 六点。rolledBack terminal、raw durability 子步骤与其他平台仍待覆盖 |
 | v2 已写新消息后代码回滚 | 使用 v2-compatible rollback | 最多一个未 checkpoint stream 尾部 | `未开始` | — |
-| Restore 任一阶段 kill | 破坏性切换前旧 live 不变；开始切换后 gate 收敛到完整 new 或经验证 old，绝不放行混合 | 无已放行业务写入 | `进行中` | macOS forward 25/25 与 committed terminal 6/6 强类型高层 failpoint 已完成真实 SIGKILL；同进程测试另覆盖 rollback 和 raw terminal archive 可见拓扑。尚不能外推到 pre-commit rollback/rolledBack terminal、raw rename/fsync 子步骤、硬件断电或其他平台 |
-| terminal cold-ack/archive kill | active admission 保持到跨进程 settings readback 与 archive barriers 完成 | 无已放行业务写入；evidence 保留 | `进行中` | committed/target 六点 6/6：ACK temp/publish、completed root、archiving marker、terminal run archived、marker durable removal。ACK temp case 的 R3 必须重应用/轮换；ACK published case 的 R3 必须零写归档；R4 始终零写验证最终业务就绪与 archived evidence。显式 settings 部分态、rolledBack/before、legacy marker create/write、raw delete/rename/fsync 与断电未覆盖 |
+| Restore 任一阶段 kill | 破坏性切换前旧 live 不变；开始切换后 gate 收敛到完整 new 或经验证 old，绝不放行混合 | 无已放行业务写入 | `进行中` | macOS forward 25/25、committed terminal 6/6 与 verified-origin rollback 18/18 强类型高层 failpoint 已完成真实 SIGKILL；rollback 是 12+6 分段证据。尚不能外推到 rolledBack terminal 六点、其他 rollback 起点/topology、raw rename/fsync 子步骤、硬件断电或其他平台 |
+| terminal cold-ack/archive kill | active admission 保持到跨进程 settings readback 与 archive barriers 完成 | 无已放行业务写入；evidence 保留 | `进行中` | committed/target 六点 6/6：ACK temp/publish、completed root、archiving marker、terminal run archived、marker durable removal。ACK temp case 的 R3 必须重应用/轮换；ACK published case 的 R3 必须零写归档；R4 始终零写验证最终业务就绪与 archived evidence。terminal cold-readback/repair 的显式 before/target 部分态、`rolledBack/before` terminal 六点、legacy marker create/write、raw delete/rename/fsync 与断电未覆盖 |
 | Streaming checkpoint 前 kill | 最后已提交 checkpoint 可读，run interrupted | 一个 checkpoint 窗口尾部 | `未开始` | — |
 | Final transaction 中 kill | 完整 streaming checkpoint 或完整 final | 无半 final 状态 | `未开始` | — |
 | Cancel/onDone/late chunk 竞态 | 唯一终态且不可回退 | 无已提交内容倒退 | `未开始` | — |
@@ -350,7 +366,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | DB/WAL/SHM 损坏/缺失 | 进入只读恢复/诊断 | 不覆盖现场 | `未开始` | — |
 | `user_version` 高于二进制支持版本 | 只读/拒绝打开并要求升级 | 不执行任何写入或降级 | `未开始` | — |
 | ZIP/manifest/hash 损坏 | 拒绝恢复，live 不变 | staging | `进行中` | DataSync/candidate/receipt/previous 测试覆盖 ZIP 预算、manifest/hash/schema/count/topology 篡改；只读恢复 UI 尚未实现 |
-| Receipt 损坏/缺失/sequence 回退 | 进入只读恢复，不按文件名猜测 | 不开放混合 bundle | `进行中` | checksum/hash-chain 损坏、缺口、超限、非法状态与链接目录继续 fail-closed；macOS 已真实 kill 覆盖四个前向 receipt 的 temp/final 边界，并修复 unpublished later-temp 仲裁。terminal archive 六点不新增 receipt；只读恢复入口、`rollingBack/rolledBack` receipt temp/final publication kill 与多 run 诊断仍未完成 |
+| Receipt 损坏/缺失/sequence 回退 | 进入只读恢复，不按文件名猜测 | 不开放混合 bundle | `进行中` | checksum/hash-chain 损坏、缺口、超限、非法状态与链接目录继续 fail-closed；macOS 已真实 kill 覆盖四个前向 receipt 及 `rollingBack/rolledBack` 的 temp/final 边界，并修复 unpublished later-temp 仲裁；`rollingBack` temp case 还要求 canonical verified 重试同一失败后收敛。terminal archive 六点不新增 receipt；只读恢复入口、legacy marker create/write 与多 run 诊断仍未完成 |
 | 多组 previous/candidate 同时存在 | 根据有效 manifest/receipt 诊断，无法唯一确定则阻塞 | 不自动删除任何候选 | `未开始` | — |
 | Duplicate ID/order/version | 确定性报告/隔离，不覆盖 | rejects 中的数据 | `未开始` | — |
 | Missing parent/selection | 阻止 active graph 切换 | rejects 中的数据 | `未开始` | — |
@@ -367,7 +383,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | Online Backup API | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | WAL/FULL 实际 PRAGMA | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | File close/rename/fsync | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| Kill/restart recovery | 未开始 | 未开始 | 进行中：25/25 forward + committed terminal 6/6 高层 failpoint SIGKILL 通过；rollback/rolledBack/raw 子窗口未覆盖 | 未开始 | 未开始 |
+| Kill/restart recovery | 未开始 | 未开始 | 进行中：25/25 forward + committed terminal 6/6 + verified-origin rollback 18/18 高层 failpoint SIGKILL 通过；rolledBack terminal、其余 rollback topology 与 raw 子窗口未覆盖 | 未开始 | 未开始 |
 | Timeline profile/anchor | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Secure storage/backup boundary | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Build/package ABI | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
@@ -388,7 +404,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 | R-08 | Cache 只限制条目不限制字节再次 OOM | 高 | RSS/cache bytes telemetry | 所有 cache 字节 LRU | `未开始` |
 | R-09 | 普通备份继续泄露秘密 | 高 | ZIP 内容审计 | P0-08 + OPS-07 | `进行中`：应用已知认证凭据已排除；自由文本与 secure storage 边界待 OPS-07 |
 | R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿 | `进行中` |
-| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + business lease + 启动恢复 | `进行中`：v2 DataSync 已移除运行期在线覆盖；lease 排除旧/第二业务进程，unpublished/forward/rollingBack/terminal 主链已联通。macOS 25/25 forward 与 committed terminal 6/6 高层 failpoint 已在真实 SIGKILL 后收敛；已修复 later receipt temp 仲裁及 raw terminal run rename 后 admission 过早释放。pre-commit rollback、rolledBack terminal、raw/legacy marker durability、硬件断电、五平台与升级时旧版本进程退出策略仍开放 |
+| R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + business lease + 启动恢复 | `进行中`：v2 DataSync 已移除运行期在线覆盖；lease 排除旧/第二业务进程，unpublished/forward/rollingBack/terminal 主链已联通。macOS 25/25 forward、committed terminal 6/6 与 verified-origin rollback 18/18 高层 failpoint 已在真实 SIGKILL 后收敛；已修复 later receipt temp 仲裁及 raw terminal run rename 后 admission 过早释放。rolledBack terminal、其余 rollback topology、raw/legacy marker durability、硬件断电、五平台与升级时旧版本进程退出策略仍开放 |
 | R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
 | R-13 | 旧 `chats.json`/迁移 JSON 全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB legacy fixture 的 RSS/frame profile | 新备份改 SQLite snapshot；legacy adapter 使用 chunk reader 与增量导入 | `进行中` |
 | R-14 | ZIP32 与恢复展开边界导致超大备份失败或磁盘耗尽 | 中 | >4GiB compressed、8GiB 单项、16GiB 总展开 fixture | 当前显式拒绝超限并在写出时计数中止；后续评估 Zip64 和按可用磁盘预算 | `进行中` |
@@ -411,7 +427,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
-1. 继续收尾 `P0-02`：增加 pre-commit rollback/rolledBack 真实 SIGKILL；为 raw rename→双 parent barrier、fsync→F_FULLFSYNC、marker delete→workspace barrier 和 legacy archiving marker temp→canonical 建立更低层注入/仲裁；补磁盘满、只读目录、锁库，并在 Android/iOS/Windows/Linux runner 验证 durability ABI/rename。
+1. 继续收尾 `P0-02`：为 `rolledBack/before` terminal 六点、其他 rollback 起点及 missing/empty/unselected previous topology 增加真实 SIGKILL；为 raw rename→双 parent barrier、fsync→F_FULLFSYNC、marker delete→workspace barrier 和 legacy archiving marker temp→canonical 建立更低层注入/仲裁；补磁盘满、只读目录、锁库，并在 Android/iOS/Windows/Linux runner 验证 durability ABI/rename。
 2. 按 PD-10/12 设计 completed evidence 的成功启动 acknowledgement、保留周期、脱敏诊断与可恢复清理；在此之前保留受限 evidence，不无记录删除 previous。
 3. 启动 `P0-03` 单 writer latest-wins checkpoint + final barrier；同时完成 PD-13 调查和 P0-09 fixture/性能基线。
 4. 保留旧 `chats.json` 只读 adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 做 OOM/坏数据回归。`P0-05` v2 merge 继续安全拒绝，待 PD-09 后单独实现 hash 去重、remap 与 report。
@@ -420,6 +436,7 @@ dart run tool/run_restore_process_harness.dart --scenario=terminal
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-10 | 新增独立 rollback control v1、18 个 verified-origin 高层故障点与严格 host/oracle：覆盖 `rollingBack/rolledBack` receipt temp/final、DB 与四资源根反向移动、previous/database parent barrier、settings first/secret/target-only tombstone；每点以真实 Runner PID 执行外部 SIGKILL，R3 mutation>0 且到达 `rolledBack/before` ACK，R4 settings 零写归档。首轮被交互中断前有 12 个明确 PASS，再从第 13 点完整续跑 6/6，合计 72 Runner phases/18 kills，但不宣称一次未中断 full。夹具 v3 增加 target-only 键后，前向 smoke 首次复验暴露并修正测试 oracle 的矛盾断言，随后 forward smoke 与 terminal `coldAckPublished` exact case 均通过。本里程碑没有新增 `lib/` 生产改动；raw durability、其他 rollback topology、rolledBack terminal、硬件断电与其他平台仍开放 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-09 | 新增独立 terminal control v1 与六个 committed/target 高层 cold-ack/archive failpoint；一次完整 macOS 运行取得 6/6、24 Runner phases、6 次外部 SIGKILL，oracle 收紧后两个 ACK exact case 再次通过：temp 要求 R3 重应用/轮换，published 要求 R3 零写归档，R4 始终零写验证。修复 terminal run raw rename 后 admission 过早释放：operation-ahead archiving marker 保留到 move+双 parent barrier，gate 可从 completed evidence 续跑，并兼容 legacy markerless active terminal。未宣称显式 settings 部分态、rollback/rolledBack、raw durability、legacy marker create/write、硬件断电或其他平台 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-09 | 将 macOS RestoreHarness 升级为 control v2 的 25 个强类型前向 failpoint，提供 smoke/core/full、`--failpoint`/`--from`；host 每次生成一个 matrix run，同一 matrix run 下每 case 独立 scenario/prefix/AppData/restore run，以四个真实 Runner 完成 setup、外部 SIGKILL、前向恢复、cold finalize。跨 core 分段与 full-only targeted 运行取得 25/25、100 个成功 Runner phase、25 次 SIGKILL，support 13/13；实测修复 unpublished 仲裁误拒 later receipt temp+final receipt，无 final receipt 的 later temp 保持 fail-closed。该前向里程碑当时未宣称单次 full、硬件断电、raw rename/fsync、rollback、cold-ack/archive kill 或其他平台 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-09 | 增加隔离正式数据的 macOS RestoreHarness bundle、四阶段真实 Runner 协议和独立宿主；在 candidate SQLite 耐久替换 live、`newInstalled` receipt 前复验 executable/PID/lstart 并执行外部 SIGKILL，再由两个新 PID 完成原生 SharedPreferences 读回、前向收敛、PID+token cold ack、settings 零写入归档；严格回读 DB/四资源根/previous/receipt/WAL/owner，以 phase baseline 安全清理未知 Runner，并用宿主单实例锁阻止 Flutter build/temp 串用 | P0-02、OPS-02 | 本里程碑提交 | Codex |

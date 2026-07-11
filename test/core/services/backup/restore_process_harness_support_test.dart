@@ -537,6 +537,8 @@ void main() {
       secondaryNewPreferenceValue: 'secondary-new',
       secretPreferenceKey: 'restore_harness_secret_$_scenarioId',
       secretOldPreferenceValue: 'secret-old',
+      targetOnlyPreferenceKey: 'restore_harness_target_only_$_scenarioId',
+      targetOnlyNewPreferenceValue: 'target-only-new',
       oldConversationId: 'old-$_scenarioId',
       newConversationId: 'new-$_scenarioId',
     );

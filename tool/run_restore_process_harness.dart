@@ -53,31 +53,42 @@ enum _MatrixTier {
   }
 }
 
-enum _MatrixScenario { forward, terminal }
+enum _MatrixScenario { forward, terminal, rollback }
 
 final class _MatrixFailpoint {
   const _MatrixFailpoint.forward(RestoreProcessFailpoint value)
     : forward = value,
       terminal = null,
+      rollback = null,
       scenario = _MatrixScenario.forward;
 
   const _MatrixFailpoint.terminal(RestoreTerminalProcessFailpoint value)
     : forward = null,
       terminal = value,
+      rollback = null,
       scenario = _MatrixScenario.terminal;
+
+  const _MatrixFailpoint.rollback(RestoreRollbackProcessFailpoint value)
+    : forward = null,
+      terminal = null,
+      rollback = value,
+      scenario = _MatrixScenario.rollback;
 
   final _MatrixScenario scenario;
   final RestoreProcessFailpoint? forward;
   final RestoreTerminalProcessFailpoint? terminal;
+  final RestoreRollbackProcessFailpoint? rollback;
 
   String get name => switch (scenario) {
     _MatrixScenario.forward => forward!.name,
     _MatrixScenario.terminal => terminal!.name,
+    _MatrixScenario.rollback => rollback!.name,
   };
 
   String get scenarioName => switch (scenario) {
     _MatrixScenario.forward => restoreHarnessScenario,
     _MatrixScenario.terminal => restoreTerminalHarnessScenario,
+    _MatrixScenario.rollback => restoreRollbackHarnessScenario,
   };
 }
 
@@ -85,35 +96,59 @@ final class _MatrixSelection {
   const _MatrixSelection.forward({
     required this.tier,
     this.singleFailpoint,
-    this.startAt,
-  }) : scenario = _MatrixScenario.forward;
+    this.forwardStartAt,
+  }) : scenario = _MatrixScenario.forward,
+       rollbackStartAt = null;
 
   const _MatrixSelection.terminal({this.singleFailpoint})
     : scenario = _MatrixScenario.terminal,
       tier = _MatrixTier.full,
-      startAt = null;
+      forwardStartAt = null,
+      rollbackStartAt = null;
+
+  const _MatrixSelection.rollback({this.singleFailpoint, this.rollbackStartAt})
+    : scenario = _MatrixScenario.rollback,
+      tier = _MatrixTier.full,
+      forwardStartAt = null;
 
   final _MatrixScenario scenario;
   final _MatrixTier tier;
   final _MatrixFailpoint? singleFailpoint;
-  final RestoreProcessFailpoint? startAt;
+  final RestoreProcessFailpoint? forwardStartAt;
+  final RestoreRollbackProcessFailpoint? rollbackStartAt;
 
   List<_MatrixFailpoint> get failpoints {
     if (singleFailpoint != null) return [singleFailpoint!];
-    if (scenario == _MatrixScenario.terminal) {
-      return [
-        for (final failpoint in RestoreTerminalProcessFailpoint.values)
-          _MatrixFailpoint.terminal(failpoint),
-      ];
+    switch (scenario) {
+      case _MatrixScenario.terminal:
+        return [
+          for (final failpoint in RestoreTerminalProcessFailpoint.values)
+            _MatrixFailpoint.terminal(failpoint),
+        ];
+      case _MatrixScenario.rollback:
+        final all = RestoreRollbackProcessFailpoint.values;
+        final start = rollbackStartAt;
+        final index = start == null ? 0 : all.indexOf(start);
+        if (index < 0) {
+          throw StateError(
+            'restore_rollback_harness_matrix_start:${start!.name}',
+          );
+        }
+        return List.unmodifiable([
+          for (final failpoint in all.sublist(index))
+            _MatrixFailpoint.rollback(failpoint),
+        ]);
+      case _MatrixScenario.forward:
+        break;
     }
     final all = tier.failpoints;
-    if (startAt == null) {
+    if (forwardStartAt == null) {
       return [for (final failpoint in all) _MatrixFailpoint.forward(failpoint)];
     }
-    final index = all.indexOf(startAt!);
+    final index = all.indexOf(forwardStartAt!);
     if (index < 0) {
       throw StateError(
-        'restore_harness_matrix_start_not_in_tier:${startAt!.name}',
+        'restore_harness_matrix_start_not_in_tier:${forwardStartAt!.name}',
       );
     }
     return List.unmodifiable([
@@ -126,13 +161,18 @@ final class _MatrixSelection {
       ? 'failpoint=${singleFailpoint!.name}'
       : scenario == _MatrixScenario.terminal
       ? 'terminal'
-      : startAt == null
+      : scenario == _MatrixScenario.rollback
+      ? rollbackStartAt == null
+            ? 'rollback'
+            : 'rollback-from=${rollbackStartAt!.name}'
+      : forwardStartAt == null
       ? tier.name
-      : '${tier.name}-from=${startAt!.name}';
+      : '${tier.name}-from=${forwardStartAt!.name}';
 
   String get scenarioName => switch (scenario) {
     _MatrixScenario.forward => restoreHarnessScenario,
     _MatrixScenario.terminal => restoreTerminalHarnessScenario,
+    _MatrixScenario.rollback => restoreRollbackHarnessScenario,
   };
 
   static _MatrixSelection parse(List<String> arguments) {
@@ -142,31 +182,59 @@ final class _MatrixSelection {
     if (arguments.length == 1 && arguments.single == '--scenario=terminal') {
       return const _MatrixSelection.terminal();
     }
+    if (arguments.length == 1 && arguments.single == '--scenario=rollback') {
+      return const _MatrixSelection.rollback();
+    }
+    if (arguments.length == 2 && arguments.contains('--scenario=rollback')) {
+      final fromArguments = arguments
+          .where((argument) => argument.startsWith('--from='))
+          .toList(growable: false);
+      if (fromArguments.length != 1) {
+        throw ArgumentError(
+          'rollback scenario accepts exactly one --from=<name>',
+        );
+      }
+      return _MatrixSelection.rollback(
+        rollbackStartAt: _parseRollbackFailpoint(
+          fromArguments.single.substring('--from='.length),
+        ),
+      );
+    }
     if (arguments.length == 1 && arguments.single.startsWith('--failpoint=')) {
       final name = arguments.single.substring('--failpoint='.length);
       final forward = _tryParseForwardFailpoint(name);
       final terminal = _tryParseTerminalFailpoint(name);
-      if ((forward == null) == (terminal == null)) {
+      final rollback = _tryParseRollbackFailpoint(name);
+      final matches = <_MatrixFailpoint>[
+        if (forward != null) _MatrixFailpoint.forward(forward),
+        if (terminal != null) _MatrixFailpoint.terminal(terminal),
+        if (rollback != null) _MatrixFailpoint.rollback(rollback),
+      ];
+      if (matches.length != 1) {
         throw ArgumentError.value(
           name,
           'failpoint',
           'unknown or ambiguous restore process failpoint',
         );
       }
-      return forward != null
-          ? _MatrixSelection.forward(
-              tier: _MatrixTier.full,
-              singleFailpoint: _MatrixFailpoint.forward(forward),
-            )
-          : _MatrixSelection.terminal(
-              singleFailpoint: _MatrixFailpoint.terminal(terminal!),
-            );
+      return switch (matches.single.scenario) {
+        _MatrixScenario.forward => _MatrixSelection.forward(
+          tier: _MatrixTier.full,
+          singleFailpoint: matches.single,
+        ),
+        _MatrixScenario.terminal => _MatrixSelection.terminal(
+          singleFailpoint: matches.single,
+        ),
+        _MatrixScenario.rollback => _MatrixSelection.rollback(
+          singleFailpoint: matches.single,
+        ),
+      };
     }
     if (arguments.length > 2 || arguments.toSet().length != arguments.length) {
       throw ArgumentError(
         'run_restore_process_harness accepts '
         '[--tier=smoke|core|full] [--from=<name>] '
-        'or --scenario=terminal or --failpoint=<name>',
+        'or --scenario=terminal|rollback or --failpoint=<unique-name>',
       );
     }
     _MatrixTier? tier;
@@ -184,7 +252,7 @@ final class _MatrixSelection {
     }
     return _MatrixSelection.forward(
       tier: tier ?? _MatrixTier.core,
-      startAt: startAt,
+      forwardStartAt: startAt,
     );
   }
 
@@ -211,6 +279,27 @@ final class _MatrixSelection {
     String name,
   ) {
     for (final candidate in RestoreTerminalProcessFailpoint.values) {
+      if (candidate.name == name) return candidate;
+    }
+    return null;
+  }
+
+  static RestoreRollbackProcessFailpoint _parseRollbackFailpoint(String name) {
+    final failpoint = _tryParseRollbackFailpoint(name);
+    if (failpoint == null) {
+      throw ArgumentError.value(
+        name,
+        'failpoint',
+        'unknown rollback restore process failpoint',
+      );
+    }
+    return failpoint;
+  }
+
+  static RestoreRollbackProcessFailpoint? _tryParseRollbackFailpoint(
+    String name,
+  ) {
+    for (final candidate in RestoreRollbackProcessFailpoint.values) {
       if (candidate.name == name) return candidate;
     }
     return null;
@@ -432,6 +521,11 @@ final class _RestoreProcessHarnessHost {
       scenarioId: scenarioId,
       failpoint: failpoint.terminal!,
     ),
+    _MatrixScenario.rollback => restoreRollbackProcessPreferencesPrefix(
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      failpoint: failpoint.rollback!,
+    ),
   };
 
   Future<void> releaseHostLock() async {
@@ -596,6 +690,8 @@ final class _RestoreProcessHarnessHost {
         await _runForwardCasePhases();
       case _MatrixScenario.terminal:
         await _runTerminalCasePhases();
+      case _MatrixScenario.rollback:
+        await _runRollbackCasePhases();
     }
   }
 
@@ -759,6 +855,60 @@ final class _RestoreProcessHarnessHost {
     );
   }
 
+  Future<void> _runRollbackCasePhases() async {
+    final setup = await _runNormalPhase(
+      await _writeRollbackControl(RestoreRollbackProcessHarnessPhase.setup),
+      _validateSetupEvent,
+    );
+    final runId = setup.requireIdentifier('runId');
+
+    final rollbackKill = await _runKillPhase(
+      await _writeRollbackControl(
+        RestoreRollbackProcessHarnessPhase.triggerRollbackKill,
+      ),
+      (event, control, process) => _validateRollbackKillEvent(
+        event,
+        control as RestoreRollbackProcessHarnessControl,
+        process,
+        runId: runId,
+      ),
+    );
+    final rollbackKillLease = rollbackKill.requireIdentifier('leaseInstanceId');
+
+    final recovery = await _runNormalPhase(
+      await _writeRollbackControl(
+        RestoreRollbackProcessHarnessPhase.recoverToColdAck,
+      ),
+      (event, control, process) => _validateRollbackRecoveryEvent(
+        event,
+        control as RestoreRollbackProcessHarnessControl,
+        process,
+        runId: runId,
+        rollbackKillLeaseInstanceId: rollbackKillLease,
+      ),
+    );
+    final recoveryLease = recovery.requireIdentifier('leaseInstanceId');
+    final ackProcessId = recovery.requireProcessId('ackProcessId');
+    final ackLeaseInstanceId = recovery.requireIdentifier('ackLeaseInstanceId');
+    final coldAckChecksum = recovery.requireSha256('coldAckChecksum');
+
+    await _runNormalPhase(
+      await _writeRollbackControl(
+        RestoreRollbackProcessHarnessPhase.verifyBusinessReady,
+      ),
+      (event, control, process) => _validateRollbackVerifyEvent(
+        event,
+        control as RestoreRollbackProcessHarnessControl,
+        process,
+        runId: runId,
+        expectedAckProcessId: ackProcessId,
+        expectedAckLeaseInstanceId: ackLeaseInstanceId,
+        expectedAckChecksum: coldAckChecksum,
+        priorLeaseInstanceIds: {rollbackKillLease, recoveryLease},
+      ),
+    );
+  }
+
   bool _isColdAckFailpoint(RestoreTerminalProcessFailpoint value) =>
       value == RestoreTerminalProcessFailpoint.coldAckTempDurable ||
       value == RestoreTerminalProcessFailpoint.coldAckPublished;
@@ -801,12 +951,22 @@ final class _RestoreProcessHarnessHost {
 
     final outerExitCode = await process.waitForExit(_killExitTimeout);
     if (outerExitCode == 0) {
-      if (control is RestoreProcessHarnessControl) {
-        throw StateError('restore_harness_cutover_outer_succeeded');
+      switch (control) {
+        case RestoreProcessHarnessControl():
+          throw StateError('restore_harness_cutover_outer_succeeded');
+        case RestoreTerminalProcessHarnessControl():
+          throw StateError(
+            'restore_terminal_harness_kill_outer_succeeded:'
+            '${control.phaseName}',
+          );
+        case RestoreRollbackProcessHarnessControl():
+          throw StateError(
+            'restore_rollback_harness_kill_outer_succeeded:'
+            '${control.phaseName}',
+          );
+        default:
+          throw StateError('restore_harness_kill_control_runtime_type');
       }
-      throw StateError(
-        'restore_terminal_harness_kill_outer_succeeded:${control.phaseName}',
-      );
     }
     return event;
   }
@@ -835,6 +995,21 @@ final class _RestoreProcessHarnessHost {
       scenarioId: scenarioId,
       phase: phase,
       failpoint: failpoint.terminal!,
+      scenarioRoot: scenarioRoot.path,
+      preferencesPrefix: _preferencesPrefix,
+    );
+    return _persistControl(control);
+  }
+
+  Future<RestoreRollbackProcessHarnessControl> _writeRollbackControl(
+    RestoreRollbackProcessHarnessPhase phase,
+  ) async {
+    final control = RestoreRollbackProcessHarnessControl(
+      generation: phase.index + 1,
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      phase: phase,
+      failpoint: failpoint.rollback!,
       scenarioRoot: scenarioRoot.path,
       preferencesPrefix: _preferencesPrefix,
     );
@@ -1316,6 +1491,334 @@ final class _RestoreProcessHarnessHost {
     }
     if (event.requireInt('settingsMutationAttempts') != 0) {
       throw StateError('restore_terminal_harness_verify_settings_mutation');
+    }
+  }
+
+  void _validateRollbackKillEvent(
+    _HarnessEvent event,
+    RestoreRollbackProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    final observationKeys = switch (control.failpoint) {
+      RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable ||
+      RestoreRollbackProcessFailpoint.rollingBackReceiptPublished ||
+      RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable ||
+      RestoreRollbackProcessFailpoint.rolledBackReceiptPublished => const {
+        'operationKind',
+        'receiptSequence',
+        'receiptState',
+        'temporaryPath',
+        'targetPath',
+      },
+      RestoreRollbackProcessFailpoint.newDatabaseReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousUploadRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousImagesRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousFontsRestoredToLive => const {
+        'operationKind',
+        'sourcePath',
+        'targetPath',
+        'sourceKind',
+      },
+      RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable =>
+        const {'operationKind', 'path', 'fullBarrier'},
+      RestoreRollbackProcessFailpoint.settingsFirstRestored ||
+      RestoreRollbackProcessFailpoint.settingsSecretRestored ||
+      RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved => const {
+        'operationKind',
+        'preferenceKey',
+        'valueType',
+      },
+    };
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'rollbackOriginReceiptState',
+        'triggerKind',
+        'triggerPreferenceKey',
+        'triggerFailureCount',
+        'observedReceiptState',
+        ...observationKeys,
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireIdentifier('leaseInstanceId');
+    event.requireExactString('rollbackOriginReceiptState', 'verified');
+    event.requireExactString('triggerKind', 'repeatedTargetSetRejected');
+    event.requireExactString(
+      'triggerPreferenceKey',
+      'restore_harness_${control.scenarioId}_primary',
+    );
+    if (event.requireInt('triggerFailureCount') != 1) {
+      throw StateError('restore_rollback_harness_trigger_failure_count');
+    }
+    event.requireExactString(
+      'observedReceiptState',
+      _expectedRollbackObservedReceiptState(control.failpoint),
+    );
+    _validateRollbackObservation(event, control, runId: runId);
+  }
+
+  String _expectedRollbackObservedReceiptState(
+    RestoreRollbackProcessFailpoint failpoint,
+  ) {
+    return switch (failpoint) {
+      RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable =>
+        'verified',
+      RestoreRollbackProcessFailpoint.rollingBackReceiptPublished ||
+      RestoreRollbackProcessFailpoint.newDatabaseReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive ||
+      RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable ||
+      RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousUploadRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousImagesRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive ||
+      RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousFontsRestoredToLive ||
+      RestoreRollbackProcessFailpoint.settingsFirstRestored ||
+      RestoreRollbackProcessFailpoint.settingsSecretRestored ||
+      RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved ||
+      RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable =>
+        'rollingBack',
+      RestoreRollbackProcessFailpoint.rolledBackReceiptPublished =>
+        'rolledBack',
+    };
+  }
+
+  void _validateRollbackObservation(
+    _HarnessEvent event,
+    RestoreRollbackProcessHarnessControl control, {
+    required String runId,
+  }) {
+    final appData = p.normalize(p.absolute(control.appDataDirectory.path));
+    final runDirectory = p.join(appData, '.kelivo_restore', 'run_$runId');
+    final candidate = p.join(runDirectory, 'candidate');
+    final previous = p.join(runDirectory, 'previous');
+    final receipts = p.join(runDirectory, 'receipts');
+    const databaseFileName = 'kelivo.sqlite';
+
+    switch (control.failpoint) {
+      case RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 5,
+          state: 'rollingBack',
+          published: false,
+        );
+      case RestoreRollbackProcessFailpoint.rollingBackReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 5,
+          state: 'rollingBack',
+          published: true,
+        );
+      case RestoreRollbackProcessFailpoint.newDatabaseReturnedToCandidate:
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, databaseFileName),
+          targetPath: p.join(candidate, 'database', databaseFileName),
+          sourceKind: 'file',
+        );
+      case RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive:
+        event.requireRenameObservation(
+          sourcePath: p.join(previous, 'database', databaseFileName),
+          targetPath: p.join(appData, databaseFileName),
+          sourceKind: 'file',
+        );
+      case RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable:
+        event.requireSyncObservation(
+          operationKind: 'directorySyncAfter',
+          path: previous,
+          fullBarrier: true,
+        );
+      case RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+          RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+          RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+          RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate:
+        final root = _rollbackAssetRoot(control.failpoint);
+        event.requireRenameObservation(
+          sourcePath: p.join(appData, root),
+          targetPath: p.join(candidate, root),
+          sourceKind: 'directory',
+        );
+      case RestoreRollbackProcessFailpoint.previousUploadRestoredToLive ||
+          RestoreRollbackProcessFailpoint.previousImagesRestoredToLive ||
+          RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive ||
+          RestoreRollbackProcessFailpoint.previousFontsRestoredToLive:
+        final root = _rollbackAssetRoot(control.failpoint);
+        event.requireRenameObservation(
+          sourcePath: p.join(previous, root),
+          targetPath: p.join(appData, root),
+          sourceKind: 'directory',
+        );
+      case RestoreRollbackProcessFailpoint.settingsFirstRestored:
+        event.requirePreferenceObservation(
+          operationKind: 'preferenceSetAfter',
+          preferenceKey: 'restore_harness_${control.scenarioId}_primary',
+          valueType: 'String',
+        );
+      case RestoreRollbackProcessFailpoint.settingsSecretRestored:
+        event.requirePreferenceObservation(
+          operationKind: 'preferenceSetAfter',
+          preferenceKey: 'restore_harness_${control.scenarioId}_secret_api_key',
+          valueType: 'String',
+        );
+      case RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved:
+        event.requirePreferenceObservation(
+          operationKind: 'preferenceRemoveAfter',
+          preferenceKey: 'restore_harness_${control.scenarioId}_target_only',
+          valueType: '',
+        );
+      case RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 6,
+          state: 'rolledBack',
+          published: false,
+        );
+      case RestoreRollbackProcessFailpoint.rolledBackReceiptPublished:
+        event.requireReceiptObservation(
+          receiptDirectory: receipts,
+          sequence: 6,
+          state: 'rolledBack',
+          published: true,
+        );
+    }
+  }
+
+  String _rollbackAssetRoot(RestoreRollbackProcessFailpoint failpoint) {
+    return switch (failpoint) {
+      RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousUploadRestoredToLive => 'upload',
+      RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousImagesRestoredToLive => 'images',
+      RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive =>
+        'avatars',
+      RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate ||
+      RestoreRollbackProcessFailpoint.previousFontsRestoredToLive => 'fonts',
+      _ => throw StateError(
+        'restore_rollback_harness_asset_failpoint:${failpoint.name}',
+      ),
+    };
+  }
+
+  void _validateRollbackRecoveryEvent(
+    _HarnessEvent event,
+    RestoreRollbackProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required String rollbackKillLeaseInstanceId,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'outcome',
+        'leaseInstanceId',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'ackExpected',
+        'terminalReceiptChecksum',
+        'coldAckChecksum',
+        'settingsMutationAttempts',
+        'triggerFailureCount',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'rolledBack');
+    event.requireExactString('outcome', 'coldRestartRequired');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == rollbackKillLeaseInstanceId) {
+      throw StateError('restore_rollback_harness_recovery_lease_reused');
+    }
+    if (event.requireProcessId('ackProcessId') != event.pid) {
+      throw StateError('restore_rollback_harness_recovery_ack_pid');
+    }
+    if (event.requireIdentifier('ackLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_rollback_harness_recovery_ack_lease');
+    }
+    event.requireExactString('ackExpected', 'before');
+    event.requireSha256('terminalReceiptChecksum');
+    event.requireSha256('coldAckChecksum');
+    if (event.requireInt('settingsMutationAttempts') < 1) {
+      throw StateError('restore_rollback_harness_recovery_settings_mutation');
+    }
+    final expectedTriggerFailures =
+        control.failpoint ==
+            RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable
+        ? 1
+        : 0;
+    if (event.requireInt('triggerFailureCount') != expectedTriggerFailures) {
+      throw StateError('restore_rollback_harness_recovery_trigger_count');
+    }
+  }
+
+  void _validateRollbackVerifyEvent(
+    _HarnessEvent event,
+    RestoreRollbackProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int expectedAckProcessId,
+    required String expectedAckLeaseInstanceId,
+    required String expectedAckChecksum,
+    required Set<String> priorLeaseInstanceIds,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'gateResult',
+        'archiveState',
+        'observedAckProcessId',
+        'observedAckLeaseInstanceId',
+        'observedAckChecksum',
+        'leaseInstanceId',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'rolledBack');
+    event.requireExactString('gateResult', 'rolledBack');
+    event.requireExactString('archiveState', 'archived');
+    if (event.requireProcessId('observedAckProcessId') !=
+        expectedAckProcessId) {
+      throw StateError('restore_rollback_harness_verify_ack_pid');
+    }
+    if (event.requireIdentifier('observedAckLeaseInstanceId') !=
+        expectedAckLeaseInstanceId) {
+      throw StateError('restore_rollback_harness_verify_ack_lease');
+    }
+    if (event.requireSha256('observedAckChecksum') != expectedAckChecksum) {
+      throw StateError('restore_rollback_harness_verify_ack_checksum');
+    }
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (priorLeaseInstanceIds.length != 2 ||
+        priorLeaseInstanceIds.contains(leaseInstanceId) ||
+        leaseInstanceId == expectedAckLeaseInstanceId) {
+      throw StateError('restore_rollback_harness_verify_lease_reused');
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError('restore_rollback_harness_verify_settings_mutation');
     }
   }
 
@@ -1854,6 +2357,8 @@ int _controlVersion(RestoreHarnessControl control) => switch (control) {
   RestoreProcessHarnessControl() => RestoreProcessHarnessControl.version,
   RestoreTerminalProcessHarnessControl() =>
     RestoreTerminalProcessHarnessControl.version,
+  RestoreRollbackProcessHarnessControl() =>
+    RestoreRollbackProcessHarnessControl.version,
   _ => throw StateError('restore_harness_control_runtime_type'),
 };
 

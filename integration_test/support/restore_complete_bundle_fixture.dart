@@ -30,11 +30,13 @@ final class RestoreCompleteBundleFixtureState {
     required this.secondaryNewPreferenceValue,
     required this.secretPreferenceKey,
     required this.secretOldPreferenceValue,
+    required this.targetOnlyPreferenceKey,
+    required this.targetOnlyNewPreferenceValue,
     required this.oldConversationId,
     required this.newConversationId,
   });
 
-  static const version = 2;
+  static const version = 3;
 
   final String matrixRunId;
   final String failpoint;
@@ -49,6 +51,8 @@ final class RestoreCompleteBundleFixtureState {
   final String secondaryNewPreferenceValue;
   final String secretPreferenceKey;
   final String secretOldPreferenceValue;
+  final String targetOnlyPreferenceKey;
+  final String targetOnlyNewPreferenceValue;
   final String oldConversationId;
   final String newConversationId;
 
@@ -68,6 +72,8 @@ final class RestoreCompleteBundleFixtureState {
     'secondaryNewPreferenceValue': secondaryNewPreferenceValue,
     'secretPreferenceKey': secretPreferenceKey,
     'secretOldPreferenceValue': secretOldPreferenceValue,
+    'targetOnlyPreferenceKey': targetOnlyPreferenceKey,
+    'targetOnlyNewPreferenceValue': targetOnlyNewPreferenceValue,
     'oldConversationId': oldConversationId,
     'newConversationId': newConversationId,
   };
@@ -91,6 +97,8 @@ final class RestoreCompleteBundleFixtureState {
       'secondaryNewPreferenceValue',
       'secretPreferenceKey',
       'secretOldPreferenceValue',
+      'targetOnlyPreferenceKey',
+      'targetOnlyNewPreferenceValue',
       'oldConversationId',
       'newConversationId',
     };
@@ -124,6 +132,9 @@ final class RestoreCompleteBundleFixtureState {
           json['secondaryNewPreferenceValue'] as String,
       secretPreferenceKey: json['secretPreferenceKey'] as String,
       secretOldPreferenceValue: json['secretOldPreferenceValue'] as String,
+      targetOnlyPreferenceKey: json['targetOnlyPreferenceKey'] as String,
+      targetOnlyNewPreferenceValue:
+          json['targetOnlyNewPreferenceValue'] as String,
       oldConversationId: json['oldConversationId'] as String,
       newConversationId: json['newConversationId'] as String,
     );
@@ -158,12 +169,17 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
       'restore_harness_${control.scenarioId}_secondary';
   final secretPreferenceKey =
       'restore_harness_${control.scenarioId}_secret_api_key';
+  final targetOnlyPreferenceKey =
+      'restore_harness_${control.scenarioId}_target_only';
   const primaryOldPreferenceValue = 'old-primary';
   const primaryNewPreferenceValue = 'new-primary';
   const secondaryOldPreferenceValue = 'old-secondary';
   const secondaryNewPreferenceValue = 'new-secondary';
   const secretOldPreferenceValue = 'old-secret';
-  if (primaryPreferenceKey.compareTo(secondaryPreferenceKey) >= 0) {
+  const targetOnlyNewPreferenceValue = 'new-target-only';
+  if (primaryPreferenceKey.compareTo(secondaryPreferenceKey) >= 0 ||
+      secondaryPreferenceKey.compareTo(secretPreferenceKey) >= 0 ||
+      secretPreferenceKey.compareTo(targetOnlyPreferenceKey) >= 0) {
     throw StateError('restore_harness_preference_order');
   }
   if (!BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite(
@@ -187,6 +203,7 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
     jsonEncode({
       primaryPreferenceKey: primaryNewPreferenceValue,
       secondaryPreferenceKey: secondaryNewPreferenceValue,
+      targetOnlyPreferenceKey: targetOnlyNewPreferenceValue,
     }),
     flush: true,
   );
@@ -261,6 +278,8 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
     secondaryNewPreferenceValue: secondaryNewPreferenceValue,
     secretPreferenceKey: secretPreferenceKey,
     secretOldPreferenceValue: secretOldPreferenceValue,
+    targetOnlyPreferenceKey: targetOnlyPreferenceKey,
+    targetOnlyNewPreferenceValue: targetOnlyNewPreferenceValue,
     oldConversationId: oldConversationId,
     newConversationId: newConversationId,
   );

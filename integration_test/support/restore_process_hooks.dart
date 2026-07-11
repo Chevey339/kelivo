@@ -223,6 +223,79 @@ final class RestoreExactDirectorySyncMatcher extends RestoreDurabilityMatcher {
   }
 }
 
+/// Matches the explicit full barrier after rollback has removed the empty
+/// previous database parent, but only after both the restored live database
+/// and returned candidate database are present.
+final class RestoreRollbackDatabaseParentSyncMatcher
+    extends RestoreDurabilityMatcher {
+  RestoreRollbackDatabaseParentSyncMatcher({
+    required String previousDirectoryPath,
+    required String previousDatabaseDirectoryPath,
+    required String candidateDatabasePath,
+    required String liveDatabasePath,
+  }) : previousDirectoryPath = _requireAbsoluteNormalized(
+         previousDirectoryPath,
+         'previousDirectoryPath',
+       ),
+       previousDatabaseDirectoryPath = _requireAbsoluteNormalized(
+         previousDatabaseDirectoryPath,
+         'previousDatabaseDirectoryPath',
+       ),
+       candidateDatabasePath = _requireAbsoluteNormalized(
+         candidateDatabasePath,
+         'candidateDatabasePath',
+       ),
+       liveDatabasePath = _requireAbsoluteNormalized(
+         liveDatabasePath,
+         'liveDatabasePath',
+       ) {
+    if (!p.equals(
+      p.dirname(this.previousDatabaseDirectoryPath),
+      this.previousDirectoryPath,
+    )) {
+      throw ArgumentError.value(
+        previousDatabaseDirectoryPath,
+        'previousDatabaseDirectoryPath',
+      );
+    }
+  }
+
+  final String previousDirectoryPath;
+  final String previousDatabaseDirectoryPath;
+  final String candidateDatabasePath;
+  final String liveDatabasePath;
+
+  @override
+  Future<RestoreDurabilityObservation?> matchDirectorySync({
+    required Directory directory,
+    required bool fullBarrier,
+  }) async {
+    if (!fullBarrier ||
+        !p.equals(
+          _normalizeObservedPath(directory.path),
+          previousDirectoryPath,
+        )) {
+      return null;
+    }
+    final types = await Future.wait([
+      FileSystemEntity.type(previousDirectoryPath, followLinks: false),
+      FileSystemEntity.type(previousDatabaseDirectoryPath, followLinks: false),
+      FileSystemEntity.type(candidateDatabasePath, followLinks: false),
+      FileSystemEntity.type(liveDatabasePath, followLinks: false),
+    ]);
+    if (types[0] != FileSystemEntityType.directory ||
+        types[1] != FileSystemEntityType.notFound ||
+        types[2] != FileSystemEntityType.file ||
+        types[3] != FileSystemEntityType.file) {
+      return null;
+    }
+    return RestoreDirectorySyncObservation(
+      path: previousDirectoryPath,
+      fullBarrier: fullBarrier,
+    );
+  }
+}
+
 final class RestoreReceiptTempDurableMatcher extends RestoreDurabilityMatcher {
   RestoreReceiptTempDurableMatcher({
     required String receiptDirectoryPath,
@@ -580,6 +653,66 @@ final class RestorePreferenceMutationObservation {
   final String? valueType;
 }
 
+/// Fails exactly once after [failOnMatch] - 1 successful writes to one exact
+/// prefixed key. Calls after the injected failure delegate normally so the
+/// same wrapper can remain installed while rollback restores the before state.
+final class NthExactSetFailurePreferencesStore
+    extends SharedPreferencesStorePlatform {
+  NthExactSetFailurePreferencesStore({
+    required this.delegate,
+    required this.prefixedKey,
+    required this.failOnMatch,
+  }) {
+    if (prefixedKey.isEmpty) {
+      throw ArgumentError.value(prefixedKey, 'prefixedKey');
+    }
+    if (failOnMatch < 1) {
+      throw ArgumentError.value(failOnMatch, 'failOnMatch');
+    }
+  }
+
+  final SharedPreferencesStorePlatform delegate;
+  final String prefixedKey;
+  final int failOnMatch;
+  var _successfulMatches = 0;
+  var _didFail = false;
+
+  int get successfulMatches => _successfulMatches;
+  bool get didFail => _didFail;
+
+  @override
+  Future<bool> clear() => delegate.clear();
+
+  @override
+  Future<bool> clearWithParameters(ClearParameters parameters) =>
+      delegate.clearWithParameters(parameters);
+
+  @override
+  Future<Map<String, Object>> getAll() => delegate.getAll();
+
+  @override
+  Future<Map<String, Object>> getAllWithParameters(
+    GetAllParameters parameters,
+  ) => delegate.getAllWithParameters(parameters);
+
+  @override
+  Future<bool> remove(String key) => delegate.remove(key);
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async {
+    if (key != prefixedKey || _didFail) {
+      return delegate.setValue(valueType, key, value);
+    }
+    if (_successfulMatches + 1 == failOnMatch) {
+      _didFail = true;
+      return false;
+    }
+    final written = await delegate.setValue(valueType, key, value);
+    if (written) _successfulMatches++;
+    return written;
+  }
+}
+
 final class OneShotBlockingPreferencesStore
     extends SharedPreferencesStorePlatform {
   OneShotBlockingPreferencesStore({
@@ -587,6 +720,7 @@ final class OneShotBlockingPreferencesStore
     required this.prefixedKey,
     required this.mutationKind,
     required this.onMatched,
+    this.isArmed,
   }) {
     if (prefixedKey.isEmpty) {
       throw ArgumentError.value(prefixedKey, 'prefixedKey');
@@ -598,6 +732,7 @@ final class OneShotBlockingPreferencesStore
   final RestorePreferenceMutationKind mutationKind;
   final Future<void> Function(RestorePreferenceMutationObservation observation)
   onMatched;
+  final bool Function()? isArmed;
   bool _didMatch = false;
 
   bool get didMatch => _didMatch;
@@ -622,7 +757,8 @@ final class OneShotBlockingPreferencesStore
     final removed = await delegate.remove(key);
     if (removed &&
         mutationKind == RestorePreferenceMutationKind.remove &&
-        key == prefixedKey) {
+        key == prefixedKey &&
+        (isArmed?.call() ?? true)) {
       await _notifyAndBlock(
         RestorePreferenceMutationObservation(
           kind: RestorePreferenceMutationKind.remove,
@@ -638,7 +774,8 @@ final class OneShotBlockingPreferencesStore
     final written = await delegate.setValue(valueType, key, value);
     if (written &&
         mutationKind == RestorePreferenceMutationKind.set &&
-        key == prefixedKey) {
+        key == prefixedKey &&
+        (isArmed?.call() ?? true)) {
       await _notifyAndBlock(
         RestorePreferenceMutationObservation(
           kind: RestorePreferenceMutationKind.set,

@@ -65,6 +65,17 @@ void main() {
           case RestoreTerminalProcessHarnessPhase.verifyBusinessReady:
             await _runTerminalVerify(control, preferences);
         }
+      case RestoreRollbackProcessHarnessControl():
+        switch (control.phase) {
+          case RestoreRollbackProcessHarnessPhase.setup:
+            await _runSetup(control, preferences);
+          case RestoreRollbackProcessHarnessPhase.triggerRollbackKill:
+            await _runRollbackKill(control, preferences);
+          case RestoreRollbackProcessHarnessPhase.recoverToColdAck:
+            await _runRollbackRecoverToColdAck(control, preferences);
+          case RestoreRollbackProcessHarnessPhase.verifyBusinessReady:
+            await _runRollbackVerifyBusinessReady(control, preferences);
+        }
     }
   });
 }
@@ -104,6 +115,11 @@ Future<void> _runSetup(
   expect(state.secondaryOldPreferenceValue, preferenceSeed.values.elementAt(1));
   expect(state.secretPreferenceKey, preferenceSeed.keys.elementAt(2));
   expect(state.secretOldPreferenceValue, preferenceSeed.values.elementAt(2));
+  expect(
+    state.targetOnlyPreferenceKey,
+    'restore_harness_${control.scenarioId}_target_only',
+  );
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
 
   final pending = await RestoreStartupGate.inspect(
     appDataDirectory: control.appDataDirectory,
@@ -452,6 +468,7 @@ Future<void> _runColdFinalize(
     state.primaryPreferenceKey,
     state.secondaryPreferenceKey,
     state.secretPreferenceKey,
+    state.targetOnlyPreferenceKey,
   ]) {
     if (preferences.containsKey(key) && !await preferences.remove(key)) {
       throw StateError('restore_harness_preference_cleanup:$key');
@@ -461,6 +478,7 @@ Future<void> _runColdFinalize(
   expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
   expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
   expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
 }
 
 Future<void> _runTerminalCommitToColdAck(
@@ -971,6 +989,7 @@ Future<void> _runTerminalVerify(
     state.primaryPreferenceKey,
     state.secondaryPreferenceKey,
     state.secretPreferenceKey,
+    state.targetOnlyPreferenceKey,
   ]) {
     if (preferences.containsKey(key) && !await preferences.remove(key)) {
       throw StateError('restore_terminal_harness_preference_cleanup:$key');
@@ -980,6 +999,716 @@ Future<void> _runTerminalVerify(
   expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
   expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
   expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
+}
+
+Future<void> _runRollbackKill(
+  RestoreRollbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final setupEvent = await _readRollbackSetupEvent(control, state);
+  expect(setupEvent['pid'], isNot(pid));
+  _expectBeforePreferences(preferences, state);
+  final pending = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(pending?.runId, state.runId);
+  expect(pending?.receipt.state, RestoreReceiptState.prepared);
+  expect(pending?.markerFileName, RestoreWorkspaceLock.activeRunFileName);
+
+  final receiptStore = _activeReceiptStore(control, state);
+  final platformDurability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: platformDurability,
+  );
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final trigger = NthExactSetFailurePreferencesStore(
+    delegate: preferenceDelegate,
+    prefixedKey: '${control.preferencesPrefix}${state.primaryPreferenceKey}',
+    failOnMatch: 3,
+  );
+
+  Future<void> onReached(Map<String, dynamic> observation) async {
+    expect(trigger.didFail, isTrue);
+    expect(trigger.successfulMatches, 2);
+    await preferences.reload();
+    final history = await receiptStore.readHistoryWhileWorkspaceLocked();
+    await _expectRollbackCrashTopology(
+      control: control,
+      state: state,
+      preferences: preferences,
+      receiptStore: receiptStore,
+      history: history,
+    );
+    await _publishEvent(control, {
+      'status': 'readyForKill',
+      'marker': control.failpoint.name,
+      'runId': state.runId,
+      'leaseInstanceId': lease.instanceId,
+      'rollbackOriginReceiptState': RestoreReceiptState.verified.name,
+      'triggerKind': 'repeatedTargetSetRejected',
+      'triggerPreferenceKey': state.primaryPreferenceKey,
+      'triggerFailureCount': 1,
+      'observedReceiptState': history.last.state.name,
+      ...observation,
+    });
+  }
+
+  final matcher = _rollbackDurabilityMatcher(control, state, receiptStore);
+  final durability = matcher == null
+      ? platformDurability
+      : OneShotBlockingRestoreDurability(
+          delegate: platformDurability,
+          matcher: matcher,
+          onMatched: (observation) =>
+              onReached(_durabilityObservationJson(observation)),
+        );
+  final settingsBlocker = _rollbackSettingsBlocker(
+    control: control,
+    state: state,
+    delegate: trigger,
+    isArmed: () => trigger.didFail,
+    onMatched: (observation) =>
+        onReached(_preferenceObservationJson(control, observation)),
+  );
+  if ((matcher == null) == (settingsBlocker == null)) {
+    throw StateError(
+      'restore_rollback_harness_failpoint_trigger:${control.failpoint.name}',
+    );
+  }
+  try {
+    SharedPreferencesStorePlatform.instance = settingsBlocker ?? trigger;
+    await RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: control.appDataDirectory,
+      preferences: preferences,
+      businessLease: lease,
+      durability: durability,
+    );
+    throw StateError('restore_rollback_harness_kill_returned');
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+}
+
+Future<void> _runRollbackRecoverToColdAck(
+  RestoreRollbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final killEvent = await _readRollbackKillEvent(control, state);
+  expect(killEvent['pid'], isNot(pid));
+  await preferences.reload();
+  final receiptStore = _activeReceiptStore(control, state);
+  await _expectRollbackCrashTopology(
+    control: control,
+    state: state,
+    preferences: preferences,
+    receiptStore: receiptStore,
+    history: await receiptStore.readHistory(),
+  );
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(killEvent['pid']));
+  expect(lease.instanceId, isNot(killEvent['leaseInstanceId']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationCounter = CountingMutationPreferencesStore(preferenceDelegate);
+  final repeatsVerifiedFailure =
+      control.failpoint ==
+      RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable;
+  final repeatedTrigger = repeatsVerifiedFailure
+      ? NthExactSetFailurePreferencesStore(
+          delegate: mutationCounter,
+          prefixedKey:
+              '${control.preferencesPrefix}${state.primaryPreferenceKey}',
+          failOnMatch: 1,
+        )
+      : null;
+  late final RestoreReceipt terminal;
+  try {
+    SharedPreferencesStorePlatform.instance =
+        repeatedTrigger ?? mutationCounter;
+    try {
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      throw StateError('restore_rollback_harness_recovery_returned');
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, RestoreReceiptState.rolledBack);
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(repeatedTrigger?.didFail ?? false, repeatsVerifiedFailure);
+    expect(mutationCounter.mutationAttempts, greaterThan(0));
+    final pending = await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    );
+    expect(pending?.runId, state.runId);
+    expect(pending?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+    expect(pending?.receipt.state, RestoreReceiptState.rolledBack);
+    terminal = pending!.receipt;
+    final ack = await RestoreSettingsColdAckStore(
+      runDirectory: receiptStore.runDirectory,
+      durability: durability,
+    ).read();
+    expect(ack, isNotNull);
+    expect(ack!.terminalReceiptChecksum, terminal.checksum);
+    expect(ack.expected, RestoreSettingsColdAckExpected.before);
+    expect(ack.processId, lease.processId);
+    expect(ack.leaseInstanceId, lease.instanceId);
+    await preferences.reload();
+    _expectBeforePreferences(preferences, state);
+    await _expectRolledBackActiveEvidence(
+      control: control,
+      state: state,
+      receiptStore: receiptStore,
+      expectedAck: ack,
+    );
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': terminal.state.name,
+      'outcome': 'coldRestartRequired',
+      'leaseInstanceId': lease.instanceId,
+      'terminalReceiptChecksum': terminal.checksum,
+      'ackExpected': ack.expected.name,
+      'ackProcessId': ack.processId,
+      'ackLeaseInstanceId': ack.leaseInstanceId,
+      'coldAckChecksum': ack.checksum,
+      'settingsMutationAttempts': mutationCounter.mutationAttempts,
+      'triggerFailureCount': repeatedTrigger?.didFail == true ? 1 : 0,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+}
+
+Future<void> _runRollbackVerifyBusinessReady(
+  RestoreRollbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final recoveryEvent = await _readRollbackRecoveryEvent(control, state);
+  expect(recoveryEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectBeforePreferences(preferences, state);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(recoveryEvent['pid']));
+  expect(lease.instanceId, isNot(recoveryEvent['leaseInstanceId']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  late final RestoreReceipt terminal;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    try {
+      final result = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      expect(result?.state, RestoreReceiptState.rolledBack);
+      terminal = result!;
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(mutationGuard.mutationAttempts, 0);
+    final expectedAck = RestoreSettingsColdAck(
+      runId: state.runId,
+      terminalReceiptChecksum:
+          recoveryEvent['terminalReceiptChecksum'] as String,
+      expected: RestoreSettingsColdAckExpected.before,
+      leaseInstanceId: recoveryEvent['ackLeaseInstanceId'] as String,
+      processId: recoveryEvent['ackProcessId'] as int,
+    );
+    final evidence = await _expectArchivedRolledBackEvidence(
+      control: control,
+      state: state,
+      expectedAck: expectedAck,
+    );
+    expect(terminal.checksum, evidence.terminal.checksum);
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': evidence.terminal.state.name,
+      'gateResult': terminal.state.name,
+      'archiveState': 'archived',
+      'observedAckProcessId': evidence.ack.processId,
+      'observedAckLeaseInstanceId': evidence.ack.leaseInstanceId,
+      'observedAckChecksum': evidence.ack.checksum,
+      'leaseInstanceId': lease.instanceId,
+      'settingsMutationAttempts': mutationGuard.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+  for (final key in [
+    state.primaryPreferenceKey,
+    state.secondaryPreferenceKey,
+    state.secretPreferenceKey,
+    state.targetOnlyPreferenceKey,
+  ]) {
+    if (preferences.containsKey(key) && !await preferences.remove(key)) {
+      throw StateError('restore_rollback_harness_preference_cleanup:$key');
+    }
+  }
+  await preferences.reload();
+  expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
+}
+
+Future<void> _expectRollbackCrashTopology({
+  required RestoreRollbackProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required SharedPreferences preferences,
+  required RestoreReceiptStore receiptStore,
+  required List<RestoreReceipt> history,
+}) async {
+  final expectedState = _rollbackObservedReceiptState(control.failpoint);
+  expect(
+    history.map((receipt) => receipt.state),
+    _rollbackHistory(expectedState),
+  );
+  expect(history.first.checksum, state.preparedReceiptChecksum);
+  expect(history.first.candidateManifestSha256, state.candidateManifestSha256);
+  expect(history.last.state, expectedState);
+  expect(
+    history.last.previousManifestSha256,
+    isNotEmpty,
+    reason: control.failpoint.name,
+  );
+  await _expectExactTerminalMarkers(
+    receiptStore.workspaceRoot,
+    runId: state.runId,
+    expectedMarker: RestoreWorkspaceLock.publishingRunFileName,
+  );
+  expect(await receiptStore.runDirectory.exists(), isTrue);
+  expect(
+    await RestoreReceiptStore(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+      archived: true,
+    ).runDirectory.exists(),
+    isFalse,
+  );
+  await _expectRollbackReceiptTemporaries(
+    control: control,
+    receiptStore: receiptStore,
+    history: history,
+    canonicalComplete: false,
+  );
+  await _expectRollbackDatabaseTopology(control, state, receiptStore);
+  await _expectRollbackAssetTopology(control, receiptStore);
+  _expectRollbackCrashPreferences(preferences, state, control.failpoint);
+}
+
+Future<void> _expectRollbackDatabaseTopology(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  RestoreReceiptStore receiptStore,
+) async {
+  final live = _liveDatabase(control);
+  final candidate = _candidateDatabase(receiptStore);
+  final previous = File(
+    p.join(
+      _previousDirectory(receiptStore).path,
+      'database',
+      AppDatabase.databaseFileName,
+    ),
+  );
+  final returned = _rollbackHasReached(
+    control.failpoint,
+    RestoreRollbackProcessFailpoint.newDatabaseReturnedToCandidate,
+  );
+  final restored = _rollbackHasReached(
+    control.failpoint,
+    RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive,
+  );
+  if (!returned) {
+    expect(await harnessConversationIds(live), [state.newConversationId]);
+    expect(await candidate.exists(), isFalse);
+    expect(await harnessConversationIds(previous), [state.oldConversationId]);
+  } else if (!restored) {
+    expect(await live.exists(), isFalse);
+    expect(await harnessConversationIds(candidate), [state.newConversationId]);
+    expect(await harnessConversationIds(previous), [state.oldConversationId]);
+  } else {
+    expect(await harnessConversationIds(live), [state.oldConversationId]);
+    expect(await harnessConversationIds(candidate), [state.newConversationId]);
+    expect(await previous.exists(), isFalse);
+    final previousDatabaseDirectory = previous.parent;
+    if (control.failpoint ==
+        RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive) {
+      expect(await previousDatabaseDirectory.exists(), isTrue);
+      expect(
+        await previousDatabaseDirectory.list(followLinks: false).isEmpty,
+        isTrue,
+      );
+    } else {
+      expect(await previousDatabaseDirectory.exists(), isFalse);
+    }
+  }
+  for (final database in [live, candidate, previous]) {
+    for (final suffix in const ['-wal', '-shm', '-journal']) {
+      expect(await File('${database.path}$suffix').exists(), isFalse);
+    }
+  }
+}
+
+Future<void> _expectRollbackAssetTopology(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreReceiptStore receiptStore,
+) async {
+  final candidate = _candidateDirectory(receiptStore);
+  final previous = _previousDirectory(receiptStore);
+  for (final root in restoreHarnessAssetRoots) {
+    final newReturned = _rollbackHasReached(
+      control.failpoint,
+      _rollbackNewAssetFailpoint(root),
+    );
+    final oldRestored = _rollbackHasReached(
+      control.failpoint,
+      _rollbackOldAssetFailpoint(root),
+    );
+    final liveRoot = Directory(p.join(control.appDataDirectory.path, root));
+    final candidateRoot = Directory(p.join(candidate.path, root));
+    final previousRoot = Directory(p.join(previous.path, root));
+    if (!newReturned) {
+      expect(
+        await File(p.join(liveRoot.path, 'new.txt')).readAsString(),
+        'new:$root',
+      );
+      expect(await candidateRoot.exists(), isFalse);
+      expect(
+        await File(p.join(previousRoot.path, 'old.txt')).readAsString(),
+        'old:$root',
+      );
+    } else if (!oldRestored) {
+      expect(await liveRoot.exists(), isFalse);
+      expect(
+        await File(p.join(candidateRoot.path, 'new.txt')).readAsString(),
+        'new:$root',
+      );
+      expect(
+        await File(p.join(previousRoot.path, 'old.txt')).readAsString(),
+        'old:$root',
+      );
+    } else {
+      expect(
+        await File(p.join(liveRoot.path, 'old.txt')).readAsString(),
+        'old:$root',
+      );
+      expect(
+        await File(p.join(candidateRoot.path, 'new.txt')).readAsString(),
+        'new:$root',
+      );
+      expect(await previousRoot.exists(), isFalse);
+    }
+  }
+}
+
+void _expectRollbackCrashPreferences(
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+  RestoreRollbackProcessFailpoint failpoint,
+) {
+  if (!_rollbackHasReached(
+    failpoint,
+    RestoreRollbackProcessFailpoint.settingsFirstRestored,
+  )) {
+    _expectTargetPreferences(preferences, state);
+    return;
+  }
+  expect(
+    preferences.getString(state.primaryPreferenceKey),
+    state.primaryOldPreferenceValue,
+  );
+  if (failpoint == RestoreRollbackProcessFailpoint.settingsFirstRestored) {
+    expect(
+      preferences.getString(state.secondaryPreferenceKey),
+      state.secondaryNewPreferenceValue,
+    );
+    expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+    expect(
+      preferences.getString(state.targetOnlyPreferenceKey),
+      state.targetOnlyNewPreferenceValue,
+    );
+    return;
+  }
+  expect(
+    preferences.getString(state.secondaryPreferenceKey),
+    state.secondaryOldPreferenceValue,
+  );
+  expect(
+    preferences.getString(state.secretPreferenceKey),
+    state.secretOldPreferenceValue,
+  );
+  if (failpoint == RestoreRollbackProcessFailpoint.settingsSecretRestored) {
+    expect(
+      preferences.getString(state.targetOnlyPreferenceKey),
+      state.targetOnlyNewPreferenceValue,
+    );
+    return;
+  }
+  _expectBeforePreferences(preferences, state);
+}
+
+Future<void> _expectRollbackReceiptTemporaries({
+  required RestoreRollbackProcessHarnessControl control,
+  required RestoreReceiptStore receiptStore,
+  required List<RestoreReceipt> history,
+  required bool canonicalComplete,
+}) async {
+  final expectedSequence = switch (control.failpoint) {
+    RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable => 5,
+    RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable => 6,
+    _ => null,
+  };
+  final temporaryPattern = RegExp(
+    r'^receipt_([0-9]{16})\.json\.([1-9][0-9]*)_([1-9][0-9]*)\.tmp$',
+  );
+  final temporaries = <File>[];
+  await for (final entity in receiptStore.receiptDirectory.list(
+    followLinks: false,
+  )) {
+    final name = p.basename(entity.path);
+    if (temporaryPattern.hasMatch(name)) temporaries.add(File(entity.path));
+  }
+  if (expectedSequence == null) {
+    expect(temporaries, isEmpty);
+    return;
+  }
+  expect(temporaries, hasLength(1));
+  final match = temporaryPattern.firstMatch(
+    p.basename(temporaries.single.path),
+  );
+  expect(int.parse(match![1]!), expectedSequence);
+  final decoded = jsonDecode(await temporaries.single.readAsString());
+  expect(decoded, isA<Map>());
+  final temporaryReceipt = RestoreReceipt.fromJson(decoded as Map);
+  expect(temporaryReceipt.sequence, expectedSequence);
+  expect(
+    temporaryReceipt.state,
+    expectedSequence == 5
+        ? RestoreReceiptState.rollingBack
+        : RestoreReceiptState.rolledBack,
+  );
+  if (canonicalComplete) {
+    final canonical = history.singleWhere(
+      (receipt) => receipt.sequence == expectedSequence,
+    );
+    expect(temporaryReceipt.checksum, canonical.checksum);
+    expect(temporaryReceipt.previousChecksum, canonical.previousChecksum);
+  } else {
+    expect(temporaryReceipt.previousChecksum, history.last.checksum);
+    expect(history.last.sequence, expectedSequence - 1);
+  }
+}
+
+Future<void> _expectRolledBackActiveEvidence({
+  required RestoreRollbackProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreReceiptStore receiptStore,
+  required RestoreSettingsColdAck expectedAck,
+}) async {
+  final history = await receiptStore.readHistory();
+  expect(
+    history.map((receipt) => receipt.state),
+    _rollbackHistory(RestoreReceiptState.rolledBack),
+  );
+  expect(history.first.checksum, state.preparedReceiptChecksum);
+  expect(history.last.checksum, expectedAck.terminalReceiptChecksum);
+  await _expectRollbackReceiptTemporaries(
+    control: control,
+    receiptStore: receiptStore,
+    history: history,
+    canonicalComplete: true,
+  );
+  await _expectRolledBackBundle(control, state, receiptStore, history);
+  final ack = await RestoreSettingsColdAckStore(
+    runDirectory: receiptStore.runDirectory,
+  ).read();
+  expect(ack?.checksum, expectedAck.checksum);
+}
+
+Future<({RestoreReceipt terminal, RestoreSettingsColdAck ack})>
+_expectArchivedRolledBackEvidence({
+  required RestoreRollbackProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreSettingsColdAck expectedAck,
+}) async {
+  expect(
+    await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    ),
+    isNull,
+  );
+  expect(
+    await _activeReceiptStore(control, state).runDirectory.exists(),
+    isFalse,
+  );
+  final archivedStore = RestoreReceiptStore(
+    appDataDirectory: control.appDataDirectory,
+    runId: state.runId,
+    archived: true,
+  );
+  expect(await archivedStore.runDirectory.exists(), isTrue);
+  final history = await archivedStore.readHistory();
+  expect(
+    history.map((receipt) => receipt.state),
+    _rollbackHistory(RestoreReceiptState.rolledBack),
+  );
+  await _expectRollbackReceiptTemporaries(
+    control: control,
+    receiptStore: archivedStore,
+    history: history,
+    canonicalComplete: true,
+  );
+  await _expectRolledBackBundle(control, state, archivedStore, history);
+  final ack = await RestoreSettingsColdAckStore(
+    runDirectory: archivedStore.runDirectory,
+  ).read();
+  expect(ack, isNotNull);
+  expect(ack!.checksum, expectedAck.checksum);
+  expect(ack.expected, RestoreSettingsColdAckExpected.before);
+  expect(ack.terminalReceiptChecksum, history.last.checksum);
+  return (terminal: history.last, ack: ack);
+}
+
+Future<void> _expectRolledBackBundle(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  RestoreReceiptStore receiptStore,
+  List<RestoreReceipt> history,
+) async {
+  expect(await harnessConversationIds(_liveDatabase(control)), [
+    state.oldConversationId,
+  ]);
+  expect(await harnessConversationIds(_candidateDatabase(receiptStore)), [
+    state.newConversationId,
+  ]);
+  for (final database in [
+    _liveDatabase(control),
+    _candidateDatabase(receiptStore),
+  ]) {
+    for (final suffix in const ['-wal', '-shm', '-journal']) {
+      expect(await File('${database.path}$suffix').exists(), isFalse);
+    }
+  }
+  for (final root in restoreHarnessAssetRoots) {
+    expect(
+      await File(
+        p.join(control.appDataDirectory.path, root, 'old.txt'),
+      ).readAsString(),
+      'old:$root',
+    );
+    expect(
+      await File(
+        p.join(_candidateDirectory(receiptStore).path, root, 'new.txt'),
+      ).readAsString(),
+      'new:$root',
+    );
+  }
+  final previousStore = RestorePreviousStore(
+    runDirectory: receiptStore.runDirectory,
+  );
+  final previous = await previousStore.readPrevious(
+    preparedReceipt: history.first,
+  );
+  await previousStore.validateControlOnlyAfterRollback(previous);
+  expect(previous.manifestSha256, history.last.previousManifestSha256);
+  expect(jsonDecode(utf8.decode(previous.settingsSnapshotBytes)), {
+    state.primaryPreferenceKey: state.primaryOldPreferenceValue,
+    state.secondaryPreferenceKey: state.secondaryOldPreferenceValue,
+    state.secretPreferenceKey: state.secretOldPreferenceValue,
+  });
+}
+
+List<RestoreReceiptState> _rollbackHistory(RestoreReceiptState last) {
+  return switch (last) {
+    RestoreReceiptState.verified => const [
+      RestoreReceiptState.prepared,
+      RestoreReceiptState.oldRenamed,
+      RestoreReceiptState.newInstalled,
+      RestoreReceiptState.verified,
+    ],
+    RestoreReceiptState.rollingBack => const [
+      RestoreReceiptState.prepared,
+      RestoreReceiptState.oldRenamed,
+      RestoreReceiptState.newInstalled,
+      RestoreReceiptState.verified,
+      RestoreReceiptState.rollingBack,
+    ],
+    RestoreReceiptState.rolledBack => const [
+      RestoreReceiptState.prepared,
+      RestoreReceiptState.oldRenamed,
+      RestoreReceiptState.newInstalled,
+      RestoreReceiptState.verified,
+      RestoreReceiptState.rollingBack,
+      RestoreReceiptState.rolledBack,
+    ],
+    _ => throw StateError('restore_rollback_harness_history'),
+  };
+}
+
+RestoreReceiptState _rollbackObservedReceiptState(
+  RestoreRollbackProcessFailpoint failpoint,
+) {
+  if (failpoint ==
+      RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable) {
+    return RestoreReceiptState.verified;
+  }
+  if (failpoint == RestoreRollbackProcessFailpoint.rolledBackReceiptPublished) {
+    return RestoreReceiptState.rolledBack;
+  }
+  return RestoreReceiptState.rollingBack;
+}
+
+bool _rollbackHasReached(
+  RestoreRollbackProcessFailpoint current,
+  RestoreRollbackProcessFailpoint boundary,
+) => current.index >= boundary.index;
+
+RestoreRollbackProcessFailpoint _rollbackNewAssetFailpoint(String root) {
+  return switch (root) {
+    'upload' => RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate,
+    'images' => RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate,
+    'avatars' => RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate,
+    'fonts' => RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate,
+    _ => throw StateError('restore_rollback_harness_asset_root'),
+  };
+}
+
+RestoreRollbackProcessFailpoint _rollbackOldAssetFailpoint(String root) {
+  return switch (root) {
+    'upload' => RestoreRollbackProcessFailpoint.previousUploadRestoredToLive,
+    'images' => RestoreRollbackProcessFailpoint.previousImagesRestoredToLive,
+    'avatars' => RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive,
+    'fonts' => RestoreRollbackProcessFailpoint.previousFontsRestoredToLive,
+    _ => throw StateError('restore_rollback_harness_asset_root'),
+  };
 }
 
 Future<void> _expectTerminalColdAckCrashTopology({
@@ -1239,6 +1968,10 @@ void _expectTargetPreferences(
     state.secondaryNewPreferenceValue,
   );
   expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(
+    preferences.getString(state.targetOnlyPreferenceKey),
+    state.targetOnlyNewPreferenceValue,
+  );
 }
 
 Future<RestoreCompleteBundleFixtureState> _readBoundState(
@@ -1262,6 +1995,9 @@ void _requireStateBinding(
       state.secondaryOldPreferenceValue != seed.values.elementAt(1) ||
       state.secretPreferenceKey != seed.keys.elementAt(2) ||
       state.secretOldPreferenceValue != seed.values.elementAt(2) ||
+      state.targetOnlyPreferenceKey !=
+          'restore_harness_${control.scenarioId}_target_only' ||
+      state.targetOnlyNewPreferenceValue != 'new-target-only' ||
       state.oldConversationId != 'old-${control.scenarioId}' ||
       state.newConversationId != 'new-${control.scenarioId}' ||
       !RegExp(r'^[a-f0-9]{32}$').hasMatch(state.runId) ||
@@ -1281,6 +2017,7 @@ void _requireControlSequence(RestoreHarnessControl control) {
   final expectedGeneration = switch (control) {
     RestoreProcessHarnessControl() => control.phase.index + 1,
     RestoreTerminalProcessHarnessControl() => control.phase.index + 1,
+    RestoreRollbackProcessHarnessControl() => control.phase.index + 1,
     _ => throw StateError('restore_harness_control_type'),
   };
   if (control.generation != expectedGeneration) {
@@ -1333,6 +2070,151 @@ Directory _previousDirectory(RestoreReceiptStore store) => Directory(
 Directory _previousPendingDirectory(RestoreReceiptStore store) => Directory(
   p.join(store.runDirectory.path, RestorePreviousStore.pendingDirectoryName),
 );
+
+RestoreDurabilityMatcher? _rollbackDurabilityMatcher(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  RestoreReceiptStore receiptStore,
+) {
+  final candidate = _candidateDirectory(receiptStore);
+  final previous = _previousDirectory(receiptStore);
+  final liveDatabase = _liveDatabase(control);
+  final candidateDatabase = _candidateDatabase(receiptStore);
+  final previousDatabase = File(
+    p.join(previous.path, 'database', AppDatabase.databaseFileName),
+  );
+  return switch (control.failpoint) {
+    RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 5,
+        state: RestoreReceiptState.rollingBack,
+      ),
+    RestoreRollbackProcessFailpoint.rollingBackReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 5,
+        state: RestoreReceiptState.rollingBack,
+      ),
+    RestoreRollbackProcessFailpoint.newDatabaseReturnedToCandidate =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(liveDatabase.path),
+        targetPath: _absolutePath(candidateDatabase.path),
+        sourceKind: RestoreProcessEntityKind.file,
+      ),
+    RestoreRollbackProcessFailpoint.previousDatabaseRestoredToLive =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(previousDatabase.path),
+        targetPath: _absolutePath(liveDatabase.path),
+        sourceKind: RestoreProcessEntityKind.file,
+      ),
+    RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable =>
+      RestoreRollbackDatabaseParentSyncMatcher(
+        previousDirectoryPath: _absolutePath(previous.path),
+        previousDatabaseDirectoryPath: _absolutePath(
+          previousDatabase.parent.path,
+        ),
+        candidateDatabasePath: _absolutePath(candidateDatabase.path),
+        liveDatabasePath: _absolutePath(liveDatabase.path),
+      ),
+    RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(
+          p.join(
+            control.appDataDirectory.path,
+            _rollbackAssetRoot(control.failpoint),
+          ),
+        ),
+        targetPath: _absolutePath(
+          p.join(candidate.path, _rollbackAssetRoot(control.failpoint)),
+        ),
+        sourceKind: RestoreProcessEntityKind.directory,
+      ),
+    RestoreRollbackProcessFailpoint.previousUploadRestoredToLive ||
+    RestoreRollbackProcessFailpoint.previousImagesRestoredToLive ||
+    RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive ||
+    RestoreRollbackProcessFailpoint.previousFontsRestoredToLive =>
+      RestoreExactRenameMatcher(
+        sourcePath: _absolutePath(
+          p.join(previous.path, _rollbackAssetRoot(control.failpoint)),
+        ),
+        targetPath: _absolutePath(
+          p.join(
+            control.appDataDirectory.path,
+            _rollbackAssetRoot(control.failpoint),
+          ),
+        ),
+        sourceKind: RestoreProcessEntityKind.directory,
+      ),
+    RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable =>
+      RestoreReceiptTempDurableMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 6,
+        state: RestoreReceiptState.rolledBack,
+      ),
+    RestoreRollbackProcessFailpoint.rolledBackReceiptPublished =>
+      RestoreReceiptPublishedMatcher(
+        receiptDirectoryPath: _absolutePath(receiptStore.receiptDirectory.path),
+        sequence: 6,
+        state: RestoreReceiptState.rolledBack,
+      ),
+    RestoreRollbackProcessFailpoint.settingsFirstRestored ||
+    RestoreRollbackProcessFailpoint.settingsSecretRestored ||
+    RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved => null,
+  };
+}
+
+OneShotBlockingPreferencesStore? _rollbackSettingsBlocker({
+  required RestoreRollbackProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required SharedPreferencesStorePlatform delegate,
+  required bool Function() isArmed,
+  required Future<void> Function(
+    RestorePreferenceMutationObservation observation,
+  )
+  onMatched,
+}) {
+  final (key, kind) = switch (control.failpoint) {
+    RestoreRollbackProcessFailpoint.settingsFirstRestored => (
+      state.primaryPreferenceKey,
+      RestorePreferenceMutationKind.set,
+    ),
+    RestoreRollbackProcessFailpoint.settingsSecretRestored => (
+      state.secretPreferenceKey,
+      RestorePreferenceMutationKind.set,
+    ),
+    RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved => (
+      state.targetOnlyPreferenceKey,
+      RestorePreferenceMutationKind.remove,
+    ),
+    _ => (null, null),
+  };
+  if (key == null || kind == null) return null;
+  return OneShotBlockingPreferencesStore(
+    delegate: delegate,
+    prefixedKey: '${control.preferencesPrefix}$key',
+    mutationKind: kind,
+    isArmed: isArmed,
+    onMatched: onMatched,
+  );
+}
+
+String _rollbackAssetRoot(RestoreRollbackProcessFailpoint failpoint) {
+  return switch (failpoint) {
+    RestoreRollbackProcessFailpoint.newUploadReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.previousUploadRestoredToLive => 'upload',
+    RestoreRollbackProcessFailpoint.newImagesReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.previousImagesRestoredToLive => 'images',
+    RestoreRollbackProcessFailpoint.newAvatarsReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.previousAvatarsRestoredToLive => 'avatars',
+    RestoreRollbackProcessFailpoint.newFontsReturnedToCandidate ||
+    RestoreRollbackProcessFailpoint.previousFontsRestoredToLive => 'fonts',
+    _ => throw StateError('restore_rollback_harness_asset_failpoint'),
+  };
+}
 
 RestoreDurabilityMatcher? _durabilityMatcher(
   RestoreProcessHarnessControl control,
@@ -1575,7 +2457,7 @@ Map<String, dynamic> _durabilityObservationJson(
 }
 
 Map<String, dynamic> _preferenceObservationJson(
-  RestoreProcessHarnessControl control,
+  RestoreHarnessControl control,
   RestorePreferenceMutationObservation observation,
 ) {
   if (!observation.prefixedKey.startsWith(control.preferencesPrefix)) {
@@ -1892,6 +2774,7 @@ void _expectCrashPreferences(
       preferences.getString(state.secondaryPreferenceKey),
       state.secondaryOldPreferenceValue,
     );
+    expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
     return;
   }
   if (failpoint == RestoreProcessFailpoint.settingsFirstSet) {
@@ -1903,6 +2786,7 @@ void _expectCrashPreferences(
       preferences.getString(state.secondaryPreferenceKey),
       state.secondaryOldPreferenceValue,
     );
+    expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
     return;
   }
   _expectTargetPreferences(preferences, state);
@@ -1924,6 +2808,7 @@ void _expectBeforePreferences(
     preferences.getString(state.secretPreferenceKey),
     state.secretOldPreferenceValue,
   );
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
 }
 
 String _assetRootForFailpoint(RestoreProcessFailpoint failpoint) {
@@ -2083,6 +2968,221 @@ Future<Map<String, dynamic>> _readTerminalSetupEvent(
       event['runId'] != state.runId ||
       event['receiptState'] != RestoreReceiptState.prepared.name) {
     throw const FormatException('restore_terminal_harness_setup_event');
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readRollbackSetupEvent(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readRollbackPriorEvent(
+    control,
+    generation: 1,
+    phase: RestoreRollbackProcessHarnessPhase.setup,
+    phaseKeys: const {'runId', 'receiptState'},
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.prepared.name) {
+    throw const FormatException('restore_rollback_harness_setup_event');
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readRollbackKillEvent(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readRollbackPriorEvent(
+    control,
+    generation: 2,
+    phase: RestoreRollbackProcessHarnessPhase.triggerRollbackKill,
+    phaseKeys: _rollbackKillEventKeys(control.failpoint),
+  );
+  if (event['status'] != 'readyForKill' ||
+      event['marker'] != control.failpoint.name ||
+      event['runId'] != state.runId ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['rollbackOriginReceiptState'] !=
+          RestoreReceiptState.verified.name ||
+      event['triggerKind'] != 'repeatedTargetSetRejected' ||
+      event['triggerPreferenceKey'] != state.primaryPreferenceKey ||
+      event['triggerFailureCount'] != 1 ||
+      event['observedReceiptState'] !=
+          _rollbackObservedReceiptState(control.failpoint).name) {
+    throw const FormatException('restore_rollback_harness_kill_event');
+  }
+  _validateRollbackKillObservation(control, state, event);
+  return event;
+}
+
+Set<String> _rollbackKillEventKeys(RestoreRollbackProcessFailpoint failpoint) {
+  const common = {
+    'marker',
+    'runId',
+    'leaseInstanceId',
+    'rollbackOriginReceiptState',
+    'triggerKind',
+    'triggerPreferenceKey',
+    'triggerFailureCount',
+    'observedReceiptState',
+  };
+  return switch (failpoint) {
+    RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable ||
+    RestoreRollbackProcessFailpoint.rollingBackReceiptPublished ||
+    RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable ||
+    RestoreRollbackProcessFailpoint.rolledBackReceiptPublished => {
+      ...common,
+      'operationKind',
+      'receiptSequence',
+      'receiptState',
+      'temporaryPath',
+      'targetPath',
+    },
+    RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable => {
+      ...common,
+      'operationKind',
+      'path',
+      'fullBarrier',
+    },
+    RestoreRollbackProcessFailpoint.settingsFirstRestored ||
+    RestoreRollbackProcessFailpoint.settingsSecretRestored ||
+    RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved => {
+      ...common,
+      'operationKind',
+      'preferenceKey',
+      'valueType',
+    },
+    _ => {...common, 'operationKind', 'sourcePath', 'targetPath', 'sourceKind'},
+  };
+}
+
+void _validateRollbackKillObservation(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+  Map<String, dynamic> event,
+) {
+  final receiptStore = _activeReceiptStore(control, state);
+  final matcher = _rollbackDurabilityMatcher(control, state, receiptStore);
+  switch (control.failpoint) {
+    case RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable:
+    case RestoreRollbackProcessFailpoint.rolledBackReceiptTempDurable:
+      final expected = matcher! as RestoreReceiptTempDurableMatcher;
+      _validateReceiptObservation(
+        event,
+        receiptDirectoryPath: expected.receiptDirectoryPath,
+        sequence: expected.sequence,
+        state: expected.state,
+        operationKind: 'receiptTempDurable',
+      );
+    case RestoreRollbackProcessFailpoint.rollingBackReceiptPublished:
+    case RestoreRollbackProcessFailpoint.rolledBackReceiptPublished:
+      final expected = matcher! as RestoreReceiptPublishedMatcher;
+      _validateReceiptObservation(
+        event,
+        receiptDirectoryPath: expected.receiptDirectoryPath,
+        sequence: expected.sequence,
+        state: expected.state,
+        operationKind: 'receiptPublished',
+      );
+    case RestoreRollbackProcessFailpoint.previousDatabaseParentRemovedDurable:
+      final expected = matcher! as RestoreRollbackDatabaseParentSyncMatcher;
+      if (event['operationKind'] != 'directorySyncAfter' ||
+          event['path'] != expected.previousDirectoryPath ||
+          event['fullBarrier'] != true) {
+        throw const FormatException('restore_rollback_harness_parent_sync');
+      }
+    case RestoreRollbackProcessFailpoint.settingsFirstRestored:
+      _requireRollbackPreferenceObservation(
+        event,
+        key: state.primaryPreferenceKey,
+        kind: RestorePreferenceMutationKind.set,
+      );
+    case RestoreRollbackProcessFailpoint.settingsSecretRestored:
+      _requireRollbackPreferenceObservation(
+        event,
+        key: state.secretPreferenceKey,
+        kind: RestorePreferenceMutationKind.set,
+      );
+    case RestoreRollbackProcessFailpoint.settingsTargetOnlyRemoved:
+      _requireRollbackPreferenceObservation(
+        event,
+        key: state.targetOnlyPreferenceKey,
+        kind: RestorePreferenceMutationKind.remove,
+      );
+    default:
+      final expected = matcher! as RestoreExactRenameMatcher;
+      if (event['operationKind'] != 'renameAfter' ||
+          event['sourcePath'] != expected.sourcePath ||
+          event['targetPath'] != expected.targetPath ||
+          event['sourceKind'] != expected.sourceKind.name) {
+        throw const FormatException('restore_rollback_harness_rename');
+      }
+  }
+}
+
+void _requireRollbackPreferenceObservation(
+  Map<String, dynamic> event, {
+  required String key,
+  required RestorePreferenceMutationKind kind,
+}) {
+  final expectedOperation = kind == RestorePreferenceMutationKind.set
+      ? 'preferenceSetAfter'
+      : 'preferenceRemoveAfter';
+  final expectedType = kind == RestorePreferenceMutationKind.set
+      ? 'String'
+      : '';
+  if (event['operationKind'] != expectedOperation ||
+      event['preferenceKey'] != key ||
+      event['valueType'] != expectedType) {
+    throw const FormatException('restore_rollback_harness_preference');
+  }
+}
+
+Future<Map<String, dynamic>> _readRollbackRecoveryEvent(
+  RestoreRollbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final killed = await _readRollbackKillEvent(control, state);
+  final event = await _readRollbackPriorEvent(
+    control,
+    generation: 3,
+    phase: RestoreRollbackProcessHarnessPhase.recoverToColdAck,
+    phaseKeys: const {
+      'runId',
+      'receiptState',
+      'outcome',
+      'leaseInstanceId',
+      'terminalReceiptChecksum',
+      'ackExpected',
+      'ackProcessId',
+      'ackLeaseInstanceId',
+      'coldAckChecksum',
+      'settingsMutationAttempts',
+      'triggerFailureCount',
+    },
+  );
+  final expectedTriggerFailures =
+      control.failpoint ==
+          RestoreRollbackProcessFailpoint.rollingBackReceiptTempDurable
+      ? 1
+      : 0;
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.rolledBack.name ||
+      event['outcome'] != 'coldRestartRequired' ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['leaseInstanceId'] == killed['leaseInstanceId'] ||
+      !_isSha256(event['terminalReceiptChecksum']) ||
+      event['ackExpected'] != RestoreSettingsColdAckExpected.before.name ||
+      event['ackProcessId'] != event['pid'] ||
+      event['ackLeaseInstanceId'] != event['leaseInstanceId'] ||
+      !_isSha256(event['coldAckChecksum']) ||
+      event['settingsMutationAttempts'] is! int ||
+      (event['settingsMutationAttempts'] as int) < 1 ||
+      event['triggerFailureCount'] != expectedTriggerFailures) {
+    throw const FormatException('restore_rollback_harness_recovery_event');
   }
   return event;
 }
@@ -2352,6 +3452,50 @@ Future<Map<String, dynamic>> _readTerminalPriorEvent(
   return event;
 }
 
+Future<Map<String, dynamic>> _readRollbackPriorEvent(
+  RestoreRollbackProcessHarnessControl control, {
+  required int generation,
+  required RestoreRollbackProcessHarnessPhase phase,
+  required Set<String> phaseKeys,
+}) async {
+  final eventFile = File(
+    p.join(
+      control.eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+  final event = await readHarnessJson(eventFile);
+  final expectedKeys = {
+    'format',
+    'version',
+    'generation',
+    'matrixRunId',
+    'scenario',
+    'scenarioId',
+    'phase',
+    'failpoint',
+    'pid',
+    'status',
+    ...phaseKeys,
+  };
+  if (event.length != expectedKeys.length ||
+      !event.keys.toSet().containsAll(expectedKeys) ||
+      event['format'] != restoreHarnessFormat ||
+      event['version'] != RestoreRollbackProcessHarnessControl.version ||
+      event['generation'] != generation ||
+      event['matrixRunId'] != control.matrixRunId ||
+      event['scenario'] != restoreRollbackHarnessScenario ||
+      event['scenarioId'] != control.scenarioId ||
+      event['phase'] != phase.name ||
+      event['failpoint'] != control.failpoint.name ||
+      event['pid'] is! int ||
+      (event['pid'] as int) < 1 ||
+      event['status'] is! String) {
+    throw const FormatException('restore_rollback_harness_event');
+  }
+  return event;
+}
+
 bool _isIdentifier(Object? value) =>
     value is String && RegExp(_leaseInstancePattern).hasMatch(value);
 
@@ -2592,6 +3736,8 @@ Future<void> _publishEvent(
     RestoreProcessHarnessControl() => RestoreProcessHarnessControl.version,
     RestoreTerminalProcessHarnessControl() =>
       RestoreTerminalProcessHarnessControl.version,
+    RestoreRollbackProcessHarnessControl() =>
+      RestoreRollbackProcessHarnessControl.version,
     _ => throw StateError('restore_harness_control_type'),
   };
   return writeDurableHarnessJson(control.eventFile, {

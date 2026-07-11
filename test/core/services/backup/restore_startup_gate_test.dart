@@ -7,7 +7,10 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 import 'package:Kelivo/core/services/backup/restore_business_lease.dart';
 import 'package:Kelivo/core/services/backup/restore_cutover_executor.dart';
@@ -34,6 +37,58 @@ final class _FailingNthSetPreferencesStore
     if (_setCalls == failOnCall) return false;
     return super.setValue(valueType, key, value);
   }
+}
+
+final class _FailVerifiedRetryPreferencesStore
+    extends InMemorySharedPreferencesStore {
+  _FailVerifiedRetryPreferencesStore(super.data) : super.withData();
+
+  var _failNextVerifiedTarget = false;
+  var verifiedTargetFailures = 0;
+  var mutationAttempts = 0;
+
+  void armVerifiedTargetFailure() {
+    if (_failNextVerifiedTarget) {
+      throw StateError('restore_test_verified_failure_already_armed');
+    }
+    _failNextVerifiedTarget = true;
+  }
+
+  void resetMutationAttempts() => mutationAttempts = 0;
+
+  @override
+  Future<bool> setValue(String valueType, String key, Object value) async {
+    mutationAttempts++;
+    if (_failNextVerifiedTarget &&
+        valueType == 'String' &&
+        key == 'flutter.theme' &&
+        value == 'new') {
+      _failNextVerifiedTarget = false;
+      verifiedTargetFailures++;
+      return false;
+    }
+    return super.setValue(valueType, key, value);
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    mutationAttempts++;
+    return super.remove(key);
+  }
+}
+
+final class _CompleteRollbackBundleFixture {
+  const _CompleteRollbackBundleFixture({
+    required this.prepared,
+    required this.liveDatabase,
+    required this.liveOldUpload,
+    required this.liveNewUpload,
+  });
+
+  final PreparedRestoreBundle prepared;
+  final File liveDatabase;
+  final File liveOldUpload;
+  final File liveNewUpload;
 }
 
 enum _LogicalCutoverInterruption {
@@ -353,6 +408,120 @@ Future<({Directory directory, String manifestSha256})> _createBundle(
     directory: directory,
     manifestSha256: (await sha256.bind(manifest.openRead()).first).toString(),
   );
+}
+
+Future<_CompleteRollbackBundleFixture> _prepareCompleteRollbackBundle({
+  required Directory root,
+  required String directoryName,
+}) async {
+  final liveDatabase = File(p.join(root.path, 'kelivo.sqlite'));
+  await _createRollbackDatabase(liveDatabase, conversationId: 'old');
+  final liveOldUpload = File(p.join(root.path, 'upload', 'old.txt'));
+  await liveOldUpload.parent.create();
+  await liveOldUpload.writeAsString('old asset', flush: true);
+  await Directory(p.join(root.path, 'images')).create();
+
+  final extracted = Directory(p.join(root.path, directoryName));
+  await extracted.create();
+  final settings = File(p.join(extracted.path, 'settings.json'));
+  await settings.writeAsString('{"theme":"new"}', flush: true);
+  final candidateDatabase = File(
+    p.join(extracted.path, 'database', 'kelivo.sqlite'),
+  );
+  await candidateDatabase.parent.create(recursive: true);
+  await _createRollbackDatabase(candidateDatabase, conversationId: 'new');
+  final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+    candidateDatabase,
+  );
+  final candidateUpload = File(p.join(extracted.path, 'upload', 'new.txt'));
+  await candidateUpload.parent.create();
+  await candidateUpload.writeAsString('new asset', flush: true);
+  final manifest = File(p.join(extracted.path, 'manifest.json'));
+  await manifest.writeAsString(
+    jsonEncode({
+      'format': 'kelivo-backup',
+      'formatVersion': 2,
+      'payloadKind': 'sqlite',
+      'createdAtUtc': '2026-07-09T00:00:00.000Z',
+      'appVersion': 'test',
+      'includeChats': true,
+      'includeFiles': true,
+      'secretsIncluded': true,
+      'database': {
+        'entry': 'database/kelivo.sqlite',
+        'schemaVersion': databaseInfo.schemaVersion,
+        'conversationCount': databaseInfo.conversationCount,
+        'messageCount': databaseInfo.messageCount,
+      },
+      'entries': {
+        'settings.json': await _rollbackFileDescriptor(settings),
+        'database/kelivo.sqlite': await _rollbackFileDescriptor(
+          candidateDatabase,
+        ),
+        'upload/new.txt': await _rollbackFileDescriptor(candidateUpload),
+      },
+    }),
+    flush: true,
+  );
+  final prepared = await RestoreBundlePreparation.prepare(
+    appDataDirectory: root,
+    extractedDirectory: extracted,
+    sourceManifestSha256: (await sha256.bind(manifest.openRead()).first)
+        .toString(),
+    bundleIncludesChats: true,
+    bundleIncludesFiles: true,
+    restoreChats: true,
+    restoreFiles: true,
+    createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+  );
+  return _CompleteRollbackBundleFixture(
+    prepared: prepared,
+    liveDatabase: liveDatabase,
+    liveOldUpload: liveOldUpload,
+    liveNewUpload: File(p.join(root.path, 'upload', 'new.txt')),
+  );
+}
+
+Future<void> _createRollbackDatabase(
+  File file, {
+  required String conversationId,
+}) async {
+  final repository = ChatDatabaseRepository.open(file: file);
+  try {
+    await repository.ensureReady();
+    await repository.putMigrationBatch(
+      conversations: [Conversation(id: conversationId, title: conversationId)],
+      messages: const [],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    await repository.markMigrationComplete();
+    await repository.checkpoint();
+  } finally {
+    await repository.close();
+  }
+}
+
+Future<Map<String, dynamic>> _rollbackFileDescriptor(File file) async {
+  return {
+    'bytes': await file.length(),
+    'sha256': (await sha256.bind(file.openRead()).first).toString(),
+  };
+}
+
+Future<List<String>> _rollbackConversationIds(File file) async {
+  final database = sqlite.sqlite3.open(
+    file.path,
+    mode: sqlite.OpenMode.readOnly,
+  );
+  try {
+    return database
+        .select('SELECT id FROM conversation_rows ORDER BY id;')
+        .map((row) => row['id'] as String)
+        .toList(growable: false);
+  } finally {
+    database.close();
+  }
 }
 
 Future<Directory> _createStrictUnpublishedRun({
@@ -1629,6 +1798,212 @@ void main() {
         );
       });
     }
+
+    test(
+      'retries verified rollback when a durable rollingBack temp exists',
+      () async {
+        SharedPreferences.setMockInitialValues({'theme': 'old'});
+        final fixture = await _prepareCompleteRollbackBundle(
+          root: root,
+          directoryName: 'verified_rolling_back_temp',
+        );
+        final preferenceStore = _FailVerifiedRetryPreferencesStore({
+          'flutter.theme': 'old',
+        });
+        SharedPreferencesStorePlatform.instance = preferenceStore;
+        final preferences = await SharedPreferences.getInstance();
+        final verifiedDurability = _InterruptingCutoverDurability(
+          RestorePlatformDurability(),
+          _LogicalCutoverInterruption.verifiedPublished,
+        );
+
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+            durability: verifiedDurability,
+          ),
+          throwsA(isA<StateError>()),
+        );
+        expect(verifiedDurability.didInterrupt, isTrue);
+
+        final activeReceiptStore = RestoreReceiptStore(
+          appDataDirectory: root,
+          runId: fixture.prepared.runId,
+        );
+        final verifiedHistory = await activeReceiptStore.readHistory();
+        expect(verifiedHistory.map((receipt) => receipt.state), [
+          RestoreReceiptState.prepared,
+          RestoreReceiptState.oldRenamed,
+          RestoreReceiptState.newInstalled,
+          RestoreReceiptState.verified,
+        ]);
+        expect(verifiedHistory.map((receipt) => receipt.sequence), [
+          1,
+          2,
+          3,
+          4,
+        ]);
+        final verified = verifiedHistory.last;
+        final stagedRollingBack = verified.advance(
+          RestoreReceiptState.rollingBack,
+        );
+        final staleTemporary = File(
+          p.join(
+            activeReceiptStore.receiptDirectory.path,
+            'receipt_0000000000000005.json.123456_789.tmp',
+          ),
+        );
+        final durability = RestorePlatformDurability();
+        await staleTemporary.create(exclusive: true);
+        await durability.restrictFile(staleTemporary);
+        await staleTemporary.writeAsString(
+          jsonEncode(stagedRollingBack.toJson()),
+          flush: true,
+        );
+        await durability.syncFile(staleTemporary, fullBarrier: true);
+
+        final stagedReceipt = RestoreReceipt.fromJson(
+          jsonDecode(await staleTemporary.readAsString()) as Map,
+        );
+        expect(stagedReceipt.sequence, 5);
+        expect(stagedReceipt.state, RestoreReceiptState.rollingBack);
+        expect(stagedReceipt.runId, fixture.prepared.runId);
+        expect(stagedReceipt.previousChecksum, verified.checksum);
+        expect(stagedReceipt.checksum, stagedRollingBack.checksum);
+
+        preferenceStore.armVerifiedTargetFailure();
+        await expectLater(
+          RestoreStartupGate.recoverAndRequireBusinessReady(
+            appDataDirectory: root,
+            preferences: preferences,
+          ),
+          throwsA(
+            isA<RestoreColdRestartRequired>().having(
+              (error) => error.state,
+              'state',
+              RestoreReceiptState.rolledBack,
+            ),
+          ),
+        );
+        expect(preferenceStore.verifiedTargetFailures, 1);
+
+        final activeHistory = await activeReceiptStore.readHistory();
+        expect(activeHistory.map((receipt) => receipt.state), [
+          RestoreReceiptState.prepared,
+          RestoreReceiptState.oldRenamed,
+          RestoreReceiptState.newInstalled,
+          RestoreReceiptState.verified,
+          RestoreReceiptState.rollingBack,
+          RestoreReceiptState.rolledBack,
+        ]);
+        expect(activeHistory.map((receipt) => receipt.sequence), [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+        ]);
+        expect(activeHistory[4].checksum, stagedReceipt.checksum);
+        expect(activeHistory[4].previousChecksum, verified.checksum);
+        expect(await staleTemporary.exists(), isTrue);
+        expect(
+          RestoreReceipt.fromJson(
+            jsonDecode(await staleTemporary.readAsString()) as Map,
+          ).checksum,
+          activeHistory[4].checksum,
+        );
+
+        await preferences.reload();
+        expect(preferences.getString('theme'), 'old');
+        expect(await _rollbackConversationIds(fixture.liveDatabase), ['old']);
+        expect(await fixture.liveOldUpload.readAsString(), 'old asset');
+        expect(await fixture.liveNewUpload.exists(), isFalse);
+        final candidateDirectory = fixture.prepared.candidateDirectory;
+        expect(
+          await _rollbackConversationIds(
+            File(p.join(candidateDirectory.path, 'database', 'kelivo.sqlite')),
+          ),
+          ['new'],
+        );
+        expect(
+          await File(
+            p.join(candidateDirectory.path, 'upload', 'new.txt'),
+          ).readAsString(),
+          'new asset',
+        );
+        final previousDirectory = Directory(
+          p.join(
+            activeReceiptStore.runDirectory.path,
+            RestorePreviousStore.previousDirectoryName,
+          ),
+        );
+        expect(
+          (await previousDirectory
+                .list(followLinks: false)
+                .map((entity) => p.basename(entity.path))
+                .toList()
+            ..sort()),
+          [
+            RestorePreviousStore.manifestFileName,
+            RestorePreviousStore.settingsFileName,
+          ],
+        );
+
+        final activeAck = await RestoreSettingsColdAckStore(
+          runDirectory: activeReceiptStore.runDirectory,
+        ).read();
+        expect(activeAck, isNotNull);
+        expect(activeAck!.expected, RestoreSettingsColdAckExpected.before);
+        expect(activeAck.terminalReceiptChecksum, activeHistory.last.checksum);
+
+        await simulateRestoreColdProcessBoundary(root);
+        preferenceStore.resetMutationAttempts();
+        final result = await RestoreStartupGate.recoverAndRequireBusinessReady(
+          appDataDirectory: root,
+          preferences: preferences,
+        );
+        expect(result?.state, RestoreReceiptState.rolledBack);
+        expect(preferenceStore.mutationAttempts, 0);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
+
+        final archivedReceiptStore = RestoreReceiptStore(
+          appDataDirectory: root,
+          runId: fixture.prepared.runId,
+          archived: true,
+        );
+        final archivedHistory = await archivedReceiptStore.readHistory();
+        expect(
+          archivedHistory.map((receipt) => receipt.state),
+          activeHistory.map((receipt) => receipt.state),
+        );
+        final archivedTemporary = File(
+          p.join(
+            archivedReceiptStore.receiptDirectory.path,
+            p.basename(staleTemporary.path),
+          ),
+        );
+        expect(await archivedTemporary.exists(), isTrue);
+        expect(
+          RestoreReceipt.fromJson(
+            jsonDecode(await archivedTemporary.readAsString()) as Map,
+          ).checksum,
+          archivedHistory[4].checksum,
+        );
+        final archivedAck = await RestoreSettingsColdAckStore(
+          runDirectory: archivedReceiptStore.runDirectory,
+        ).read();
+        expect(archivedAck?.expected, RestoreSettingsColdAckExpected.before);
+        expect(
+          archivedAck?.terminalReceiptChecksum,
+          archivedHistory.last.checksum,
+        );
+      },
+    );
 
     for (final point in const [
       _LogicalCutoverInterruption.rollingBackPublished,
