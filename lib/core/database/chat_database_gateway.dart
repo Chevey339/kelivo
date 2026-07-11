@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'chat_database_observer.dart';
 import 'chat_database_repository.dart';
 import 'database_installation_gate.dart';
 
@@ -18,7 +19,8 @@ final class ChatDatabaseLease {
 }
 
 final class ChatDatabaseGateway {
-  ChatDatabaseGateway();
+  ChatDatabaseGateway({ChatDatabaseObserver? observer})
+    : _observer = observer ?? ChatDatabaseObserver.instance;
 
   static final ChatDatabaseGateway instance = ChatDatabaseGateway();
 
@@ -28,6 +30,7 @@ final class ChatDatabaseGateway {
   String? _databasePath;
   int _leaseCount = 0;
   DatabaseSessionReceipt? _sessionReceipt;
+  final ChatDatabaseObserver _observer;
 
   Future<ChatDatabaseLease> acquire(File databaseFile) async {
     await _closing;
@@ -61,19 +64,26 @@ final class ChatDatabaseGateway {
   }
 
   Future<ChatDatabaseRepository> _open(File databaseFile) async {
-    final repository = ChatDatabaseRepository.open(file: databaseFile);
-    try {
-      await repository.ensureReady();
-      final databaseId = await repository.getDatabaseIdentity();
-      _sessionReceipt = await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: databaseFile.absolute.parent,
-        databaseId: databaseId,
+    return _observer.measure(ChatDatabaseOperation.gatewayOpen, () async {
+      final repository = ChatDatabaseRepository.open(
+        file: databaseFile,
+        observer: _observer,
       );
-      return repository;
-    } catch (_) {
-      await repository.close();
-      rethrow;
-    }
+      try {
+        await repository.ensureReady();
+        await repository.validateConnectionContract();
+        final databaseId = await repository.getDatabaseIdentity();
+        _sessionReceipt =
+            await DatabaseInstallationGate.beginSessionIfInstalled(
+              appDataDirectory: databaseFile.absolute.parent,
+              databaseId: databaseId,
+            );
+        return repository;
+      } catch (_) {
+        await repository.close();
+        rethrow;
+      }
+    });
   }
 
   Future<void> _release(ChatDatabaseRepository repository) async {

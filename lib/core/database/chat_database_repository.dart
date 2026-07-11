@@ -8,6 +8,7 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import 'app_database.dart';
+import 'chat_database_observer.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -54,13 +55,23 @@ class SandboxPathMigrationResult {
 }
 
 class ChatDatabaseRepository {
-  ChatDatabaseRepository(this._db);
+  ChatDatabaseRepository(
+    this._db, {
+    File? databaseFile,
+    ChatDatabaseObserver? observer,
+  }) : _databaseFile = databaseFile?.absolute,
+       _observer = observer ?? ChatDatabaseObserver.instance;
 
   final AppDatabase _db;
+  final File? _databaseFile;
+  final ChatDatabaseObserver _observer;
 
-  static ChatDatabaseRepository open({File? file}) {
+  static ChatDatabaseRepository open({
+    File? file,
+    ChatDatabaseObserver? observer,
+  }) {
     final db = AppDatabase.open(file: file);
-    return ChatDatabaseRepository(db);
+    return ChatDatabaseRepository(db, databaseFile: file, observer: observer);
   }
 
   static Future<bool> migrateInstalledDatabase(File file) async {
@@ -548,6 +559,63 @@ class ChatDatabaseRepository {
     await _db.customSelect('SELECT 1').get();
   }
 
+  Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      Future<Object?> pragma(String name) async {
+        final row = await _db.customSelect('PRAGMA $name;').getSingle();
+        return row.data.values.single;
+      }
+
+      final contract = ChatDatabaseConnectionContract(
+        schemaVersion: await pragma('user_version') as int,
+        journalModeWal:
+            (await pragma('journal_mode')).toString().toLowerCase() == 'wal',
+        foreignKeysEnabled: await pragma('foreign_keys') == 1,
+        busyTimeoutMillis: await pragma('busy_timeout') as int,
+        synchronous: await pragma('synchronous') as int,
+        walAutoCheckpointPages: await pragma('wal_autocheckpoint') as int,
+        journalSizeLimitBytes: await pragma('journal_size_limit') as int,
+      );
+      if (contract.schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_connection_contract:schema_version');
+      }
+      if (!contract.journalModeWal) {
+        throw StateError('database_connection_contract:journal_mode');
+      }
+      if (!contract.foreignKeysEnabled) {
+        throw StateError('database_connection_contract:foreign_keys');
+      }
+      if (contract.busyTimeoutMillis != AppDatabase.busyTimeoutMillis) {
+        throw StateError('database_connection_contract:busy_timeout');
+      }
+      if (contract.synchronous != AppDatabase.synchronousFull) {
+        throw StateError('database_connection_contract:synchronous');
+      }
+      if (contract.walAutoCheckpointPages !=
+          AppDatabase.walAutoCheckpointPages) {
+        throw StateError('database_connection_contract:wal_autocheckpoint');
+      }
+      if (contract.journalSizeLimitBytes != AppDatabase.journalSizeLimitBytes) {
+        throw StateError('database_connection_contract:journal_size_limit');
+      }
+      stopwatch.stop();
+      _observer.recordConnectionContract(
+        contract,
+        elapsedMicros: stopwatch.elapsedMicroseconds,
+      );
+      return contract;
+    } catch (error) {
+      stopwatch.stop();
+      _observer.recordFailure(
+        operation: ChatDatabaseOperation.connectionContract,
+        elapsedMicros: stopwatch.elapsedMicroseconds,
+        error: error,
+      );
+      rethrow;
+    }
+  }
+
   Future<String?> getDatabaseIdentity() async {
     final row =
         await (_db.select(_db.chatStorageMetaRows)..where(
@@ -658,92 +726,167 @@ class ChatDatabaseRepository {
   }
 
   Future<void> checkpoint() async {
-    await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
+    final stopwatch = Stopwatch()..start();
+    int? walBytesBefore;
+    try {
+      walBytesBefore = await _walBytes();
+      final row = await _db
+          .customSelect('PRAGMA wal_checkpoint(TRUNCATE);')
+          .getSingle();
+      final walBytesAfter = await _walBytes();
+      stopwatch.stop();
+      _observer.record(
+        ChatDatabaseObservation(
+          operation: ChatDatabaseOperation.walCheckpoint,
+          elapsedMicros: stopwatch.elapsedMicroseconds,
+          succeeded: true,
+          walBytesBefore: walBytesBefore,
+          walBytesAfter: walBytesAfter,
+          checkpointBusy: row.read<int>('busy'),
+          checkpointLogFrames: row.read<int>('log'),
+          checkpointedFrames: row.read<int>('checkpointed'),
+        ),
+      );
+    } catch (error) {
+      stopwatch.stop();
+      _observer.recordFailure(
+        operation: ChatDatabaseOperation.walCheckpoint,
+        elapsedMicros: stopwatch.elapsedMicroseconds,
+        error: error,
+        walBytesBefore: walBytesBefore,
+      );
+      rethrow;
+    }
   }
 
   Future<void> validateIntegrity() async {
-    final integrityRows = await _db
-        .customSelect('PRAGMA integrity_check')
-        .get();
-    final integrityValues = integrityRows
-        .expand((row) => row.data.values)
-        .map((value) => value.toString())
-        .toList(growable: false);
-    if (integrityValues.length != 1 || integrityValues.single != 'ok') {
-      throw StateError('integrity_check');
+    await _observer.measure(ChatDatabaseOperation.integrityCheck, () async {
+      final integrityRows = await _db
+          .customSelect('PRAGMA integrity_check')
+          .get();
+      final integrityValues = integrityRows
+          .expand((row) => row.data.values)
+          .map((value) => value.toString())
+          .toList(growable: false);
+      if (integrityValues.length != 1 || integrityValues.single != 'ok') {
+        throw StateError('integrity_check');
+      }
+      final foreignKeyRows = await _db
+          .customSelect('PRAGMA foreign_key_check')
+          .get();
+      if (foreignKeyRows.isNotEmpty) {
+        throw StateError('foreign_key_check');
+      }
+    });
+  }
+
+  Future<int?> _walBytes() async {
+    final databaseFile = _databaseFile;
+    if (databaseFile == null) return null;
+    final wal = File('${databaseFile.path}-wal');
+    if (await FileSystemEntity.type(wal.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      return 0;
     }
-    final foreignKeyRows = await _db
-        .customSelect('PRAGMA foreign_key_check')
-        .get();
-    if (foreignKeyRows.isNotEmpty) {
-      throw StateError('foreign_key_check');
-    }
+    return wal.length();
   }
 
   Future<List<Conversation>> getAllConversations() async {
-    final rows =
-        await (_db.select(_db.conversationRows)..orderBy([
-              (t) => OrderingTerm(
-                expression: t.updatedAt,
-                mode: OrderingMode.desc,
-              ),
-            ]))
-            .get();
-    final out = <Conversation>[];
-    for (final row in rows) {
-      out.add(await _conversationFromRow(row));
-    }
-    return out;
+    return _observer.measure(
+      ChatDatabaseOperation.queryConversationList,
+      () async {
+        final rows =
+            await (_db.select(_db.conversationRows)..orderBy([
+                  (t) => OrderingTerm(
+                    expression: t.updatedAt,
+                    mode: OrderingMode.desc,
+                  ),
+                ]))
+                .get();
+        final out = <Conversation>[];
+        for (final row in rows) {
+          out.add(await _conversationFromRow(row));
+        }
+        return out;
+      },
+      resultCount: (rows) => rows.length,
+    );
   }
 
   Future<List<Conversation>> getAllConversationSummaries() async {
-    final rows =
-        await (_db.select(_db.conversationRows)..orderBy([
-              (t) => OrderingTerm(
-                expression: t.updatedAt,
-                mode: OrderingMode.desc,
-              ),
-            ]))
-            .get();
-    final out = <Conversation>[];
-    for (final row in rows) {
-      out.add(await _conversationFromRow(row, includeMessageIds: false));
-    }
-    return out;
+    return _observer.measure(
+      ChatDatabaseOperation.queryConversationList,
+      () async {
+        final rows =
+            await (_db.select(_db.conversationRows)..orderBy([
+                  (t) => OrderingTerm(
+                    expression: t.updatedAt,
+                    mode: OrderingMode.desc,
+                  ),
+                ]))
+                .get();
+        final out = <Conversation>[];
+        for (final row in rows) {
+          out.add(await _conversationFromRow(row, includeMessageIds: false));
+        }
+        return out;
+      },
+      resultCount: (rows) => rows.length,
+    );
   }
 
   Future<Conversation?> getConversation(String id) async {
-    final row = await (_db.select(
-      _db.conversationRows,
-    )..where((t) => t.id.equals(id))).getSingleOrNull();
-    if (row == null) return null;
-    return _conversationFromRow(row);
+    return _observer.measure(
+      ChatDatabaseOperation.queryConversation,
+      () async {
+        final row = await (_db.select(
+          _db.conversationRows,
+        )..where((t) => t.id.equals(id))).getSingleOrNull();
+        if (row == null) return null;
+        return _conversationFromRow(row);
+      },
+      resultCount: (conversation) => conversation == null ? 0 : 1,
+    );
   }
 
   Future<int> getMessageCount(String conversationId) async {
-    final count = _db.messageRows.id.count();
-    final row =
-        await (_db.selectOnly(_db.messageRows)
-              ..addColumns([count])
-              ..where(_db.messageRows.conversationId.equals(conversationId)))
-            .getSingle();
-    return row.read(count) ?? 0;
+    return _observer.measure(ChatDatabaseOperation.queryMessageCount, () async {
+      final count = _db.messageRows.id.count();
+      final row =
+          await (_db.selectOnly(_db.messageRows)
+                ..addColumns([count])
+                ..where(_db.messageRows.conversationId.equals(conversationId)))
+              .getSingle();
+      return row.read(count) ?? 0;
+    }, resultCount: (count) => count);
   }
 
   Future<int> getConversationCount() async {
-    final count = _db.conversationRows.id.count();
-    final row = await (_db.selectOnly(
-      _db.conversationRows,
-    )..addColumns([count])).getSingle();
-    return row.read(count) ?? 0;
+    return _observer.measure(
+      ChatDatabaseOperation.queryConversationCount,
+      () async {
+        final count = _db.conversationRows.id.count();
+        final row = await (_db.selectOnly(
+          _db.conversationRows,
+        )..addColumns([count])).getSingle();
+        return row.read(count) ?? 0;
+      },
+      resultCount: (count) => count,
+    );
   }
 
   Future<int> getTotalMessageCount() async {
-    final count = _db.messageRows.id.count();
-    final row = await (_db.selectOnly(
-      _db.messageRows,
-    )..addColumns([count])).getSingle();
-    return row.read(count) ?? 0;
+    return _observer.measure(
+      ChatDatabaseOperation.queryTotalMessageCount,
+      () async {
+        final count = _db.messageRows.id.count();
+        final row = await (_db.selectOnly(
+          _db.messageRows,
+        )..addColumns([count])).getSingle();
+        return row.read(count) ?? 0;
+      },
+      resultCount: (count) => count,
+    );
   }
 
   Future<int> getMessageIndex(String conversationId, String messageId) async {
@@ -773,27 +916,35 @@ class ChatDatabaseRepository {
   }) async {
     if (limit <= 0) return const <ChatMessage>[];
     final safeStart = start < 0 ? 0 : start;
-    final rows =
-        await (_db.select(_db.messageRows)
-              ..where((t) => t.conversationId.equals(conversationId))
-              ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)])
-              ..limit(limit, offset: safeStart))
-            .get();
-    return rows.map(_messageFromRow).toList(growable: false);
+    return _observer.measure(ChatDatabaseOperation.queryMessageRange, () async {
+      final rows =
+          await (_db.select(_db.messageRows)
+                ..where((t) => t.conversationId.equals(conversationId))
+                ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)])
+                ..limit(limit, offset: safeStart))
+              .get();
+      return rows.map(_messageFromRow).toList(growable: false);
+    }, resultCount: (rows) => rows.length);
   }
 
   Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
     if (ids.isEmpty) return const <ChatMessage>[];
-    final rows = await (_db.select(
-      _db.messageRows,
-    )..where((t) => t.id.isIn(ids))).get();
-    final byId = <String, ChatMessage>{
-      for (final row in rows) row.id: _messageFromRow(row),
-    };
-    return [
-      for (final id in ids)
-        if (byId[id] != null) byId[id]!,
-    ];
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessagesByIds,
+      () async {
+        final rows = await (_db.select(
+          _db.messageRows,
+        )..where((t) => t.id.isIn(ids))).get();
+        final byId = <String, ChatMessage>{
+          for (final row in rows) row.id: _messageFromRow(row),
+        };
+        return [
+          for (final id in ids)
+            if (byId[id] != null) byId[id]!,
+        ];
+      },
+      resultCount: (rows) => rows.length,
+    );
   }
 
   Future<Map<String, int>> getFirstMessageIndicesForGroups(
@@ -828,28 +979,36 @@ class ChatDatabaseRepository {
   ) async {
     final ids = groupIds.where((id) => id.isNotEmpty).toSet();
     if (ids.isEmpty) return const <ChatMessage>[];
-    final rows =
-        await (_db.select(_db.messageRows)
-              ..where(
-                (t) =>
-                    t.conversationId.equals(conversationId) &
-                    (t.groupId.isIn(ids) | t.id.isIn(ids)),
-              )
-              ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
-            .get();
-    return rows.map(_messageFromRow).toList(growable: false);
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessagesForGroups,
+      () async {
+        final rows =
+            await (_db.select(_db.messageRows)
+                  ..where(
+                    (t) =>
+                        t.conversationId.equals(conversationId) &
+                        (t.groupId.isIn(ids) | t.id.isIn(ids)),
+                  )
+                  ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
+                .get();
+        return rows.map(_messageFromRow).toList(growable: false);
+      },
+      resultCount: (rows) => rows.length,
+    );
   }
 
   Future<List<String>> getMessageIds(String conversationId) async {
-    final rows =
-        await (_db.selectOnly(_db.messageRows)
-              ..addColumns([_db.messageRows.id])
-              ..where(_db.messageRows.conversationId.equals(conversationId))
-              ..orderBy([OrderingTerm.asc(_db.messageRows.messageOrder)]))
-            .get();
-    return rows
-        .map((row) => row.read(_db.messageRows.id)!)
-        .toList(growable: false);
+    return _observer.measure(ChatDatabaseOperation.queryMessageIds, () async {
+      final rows =
+          await (_db.selectOnly(_db.messageRows)
+                ..addColumns([_db.messageRows.id])
+                ..where(_db.messageRows.conversationId.equals(conversationId))
+                ..orderBy([OrderingTerm.asc(_db.messageRows.messageOrder)]))
+              .get();
+      return rows
+          .map((row) => row.read(_db.messageRows.id)!)
+          .toList(growable: false);
+    }, resultCount: (rows) => rows.length);
   }
 
   Future<void> updateMessageOrder(
@@ -865,6 +1024,22 @@ class ChatDatabaseRepository {
     required List<String> tokens,
     int limit = 200,
     int candidateMultiplier = 8,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.querySearch,
+      () => _searchConversationMatches(
+        tokens: tokens,
+        limit: limit,
+        candidateMultiplier: candidateMultiplier,
+      ),
+      resultCount: (rows) => rows.length,
+    );
+  }
+
+  Future<List<ConversationSearchMatch>> _searchConversationMatches({
+    required List<String> tokens,
+    required int limit,
+    required int candidateMultiplier,
   }) async {
     final cleanTokens = tokens
         .map((token) => token.trim().toLowerCase())
@@ -985,6 +1160,23 @@ class ChatDatabaseRepository {
     required ChatMessage message,
     bool selectVersion = false,
     bool touchUpdatedAt = true,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendMessage,
+      () => _appendMessageToConversation(
+        conversation: conversation,
+        message: message,
+        selectVersion: selectVersion,
+        touchUpdatedAt: touchUpdatedAt,
+      ),
+    );
+  }
+
+  Future<Conversation> _appendMessageToConversation({
+    required Conversation conversation,
+    required ChatMessage message,
+    required bool selectVersion,
+    required bool touchUpdatedAt,
   }) async {
     if (message.conversationId != conversation.id) {
       throw ArgumentError.value(
@@ -1030,6 +1222,19 @@ class ChatDatabaseRepository {
   Future<void> createConversationWithMessages({
     required Conversation conversation,
     required List<ChatMessage> messages,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandCreateConversation,
+      () => _createConversationWithMessages(
+        conversation: conversation,
+        messages: messages,
+      ),
+    );
+  }
+
+  Future<void> _createConversationWithMessages({
+    required Conversation conversation,
+    required List<ChatMessage> messages,
   }) async {
     for (final message in messages) {
       if (message.conversationId != conversation.id) {
@@ -1068,6 +1273,16 @@ class ChatDatabaseRepository {
   }
 
   Future<AppendedMessageVersion?> appendMessageVersion({
+    required String messageId,
+    required String content,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendVersion,
+      () => _appendMessageVersion(messageId: messageId, content: content),
+    );
+  }
+
+  Future<AppendedMessageVersion?> _appendMessageVersion({
     required String messageId,
     required String content,
   }) async {
@@ -1130,6 +1345,21 @@ class ChatDatabaseRepository {
   }
 
   Future<Conversation?> setSelectedVersion({
+    required String conversationId,
+    required String groupId,
+    required int? version,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandSelectVersion,
+      () => _setSelectedVersion(
+        conversationId: conversationId,
+        groupId: groupId,
+        version: version,
+      ),
+    );
+  }
+
+  Future<Conversation?> _setSelectedVersion({
     required String conversationId,
     required String groupId,
     required int? version,
@@ -1712,6 +1942,18 @@ class ChatDatabaseRepository {
   Future<void> updateStreamingCheckpoint(
     ChatMessage message,
     List<Map<String, dynamic>> toolEvents,
+  ) {
+    return _observer.measure(
+      message.isStreaming
+          ? ChatDatabaseOperation.commandStreamingCheckpoint
+          : ChatDatabaseOperation.commandFinalCheckpoint,
+      () => _updateStreamingCheckpoint(message, toolEvents),
+    );
+  }
+
+  Future<void> _updateStreamingCheckpoint(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents,
   ) async {
     await _db.transaction(() async {
       await (_db.update(
@@ -1765,6 +2007,21 @@ class ChatDatabaseRepository {
   }
 
   Future<DeletedMessagesResult?> deleteMessages({
+    required String conversationId,
+    required Set<String> messageIds,
+    required Map<String, int?> versionSelectionChanges,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _deleteMessages(
+        conversationId: conversationId,
+        messageIds: messageIds,
+        versionSelectionChanges: versionSelectionChanges,
+      ),
+    );
+  }
+
+  Future<DeletedMessagesResult?> _deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,

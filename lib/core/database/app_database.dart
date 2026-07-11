@@ -189,6 +189,15 @@ class AppDatabase extends _$AppDatabase {
   // adds enforced invariants, stable ordering indexes, and microsecond time.
   static const currentSchemaVersion = 3;
   static const oldestMigratableSchemaVersion = 1;
+  // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
+  // page size this starts a checkpoint around 4 MiB, but page size remains the
+  // source of truth.
+  static const walAutoCheckpointPages = 1000;
+  // This limits retained journal/WAL storage after reset/checkpoint; it is not
+  // a promise that an active WAL can never temporarily exceed 16 MiB.
+  static const journalSizeLimitBytes = 16 << 20;
+  static const busyTimeoutMillis = 5000;
+  static const synchronousFull = 2;
 
   factory AppDatabase.open({File? file}) {
     final databaseFile = file;
@@ -212,9 +221,13 @@ class AppDatabase extends _$AppDatabase {
       setup: (database) {
         database.execute('PRAGMA journal_mode = WAL;');
         database.execute('PRAGMA foreign_keys = ON;');
-        database.execute('PRAGMA busy_timeout = 5000;');
+        database.execute('PRAGMA busy_timeout = $busyTimeoutMillis;');
+        database.execute('PRAGMA synchronous = FULL;');
+        database.execute(
+          'PRAGMA wal_autocheckpoint = $walAutoCheckpointPages;',
+        );
+        database.execute('PRAGMA journal_size_limit = $journalSizeLimitBytes;');
       },
-      readPool: 1,
     );
   }
 

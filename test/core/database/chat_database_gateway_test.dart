@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_gateway.dart';
+import 'package:Kelivo/core/database/chat_database_observer.dart';
 import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -61,6 +62,8 @@ void main() {
     test(
       'failed initialization can be retried after preserving evidence',
       () async {
+        final observer = ChatDatabaseObserver();
+        gateway = ChatDatabaseGateway(observer: observer);
         final file = File('${directory.path}/chat.sqlite');
         await file.writeAsString('not sqlite');
 
@@ -71,6 +74,11 @@ void main() {
         final lease = await gateway.acquire(file);
         expect(await lease.repository.getConversationCount(), 0);
         await lease.release();
+        final metric = observer
+            .snapshot()
+            .operations[ChatDatabaseOperation.gatewayOpen]!;
+        expect(metric.totalCount, 2);
+        expect(metric.failureCount, 1);
       },
     );
 

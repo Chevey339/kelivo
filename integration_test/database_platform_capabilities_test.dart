@@ -61,6 +61,7 @@ Future<int> _verifySchemaMigration(Directory root) async {
   repository = ChatDatabaseRepository.open(file: file);
   try {
     await repository.ensureReady();
+    await repository.validateConnectionContract();
     await repository.validateIntegrity();
   } finally {
     await repository.close();

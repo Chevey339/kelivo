@@ -14,6 +14,8 @@
 - 平台 full file/directory barrier 与 rename；
 - SQLite version/source ID 和 Dart target ABI 输出。
 
+DB2-08 接入 live connection contract 后，macOS/iOS 两个目标均再次运行通过；runner 会在 migration 后通过 repository 断言 live Drift 连接实际为 WAL、FK ON、busy timeout 5000ms、FULL、auto-checkpoint 1000 pages 与 journal size limit 16 MiB，而不只验证独立 raw sqlite handle。
+
 输出只包含平台、ABI、SQLite 元数据和布尔/数值能力，不包含消息正文、秘密或完整文件路径。
 
 ## 2. 实际命令
