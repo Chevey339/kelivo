@@ -25,7 +25,10 @@ void main() {
   group('AppDatabase migrations', () {
     test('every frozen schema upgrades and validates step by step', () async {
       const versions = GeneratedHelper.versions;
-      expect(versions, orderedEquals([1, 2, AppDatabase.currentSchemaVersion]));
+      expect(
+        versions,
+        orderedEquals([1, 2, 3, AppDatabase.currentSchemaVersion]),
+      );
 
       for (final (index, fromVersion) in versions.indexed) {
         for (final toVersion in versions.skip(index + 1)) {
@@ -191,6 +194,55 @@ void main() {
             ['conversation-1'],
           ).single['created_at'],
           100,
+        );
+      } finally {
+        await database.close();
+        schema.close();
+      }
+    });
+
+    test('v3 to v4 adds empty graph tables without changing v3 rows', () async {
+      final schema = await verifier.schemaAt(3);
+      schema.rawDatabase.execute(
+        'INSERT INTO conversation_rows ('
+        'id, title, created_at, updated_at, is_pinned, truncate_index, '
+        'version_selections_json, last_summarized_message_count, '
+        'chat_suggestions_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+        [
+          'conversation-1',
+          'Legacy input',
+          1000000,
+          2000000,
+          0,
+          -1,
+          '{}',
+          0,
+          '[]',
+        ],
+      );
+
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+        );
+        expect(
+          (await database.select(database.conversationRows).getSingle()).title,
+          'Legacy input',
+        );
+        expect(await database.select(database.messageSlotRows).get(), isEmpty);
+        expect(
+          await database.select(database.messageRevisionRows).get(),
+          isEmpty,
+        );
+        expect(
+          await database.select(database.conversationBranchRows).get(),
+          isEmpty,
+        );
+        expect(
+          await database.select(database.conversationStateRows).get(),
+          isEmpty,
         );
       } finally {
         await database.close();

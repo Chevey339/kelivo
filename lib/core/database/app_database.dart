@@ -178,6 +178,162 @@ class ChatStorageMetaRows extends Table {
   Set<Column<Object>> get primaryKey => {key};
 }
 
+@TableIndex(
+  name: 'idx_message_slots_conversation_created',
+  columns: {#conversationId, #createdAt, #id},
+)
+class MessageSlotRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get role =>
+      text()
+      // ignore: recursive_getters
+      .check(role.isIn(const ['user', 'assistant', 'system', 'tool']))();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, id},
+  ];
+}
+
+@TableIndex(
+  name: 'idx_message_revisions_parent',
+  columns: {#conversationId, #parentRevisionId, #id},
+)
+@TableIndex(
+  name: 'idx_message_revisions_slot_version',
+  columns: {
+    #conversationId,
+    #slotId,
+    IndexedColumn(#revisionNo, orderBy: OrderingMode.desc),
+    #id,
+  },
+)
+class MessageRevisionRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get slotId => text()();
+  TextColumn get parentRevisionId => text().nullable()();
+  IntColumn get revisionNo =>
+      integer()
+      // ignore: recursive_getters
+      .check(revisionNo.isBiggerOrEqualValue(0))();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get finalizedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+  IntColumn get deletedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, id},
+    {conversationId, slotId, revisionNo},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, slot_id) '
+        'REFERENCES message_slot_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'FOREIGN KEY (conversation_id, parent_revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'CHECK (parent_revision_id IS NULL OR parent_revision_id <> id)',
+    'CHECK (updated_at >= created_at)',
+    'CHECK (finalized_at IS NULL OR finalized_at >= created_at)',
+    'CHECK (deleted_at IS NULL OR deleted_at >= created_at)',
+  ];
+}
+
+@TableIndex(
+  name: 'idx_conversation_branches_leaf',
+  columns: {#conversationId, #leafRevisionId, #id},
+)
+@TableIndex(
+  name: 'idx_conversation_branches_parent',
+  columns: {#conversationId, #parentBranchId, #id},
+)
+class ConversationBranchRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get parentBranchId => text().nullable()();
+  TextColumn get forkedFromRevisionId => text().nullable()();
+  TextColumn get leafRevisionId => text().nullable()();
+  TextColumn get causalityKind => text().check(
+    // ignore: recursive_getters
+    causalityKind.isIn(const [
+      'native',
+      'legacy_visible_projection',
+      'legacy_ambiguous',
+    ]),
+  )();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get deletedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, id},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, parent_branch_id) '
+        'REFERENCES conversation_branch_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'FOREIGN KEY (conversation_id, forked_from_revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'FOREIGN KEY (conversation_id, leaf_revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'CHECK (parent_branch_id IS NULL OR parent_branch_id <> id)',
+    'CHECK (deleted_at IS NULL OR deleted_at >= created_at)',
+  ];
+}
+
+class ConversationStateRows extends Table {
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get activeBranchId => text().nullable()();
+  TextColumn get contextStartRevisionId => text().nullable()();
+  IntColumn get stateRevision => integer()
+      // ignore: recursive_getters
+      .check(stateRevision.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {conversationId};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, active_branch_id) '
+        'REFERENCES conversation_branch_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'FOREIGN KEY (conversation_id, context_start_revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+  ];
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -186,6 +342,10 @@ class ChatStorageMetaRows extends Table {
     ToolEventRows,
     GeminiThoughtSignatureRows,
     ChatStorageMetaRows,
+    MessageSlotRows,
+    MessageRevisionRows,
+    ConversationBranchRows,
+    ConversationStateRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -195,7 +355,9 @@ class AppDatabase extends _$AppDatabase {
 
   // Version 2 established the Database Kernel v2 format boundary. Version 3
   // adds enforced invariants, stable ordering indexes, and microsecond time.
-  static const currentSchemaVersion = 3;
+  // Version 4 adds the Message Graph identity and ancestry kernel while the
+  // v3 rows remain available as an unpublished legacy migration source.
+  static const currentSchemaVersion = 4;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -356,6 +518,19 @@ FROM probe;
             await customStatement('PRAGMA foreign_keys = ON;');
           }
         }
+      },
+      from3To4: (migrator, schema) async {
+        await transaction(() async {
+          await migrator.createTable(messageSlotRows);
+          await migrator.createTable(messageRevisionRows);
+          await migrator.createTable(conversationBranchRows);
+          await migrator.createTable(conversationStateRows);
+          await migrator.createIndex(idxMessageSlotsConversationCreated);
+          await migrator.createIndex(idxMessageRevisionsParent);
+          await migrator.createIndex(idxMessageRevisionsSlotVersion);
+          await migrator.createIndex(idxConversationBranchesLeaf);
+          await migrator.createIndex(idxConversationBranchesParent);
+        });
       },
     ),
     beforeOpen: (details) async {

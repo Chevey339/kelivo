@@ -2911,6 +2911,1868 @@ class ChatStorageMetaRowsCompanion extends UpdateCompanion<ChatStorageMetaRow> {
   }
 }
 
+class $MessageSlotRowsTable extends MessageSlotRows
+    with TableInfo<$MessageSlotRowsTable, MessageSlotRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageSlotRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    check: () => role.isIn(const ['user', 'assistant', 'system', 'tool']),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MessageSlotRowsTable.$convertercreatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, conversationId, role, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_slot_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MessageSlotRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {conversationId, id},
+  ];
+  @override
+  MessageSlotRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageSlotRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      createdAt: $MessageSlotRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $MessageSlotRowsTable createAlias(String alias) {
+    return $MessageSlotRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class MessageSlotRow extends DataClass implements Insertable<MessageSlotRow> {
+  final String id;
+  final String conversationId;
+  final String role;
+  final DateTime createdAt;
+  const MessageSlotRow({
+    required this.id,
+    required this.conversationId,
+    required this.role,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['role'] = Variable<String>(role);
+    {
+      map['created_at'] = Variable<int>(
+        $MessageSlotRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    return map;
+  }
+
+  MessageSlotRowsCompanion toCompanion(bool nullToAbsent) {
+    return MessageSlotRowsCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      role: Value(role),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MessageSlotRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageSlotRow(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      role: serializer.fromJson<String>(json['role']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'role': serializer.toJson<String>(role),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  MessageSlotRow copyWith({
+    String? id,
+    String? conversationId,
+    String? role,
+    DateTime? createdAt,
+  }) => MessageSlotRow(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    role: role ?? this.role,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MessageSlotRow copyWithCompanion(MessageSlotRowsCompanion data) {
+    return MessageSlotRow(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      role: data.role.present ? data.role.value : this.role,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSlotRow(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('role: $role, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, conversationId, role, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageSlotRow &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.role == this.role &&
+          other.createdAt == this.createdAt);
+}
+
+class MessageSlotRowsCompanion extends UpdateCompanion<MessageSlotRow> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String> role;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const MessageSlotRowsCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.role = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessageSlotRowsCompanion.insert({
+    required String id,
+    required String conversationId,
+    required String role,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       role = Value(role),
+       createdAt = Value(createdAt);
+  static Insertable<MessageSlotRow> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? role,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (role != null) 'role': role,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessageSlotRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String>? role,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return MessageSlotRowsCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      role: role ?? this.role,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $MessageSlotRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageSlotRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('role: $role, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MessageRevisionRowsTable extends MessageRevisionRows
+    with TableInfo<$MessageRevisionRowsTable, MessageRevisionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MessageRevisionRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _slotIdMeta = const VerificationMeta('slotId');
+  @override
+  late final GeneratedColumn<String> slotId = GeneratedColumn<String>(
+    'slot_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _parentRevisionIdMeta = const VerificationMeta(
+    'parentRevisionId',
+  );
+  @override
+  late final GeneratedColumn<String> parentRevisionId = GeneratedColumn<String>(
+    'parent_revision_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _revisionNoMeta = const VerificationMeta(
+    'revisionNo',
+  );
+  @override
+  late final GeneratedColumn<int> revisionNo = GeneratedColumn<int>(
+    'revision_no',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(revisionNo).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MessageRevisionRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MessageRevisionRowsTable.$converterupdatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> finalizedAt =
+      GeneratedColumn<int>(
+        'finalized_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>(
+        $MessageRevisionRowsTable.$converterfinalizedAtn,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> deletedAt =
+      GeneratedColumn<int>(
+        'deleted_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>(
+        $MessageRevisionRowsTable.$converterdeletedAtn,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    conversationId,
+    slotId,
+    parentRevisionId,
+    revisionNo,
+    createdAt,
+    updatedAt,
+    finalizedAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'message_revision_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MessageRevisionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('slot_id')) {
+      context.handle(
+        _slotIdMeta,
+        slotId.isAcceptableOrUnknown(data['slot_id']!, _slotIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_slotIdMeta);
+    }
+    if (data.containsKey('parent_revision_id')) {
+      context.handle(
+        _parentRevisionIdMeta,
+        parentRevisionId.isAcceptableOrUnknown(
+          data['parent_revision_id']!,
+          _parentRevisionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('revision_no')) {
+      context.handle(
+        _revisionNoMeta,
+        revisionNo.isAcceptableOrUnknown(data['revision_no']!, _revisionNoMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionNoMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {conversationId, id},
+    {conversationId, slotId, revisionNo},
+  ];
+  @override
+  MessageRevisionRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MessageRevisionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      slotId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slot_id'],
+      )!,
+      parentRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_revision_id'],
+      ),
+      revisionNo: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}revision_no'],
+      )!,
+      createdAt: $MessageRevisionRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $MessageRevisionRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      finalizedAt: $MessageRevisionRowsTable.$converterfinalizedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}finalized_at'],
+        ),
+      ),
+      deletedAt: $MessageRevisionRowsTable.$converterdeletedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}deleted_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $MessageRevisionRowsTable createAlias(String alias) {
+    return $MessageRevisionRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterfinalizedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterfinalizedAtn =
+      NullAwareTypeConverter.wrap($converterfinalizedAt);
+  static TypeConverter<DateTime, int> $converterdeletedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterdeletedAtn =
+      NullAwareTypeConverter.wrap($converterdeletedAt);
+}
+
+class MessageRevisionRow extends DataClass
+    implements Insertable<MessageRevisionRow> {
+  final String id;
+  final String conversationId;
+  final String slotId;
+  final String? parentRevisionId;
+  final int revisionNo;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? finalizedAt;
+  final DateTime? deletedAt;
+  const MessageRevisionRow({
+    required this.id,
+    required this.conversationId,
+    required this.slotId,
+    this.parentRevisionId,
+    required this.revisionNo,
+    required this.createdAt,
+    required this.updatedAt,
+    this.finalizedAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['slot_id'] = Variable<String>(slotId);
+    if (!nullToAbsent || parentRevisionId != null) {
+      map['parent_revision_id'] = Variable<String>(parentRevisionId);
+    }
+    map['revision_no'] = Variable<int>(revisionNo);
+    {
+      map['created_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    if (!nullToAbsent || finalizedAt != null) {
+      map['finalized_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterfinalizedAtn.toSql(finalizedAt),
+      );
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterdeletedAtn.toSql(deletedAt),
+      );
+    }
+    return map;
+  }
+
+  MessageRevisionRowsCompanion toCompanion(bool nullToAbsent) {
+    return MessageRevisionRowsCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      slotId: Value(slotId),
+      parentRevisionId: parentRevisionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentRevisionId),
+      revisionNo: Value(revisionNo),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      finalizedAt: finalizedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(finalizedAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory MessageRevisionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MessageRevisionRow(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      slotId: serializer.fromJson<String>(json['slotId']),
+      parentRevisionId: serializer.fromJson<String?>(json['parentRevisionId']),
+      revisionNo: serializer.fromJson<int>(json['revisionNo']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      finalizedAt: serializer.fromJson<DateTime?>(json['finalizedAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'slotId': serializer.toJson<String>(slotId),
+      'parentRevisionId': serializer.toJson<String?>(parentRevisionId),
+      'revisionNo': serializer.toJson<int>(revisionNo),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'finalizedAt': serializer.toJson<DateTime?>(finalizedAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  MessageRevisionRow copyWith({
+    String? id,
+    String? conversationId,
+    String? slotId,
+    Value<String?> parentRevisionId = const Value.absent(),
+    int? revisionNo,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> finalizedAt = const Value.absent(),
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => MessageRevisionRow(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    slotId: slotId ?? this.slotId,
+    parentRevisionId: parentRevisionId.present
+        ? parentRevisionId.value
+        : this.parentRevisionId,
+    revisionNo: revisionNo ?? this.revisionNo,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    finalizedAt: finalizedAt.present ? finalizedAt.value : this.finalizedAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  MessageRevisionRow copyWithCompanion(MessageRevisionRowsCompanion data) {
+    return MessageRevisionRow(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      slotId: data.slotId.present ? data.slotId.value : this.slotId,
+      parentRevisionId: data.parentRevisionId.present
+          ? data.parentRevisionId.value
+          : this.parentRevisionId,
+      revisionNo: data.revisionNo.present
+          ? data.revisionNo.value
+          : this.revisionNo,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      finalizedAt: data.finalizedAt.present
+          ? data.finalizedAt.value
+          : this.finalizedAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageRevisionRow(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('slotId: $slotId, ')
+          ..write('parentRevisionId: $parentRevisionId, ')
+          ..write('revisionNo: $revisionNo, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('finalizedAt: $finalizedAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    conversationId,
+    slotId,
+    parentRevisionId,
+    revisionNo,
+    createdAt,
+    updatedAt,
+    finalizedAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MessageRevisionRow &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.slotId == this.slotId &&
+          other.parentRevisionId == this.parentRevisionId &&
+          other.revisionNo == this.revisionNo &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.finalizedAt == this.finalizedAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class MessageRevisionRowsCompanion extends UpdateCompanion<MessageRevisionRow> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String> slotId;
+  final Value<String?> parentRevisionId;
+  final Value<int> revisionNo;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> finalizedAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const MessageRevisionRowsCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.slotId = const Value.absent(),
+    this.parentRevisionId = const Value.absent(),
+    this.revisionNo = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.finalizedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MessageRevisionRowsCompanion.insert({
+    required String id,
+    required String conversationId,
+    required String slotId,
+    this.parentRevisionId = const Value.absent(),
+    required int revisionNo,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.finalizedAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       slotId = Value(slotId),
+       revisionNo = Value(revisionNo),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<MessageRevisionRow> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? slotId,
+    Expression<String>? parentRevisionId,
+    Expression<int>? revisionNo,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? finalizedAt,
+    Expression<int>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (slotId != null) 'slot_id': slotId,
+      if (parentRevisionId != null) 'parent_revision_id': parentRevisionId,
+      if (revisionNo != null) 'revision_no': revisionNo,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (finalizedAt != null) 'finalized_at': finalizedAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MessageRevisionRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String>? slotId,
+    Value<String?>? parentRevisionId,
+    Value<int>? revisionNo,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? finalizedAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return MessageRevisionRowsCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      slotId: slotId ?? this.slotId,
+      parentRevisionId: parentRevisionId ?? this.parentRevisionId,
+      revisionNo: revisionNo ?? this.revisionNo,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      finalizedAt: finalizedAt ?? this.finalizedAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (slotId.present) {
+      map['slot_id'] = Variable<String>(slotId.value);
+    }
+    if (parentRevisionId.present) {
+      map['parent_revision_id'] = Variable<String>(parentRevisionId.value);
+    }
+    if (revisionNo.present) {
+      map['revision_no'] = Variable<int>(revisionNo.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (finalizedAt.present) {
+      map['finalized_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterfinalizedAtn.toSql(
+          finalizedAt.value,
+        ),
+      );
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(
+        $MessageRevisionRowsTable.$converterdeletedAtn.toSql(deletedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MessageRevisionRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('slotId: $slotId, ')
+          ..write('parentRevisionId: $parentRevisionId, ')
+          ..write('revisionNo: $revisionNo, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('finalizedAt: $finalizedAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ConversationBranchRowsTable extends ConversationBranchRows
+    with TableInfo<$ConversationBranchRowsTable, ConversationBranchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ConversationBranchRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _parentBranchIdMeta = const VerificationMeta(
+    'parentBranchId',
+  );
+  @override
+  late final GeneratedColumn<String> parentBranchId = GeneratedColumn<String>(
+    'parent_branch_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _forkedFromRevisionIdMeta =
+      const VerificationMeta('forkedFromRevisionId');
+  @override
+  late final GeneratedColumn<String> forkedFromRevisionId =
+      GeneratedColumn<String>(
+        'forked_from_revision_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _leafRevisionIdMeta = const VerificationMeta(
+    'leafRevisionId',
+  );
+  @override
+  late final GeneratedColumn<String> leafRevisionId = GeneratedColumn<String>(
+    'leaf_revision_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _causalityKindMeta = const VerificationMeta(
+    'causalityKind',
+  );
+  @override
+  late final GeneratedColumn<String> causalityKind = GeneratedColumn<String>(
+    'causality_kind',
+    aliasedName,
+    false,
+    check: () => causalityKind.isIn(const [
+      'native',
+      'legacy_visible_projection',
+      'legacy_ambiguous',
+    ]),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>(
+        $ConversationBranchRowsTable.$convertercreatedAt,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> deletedAt =
+      GeneratedColumn<int>(
+        'deleted_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>(
+        $ConversationBranchRowsTable.$converterdeletedAtn,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    conversationId,
+    parentBranchId,
+    forkedFromRevisionId,
+    leafRevisionId,
+    causalityKind,
+    createdAt,
+    deletedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'conversation_branch_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ConversationBranchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('parent_branch_id')) {
+      context.handle(
+        _parentBranchIdMeta,
+        parentBranchId.isAcceptableOrUnknown(
+          data['parent_branch_id']!,
+          _parentBranchIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('forked_from_revision_id')) {
+      context.handle(
+        _forkedFromRevisionIdMeta,
+        forkedFromRevisionId.isAcceptableOrUnknown(
+          data['forked_from_revision_id']!,
+          _forkedFromRevisionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('leaf_revision_id')) {
+      context.handle(
+        _leafRevisionIdMeta,
+        leafRevisionId.isAcceptableOrUnknown(
+          data['leaf_revision_id']!,
+          _leafRevisionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('causality_kind')) {
+      context.handle(
+        _causalityKindMeta,
+        causalityKind.isAcceptableOrUnknown(
+          data['causality_kind']!,
+          _causalityKindMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_causalityKindMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {conversationId, id},
+  ];
+  @override
+  ConversationBranchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ConversationBranchRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      parentBranchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_branch_id'],
+      ),
+      forkedFromRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}forked_from_revision_id'],
+      ),
+      leafRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}leaf_revision_id'],
+      ),
+      causalityKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}causality_kind'],
+      )!,
+      createdAt: $ConversationBranchRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      deletedAt: $ConversationBranchRowsTable.$converterdeletedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}deleted_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $ConversationBranchRowsTable createAlias(String alias) {
+    return $ConversationBranchRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterdeletedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterdeletedAtn =
+      NullAwareTypeConverter.wrap($converterdeletedAt);
+}
+
+class ConversationBranchRow extends DataClass
+    implements Insertable<ConversationBranchRow> {
+  final String id;
+  final String conversationId;
+  final String? parentBranchId;
+  final String? forkedFromRevisionId;
+  final String? leafRevisionId;
+  final String causalityKind;
+  final DateTime createdAt;
+  final DateTime? deletedAt;
+  const ConversationBranchRow({
+    required this.id,
+    required this.conversationId,
+    this.parentBranchId,
+    this.forkedFromRevisionId,
+    this.leafRevisionId,
+    required this.causalityKind,
+    required this.createdAt,
+    this.deletedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    if (!nullToAbsent || parentBranchId != null) {
+      map['parent_branch_id'] = Variable<String>(parentBranchId);
+    }
+    if (!nullToAbsent || forkedFromRevisionId != null) {
+      map['forked_from_revision_id'] = Variable<String>(forkedFromRevisionId);
+    }
+    if (!nullToAbsent || leafRevisionId != null) {
+      map['leaf_revision_id'] = Variable<String>(leafRevisionId);
+    }
+    map['causality_kind'] = Variable<String>(causalityKind);
+    {
+      map['created_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    if (!nullToAbsent || deletedAt != null) {
+      map['deleted_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$converterdeletedAtn.toSql(deletedAt),
+      );
+    }
+    return map;
+  }
+
+  ConversationBranchRowsCompanion toCompanion(bool nullToAbsent) {
+    return ConversationBranchRowsCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      parentBranchId: parentBranchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentBranchId),
+      forkedFromRevisionId: forkedFromRevisionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(forkedFromRevisionId),
+      leafRevisionId: leafRevisionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(leafRevisionId),
+      causalityKind: Value(causalityKind),
+      createdAt: Value(createdAt),
+      deletedAt: deletedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deletedAt),
+    );
+  }
+
+  factory ConversationBranchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ConversationBranchRow(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      parentBranchId: serializer.fromJson<String?>(json['parentBranchId']),
+      forkedFromRevisionId: serializer.fromJson<String?>(
+        json['forkedFromRevisionId'],
+      ),
+      leafRevisionId: serializer.fromJson<String?>(json['leafRevisionId']),
+      causalityKind: serializer.fromJson<String>(json['causalityKind']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      deletedAt: serializer.fromJson<DateTime?>(json['deletedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'parentBranchId': serializer.toJson<String?>(parentBranchId),
+      'forkedFromRevisionId': serializer.toJson<String?>(forkedFromRevisionId),
+      'leafRevisionId': serializer.toJson<String?>(leafRevisionId),
+      'causalityKind': serializer.toJson<String>(causalityKind),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'deletedAt': serializer.toJson<DateTime?>(deletedAt),
+    };
+  }
+
+  ConversationBranchRow copyWith({
+    String? id,
+    String? conversationId,
+    Value<String?> parentBranchId = const Value.absent(),
+    Value<String?> forkedFromRevisionId = const Value.absent(),
+    Value<String?> leafRevisionId = const Value.absent(),
+    String? causalityKind,
+    DateTime? createdAt,
+    Value<DateTime?> deletedAt = const Value.absent(),
+  }) => ConversationBranchRow(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    parentBranchId: parentBranchId.present
+        ? parentBranchId.value
+        : this.parentBranchId,
+    forkedFromRevisionId: forkedFromRevisionId.present
+        ? forkedFromRevisionId.value
+        : this.forkedFromRevisionId,
+    leafRevisionId: leafRevisionId.present
+        ? leafRevisionId.value
+        : this.leafRevisionId,
+    causalityKind: causalityKind ?? this.causalityKind,
+    createdAt: createdAt ?? this.createdAt,
+    deletedAt: deletedAt.present ? deletedAt.value : this.deletedAt,
+  );
+  ConversationBranchRow copyWithCompanion(
+    ConversationBranchRowsCompanion data,
+  ) {
+    return ConversationBranchRow(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      parentBranchId: data.parentBranchId.present
+          ? data.parentBranchId.value
+          : this.parentBranchId,
+      forkedFromRevisionId: data.forkedFromRevisionId.present
+          ? data.forkedFromRevisionId.value
+          : this.forkedFromRevisionId,
+      leafRevisionId: data.leafRevisionId.present
+          ? data.leafRevisionId.value
+          : this.leafRevisionId,
+      causalityKind: data.causalityKind.present
+          ? data.causalityKind.value
+          : this.causalityKind,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      deletedAt: data.deletedAt.present ? data.deletedAt.value : this.deletedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationBranchRow(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('parentBranchId: $parentBranchId, ')
+          ..write('forkedFromRevisionId: $forkedFromRevisionId, ')
+          ..write('leafRevisionId: $leafRevisionId, ')
+          ..write('causalityKind: $causalityKind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deletedAt: $deletedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    conversationId,
+    parentBranchId,
+    forkedFromRevisionId,
+    leafRevisionId,
+    causalityKind,
+    createdAt,
+    deletedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ConversationBranchRow &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.parentBranchId == this.parentBranchId &&
+          other.forkedFromRevisionId == this.forkedFromRevisionId &&
+          other.leafRevisionId == this.leafRevisionId &&
+          other.causalityKind == this.causalityKind &&
+          other.createdAt == this.createdAt &&
+          other.deletedAt == this.deletedAt);
+}
+
+class ConversationBranchRowsCompanion
+    extends UpdateCompanion<ConversationBranchRow> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String?> parentBranchId;
+  final Value<String?> forkedFromRevisionId;
+  final Value<String?> leafRevisionId;
+  final Value<String> causalityKind;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> deletedAt;
+  final Value<int> rowid;
+  const ConversationBranchRowsCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.parentBranchId = const Value.absent(),
+    this.forkedFromRevisionId = const Value.absent(),
+    this.leafRevisionId = const Value.absent(),
+    this.causalityKind = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ConversationBranchRowsCompanion.insert({
+    required String id,
+    required String conversationId,
+    this.parentBranchId = const Value.absent(),
+    this.forkedFromRevisionId = const Value.absent(),
+    this.leafRevisionId = const Value.absent(),
+    required String causalityKind,
+    required DateTime createdAt,
+    this.deletedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       causalityKind = Value(causalityKind),
+       createdAt = Value(createdAt);
+  static Insertable<ConversationBranchRow> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? parentBranchId,
+    Expression<String>? forkedFromRevisionId,
+    Expression<String>? leafRevisionId,
+    Expression<String>? causalityKind,
+    Expression<int>? createdAt,
+    Expression<int>? deletedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (parentBranchId != null) 'parent_branch_id': parentBranchId,
+      if (forkedFromRevisionId != null)
+        'forked_from_revision_id': forkedFromRevisionId,
+      if (leafRevisionId != null) 'leaf_revision_id': leafRevisionId,
+      if (causalityKind != null) 'causality_kind': causalityKind,
+      if (createdAt != null) 'created_at': createdAt,
+      if (deletedAt != null) 'deleted_at': deletedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ConversationBranchRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String?>? parentBranchId,
+    Value<String?>? forkedFromRevisionId,
+    Value<String?>? leafRevisionId,
+    Value<String>? causalityKind,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? deletedAt,
+    Value<int>? rowid,
+  }) {
+    return ConversationBranchRowsCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      parentBranchId: parentBranchId ?? this.parentBranchId,
+      forkedFromRevisionId: forkedFromRevisionId ?? this.forkedFromRevisionId,
+      leafRevisionId: leafRevisionId ?? this.leafRevisionId,
+      causalityKind: causalityKind ?? this.causalityKind,
+      createdAt: createdAt ?? this.createdAt,
+      deletedAt: deletedAt ?? this.deletedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (parentBranchId.present) {
+      map['parent_branch_id'] = Variable<String>(parentBranchId.value);
+    }
+    if (forkedFromRevisionId.present) {
+      map['forked_from_revision_id'] = Variable<String>(
+        forkedFromRevisionId.value,
+      );
+    }
+    if (leafRevisionId.present) {
+      map['leaf_revision_id'] = Variable<String>(leafRevisionId.value);
+    }
+    if (causalityKind.present) {
+      map['causality_kind'] = Variable<String>(causalityKind.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (deletedAt.present) {
+      map['deleted_at'] = Variable<int>(
+        $ConversationBranchRowsTable.$converterdeletedAtn.toSql(
+          deletedAt.value,
+        ),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationBranchRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('parentBranchId: $parentBranchId, ')
+          ..write('forkedFromRevisionId: $forkedFromRevisionId, ')
+          ..write('leafRevisionId: $leafRevisionId, ')
+          ..write('causalityKind: $causalityKind, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('deletedAt: $deletedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ConversationStateRowsTable extends ConversationStateRows
+    with TableInfo<$ConversationStateRowsTable, ConversationStateRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ConversationStateRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _activeBranchIdMeta = const VerificationMeta(
+    'activeBranchId',
+  );
+  @override
+  late final GeneratedColumn<String> activeBranchId = GeneratedColumn<String>(
+    'active_branch_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contextStartRevisionIdMeta =
+      const VerificationMeta('contextStartRevisionId');
+  @override
+  late final GeneratedColumn<String> contextStartRevisionId =
+      GeneratedColumn<String>(
+        'context_start_revision_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _stateRevisionMeta = const VerificationMeta(
+    'stateRevision',
+  );
+  @override
+  late final GeneratedColumn<int> stateRevision = GeneratedColumn<int>(
+    'state_revision',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(stateRevision).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    conversationId,
+    activeBranchId,
+    contextStartRevisionId,
+    stateRevision,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'conversation_state_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ConversationStateRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('active_branch_id')) {
+      context.handle(
+        _activeBranchIdMeta,
+        activeBranchId.isAcceptableOrUnknown(
+          data['active_branch_id']!,
+          _activeBranchIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('context_start_revision_id')) {
+      context.handle(
+        _contextStartRevisionIdMeta,
+        contextStartRevisionId.isAcceptableOrUnknown(
+          data['context_start_revision_id']!,
+          _contextStartRevisionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('state_revision')) {
+      context.handle(
+        _stateRevisionMeta,
+        stateRevision.isAcceptableOrUnknown(
+          data['state_revision']!,
+          _stateRevisionMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {conversationId};
+  @override
+  ConversationStateRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ConversationStateRow(
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      activeBranchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}active_branch_id'],
+      ),
+      contextStartRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context_start_revision_id'],
+      ),
+      stateRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}state_revision'],
+      )!,
+    );
+  }
+
+  @override
+  $ConversationStateRowsTable createAlias(String alias) {
+    return $ConversationStateRowsTable(attachedDatabase, alias);
+  }
+}
+
+class ConversationStateRow extends DataClass
+    implements Insertable<ConversationStateRow> {
+  final String conversationId;
+  final String? activeBranchId;
+  final String? contextStartRevisionId;
+  final int stateRevision;
+  const ConversationStateRow({
+    required this.conversationId,
+    this.activeBranchId,
+    this.contextStartRevisionId,
+    required this.stateRevision,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['conversation_id'] = Variable<String>(conversationId);
+    if (!nullToAbsent || activeBranchId != null) {
+      map['active_branch_id'] = Variable<String>(activeBranchId);
+    }
+    if (!nullToAbsent || contextStartRevisionId != null) {
+      map['context_start_revision_id'] = Variable<String>(
+        contextStartRevisionId,
+      );
+    }
+    map['state_revision'] = Variable<int>(stateRevision);
+    return map;
+  }
+
+  ConversationStateRowsCompanion toCompanion(bool nullToAbsent) {
+    return ConversationStateRowsCompanion(
+      conversationId: Value(conversationId),
+      activeBranchId: activeBranchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(activeBranchId),
+      contextStartRevisionId: contextStartRevisionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(contextStartRevisionId),
+      stateRevision: Value(stateRevision),
+    );
+  }
+
+  factory ConversationStateRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ConversationStateRow(
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      activeBranchId: serializer.fromJson<String?>(json['activeBranchId']),
+      contextStartRevisionId: serializer.fromJson<String?>(
+        json['contextStartRevisionId'],
+      ),
+      stateRevision: serializer.fromJson<int>(json['stateRevision']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'conversationId': serializer.toJson<String>(conversationId),
+      'activeBranchId': serializer.toJson<String?>(activeBranchId),
+      'contextStartRevisionId': serializer.toJson<String?>(
+        contextStartRevisionId,
+      ),
+      'stateRevision': serializer.toJson<int>(stateRevision),
+    };
+  }
+
+  ConversationStateRow copyWith({
+    String? conversationId,
+    Value<String?> activeBranchId = const Value.absent(),
+    Value<String?> contextStartRevisionId = const Value.absent(),
+    int? stateRevision,
+  }) => ConversationStateRow(
+    conversationId: conversationId ?? this.conversationId,
+    activeBranchId: activeBranchId.present
+        ? activeBranchId.value
+        : this.activeBranchId,
+    contextStartRevisionId: contextStartRevisionId.present
+        ? contextStartRevisionId.value
+        : this.contextStartRevisionId,
+    stateRevision: stateRevision ?? this.stateRevision,
+  );
+  ConversationStateRow copyWithCompanion(ConversationStateRowsCompanion data) {
+    return ConversationStateRow(
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      activeBranchId: data.activeBranchId.present
+          ? data.activeBranchId.value
+          : this.activeBranchId,
+      contextStartRevisionId: data.contextStartRevisionId.present
+          ? data.contextStartRevisionId.value
+          : this.contextStartRevisionId,
+      stateRevision: data.stateRevision.present
+          ? data.stateRevision.value
+          : this.stateRevision,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationStateRow(')
+          ..write('conversationId: $conversationId, ')
+          ..write('activeBranchId: $activeBranchId, ')
+          ..write('contextStartRevisionId: $contextStartRevisionId, ')
+          ..write('stateRevision: $stateRevision')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    conversationId,
+    activeBranchId,
+    contextStartRevisionId,
+    stateRevision,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ConversationStateRow &&
+          other.conversationId == this.conversationId &&
+          other.activeBranchId == this.activeBranchId &&
+          other.contextStartRevisionId == this.contextStartRevisionId &&
+          other.stateRevision == this.stateRevision);
+}
+
+class ConversationStateRowsCompanion
+    extends UpdateCompanion<ConversationStateRow> {
+  final Value<String> conversationId;
+  final Value<String?> activeBranchId;
+  final Value<String?> contextStartRevisionId;
+  final Value<int> stateRevision;
+  final Value<int> rowid;
+  const ConversationStateRowsCompanion({
+    this.conversationId = const Value.absent(),
+    this.activeBranchId = const Value.absent(),
+    this.contextStartRevisionId = const Value.absent(),
+    this.stateRevision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ConversationStateRowsCompanion.insert({
+    required String conversationId,
+    this.activeBranchId = const Value.absent(),
+    this.contextStartRevisionId = const Value.absent(),
+    this.stateRevision = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : conversationId = Value(conversationId);
+  static Insertable<ConversationStateRow> custom({
+    Expression<String>? conversationId,
+    Expression<String>? activeBranchId,
+    Expression<String>? contextStartRevisionId,
+    Expression<int>? stateRevision,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (activeBranchId != null) 'active_branch_id': activeBranchId,
+      if (contextStartRevisionId != null)
+        'context_start_revision_id': contextStartRevisionId,
+      if (stateRevision != null) 'state_revision': stateRevision,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ConversationStateRowsCompanion copyWith({
+    Value<String>? conversationId,
+    Value<String?>? activeBranchId,
+    Value<String?>? contextStartRevisionId,
+    Value<int>? stateRevision,
+    Value<int>? rowid,
+  }) {
+    return ConversationStateRowsCompanion(
+      conversationId: conversationId ?? this.conversationId,
+      activeBranchId: activeBranchId ?? this.activeBranchId,
+      contextStartRevisionId:
+          contextStartRevisionId ?? this.contextStartRevisionId,
+      stateRevision: stateRevision ?? this.stateRevision,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (activeBranchId.present) {
+      map['active_branch_id'] = Variable<String>(activeBranchId.value);
+    }
+    if (contextStartRevisionId.present) {
+      map['context_start_revision_id'] = Variable<String>(
+        contextStartRevisionId.value,
+      );
+    }
+    if (stateRevision.present) {
+      map['state_revision'] = Variable<int>(stateRevision.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ConversationStateRowsCompanion(')
+          ..write('conversationId: $conversationId, ')
+          ..write('activeBranchId: $activeBranchId, ')
+          ..write('contextStartRevisionId: $contextStartRevisionId, ')
+          ..write('stateRevision: $stateRevision, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -2925,6 +4787,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $GeminiThoughtSignatureRowsTable(this);
   late final $ChatStorageMetaRowsTable chatStorageMetaRows =
       $ChatStorageMetaRowsTable(this);
+  late final $MessageSlotRowsTable messageSlotRows = $MessageSlotRowsTable(
+    this,
+  );
+  late final $MessageRevisionRowsTable messageRevisionRows =
+      $MessageRevisionRowsTable(this);
+  late final $ConversationBranchRowsTable conversationBranchRows =
+      $ConversationBranchRowsTable(this);
+  late final $ConversationStateRowsTable conversationStateRows =
+      $ConversationStateRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -2945,6 +4816,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_messages_group',
     'CREATE INDEX idx_messages_group ON message_rows (conversation_id, group_id, version, id)',
   );
+  late final Index idxMessageSlotsConversationCreated = Index(
+    'idx_message_slots_conversation_created',
+    'CREATE INDEX idx_message_slots_conversation_created ON message_slot_rows (conversation_id, created_at, id)',
+  );
+  late final Index idxMessageRevisionsParent = Index(
+    'idx_message_revisions_parent',
+    'CREATE INDEX idx_message_revisions_parent ON message_revision_rows (conversation_id, parent_revision_id, id)',
+  );
+  late final Index idxMessageRevisionsSlotVersion = Index(
+    'idx_message_revisions_slot_version',
+    'CREATE INDEX idx_message_revisions_slot_version ON message_revision_rows (conversation_id, slot_id, revision_no DESC, id)',
+  );
+  late final Index idxConversationBranchesLeaf = Index(
+    'idx_conversation_branches_leaf',
+    'CREATE INDEX idx_conversation_branches_leaf ON conversation_branch_rows (conversation_id, leaf_revision_id, id)',
+  );
+  late final Index idxConversationBranchesParent = Index(
+    'idx_conversation_branches_parent',
+    'CREATE INDEX idx_conversation_branches_parent ON conversation_branch_rows (conversation_id, parent_branch_id, id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2956,11 +4847,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     toolEventRows,
     geminiThoughtSignatureRows,
     chatStorageMetaRows,
+    messageSlotRows,
+    messageRevisionRows,
+    conversationBranchRows,
+    conversationStateRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
     idxMessagesConversationTimestamp,
     idxMessagesGroup,
+    idxMessageSlotsConversationCreated,
+    idxMessageRevisionsParent,
+    idxMessageRevisionsSlotVersion,
+    idxConversationBranchesLeaf,
+    idxConversationBranchesParent,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -2995,6 +4895,36 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       result: [
         TableUpdate('gemini_thought_signature_rows', kind: UpdateKind.delete),
       ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('message_slot_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('message_revision_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('conversation_branch_rows', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('conversation_state_rows', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -3078,6 +5008,103 @@ final class $$ConversationRowsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _conversationMcpServerRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$MessageSlotRowsTable, List<MessageSlotRow>>
+  _messageSlotRowsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.messageSlotRows,
+    aliasName: 'conversation_rows__id__message_slot_rows__conversation_id',
+  );
+
+  $$MessageSlotRowsTableProcessedTableManager get messageSlotRowsRefs {
+    final manager = $$MessageSlotRowsTableTableManager(
+      $_db,
+      $_db.messageSlotRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _messageSlotRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $MessageRevisionRowsTable,
+    List<MessageRevisionRow>
+  >
+  _messageRevisionRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.messageRevisionRows,
+        aliasName:
+            'conversation_rows__id__message_revision_rows__conversation_id',
+      );
+
+  $$MessageRevisionRowsTableProcessedTableManager get messageRevisionRowsRefs {
+    final manager = $$MessageRevisionRowsTableTableManager(
+      $_db,
+      $_db.messageRevisionRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _messageRevisionRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ConversationBranchRowsTable,
+    List<ConversationBranchRow>
+  >
+  _conversationBranchRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.conversationBranchRows,
+        aliasName:
+            'conversation_rows__id__conversation_branch_rows__conversation_id',
+      );
+
+  $$ConversationBranchRowsTableProcessedTableManager
+  get conversationBranchRowsRefs {
+    final manager = $$ConversationBranchRowsTableTableManager(
+      $_db,
+      $_db.conversationBranchRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _conversationBranchRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<
+    $ConversationStateRowsTable,
+    List<ConversationStateRow>
+  >
+  _conversationStateRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.conversationStateRows,
+        aliasName:
+            'conversation_rows__id__conversation_state_rows__conversation_id',
+      );
+
+  $$ConversationStateRowsTableProcessedTableManager
+  get conversationStateRowsRefs {
+    final manager = $$ConversationStateRowsTableTableManager(
+      $_db,
+      $_db.conversationStateRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _conversationStateRowsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -3194,6 +5221,108 @@ class $$ConversationRowsTableFilterComposer
               }) => $$ConversationMcpServerRowsTableFilterComposer(
                 $db: $db,
                 $table: $db.conversationMcpServerRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> messageSlotRowsRefs(
+    Expression<bool> Function($$MessageSlotRowsTableFilterComposer f) f,
+  ) {
+    final $$MessageSlotRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageSlotRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageSlotRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageSlotRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> messageRevisionRowsRefs(
+    Expression<bool> Function($$MessageRevisionRowsTableFilterComposer f) f,
+  ) {
+    final $$MessageRevisionRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageRevisionRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageRevisionRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.messageRevisionRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> conversationBranchRowsRefs(
+    Expression<bool> Function($$ConversationBranchRowsTableFilterComposer f) f,
+  ) {
+    final $$ConversationBranchRowsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationBranchRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationBranchRowsTableFilterComposer(
+                $db: $db,
+                $table: $db.conversationBranchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<bool> conversationStateRowsRefs(
+    Expression<bool> Function($$ConversationStateRowsTableFilterComposer f) f,
+  ) {
+    final $$ConversationStateRowsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationStateRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationStateRowsTableFilterComposer(
+                $db: $db,
+                $table: $db.conversationStateRows,
                 $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
                 joinBuilder: joinBuilder,
                 $removeJoinBuilderFromRootComposer:
@@ -3372,6 +5501,109 @@ class $$ConversationRowsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> messageSlotRowsRefs<T extends Object>(
+    Expression<T> Function($$MessageSlotRowsTableAnnotationComposer a) f,
+  ) {
+    final $$MessageSlotRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.messageSlotRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MessageSlotRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.messageSlotRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> messageRevisionRowsRefs<T extends Object>(
+    Expression<T> Function($$MessageRevisionRowsTableAnnotationComposer a) f,
+  ) {
+    final $$MessageRevisionRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.messageRevisionRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MessageRevisionRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.messageRevisionRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> conversationBranchRowsRefs<T extends Object>(
+    Expression<T> Function($$ConversationBranchRowsTableAnnotationComposer a) f,
+  ) {
+    final $$ConversationBranchRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationBranchRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationBranchRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.conversationBranchRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+
+  Expression<T> conversationStateRowsRefs<T extends Object>(
+    Expression<T> Function($$ConversationStateRowsTableAnnotationComposer a) f,
+  ) {
+    final $$ConversationStateRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.conversationStateRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ConversationStateRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.conversationStateRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ConversationRowsTableTableManager
@@ -3390,6 +5622,10 @@ class $$ConversationRowsTableTableManager
           PrefetchHooks Function({
             bool messageRowsRefs,
             bool conversationMcpServerRowsRefs,
+            bool messageSlotRowsRefs,
+            bool messageRevisionRowsRefs,
+            bool conversationBranchRowsRefs,
+            bool conversationStateRowsRefs,
           })
         > {
   $$ConversationRowsTableTableManager(
@@ -3473,6 +5709,10 @@ class $$ConversationRowsTableTableManager
               ({
                 messageRowsRefs = false,
                 conversationMcpServerRowsRefs = false,
+                messageSlotRowsRefs = false,
+                messageRevisionRowsRefs = false,
+                conversationBranchRowsRefs = false,
+                conversationStateRowsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -3480,6 +5720,10 @@ class $$ConversationRowsTableTableManager
                     if (messageRowsRefs) db.messageRows,
                     if (conversationMcpServerRowsRefs)
                       db.conversationMcpServerRows,
+                    if (messageSlotRowsRefs) db.messageSlotRows,
+                    if (messageRevisionRowsRefs) db.messageRevisionRows,
+                    if (conversationBranchRowsRefs) db.conversationBranchRows,
+                    if (conversationStateRowsRefs) db.conversationStateRows,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -3526,6 +5770,90 @@ class $$ConversationRowsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (messageSlotRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          MessageSlotRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._messageSlotRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).messageSlotRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (messageRevisionRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          MessageRevisionRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._messageRevisionRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).messageRevisionRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (conversationBranchRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          ConversationBranchRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._conversationBranchRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).conversationBranchRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (conversationStateRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          ConversationStateRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._conversationStateRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).conversationStateRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -3549,6 +5877,10 @@ typedef $$ConversationRowsTableProcessedTableManager =
       PrefetchHooks Function({
         bool messageRowsRefs,
         bool conversationMcpServerRowsRefs,
+        bool messageSlotRowsRefs,
+        bool messageRevisionRowsRefs,
+        bool conversationBranchRowsRefs,
+        bool conversationStateRowsRefs,
       })
     >;
 typedef $$MessageRowsTableCreateCompanionBuilder =
@@ -5434,6 +7766,1476 @@ typedef $$ChatStorageMetaRowsTableProcessedTableManager =
       ChatStorageMetaRow,
       PrefetchHooks Function()
     >;
+typedef $$MessageSlotRowsTableCreateCompanionBuilder =
+    MessageSlotRowsCompanion Function({
+      required String id,
+      required String conversationId,
+      required String role,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$MessageSlotRowsTableUpdateCompanionBuilder =
+    MessageSlotRowsCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String> role,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$MessageSlotRowsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $MessageSlotRowsTable, MessageSlotRow> {
+  $$MessageSlotRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) => db
+      .conversationRows
+      .createAlias('message_slot_rows__conversation_id__conversation_rows__id');
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MessageSlotRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $MessageSlotRowsTable> {
+  $$MessageSlotRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSlotRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MessageSlotRowsTable> {
+  $$MessageSlotRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSlotRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MessageSlotRowsTable> {
+  $$MessageSlotRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageSlotRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MessageSlotRowsTable,
+          MessageSlotRow,
+          $$MessageSlotRowsTableFilterComposer,
+          $$MessageSlotRowsTableOrderingComposer,
+          $$MessageSlotRowsTableAnnotationComposer,
+          $$MessageSlotRowsTableCreateCompanionBuilder,
+          $$MessageSlotRowsTableUpdateCompanionBuilder,
+          (MessageSlotRow, $$MessageSlotRowsTableReferences),
+          MessageSlotRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$MessageSlotRowsTableTableManager(
+    _$AppDatabase db,
+    $MessageSlotRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageSlotRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageSlotRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MessageSlotRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageSlotRowsCompanion(
+                id: id,
+                conversationId: conversationId,
+                role: role,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                required String role,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => MessageSlotRowsCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                role: role,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MessageSlotRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$MessageSlotRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$MessageSlotRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MessageSlotRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MessageSlotRowsTable,
+      MessageSlotRow,
+      $$MessageSlotRowsTableFilterComposer,
+      $$MessageSlotRowsTableOrderingComposer,
+      $$MessageSlotRowsTableAnnotationComposer,
+      $$MessageSlotRowsTableCreateCompanionBuilder,
+      $$MessageSlotRowsTableUpdateCompanionBuilder,
+      (MessageSlotRow, $$MessageSlotRowsTableReferences),
+      MessageSlotRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
+typedef $$MessageRevisionRowsTableCreateCompanionBuilder =
+    MessageRevisionRowsCompanion Function({
+      required String id,
+      required String conversationId,
+      required String slotId,
+      Value<String?> parentRevisionId,
+      required int revisionNo,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> finalizedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$MessageRevisionRowsTableUpdateCompanionBuilder =
+    MessageRevisionRowsCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String> slotId,
+      Value<String?> parentRevisionId,
+      Value<int> revisionNo,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> finalizedAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$MessageRevisionRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MessageRevisionRowsTable,
+          MessageRevisionRow
+        > {
+  $$MessageRevisionRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'message_revision_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MessageRevisionRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $MessageRevisionRowsTable> {
+  $$MessageRevisionRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get slotId => $composableBuilder(
+    column: $table.slotId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentRevisionId => $composableBuilder(
+    column: $table.parentRevisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get revisionNo => $composableBuilder(
+    column: $table.revisionNo,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get finalizedAt =>
+      $composableBuilder(
+        column: $table.finalizedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get deletedAt =>
+      $composableBuilder(
+        column: $table.deletedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageRevisionRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MessageRevisionRowsTable> {
+  $$MessageRevisionRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get slotId => $composableBuilder(
+    column: $table.slotId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentRevisionId => $composableBuilder(
+    column: $table.parentRevisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get revisionNo => $composableBuilder(
+    column: $table.revisionNo,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get finalizedAt => $composableBuilder(
+    column: $table.finalizedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageRevisionRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MessageRevisionRowsTable> {
+  $$MessageRevisionRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get slotId =>
+      $composableBuilder(column: $table.slotId, builder: (column) => column);
+
+  GeneratedColumn<String> get parentRevisionId => $composableBuilder(
+    column: $table.parentRevisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get revisionNo => $composableBuilder(
+    column: $table.revisionNo,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get finalizedAt =>
+      $composableBuilder(
+        column: $table.finalizedAt,
+        builder: (column) => column,
+      );
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MessageRevisionRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MessageRevisionRowsTable,
+          MessageRevisionRow,
+          $$MessageRevisionRowsTableFilterComposer,
+          $$MessageRevisionRowsTableOrderingComposer,
+          $$MessageRevisionRowsTableAnnotationComposer,
+          $$MessageRevisionRowsTableCreateCompanionBuilder,
+          $$MessageRevisionRowsTableUpdateCompanionBuilder,
+          (MessageRevisionRow, $$MessageRevisionRowsTableReferences),
+          MessageRevisionRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$MessageRevisionRowsTableTableManager(
+    _$AppDatabase db,
+    $MessageRevisionRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MessageRevisionRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MessageRevisionRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$MessageRevisionRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String> slotId = const Value.absent(),
+                Value<String?> parentRevisionId = const Value.absent(),
+                Value<int> revisionNo = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> finalizedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageRevisionRowsCompanion(
+                id: id,
+                conversationId: conversationId,
+                slotId: slotId,
+                parentRevisionId: parentRevisionId,
+                revisionNo: revisionNo,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                finalizedAt: finalizedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                required String slotId,
+                Value<String?> parentRevisionId = const Value.absent(),
+                required int revisionNo,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> finalizedAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MessageRevisionRowsCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                slotId: slotId,
+                parentRevisionId: parentRevisionId,
+                revisionNo: revisionNo,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                finalizedAt: finalizedAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MessageRevisionRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$MessageRevisionRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$MessageRevisionRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MessageRevisionRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MessageRevisionRowsTable,
+      MessageRevisionRow,
+      $$MessageRevisionRowsTableFilterComposer,
+      $$MessageRevisionRowsTableOrderingComposer,
+      $$MessageRevisionRowsTableAnnotationComposer,
+      $$MessageRevisionRowsTableCreateCompanionBuilder,
+      $$MessageRevisionRowsTableUpdateCompanionBuilder,
+      (MessageRevisionRow, $$MessageRevisionRowsTableReferences),
+      MessageRevisionRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
+typedef $$ConversationBranchRowsTableCreateCompanionBuilder =
+    ConversationBranchRowsCompanion Function({
+      required String id,
+      required String conversationId,
+      Value<String?> parentBranchId,
+      Value<String?> forkedFromRevisionId,
+      Value<String?> leafRevisionId,
+      required String causalityKind,
+      required DateTime createdAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+typedef $$ConversationBranchRowsTableUpdateCompanionBuilder =
+    ConversationBranchRowsCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String?> parentBranchId,
+      Value<String?> forkedFromRevisionId,
+      Value<String?> leafRevisionId,
+      Value<String> causalityKind,
+      Value<DateTime> createdAt,
+      Value<DateTime?> deletedAt,
+      Value<int> rowid,
+    });
+
+final class $$ConversationBranchRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ConversationBranchRowsTable,
+          ConversationBranchRow
+        > {
+  $$ConversationBranchRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'conversation_branch_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ConversationBranchRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get forkedFromRevisionId => $composableBuilder(
+    column: $table.forkedFromRevisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get leafRevisionId => $composableBuilder(
+    column: $table.leafRevisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get causalityKind => $composableBuilder(
+    column: $table.causalityKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get deletedAt =>
+      $composableBuilder(
+        column: $table.deletedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get forkedFromRevisionId => $composableBuilder(
+    column: $table.forkedFromRevisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get leafRevisionId => $composableBuilder(
+    column: $table.leafRevisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get causalityKind => $composableBuilder(
+    column: $table.causalityKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAt => $composableBuilder(
+    column: $table.deletedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ConversationBranchRowsTable> {
+  $$ConversationBranchRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get parentBranchId => $composableBuilder(
+    column: $table.parentBranchId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get forkedFromRevisionId => $composableBuilder(
+    column: $table.forkedFromRevisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get leafRevisionId => $composableBuilder(
+    column: $table.leafRevisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get causalityKind => $composableBuilder(
+    column: $table.causalityKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get deletedAt =>
+      $composableBuilder(column: $table.deletedAt, builder: (column) => column);
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationBranchRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ConversationBranchRowsTable,
+          ConversationBranchRow,
+          $$ConversationBranchRowsTableFilterComposer,
+          $$ConversationBranchRowsTableOrderingComposer,
+          $$ConversationBranchRowsTableAnnotationComposer,
+          $$ConversationBranchRowsTableCreateCompanionBuilder,
+          $$ConversationBranchRowsTableUpdateCompanionBuilder,
+          (ConversationBranchRow, $$ConversationBranchRowsTableReferences),
+          ConversationBranchRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$ConversationBranchRowsTableTableManager(
+    _$AppDatabase db,
+    $ConversationBranchRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ConversationBranchRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ConversationBranchRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ConversationBranchRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String?> parentBranchId = const Value.absent(),
+                Value<String?> forkedFromRevisionId = const Value.absent(),
+                Value<String?> leafRevisionId = const Value.absent(),
+                Value<String> causalityKind = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationBranchRowsCompanion(
+                id: id,
+                conversationId: conversationId,
+                parentBranchId: parentBranchId,
+                forkedFromRevisionId: forkedFromRevisionId,
+                leafRevisionId: leafRevisionId,
+                causalityKind: causalityKind,
+                createdAt: createdAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                Value<String?> parentBranchId = const Value.absent(),
+                Value<String?> forkedFromRevisionId = const Value.absent(),
+                Value<String?> leafRevisionId = const Value.absent(),
+                required String causalityKind,
+                required DateTime createdAt,
+                Value<DateTime?> deletedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationBranchRowsCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                parentBranchId: parentBranchId,
+                forkedFromRevisionId: forkedFromRevisionId,
+                leafRevisionId: leafRevisionId,
+                causalityKind: causalityKind,
+                createdAt: createdAt,
+                deletedAt: deletedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ConversationBranchRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$ConversationBranchRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$ConversationBranchRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ConversationBranchRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ConversationBranchRowsTable,
+      ConversationBranchRow,
+      $$ConversationBranchRowsTableFilterComposer,
+      $$ConversationBranchRowsTableOrderingComposer,
+      $$ConversationBranchRowsTableAnnotationComposer,
+      $$ConversationBranchRowsTableCreateCompanionBuilder,
+      $$ConversationBranchRowsTableUpdateCompanionBuilder,
+      (ConversationBranchRow, $$ConversationBranchRowsTableReferences),
+      ConversationBranchRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
+typedef $$ConversationStateRowsTableCreateCompanionBuilder =
+    ConversationStateRowsCompanion Function({
+      required String conversationId,
+      Value<String?> activeBranchId,
+      Value<String?> contextStartRevisionId,
+      Value<int> stateRevision,
+      Value<int> rowid,
+    });
+typedef $$ConversationStateRowsTableUpdateCompanionBuilder =
+    ConversationStateRowsCompanion Function({
+      Value<String> conversationId,
+      Value<String?> activeBranchId,
+      Value<String?> contextStartRevisionId,
+      Value<int> stateRevision,
+      Value<int> rowid,
+    });
+
+final class $$ConversationStateRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ConversationStateRowsTable,
+          ConversationStateRow
+        > {
+  $$ConversationStateRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'conversation_state_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$ConversationStateRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ConversationStateRowsTable> {
+  $$ConversationStateRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get contextStartRevisionId => $composableBuilder(
+    column: $table.contextStartRevisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationStateRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ConversationStateRowsTable> {
+  $$ConversationStateRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get contextStartRevisionId => $composableBuilder(
+    column: $table.contextStartRevisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationStateRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ConversationStateRowsTable> {
+  $$ConversationStateRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get activeBranchId => $composableBuilder(
+    column: $table.activeBranchId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get contextStartRevisionId => $composableBuilder(
+    column: $table.contextStartRevisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => column,
+  );
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$ConversationStateRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ConversationStateRowsTable,
+          ConversationStateRow,
+          $$ConversationStateRowsTableFilterComposer,
+          $$ConversationStateRowsTableOrderingComposer,
+          $$ConversationStateRowsTableAnnotationComposer,
+          $$ConversationStateRowsTableCreateCompanionBuilder,
+          $$ConversationStateRowsTableUpdateCompanionBuilder,
+          (ConversationStateRow, $$ConversationStateRowsTableReferences),
+          ConversationStateRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$ConversationStateRowsTableTableManager(
+    _$AppDatabase db,
+    $ConversationStateRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ConversationStateRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$ConversationStateRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ConversationStateRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> conversationId = const Value.absent(),
+                Value<String?> activeBranchId = const Value.absent(),
+                Value<String?> contextStartRevisionId = const Value.absent(),
+                Value<int> stateRevision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationStateRowsCompanion(
+                conversationId: conversationId,
+                activeBranchId: activeBranchId,
+                contextStartRevisionId: contextStartRevisionId,
+                stateRevision: stateRevision,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String conversationId,
+                Value<String?> activeBranchId = const Value.absent(),
+                Value<String?> contextStartRevisionId = const Value.absent(),
+                Value<int> stateRevision = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ConversationStateRowsCompanion.insert(
+                conversationId: conversationId,
+                activeBranchId: activeBranchId,
+                contextStartRevisionId: contextStartRevisionId,
+                stateRevision: stateRevision,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ConversationStateRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$ConversationStateRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$ConversationStateRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ConversationStateRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ConversationStateRowsTable,
+      ConversationStateRow,
+      $$ConversationStateRowsTableFilterComposer,
+      $$ConversationStateRowsTableOrderingComposer,
+      $$ConversationStateRowsTableAnnotationComposer,
+      $$ConversationStateRowsTableCreateCompanionBuilder,
+      $$ConversationStateRowsTableUpdateCompanionBuilder,
+      (ConversationStateRow, $$ConversationStateRowsTableReferences),
+      ConversationStateRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -5457,4 +9259,15 @@ class $AppDatabaseManager {
       );
   $$ChatStorageMetaRowsTableTableManager get chatStorageMetaRows =>
       $$ChatStorageMetaRowsTableTableManager(_db, _db.chatStorageMetaRows);
+  $$MessageSlotRowsTableTableManager get messageSlotRows =>
+      $$MessageSlotRowsTableTableManager(_db, _db.messageSlotRows);
+  $$MessageRevisionRowsTableTableManager get messageRevisionRows =>
+      $$MessageRevisionRowsTableTableManager(_db, _db.messageRevisionRows);
+  $$ConversationBranchRowsTableTableManager get conversationBranchRows =>
+      $$ConversationBranchRowsTableTableManager(
+        _db,
+        _db.conversationBranchRows,
+      );
+  $$ConversationStateRowsTableTableManager get conversationStateRows =>
+      $$ConversationStateRowsTableTableManager(_db, _db.conversationStateRows);
 }

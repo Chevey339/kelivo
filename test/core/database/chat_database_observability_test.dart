@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_observer.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -50,7 +51,7 @@ void main() {
     test('records query, command, WAL and checkpoint aggregates', () async {
       const secret = 'must-not-appear-in-database-observation';
       final connection = await repository.validateConnectionContract();
-      expect(connection.schemaVersion, 3);
+      expect(connection.schemaVersion, AppDatabase.currentSchemaVersion);
       expect(connection.journalModeWal, isTrue);
       expect(connection.foreignKeysEnabled, isTrue);
       expect(connection.busyTimeoutMillis, 5000);
