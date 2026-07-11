@@ -612,6 +612,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displaySettingsPageLanguageEnglishLabel => 'English';
 
   @override
+  String get displaySettingsPageLanguageKoreanLabel => '한국어';
+
+  @override
   String get homePagePleaseSelectModel => 'Please select a model first';
 
   @override
