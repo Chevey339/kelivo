@@ -53,7 +53,7 @@ enum _MatrixTier {
   }
 }
 
-enum _MatrixScenario { forward, terminal, rollback }
+enum _MatrixScenario { forward, terminal, rollback, rolledBackTerminal }
 
 final class _MatrixFailpoint {
   const _MatrixFailpoint.forward(RestoreProcessFailpoint value)
@@ -74,6 +74,13 @@ final class _MatrixFailpoint {
       rollback = value,
       scenario = _MatrixScenario.rollback;
 
+  const _MatrixFailpoint.rolledBackTerminal(
+    RestoreTerminalProcessFailpoint value,
+  ) : forward = null,
+      terminal = value,
+      rollback = null,
+      scenario = _MatrixScenario.rolledBackTerminal;
+
   final _MatrixScenario scenario;
   final RestoreProcessFailpoint? forward;
   final RestoreTerminalProcessFailpoint? terminal;
@@ -83,12 +90,15 @@ final class _MatrixFailpoint {
     _MatrixScenario.forward => forward!.name,
     _MatrixScenario.terminal => terminal!.name,
     _MatrixScenario.rollback => rollback!.name,
+    _MatrixScenario.rolledBackTerminal => terminal!.name,
   };
 
   String get scenarioName => switch (scenario) {
     _MatrixScenario.forward => restoreHarnessScenario,
     _MatrixScenario.terminal => restoreTerminalHarnessScenario,
     _MatrixScenario.rollback => restoreRollbackHarnessScenario,
+    _MatrixScenario.rolledBackTerminal =>
+      restoreRolledBackTerminalHarnessScenario,
   };
 }
 
@@ -98,24 +108,36 @@ final class _MatrixSelection {
     this.singleFailpoint,
     this.forwardStartAt,
   }) : scenario = _MatrixScenario.forward,
-       rollbackStartAt = null;
+       rollbackStartAt = null,
+       rolledBackTerminalStartAt = null;
 
   const _MatrixSelection.terminal({this.singleFailpoint})
     : scenario = _MatrixScenario.terminal,
       tier = _MatrixTier.full,
       forwardStartAt = null,
-      rollbackStartAt = null;
+      rollbackStartAt = null,
+      rolledBackTerminalStartAt = null;
 
   const _MatrixSelection.rollback({this.singleFailpoint, this.rollbackStartAt})
     : scenario = _MatrixScenario.rollback,
       tier = _MatrixTier.full,
-      forwardStartAt = null;
+      forwardStartAt = null,
+      rolledBackTerminalStartAt = null;
+
+  const _MatrixSelection.rolledBackTerminal({
+    this.singleFailpoint,
+    this.rolledBackTerminalStartAt,
+  }) : scenario = _MatrixScenario.rolledBackTerminal,
+       tier = _MatrixTier.full,
+       forwardStartAt = null,
+       rollbackStartAt = null;
 
   final _MatrixScenario scenario;
   final _MatrixTier tier;
   final _MatrixFailpoint? singleFailpoint;
   final RestoreProcessFailpoint? forwardStartAt;
   final RestoreRollbackProcessFailpoint? rollbackStartAt;
+  final RestoreTerminalProcessFailpoint? rolledBackTerminalStartAt;
 
   List<_MatrixFailpoint> get failpoints {
     if (singleFailpoint != null) return [singleFailpoint!];
@@ -137,6 +159,20 @@ final class _MatrixSelection {
         return List.unmodifiable([
           for (final failpoint in all.sublist(index))
             _MatrixFailpoint.rollback(failpoint),
+        ]);
+      case _MatrixScenario.rolledBackTerminal:
+        final all = RestoreTerminalProcessFailpoint.values;
+        final start = rolledBackTerminalStartAt;
+        final index = start == null ? 0 : all.indexOf(start);
+        if (index < 0) {
+          throw StateError(
+            'restore_rolled_back_terminal_harness_matrix_start:'
+            '${start!.name}',
+          );
+        }
+        return List.unmodifiable([
+          for (final failpoint in all.sublist(index))
+            _MatrixFailpoint.rolledBackTerminal(failpoint),
         ]);
       case _MatrixScenario.forward:
         break;
@@ -165,6 +201,11 @@ final class _MatrixSelection {
       ? rollbackStartAt == null
             ? 'rollback'
             : 'rollback-from=${rollbackStartAt!.name}'
+      : scenario == _MatrixScenario.rolledBackTerminal
+      ? rolledBackTerminalStartAt == null
+            ? 'rolledback-terminal'
+            : 'rolledback-terminal-from='
+                  '${rolledBackTerminalStartAt!.name}'
       : forwardStartAt == null
       ? tier.name
       : '${tier.name}-from=${forwardStartAt!.name}';
@@ -173,6 +214,8 @@ final class _MatrixSelection {
     _MatrixScenario.forward => restoreHarnessScenario,
     _MatrixScenario.terminal => restoreTerminalHarnessScenario,
     _MatrixScenario.rollback => restoreRollbackHarnessScenario,
+    _MatrixScenario.rolledBackTerminal =>
+      restoreRolledBackTerminalHarnessScenario,
   };
 
   static _MatrixSelection parse(List<String> arguments) {
@@ -184,6 +227,10 @@ final class _MatrixSelection {
     }
     if (arguments.length == 1 && arguments.single == '--scenario=rollback') {
       return const _MatrixSelection.rollback();
+    }
+    if (arguments.length == 1 &&
+        arguments.single == '--scenario=rolledback-terminal') {
+      return const _MatrixSelection.rolledBackTerminal();
     }
     if (arguments.length == 2 && arguments.contains('--scenario=rollback')) {
       final fromArguments = arguments
@@ -199,6 +246,33 @@ final class _MatrixSelection {
           fromArguments.single.substring('--from='.length),
         ),
       );
+    }
+    if (arguments.length == 2 &&
+        arguments.contains('--scenario=rolledback-terminal')) {
+      final options = arguments
+          .where((argument) => argument != '--scenario=rolledback-terminal')
+          .toList(growable: false);
+      if (options.length != 1) {
+        throw ArgumentError(
+          'rolledback-terminal scenario accepts one --failpoint or --from',
+        );
+      }
+      final option = options.single;
+      if (option.startsWith('--failpoint=')) {
+        return _MatrixSelection.rolledBackTerminal(
+          singleFailpoint: _MatrixFailpoint.rolledBackTerminal(
+            _parseTerminalFailpoint(option.substring('--failpoint='.length)),
+          ),
+        );
+      }
+      if (option.startsWith('--from=')) {
+        return _MatrixSelection.rolledBackTerminal(
+          rolledBackTerminalStartAt: _parseTerminalFailpoint(
+            option.substring('--from='.length),
+          ),
+        );
+      }
+      throw ArgumentError.value(option, 'argument');
     }
     if (arguments.length == 1 && arguments.single.startsWith('--failpoint=')) {
       final name = arguments.single.substring('--failpoint='.length);
@@ -228,13 +302,20 @@ final class _MatrixSelection {
         _MatrixScenario.rollback => _MatrixSelection.rollback(
           singleFailpoint: matches.single,
         ),
+        _MatrixScenario.rolledBackTerminal => throw StateError(
+          'restore_harness_global_failpoint_scenario',
+        ),
       };
     }
     if (arguments.length > 2 || arguments.toSet().length != arguments.length) {
       throw ArgumentError(
         'run_restore_process_harness accepts '
         '[--tier=smoke|core|full] [--from=<name>] '
-        'or --scenario=terminal|rollback or --failpoint=<unique-name>',
+        'or --scenario=terminal '
+        'or --scenario=rollback [--from=<rollback-name>] '
+        'or --scenario=rolledback-terminal '
+        '[--failpoint=<terminal-name>|--from=<terminal-name>] '
+        'or --failpoint=<unique-name>',
       );
     }
     _MatrixTier? tier;
@@ -282,6 +363,18 @@ final class _MatrixSelection {
       if (candidate.name == name) return candidate;
     }
     return null;
+  }
+
+  static RestoreTerminalProcessFailpoint _parseTerminalFailpoint(String name) {
+    final failpoint = _tryParseTerminalFailpoint(name);
+    if (failpoint == null) {
+      throw ArgumentError.value(
+        name,
+        'failpoint',
+        'unknown terminal restore process failpoint',
+      );
+    }
+    return failpoint;
   }
 
   static RestoreRollbackProcessFailpoint _parseRollbackFailpoint(String name) {
@@ -526,6 +619,12 @@ final class _RestoreProcessHarnessHost {
       scenarioId: scenarioId,
       failpoint: failpoint.rollback!,
     ),
+    _MatrixScenario.rolledBackTerminal =>
+      restoreRolledBackTerminalProcessPreferencesPrefix(
+        matrixRunId: matrixRunId,
+        scenarioId: scenarioId,
+        failpoint: failpoint.terminal!,
+      ),
   };
 
   Future<void> releaseHostLock() async {
@@ -692,6 +791,8 @@ final class _RestoreProcessHarnessHost {
         await _runTerminalCasePhases();
       case _MatrixScenario.rollback:
         await _runRollbackCasePhases();
+      case _MatrixScenario.rolledBackTerminal:
+        await _runRolledBackTerminalCasePhases();
     }
   }
 
@@ -909,6 +1010,130 @@ final class _RestoreProcessHarnessHost {
     );
   }
 
+  Future<void> _runRolledBackTerminalCasePhases() async {
+    final terminalFailpoint = failpoint.terminal!;
+    final setup = await _runNormalPhase(
+      await _writeRolledBackTerminalControl(
+        RestoreRolledBackTerminalProcessHarnessPhase.setup,
+      ),
+      _validateSetupEvent,
+    );
+    final runId = setup.requireIdentifier('runId');
+
+    if (_isColdAckFailpoint(terminalFailpoint)) {
+      final killed = await _runKillPhase(
+        await _writeRolledBackTerminalControl(
+          RestoreRolledBackTerminalProcessHarnessPhase.rollbackToColdAck,
+        ),
+        (event, control, process) =>
+            _validateRolledBackTerminalColdAckKillEvent(
+              event,
+              control as RestoreRolledBackTerminalProcessHarnessControl,
+              process,
+              runId: runId,
+            ),
+      );
+      final killedLease = killed.requireIdentifier('leaseInstanceId');
+      final terminalReceiptChecksum = killed.requireSha256(
+        'terminalReceiptChecksum',
+      );
+      final killedAckChecksum = killed.requireSha256('ackChecksum');
+      final recovery = await _runNormalPhase(
+        await _writeRolledBackTerminalControl(
+          RestoreRolledBackTerminalProcessHarnessPhase.recoverTerminal,
+        ),
+        (event, control, process) =>
+            _validateRolledBackTerminalColdAckRecoveryEvent(
+              event,
+              control as RestoreRolledBackTerminalProcessHarnessControl,
+              process,
+              runId: runId,
+              killedProcessId: killed.pid,
+              killedLeaseInstanceId: killedLease,
+              killedAckChecksum: killedAckChecksum,
+              terminalReceiptChecksum: terminalReceiptChecksum,
+            ),
+      );
+      final recoveryLease = recovery.requireIdentifier('leaseInstanceId');
+      final ackProcessId = recovery.requireProcessId('ackProcessId');
+      final ackLease = recovery.requireIdentifier('ackLeaseInstanceId');
+      final ackChecksum = recovery.requireSha256('coldAckChecksum');
+      final outcome = recovery.requireString('outcome');
+      await _runNormalPhase(
+        await _writeRolledBackTerminalControl(
+          RestoreRolledBackTerminalProcessHarnessPhase.verifyBusinessReady,
+        ),
+        (event, control, process) => _validateRolledBackTerminalVerifyEvent(
+          event,
+          control as RestoreRolledBackTerminalProcessHarnessControl,
+          process,
+          runId: runId,
+          expectedGateResult: outcome == 'archived' ? 'none' : 'rolledBack',
+          expectedAckProcessId: ackProcessId,
+          expectedAckLeaseInstanceId: ackLease,
+          expectedAckChecksum: ackChecksum,
+          priorLeaseInstanceIds: {killedLease, recoveryLease},
+        ),
+      );
+      return;
+    }
+
+    final arm = await _runNormalPhase(
+      await _writeRolledBackTerminalControl(
+        RestoreRolledBackTerminalProcessHarnessPhase.rollbackToColdAck,
+      ),
+      (event, control, process) => _validateRolledBackTerminalArmEvent(
+        event,
+        control as RestoreRolledBackTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+      ),
+    );
+    final armLease = arm.requireIdentifier('leaseInstanceId');
+    final ackProcessId = arm.requireProcessId('coldAckProcessId');
+    final ackLease = arm.requireIdentifier('coldAckLeaseInstanceId');
+    final ackChecksum = arm.requireSha256('coldAckChecksum');
+    final terminalReceiptChecksum = arm.requireSha256(
+      'terminalReceiptChecksum',
+    );
+    final archiveKill = await _runKillPhase(
+      await _writeRolledBackTerminalControl(
+        RestoreRolledBackTerminalProcessHarnessPhase.recoverTerminal,
+      ),
+      (event, control, process) => _validateRolledBackTerminalArchiveKillEvent(
+        event,
+        control as RestoreRolledBackTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+        armProcessId: arm.pid,
+        armLeaseInstanceId: armLease,
+        ackChecksum: ackChecksum,
+        terminalReceiptChecksum: terminalReceiptChecksum,
+      ),
+    );
+    final archiveKillLease = archiveKill.requireIdentifier('leaseInstanceId');
+    await _runNormalPhase(
+      await _writeRolledBackTerminalControl(
+        RestoreRolledBackTerminalProcessHarnessPhase.verifyBusinessReady,
+      ),
+      (event, control, process) => _validateRolledBackTerminalVerifyEvent(
+        event,
+        control as RestoreRolledBackTerminalProcessHarnessControl,
+        process,
+        runId: runId,
+        expectedGateResult:
+            terminalFailpoint ==
+                RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable
+            ? 'none'
+            : 'rolledBack',
+        expectedAckProcessId: ackProcessId,
+        expectedAckLeaseInstanceId: ackLease,
+        expectedAckChecksum: ackChecksum,
+        priorLeaseInstanceIds: {armLease, archiveKillLease},
+      ),
+    );
+  }
+
   bool _isColdAckFailpoint(RestoreTerminalProcessFailpoint value) =>
       value == RestoreTerminalProcessFailpoint.coldAckTempDurable ||
       value == RestoreTerminalProcessFailpoint.coldAckPublished;
@@ -964,6 +1189,11 @@ final class _RestoreProcessHarnessHost {
             'restore_rollback_harness_kill_outer_succeeded:'
             '${control.phaseName}',
           );
+        case RestoreRolledBackTerminalProcessHarnessControl():
+          throw StateError(
+            'restore_rolled_back_terminal_harness_kill_outer_succeeded:'
+            '${control.phaseName}',
+          );
         default:
           throw StateError('restore_harness_kill_control_runtime_type');
       }
@@ -1010,6 +1240,22 @@ final class _RestoreProcessHarnessHost {
       scenarioId: scenarioId,
       phase: phase,
       failpoint: failpoint.rollback!,
+      scenarioRoot: scenarioRoot.path,
+      preferencesPrefix: _preferencesPrefix,
+    );
+    return _persistControl(control);
+  }
+
+  Future<RestoreRolledBackTerminalProcessHarnessControl>
+  _writeRolledBackTerminalControl(
+    RestoreRolledBackTerminalProcessHarnessPhase phase,
+  ) async {
+    final control = RestoreRolledBackTerminalProcessHarnessControl(
+      generation: phase.index + 1,
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      phase: phase,
+      failpoint: failpoint.terminal!,
       scenarioRoot: scenarioRoot.path,
       preferencesPrefix: _preferencesPrefix,
     );
@@ -1491,6 +1737,398 @@ final class _RestoreProcessHarnessHost {
     }
     if (event.requireInt('settingsMutationAttempts') != 0) {
       throw StateError('restore_terminal_harness_verify_settings_mutation');
+    }
+  }
+
+  void _validateRolledBackTerminalArmEvent(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    if (_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_rolled_back_terminal_arm_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'leaseInstanceId',
+        'rollbackOriginReceiptState',
+        'triggerKind',
+        'triggerPreferenceKey',
+        'triggerFailureCount',
+        'ackExpected',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'rolledBack');
+    event.requireExactString('rollbackOriginReceiptState', 'verified');
+    event.requireExactString('triggerKind', 'repeatedTargetSetRejected');
+    event.requireExactString(
+      'triggerPreferenceKey',
+      'restore_harness_${control.scenarioId}_primary',
+    );
+    if (event.requireInt('triggerFailureCount') != 1) {
+      throw StateError('restore_rolled_back_terminal_arm_trigger');
+    }
+    event.requireExactString('ackExpected', 'before');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (event.requireProcessId('coldAckProcessId') != event.pid) {
+      throw StateError('restore_rolled_back_terminal_arm_ack_pid');
+    }
+    if (event.requireIdentifier('coldAckLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_arm_ack_lease');
+    }
+    event.requireSha256('coldAckChecksum');
+    event.requireSha256('terminalReceiptChecksum');
+    if (event.requireInt('settingsMutationAttempts') < 1) {
+      throw StateError('restore_rolled_back_terminal_arm_settings_mutation');
+    }
+  }
+
+  void _validateRolledBackTerminalColdAckKillEvent(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    if (!_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_rolled_back_terminal_cold_ack_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: const {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'rollbackOriginReceiptState',
+        'triggerKind',
+        'triggerPreferenceKey',
+        'triggerFailureCount',
+        'observedReceiptState',
+        'settingsMutationAttempts',
+        'operationKind',
+        'terminalReceiptChecksum',
+        'expected',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'ackChecksum',
+        'temporaryPath',
+        'targetPath',
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireExactString('rollbackOriginReceiptState', 'verified');
+    event.requireExactString('triggerKind', 'repeatedTargetSetRejected');
+    event.requireExactString(
+      'triggerPreferenceKey',
+      'restore_harness_${control.scenarioId}_primary',
+    );
+    if (event.requireInt('triggerFailureCount') != 1 ||
+        event.requireInt('settingsMutationAttempts') < 1) {
+      throw StateError('restore_rolled_back_terminal_cold_ack_trigger');
+    }
+    event.requireExactString('observedReceiptState', 'rolledBack');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    _validateRolledBackTerminalColdAckObservation(
+      event,
+      control,
+      runId: runId,
+      leaseInstanceId: leaseInstanceId,
+    );
+  }
+
+  void _validateRolledBackTerminalColdAckObservation(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control, {
+    required String runId,
+    required String leaseInstanceId,
+  }) {
+    final expectedOperation =
+        control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable
+        ? 'coldAckTempDurable'
+        : 'coldAckPublished';
+    event.requireExactString('operationKind', expectedOperation);
+    event.requireSha256('terminalReceiptChecksum');
+    event.requireExactString('expected', 'before');
+    if (event.requireProcessId('ackProcessId') != event.pid) {
+      throw StateError('restore_rolled_back_terminal_cold_ack_pid');
+    }
+    if (event.requireIdentifier('ackLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_cold_ack_lease');
+    }
+    event.requireSha256('ackChecksum');
+    final runDirectory = p.join(
+      p.normalize(p.absolute(control.appDataDirectory.path)),
+      '.kelivo_restore',
+      'run_$runId',
+    );
+    const ackFileName = 'settings_cold_ack.json';
+    final temporaryPath = event.requirePath('temporaryPath');
+    final temporaryPattern = RegExp(
+      '^${RegExp.escape(ackFileName)}\\.'
+      '([1-9][0-9]*)_${event.pid}_([0-9]+)\\.tmp\$',
+    );
+    if (!p.equals(p.dirname(temporaryPath), runDirectory) ||
+        temporaryPattern.firstMatch(p.basename(temporaryPath)) == null) {
+      throw const FormatException('restore_rolled_back_terminal_cold_ack_temp');
+    }
+    event.requirePath(
+      'targetPath',
+      expected: p.join(runDirectory, ackFileName),
+    );
+  }
+
+  void _validateRolledBackTerminalColdAckRecoveryEvent(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int killedProcessId,
+    required String killedLeaseInstanceId,
+    required String killedAckChecksum,
+    required String terminalReceiptChecksum,
+  }) {
+    if (!_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_rolled_back_terminal_recovery_failpoint');
+    }
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'outcome',
+        'leaseInstanceId',
+        'ackExpected',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'rolledBack');
+    event.requireExactString('ackExpected', 'before');
+    event.requireExactString(
+      'terminalReceiptChecksum',
+      terminalReceiptChecksum,
+    );
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == killedLeaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_recovery_lease_reused');
+    }
+    final tempFailpoint =
+        control.failpoint == RestoreTerminalProcessFailpoint.coldAckTempDurable;
+    final outcome = event.requireString('outcome');
+    if (outcome != (tempFailpoint ? 'coldRestartRequired' : 'archived')) {
+      throw StateError('restore_rolled_back_terminal_recovery_outcome');
+    }
+    final expectedAckProcessId = tempFailpoint ? event.pid : killedProcessId;
+    final expectedAckLease = tempFailpoint
+        ? leaseInstanceId
+        : killedLeaseInstanceId;
+    if (event.requireProcessId('ackProcessId') != expectedAckProcessId ||
+        event.requireIdentifier('ackLeaseInstanceId') != expectedAckLease) {
+      throw StateError('restore_rolled_back_terminal_recovery_ack_identity');
+    }
+    final ackChecksum = event.requireSha256('coldAckChecksum');
+    if (tempFailpoint
+        ? ackChecksum == killedAckChecksum
+        : ackChecksum != killedAckChecksum) {
+      throw StateError('restore_rolled_back_terminal_recovery_ack_checksum');
+    }
+    final mutationAttempts = event.requireInt('settingsMutationAttempts');
+    if (tempFailpoint ? mutationAttempts < 1 : mutationAttempts != 0) {
+      throw StateError(
+        'restore_rolled_back_terminal_recovery_settings_mutation',
+      );
+    }
+  }
+
+  void _validateRolledBackTerminalArchiveKillEvent(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int armProcessId,
+    required String armLeaseInstanceId,
+    required String ackChecksum,
+    required String terminalReceiptChecksum,
+  }) {
+    if (_isColdAckFailpoint(control.failpoint)) {
+      throw StateError('restore_rolled_back_terminal_archive_failpoint');
+    }
+    final observationKeys = switch (control.failpoint) {
+      RestoreTerminalProcessFailpoint.completedRunsRootDurable ||
+      RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable => const {
+        'operationKind',
+        'boundary',
+        'path',
+        'fullBarrier',
+      },
+      RestoreTerminalProcessFailpoint.archivingMarkerPublished ||
+      RestoreTerminalProcessFailpoint.terminalRunArchived => const {
+        'operationKind',
+        'sourcePath',
+        'targetPath',
+        'sourceKind',
+      },
+      _ => throw StateError('restore_rolled_back_terminal_archive_failpoint'),
+    };
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'observedReceiptState',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'ackExpected',
+        'ackProcessId',
+        'ackLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+        ...observationKeys,
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireExactString('observedReceiptState', 'rolledBack');
+    event.requireExactString('ackExpected', 'before');
+    event.requireExactString(
+      'terminalReceiptChecksum',
+      terminalReceiptChecksum,
+    );
+    event.requireExactString('coldAckChecksum', ackChecksum);
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == armLeaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_archive_lease_reused');
+    }
+    for (final key in const ['coldAckProcessId', 'ackProcessId']) {
+      if (event.requireProcessId(key) != armProcessId) {
+        throw StateError('restore_rolled_back_terminal_archive_ack_pid:$key');
+      }
+    }
+    for (final key in const ['coldAckLeaseInstanceId', 'ackLeaseInstanceId']) {
+      if (event.requireIdentifier(key) != armLeaseInstanceId) {
+        throw StateError('restore_rolled_back_terminal_archive_ack_lease:$key');
+      }
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError(
+        'restore_rolled_back_terminal_archive_settings_mutation',
+      );
+    }
+    _validateRolledBackTerminalArchiveObservation(event, control, runId: runId);
+  }
+
+  void _validateRolledBackTerminalArchiveObservation(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control, {
+    required String runId,
+  }) {
+    final workspace = p.join(
+      p.normalize(p.absolute(control.appDataDirectory.path)),
+      '.kelivo_restore',
+    );
+    switch (control.failpoint) {
+      case RestoreTerminalProcessFailpoint.completedRunsRootDurable:
+      case RestoreTerminalProcessFailpoint.archivingMarkerRemovedDurable:
+        event.requireExactString('operationKind', 'terminalWorkspaceSyncAfter');
+        event.requireExactString('boundary', control.failpoint.name);
+        event.requirePath('path', expected: workspace);
+        if (!event.requireBool('fullBarrier')) {
+          throw const FormatException(
+            'restore_rolled_back_terminal_workspace_barrier',
+          );
+        }
+      case RestoreTerminalProcessFailpoint.archivingMarkerPublished:
+        event.requireRenameObservation(
+          sourcePath: p.join(workspace, '.active_run.publishing'),
+          targetPath: p.join(workspace, '.active_run.archiving'),
+          sourceKind: 'file',
+        );
+      case RestoreTerminalProcessFailpoint.terminalRunArchived:
+        event.requireRenameObservation(
+          sourcePath: p.join(workspace, 'run_$runId'),
+          targetPath: p.join(workspace, 'completed', 'run_$runId'),
+          sourceKind: 'directory',
+        );
+      case RestoreTerminalProcessFailpoint.coldAckTempDurable:
+      case RestoreTerminalProcessFailpoint.coldAckPublished:
+        throw StateError('restore_rolled_back_terminal_archive_observation');
+    }
+  }
+
+  void _validateRolledBackTerminalVerifyEvent(
+    _HarnessEvent event,
+    RestoreRolledBackTerminalProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required String expectedGateResult,
+    required int expectedAckProcessId,
+    required String expectedAckLeaseInstanceId,
+    required String expectedAckChecksum,
+    required Set<String> priorLeaseInstanceIds,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'gateResult',
+        'archiveState',
+        'observedAckExpected',
+        'observedAckProcessId',
+        'observedAckLeaseInstanceId',
+        'observedAckChecksum',
+        'leaseInstanceId',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'rolledBack');
+    event.requireExactString('gateResult', expectedGateResult);
+    event.requireExactString('archiveState', 'archived');
+    event.requireExactString('observedAckExpected', 'before');
+    if (event.requireProcessId('observedAckProcessId') !=
+        expectedAckProcessId) {
+      throw StateError('restore_rolled_back_terminal_verify_ack_pid');
+    }
+    if (event.requireIdentifier('observedAckLeaseInstanceId') !=
+        expectedAckLeaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_verify_ack_lease');
+    }
+    event.requireExactString('observedAckChecksum', expectedAckChecksum);
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (priorLeaseInstanceIds.length != 2 ||
+        priorLeaseInstanceIds.contains(leaseInstanceId) ||
+        leaseInstanceId == expectedAckLeaseInstanceId) {
+      throw StateError('restore_rolled_back_terminal_verify_lease_reused');
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError('restore_rolled_back_terminal_verify_settings_mutation');
     }
   }
 
@@ -2359,6 +2997,8 @@ int _controlVersion(RestoreHarnessControl control) => switch (control) {
     RestoreTerminalProcessHarnessControl.version,
   RestoreRollbackProcessHarnessControl() =>
     RestoreRollbackProcessHarnessControl.version,
+  RestoreRolledBackTerminalProcessHarnessControl() =>
+    RestoreRolledBackTerminalProcessHarnessControl.version,
   _ => throw StateError('restore_harness_control_runtime_type'),
 };
 
