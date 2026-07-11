@@ -75,6 +75,73 @@ final class ActiveMessageGraphProjection {
   final List<MessageGraphRevision> contextRevisions;
 }
 
+final class MessageGraphTimelineRevision {
+  const MessageGraphTimelineRevision({
+    required this.revisionId,
+    required this.slotId,
+    required this.parentRevisionId,
+    required this.revisionNo,
+    required this.role,
+    required this.text,
+    required this.reasoning,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.finalizedAt,
+  });
+
+  final String revisionId;
+  final String slotId;
+  final String? parentRevisionId;
+  final int revisionNo;
+  final String role;
+  final String text;
+  final String? reasoning;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? finalizedAt;
+}
+
+/// Immutable business read model. Selection and context are stable graph IDs;
+/// legacy list positions and conversation JSON never participate.
+final class MessageGraphTimelineProjection {
+  MessageGraphTimelineProjection({
+    required this.conversationId,
+    required this.branchId,
+    required this.stateRevision,
+    required this.contextStartRevisionId,
+    required List<MessageGraphTimelineRevision> activeRevisions,
+    required Map<String, List<MessageGraphTimelineRevision>> revisionsBySlot,
+    required Map<String, String> selectedRevisionBySlot,
+  }) : activeRevisions = UnmodifiableListView(activeRevisions),
+       revisionsBySlot = UnmodifiableMapView({
+         for (final entry in revisionsBySlot.entries)
+           entry.key: UnmodifiableListView(entry.value),
+       }),
+       selectedRevisionBySlot = UnmodifiableMapView(selectedRevisionBySlot);
+
+  final String conversationId;
+  final String? branchId;
+  final int stateRevision;
+  final String? contextStartRevisionId;
+  final List<MessageGraphTimelineRevision> activeRevisions;
+  final Map<String, List<MessageGraphTimelineRevision>> revisionsBySlot;
+  final Map<String, String> selectedRevisionBySlot;
+
+  List<MessageGraphTimelineRevision> get contextRevisions {
+    final boundary = contextStartRevisionId;
+    if (boundary == null) return activeRevisions;
+    final index = activeRevisions.indexWhere(
+      (revision) => revision.revisionId == boundary,
+    );
+    if (index < 0) {
+      throw MessageGraphIntegrityException(
+        'message_graph_boundary_not_on_active_path',
+      );
+    }
+    return UnmodifiableListView(activeRevisions.sublist(index));
+  }
+}
+
 final class MessageGraphValidationResult {
   const MessageGraphValidationResult({
     required this.branchCount,
@@ -223,6 +290,100 @@ final class MessageGraphProjector {
       stateRevision: state.stateRevision,
       revisions: path.revisions,
       contextRevisions: path.revisions.sublist(contextStartIndex),
+    );
+  }
+
+  Future<MessageGraphTimelineProjection?> projectTimeline({
+    required String conversationId,
+  }) async {
+    final active = await projectActivePath(conversationId: conversationId);
+    if (active == null) return null;
+    if (active.revisions.isEmpty) {
+      return MessageGraphTimelineProjection(
+        conversationId: conversationId,
+        branchId: active.branchId,
+        stateRevision: active.stateRevision,
+        contextStartRevisionId: active.contextStartRevisionId,
+        activeRevisions: const [],
+        revisionsBySlot: const {},
+        selectedRevisionBySlot: const {},
+      );
+    }
+
+    final slotIds = active.revisions.map((revision) => revision.slotId).toSet();
+    final revisionRows =
+        await (_db.select(_db.messageRevisionRows)
+              ..where(
+                (row) =>
+                    row.conversationId.equals(conversationId) &
+                    row.slotId.isIn(slotIds) &
+                    row.deletedAt.isNull(),
+              )
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.revisionNo),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final revisionIds = revisionRows.map((row) => row.id).toSet();
+    final partRows =
+        await (_db.select(_db.messagePartRows)
+              ..where(
+                (row) =>
+                    row.conversationId.equals(conversationId) &
+                    row.revisionId.isIn(revisionIds),
+              )
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.revisionId),
+                (row) => OrderingTerm.asc(row.ordinal),
+              ]))
+            .get();
+    final partsByRevision = <String, List<MessagePartRow>>{};
+    for (final part in partRows) {
+      partsByRevision.putIfAbsent(part.revisionId, () => []).add(part);
+    }
+    final roleBySlot = {
+      for (final revision in active.revisions) revision.slotId: revision.role,
+    };
+    final timelineById = <String, MessageGraphTimelineRevision>{};
+    final revisionsBySlot = <String, List<MessageGraphTimelineRevision>>{};
+    for (final row in revisionRows) {
+      final parts = partsByRevision[row.id] ?? const <MessagePartRow>[];
+      final reasoning = parts
+          .where((part) => part.kind == 'reasoning')
+          .map((part) => part.payload)
+          .join();
+      final revision = MessageGraphTimelineRevision(
+        revisionId: row.id,
+        slotId: row.slotId,
+        parentRevisionId: row.parentRevisionId,
+        revisionNo: row.revisionNo,
+        role: roleBySlot[row.slotId]!,
+        text: parts
+            .where((part) => part.kind == 'text')
+            .map((part) => part.payload)
+            .join(),
+        reasoning: reasoning.isEmpty ? null : reasoning,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        finalizedAt: row.finalizedAt,
+      );
+      timelineById[row.id] = revision;
+      revisionsBySlot.putIfAbsent(row.slotId, () => []).add(revision);
+    }
+    final activeTimeline = [
+      for (final revision in active.revisions) timelineById[revision.id]!,
+    ];
+    return MessageGraphTimelineProjection(
+      conversationId: conversationId,
+      branchId: active.branchId,
+      stateRevision: active.stateRevision,
+      contextStartRevisionId: active.contextStartRevisionId,
+      activeRevisions: activeTimeline,
+      revisionsBySlot: revisionsBySlot,
+      selectedRevisionBySlot: {
+        for (final revision in activeTimeline)
+          revision.slotId: revision.revisionId,
+      },
     );
   }
 

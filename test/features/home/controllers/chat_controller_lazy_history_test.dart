@@ -15,6 +15,10 @@ class _FakeLazyChatService extends ChatService {
   int fullLoadCalls = 0;
   int recentLoadCalls = 0;
   int rangeLoadCalls = 0;
+  int contextStartIndex = -1;
+
+  @override
+  int getContextStartIndex(String conversationId) => contextStartIndex;
 
   @override
   List<ChatMessage> getMessages(String conversationId) {
@@ -708,6 +712,7 @@ void main() {
 
     test('maps persisted truncate index into the loaded tail window', () {
       final truncatedConversation = conversation.copyWith(truncateIndex: 90);
+      chatService.contextStartIndex = 90;
       controller.setCurrentConversation(truncatedConversation);
 
       expect(controller.loadedWindowTruncateIndex(), 10);
@@ -723,6 +728,7 @@ void main() {
       'model context source keeps complete history and persisted truncate index',
       () async {
         final truncatedConversation = conversation.copyWith(truncateIndex: 30);
+        chatService.contextStartIndex = 30;
         controller.setCurrentConversation(truncatedConversation);
 
         final contextMessages = await controller

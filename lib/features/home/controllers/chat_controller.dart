@@ -116,8 +116,8 @@ class ChatController extends ChangeNotifier {
       _totalMessageCount = 0;
       _versionSelections = <String, int>{};
     } else {
-      _loadVersionSelections();
       await _loadInitialMessageWindow(conversation.id);
+      _loadVersionSelections();
     }
     notifyListeners();
   }
@@ -174,8 +174,8 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      _loadVersionSelections();
       await _loadInitialMessageWindow(id);
+      _loadVersionSelections();
       notifyListeners();
     }
   }
@@ -195,6 +195,7 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _loadInitialMessageWindow(String conversationId) async {
+    await _chatService.loadMessageGraphTimeline(conversationId);
     _totalMessageCount = _chatService.getMessageCount(conversationId);
     _messages = List.of(await _chatService.loadRecentMessages(conversationId));
     _loadedStartIndex = (_totalMessageCount - _messages.length)
@@ -362,7 +363,10 @@ class ChatController extends ChangeNotifier {
   }
 
   int loadedWindowTruncateIndex() {
-    final raw = _currentConversation?.truncateIndex ?? -1;
+    final conversationId = _currentConversation?.id;
+    final raw = conversationId == null
+        ? -1
+        : _chatService.getContextStartIndex(conversationId);
     if (raw < 0) return -1;
     if (raw <= _loadedStartIndex) return -1;
 
@@ -374,7 +378,6 @@ class ChatController extends ChangeNotifier {
   Conversation conversationForLoadedWindow(Conversation conversation) {
     if (_currentConversation?.id != conversation.id) return conversation;
     final localTruncateIndex = loadedWindowTruncateIndex();
-    if (localTruncateIndex == conversation.truncateIndex) return conversation;
     return conversation.copyWith(truncateIndex: localTruncateIndex);
   }
 
@@ -405,7 +408,11 @@ class ChatController extends ChangeNotifier {
   Conversation conversationForCompleteHistoryContext(
     Conversation conversation,
   ) {
-    return _chatService.getConversation(conversation.id) ?? conversation;
+    final current =
+        _chatService.getConversation(conversation.id) ?? conversation;
+    return current.copyWith(
+      truncateIndex: _chatService.getContextStartIndex(conversation.id),
+    );
   }
 
   List<ChatMessage> _trimWindowEnd(List<ChatMessage> messages) {
@@ -698,12 +705,30 @@ class ChatController extends ChangeNotifier {
 
   /// Set the selected version for a message group.
   Future<void> setSelectedVersion(String groupId, int version) async {
+    var candidates = _chatService.getMessagesForGroups(
+      _currentConversation?.id ?? '',
+      [groupId],
+    );
+    if (!candidates.any((message) => message.version == version) &&
+        _currentConversation != null) {
+      candidates = await _chatService.loadMessagesForGroups(
+        _currentConversation!.id,
+        [groupId],
+      );
+    }
+    ChatMessage? target;
+    for (final candidate in candidates) {
+      if (candidate.version == version) {
+        target = candidate;
+        break;
+      }
+    }
+    if (target == null) throw StateError('message_graph_revision_missing');
     _versionSelections[groupId] = version;
     if (_currentConversation != null) {
-      await _chatService.setSelectedVersion(
+      await _chatService.selectMessageRevision(
         _currentConversation!.id,
-        groupId,
-        version,
+        target.id,
       );
     }
     notifyListeners();

@@ -1546,12 +1546,7 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   Future<void> setSelectedVersion(String groupId, int version) async {
-    versionSelections[groupId] = version;
-    await _chatService.setSelectedVersion(
-      currentConversation!.id,
-      groupId,
-      version,
-    );
+    await _chatController.setSelectedVersion(groupId, version);
     notifyListeners();
   }
 

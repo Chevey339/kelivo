@@ -116,25 +116,26 @@ void main() {
   );
 
   test(
-    'append version allocates version and selection in one transaction',
+    'append version creates a selected graph revision without JSON selection',
     () async {
-      await repository.appendMessageToConversation(
+      await repository.appendGraphMessageToConversation(
         conversation: conversation(),
         message: message(id: 'message-0', groupId: 'group-1'),
       );
 
-      final results = await Future.wait([
-        repository.appendMessageVersion(messageId: 'message-0', content: 'v1'),
-        repository.appendMessageVersion(messageId: 'message-0', content: 'v2'),
-      ]);
+      final result = await repository.appendMessageVersion(
+        messageId: 'message-0',
+        content: 'v1',
+      );
 
-      expect(results.whereType<AppendedMessageVersion>(), hasLength(2));
-      expect(results.map((result) => result!.message.version).toSet(), {1, 2});
+      expect(result?.message.version, 1);
+      final timeline = await repository.projectMessageGraphTimeline(
+        conversationId: 'conversation-1',
+      );
+      expect(timeline!.activeRevisions.single.revisionId, result!.message.id);
       expect(
-        (await repository.getConversation(
-          'conversation-1',
-        ))?.versionSelections['group-1'],
-        2,
+        (await repository.getConversation('conversation-1'))?.versionSelections,
+        isEmpty,
       );
     },
   );

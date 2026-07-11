@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 2：MSG-01～06 已完成）
-> - 当前结论：released Hive JSON projection 与 frozen SQLite v1 schema 现已共享同一 fixture/digest 门禁；升级前可见 sequence、selected revision、stable context/prompt、ordered parts、asset reference 和 orphan recovery 都有冻结 SHA-256，adapter 语义漂移会直接失败。下一项为 MSG-07 业务切换与旧字段依赖退役
+> - 最后更新：2026-07-11（Phase 2：MSG-01～07 已完成）
+> - 当前结论：Message Graph 已成为正式 Hive 迁移和运行期 append/edit/regenerate/select/context/delete/fork/checkpoint 的权威路径；UI/service 选择与上下文来自 stable revision projection，不再读取 conversation selection/truncate JSON，conversation `messageIds` 也退出持久业务计数/分页。旧字段只保留于 Hive/legacy JSON/备份兼容模型与 adapter；Phase 2 已 7/7 关闭
 
 ## 1. 文档使用规则
 
@@ -38,7 +38,7 @@
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
-| Phase 2：Message Graph | 6 / 7 | `进行中` | legacy fixture/digest 已冻结；下一步切换业务读写并删除旧 selection/truncate/messageIds 依赖 |
+| Phase 2：Message Graph | 7 / 7 | `已完成` | graph timeline 与 stable-ID commands 已接管业务；Hive/legacy JSON 兼容输入保留只读解释边界 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
@@ -84,6 +84,7 @@
 | MSG-04 graph transaction commands | `已完成` | analyze 通过；database 104/104；全量 1209/1209 | 2026-07-11 | v5 message part migration/FK/ordinal/kind；edit/regenerate/select/delete/fork happy、boundary、rollback、state conflict；旧未来排除、旧 branch 保留、cascade confirm、200 unrelated revisions 删除放大反例覆盖 |
 | MSG-05 deterministic legacy adapter | `已完成` | analyze 通过；database 110/110；全量 1215/1215 | 2026-07-11 | Hive/SQLite v1 共用 typed adapter；selection ordinal/version ambiguity、invalid fallback、duplicate ID/order/version、truncate inside/outside、streaming partial、orphan Recovered、stable ID/parts/issue ledger 原子持久化覆盖 |
 | MSG-06 frozen legacy fixture/digests | `已完成` | analyze 通过；database 112/112；全量 1217/1217 | 2026-07-11 | released Hive JSON projection fixture + frozen SQLite v1 schema；visible/selection/prompt/asset SHA-256、reasoning/text part order、ambiguous selection/truncate、streaming orphan Recovered 全部一致 |
+| MSG-07 graph business cutover | `已完成` | analyze 通过；database 113/113；全量 1216/1216 | 2026-07-11 | Hive migration 逐 conversation 生成 graph/parts/ledger 后才完成；immutable timeline projection 忽略故意冲突的 legacy JSON/order；append/edit/regenerate/select/context/delete/fork/checkpoint 均走 stable graph ID。删除 inactive alternate 后物理 order 保持 `0,2`，不 compact；Cherry/legacy JSON/overwrite 回归通过 |
 | P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；当前快速门禁 analyze + 49 tests；里程碑全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；profile harness 已加入 DB2-02 execution-isolate 64-sample probe；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
@@ -313,7 +314,7 @@ dart run tool/run_restore_process_harness.dart \
 | MSG-04 | Edit/regenerate/select/delete/fork commands | DB2-05、MSG-03 | `已完成` | 全部使用稳定 revision/branch ID 且单事务；删除不得复用 `_rewriteMessageOrder` 或全会话 compact，D3 删除更新量不得随会话总消息数线性增长 | 本里程碑提交（2026-07-11） | v5 增加 composite FK/ordinal/kind 受约束的最小权威 `message_part_rows`，保证 edit/regenerate 不产生无正文半状态。commands 原子写 revision+text part+branch+state，selection 输入 revision ID；delete 递归更新目标因果子树和 branch-parent 子树，最新 alternate/截断 prefix 修复 active head，末 revision 要求确认，无任何 legacy order 读写。200 个无关 revision 删除反例仅 1 行 revision 进入 deleted；fork 原子 remap path/slot/revision/part ID。复杂 parts 留 GEN-05 |
 | MSG-05 | Hive/SQLite v1 → graph/legacy projection adapter | DB2-01、MSG-02、PD-13 | `已完成` | selection 双解释、因果歧义、truncate/orphan/duplicate 均保留 issue，不伪造真实历史 | 本里程碑提交（2026-07-11） | `LegacyMessageGraphAdapter` 对 Hive model 与 SQLite v1 row projection 使用同一 typed input；group anchor 按 order/time/ID，revision 按 version/time/ID，selection 同算 ordinal/version，冲突用旧 UI ordinal 保画面并写 `selection_ambiguous`，均非法 latest fallback + issue。duplicate version 分配稳定稀疏号，truncate slot 内/越界、streaming partial、cross-conversation orphan/recovered 均显式记录。v6 `migration_run/issues` ledger 与 graph/parts 同事务持久化；不生成 native causality |
 | MSG-06 | Legacy fixtures 与 digest 对比 | MSG-05、P0-09 | `已完成` | 可见序列、选中版本、prompt、parts/assets 均验证 | 本里程碑提交（2026-07-11） | `legacy_message_graph_v1.json` 冻结 released Hive backup JSON projection（物理尾部旧 assistant alternate、ordinal/version 冲突、truncate 落组内、reasoning、asset path、streaming orphan）；同一 payload 写入 frozen SQLite v1 schema 后再读取，二者 adapter active IDs/context/digest 一致。visible `832ec2…`、selection `db078e…`、prompt `289d88…`、asset `47066c…` 均冻结 |
-| MSG-07 | 删除旧业务依赖 | MSG-03～06 | `未开始` | 业务不再依赖 `messageIds/versionSelectionsJson/truncateIndex` | — | — |
+| MSG-07 | 删除旧业务依赖 | MSG-03～06 | `已完成` | 业务不再依赖 `messageIds/versionSelectionsJson/truncateIndex` | 本里程碑提交（2026-07-11） | 新 `MessageGraphTimelineProjection` 以 slot/revision/branch/context stable ID 输出 active path、alternates、ordered text/reasoning parts；故意把 legacy `version_selections_json`/`truncate_index` 写成冲突值仍得到 graph selection/context。ChatService 启动只加载 conversation summaries + SQL counts，不构造所有 conversation `messageIds`；选择、context、搜索选中版本、统计计数改从 graph/DAO projection 获取。运行期普通追加、revision branch、checkpoint parts、stable-ID selection、sparse delete、fork shadow projection 均闭环；正式 Hive migration 每 conversation 有界转换并完成 ledger，未发布 SQLite v1/旧 JSON 仅 best-effort backfill。允许旧字段继续存在的范围仅为 `Conversation`/`ChatMessage` 兼容 model、legacy adapter、Hive/旧 JSON/备份导入导出和旧 schema migration；正常 controller/service 不读取其持久语义。analyze、database 113/113、全量 1216/1216 通过 |
 
 ## 9. Phase 3：Generation State Machine
 
@@ -479,16 +480,17 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，产品决策和 Phase 1 平台输入均不再阻塞 Phase 2。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，精确 ABI/SQLite 元数据留给五平台发布门禁补证；这不重新打开已通过的 DB2-07 capability gate。
+PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2 已完成且无产品决策阻塞。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，精确 ABI/SQLite 元数据留给五平台发布门禁补证；这不重新打开已通过的 DB2-07 capability gate。
 
 ## 19. 下一步
 
-Phase 2 当前 6/7。下一步执行 MSG-07：把 Hive migration 完成路径和业务 conversation/message projection 切到 graph/parts，删除 controller/service 对 `messageIds`、`versionSelectionsJson`、`truncateIndex` 的业务解释；旧字段只允许存在于 read-only legacy adapter/兼容 model。D4 renderer/RSS 超标不在 Message Graph 阶段扩 scope。
+Phase 2 已 7/7 完成。下一步按方案进入 Phase 3 `GEN-01`：建立 GenerationRun schema 与条件 transition；P0-03 checkpoint writer 继续作为 GEN-03 输入。D4 renderer/RSS 超标留在 Phase 4，不在 generation 阶段扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成 graph 业务切换：新增不可变 timeline/parts projection，selection/context/search/count 不再读取旧 conversation JSON/list 字段；正式 Hive migration 在 mark complete 前逐 conversation 生成 graph 与 ledger，开发 SQLite v1/旧 JSON 只走显式 best-effort adapter。普通 append、edit/regenerate、stable revision selection、context boundary、sparse delete、fork 与 streaming/final checkpoint 同步 graph；inactive alternate 删除保留物理 order 缺口且不调用 compact。controller fork/selection 提交 stable revision ID，旧字段限制在兼容 model/adapter/迁移与备份边界。Cherry/legacy JSON/overwrite 兼容回归、database 113/113、全量 1216/1216、analyze 全绿，Phase 2 7/7 关闭 | MSG-07、Phase 2 | 本里程碑提交 | Codex |
 | 2026-07-11 | 冻结真实 legacy fixture/digest：新增 released Hive backup JSON projection fixture，包含物理尾部旧 assistant alternate、ordinal/version selection 冲突、truncate 落 group 内、reasoning/text part、asset path 与 streaming orphan。fixture 直接走 Hive model JSON adapter，并另写入 frozen SQLite v1 schema 后读回走同一 adapter；两路径 active IDs/context 一致。冻结 visible/selection/prompt/asset 四个 SHA-256，验证旧可见序列、selected revision、stable prompt boundary、part order、资源引用和 Recovered orphan，不比较无法获知的 native ancestor history | MSG-06 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 deterministic legacy graph adapter 与审计 ledger：Hive/SQLite v1 共用 typed ordered-message input，slot/group/revision stable ID 与排序确定；selection 同时按 ordinal/version 解释，歧义保留两候选并沿旧 UI ordinal 可见投影，非法值 latest fallback，均写 issue。duplicate ID/order/version、truncate 落 slot/越界、streaming partial、cross-conversation orphan reject 与显式 Recovered conversation 均覆盖；v6 新增 migration run/issue 表，graph/parts/issues 单事务替换并由 projector 复验。所有 legacy branch 仅标 `legacy_visible_projection`/`legacy_ambiguous` | MSG-05 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 graph transaction commands 与最小权威 text part：schema v5 新增 `message_part_rows` composite FK、unique ordinal、kind/time CHECK 和逐版本 migration；edit user/regenerate assistant 原子创建 revision+part+native branch 并切 active state，旧 branch/后代保留且不进新 prompt；selection 只接受 stable revision ID；delete 仅递归标记目标因果子树及受影响 branch-parent 子树，自动选最新 alternate或经确认截断到 parent，未调用 `_rewriteMessageOrder`。200 个无关 alternates 的删除反例证明只标记目标 1 revision；fork 单事务 remap 截止 target 的 slot/revision/parts/context | MSG-04 | 本里程碑提交 | Codex |

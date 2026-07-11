@@ -205,7 +205,7 @@ class _StatsPageState extends State<StatsPage> {
         .map(
           (conversation) =>
               '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
-              '${conversation.messageIds.length}',
+              '${chatService.getMessageCount(conversation.id)}',
         )
         .join('|');
     if (_loadingMessages || _loadedMessageSignature == signature) return;

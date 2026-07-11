@@ -710,6 +710,18 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<MessageGraphTimelineProjection?> projectMessageGraphTimeline({
+    required String conversationId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessageGraphPath,
+      () => MessageGraphProjector(
+        _db,
+      ).projectTimeline(conversationId: conversationId),
+      resultCount: (projection) => projection?.activeRevisions.length ?? 0,
+    );
+  }
+
   Future<MessageGraphPath> projectMessageGraphBranch({
     required String conversationId,
     required String branchId,
@@ -871,6 +883,71 @@ class ChatDatabaseRepository {
     ),
   );
 
+  Future<MessageGraphForkResult> forkMessageGraphConversationWithShadow({
+    required String sourceConversationId,
+    required String sourceBranchId,
+    required String sourceRevisionId,
+    required String targetConversationId,
+    required String title,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandMessageGraphMutation,
+      () => _db.transaction(() async {
+        final sourcePath = await MessageGraphProjector(_db).projectBranchPath(
+          conversationId: sourceConversationId,
+          branchId: sourceBranchId,
+          targetRevisionId: sourceRevisionId,
+        );
+        final result = await MessageGraphCommands(_db).forkConversation(
+          sourceConversationId: sourceConversationId,
+          sourceBranchId: sourceBranchId,
+          sourceRevisionId: sourceRevisionId,
+          targetConversationId: targetConversationId,
+          title: title,
+        );
+        final sourceIds = sourcePath.revisions
+            .map((revision) => revision.id)
+            .toList(growable: false);
+        final sourceRows = await (_db.select(
+          _db.messageRows,
+        )..where((row) => row.id.isIn(sourceIds))).get();
+        final byId = {for (final row in sourceRows) row.id: row};
+        for (final (index, sourceRevision) in sourcePath.revisions.indexed) {
+          final sourceRow = byId[sourceRevision.id];
+          if (sourceRow == null) continue;
+          final targetRevisionId = result.revisionIds[sourceRevision.id]!;
+          final source = _messageFromRow(sourceRow);
+          final clone = ChatMessage(
+            id: targetRevisionId,
+            role: source.role,
+            content: source.content,
+            timestamp: source.timestamp,
+            modelId: source.modelId,
+            providerId: source.providerId,
+            totalTokens: source.totalTokens,
+            conversationId: targetConversationId,
+            isStreaming: false,
+            reasoningText: source.reasoningText,
+            reasoningStartAt: source.reasoningStartAt,
+            reasoningFinishedAt: source.reasoningFinishedAt,
+            translation: source.translation,
+            reasoningSegmentsJson: source.reasoningSegmentsJson,
+            groupId: targetRevisionId,
+            version: 0,
+            promptTokens: source.promptTokens,
+            completionTokens: source.completionTokens,
+            cachedTokens: source.cachedTokens,
+            durationMs: source.durationMs,
+          );
+          await _db
+              .into(_db.messageRows)
+              .insert(_messageCompanion(clone, index), mode: InsertMode.insert);
+        }
+        return result;
+      }),
+    );
+  }
+
   Future<void> beginLegacyGraphMigration({
     required String migrationRunId,
     required String sourceKind,
@@ -889,6 +966,73 @@ class ChatDatabaseRepository {
         mode: InsertMode.insertOrIgnore,
       );
 
+  /// Converts one already-copied legacy conversation into the authoritative
+  /// graph representation. Memory is bounded to one conversation, never the
+  /// complete Hive store.
+  Future<ActiveMessageGraphProjection> migrateStoredLegacyConversationGraph({
+    required String migrationRunId,
+    required String conversationId,
+  }) async {
+    final conversationRow = await (_db.select(
+      _db.conversationRows,
+    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+    if (conversationRow == null) {
+      throw StateError('legacy_graph_conversation_missing');
+    }
+    final conversation = await _conversationFromRow(conversationRow);
+    final messageRows =
+        await (_db.select(_db.messageRows)
+              ..where((row) => row.conversationId.equals(conversationId))
+              ..orderBy([
+                (row) => OrderingTerm.asc(row.messageOrder),
+                (row) => OrderingTerm.asc(row.id),
+              ]))
+            .get();
+    final graph = const LegacyMessageGraphAdapter().adapt(
+      conversation: conversation,
+      messages: [
+        for (final row in messageRows)
+          LegacyOrderedMessage(
+            message: _messageFromRow(row),
+            order: row.messageOrder,
+          ),
+      ],
+    );
+    return putLegacyMessageGraph(migrationRunId: migrationRunId, graph: graph);
+  }
+
+  /// Best-effort bridge for development SQLite v1 databases and legacy JSON
+  /// imports. Released installations enter through the Hive migration above.
+  Future<int> backfillMissingMessageGraphs() async {
+    final conversations = await _db.select(_db.conversationRows).get();
+    final states = await _db.select(_db.conversationStateRows).get();
+    final existing = states.map((state) => state.conversationId).toSet();
+    final missing = conversations
+        .where((conversation) => !existing.contains(conversation.id))
+        .map((conversation) => conversation.id)
+        .toList(growable: false);
+    if (missing.isEmpty) return 0;
+
+    const runId = 'sqlite-v1-development-backfill-v1';
+    await beginLegacyGraphMigration(
+      migrationRunId: runId,
+      sourceKind: 'sqlite_v1',
+      sourceHash: 'development-sqlite-v1-best-effort-v1',
+      startedAt: DateTime.fromMicrosecondsSinceEpoch(0, isUtc: true),
+    );
+    for (final conversationId in missing) {
+      await migrateStoredLegacyConversationGraph(
+        migrationRunId: runId,
+        conversationId: conversationId,
+      );
+    }
+    await completeLegacyGraphMigration(
+      migrationRunId: runId,
+      completedAt: DateTime.now().toUtc(),
+    );
+    return missing.length;
+  }
+
   Future<ActiveMessageGraphProjection> putLegacyMessageGraph({
     required String migrationRunId,
     required LegacyMessageGraphProjection graph,
@@ -900,6 +1044,12 @@ class ChatDatabaseRepository {
       if (conversation == null) {
         throw StateError('legacy_graph_conversation_missing');
       }
+      await (_db.delete(_db.migrationIssueRows)..where(
+            (row) =>
+                row.migrationRunId.equals(migrationRunId) &
+                row.conversationId.equals(graph.conversationId),
+          ))
+          .go();
       await (_db.delete(
         _db.conversationStateRows,
       )..where((row) => row.conversationId.equals(graph.conversationId))).go();
@@ -1327,6 +1477,19 @@ class ChatDatabaseRepository {
     }, resultCount: (count) => count);
   }
 
+  Future<Map<String, int>> getMessageCountsByConversation() async {
+    final conversationId = _db.messageRows.conversationId;
+    final count = _db.messageRows.id.count();
+    final rows =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([conversationId, count])
+              ..groupBy([conversationId]))
+            .get();
+    return {
+      for (final row in rows) row.read(conversationId)!: row.read(count) ?? 0,
+    };
+  }
+
   Future<int> getConversationCount() async {
     return _observer.measure(
       ChatDatabaseOperation.queryConversationCount,
@@ -1549,17 +1712,43 @@ class ChatDatabaseRepository {
     final rows = await _db
         .customSelect(
           '''
+      WITH RECURSIVE active_revisions(conversation_id, revision_id, parent_revision_id) AS (
+        SELECT s.conversation_id, b.leaf_revision_id, r.parent_revision_id
+        FROM conversation_state_rows s
+        INNER JOIN conversation_branch_rows b
+          ON b.conversation_id = s.conversation_id
+         AND b.id = s.active_branch_id
+        INNER JOIN message_revision_rows r
+          ON r.conversation_id = b.conversation_id
+         AND r.id = b.leaf_revision_id
+        UNION
+        SELECT parent.conversation_id, parent.id, parent.parent_revision_id
+        FROM message_revision_rows parent
+        INNER JOIN active_revisions child
+          ON child.conversation_id = parent.conversation_id
+         AND child.parent_revision_id = parent.id
+      )
       SELECT
         c.id AS conversation_id,
         c.title AS conversation_title,
         c.updated_at AS updated_at,
-        c.version_selections_json AS version_selections_json,
         m.id AS message_id,
         m.content AS message_content,
         m.role AS message_role,
         m.group_id AS group_id,
         m.version AS version,
         m.message_order AS message_order,
+        (
+          SELECT selected.version
+          FROM active_revisions ar
+          INNER JOIN message_rows selected
+            ON selected.conversation_id = ar.conversation_id
+           AND selected.id = ar.revision_id
+          WHERE ar.conversation_id = m.conversation_id
+            AND COALESCE(selected.group_id, selected.id) =
+                COALESCE(m.group_id, m.id)
+          LIMIT 1
+        ) AS selected_version,
         (
           SELECT MAX(vm.version)
           FROM message_rows vm
@@ -1586,17 +1775,22 @@ class ChatDatabaseRepository {
 
     return rows
         .map((row) {
+          final groupId = row.readNullable<String>('group_id');
+          final messageId = row.readNullable<String>('message_id');
+          final effectiveGroupId = groupId ?? messageId;
+          final selectedVersion = row.readNullable<int>('selected_version');
           return ConversationSearchMatch(
             conversationId: row.read<String>('conversation_id'),
             conversationTitle: row.read<String>('conversation_title'),
             updatedAt: _dateTimeFromSqlite(row.read<int>('updated_at')),
-            versionSelections: _decodeStringIntMap(
-              row.readNullable<String>('version_selections_json') ?? '{}',
-            ),
-            messageId: row.readNullable<String>('message_id'),
+            versionSelections:
+                effectiveGroupId == null || selectedVersion == null
+                ? const {}
+                : {effectiveGroupId: selectedVersion},
+            messageId: messageId,
             messageContent: row.readNullable<String>('message_content'),
             messageRole: row.readNullable<String>('message_role'),
-            groupId: row.readNullable<String>('group_id'),
+            groupId: groupId,
             version: row.readNullable<int>('version'),
             maxVersion: row.readNullable<int>('max_version'),
           );
@@ -1636,6 +1830,288 @@ class ChatDatabaseRepository {
         touchUpdatedAt: touchUpdatedAt,
       ),
     );
+  }
+
+  Future<Conversation> appendGraphMessageToConversation({
+    required Conversation conversation,
+    required ChatMessage message,
+    bool selectVersion = false,
+    bool touchUpdatedAt = true,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendMessage,
+      () => _appendGraphMessageToConversation(
+        conversation: conversation,
+        message: message,
+        selectVersion: selectVersion,
+        touchUpdatedAt: touchUpdatedAt,
+      ),
+    );
+  }
+
+  Future<Conversation> _appendGraphMessageToConversation({
+    required Conversation conversation,
+    required ChatMessage message,
+    required bool selectVersion,
+    required bool touchUpdatedAt,
+  }) {
+    if (message.conversationId != conversation.id) {
+      throw ArgumentError.value(
+        message.conversationId,
+        'message.conversationId',
+        'Message and conversation IDs must match.',
+      );
+    }
+    return _db.transaction(() async {
+      final existingRow = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(conversation.id))).getSingleOrNull();
+      final current = existingRow == null
+          ? conversation
+          : await _conversationFromRow(existingRow, includeMessageIds: false);
+      final persisted = current.copyWith(
+        updatedAt: touchUpdatedAt ? DateTime.now() : current.updatedAt,
+      );
+      await _db
+          .into(_db.conversationRows)
+          .insertOnConflictUpdate(_conversationCompanion(persisted));
+      if (existingRow == null) {
+        await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
+      }
+
+      var state =
+          await (_db.select(_db.conversationStateRows)
+                ..where((row) => row.conversationId.equals(conversation.id)))
+              .getSingleOrNull();
+      if (state == null) {
+        final existingMessageCount = _db.messageRows.id.count();
+        final countRow =
+            await (_db.selectOnly(_db.messageRows)
+                  ..addColumns([existingMessageCount])
+                  ..where(
+                    _db.messageRows.conversationId.equals(conversation.id),
+                  ))
+                .getSingle();
+        if ((countRow.read(existingMessageCount) ?? 0) != 0) {
+          throw StateError('message_graph_backfill_required');
+        }
+        final branchId = _deterministicMergeId(
+          'graph_branch',
+          conversation.id,
+          'native-main',
+        );
+        await _db
+            .into(_db.conversationBranchRows)
+            .insert(
+              ConversationBranchRowsCompanion.insert(
+                id: branchId,
+                conversationId: conversation.id,
+                causalityKind: 'native',
+                createdAt: message.timestamp,
+              ),
+            );
+        await _db
+            .into(_db.conversationStateRows)
+            .insert(
+              ConversationStateRowsCompanion.insert(
+                conversationId: conversation.id,
+                activeBranchId: Value(branchId),
+              ),
+            );
+        state =
+            await (_db.select(_db.conversationStateRows)
+                  ..where((row) => row.conversationId.equals(conversation.id)))
+                .getSingle();
+      }
+
+      final order = await _nextMessageOrder(persisted.id);
+      await _db
+          .into(_db.messageRows)
+          .insert(_messageCompanion(message, order), mode: InsertMode.insert);
+      final projector = MessageGraphProjector(_db);
+      final active = (await projector.projectActivePath(
+        conversationId: conversation.id,
+      ))!;
+      final activeBranchId = active.branchId!;
+
+      if (selectVersion && message.groupId != null) {
+        final activeIds = active.revisions
+            .map((revision) => revision.id)
+            .toList(growable: false);
+        final rows = activeIds.isEmpty
+            ? const <MessageRow>[]
+            : await (_db.select(_db.messageRows)..where(
+                    (row) =>
+                        row.conversationId.equals(conversation.id) &
+                        row.id.isIn(activeIds),
+                  ))
+                  .get();
+        final byId = {for (final row in rows) row.id: row};
+        MessageGraphRevision? target;
+        for (final revision in active.revisions.reversed) {
+          final row = byId[revision.id];
+          if (row != null && (row.groupId ?? row.id) == message.groupId) {
+            target = revision;
+            break;
+          }
+        }
+        if (target == null) {
+          throw StateError('message_graph_revision_group_missing');
+        }
+        await _insertGraphRevision(
+          message: message,
+          slotId: target.slotId,
+          parentRevisionId: target.parentRevisionId,
+          requestedRevisionNo: message.version,
+        );
+        final branchId = _deterministicMergeId(
+          'graph_branch',
+          conversation.id,
+          message.id,
+        );
+        await _db
+            .into(_db.conversationBranchRows)
+            .insert(
+              ConversationBranchRowsCompanion.insert(
+                id: branchId,
+                conversationId: conversation.id,
+                parentBranchId: Value(activeBranchId),
+                forkedFromRevisionId: Value(target.parentRevisionId),
+                leafRevisionId: Value(message.id),
+                causalityKind: 'native',
+                createdAt: message.timestamp,
+              ),
+            );
+        await (_db.update(
+          _db.conversationStateRows,
+        )..where((row) => row.conversationId.equals(conversation.id))).write(
+          ConversationStateRowsCompanion(
+            activeBranchId: Value(branchId),
+            contextStartRevisionId: const Value(null),
+            stateRevision: Value(state.stateRevision + 1),
+          ),
+        );
+      } else {
+        final slotId = _deterministicMergeId(
+          'graph_slot',
+          conversation.id,
+          message.id,
+        );
+        await _db
+            .into(_db.messageSlotRows)
+            .insert(
+              MessageSlotRowsCompanion.insert(
+                id: slotId,
+                conversationId: conversation.id,
+                role: message.role,
+                createdAt: message.timestamp,
+              ),
+            );
+        await _insertGraphRevision(
+          message: message,
+          slotId: slotId,
+          parentRevisionId: active.branchLeafRevisionId,
+          requestedRevisionNo: 0,
+        );
+        await (_db.update(_db.conversationBranchRows)..where(
+              (row) =>
+                  row.conversationId.equals(conversation.id) &
+                  row.id.equals(activeBranchId),
+            ))
+            .write(
+              ConversationBranchRowsCompanion(
+                leafRevisionId: Value(message.id),
+              ),
+            );
+        await (_db.update(
+          _db.conversationStateRows,
+        )..where((row) => row.conversationId.equals(conversation.id))).write(
+          ConversationStateRowsCompanion(
+            stateRevision: Value(state.stateRevision + 1),
+          ),
+        );
+      }
+      if (message.isStreaming) await trackActiveStreamingId(message.id);
+      return persisted;
+    });
+  }
+
+  Future<void> _insertGraphRevision({
+    required ChatMessage message,
+    required String slotId,
+    required String? parentRevisionId,
+    required int requestedRevisionNo,
+  }) async {
+    final maxRevision = _db.messageRevisionRows.revisionNo.max();
+    final row =
+        await (_db.selectOnly(_db.messageRevisionRows)
+              ..addColumns([maxRevision])
+              ..where(
+                _db.messageRevisionRows.conversationId.equals(
+                      message.conversationId,
+                    ) &
+                    _db.messageRevisionRows.slotId.equals(slotId),
+              ))
+            .getSingle();
+    final maximum = row.read(maxRevision);
+    final revisionNo = maximum != null && requestedRevisionNo <= maximum
+        ? maximum + 1
+        : requestedRevisionNo;
+    await _db
+        .into(_db.messageRevisionRows)
+        .insert(
+          MessageRevisionRowsCompanion.insert(
+            id: message.id,
+            conversationId: message.conversationId,
+            slotId: slotId,
+            parentRevisionId: Value(parentRevisionId),
+            revisionNo: revisionNo,
+            createdAt: message.timestamp,
+            updatedAt: message.timestamp,
+            finalizedAt: message.isStreaming
+                ? const Value.absent()
+                : Value(message.timestamp),
+          ),
+        );
+    await _replaceGraphParts(message);
+  }
+
+  Future<void> _replaceGraphParts(ChatMessage message) async {
+    await (_db.delete(
+      _db.messagePartRows,
+    )..where((row) => row.revisionId.equals(message.id))).go();
+    var ordinal = 0;
+    final now = DateTime.now().toUtc();
+    final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
+    final reasoning = message.reasoningText;
+    if (reasoning != null && reasoning.isNotEmpty) {
+      await _db
+          .into(_db.messagePartRows)
+          .insert(
+            MessagePartRowsCompanion.insert(
+              conversationId: message.conversationId,
+              revisionId: message.id,
+              ordinal: ordinal++,
+              kind: 'reasoning',
+              payload: reasoning,
+              createdAt: message.timestamp,
+              updatedAt: updatedAt,
+            ),
+          );
+    }
+    await _db
+        .into(_db.messagePartRows)
+        .insert(
+          MessagePartRowsCompanion.insert(
+            conversationId: message.conversationId,
+            revisionId: message.id,
+            ordinal: ordinal,
+            kind: 'text',
+            payload: message.content,
+            createdAt: message.timestamp,
+            updatedAt: updatedAt,
+          ),
+        );
   }
 
   Future<Conversation> _appendMessageToConversation({
@@ -1696,6 +2172,94 @@ class ChatDatabaseRepository {
         messages: messages,
       ),
     );
+  }
+
+  Future<void> createGraphConversationWithMessages({
+    required Conversation conversation,
+    required List<ChatMessage> messages,
+  }) async {
+    for (final message in messages) {
+      if (message.conversationId != conversation.id) {
+        throw ArgumentError.value(
+          message.conversationId,
+          'messages',
+          'Every message must belong to the new conversation.',
+        );
+      }
+    }
+    await _db.transaction(() async {
+      final persisted = conversation.copyWith(
+        messageIds: const [],
+        versionSelections: const {},
+        truncateIndex: -1,
+      );
+      await _db
+          .into(_db.conversationRows)
+          .insert(_conversationCompanion(persisted), mode: InsertMode.insert);
+      await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
+      final branchId = _deterministicMergeId(
+        'graph_branch',
+        persisted.id,
+        'native-main',
+      );
+      await _db
+          .into(_db.conversationBranchRows)
+          .insert(
+            ConversationBranchRowsCompanion.insert(
+              id: branchId,
+              conversationId: persisted.id,
+              causalityKind: 'native',
+              createdAt: persisted.createdAt,
+            ),
+          );
+      String? parentRevisionId;
+      for (final (index, message) in messages.indexed) {
+        await _db
+            .into(_db.messageRows)
+            .insert(_messageCompanion(message, index), mode: InsertMode.insert);
+        final slotId = _deterministicMergeId(
+          'graph_slot',
+          persisted.id,
+          message.id,
+        );
+        await _db
+            .into(_db.messageSlotRows)
+            .insert(
+              MessageSlotRowsCompanion.insert(
+                id: slotId,
+                conversationId: persisted.id,
+                role: message.role,
+                createdAt: message.timestamp,
+              ),
+            );
+        await _insertGraphRevision(
+          message: message,
+          slotId: slotId,
+          parentRevisionId: parentRevisionId,
+          requestedRevisionNo: 0,
+        );
+        parentRevisionId = message.id;
+      }
+      await (_db.update(_db.conversationBranchRows)..where(
+            (row) =>
+                row.conversationId.equals(persisted.id) &
+                row.id.equals(branchId),
+          ))
+          .write(
+            ConversationBranchRowsCompanion(
+              leafRevisionId: Value(parentRevisionId),
+            ),
+          );
+      await _db
+          .into(_db.conversationStateRows)
+          .insert(
+            ConversationStateRowsCompanion.insert(
+              conversationId: persisted.id,
+              activeBranchId: Value(branchId),
+              stateRevision: Value(messages.length),
+            ),
+          );
+    });
   }
 
   Future<void> _createConversationWithMessages({
@@ -1790,19 +2354,33 @@ class ChatDatabaseRepository {
         groupId: groupId,
         version: nextVersion,
       );
-      final currentConversation = await _conversationFromRow(conversationRow);
-      final selections = Map<String, int>.from(
-        currentConversation.versionSelections,
-      )..[groupId] = nextVersion;
+      final currentConversation = await _conversationFromRow(
+        conversationRow,
+        includeMessageIds: false,
+      );
       final conversation = currentConversation.copyWith(
-        messageIds: [...currentConversation.messageIds, message.id],
-        versionSelections: selections,
         updatedAt: DateTime.now(),
+      );
+      final mutation = original.role == 'user'
+          ? MessageGraphRevisionMutation.editUser
+          : MessageGraphRevisionMutation.regenerateAssistant;
+      await MessageGraphCommands(_db).createRevisionBranch(
+        conversationId: conversation.id,
+        targetRevisionId: original.id,
+        text: content,
+        mutation: mutation,
+        revisionId: message.id,
+        branchId: _deterministicMergeId(
+          'graph_branch',
+          conversation.id,
+          message.id,
+        ),
       );
       final order = await _nextMessageOrder(conversation.id);
       await _db
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
+      await _updateGraphRevisionPayload(message);
       await (_db.update(_db.conversationRows)
             ..where((row) => row.id.equals(conversation.id)))
           .write(_conversationCompanion(conversation));
@@ -2399,6 +2977,7 @@ class ChatDatabaseRepository {
   }) async {
     await _db.transaction(() async {
       await updateMessage(message);
+      await _updateGraphRevisionPayload(message);
       if (untrackStreaming) {
         await untrackActiveStreamingId(message.id);
       }
@@ -2425,6 +3004,7 @@ class ChatDatabaseRepository {
       await (_db.update(
         _db.messageRows,
       )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+      await _updateGraphRevisionPayload(message);
       await _db
           .into(_db.toolEventRows)
           .insertOnConflictUpdate(
@@ -2437,6 +3017,35 @@ class ChatDatabaseRepository {
         await untrackActiveStreamingId(message.id);
       }
     });
+  }
+
+  Future<void> _updateGraphRevisionPayload(ChatMessage message) async {
+    final revision =
+        await (_db.select(_db.messageRevisionRows)..where(
+              (row) =>
+                  row.conversationId.equals(message.conversationId) &
+                  row.id.equals(message.id),
+            ))
+            .getSingleOrNull();
+    if (revision == null) return;
+    final now = DateTime.now().toUtc();
+    final updatedAt = now.isBefore(revision.createdAt)
+        ? revision.createdAt
+        : now;
+    await (_db.update(_db.messageRevisionRows)..where(
+          (row) =>
+              row.conversationId.equals(message.conversationId) &
+              row.id.equals(message.id),
+        ))
+        .write(
+          MessageRevisionRowsCompanion(
+            updatedAt: Value(updatedAt),
+            finalizedAt: message.isStreaming
+                ? const Value.absent()
+                : Value(updatedAt),
+          ),
+        );
+    await _replaceGraphParts(message);
   }
 
   Future<void> updateConversationMessages({
@@ -2484,6 +3093,71 @@ class ChatDatabaseRepository {
         messageIds: messageIds,
         versionSelectionChanges: versionSelectionChanges,
       ),
+    );
+  }
+
+  Future<DeletedMessagesResult?> deleteGraphMessages({
+    required String conversationId,
+    required Set<String> revisionIds,
+  }) {
+    if (revisionIds.isEmpty) return Future.value(null);
+    return _observer.measure(
+      ChatDatabaseOperation.commandDeleteMessages,
+      () => _db.transaction(() async {
+        final conversationRow = await (_db.select(
+          _db.conversationRows,
+        )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+        if (conversationRow == null) return null;
+        final beforeRows = await (_db.select(
+          _db.messageRows,
+        )..where((row) => row.conversationId.equals(conversationId))).get();
+        final commands = MessageGraphCommands(_db);
+        for (final revisionId in revisionIds) {
+          final revision =
+              await (_db.select(_db.messageRevisionRows)..where(
+                    (row) =>
+                        row.conversationId.equals(conversationId) &
+                        row.id.equals(revisionId) &
+                        row.deletedAt.isNull(),
+                  ))
+                  .getSingleOrNull();
+          if (revision == null) continue;
+          await commands.deleteRevision(
+            conversationId: conversationId,
+            revisionId: revisionId,
+            confirmCascade: true,
+          );
+        }
+        final deletedRevisionRows =
+            await (_db.select(_db.messageRevisionRows)..where(
+                  (row) =>
+                      row.conversationId.equals(conversationId) &
+                      row.deletedAt.isNotNull(),
+                ))
+                .get();
+        final deletedIds = deletedRevisionRows.map((row) => row.id).toSet();
+        final deletedMessages = beforeRows
+            .where((row) => deletedIds.contains(row.id))
+            .map(_messageFromRow)
+            .toList(growable: false);
+        if (deletedIds.isNotEmpty) {
+          await (_db.delete(
+            _db.messageRows,
+          )..where((row) => row.id.isIn(deletedIds))).go();
+        }
+        final current = await _conversationFromRow(
+          conversationRow,
+          includeMessageIds: false,
+        );
+        final conversation = current.copyWith(
+          chatSuggestions: const [],
+          updatedAt: DateTime.now(),
+        );
+        await (_db.update(_db.conversationRows)
+              ..where((row) => row.id.equals(conversationId)))
+            .write(_conversationCompanion(conversation));
+        return (conversation: conversation, messages: deletedMessages);
+      }),
     );
   }
 

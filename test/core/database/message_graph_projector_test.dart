@@ -96,6 +96,25 @@ void main() {
         ),
       );
 
+  Future<void> insertPart({
+    required String revisionId,
+    required int ordinal,
+    required String kind,
+    required String payload,
+  }) => database
+      .into(database.messagePartRows)
+      .insert(
+        MessagePartRowsCompanion.insert(
+          conversationId: 'conversation-1',
+          revisionId: revisionId,
+          ordinal: ordinal,
+          kind: kind,
+          payload: payload,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        ),
+      );
+
   Future<void> insertState({
     required String conversationId,
     String? activeBranchId,
@@ -190,6 +209,59 @@ void main() {
       'slot-u2',
       'slot-a2',
     });
+  });
+
+  test('timeline read model ignores legacy order and JSON selection', () async {
+    await insertMainGraph(boundaryId: 'u2');
+    await insertPart(
+      revisionId: 'a1-v1',
+      ordinal: 0,
+      kind: 'reasoning',
+      payload: 'thinking',
+    );
+    await insertPart(
+      revisionId: 'a1-v1',
+      ordinal: 1,
+      kind: 'text',
+      payload: 'selected',
+    );
+    await insertPart(
+      revisionId: 'a1-v7',
+      ordinal: 0,
+      kind: 'text',
+      payload: 'alternate',
+    );
+    await (database.update(
+      database.conversationRows,
+    )..where((row) => row.id.equals('conversation-1'))).write(
+      const ConversationRowsCompanion(
+        truncateIndex: Value(999),
+        versionSelectionsJson: Value('{"slot-a1":7}'),
+      ),
+    );
+
+    final timeline = await repository.projectMessageGraphTimeline(
+      conversationId: 'conversation-1',
+    );
+
+    expect(timeline!.activeRevisions.map((revision) => revision.revisionId), [
+      'u1',
+      'a1-v1',
+      'u2',
+      'a2',
+    ]);
+    expect(timeline.selectedRevisionBySlot['slot-a1'], 'a1-v1');
+    expect(timeline.contextStartRevisionId, 'u2');
+    expect(timeline.contextRevisions.map((revision) => revision.revisionId), [
+      'u2',
+      'a2',
+    ]);
+    expect(timeline.revisionsBySlot['slot-a1'], hasLength(2));
+    final selected = timeline.revisionsBySlot['slot-a1']!.firstWhere(
+      (revision) => revision.revisionId == 'a1-v1',
+    );
+    expect(selected.text, 'selected');
+    expect(selected.reasoning, 'thinking');
   });
 
   test('target revision projection excludes every future revision', () async {

@@ -62,6 +62,8 @@ final class MessageGraphCommands {
     required String text,
     required MessageGraphRevisionMutation mutation,
     int? expectedStateRevision,
+    String? revisionId,
+    String? branchId,
   }) {
     return _db.transaction(() async {
       final projector = MessageGraphProjector(_db);
@@ -102,14 +104,14 @@ final class MessageGraphCommands {
                 ))
               .getSingle();
       final nextRevisionNo = (maxRow.read(maxRevision) ?? -1) + 1;
-      final revisionId = _createId();
-      final branchId = _createId();
+      final createdRevisionId = revisionId ?? _createId();
+      final createdBranchId = branchId ?? _createId();
       final timestamp = _now();
       await _db
           .into(_db.messageRevisionRows)
           .insert(
             MessageRevisionRowsCompanion.insert(
-              id: revisionId,
+              id: createdRevisionId,
               conversationId: conversationId,
               slotId: target.slotId,
               parentRevisionId: Value(target.parentRevisionId),
@@ -123,7 +125,7 @@ final class MessageGraphCommands {
           );
       await _insertTextPart(
         conversationId: conversationId,
-        revisionId: revisionId,
+        revisionId: createdRevisionId,
         text: text,
         timestamp: timestamp,
       );
@@ -131,11 +133,11 @@ final class MessageGraphCommands {
           .into(_db.conversationBranchRows)
           .insert(
             ConversationBranchRowsCompanion.insert(
-              id: branchId,
+              id: createdBranchId,
               conversationId: conversationId,
               parentBranchId: Value(current.branchId),
               forkedFromRevisionId: Value(target.parentRevisionId),
-              leafRevisionId: Value(revisionId),
+              leafRevisionId: Value(createdRevisionId),
               causalityKind: 'native',
               createdAt: timestamp,
             ),
@@ -143,7 +145,7 @@ final class MessageGraphCommands {
       final boundary = _boundaryBeforeTarget(current, targetIndex);
       await _activateBranch(
         conversationId: conversationId,
-        branchId: branchId,
+        branchId: createdBranchId,
         boundaryRevisionId: boundary,
         currentStateRevision: current.stateRevision,
       );
@@ -151,8 +153,8 @@ final class MessageGraphCommands {
         conversationId: conversationId,
       );
       return MessageGraphMutationResult(
-        revisionId: revisionId,
-        branchId: branchId,
+        revisionId: createdRevisionId,
+        branchId: createdBranchId,
         projection: projection!,
       );
     });

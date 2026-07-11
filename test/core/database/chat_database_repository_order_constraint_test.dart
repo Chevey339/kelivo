@@ -63,26 +63,61 @@ void main() {
     },
   );
 
-  test('deletes and compacts order in one transaction', () async {
-    await repository.deleteMessage('message-1');
-
-    expect(await repository.getMessageIds('conversation-1'), const [
-      'message-0',
-      'message-2',
-    ]);
-    await repository.putMessage(
-      ChatMessage(
-        id: 'message-3',
+  test(
+    'graph deletion leaves sparse physical order without compaction',
+    () async {
+      await repository.clearAllData();
+      var conversation = Conversation(id: 'graph-conversation', title: 'Graph');
+      final original = ChatMessage(
+        id: 'assistant-v0',
         role: 'assistant',
-        content: 'content-3',
-        conversationId: 'conversation-1',
-        groupId: 'group-3',
-      ),
-    );
-    expect(await repository.getMessageIds('conversation-1'), const [
-      'message-0',
-      'message-2',
-      'message-3',
-    ]);
-  });
+        content: 'v0',
+        conversationId: conversation.id,
+        groupId: 'assistant-slot',
+        version: 0,
+      );
+      conversation = await repository.appendGraphMessageToConversation(
+        conversation: conversation,
+        message: original,
+      );
+      final alternate = ChatMessage(
+        id: 'assistant-v1',
+        role: 'assistant',
+        content: 'v1',
+        conversationId: conversation.id,
+        groupId: 'assistant-slot',
+        version: 1,
+      );
+      conversation = await repository.appendGraphMessageToConversation(
+        conversation: conversation,
+        message: alternate,
+        selectVersion: true,
+      );
+      await repository.selectMessageGraphRevision(
+        conversationId: conversation.id,
+        revisionId: original.id,
+      );
+      final tail = ChatMessage(
+        id: 'user-tail',
+        role: 'user',
+        content: 'tail',
+        conversationId: conversation.id,
+      );
+      await repository.appendGraphMessageToConversation(
+        conversation: conversation,
+        message: tail,
+      );
+
+      await repository.deleteGraphMessages(
+        conversationId: conversation.id,
+        revisionIds: {alternate.id},
+      );
+
+      expect(await repository.getMessageIds(conversation.id), [
+        original.id,
+        tail.id,
+      ]);
+      expect(await repository.getMessageIndex(conversation.id, tail.id), 2);
+    },
+  );
 }

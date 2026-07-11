@@ -56,51 +56,6 @@ String buildConversationTextForCompression(List<ChatMessage> messages) {
       .join('\n\n');
 }
 
-List<ChatMessage> selectForkConversationMessages({
-  required List<ChatMessage> messages,
-  required ChatMessage targetMessage,
-  Map<String, int> versionSelections = const <String, int>{},
-}) {
-  final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
-  final List<String> groupOrder = <String>[];
-  for (final message in messages) {
-    final groupId = message.groupId ?? message.id;
-    byGroup
-        .putIfAbsent(groupId, () {
-          groupOrder.add(groupId);
-          return <ChatMessage>[];
-        })
-        .add(message);
-  }
-
-  final targetGroup = (targetMessage.groupId ?? targetMessage.id);
-  final targetOrderIndex = groupOrder.indexOf(targetGroup);
-  if (targetOrderIndex < 0) return const <ChatMessage>[];
-
-  final selected = <ChatMessage>[];
-  for (final groupId in groupOrder.take(targetOrderIndex + 1)) {
-    final versions = byGroup[groupId]!
-      ..sort((a, b) => a.version.compareTo(b.version));
-    final targetVersionIndex = versions.indexWhere(
-      (message) => message.id == targetMessage.id,
-    );
-    if (targetVersionIndex >= 0) {
-      selected.add(versions[targetVersionIndex]);
-      continue;
-    }
-
-    final selectedVersion = versionSelections[groupId];
-    final selectedIndex =
-        selectedVersion != null &&
-            selectedVersion >= 0 &&
-            selectedVersion < versions.length
-        ? selectedVersion
-        : versions.length - 1;
-    selected.add(versions[selectedIndex]);
-  }
-  return selected;
-}
-
 class BatchDeleteGroupPlan {
   const BatchDeleteGroupPlan({
     required this.groupId,
@@ -702,12 +657,7 @@ class HomeViewModel extends ChangeNotifier {
     for (final id in plan.deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
-    for (final groupId in plan.clearedVersionSelectionGroupIds) {
-      _chatController.versionSelections.remove(groupId);
-    }
-    for (final entry in plan.nextVersionSelections.entries) {
-      _chatController.versionSelections[entry.key] = entry.value;
-    }
+    _chatController.loadVersionSelections();
     _chatController.updateCurrentConversation(
       _chatService.getConversation(conversation.id),
     );
@@ -746,11 +696,7 @@ class HomeViewModel extends ChangeNotifier {
     for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
-    if (newSel == null) {
-      _chatController.versionSelections.remove(gid);
-    } else {
-      _chatController.versionSelections[gid] = newSel;
-    }
+    _chatController.loadVersionSelections();
 
     // Reload messages
     await _chatController.reloadMessages();
@@ -864,20 +810,12 @@ class HomeViewModel extends ChangeNotifier {
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
     final title = getTitleForLocale(_contextProvider);
-    final assistantId = currentConversation?.assistantId;
-    final allMessages = await _chatController
-        .allMessagesForCurrentConversationContext();
-    final selected = selectForkConversationMessages(
-      messages: allMessages,
-      targetMessage: message,
-      versionSelections: versionSelections,
-    );
-    if (selected.isEmpty) return;
-
-    final newConvo = await _chatService.forkConversation(
+    final sourceConversation = currentConversation;
+    if (sourceConversation == null) return;
+    final newConvo = await _chatService.forkConversationAtRevision(
+      sourceConversationId: sourceConversation.id,
+      sourceRevisionId: message.id,
       title: title,
-      assistantId: assistantId,
-      sourceMessages: selected,
     );
 
     // Switch to the new conversation
@@ -1114,7 +1052,9 @@ class HomeViewModel extends ChangeNotifier {
     final remaining = computeClearContextRemainingMessageCount(
       completeMessages: completeMessages,
       collapsedMessages: collapsed,
-      truncateIndex: currentConversation?.truncateIndex ?? -1,
+      truncateIndex: currentConversation == null
+          ? -1
+          : _chatService.getContextStartIndex(currentConversation!.id),
     );
     if (configured > 0) {
       final actual = remaining > configured ? configured : remaining;
@@ -1193,7 +1133,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Build content from messages (truncate to reasonable length)
     final msgs = _chatService.getMessages(convo.id);
-    final tIndex = convo.truncateIndex;
+    final tIndex = _chatService.getContextStartIndex(convo.id);
     final List<ChatMessage> sourceAll = (tIndex >= 0 && tIndex <= msgs.length)
         ? msgs.sublist(tIndex)
         : msgs;
@@ -1256,7 +1196,7 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final msgCount = convo.messageIds.length;
+    final msgCount = _chatService.getMessageCount(conversationId);
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // Get assistant for this conversation
@@ -1406,7 +1346,7 @@ class HomeViewModel extends ChangeNotifier {
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: convo.truncateIndex,
+        truncateIndex: _chatService.getContextStartIndex(conversationId),
         locale: locale,
         thinkingBudget: budget,
       );
@@ -1414,7 +1354,7 @@ class HomeViewModel extends ChangeNotifier {
 
       final latest = _chatService.getConversation(conversationId);
       if (latest == null ||
-          latest.messageIds.length != convo.messageIds.length) {
+          _chatService.getMessageCount(latest.id) != msgs.length) {
         return;
       }
 

@@ -83,7 +83,7 @@ void main() {
       await service.init();
 
       final conversation = await service.createDraftConversation(title: 'Chat');
-      await service.addMessage(
+      final message = await service.addMessage(
         conversationId: conversation.id,
         role: 'user',
         content: 'hello',
@@ -91,6 +91,9 @@ void main() {
 
       expect(service.getAllConversations().map((c) => c.id), [conversation.id]);
       expect(await service.loadMessages(conversation.id), hasLength(1));
+      final timeline = await service.loadMessageGraphTimeline(conversation.id);
+      expect(timeline!.activeRevisions.single.revisionId, message.id);
+      expect(timeline.activeRevisions.single.text, 'hello');
     });
 
     test(
@@ -223,10 +226,10 @@ void main() {
         );
         expect(edited, isNotNull);
 
-        final fork = await service.forkConversation(
+        final fork = await service.forkConversationAtRevision(
+          sourceConversationId: source.id,
+          sourceRevisionId: edited!.id,
           title: 'Fork',
-          assistantId: null,
-          sourceMessages: [edited!],
         );
 
         final forkMessages = service.getMessages(fork.id);
@@ -242,4 +245,41 @@ void main() {
       },
     );
   });
+
+  test(
+    'business selection and context are projected from stable graph IDs',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Graph');
+      final original = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'v0',
+      );
+      final edited = await service.appendMessageVersion(
+        messageId: original.id,
+        content: 'v1',
+      );
+
+      var timeline = await service.loadMessageGraphTimeline(
+        conversation.id,
+        force: true,
+      );
+      expect(timeline!.activeRevisions.single.revisionId, edited!.id);
+      expect(service.getVersionSelections(conversation.id), {original.id: 1});
+
+      await service.setSelectedVersion(conversation.id, original.id, 0);
+      timeline = await service.loadMessageGraphTimeline(
+        conversation.id,
+        force: true,
+      );
+      expect(timeline!.activeRevisions.single.revisionId, original.id);
+
+      await service.toggleTruncateAtTail(conversation.id);
+      expect(service.getContextStartRevisionId(conversation.id), original.id);
+      await service.toggleTruncateAtTail(conversation.id);
+      expect(service.getContextStartRevisionId(conversation.id), isNull);
+    },
+  );
 }

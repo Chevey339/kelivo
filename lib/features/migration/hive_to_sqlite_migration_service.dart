@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 
@@ -401,6 +402,14 @@ class HiveToSqliteMigrationService {
       );
 
       await repo.clearAllData();
+      final graphSourceHash = await _legacyGraphSourceHash();
+      final graphMigrationRunId = 'hive-${graphSourceHash.substring(0, 32)}';
+      await repo.beginLegacyGraphMigration(
+        migrationRunId: graphMigrationRunId,
+        sourceKind: 'hive',
+        sourceHash: graphSourceHash,
+        startedAt: DateTime.now().toUtc(),
+      );
       for (final conversation in conversations) {
         var needsConversationInsert = true;
         var order = 0;
@@ -464,7 +473,16 @@ class HiveToSqliteMigrationService {
             geminiSignaturesByMessageId: const <String, String>{},
           );
         }
+        await repo.migrateStoredLegacyConversationGraph(
+          migrationRunId: graphMigrationRunId,
+          conversationId: conversation.id,
+        );
       }
+
+      await repo.completeLegacyGraphMigration(
+        migrationRunId: graphMigrationRunId,
+        completedAt: DateTime.now().toUtc(),
+      );
 
       _emit(
         HiveToSqliteMigrationStage.migrating,
@@ -531,6 +549,19 @@ class HiveToSqliteMigrationService {
       await messagesBox?.close();
       await toolEventsBox?.close();
     }
+  }
+
+  Future<String> _legacyGraphSourceHash() async {
+    final entries = <String>[];
+    for (final file
+        in decision.hiveFiles.toList()
+          ..sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)))) {
+      final stat = await file.stat();
+      entries.add(
+        '${p.basename(file.path)}:${stat.size}:${stat.modified.toUtc().microsecondsSinceEpoch}',
+      );
+    }
+    return sha256.convert(utf8.encode(entries.join('\n'))).toString();
   }
 
   Future<void> dispose() async {
