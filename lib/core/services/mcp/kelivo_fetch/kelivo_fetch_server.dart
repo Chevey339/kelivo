@@ -268,23 +268,26 @@ class KelivoFetchMcpServerEngine {
     return [
       {
         'name': 'fetch_html',
-        'description': 'Fetch a website and return the content as HTML',
+        'description':
+            'Fetch a web page for the full raw HTML source. Use ONLY when you need to parse specific DOM elements that will be lost in Markdown conversion. For most content extraction tasks, **prefer fetch_markdown** to avoid context bloat. Not for login-protected or paywalled pages.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_markdown',
-        'description': 'Fetch a website and return the content as Markdown',
+        'description':
+            'Fetch a web page for clean Markdown. The preferred tool for articles, documentation, blog posts and tutorials. Not for login-protected or paywalled pages.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_txt',
         'description':
-            'Fetch a website, return the content as plain text (no HTML)',
+            'Fetch a web page for plain text stripped of HTML tags, scripts and styles. Use when you only need readable text without structure, such as text-heavy but poorly-formatted pages, or when fetch_markdown outputs noisy content. Not for login-protected or paywalled pages.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_json',
-        'description': 'Fetch a JSON file from a URL',
+        'description':
+            'Fetch a JSON document from a URL. Use only when the endpoint returns strict JSON, such as JSON config files or any JSON-based web service response. Not for login-protected or paywalled pages.',
         'inputSchema': schema(),
       },
     ];

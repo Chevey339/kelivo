@@ -22,7 +22,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('per-assistant search behavior', () {
-    test('injects search prompt only when the assistant enables search', () {
+    test('does not inject search prompt (moved to tool description)', () {
       SharedPreferences.setMockInitialValues({});
       final service = MessageBuilderService(
         chatService: ChatService(),
@@ -50,11 +50,9 @@ void main() {
       );
 
       expect(disabledMessages.length, 1);
-      expect(enabledMessages.first['role'], 'system');
-      expect(
-        (enabledMessages.first['content'] as String),
-        contains(SearchToolService.toolName),
-      );
+      expect(disabledMessages.first['role'], 'user');
+      expect(enabledMessages.length, 1);
+      expect(enabledMessages.first['role'], 'user');
     });
 
     testWidgets('builds search tool only when the assistant enables search', (

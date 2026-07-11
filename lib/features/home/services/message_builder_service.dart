@@ -16,7 +16,6 @@ import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
-import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
@@ -638,8 +637,7 @@ These memories are automatically included in future conversation contexts within
     bool hasBuiltInSearch,
   ) {
     if (assistant?.searchEnabled == true && !hasBuiltInSearch) {
-      final prompt = SearchToolService.getSystemPrompt();
-      _appendToSystemMessage(apiMessages, prompt);
+      // Deprecated. Moved to tool description.
     }
   }
 
