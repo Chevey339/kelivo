@@ -27,6 +27,7 @@ import 'mermaid_bridge.dart';
 import 'export_capture_scope.dart';
 import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
+import 'svg_preview_block.dart';
 import 'tabbed_preview_block.dart';
 import 'package:path/path.dart' as p;
 import 'package:Cuplivo/l10n/app_localizations.dart';
@@ -486,6 +487,8 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
           );
         } else if (lang.toLowerCase() == 'plantuml') {
           return PlantUMLBlock(code: restoredCode);
+        } else if (lang.toLowerCase() == 'svg') {
+          return SvgPreviewBlock(code: restoredCode);
         }
         return _CollapsibleCodeBlock(
           language: lang,
@@ -4296,6 +4299,8 @@ class FencedCodeBlockMd extends BlockMd {
       return _MermaidBlock(code: code, streaming: isStreamingFence);
     } else if (langLower == 'plantuml') {
       return PlantUMLBlock(code: code);
+    } else if (langLower == 'svg') {
+      return SvgPreviewBlock(code: code);
     }
     return _CollapsibleCodeBlock(
       language: lang,
