@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../models/backup.dart';
+import '../database/chat_database_repository.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
 
@@ -22,6 +23,7 @@ class BackupProvider extends ChangeNotifier {
   WebDavConfig get config => _cfg;
   bool get busy => _busy;
   String? get message => _message;
+  BackupMergeReport? get lastMergeReport => _dataSync.lastMergeReport;
 
   void updateConfig(WebDavConfig cfg) {
     _cfg = cfg;

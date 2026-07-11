@@ -663,9 +663,16 @@
   "backupPageSelectImportModeDescription": "Choose a restore mode. The chat and file switches determine which components are included.",
   "backupPageOverwriteMode": "Complete Overwrite",
   "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
-  "backupPageMergeMode": "Legacy JSON Merge",
-  "backupPageMergeModeDescription": "Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.",
-  "backupPageSqliteMergeUnsupported": "SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.",
+  "backupPageMergeMode": "Merge",
+  "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
+  "backupPageMergeReportSummary": "Merge complete: {imported} imported, {deduplicated} identical skipped, {remapped} conflicts remapped.",
+  "@backupPageMergeReportSummary": {
+    "placeholders": {
+      "imported": {"type": "int"},
+      "deduplicated": {"type": "int"},
+      "remapped": {"type": "int"}
+    }
+  },
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",

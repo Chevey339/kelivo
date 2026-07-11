@@ -625,6 +625,23 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
+                                            if (mode == RestoreMode.merge) {
+                                              final report = vm.lastMergeReport;
+                                              if (report != null) {
+                                                showAppSnackBar(
+                                                  context,
+                                                  message: l10n.backupPageMergeReportSummary(
+                                                    report
+                                                        .importedConversations,
+                                                    report
+                                                        .deduplicatedConversations,
+                                                    report
+                                                        .remappedConversations,
+                                                  ),
+                                                );
+                                              }
+                                              return;
+                                            }
                                             final msg = vm.message;
                                             if (msg != null &&
                                                 msg != 'Restored') {
@@ -1509,6 +1526,20 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
+    if (mode == RestoreMode.merge) {
+      final report = vm.lastMergeReport;
+      if (report != null) {
+        showAppSnackBar(
+          context,
+          message: l10n.backupPageMergeReportSummary(
+            report.importedConversations,
+            report.deduplicatedConversations,
+            report.remappedConversations,
+          ),
+        );
+      }
+      return;
+    }
     await showDialog(
       context: context,
       builder: (dctx) => AlertDialog(

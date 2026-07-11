@@ -38,14 +38,6 @@ typedef _VersionedBackupInfo = ({
   String normalizedManifestSha256,
 });
 
-/// A versioned SQLite bundle cannot use the legacy JSON merge path.
-final class VersionedBackupMergeUnsupportedException implements Exception {
-  const VersionedBackupMergeUnsupportedException();
-
-  @override
-  String toString() => 'VersionedBackupMergeUnsupportedException';
-}
-
 class DataSync {
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
@@ -61,6 +53,9 @@ class DataSync {
   static const _maxRestoreEntries = 0xffff;
 
   final ChatService chatService;
+  BackupMergeReport? _lastMergeReport;
+  BackupMergeReport? get lastMergeReport => _lastMergeReport;
+
   DataSync({required this.chatService});
 
   // ===== WebDAV helpers =====
@@ -1363,6 +1358,13 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
+    _lastMergeReport = mode == RestoreMode.merge
+        ? const BackupMergeReport(
+            importedConversations: 0,
+            deduplicatedConversations: 0,
+            remappedConversationIds: {},
+          )
+        : null;
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).
@@ -1398,36 +1400,42 @@ class DataSync {
       } else {
         versionedBackup = null;
       }
-      if (versionedBackup != null) {
-        if (mode == RestoreMode.merge) {
-          throw const VersionedBackupMergeUnsupportedException();
-        }
-        final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
-        final extractedPath = extractDir.path;
-        final includeChats = versionedBackup.includeChats;
-        final includeFiles = versionedBackup.includeFiles;
-        final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
-        final restoreChats = cfg.includeChats && includeChats;
-        final restoreFiles = cfg.includeFiles && includeFiles;
-        await Isolate.run(() async {
-          await RestoreBundlePreparation.prepare(
-            appDataDirectory: Directory(appDataPath),
-            extractedDirectory: Directory(extractedPath),
-            sourceManifestSha256: sourceManifestSha256,
-            bundleIncludesChats: includeChats,
-            bundleIncludesFiles: includeFiles,
-            restoreChats: restoreChats,
-            restoreFiles: restoreFiles,
-          );
-        });
-        return;
-      }
-      final restoreChats = cfg.includeChats && await chatsFile.exists();
-
       final settings =
           jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
-      final prefs = await SharedPreferencesAsync.instance;
       BackupSettingsValidator.normalizeAndValidate(settings);
+      final prefs = await SharedPreferencesAsync.instance;
+      if (versionedBackup != null) {
+        final includeChats = versionedBackup.includeChats;
+        final includeFiles = versionedBackup.includeFiles;
+        final restoreChats = cfg.includeChats && includeChats;
+        final restoreFiles = cfg.includeFiles && includeFiles;
+        if (mode == RestoreMode.overwrite) {
+          final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
+          final extractedPath = extractDir.path;
+          final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
+          await Isolate.run(() async {
+            await RestoreBundlePreparation.prepare(
+              appDataDirectory: Directory(appDataPath),
+              extractedDirectory: Directory(extractedPath),
+              sourceManifestSha256: sourceManifestSha256,
+              bundleIncludesChats: includeChats,
+              bundleIncludesFiles: includeFiles,
+              restoreChats: restoreChats,
+              restoreFiles: restoreFiles,
+            );
+          });
+          return;
+        }
+        if (restoreChats) {
+          _lastMergeReport = await chatService.mergeDatabaseSnapshot(
+            File(p.join(extractDir.path, _databaseEntryName)),
+          );
+        }
+      }
+      final restoreChats =
+          versionedBackup == null &&
+          cfg.includeChats &&
+          await chatsFile.exists();
 
       var conversations = const <Conversation>[];
       var messages = const <ChatMessage>[];
@@ -1731,6 +1739,16 @@ class DataSync {
                 pendingSettings[key] = newValue;
               }
               // Skip existing non-mergeable keys to preserve user preferences
+            }
+            for (final entry in pendingSettings.entries.toList()) {
+              final localValue = existing[entry.key];
+              if (localValue == null) continue;
+              pendingSettings[entry.key] =
+                  BackupSettingsSanitizer.preserveLocalCredentialsForMerge(
+                    key: entry.key,
+                    localValue: localValue,
+                    mergedValue: entry.value,
+                  );
             }
             BackupSettingsValidator.validate(pendingSettings);
             for (final entry in pendingSettings.entries) {

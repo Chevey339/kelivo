@@ -530,9 +530,16 @@
   "backupPageSelectImportModeDescription": "請選擇還原方式。聊天與檔案開關決定本次還原的元件。",
   "backupPageOverwriteMode": "完全覆蓋",
   "backupPageOverwriteModeDescription": "僅替換已選元件；保留未選元件及無關的本機設定",
-  "backupPageMergeMode": "舊 JSON 智慧合併",
-  "backupPageMergeModeDescription": "僅適用於舊 JSON 備份；暫不支援合併 SQLite 備份。",
-  "backupPageSqliteMergeUnsupported": "SQLite 備份暫不支援合併。請選擇「完整覆寫」，或只對舊 JSON 備份使用「舊 JSON 智慧合併」。",
+  "backupPageMergeMode": "合併",
+  "backupPageMergeModeDescription": "保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。",
+  "backupPageMergeReportSummary": "合併完成：匯入 {imported} 個，略過 {deduplicated} 個相同對話，重新映射 {remapped} 個衝突。",
+  "@backupPageMergeReportSummary": {
+    "placeholders": {
+      "imported": {"type": "int"},
+      "deduplicated": {"type": "int"},
+      "remapped": {"type": "int"}
+    }
+  },
   "backupPageRestore": "還原",
   "backupPageBackupUploaded": "已上傳備份",
   "backupPageBackup": "立即備份",

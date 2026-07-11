@@ -1600,15 +1600,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Replace the selected components; keep unselected components and unrelated local settings';
 
   @override
-  String get backupPageMergeMode => 'Legacy JSON Merge';
+  String get backupPageMergeMode => 'Merge';
 
   @override
   String get backupPageMergeModeDescription =>
-      'Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.';
+      'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.';
 
   @override
-  String get backupPageSqliteMergeUnsupported =>
-      'SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.';
+  String backupPageMergeReportSummary(
+    int imported,
+    int deduplicated,
+    int remapped,
+  ) {
+    return 'Merge complete: $imported imported, $deduplicated identical skipped, $remapped conflicts remapped.';
+  }
 
   @override
   String get backupPageRestore => 'Restore';

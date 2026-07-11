@@ -631,50 +631,49 @@ void main() {
       },
     );
 
-    test(
-      'secret-free settings bundle rejects merge without changing target',
-      () async {
-        SharedPreferences.setMockInitialValues({
-          'provider_configs_v1': jsonEncode({
-            'openai': {
-              'id': 'openai',
-              'name': 'Source Provider',
-              'apiKey': 'source-api-secret',
-              'baseUrl': 'https://source.example',
-            },
-          }),
-        });
-        final sync = DataSync(chatService: ChatService());
-        final backupFile = await sync.prepareBackupFile(
-          const WebDavConfig(includeChats: false, includeFiles: false),
-        );
-        addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
-
-        final targetProviders = jsonEncode({
+    test('secret-free settings merge preserves local credentials', () async {
+      SharedPreferences.setMockInitialValues({
+        'provider_configs_v1': jsonEncode({
           'openai': {
             'id': 'openai',
-            'name': 'Target Provider',
-            'apiKey': 'target-api-secret',
-            'baseUrl': 'https://target.example',
+            'name': 'Source Provider',
+            'apiKey': 'source-api-secret',
+            'baseUrl': 'https://source.example',
           },
-        });
-        SharedPreferences.setMockInitialValues({
-          'provider_configs_v1': targetProviders,
-        });
+        }),
+      });
+      final sync = DataSync(chatService: ChatService());
+      final backupFile = await sync.prepareBackupFile(
+        const WebDavConfig(includeChats: false, includeFiles: false),
+      );
+      addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
-        await expectLater(
-          sync.restoreFromLocalFile(
-            backupFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
-            mode: RestoreMode.merge,
-          ),
-          throwsA(isA<VersionedBackupMergeUnsupportedException>()),
-        );
+      final targetProviders = jsonEncode({
+        'openai': {
+          'id': 'openai',
+          'name': 'Target Provider',
+          'apiKey': 'target-api-secret',
+          'baseUrl': 'https://target.example',
+        },
+      });
+      SharedPreferences.setMockInitialValues({
+        'provider_configs_v1': targetProviders,
+      });
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('provider_configs_v1'), targetProviders);
-      },
-    );
+      await sync.restoreFromLocalFile(
+        backupFile,
+        const WebDavConfig(includeChats: false, includeFiles: false),
+        mode: RestoreMode.merge,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      final providers =
+          jsonDecode(prefs.getString('provider_configs_v1')!) as Map;
+      final provider = providers['openai'] as Map;
+      expect(provider['name'], 'Source Provider');
+      expect(provider['baseUrl'], 'https://source.example');
+      expect(provider['apiKey'], 'target-api-secret');
+    });
 
     test(
       'secret-free overwrite rolls back a credential cleanup failure',
@@ -1422,7 +1421,7 @@ void main() {
       expect(prefs.getString('preserved_setting'), 'local');
     });
 
-    test('rejects SQLite merge before changing live data', () async {
+    test('merges SQLite snapshot without clobbering local data', () async {
       final fixture = await _createSqliteBackupFixture(
         root: root,
         prefix: 'merge_rejected',
@@ -1434,19 +1433,18 @@ void main() {
       addTearDown(chatService.close);
       final existing = await chatService.createConversation(title: 'Local');
 
-      await expectLater(
-        DataSync(chatService: chatService).restoreFromLocalFile(
-          fixture,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-          mode: RestoreMode.merge,
-        ),
-        throwsA(isA<VersionedBackupMergeUnsupportedException>()),
+      final sync = DataSync(chatService: chatService);
+      await sync.restoreFromLocalFile(
+        fixture,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+        mode: RestoreMode.merge,
       );
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('preserved_setting'), 'local');
       expect(chatService.getConversation(existing.id), isNotNull);
-      expect(chatService.getConversation('fixture-conversation'), isNull);
+      expect(chatService.getConversation('fixture-conversation'), isNotNull);
+      expect(sync.lastMergeReport?.importedConversations, 1);
     });
 
     test('restores managed font files in overwrite and merge modes', () async {

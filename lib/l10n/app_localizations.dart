@@ -3068,20 +3068,24 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
-  /// **'Legacy JSON Merge'**
+  /// **'Merge'**
   String get backupPageMergeMode;
 
   /// No description provided for @backupPageMergeModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Add missing data from legacy JSON backups. SQLite backup merge is not supported yet.'**
+  /// **'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.'**
   String get backupPageMergeModeDescription;
 
-  /// No description provided for @backupPageSqliteMergeUnsupported.
+  /// No description provided for @backupPageMergeReportSummary.
   ///
   /// In en, this message translates to:
-  /// **'SQLite backups cannot be merged yet. Choose Complete Overwrite, or use Legacy JSON Merge with an older JSON backup.'**
-  String get backupPageSqliteMergeUnsupported;
+  /// **'Merge complete: {imported} imported, {deduplicated} identical skipped, {remapped} conflicts remapped.'**
+  String backupPageMergeReportSummary(
+    int imported,
+    int deduplicated,
+    int remapped,
+  );
 
   /// No description provided for @backupPageRestore.
   ///

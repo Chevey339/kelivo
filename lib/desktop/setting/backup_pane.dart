@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
+import '../../core/database/chat_database_repository.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
@@ -225,6 +226,20 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     }
     if (!rootCtx.mounted) return;
     final l10n = AppLocalizations.of(rootCtx)!;
+    if (mode == RestoreMode.merge) {
+      final report = rootCtx.read<BackupProvider>().lastMergeReport;
+      if (report != null) {
+        showAppSnackBar(
+          rootCtx,
+          message: l10n.backupPageMergeReportSummary(
+            report.importedConversations,
+            report.deduplicatedConversations,
+            report.remappedConversations,
+          ),
+        );
+      }
+      return;
+    }
     // Inform restart requirement
     await showDialog(
       context: rootCtx,
@@ -524,6 +539,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
+                                      mergeReport: () =>
+                                          backupProvider.lastMergeReport,
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -790,6 +807,8 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
+                                      mergeReport: () =>
+                                          s3BackupProvider.lastMergeReport,
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -1360,6 +1379,7 @@ class _RemoteBackupsDialog extends StatefulWidget {
     required this.title,
     required this.listRemote,
     required this.restoreFromItem,
+    required this.mergeReport,
     required this.deleteAndReload,
   });
 
@@ -1367,6 +1387,7 @@ class _RemoteBackupsDialog extends StatefulWidget {
   final Future<List<BackupFileItem>> Function() listRemote;
   final Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem;
+  final BackupMergeReport? Function() mergeReport;
   final Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload;
 
@@ -1449,6 +1470,20 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     }
     if (!rootCtx.mounted) return;
     final l10n = AppLocalizations.of(rootCtx)!;
+    if (mode == RestoreMode.merge) {
+      final report = widget.mergeReport();
+      if (report != null) {
+        showAppSnackBar(
+          rootCtx,
+          message: l10n.backupPageMergeReportSummary(
+            report.importedConversations,
+            report.deduplicatedConversations,
+            report.remappedConversations,
+          ),
+        );
+      }
+      return;
+    }
     final cs = Theme.of(rootCtx).colorScheme;
     await showDialog(
       context: rootCtx,
@@ -1625,6 +1660,7 @@ void _showRemoteBackupsDialog(
   required Future<List<BackupFileItem>> Function() listRemote,
   required Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem,
+  required BackupMergeReport? Function() mergeReport,
   required Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload,
 }) {
@@ -1634,6 +1670,7 @@ void _showRemoteBackupsDialog(
       title: title,
       listRemote: listRemote,
       restoreFromItem: restoreFromItem,
+      mergeReport: mergeReport,
       deleteAndReload: deleteAndReload,
     ),
   );

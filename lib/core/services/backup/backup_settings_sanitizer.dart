@@ -97,6 +97,88 @@ final class BackupSettingsSanitizer {
         _isSecretPreferenceKey(key);
   }
 
+  /// Retains credentials that only exist on this installation while applying
+  /// the non-secret fields from a validated normal backup.
+  static dynamic preserveLocalCredentialsForMerge({
+    required String key,
+    required dynamic localValue,
+    required dynamic mergedValue,
+  }) {
+    final baseKey = _preferenceKeyBase(key);
+    if (_isSecretPreferenceKey(key) || _excludedBaseKeys.contains(baseKey)) {
+      return localValue;
+    }
+    if (!_credentialJsonBaseKeys.contains(baseKey)) return mergedValue;
+    if (localValue is! String || mergedValue is! String) {
+      throw FormatException(key);
+    }
+    final local = jsonDecode(localValue);
+    final sanitizedLocal = jsonDecode(
+      _sanitizeCredentialJson(
+        preferenceKey: key,
+        baseKey: baseKey,
+        value: localValue,
+      ),
+    );
+    final merged = jsonDecode(mergedValue);
+    return jsonEncode(
+      _restoreSanitizedLeaves(
+        local: local,
+        sanitizedLocal: sanitizedLocal,
+        merged: merged,
+      ),
+    );
+  }
+
+  static dynamic _restoreSanitizedLeaves({
+    required dynamic local,
+    required dynamic sanitizedLocal,
+    required dynamic merged,
+  }) {
+    if (local is Map && sanitizedLocal is Map && merged is Map) {
+      final restored = Map<String, dynamic>.from(merged);
+      for (final entry in local.entries) {
+        final key = entry.key.toString();
+        if (!sanitizedLocal.containsKey(key) || !restored.containsKey(key)) {
+          continue;
+        }
+        restored[key] = _restoreSanitizedLeaves(
+          local: entry.value,
+          sanitizedLocal: sanitizedLocal[key],
+          merged: restored[key],
+        );
+      }
+      return restored;
+    }
+    if (local is List && sanitizedLocal is List && merged is List) {
+      final restored = List<dynamic>.from(merged);
+      final mergedById = <String, int>{};
+      for (var index = 0; index < restored.length; index++) {
+        final item = restored[index];
+        if (item is Map && item['id'] != null) {
+          mergedById[item['id'].toString()] = index;
+        }
+      }
+      for (var index = 0; index < local.length; index++) {
+        final localItem = local[index];
+        final sanitizedItem = index < sanitizedLocal.length
+            ? sanitizedLocal[index]
+            : null;
+        final targetIndex = localItem is Map && localItem['id'] != null
+            ? mergedById[localItem['id'].toString()]
+            : (index < restored.length ? index : null);
+        if (targetIndex == null || sanitizedItem == null) continue;
+        restored[targetIndex] = _restoreSanitizedLeaves(
+          local: localItem,
+          sanitizedLocal: sanitizedItem,
+          merged: restored[targetIndex],
+        );
+      }
+      return restored;
+    }
+    return _jsonEquals(local, sanitizedLocal) ? merged : local;
+  }
+
   static String _preferenceKeyBase(String key) =>
       key.toLowerCase().replaceFirst(RegExp(r'_v\d+$'), '');
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
@@ -13,6 +14,20 @@ typedef ChatDatabaseSnapshotInfo = ({
   int conversationCount,
   int messageCount,
 });
+
+class BackupMergeReport {
+  const BackupMergeReport({
+    required this.importedConversations,
+    required this.deduplicatedConversations,
+    required this.remappedConversationIds,
+  });
+
+  final int importedConversations;
+  final int deduplicatedConversations;
+  final Map<String, String> remappedConversationIds;
+
+  int get remappedConversations => remappedConversationIds.length;
+}
 
 class ChatDatabaseRepository {
   ChatDatabaseRepository(this._db, [this._syncDb]);
@@ -857,6 +872,350 @@ class ChatDatabaseRepository {
 
   Future<void> replaceBackupSnapshot(File snapshotFile) async {
     await _importBackupSnapshot(snapshotFile);
+  }
+
+  Future<BackupMergeReport> mergeBackupSnapshot(File snapshotFile) async {
+    if (!await snapshotFile.exists()) {
+      throw FileSystemException(
+        'Snapshot database does not exist',
+        snapshotFile.path,
+      );
+    }
+
+    var attached = false;
+    try {
+      await _db.customStatement('ATTACH DATABASE ? AS merge_source;', [
+        snapshotFile.absolute.path,
+      ]);
+      attached = true;
+      return await _db.transaction(() async {
+        final sourceRows = await _db
+            .customSelect(
+              'SELECT id FROM merge_source.conversation_rows ORDER BY id;',
+            )
+            .get();
+        var imported = 0;
+        var deduplicated = 0;
+        final remapped = <String, String>{};
+
+        for (final sourceRow in sourceRows) {
+          final sourceId = sourceRow.read<String>('id');
+          await _requireContiguousMessageOrder('merge_source', sourceId);
+          final sourceFingerprint = await _conversationFingerprint(
+            'merge_source',
+            sourceId,
+          );
+          if (sourceFingerprint == null) {
+            throw StateError('merge_source_conversation');
+          }
+          final existingFingerprint = await _conversationFingerprint(
+            'main',
+            sourceId,
+          );
+          if (existingFingerprint == sourceFingerprint) {
+            deduplicated += 1;
+            continue;
+          }
+
+          final sourceMessageIds = await _messageIds('merge_source', sourceId);
+          final hasConversationConflict = existingFingerprint != null;
+          final hasMessageConflict = await _anyMessageIdExists(
+            sourceMessageIds,
+          );
+          var targetId = sourceId;
+          var remapWholeConversation =
+              hasConversationConflict || hasMessageConflict;
+          if (remapWholeConversation) {
+            targetId = _deterministicMergeId(
+              'conversation',
+              sourceId,
+              sourceFingerprint,
+            );
+            var suffix = 0;
+            while (true) {
+              final candidateFingerprint = await _conversationFingerprint(
+                'main',
+                targetId,
+              );
+              if (candidateFingerprint == null) break;
+              if (candidateFingerprint == sourceFingerprint) {
+                deduplicated += 1;
+                remapped[sourceId] = targetId;
+                targetId = '';
+                break;
+              }
+              suffix += 1;
+              targetId =
+                  '${_deterministicMergeId('conversation', sourceId, sourceFingerprint)}-$suffix';
+            }
+            if (targetId.isEmpty) continue;
+            remapped[sourceId] = targetId;
+          }
+
+          final messageIdMap = <String, String>{};
+          for (final messageId in sourceMessageIds) {
+            messageIdMap[messageId] = remapWholeConversation
+                ? _deterministicMergeId('message', messageId, sourceFingerprint)
+                : messageId;
+          }
+          await _insertMergedConversation(
+            sourceId: sourceId,
+            targetId: targetId,
+            messageIdMap: messageIdMap,
+          );
+          imported += 1;
+        }
+
+        final foreignKeyFailures = await _db
+            .customSelect('PRAGMA foreign_key_check;')
+            .get();
+        if (foreignKeyFailures.isNotEmpty) {
+          throw StateError('foreign_key_check');
+        }
+        return BackupMergeReport(
+          importedConversations: imported,
+          deduplicatedConversations: deduplicated,
+          remappedConversationIds: Map.unmodifiable(remapped),
+        );
+      });
+    } finally {
+      if (attached) {
+        await _db.customStatement('DETACH DATABASE merge_source;');
+      }
+    }
+  }
+
+  Future<String?> _conversationFingerprint(String schema, String id) async {
+    final conversation = await _db
+        .customSelect(
+          'SELECT title, created_at, updated_at, is_pinned, assistant_id, '
+          'truncate_index, version_selections_json, summary, '
+          'last_summarized_message_count, chat_suggestions_json '
+          'FROM $schema.conversation_rows WHERE id = ?;',
+          variables: [Variable<String>(id)],
+        )
+        .getSingleOrNull();
+    if (conversation == null) return null;
+    final mcpRows = await _db
+        .customSelect(
+          'SELECT server_id, ordinal FROM $schema.conversation_mcp_server_rows '
+          'WHERE conversation_id = ? ORDER BY ordinal, server_id;',
+          variables: [Variable<String>(id)],
+        )
+        .get();
+    final messageRows = await _db
+        .customSelect(
+          'SELECT id, role, content, timestamp, model_id, provider_id, '
+          'total_tokens, is_streaming, reasoning_text, reasoning_start_at, '
+          'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
+          'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
+          'message_order FROM $schema.message_rows WHERE conversation_id = ? '
+          'ORDER BY message_order, id;',
+          variables: [Variable<String>(id)],
+        )
+        .get();
+    final messages = <Object?>[];
+    final groupOrdinals = <String, int>{};
+    for (final row in messageRows) {
+      final messageId = row.read<String>('id');
+      final tool = await _db
+          .customSelect(
+            'SELECT events_json FROM $schema.tool_event_rows WHERE message_id = ?;',
+            variables: [Variable<String>(messageId)],
+          )
+          .getSingleOrNull();
+      final signature = await _db
+          .customSelect(
+            'SELECT signature FROM $schema.gemini_thought_signature_rows '
+            'WHERE message_id = ?;',
+            variables: [Variable<String>(messageId)],
+          )
+          .getSingleOrNull();
+      final data = Map<String, Object?>.from(row.data)..remove('id');
+      data['is_streaming'] = 0;
+      final groupId = data.remove('group_id')?.toString() ?? '';
+      data['group_ordinal'] = groupOrdinals.putIfAbsent(
+        groupId,
+        () => groupOrdinals.length,
+      );
+      messages.add([
+        data,
+        tool?.data['events_json'],
+        signature?.data['signature'],
+      ]);
+    }
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode([
+              _normalizedConversationFingerprintData(
+                conversation.data,
+                groupOrdinals,
+              ),
+              mcpRows.map((row) => row.data).toList(),
+              messages,
+            ]),
+          ),
+        )
+        .toString();
+  }
+
+  Map<String, Object?> _normalizedConversationFingerprintData(
+    Map<String, Object?> data,
+    Map<String, int> groupOrdinals,
+  ) {
+    final normalized = Map<String, Object?>.from(data);
+    final rawSelections = normalized['version_selections_json'];
+    if (rawSelections is String) {
+      final decoded = _decodeStringIntMap(rawSelections);
+      final selections = <String, int>{};
+      for (final entry in decoded.entries) {
+        final ordinal = groupOrdinals[entry.key];
+        if (ordinal != null) selections['$ordinal'] = entry.value;
+      }
+      normalized['version_selections_json'] = selections;
+    }
+    return normalized;
+  }
+
+  Future<List<String>> _messageIds(String schema, String conversationId) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT id FROM $schema.message_rows WHERE conversation_id = ? '
+          'ORDER BY message_order, id;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    return rows.map((row) => row.read<String>('id')).toList(growable: false);
+  }
+
+  Future<void> _requireContiguousMessageOrder(
+    String schema,
+    String conversationId,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT message_order FROM $schema.message_rows '
+          'WHERE conversation_id = ? ORDER BY message_order, id;',
+          variables: [Variable<String>(conversationId)],
+        )
+        .get();
+    for (var index = 0; index < rows.length; index++) {
+      if (rows[index].read<int>('message_order') != index) {
+        throw StateError('conversation_message_order');
+      }
+    }
+  }
+
+  Future<bool> _anyMessageIdExists(List<String> ids) async {
+    for (final id in ids) {
+      final row = await _db
+          .customSelect(
+            'SELECT 1 AS found FROM main.message_rows WHERE id = ? LIMIT 1;',
+            variables: [Variable<String>(id)],
+          )
+          .getSingleOrNull();
+      if (row != null) return true;
+    }
+    return false;
+  }
+
+  String _deterministicMergeId(String kind, String id, String fingerprint) {
+    final digest = sha256.convert(
+      utf8.encode('$kind\u0000$id\u0000$fingerprint'),
+    );
+    return 'merge-${digest.toString().substring(0, 32)}';
+  }
+
+  Future<void> _insertMergedConversation({
+    required String sourceId,
+    required String targetId,
+    required Map<String, String> messageIdMap,
+  }) async {
+    final sourceMessages = await _db
+        .customSelect(
+          'SELECT id, group_id FROM merge_source.message_rows '
+          'WHERE conversation_id = ? ORDER BY message_order, id;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .get();
+    final remapping = sourceId != targetId;
+    final groupIdMap = <String, String>{};
+    for (final row in sourceMessages) {
+      final groupId = row.data['group_id']?.toString();
+      if (groupId == null || groupIdMap.containsKey(groupId)) continue;
+      groupIdMap[groupId] = remapping
+          ? _deterministicMergeId('group', groupId, targetId)
+          : groupId;
+    }
+    final sourceConversation = await _db
+        .customSelect(
+          'SELECT version_selections_json FROM merge_source.conversation_rows '
+          'WHERE id = ?;',
+          variables: [Variable<String>(sourceId)],
+        )
+        .getSingle();
+    final sourceSelections = _decodeStringIntMap(
+      sourceConversation.read<String>('version_selections_json'),
+    );
+    final targetSelections = <String, int>{};
+    for (final entry in sourceSelections.entries) {
+      targetSelections[groupIdMap[entry.key] ?? entry.key] = entry.value;
+    }
+    await _db.customStatement(
+      'INSERT INTO main.conversation_rows '
+      '(id, title, created_at, updated_at, is_pinned, assistant_id, '
+      'truncate_index, version_selections_json, summary, '
+      'last_summarized_message_count, chat_suggestions_json) '
+      'SELECT ?, title, created_at, updated_at, is_pinned, assistant_id, '
+      'truncate_index, ?, summary, '
+      'last_summarized_message_count, chat_suggestions_json '
+      'FROM merge_source.conversation_rows WHERE id = ?;',
+      [targetId, jsonEncode(targetSelections), sourceId],
+    );
+    await _db.customStatement(
+      'INSERT INTO main.conversation_mcp_server_rows '
+      '(conversation_id, server_id, ordinal) '
+      'SELECT ?, server_id, ordinal FROM merge_source.conversation_mcp_server_rows '
+      'WHERE conversation_id = ?;',
+      [targetId, sourceId],
+    );
+    for (final entry in messageIdMap.entries) {
+      final sourceMessage = sourceMessages.firstWhere(
+        (row) => row.read<String>('id') == entry.key,
+      );
+      final sourceGroupId = sourceMessage.data['group_id']?.toString();
+      final targetGroupId = sourceGroupId == null
+          ? entry.value
+          : (groupIdMap[sourceGroupId] ?? sourceGroupId);
+      await _db.customStatement(
+        'INSERT INTO main.message_rows '
+        '(id, conversation_id, role, content, timestamp, model_id, provider_id, '
+        'total_tokens, is_streaming, reasoning_text, reasoning_start_at, '
+        'reasoning_finished_at, translation, reasoning_segments_json, group_id, '
+        'version, prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
+        'message_order) '
+        'SELECT ?, ?, role, content, timestamp, model_id, provider_id, '
+        'total_tokens, 0, reasoning_text, reasoning_start_at, '
+        'reasoning_finished_at, translation, reasoning_segments_json, '
+        '?, version, '
+        'prompt_tokens, completion_tokens, cached_tokens, duration_ms, '
+        'message_order FROM merge_source.message_rows WHERE id = ?;',
+        [entry.value, targetId, targetGroupId, entry.key],
+      );
+      await _db.customStatement(
+        'INSERT INTO main.tool_event_rows (message_id, events_json) '
+        'SELECT ?, events_json FROM merge_source.tool_event_rows '
+        'WHERE message_id = ?;',
+        [entry.value, entry.key],
+      );
+      await _db.customStatement(
+        'INSERT INTO main.gemini_thought_signature_rows (message_id, signature) '
+        'SELECT ?, signature FROM merge_source.gemini_thought_signature_rows '
+        'WHERE message_id = ?;',
+        [entry.value, entry.key],
+      );
+    }
   }
 
   Future<void> _importBackupSnapshot(File snapshotFile) async {

@@ -1546,14 +1546,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '旧 JSON 智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅用于旧 JSON 备份；暂不支持合并 SQLite 备份。';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
-  String get backupPageSqliteMergeUnsupported =>
-      'SQLite 备份暂不支持合并。请选择“完整覆盖”，或仅对旧 JSON 备份使用“旧 JSON 智能合并”。';
+  String backupPageMergeReportSummary(
+    int imported,
+    int deduplicated,
+    int remapped,
+  ) {
+    return '合并完成：导入 $imported 个，跳过 $deduplicated 个相同会话，重新映射 $remapped 个冲突。';
+  }
 
   @override
   String get backupPageRestore => '恢复';
@@ -7037,14 +7043,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '旧 JSON 智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅用于旧 JSON 备份；暂不支持合并 SQLite 备份。';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
-  String get backupPageSqliteMergeUnsupported =>
-      'SQLite 备份暂不支持合并。请选择“完整覆盖”，或仅对旧 JSON 备份使用“旧 JSON 智能合并”。';
+  String backupPageMergeReportSummary(
+    int imported,
+    int deduplicated,
+    int remapped,
+  ) {
+    return '合并完成：导入 $imported 个，跳过 $deduplicated 个相同会话，重新映射 $remapped 个冲突。';
+  }
 
   @override
   String get backupPageRestore => '恢复';
@@ -12528,15 +12540,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
 
   @override
-  String get backupPageMergeMode => '舊 JSON 智慧合併';
+  String get backupPageMergeMode => '合併';
 
   @override
   String get backupPageMergeModeDescription =>
-      '僅適用於舊 JSON 備份；暫不支援合併 SQLite 備份。';
+      '保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。';
 
   @override
-  String get backupPageSqliteMergeUnsupported =>
-      'SQLite 備份暫不支援合併。請選擇「完整覆寫」，或只對舊 JSON 備份使用「舊 JSON 智慧合併」。';
+  String backupPageMergeReportSummary(
+    int imported,
+    int deduplicated,
+    int remapped,
+  ) {
+    return '合併完成：匯入 $imported 個，略過 $deduplicated 個相同對話，重新映射 $remapped 個衝突。';
+  }
 
   @override
   String get backupPageRestore => '還原';
