@@ -785,7 +785,7 @@ flowchart LR
 
 工作项：
 
-- `MSG-01`：批准 PD-01、PD-02、PD-04 及消息图 ADR。
+- `MSG-01`：批准 PD-01、PD-02、PD-04 及[消息图 ADR](./adr/0001-message-graph-branch-semantics.md)。
 - `MSG-02`：实现 conversation/branch/slot/revision schema 和不变量。
 - `MSG-03`：实现 active path projector 和稳定 context boundary。
 - `MSG-04`：实现 edit/regenerate/select/delete/fork 的事务语义；删除不得复用旧 `_rewriteMessageOrder` 或把整个会话 compact 为连续 order，必须使用稳定稀疏序号/图路径，使删除写放大不随会话总消息数线性增长。

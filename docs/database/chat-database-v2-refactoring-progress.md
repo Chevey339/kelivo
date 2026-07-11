@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 1：DB2-01～08 已完成；DB2-07 capability runner 五平台 5/5）
-> - 当前结论：Database Kernel v2 的 schema、异步 gateway、事务 command、recovery、平台能力门禁和脱敏观测已闭环，Phase 1 为 8/8 完成。DB2-02 已补 macOS profile 运行时证据：生产 live `AppDatabase` 的 64 次 SQLite 引擎回调全部在 Drift background isolate，opening/UI isolate 为 0；maintenance raw SQLite 路径仍单独受 OPS-02/发布门禁约束。macOS、iOS simulator、Android 11 arm64 物理设备保留了机器可读 capability 结果；Windows/Linux 由用户在原生环境执行同一 runner 并确认通过，但未回传结构化元数据，因此不猜测 ABI/SQLite version/source ID。D4 renderer/RSS 超标留在 Phase 4，短中文策略留在 OPS-04。下一实施阶段为 Phase 2 Message Graph
+> - 最后更新：2026-07-11（Phase 2：MSG-01 已完成）
+> - 当前结论：Message Graph 已进入实施，MSG-01 把 PD-01/02/04 冻结为可执行 ADR：稳定 branch/slot/revision ID、真实 ancestor path、旧后代保留、稳定 context boundary、删除不 compact 与 UI/Generation/Timeline 分层边界均已明确。下一项为 MSG-02 graph schema 与数据库不变量
 
 ## 1. 文档使用规则
 
@@ -38,7 +38,7 @@
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
-| Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
+| Phase 2：Message Graph | 1 / 7 | `进行中` | MSG-01 ADR 已接受；下一步实现 conversation/branch/slot/revision schema 与约束 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
@@ -302,7 +302,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| MSG-01 | 批准 branch 语义与 ADR | PD-01/02/04 | `未开始` | 产品示例与数据语义无歧义 | — | — |
+| MSG-01 | 批准 branch 语义与 ADR | PD-01/02/04 | `已完成` | 产品示例与数据语义无歧义 | 本里程碑提交（2026-07-11） | [ADR-0001](./adr/0001-message-graph-branch-semantics.md) 已接受；覆盖发送、assistant 重生成、user 编辑、稳定 ID 切版本、三类删除、fork 与 context boundary，并明确 repository/projector/UI/Generation/Timeline 边界 |
 | MSG-02 | Conversation/Branch/Slot/Revision schema | DB2-04、MSG-01 | `未开始` | parent/branch/slot 不变量由 FK/CHECK/事务强制 | — | — |
 | MSG-03 | Active path projector 与 context boundary | MSG-02 | `未开始` | prompt 只含真实 ancestor path | — | — |
 | MSG-04 | Edit/regenerate/select/delete/fork commands | DB2-05、MSG-03 | `未开始` | 全部使用稳定 revision/branch ID 且单事务；删除不得复用 `_rewriteMessageOrder` 或全会话 compact，D3 删除更新量不得随会话总消息数线性增长 | — | 旧 v1 删除仍以两阶段更新把全会话重写为 `0..n-1`，只作为 UNIQUE 约束下的过渡实现；消息图不得继承该语义 |
@@ -454,7 +454,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 风险 | 严重度 | 检测方式 | 缓解/回滚 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | Branch 产品语义未定导致 schema 返工 | 高 | PD-01/02/04 未批准 | PD-01/02/04 已于 2026-07-10 冻结；MSG-01 仍需交互实例 ADR | `进行中` |
+| R-01 | Branch 产品语义未定导致 schema 返工 | 高 | PD-01/02/04 未批准 | PD-01/02/04 已冻结且 ADR-0001 已接受；后续偏离必须先修订 ADR 与方案 | `已完成` |
 | R-02 | SQLite v1 已发布却错误以 Hive 为主源 | 高 | 发布记录/真实用户数据核对 | PD-13 已核实 v1 从未发布，Hive 即公开主源；开发机 v1/Hive 双源 precedence 仍需迁移测试 | `进行中` |
 | R-03 | v2 写入后直接回 previous 丢新消息 | 高 | 记录 cutover 后 write epoch | v2-compatible rollback build | `未开始` |
 | R-04 | Windows handle/杀软导致 swap 失败 | 高 | Windows failpoint/锁库测试 | 单一连接、关闭 handle、receipt 恢复 | `未开始` |
@@ -474,19 +474,17 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1），产品决策和 Phase 1 平台输入均不再阻塞后续阶段。剩余实施输入：
-
-1. MSG-01 需把已冻结的 PD-01/02/04 落成带交互实例的 ADR（实现口径，非产品决策）。
-2. Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，精确 ABI/SQLite 元数据留给五平台发布门禁补证；这不重新打开已通过的 DB2-07 capability gate。
+PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，产品决策和 Phase 1 平台输入均不再阻塞 Phase 2。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，精确 ABI/SQLite 元数据留给五平台发布门禁补证；这不重新打开已通过的 DB2-07 capability gate。
 
 ## 19. 下一步
 
-Phase 1 已完成 `DB2-01～08`，当前 8/8，Database Kernel v2 关闭。下一步按方案进入 Phase 2 Message Graph，先执行 MSG-01：把已冻结的真实分支、selection 与 fork 语义写成带交互实例的 ADR，再实现消息图 schema/command。D4 renderer/RSS 超标不在 Message Graph 前置工作中扩 scope。
+Phase 2 当前 1/7。下一步执行 MSG-02：实现 conversation state、branch、slot、revision schema、逐版本 migration snapshot 和 composite FK/CHECK/UNIQUE/索引/事务不变量。D4 renderer/RSS 超标不在 Message Graph 阶段扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成 Message Graph ADR：把 PD-01/02/04 转成可执行的稳定 identity 与真实 branch 语义，逐例冻结普通发送、旧 assistant 重生成、旧 user 编辑、revision 切换、三类删除、conversation fork 和 context boundary；明确旧后代保留、active path 唯一 selection、删除不得 compact，以及 UI/Repository/Projector/Generation/Timeline 分层边界。R-01 关闭，Phase 2 进入 1/7 | MSG-01 | 本里程碑提交 | Codex |
 | 2026-07-11 | 补齐 DB2-02 profile 证据并锁定 MSG-04 删除边界：生产 `AppDatabase.open` connection 注册 direct-only SQLite execution-isolate probe，P0-09 macOS `--profile` 以递归 CTE 采样 64 次，opening/UI isolate 0、Drift background isolate 64；新增 64-sample happy path 与 0-sample boundary 单测，使 DB2-02 验收摘要与 SLO 台账一致。明确该口径不覆盖 restore/backup/inspection maintenance raw SQLite。方案与进度同时规定 MSG-04 不得继承 v1 `_rewriteMessageOrder`/全会话 `0..n-1` compact，D3 删除更新量不得随会话总消息数线性增长。`flutter analyze`、database 75/75、全量 1180/1180 与 macOS profile 均通过 | DB2-02、P0-09、MSG-04 | 本补证提交 | Codex |
 | 2026-07-11 | 完成 DB2-07 与 Phase 1：用户在 Windows、Linux 原生环境执行既有统一 capability runner 并确认均通过，五平台矩阵达到 5/5。macOS/iOS simulator/Android 的结构化结果已归档；Windows/Linux 原始 `DB2_CAPABILITY_RESULT` 未回传，因此只记录用户侧 PASS，不猜测机器、ABI、SQLite version/source ID 或短中文数值，并把精确元数据归档留给发布门禁。DB2-07 标记完成，Database Kernel v2 8/8 关闭，下一步进入 MSG-01 | DB2-07、Phase 1 | 本里程碑提交（完成） | 用户 / Codex |
 | 2026-07-11 | 补齐 DB2-07 Android 真机证据：2112123AC / Android 11（API 30）/ `android_arm64` 在设备进程通过 v2→v3 migration、live PRAGMA contract、FTS5/unicode61、WAL+FULL、Online Backup、SQLite 双连接写锁、Dart 文件锁与 full-barrier rename，SQLite 3.53.2，短中文仍为 0。Android app NDK 从 27 对齐 `integration_test`/`jni` 所需 28.2.13676358；debug APK 构建、安装和 runner 通过。DB2-07 更新为 3/5，Windows/Linux 仍待用户侧 runner，不提前关闭 Phase 1 | DB2-07、OPS-04 | 本里程碑提交（Android 证据） | Codex |
