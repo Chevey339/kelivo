@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 
 import '../../utils/app_directories.dart';
+import 'app_database.steps.dart';
 
 part 'app_database.g.dart';
 
@@ -116,7 +117,11 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
   static const databaseFileName = 'kelivo.sqlite';
-  static const currentSchemaVersion = 1;
+
+  // Version 2 establishes the Database Kernel v2 format boundary. Its physical
+  // tables intentionally match unpublished v1; future changes use snapshots.
+  static const currentSchemaVersion = 2;
+  static const oldestMigratableSchemaVersion = 1;
 
   factory AppDatabase.open({File? file}) {
     final databaseFile = file;
@@ -151,6 +156,12 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
+    onUpgrade: stepByStep(
+      from1To2: (migrator, schema) async {
+        // No physical schema change: v2 freezes the first supported migration
+        // boundary before later kernel versions add constraints and indexes.
+      },
+    ),
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA busy_timeout = 5000;');

@@ -62,6 +62,38 @@ class ChatDatabaseRepository {
     return db;
   }
 
+  static Future<bool> migrateInstalledDatabase(File file) async {
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    late final int schemaVersion;
+    try {
+      schemaVersion = database.userVersion;
+      if (schemaVersion > AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_too_new');
+      }
+      if (schemaVersion == AppDatabase.currentSchemaVersion) return false;
+      if (schemaVersion < AppDatabase.oldestMigratableSchemaVersion) {
+        throw StateError('database_schema_too_old');
+      }
+      _validateRawSnapshot(database);
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    } finally {
+      database.close();
+    }
+
+    final driftDatabase = AppDatabase.open(file: file);
+    try {
+      await driftDatabase.customSelect('SELECT 1;').getSingle();
+    } finally {
+      await driftDatabase.close();
+    }
+    inspectInstalledDatabase(file, validateContents: true);
+    return true;
+  }
+
   static InstalledChatDatabaseInfo inspectInstalledDatabase(
     File file, {
     bool validateContents = false,

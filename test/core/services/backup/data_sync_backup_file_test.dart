@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 // ignore: depend_on_referenced_packages
 import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -858,7 +859,7 @@ void main() {
           'secretsIncluded': true,
           'database': {
             'entry': 'database/kelivo.sqlite',
-            'schemaVersion': 1,
+            'schemaVersion': AppDatabase.currentSchemaVersion,
             'conversationCount': 1,
             'messageCount': 1,
           },

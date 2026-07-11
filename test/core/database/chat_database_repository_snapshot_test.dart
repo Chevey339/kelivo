@@ -4,6 +4,7 @@ import 'dart:isolate';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
@@ -69,7 +70,7 @@ void main() {
         destinationFile: snapshotFile,
       );
 
-      expect(info.schemaVersion, 1);
+      expect(info.schemaVersion, AppDatabase.currentSchemaVersion);
       expect(info.conversationCount, 1);
       expect(info.messageCount, 1);
       expect(await snapshotFile.exists(), isTrue);

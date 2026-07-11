@@ -82,6 +82,8 @@ final class DatabaseInstallationGate {
       } finally {
         await repository.close();
       }
+    } else {
+      await ChatDatabaseRepository.migrateInstalledDatabase(databaseFile);
     }
 
     var info = ChatDatabaseRepository.inspectInstalledDatabase(
