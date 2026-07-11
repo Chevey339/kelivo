@@ -14,6 +14,8 @@ const restoreRolledBackTerminalHarnessScenario =
     'rolledBackTerminalRecoveryMatrix';
 const restoreLegacyArchivingMarkerHarnessScenario =
     'legacyArchivingMarkerRecoveryMatrix';
+const restoreTerminalSettingsReadbackHarnessScenario =
+    'terminalSettingsReadbackRecoveryMatrix';
 const restoreHarnessFormat = 'kelivo.restore-process-harness';
 
 abstract interface class RestoreHarnessControl {
@@ -62,6 +64,8 @@ abstract interface class RestoreHarnessControl {
         RestoreRolledBackTerminalProcessHarnessControl.fromJson(source),
       restoreLegacyArchivingMarkerHarnessScenario =>
         RestoreLegacyArchivingMarkerProcessHarnessControl.fromJson(source),
+      restoreTerminalSettingsReadbackHarnessScenario =>
+        RestoreTerminalSettingsReadbackProcessHarnessControl.fromJson(source),
       _ => throw const FormatException('restore_harness_control_scenario'),
     };
   }
@@ -146,6 +150,18 @@ enum RestoreLegacyArchivingMarkerProcessFailpoint {
   archivingMarkerEmptyRestricted,
   archivingMarkerTempDurable,
   archivingMarkerPublished,
+}
+
+enum RestoreTerminalSettingsReadbackProcessHarnessPhase {
+  setup,
+  createTerminalPartial,
+  repairToColdAck,
+  verifyBusinessReady,
+}
+
+enum RestoreTerminalSettingsReadbackProcessCase {
+  committedTarget,
+  rolledBackBefore,
 }
 
 enum RestoreRollbackProcessHarnessPhase {
@@ -248,6 +264,17 @@ String restoreLegacyArchivingMarkerProcessPreferencesPrefix({
   _requireIdentifier(scenarioId, 'scenarioId');
   return 'kelivo.restore.legacy.archiving.marker.harness.$matrixRunId.'
       '$scenarioId.${failpoint.name}.';
+}
+
+String restoreTerminalSettingsReadbackProcessPreferencesPrefix({
+  required String matrixRunId,
+  required String scenarioId,
+  required RestoreTerminalSettingsReadbackProcessCase readbackCase,
+}) {
+  _requireIdentifier(matrixRunId, 'matrixRunId');
+  _requireIdentifier(scenarioId, 'scenarioId');
+  return 'kelivo.restore.terminal.settings.readback.harness.$matrixRunId.'
+      '$scenarioId.${readbackCase.name}.';
 }
 
 String restoreRollbackProcessPreferencesPrefix({
@@ -941,6 +968,185 @@ final class RestoreLegacyArchivingMarkerProcessHarnessControl
       throw StateError('restore_harness_control_define');
     }
     return RestoreLegacyArchivingMarkerProcessHarnessControl.fromJson(
+      await readHarnessJson(File(controlPath)),
+    );
+  }
+}
+
+final class RestoreTerminalSettingsReadbackProcessHarnessControl
+    implements RestoreHarnessControl {
+  RestoreTerminalSettingsReadbackProcessHarnessControl({
+    required this.generation,
+    required this.matrixRunId,
+    required this.scenarioId,
+    required this.phase,
+    required this.readbackCase,
+    required String scenarioRoot,
+    required this.preferencesPrefix,
+  }) : scenarioRoot = p.normalize(p.absolute(scenarioRoot)) {
+    if (generation < 1 ||
+        generation >
+            RestoreTerminalSettingsReadbackProcessHarnessPhase.values.length) {
+      throw ArgumentError.value(generation, 'generation');
+    }
+    if (generation != phase.index + 1) {
+      throw ArgumentError.value(generation, 'generation');
+    }
+    _requireIdentifier(matrixRunId, 'matrixRunId');
+    _requireIdentifier(scenarioId, 'scenarioId');
+    if (!p.isAbsolute(scenarioRoot) ||
+        p.normalize(scenarioRoot) != scenarioRoot ||
+        p.basename(scenarioRoot) != 'kelivo_restore_process_$scenarioId') {
+      throw ArgumentError.value(scenarioRoot, 'scenarioRoot');
+    }
+    if (preferencesPrefix !=
+        restoreTerminalSettingsReadbackProcessPreferencesPrefix(
+          matrixRunId: matrixRunId,
+          scenarioId: scenarioId,
+          readbackCase: readbackCase,
+        )) {
+      throw ArgumentError.value(preferencesPrefix, 'preferencesPrefix');
+    }
+  }
+
+  static const version = 1;
+
+  @override
+  final int generation;
+  @override
+  final String matrixRunId;
+  @override
+  final String scenarioId;
+  final RestoreTerminalSettingsReadbackProcessHarnessPhase phase;
+  final RestoreTerminalSettingsReadbackProcessCase readbackCase;
+  @override
+  final String scenarioRoot;
+  @override
+  final String preferencesPrefix;
+
+  @override
+  String get scenario => restoreTerminalSettingsReadbackHarnessScenario;
+
+  @override
+  String get phaseName => phase.name;
+
+  @override
+  String get failpointName => readbackCase.name;
+
+  @override
+  Directory get rootDirectory => Directory(scenarioRoot);
+
+  @override
+  Directory get appDataDirectory => Directory(p.join(scenarioRoot, 'app_data'));
+
+  @override
+  Directory get sourceDirectory => Directory(p.join(scenarioRoot, 'source'));
+
+  @override
+  Directory get eventsDirectory => Directory(p.join(scenarioRoot, 'events'));
+
+  @override
+  File get stateFile => File(p.join(scenarioRoot, 'state.json'));
+
+  @override
+  File get eventFile => File(
+    p.join(
+      eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'format': restoreHarnessFormat,
+    'version': version,
+    'generation': generation,
+    'matrixRunId': matrixRunId,
+    'scenario': restoreTerminalSettingsReadbackHarnessScenario,
+    'scenarioId': scenarioId,
+    'phase': phase.name,
+    'readbackCase': readbackCase.name,
+    'scenarioRoot': scenarioRoot,
+    'preferencesPrefix': preferencesPrefix,
+  };
+
+  factory RestoreTerminalSettingsReadbackProcessHarnessControl.fromJson(
+    Map<dynamic, dynamic> source,
+  ) {
+    const expectedKeys = {
+      'format',
+      'version',
+      'generation',
+      'matrixRunId',
+      'scenario',
+      'scenarioId',
+      'phase',
+      'readbackCase',
+      'scenarioRoot',
+      'preferencesPrefix',
+    };
+    if (source.keys.any((key) => key is! String) ||
+        source.length != expectedKeys.length ||
+        !source.keys.toSet().containsAll(expectedKeys)) {
+      throw const FormatException(
+        'restore_terminal_settings_readback_harness_control_fields',
+      );
+    }
+    final json = source.cast<String, dynamic>();
+    if (json['format'] != restoreHarnessFormat ||
+        json['version'] != version ||
+        json['scenario'] != restoreTerminalSettingsReadbackHarnessScenario ||
+        json['generation'] is! int ||
+        json['matrixRunId'] is! String ||
+        json['scenarioId'] is! String ||
+        json['phase'] is! String ||
+        json['readbackCase'] is! String ||
+        json['scenarioRoot'] is! String ||
+        json['preferencesPrefix'] is! String) {
+      throw const FormatException(
+        'restore_terminal_settings_readback_harness_control_types',
+      );
+    }
+    final rawPhase = json['phase'] as String;
+    final phase = RestoreTerminalSettingsReadbackProcessHarnessPhase.values
+        .firstWhere(
+          (candidate) => candidate.name == rawPhase,
+          orElse: () => throw const FormatException(
+            'restore_terminal_settings_readback_harness_control_phase',
+          ),
+        );
+    final rawReadbackCase = json['readbackCase'] as String;
+    final readbackCase = RestoreTerminalSettingsReadbackProcessCase.values
+        .firstWhere(
+          (candidate) => candidate.name == rawReadbackCase,
+          orElse: () => throw const FormatException(
+            'restore_terminal_settings_readback_harness_control_case',
+          ),
+        );
+    try {
+      return RestoreTerminalSettingsReadbackProcessHarnessControl(
+        generation: json['generation'] as int,
+        matrixRunId: json['matrixRunId'] as String,
+        scenarioId: json['scenarioId'] as String,
+        phase: phase,
+        readbackCase: readbackCase,
+        scenarioRoot: json['scenarioRoot'] as String,
+        preferencesPrefix: json['preferencesPrefix'] as String,
+      );
+    } on ArgumentError {
+      throw const FormatException(
+        'restore_terminal_settings_readback_harness_control_value',
+      );
+    }
+  }
+
+  static Future<RestoreTerminalSettingsReadbackProcessHarnessControl>
+  readFromEnvironment() async {
+    const controlPath = String.fromEnvironment(restoreHarnessControlDefine);
+    if (controlPath.isEmpty || !p.isAbsolute(controlPath)) {
+      throw StateError('restore_harness_control_define');
+    }
+    return RestoreTerminalSettingsReadbackProcessHarnessControl.fromJson(
       await readHarnessJson(File(controlPath)),
     );
   }

@@ -103,6 +103,26 @@ void main() {
               .verifyBusinessReady:
             await _runLegacyArchivingMarkerVerify(control, preferences);
         }
+      case RestoreTerminalSettingsReadbackProcessHarnessControl():
+        switch (control.phase) {
+          case RestoreTerminalSettingsReadbackProcessHarnessPhase.setup:
+            await _runSetup(control, preferences);
+          case RestoreTerminalSettingsReadbackProcessHarnessPhase
+              .createTerminalPartial:
+            await _runTerminalSettingsReadbackCreatePartial(
+              control,
+              preferences,
+            );
+          case RestoreTerminalSettingsReadbackProcessHarnessPhase
+              .repairToColdAck:
+            await _runTerminalSettingsReadbackRepairToColdAck(
+              control,
+              preferences,
+            );
+          case RestoreTerminalSettingsReadbackProcessHarnessPhase
+              .verifyBusinessReady:
+            await _runTerminalSettingsReadbackVerify(control, preferences);
+        }
     }
   });
 }
@@ -644,7 +664,7 @@ Future<void> _runTerminalCommitToColdAck(
 }
 
 Future<RestoreReceipt> _convergeCommittedWithoutColdAck({
-  required RestoreTerminalProcessHarnessControl control,
+  required RestoreHarnessControl control,
   required RestoreCompleteBundleFixtureState state,
   required SharedPreferences preferences,
   required RestoreDurability durability,
@@ -1467,7 +1487,7 @@ Future<void> _runRolledBackTerminalToColdAck(
 }
 
 Future<RestoreReceipt> _convergeRolledBackWithoutColdAck({
-  required RestoreRolledBackTerminalProcessHarnessControl control,
+  required RestoreHarnessControl control,
   required RestoreCompleteBundleFixtureState state,
   required SharedPreferences preferences,
   required RestoreDurability durability,
@@ -2166,6 +2186,506 @@ Future<void> _runLegacyArchivingMarkerVerify(
   expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
 }
 
+Future<void> _runTerminalSettingsReadbackCreatePartial(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final setupEvent = await _readTerminalSettingsReadbackSetupEvent(
+    control,
+    state,
+  );
+  expect(setupEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectBeforePreferences(preferences, state);
+  final prepared = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(prepared?.runId, state.runId);
+  expect(prepared?.receipt.state, RestoreReceiptState.prepared);
+  expect(prepared?.markerFileName, RestoreWorkspaceLock.activeRunFileName);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(setupEvent['pid']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationCounter = CountingMutationPreferencesStore(preferenceDelegate);
+  late final RestoreReceipt terminal;
+  late final RestoreSettingsColdAck coldAck;
+  try {
+    terminal = switch (control.readbackCase) {
+      RestoreTerminalSettingsReadbackProcessCase.committedTarget =>
+        await _convergeCommittedWithoutColdAck(
+          control: control,
+          state: state,
+          preferences: preferences,
+          durability: durability,
+        ),
+      RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore =>
+        await _convergeRolledBackWithoutColdAck(
+          control: control,
+          state: state,
+          preferences: preferences,
+          durability: durability,
+        ),
+    };
+    expect(terminal.state, _readbackReceiptState(control.readbackCase));
+    final receiptStore = _activeReceiptStore(control, state);
+    expect(
+      await RestoreSettingsColdAckStore(
+        runDirectory: receiptStore.runDirectory,
+        durability: durability,
+      ).read(),
+      isNull,
+    );
+
+    SharedPreferencesStorePlatform.instance = mutationCounter;
+    try {
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      throw StateError('restore_terminal_settings_readback_arm_returned');
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, terminal.state);
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    final pending = await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    );
+    expect(pending?.runId, state.runId);
+    expect(pending?.receipt.checksum, terminal.checksum);
+    expect(pending?.receipt.state, terminal.state);
+    expect(pending?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+    final persistedAck = await RestoreSettingsColdAckStore(
+      runDirectory: receiptStore.runDirectory,
+      durability: durability,
+    ).read();
+    expect(persistedAck, isNotNull);
+    coldAck = persistedAck!;
+    expect(coldAck.terminalReceiptChecksum, terminal.checksum);
+    expect(coldAck.expected, _readbackAckExpected(control.readbackCase));
+    expect(coldAck.processId, lease.processId);
+    expect(coldAck.leaseInstanceId, lease.instanceId);
+    await preferences.reload();
+    _expectReadbackExpectedPreferences(control, preferences, state);
+    await _expectReadbackActiveEvidence(
+      control: control,
+      state: state,
+      receiptStore: receiptStore,
+      expectedAck: coldAck,
+    );
+    expect(mutationCounter.mutationAttempts, greaterThan(0));
+
+    await _writeReadbackPartialPreferences(control, preferences, state);
+    await preferences.reload();
+    _expectReadbackPartialPreferences(control, preferences, state);
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': terminal.state.name,
+      'expectedProjection': coldAck.expected.name,
+      'leaseInstanceId': lease.instanceId,
+      'coldAckProcessId': coldAck.processId,
+      'coldAckLeaseInstanceId': coldAck.leaseInstanceId,
+      'coldAckChecksum': coldAck.checksum,
+      'terminalReceiptChecksum': coldAck.terminalReceiptChecksum,
+      'partialState': _readbackPartialState(control.readbackCase),
+      'settingsMutationAttempts': mutationCounter.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+}
+
+Future<void> _runTerminalSettingsReadbackRepairToColdAck(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final partialEvent = await _readTerminalSettingsReadbackPartialEvent(
+    control,
+    state,
+  );
+  expect(partialEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectReadbackPartialPreferences(control, preferences, state);
+  final receiptStore = _activeReceiptStore(control, state);
+  final priorAck = await RestoreSettingsColdAckStore(
+    runDirectory: receiptStore.runDirectory,
+  ).read();
+  expect(priorAck, isNotNull);
+  expect(priorAck!.processId, partialEvent['coldAckProcessId']);
+  expect(priorAck.leaseInstanceId, partialEvent['coldAckLeaseInstanceId']);
+  expect(priorAck.checksum, partialEvent['coldAckChecksum']);
+  expect(
+    priorAck.terminalReceiptChecksum,
+    partialEvent['terminalReceiptChecksum'],
+  );
+  expect(priorAck.expected, _readbackAckExpected(control.readbackCase));
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(priorAck.processId));
+  expect(lease.instanceId, isNot(priorAck.leaseInstanceId));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationCounter = CountingMutationPreferencesStore(preferenceDelegate);
+  late final RestoreSettingsColdAck repairedAck;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationCounter;
+    try {
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      throw StateError('restore_terminal_settings_readback_repair_returned');
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, _readbackReceiptState(control.readbackCase));
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(mutationCounter.mutationAttempts, greaterThan(0));
+    await preferences.reload();
+    _expectReadbackExpectedPreferences(control, preferences, state);
+    final pending = await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    );
+    expect(pending?.runId, state.runId);
+    expect(pending?.receipt.state, _readbackReceiptState(control.readbackCase));
+    expect(pending?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+    final observedAck = await RestoreSettingsColdAckStore(
+      runDirectory: receiptStore.runDirectory,
+      durability: durability,
+    ).read();
+    expect(observedAck, isNotNull);
+    repairedAck = observedAck!;
+    expect(repairedAck.expected, priorAck.expected);
+    expect(
+      repairedAck.terminalReceiptChecksum,
+      priorAck.terminalReceiptChecksum,
+    );
+    expect(repairedAck.processId, lease.processId);
+    expect(repairedAck.leaseInstanceId, lease.instanceId);
+    expect(repairedAck.checksum, isNot(priorAck.checksum));
+    await _expectReadbackActiveEvidence(
+      control: control,
+      state: state,
+      receiptStore: receiptStore,
+      expectedAck: repairedAck,
+    );
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': pending!.receipt.state.name,
+      'expectedProjection': repairedAck.expected.name,
+      'outcome': 'repairColdRestartRequired',
+      'priorAckProcessId': priorAck.processId,
+      'priorAckLeaseInstanceId': priorAck.leaseInstanceId,
+      'priorAckChecksum': priorAck.checksum,
+      'leaseInstanceId': lease.instanceId,
+      'coldAckProcessId': repairedAck.processId,
+      'coldAckLeaseInstanceId': repairedAck.leaseInstanceId,
+      'coldAckChecksum': repairedAck.checksum,
+      'terminalReceiptChecksum': repairedAck.terminalReceiptChecksum,
+      'settingsMutationAttempts': mutationCounter.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+}
+
+Future<void> _runTerminalSettingsReadbackVerify(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final repairEvent = await _readTerminalSettingsReadbackRepairEvent(
+    control,
+    state,
+  );
+  expect(repairEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectReadbackExpectedPreferences(control, preferences, state);
+  final expectedAck = RestoreSettingsColdAck(
+    runId: state.runId,
+    terminalReceiptChecksum: repairEvent['terminalReceiptChecksum'] as String,
+    expected: _readbackAckExpected(control.readbackCase),
+    leaseInstanceId: repairEvent['coldAckLeaseInstanceId'] as String,
+    processId: repairEvent['coldAckProcessId'] as int,
+  );
+  expect(expectedAck.checksum, repairEvent['coldAckChecksum']);
+  final activeStore = _activeReceiptStore(control, state);
+  final activeAck = await RestoreSettingsColdAckStore(
+    runDirectory: activeStore.runDirectory,
+  ).read();
+  expect(activeAck?.checksum, expectedAck.checksum);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(repairEvent['pid']));
+  expect(lease.processId, isNot(expectedAck.processId));
+  expect(lease.instanceId, isNot(repairEvent['leaseInstanceId']));
+  expect(lease.instanceId, isNot(expectedAck.leaseInstanceId));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  late final RestoreReceipt gateResult;
+  late final RestoreSettingsColdAck archivedAck;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    try {
+      final result = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      expect(result, isNotNull);
+      gateResult = result!;
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(gateResult.state, _readbackReceiptState(control.readbackCase));
+    expect(mutationGuard.mutationAttempts, 0);
+    await preferences.reload();
+    _expectReadbackExpectedPreferences(control, preferences, state);
+    final evidence = switch (control.readbackCase) {
+      RestoreTerminalSettingsReadbackProcessCase.committedTarget =>
+        await _expectArchivedTerminalEvidence(
+          control: control,
+          state: state,
+          expectedAck: expectedAck,
+        ),
+      RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore =>
+        await _expectArchivedRolledBackTerminalEvidence(
+          control: control,
+          state: state,
+          expectedAck: expectedAck,
+        ),
+    };
+    expect(evidence.terminal.checksum, gateResult.checksum);
+    expect(evidence.ack.checksum, expectedAck.checksum);
+    archivedAck = evidence.ack;
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': gateResult.state.name,
+      'expectedProjection': archivedAck.expected.name,
+      'gateResult': gateResult.state.name,
+      'archiveState': 'archived',
+      'observedAckProcessId': archivedAck.processId,
+      'observedAckLeaseInstanceId': archivedAck.leaseInstanceId,
+      'observedAckChecksum': archivedAck.checksum,
+      'leaseInstanceId': lease.instanceId,
+      'settingsMutationAttempts': mutationGuard.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+  await _cleanupHarnessPreferences(
+    preferences: preferences,
+    state: state,
+    errorPrefix: 'restore_terminal_settings_readback_cleanup',
+  );
+}
+
+RestoreReceiptState _readbackReceiptState(
+  RestoreTerminalSettingsReadbackProcessCase readbackCase,
+) => switch (readbackCase) {
+  RestoreTerminalSettingsReadbackProcessCase.committedTarget =>
+    RestoreReceiptState.committed,
+  RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore =>
+    RestoreReceiptState.rolledBack,
+};
+
+RestoreSettingsColdAckExpected _readbackAckExpected(
+  RestoreTerminalSettingsReadbackProcessCase readbackCase,
+) => switch (readbackCase) {
+  RestoreTerminalSettingsReadbackProcessCase.committedTarget =>
+    RestoreSettingsColdAckExpected.target,
+  RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore =>
+    RestoreSettingsColdAckExpected.before,
+};
+
+String _readbackPartialState(
+  RestoreTerminalSettingsReadbackProcessCase readbackCase,
+) => switch (readbackCase) {
+  RestoreTerminalSettingsReadbackProcessCase.committedTarget =>
+    'primaryBeforeSecretBeforeSecondaryTargetTargetOnlyTarget',
+  RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore =>
+    'primaryTargetSecretAbsentTargetOnlyTargetSecondaryBefore',
+};
+
+Future<void> _writeReadbackPartialPreferences(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  switch (control.readbackCase) {
+    case RestoreTerminalSettingsReadbackProcessCase.committedTarget:
+      if (!await preferences.setString(
+        state.primaryPreferenceKey,
+        state.primaryOldPreferenceValue,
+      )) {
+        throw StateError('restore_terminal_settings_readback_partial_primary');
+      }
+      if (!await preferences.setString(
+        state.secretPreferenceKey,
+        state.secretOldPreferenceValue,
+      )) {
+        throw StateError('restore_terminal_settings_readback_partial_secret');
+      }
+    case RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore:
+      if (!await preferences.setString(
+        state.primaryPreferenceKey,
+        state.primaryNewPreferenceValue,
+      )) {
+        throw StateError('restore_terminal_settings_readback_partial_primary');
+      }
+      if (!await preferences.remove(state.secretPreferenceKey)) {
+        throw StateError('restore_terminal_settings_readback_partial_secret');
+      }
+      if (!await preferences.setString(
+        state.targetOnlyPreferenceKey,
+        state.targetOnlyNewPreferenceValue,
+      )) {
+        throw StateError(
+          'restore_terminal_settings_readback_partial_target_only',
+        );
+      }
+  }
+}
+
+void _expectReadbackExpectedPreferences(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+) {
+  switch (control.readbackCase) {
+    case RestoreTerminalSettingsReadbackProcessCase.committedTarget:
+      _expectTargetPreferences(preferences, state);
+    case RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore:
+      _expectBeforePreferences(preferences, state);
+  }
+}
+
+void _expectReadbackPartialPreferences(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  SharedPreferences preferences,
+  RestoreCompleteBundleFixtureState state,
+) {
+  switch (control.readbackCase) {
+    case RestoreTerminalSettingsReadbackProcessCase.committedTarget:
+      expect(
+        preferences.getString(state.primaryPreferenceKey),
+        state.primaryOldPreferenceValue,
+      );
+      expect(
+        preferences.getString(state.secondaryPreferenceKey),
+        state.secondaryNewPreferenceValue,
+      );
+      expect(
+        preferences.getString(state.secretPreferenceKey),
+        state.secretOldPreferenceValue,
+      );
+      expect(
+        preferences.getString(state.targetOnlyPreferenceKey),
+        state.targetOnlyNewPreferenceValue,
+      );
+    case RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore:
+      expect(
+        preferences.getString(state.primaryPreferenceKey),
+        state.primaryNewPreferenceValue,
+      );
+      expect(
+        preferences.getString(state.secondaryPreferenceKey),
+        state.secondaryOldPreferenceValue,
+      );
+      expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+      expect(
+        preferences.getString(state.targetOnlyPreferenceKey),
+        state.targetOnlyNewPreferenceValue,
+      );
+  }
+}
+
+Future<void> _expectReadbackActiveEvidence({
+  required RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreReceiptStore receiptStore,
+  required RestoreSettingsColdAck expectedAck,
+}) async {
+  switch (control.readbackCase) {
+    case RestoreTerminalSettingsReadbackProcessCase.committedTarget:
+      await _expectExactTerminalMarkers(
+        receiptStore.workspaceRoot,
+        runId: state.runId,
+        expectedMarker: RestoreWorkspaceLock.publishingRunFileName,
+      );
+      final history = await receiptStore.readHistory();
+      expect(history.last.state, RestoreReceiptState.committed);
+      expect(history.last.checksum, expectedAck.terminalReceiptChecksum);
+      await _expectNoReceiptTemporaries(receiptStore);
+      await _expectNoColdAckTemporaries(receiptStore.runDirectory);
+      await _expectInstalledBundle(control, receiptStore, state);
+      final ack = await RestoreSettingsColdAckStore(
+        runDirectory: receiptStore.runDirectory,
+      ).read();
+      expect(ack?.checksum, expectedAck.checksum);
+    case RestoreTerminalSettingsReadbackProcessCase.rolledBackBefore:
+      await _expectRolledBackTerminalActiveEvidence(
+        control: control,
+        state: state,
+        receiptStore: receiptStore,
+        expectedAck: expectedAck,
+      );
+  }
+}
+
+Future<void> _cleanupHarnessPreferences({
+  required SharedPreferences preferences,
+  required RestoreCompleteBundleFixtureState state,
+  required String errorPrefix,
+}) async {
+  for (final key in [
+    state.primaryPreferenceKey,
+    state.secondaryPreferenceKey,
+    state.secretPreferenceKey,
+    state.targetOnlyPreferenceKey,
+  ]) {
+    if (preferences.containsKey(key) && !await preferences.remove(key)) {
+      throw StateError('$errorPrefix:$key');
+    }
+  }
+  await preferences.reload();
+  expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
+}
+
 RestoreLegacyArchivingMarkerBoundary _legacyArchivingMarkerBoundary(
   RestoreLegacyArchivingMarkerProcessFailpoint failpoint,
 ) => switch (failpoint) {
@@ -2787,7 +3307,7 @@ Future<void> _expectRolledBackTerminalWithoutAck({
 }
 
 Future<void> _expectRolledBackTerminalActiveEvidence({
-  required RestoreRolledBackTerminalProcessHarnessControl control,
+  required RestoreHarnessControl control,
   required RestoreCompleteBundleFixtureState state,
   required RestoreReceiptStore receiptStore,
   required RestoreSettingsColdAck expectedAck,
@@ -2816,7 +3336,7 @@ Future<void> _expectRolledBackTerminalActiveEvidence({
 
 Future<({RestoreReceipt terminal, RestoreSettingsColdAck ack})>
 _expectArchivedRolledBackTerminalEvidence({
-  required RestoreRolledBackTerminalProcessHarnessControl control,
+  required RestoreHarnessControl control,
   required RestoreCompleteBundleFixtureState state,
   required RestoreSettingsColdAck expectedAck,
 }) async {
@@ -3334,6 +3854,8 @@ void _requireControlSequence(RestoreHarnessControl control) {
     RestoreRollbackProcessHarnessControl() => control.phase.index + 1,
     RestoreRolledBackTerminalProcessHarnessControl() => control.phase.index + 1,
     RestoreLegacyArchivingMarkerProcessHarnessControl() =>
+      control.phase.index + 1,
+    RestoreTerminalSettingsReadbackProcessHarnessControl() =>
       control.phase.index + 1,
     _ => throw StateError('restore_harness_control_type'),
   };
@@ -4476,6 +4998,175 @@ Future<Map<String, dynamic>> _readLegacyArchivingMarkerPriorEvent(
   return event;
 }
 
+Future<Map<String, dynamic>> _readTerminalSettingsReadbackSetupEvent(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readTerminalSettingsReadbackPriorEvent(
+    control,
+    generation: 1,
+    phase: RestoreTerminalSettingsReadbackProcessHarnessPhase.setup,
+    phaseKeys: const {'runId', 'receiptState'},
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.prepared.name) {
+    throw const FormatException(
+      'restore_terminal_settings_readback_harness_setup_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readTerminalSettingsReadbackPartialEvent(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final setup = await _readTerminalSettingsReadbackSetupEvent(control, state);
+  final event = await _readTerminalSettingsReadbackPriorEvent(
+    control,
+    generation: 2,
+    phase: RestoreTerminalSettingsReadbackProcessHarnessPhase
+        .createTerminalPartial,
+    phaseKeys: const {
+      'runId',
+      'receiptState',
+      'expectedProjection',
+      'leaseInstanceId',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'coldAckChecksum',
+      'terminalReceiptChecksum',
+      'partialState',
+      'settingsMutationAttempts',
+    },
+  );
+  final mutations = event['settingsMutationAttempts'];
+  if (event['status'] != 'completed' ||
+      event['pid'] == setup['pid'] ||
+      event['runId'] != state.runId ||
+      event['receiptState'] !=
+          _readbackReceiptState(control.readbackCase).name ||
+      event['expectedProjection'] !=
+          _readbackAckExpected(control.readbackCase).name ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['coldAckProcessId'] != event['pid'] ||
+      event['coldAckLeaseInstanceId'] != event['leaseInstanceId'] ||
+      !_isSha256(event['coldAckChecksum']) ||
+      !_isSha256(event['terminalReceiptChecksum']) ||
+      event['partialState'] != _readbackPartialState(control.readbackCase) ||
+      mutations is! int ||
+      mutations < 1) {
+    throw const FormatException(
+      'restore_terminal_settings_readback_harness_partial_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readTerminalSettingsReadbackRepairEvent(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final partial = await _readTerminalSettingsReadbackPartialEvent(
+    control,
+    state,
+  );
+  final event = await _readTerminalSettingsReadbackPriorEvent(
+    control,
+    generation: 3,
+    phase: RestoreTerminalSettingsReadbackProcessHarnessPhase.repairToColdAck,
+    phaseKeys: const {
+      'runId',
+      'receiptState',
+      'expectedProjection',
+      'outcome',
+      'priorAckProcessId',
+      'priorAckLeaseInstanceId',
+      'priorAckChecksum',
+      'leaseInstanceId',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'coldAckChecksum',
+      'terminalReceiptChecksum',
+      'settingsMutationAttempts',
+    },
+  );
+  final mutations = event['settingsMutationAttempts'];
+  if (event['status'] != 'completed' ||
+      event['pid'] == partial['pid'] ||
+      event['runId'] != state.runId ||
+      event['receiptState'] !=
+          _readbackReceiptState(control.readbackCase).name ||
+      event['expectedProjection'] !=
+          _readbackAckExpected(control.readbackCase).name ||
+      event['outcome'] != 'repairColdRestartRequired' ||
+      event['priorAckProcessId'] != partial['coldAckProcessId'] ||
+      event['priorAckLeaseInstanceId'] != partial['coldAckLeaseInstanceId'] ||
+      event['priorAckChecksum'] != partial['coldAckChecksum'] ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['leaseInstanceId'] == partial['coldAckLeaseInstanceId'] ||
+      event['coldAckProcessId'] != event['pid'] ||
+      event['coldAckLeaseInstanceId'] != event['leaseInstanceId'] ||
+      !_isSha256(event['coldAckChecksum']) ||
+      event['coldAckChecksum'] == partial['coldAckChecksum'] ||
+      event['terminalReceiptChecksum'] != partial['terminalReceiptChecksum'] ||
+      mutations is! int ||
+      mutations < 1) {
+    throw const FormatException(
+      'restore_terminal_settings_readback_harness_repair_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readTerminalSettingsReadbackPriorEvent(
+  RestoreTerminalSettingsReadbackProcessHarnessControl control, {
+  required int generation,
+  required RestoreTerminalSettingsReadbackProcessHarnessPhase phase,
+  required Set<String> phaseKeys,
+}) async {
+  final eventFile = File(
+    p.join(
+      control.eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+  final event = await readHarnessJson(eventFile);
+  final expectedKeys = {
+    'format',
+    'version',
+    'generation',
+    'matrixRunId',
+    'scenario',
+    'scenarioId',
+    'phase',
+    'failpoint',
+    'pid',
+    'status',
+    ...phaseKeys,
+  };
+  if (event.length != expectedKeys.length ||
+      !event.keys.toSet().containsAll(expectedKeys) ||
+      event['format'] != restoreHarnessFormat ||
+      event['version'] !=
+          RestoreTerminalSettingsReadbackProcessHarnessControl.version ||
+      event['generation'] != generation ||
+      event['matrixRunId'] != control.matrixRunId ||
+      event['scenario'] != restoreTerminalSettingsReadbackHarnessScenario ||
+      event['scenarioId'] != control.scenarioId ||
+      event['phase'] != phase.name ||
+      event['failpoint'] != control.readbackCase.name ||
+      event['pid'] is! int ||
+      (event['pid'] as int) < 1 ||
+      event['status'] is! String) {
+    throw const FormatException(
+      'restore_terminal_settings_readback_harness_event',
+    );
+  }
+  return event;
+}
+
 Future<Map<String, dynamic>> _readRollbackSetupEvent(
   RestoreRollbackProcessHarnessControl control,
   RestoreCompleteBundleFixtureState state,
@@ -5594,6 +6285,8 @@ Future<void> _publishEvent(
       RestoreRolledBackTerminalProcessHarnessControl.version,
     RestoreLegacyArchivingMarkerProcessHarnessControl() =>
       RestoreLegacyArchivingMarkerProcessHarnessControl.version,
+    RestoreTerminalSettingsReadbackProcessHarnessControl() =>
+      RestoreTerminalSettingsReadbackProcessHarnessControl.version,
     _ => throw StateError('restore_harness_control_type'),
   };
   return writeDurableHarnessJson(control.eventFile, {
