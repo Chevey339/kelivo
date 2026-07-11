@@ -35,7 +35,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.timeInfo,
           'description':
-              'Get the current local date and time info from the device. Returns year, month, day, weekday, ISO date and time strings, timezone, UTC offset, and timestamp.',
+              'Get the current local date and time from the user\'s device. Use this only when time info is necessary for your response. NOT for time differences, durations, or scheduling logic.',
           'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
         },
       });
@@ -46,7 +46,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.clipboard,
           'description':
-              'Read or write plain text from the device clipboard. Use action: read or write. For write, provide text. Do NOT write to the clipboard unless the user has explicitly requested it.',
+              'Read or write plain text from/to the device clipboard. Use only when the user explicitly asks to read, copy, or paste clipboard content. CRITICAL: Do NOT write to the clipboard unless the user has explicitly requested it. Never read the clipboard speculatively as clipboard content is private.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -92,7 +92,7 @@ class LocalToolsService {
         'function': {
           'name': LocalToolNames.askUser,
           'description':
-              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before continuing. Supports single-choice and multi-choice questions. The UI will provide Other and Skip options automatically, so do not include those options yourself.',
+              'Ask the user one or more short choice questions when you need clarification, additional information, or a decision before you can continue. Use when the request is ambiguous, the user must pick between options, or you need specific information they have not provided. IMPORTANT: The UI automatically provides "Other" and "Skip" options, so do NOT include those as explicit options. DO NOT use this when you can infer the answer from conversation context. Limit to at most 4 questions at a time.',
           'parameters': {
             'type': 'object',
             'properties': {

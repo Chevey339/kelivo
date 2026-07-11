@@ -215,7 +215,8 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'create_memory',
-          'description': 'create a memory record',
+          'description':
+              'Create a new long-term memory record that persists across conversations for user preferences, personal details, plans, work facts, and other important context. Act like a personal secretary by actively recording useful information when you learn it, without waiting for the user to ask. check existing memories first to avoid duplicated memory for the same fact. DO NOT store sensitive information (ethnicity, religion, sexual orientation, political views, criminal records, or other protected data). DO NOT inform the user about the memory write unless they explicitly ask you to.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -232,7 +233,8 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'edit_memory',
-          'description': 'update a memory record',
+          'description':
+              'Update an existing memory record identified by its numeric "id" (shown in the <memories> context). Use when a stored memory is outdated, incorrect, or needs supplementary details. Only update the specific fact that changed. DO NOT delete unrelated information. DO NOT use this to create new memories (use create_memory instead). Do NOT inform the user about the update unless they explicitly ask you to.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -253,7 +255,8 @@ class ToolHandlerService {
         'type': 'function',
         'function': {
           'name': 'delete_memory',
-          'description': 'delete a memory record',
+          'description':
+              'Delete a memory record identified by its numeric "id" (shown in the <memories> context). Use when a memory is no longer relevant, outdated, incorrectly recorded, or a duplicate. Before deleting, consider whether edit_memory is more appropriate. Do NOT delete memories that may still be useful. DO NOT inform the user about the deletion unless they explicitly ask.',
           'parameters': {
             'type': 'object',
             'properties': {

@@ -5,7 +5,16 @@ import '../../providers/settings_provider.dart';
 
 class SearchToolService {
   static const String toolName = 'search_web';
-  static const String toolDescription = 'Search the web for information';
+  static const String toolDescription =
+      '''Search the web for up-to-date information via the user's configured search engine. Returns results with title, URL, snippet, "index" (1-based rank) and "id" (6-char citation id). An optional "answer" summary may be included. Refer to the system prompt for when to use this tool and how to format inline citations.
+
+When to use: (1) explicit request to search from the user; (2) the LATEST news/data such as exchange rate, pricing and availability; (3) changes to NEW versions of libraries / applications or any other content that are released after your knowledge cutoff; (4) time-sensitive fact check.
+
+When NOT to use: (1) explicit request to disable searching; (2) YOUR self-identity, capabilities or YOUR opinion; (3) reasoning / calculation / common sense that is too trivial to warrant a search; (4) personal information or context that are already exposed in chat history or memory.
+
+Citation Format: `Details [citation](index:id)`. Citations MUST follow th​e relevant fact immediat​ely, placed after the pu​nctuation. Never pile them all up at the end. Good example: The document shows that the feature requires 3.0+ version. [citation](1:d4e5f6) The steps are as follows: ... [citation](3:a1b2c3).
+
+Best Practice: (1) Use keywords rather than a complete sentence for `query`; (2) Retry searching with different keywords if the first search doesn't find relevant information. If the search results ar​e consistently filled wi​th noise/irrelevant cont​ent, report to the user if possible; (3) Fetch relevant links after searching if relevant tools are available; (4) Prefer organizing information into fluent paragraphs to repeating titles and links unless specially requested; (5) If the `answer` field (AI abstract) exists, you can refer to it.''';
 
   static final RegExp _schemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -92,39 +101,5 @@ class SearchToolService {
     } catch (e) {
       return jsonEncode({'error': 'Search failed: $e'});
     }
-  }
-
-  static String getSystemPrompt() {
-    return '''
-## search_web 工具使用说明
-
-当用户询问需要实时信息或最新数据的问题时，使用 search_web 工具进行搜索。
-
-### 引用格式
-- 搜索结果中会包含index(搜索结果序号)和id(搜索结果唯一标识符)，引用格式为：
-  `具体的引用内容 [citation](index:id)`
-- **引用必须紧跟在相关内容之后**，在标点符号后面，不得延后到回复结尾
-- 正确格式：`... [citation](index:id)` `... [citation](index:id) [citation](index:id)`
-
-### 使用规范
-1. **使用时机**
-   - 用户询问最新新闻、事件、数据
-   - 需要查证事实信息
-   - 需要获取技术文档、API信息等
-   
-2. **引用要求**
-   - 使用搜索结果时必须标注引用来源
-   - 每个引用的事实都要紧跟 [citation](index:id) 标记
-   - 不要将所有引用集中在回答末尾
-
-3. **回答格式示例**
-   ✅ 正确：
-   - 据最新报道，该事件发生在昨天下午。[citation](1:a1b2c3)
-   - 技术文档显示该功能需要版本3.0以上。[citation](2:d4e5f6) 具体配置步骤如下...[citation](3:g7h8i9)
-   
-   ❌ 错误：
-   - 据最新报道，该事件发生在昨天下午。技术文档显示该功能需要版本3.0以上。
-     [citation](1:a1b2c3) [citation](2:d4e5f6)
-''';
   }
 }
