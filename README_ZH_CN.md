@@ -1,18 +1,58 @@
 <div align="center">
-  <img src="assets/app_icon.png" alt="Kelivo Icon" width="100" />
-  <h1>Kelivo</h1>
+  <img src="assets/app_icon.png" alt="Cuplivo Icon" width="100" />
+  <h1>为什么选择 Cuplivo？</h1>
 
-一个 Flutter LLM 聊天客户端
+  一个 Flutter LLM 聊天客户端 — 社区分支
 
   <a href="https://discord.gg/Tb8DyvvV5T" target="_blank">
-    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord"/>
+    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="加入 Discord"/>
   </a>
   <a href="https://qm.qq.com/q/OQaXetKssC" target="_blank" style="margin-left: 6px;">
-    <img src="https://img.shields.io/badge/Join%20QQ%20Group-%230366CC?style=for-the-badge&logo=qq&logoColor=white" alt="Join QQ Group"/>
+    <img src="https://img.shields.io/badge/Join%20QQ%20Group-%230366CC?style=for-the-badge&logo=qq&logoColor=white" alt="加入 QQ 群"/>
   </a>
 
-[English](README.md) | 简体中文
+  [Read the English version](README.md)
 </div>
+
+### 兼容性
+
+Cuplivo 是 [Kelivo](https://github.com/Chevey339/kelivo) 的社区分支，保持完整数据兼容。配置 WebDAV 或 S3，恢复从 Kelivo 导出的备份文件即可无缝接续，无需重新配置。界面整体没有大幅改动，原有用户可以快速适应。
+
+目前已知作者本人和至少 2 位稳定用户在使用，未遇到问题。安装 Cuplivo 无需卸载 Kelivo，数据安全双重保障。
+
+### 新功能
+
+1. **SQLite 存储** — 使用 SQLite 替换了 Hive，以提升可靠性。
+   - 预估：数据丢失事件的发生概率预计降低约 70%。
+   - 备注：现有的 `.zip` 备份仍完全兼容，因为它们并非原始的 Hive 二进制文件。
+
+2. **增量备份** — 仅上传自某个选定日期以来的对话和消息，以及附件等。
+   - 实测：一次 12.6 MB 的完整备份后，通常仅会产生 50 KB 至 1.5 MB 的增量上传。随着附件和图片的积累，节省效果会更加明显。这降低了带宽与存储开销，也有助于养成更频繁的备份习惯。
+   - 注意：仍建议定期进行完整快照备份。
+
+3. **手动图片压缩** — 手机照片和桌面截图虽然像素清晰，但对于 LLM 任务往往属于过度冗余。
+   - 实测：将长边从 4096 px 调整为 2048 px，文件大小可从 2.06 MB 降至约 425 KB，输入 Token 从 8,136 减至 3,096，且模型回复质量无肉眼可见的下降。
+   - 注意：非常适合高分辨率截图以及细节要求不高的任务。
+
+4. **支持时间感知缓存的记忆工具** — 原始实现会在每次交互时使整个缓存失效。Cuplivo 引入了基于时间的刷新机制（每日/每小时），从而提升了缓存命中率。
+   - 注意：对记忆进行创建、编辑或删除（CRUD）操作仍会清空缓存——完整的底层重构计划在未来版本中推出。
+
+5. **工具提示词优化** — 重写了内置工具的描述，使其更加简洁精准，帮助模型更稳定地选对工具，并减少输出格式错误。
+
+6. **SVG 预览** — 在 `svg` 代码块内联渲染 SVG 图表。
+
+7. **仓库其他修复项**
+   - Qwen / Doubao 模型能力探测
+   - Gemini 缓存 Token 的准确统计
+   - 优化标题生成逻辑（首次失败自动重试）
+   - 其他多项稳定性改进
+
+
+## 注意事项
+
+Cuplivo 是一个社区分支，尚未与原项目完全切割。赞赏码和社区群组（Discord、QQ）仍指向原作者。过渡期间部分地方可能存在名称混用。
+
+---
 
 <div align="center">
   <img src="docx/screenshot_1.png" alt="聊天界面" width="150" />

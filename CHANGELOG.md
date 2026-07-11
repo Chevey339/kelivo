@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.1] - 2026-07-12
+
+### Added
+- SVG code block preview — render SVG diagrams inline within svg code fences
+
+### Fixed
+- Prefer `b64_json` key for OpenAI image response parsing
+
+### Changed
+- Tool descriptions rewritten for conciseness and accuracy (tool prompt optimization)
+- Shared PreviewLoadingView and PreviewErrorView components
+
 ## [1.4.0] - 2026-07-06
 
 ### Added

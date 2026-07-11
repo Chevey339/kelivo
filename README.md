@@ -1,19 +1,57 @@
 <div align="center">
-  <img src="assets/app_icon.png" alt="Kelivo Icon" width="100" />
-  <h1>Kelivo</h1>
+  <img src="assets/app_icon.png" alt="Cuplivo Icon" width="100" />
+  <h1>Why Cuplivo?</h1>
 
-A Flutter LLM Chat Client
+  A Flutter LLM Chat Client — A community fork
 
-  <a href="https://discord.gg/Tb8DyvvV5T" target="_blank">
-    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Join Discord"/>
+  <a href="...Discord...">
+    <img src="...discord-badge..." alt="Join Discord"/>
   </a>
-  <a href="https://qm.qq.com/q/OQaXetKssC" target="_blank" style="margin-left: 6px;">
-    <img src="https://img.shields.io/badge/Join%20QQ%20Group-%230366CC?style=for-the-badge&logo=qq&logoColor=white" alt="Join QQ Group"/>
+  <a href="...QQ..." style="margin-left: 6px;">
+    <img src="...qq-badge..." alt="Join QQ Group"/>
   </a>
 
-
-English | [简体中文](README_ZH_CN.md)
+  [阅读简体中文文档](README_ZH_CN.md)快速查看特性
 </div>
+
+## Compatibility
+
+Cuplivo is a community fork of [Kelivo](https://github.com/Chevey339/kelivo) and maintains full data compatibility. Configure WebDAV or S3, restore backup files exported from Kelivo, and pick up where you left off — no data loss, no reconfiguration needed. The UI has not undergone major changes either, so existing users will feel right at home.
+
+Currently known to be used by the author and at least 2 other stable users with no issues reported. Cuplivo can be installed alongside Kelivo without uninstalling the original — your data is doubly protected.
+
+## New Features
+
+1. **SQLite storage** — Replaced Hive with SQLite for improved reliability.
+   - *In practice*: Data loss incidents are expected to drop by roughly 70%.
+   - *Note*: Existing `.zip` backups remain fully compatible, as they are not raw Hive binaries.
+
+2. **Incremental backup** — Uploads only conversations, messages and related attachments since a selected date.
+   - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
+   - *Note*: Periodic full snapshots are still recommended.
+
+3. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
+   - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
+   - *Note*: Ideal for high-resolution captures and low-detail tasks.
+
+4. **Memory tool with time-aware caching** — The original implementation invalidated the entire cache on every interaction. Cuplivo introduces time-based refresh (daily/hourly), thereby improving cache hit rates.
+   - *Note*: CRUD operations on memory still flush the cache — a full refactor is planned for a future release.
+
+5. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
+
+6. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+
+7. **Additional fixes across the repo**
+   - Qwen/Doubao model capability detection
+   - Accurate Gemini cached-token reporting
+   - Optimized title generation logic (auto-retry on first failure)
+   - Various other stability improvements
+
+## Note
+
+Cuplivo is a community fork and has not been fully separated from the upstream project. Donation QR codes and community groups (Discord, QQ) still point to the original author. Some references may retain the original name during the transition.
+
+---
 
 <div align="center">
   <img src="docx/screenshot_1.png" alt="Chat Screen" width="150" />
