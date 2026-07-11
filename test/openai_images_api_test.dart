@@ -513,6 +513,57 @@ void main() {
       expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
     });
 
+    test('prefers base64 image over url when both are returned', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openai_b64_preferred_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'data': [
+              {
+                'url': 'https://example.com/remote.png',
+                'b64_json': base64Encode(const [5, 6, 7, 8]),
+              },
+            ],
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server)),
+        modelId: 'gpt-image-2',
+        messages: const [
+          {'role': 'user', 'content': 'draw a tabby cat'},
+        ],
+      ).toList();
+
+      final imagePath = RegExp(
+        r'!\[image\]\(([^)]+)\)',
+      ).firstMatch(chunks.single.content)!.group(1)!;
+      expect(chunks.single.content, isNot(contains('https://example.com')));
+      expect(imagePath.endsWith('.png'), isTrue);
+      expect(await File(imagePath).readAsBytes(), const [5, 6, 7, 8]);
+    });
+
     test(
       'throws instead of rendering null when base64 image save fails',
       () async {
