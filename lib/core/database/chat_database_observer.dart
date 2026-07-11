@@ -26,6 +26,7 @@ enum ChatDatabaseOperation {
   commandStreamingCheckpoint,
   commandFinalCheckpoint,
   commandSetContextBoundary,
+  commandMessageGraphMutation,
   walCheckpoint,
   integrityCheck,
 }

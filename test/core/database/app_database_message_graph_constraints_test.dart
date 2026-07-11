@@ -386,4 +386,65 @@ void main() {
       contains('idx_message_revisions_slot_version'),
     );
   });
+
+  test(
+    'message parts require a same-conversation revision and unique ordinal',
+    () async {
+      await insertConversation('conversation-1');
+      await insertConversation('conversation-2');
+      await insertSlot(id: 'slot-1', conversationId: 'conversation-1');
+      await insertRevision(
+        id: 'revision-1',
+        conversationId: 'conversation-1',
+        slotId: 'slot-1',
+      );
+      final part = MessagePartRowsCompanion.insert(
+        conversationId: 'conversation-1',
+        revisionId: 'revision-1',
+        ordinal: 0,
+        kind: 'text',
+        payload: 'hello',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      );
+      await database.into(database.messagePartRows).insert(part);
+
+      await expectLater(
+        database.into(database.messagePartRows).insert(part),
+        throwsA(isA<SqliteException>()),
+      );
+      await expectLater(
+        database
+            .into(database.messagePartRows)
+            .insert(
+              MessagePartRowsCompanion.insert(
+                conversationId: 'conversation-2',
+                revisionId: 'revision-1',
+                ordinal: 1,
+                kind: 'text',
+                payload: 'cross',
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              ),
+            ),
+        throwsA(isA<SqliteException>()),
+      );
+      await expectLater(
+        database
+            .into(database.messagePartRows)
+            .insert(
+              MessagePartRowsCompanion.insert(
+                conversationId: 'conversation-1',
+                revisionId: 'revision-1',
+                ordinal: 1,
+                kind: 'unknown',
+                payload: 'bad',
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              ),
+            ),
+        throwsA(isA<SqliteException>()),
+      );
+    },
+  );
 }

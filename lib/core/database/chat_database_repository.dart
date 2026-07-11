@@ -10,6 +10,7 @@ import '../models/conversation.dart';
 import 'app_database.dart';
 import 'chat_database_observer.dart';
 import 'message_graph_projector.dart';
+import 'message_graph_commands.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -426,6 +427,8 @@ class ChatDatabaseRepository {
     };
     final includesMessageGraph =
         database.userVersion >= AppDatabase.messageGraphSchemaVersion;
+    final includesMessageParts =
+        database.userVersion >= AppDatabase.messagePartsSchemaVersion;
     if (includesMessageGraph) {
       requiredTables.addAll(const {
         'message_slot_rows',
@@ -434,6 +437,7 @@ class ChatDatabaseRepository {
         'conversation_state_rows',
       });
     }
+    if (includesMessageParts) requiredTables.add('message_part_rows');
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -444,12 +448,17 @@ class ChatDatabaseRepository {
     if (!tables.containsAll(requiredTables)) {
       throw StateError('required_tables');
     }
-    _validateRawSchema(database, includesMessageGraph: includesMessageGraph);
+    _validateRawSchema(
+      database,
+      includesMessageGraph: includesMessageGraph,
+      includesMessageParts: includesMessageParts,
+    );
   }
 
   static void _validateRawSchema(
     sqlite.Database database, {
     required bool includesMessageGraph,
+    required bool includesMessageParts,
   }) {
     final expectedColumns = <String, List<String>>{
       'conversation_rows': [
@@ -529,6 +538,17 @@ class ChatDatabaseRepository {
         ],
       });
     }
+    if (includesMessageParts) {
+      expectedColumns['message_part_rows'] = const [
+        'conversation_id',
+        'revision_id',
+        'ordinal',
+        'kind',
+        'payload',
+        'created_at',
+        'updated_at',
+      ];
+    }
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -574,6 +594,12 @@ class ChatDatabaseRepository {
           'context_start_revision_id->message_revision_rows.id:NO ACTION',
         },
       });
+    }
+    if (includesMessageParts) {
+      expectedForeignKeys['message_part_rows'] = const {
+        'conversation_id->message_revision_rows.conversation_id:CASCADE',
+        'revision_id->message_revision_rows.id:CASCADE',
+      };
     }
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
@@ -730,6 +756,82 @@ class ChatDatabaseRepository {
       return projector.projectActivePath(conversationId: conversationId);
     });
   }
+
+  Future<MessageGraphMutationResult> editMessageGraphUser({
+    required String conversationId,
+    required String targetRevisionId,
+    required String text,
+    int? expectedStateRevision,
+  }) => _observer.measure(
+    ChatDatabaseOperation.commandMessageGraphMutation,
+    () => MessageGraphCommands(_db).createRevisionBranch(
+      conversationId: conversationId,
+      targetRevisionId: targetRevisionId,
+      text: text,
+      mutation: MessageGraphRevisionMutation.editUser,
+      expectedStateRevision: expectedStateRevision,
+    ),
+  );
+
+  Future<MessageGraphMutationResult> regenerateMessageGraphAssistant({
+    required String conversationId,
+    required String targetRevisionId,
+    int? expectedStateRevision,
+  }) => _observer.measure(
+    ChatDatabaseOperation.commandMessageGraphMutation,
+    () => MessageGraphCommands(_db).createRevisionBranch(
+      conversationId: conversationId,
+      targetRevisionId: targetRevisionId,
+      text: '',
+      mutation: MessageGraphRevisionMutation.regenerateAssistant,
+      expectedStateRevision: expectedStateRevision,
+    ),
+  );
+
+  Future<ActiveMessageGraphProjection> selectMessageGraphRevision({
+    required String conversationId,
+    required String revisionId,
+    int? expectedStateRevision,
+  }) => _observer.measure(
+    ChatDatabaseOperation.commandMessageGraphMutation,
+    () => MessageGraphCommands(_db).selectRevision(
+      conversationId: conversationId,
+      revisionId: revisionId,
+      expectedStateRevision: expectedStateRevision,
+    ),
+  );
+
+  Future<MessageGraphDeleteResult> deleteMessageGraphRevision({
+    required String conversationId,
+    required String revisionId,
+    required bool confirmCascade,
+    int? expectedStateRevision,
+  }) => _observer.measure(
+    ChatDatabaseOperation.commandMessageGraphMutation,
+    () => MessageGraphCommands(_db).deleteRevision(
+      conversationId: conversationId,
+      revisionId: revisionId,
+      confirmCascade: confirmCascade,
+      expectedStateRevision: expectedStateRevision,
+    ),
+  );
+
+  Future<MessageGraphForkResult> forkMessageGraphConversation({
+    required String sourceConversationId,
+    required String sourceBranchId,
+    required String sourceRevisionId,
+    required String targetConversationId,
+    required String title,
+  }) => _observer.measure(
+    ChatDatabaseOperation.commandMessageGraphMutation,
+    () => MessageGraphCommands(_db).forkConversation(
+      sourceConversationId: sourceConversationId,
+      sourceBranchId: sourceBranchId,
+      sourceRevisionId: sourceRevisionId,
+      targetConversationId: targetConversationId,
+      title: title,
+    ),
+  );
 
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
     final stopwatch = Stopwatch()..start();

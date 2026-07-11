@@ -27,7 +27,7 @@ void main() {
       const versions = GeneratedHelper.versions;
       expect(
         versions,
-        orderedEquals([1, 2, 3, AppDatabase.currentSchemaVersion]),
+        orderedEquals([1, 2, 3, 4, AppDatabase.currentSchemaVersion]),
       );
 
       for (final (index, fromVersion) in versions.indexed) {
@@ -244,6 +244,21 @@ void main() {
           await database.select(database.conversationStateRows).get(),
           isEmpty,
         );
+      } finally {
+        await database.close();
+        schema.close();
+      }
+    });
+
+    test('v4 to v5 adds the authoritative message parts table', () async {
+      final schema = await verifier.schemaAt(4);
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+        );
+        expect(await database.select(database.messagePartRows).get(), isEmpty);
       } finally {
         await database.close();
         schema.close();

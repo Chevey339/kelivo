@@ -334,6 +334,44 @@ class ConversationStateRows extends Table {
   ];
 }
 
+@TableIndex(
+  name: 'idx_message_parts_revision_ordinal',
+  columns: {#conversationId, #revisionId, #ordinal},
+)
+class MessagePartRows extends Table {
+  TextColumn get conversationId => text()();
+  TextColumn get revisionId => text()();
+  IntColumn get ordinal =>
+      integer()
+      // ignore: recursive_getters
+      .check(ordinal.isBiggerOrEqualValue(0))();
+  TextColumn get kind => text().check(
+    // ignore: recursive_getters
+    kind.isIn(const ['text', 'reasoning', 'tool_call', 'tool_result']),
+  )();
+  TextColumn get payload => text()();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {revisionId, ordinal};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, revisionId, ordinal},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
+    'CHECK (updated_at >= created_at)',
+  ];
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -346,6 +384,7 @@ class ConversationStateRows extends Table {
     MessageRevisionRows,
     ConversationBranchRows,
     ConversationStateRows,
+    MessagePartRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -358,7 +397,8 @@ class AppDatabase extends _$AppDatabase {
   // Version 4 adds the Message Graph identity and ancestry kernel while the
   // v3 rows remain available as an unpublished legacy migration source.
   static const messageGraphSchemaVersion = 4;
-  static const currentSchemaVersion = messageGraphSchemaVersion;
+  static const messagePartsSchemaVersion = 5;
+  static const currentSchemaVersion = messagePartsSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -531,6 +571,12 @@ FROM probe;
           await migrator.createIndex(idxMessageRevisionsSlotVersion);
           await migrator.createIndex(idxConversationBranchesLeaf);
           await migrator.createIndex(idxConversationBranchesParent);
+        });
+      },
+      from4To5: (migrator, schema) async {
+        await transaction(() async {
+          await migrator.createTable(messagePartRows);
+          await migrator.createIndex(idxMessagePartsRevisionOrdinal);
         });
       },
     ),
