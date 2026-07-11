@@ -593,7 +593,7 @@
   "homePageDropToUpload": "파일을 여기에 놓아 업로드하세요",
   "chatHistoryPageTitle": "채팅 기록",
   "chatHistoryPageSearchTooltip": "검색",
-  "chatHistoryPageDeleteAllTooltip": "고정 안 됨 삭제",
+  "chatHistoryPageDeleteAllTooltip": "고정 해제된 대화 삭제",
   "chatHistoryPageDeleteAllDialogTitle": "고정 해제된 대화 삭제",
   "chatHistoryPageDeleteAllDialogContent": "이 어시스턴트의 고정되지 않은 모든 대화를 삭제할까요? 고정된 채팅은 그대로 유지됩니다.",
   "chatHistoryPageCancel": "취소",

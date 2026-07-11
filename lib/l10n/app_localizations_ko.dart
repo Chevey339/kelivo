@@ -1732,7 +1732,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get chatHistoryPageSearchTooltip => '검색';
 
   @override
-  String get chatHistoryPageDeleteAllTooltip => '고정 안 됨 삭제';
+  String get chatHistoryPageDeleteAllTooltip => '고정 해제된 대화 삭제';
 
   @override
   String get chatHistoryPageDeleteAllDialogTitle => '고정 해제된 대화 삭제';
