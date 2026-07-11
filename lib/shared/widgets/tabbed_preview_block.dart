@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../icons/lucide_adapter.dart';
 import '../../theme/app_font_weights.dart';
 import 'ios_tactile.dart';
 
@@ -164,6 +165,37 @@ class PreviewTextAction extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         builder: (buttonColor) => Icon(icon, size: 14, color: buttonColor),
       ),
+    );
+  }
+}
+
+class PreviewLoadingView extends StatelessWidget {
+  const PreviewLoadingView({super.key, required this.colors});
+  final PreviewBlockColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: colors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class PreviewErrorView extends StatelessWidget {
+  const PreviewErrorView({super.key, required this.colors});
+  final PreviewBlockColors colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Icon(Lucide.ImageOff, size: 48, color: colors.textTertiary),
     );
   }
 }

@@ -191,9 +191,9 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
       child: SvgPicture.network(
         _imageUrl,
         fit: BoxFit.contain,
-        placeholderBuilder: (context) => _PlantUMLLoadingView(colors: colors),
+        placeholderBuilder: (context) => PreviewLoadingView(colors: colors),
         errorBuilder: (context, error, stackTrace) =>
-            _PlantUMLErrorView(colors: colors),
+            PreviewErrorView(colors: colors),
       ),
     );
   }
@@ -266,39 +266,6 @@ class _PlantUMLBlockState extends State<PlantUMLBlock> {
       context,
       message: failedMessage,
       type: NotificationType.error,
-    );
-  }
-}
-
-class _PlantUMLLoadingView extends StatelessWidget {
-  const _PlantUMLLoadingView({required this.colors});
-
-  final PreviewBlockColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: colors.textSecondary,
-        ),
-      ),
-    );
-  }
-}
-
-class _PlantUMLErrorView extends StatelessWidget {
-  const _PlantUMLErrorView({required this.colors});
-
-  final PreviewBlockColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Icon(Lucide.ImageOff, size: 48, color: colors.textTertiary),
     );
   }
 }
