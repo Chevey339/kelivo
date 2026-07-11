@@ -11,6 +11,7 @@ import 'app_database.dart';
 import 'chat_database_observer.dart';
 import 'message_graph_projector.dart';
 import 'message_graph_commands.dart';
+import 'legacy_message_graph_adapter.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -429,6 +430,8 @@ class ChatDatabaseRepository {
         database.userVersion >= AppDatabase.messageGraphSchemaVersion;
     final includesMessageParts =
         database.userVersion >= AppDatabase.messagePartsSchemaVersion;
+    final includesMigrationLedger =
+        database.userVersion >= AppDatabase.legacyGraphAdapterSchemaVersion;
     if (includesMessageGraph) {
       requiredTables.addAll(const {
         'message_slot_rows',
@@ -438,6 +441,12 @@ class ChatDatabaseRepository {
       });
     }
     if (includesMessageParts) requiredTables.add('message_part_rows');
+    if (includesMigrationLedger) {
+      requiredTables.addAll(const {
+        'migration_run_rows',
+        'migration_issue_rows',
+      });
+    }
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -452,6 +461,7 @@ class ChatDatabaseRepository {
       database,
       includesMessageGraph: includesMessageGraph,
       includesMessageParts: includesMessageParts,
+      includesMigrationLedger: includesMigrationLedger,
     );
   }
 
@@ -459,6 +469,7 @@ class ChatDatabaseRepository {
     sqlite.Database database, {
     required bool includesMessageGraph,
     required bool includesMessageParts,
+    required bool includesMigrationLedger,
   }) {
     final expectedColumns = <String, List<String>>{
       'conversation_rows': [
@@ -549,6 +560,28 @@ class ChatDatabaseRepository {
         'updated_at',
       ];
     }
+    if (includesMigrationLedger) {
+      expectedColumns.addAll(const {
+        'migration_run_rows': [
+          'id',
+          'source_kind',
+          'source_hash',
+          'status',
+          'started_at',
+          'completed_at',
+        ],
+        'migration_issue_rows': [
+          'id',
+          'migration_run_id',
+          'conversation_id',
+          'source_entity_id',
+          'kind',
+          'severity',
+          'details_json',
+          'created_at',
+        ],
+      });
+    }
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -599,6 +632,11 @@ class ChatDatabaseRepository {
       expectedForeignKeys['message_part_rows'] = const {
         'conversation_id->message_revision_rows.conversation_id:CASCADE',
         'revision_id->message_revision_rows.id:CASCADE',
+      };
+    }
+    if (includesMigrationLedger) {
+      expectedForeignKeys['migration_issue_rows'] = const {
+        'migration_run_id->migration_run_rows.id:CASCADE',
       };
     }
     for (final entry in expectedForeignKeys.entries) {
@@ -832,6 +870,160 @@ class ChatDatabaseRepository {
       title: title,
     ),
   );
+
+  Future<void> beginLegacyGraphMigration({
+    required String migrationRunId,
+    required String sourceKind,
+    required String sourceHash,
+    required DateTime startedAt,
+  }) => _db
+      .into(_db.migrationRunRows)
+      .insert(
+        MigrationRunRowsCompanion.insert(
+          id: migrationRunId,
+          sourceKind: sourceKind,
+          sourceHash: sourceHash,
+          status: 'building',
+          startedAt: startedAt,
+        ),
+        mode: InsertMode.insertOrIgnore,
+      );
+
+  Future<ActiveMessageGraphProjection> putLegacyMessageGraph({
+    required String migrationRunId,
+    required LegacyMessageGraphProjection graph,
+  }) {
+    return _db.transaction(() async {
+      final conversation = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(graph.conversationId))).getSingleOrNull();
+      if (conversation == null) {
+        throw StateError('legacy_graph_conversation_missing');
+      }
+      await (_db.delete(
+        _db.conversationStateRows,
+      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
+      await (_db.delete(
+        _db.conversationBranchRows,
+      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
+      await (_db.delete(
+        _db.messageRevisionRows,
+      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
+      await (_db.delete(
+        _db.messageSlotRows,
+      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
+
+      for (final slot in graph.slots) {
+        await _db
+            .into(_db.messageSlotRows)
+            .insert(
+              MessageSlotRowsCompanion.insert(
+                id: slot.id,
+                conversationId: graph.conversationId,
+                role: slot.role,
+                createdAt: slot.createdAt,
+              ),
+            );
+        for (final revision in slot.revisions) {
+          await _db
+              .into(_db.messageRevisionRows)
+              .insert(
+                MessageRevisionRowsCompanion.insert(
+                  id: revision.id,
+                  conversationId: graph.conversationId,
+                  slotId: slot.id,
+                  parentRevisionId: Value(revision.parentRevisionId),
+                  revisionNo: revision.revisionNo,
+                  createdAt: revision.createdAt,
+                  updatedAt: revision.updatedAt,
+                  finalizedAt: Value(revision.finalizedAt),
+                ),
+              );
+          for (final part in revision.parts) {
+            await _db
+                .into(_db.messagePartRows)
+                .insert(
+                  MessagePartRowsCompanion.insert(
+                    conversationId: graph.conversationId,
+                    revisionId: revision.id,
+                    ordinal: part.ordinal,
+                    kind: part.kind,
+                    payload: part.payload,
+                    createdAt: revision.createdAt,
+                    updatedAt: revision.updatedAt,
+                  ),
+                );
+          }
+        }
+      }
+      await _db
+          .into(_db.conversationBranchRows)
+          .insert(
+            ConversationBranchRowsCompanion.insert(
+              id: graph.branchId,
+              conversationId: graph.conversationId,
+              leafRevisionId: Value(
+                graph.activeRevisionIds.isEmpty
+                    ? null
+                    : graph.activeRevisionIds.last,
+              ),
+              causalityKind: graph.causalityKind,
+              createdAt: conversation.updatedAt,
+            ),
+          );
+      await _db
+          .into(_db.conversationStateRows)
+          .insert(
+            ConversationStateRowsCompanion.insert(
+              conversationId: graph.conversationId,
+              activeBranchId: Value(graph.branchId),
+              contextStartRevisionId: Value(graph.contextStartRevisionId),
+            ),
+          );
+      for (final (index, issue) in graph.issues.indexed) {
+        final details = jsonEncode(issue.details);
+        final issueId = _deterministicMergeId(
+          'migration_issue',
+          '$migrationRunId:${graph.conversationId}:$index:${issue.kind}',
+          sha256.convert(utf8.encode(details)).toString(),
+        );
+        await _db
+            .into(_db.migrationIssueRows)
+            .insert(
+              MigrationIssueRowsCompanion.insert(
+                id: issueId,
+                migrationRunId: migrationRunId,
+                conversationId: Value(graph.conversationId),
+                sourceEntityId: Value(issue.sourceEntityId),
+                kind: issue.kind,
+                severity: issue.severity,
+                detailsJson: Value(details),
+                createdAt: conversation.updatedAt,
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+      }
+      return (await MessageGraphProjector(
+        _db,
+      ).projectActivePath(conversationId: graph.conversationId))!;
+    });
+  }
+
+  Future<void> completeLegacyGraphMigration({
+    required String migrationRunId,
+    required DateTime completedAt,
+  }) async {
+    final updated =
+        await (_db.update(
+          _db.migrationRunRows,
+        )..where((row) => row.id.equals(migrationRunId))).write(
+          MigrationRunRowsCompanion(
+            status: const Value('completed'),
+            completedAt: Value(completedAt),
+          ),
+        );
+    if (updated != 1) throw StateError('migration_run_missing');
+  }
 
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
     final stopwatch = Stopwatch()..start();

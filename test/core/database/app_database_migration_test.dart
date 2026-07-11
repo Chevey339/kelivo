@@ -27,7 +27,7 @@ void main() {
       const versions = GeneratedHelper.versions;
       expect(
         versions,
-        orderedEquals([1, 2, 3, 4, AppDatabase.currentSchemaVersion]),
+        orderedEquals([1, 2, 3, 4, 5, AppDatabase.currentSchemaVersion]),
       );
 
       for (final (index, fromVersion) in versions.indexed) {
@@ -259,6 +259,25 @@ void main() {
           AppDatabase.currentSchemaVersion,
         );
         expect(await database.select(database.messagePartRows).get(), isEmpty);
+      } finally {
+        await database.close();
+        schema.close();
+      }
+    });
+
+    test('v5 to v6 adds the auditable migration ledger', () async {
+      final schema = await verifier.schemaAt(5);
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+        );
+        expect(await database.select(database.migrationRunRows).get(), isEmpty);
+        expect(
+          await database.select(database.migrationIssueRows).get(),
+          isEmpty,
+        );
       } finally {
         await database.close();
         schema.close();

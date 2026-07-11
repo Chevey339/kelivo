@@ -5255,6 +5255,970 @@ class MessagePartRowsCompanion extends UpdateCompanion<MessagePartRow> {
   }
 }
 
+class $MigrationRunRowsTable extends MigrationRunRows
+    with TableInfo<$MigrationRunRowsTable, MigrationRunRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MigrationRunRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceKindMeta = const VerificationMeta(
+    'sourceKind',
+  );
+  @override
+  late final GeneratedColumn<String> sourceKind = GeneratedColumn<String>(
+    'source_kind',
+    aliasedName,
+    false,
+    check: () => sourceKind.isIn(const ['hive', 'sqlite_v1', 'legacy_json']),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sourceHashMeta = const VerificationMeta(
+    'sourceHash',
+  );
+  @override
+  late final GeneratedColumn<String> sourceHash = GeneratedColumn<String>(
+    'source_hash',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _statusMeta = const VerificationMeta('status');
+  @override
+  late final GeneratedColumn<String> status = GeneratedColumn<String>(
+    'status',
+    aliasedName,
+    false,
+    check: () => status.isIn(const ['building', 'completed', 'failed']),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> startedAt =
+      GeneratedColumn<int>(
+        'started_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MigrationRunRowsTable.$converterstartedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> completedAt =
+      GeneratedColumn<int>(
+        'completed_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($MigrationRunRowsTable.$convertercompletedAtn);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sourceKind,
+    sourceHash,
+    status,
+    startedAt,
+    completedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'migration_run_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MigrationRunRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('source_kind')) {
+      context.handle(
+        _sourceKindMeta,
+        sourceKind.isAcceptableOrUnknown(data['source_kind']!, _sourceKindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceKindMeta);
+    }
+    if (data.containsKey('source_hash')) {
+      context.handle(
+        _sourceHashMeta,
+        sourceHash.isAcceptableOrUnknown(data['source_hash']!, _sourceHashMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sourceHashMeta);
+    }
+    if (data.containsKey('status')) {
+      context.handle(
+        _statusMeta,
+        status.isAcceptableOrUnknown(data['status']!, _statusMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_statusMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {sourceKind, sourceHash},
+  ];
+  @override
+  MigrationRunRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MigrationRunRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_kind'],
+      )!,
+      sourceHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_hash'],
+      )!,
+      status: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}status'],
+      )!,
+      startedAt: $MigrationRunRowsTable.$converterstartedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}started_at'],
+        )!,
+      ),
+      completedAt: $MigrationRunRowsTable.$convertercompletedAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}completed_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $MigrationRunRowsTable createAlias(String alias) {
+    return $MigrationRunRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterstartedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $convertercompletedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $convertercompletedAtn =
+      NullAwareTypeConverter.wrap($convertercompletedAt);
+}
+
+class MigrationRunRow extends DataClass implements Insertable<MigrationRunRow> {
+  final String id;
+  final String sourceKind;
+  final String sourceHash;
+  final String status;
+  final DateTime startedAt;
+  final DateTime? completedAt;
+  const MigrationRunRow({
+    required this.id,
+    required this.sourceKind,
+    required this.sourceHash,
+    required this.status,
+    required this.startedAt,
+    this.completedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['source_kind'] = Variable<String>(sourceKind);
+    map['source_hash'] = Variable<String>(sourceHash);
+    map['status'] = Variable<String>(status);
+    {
+      map['started_at'] = Variable<int>(
+        $MigrationRunRowsTable.$converterstartedAt.toSql(startedAt),
+      );
+    }
+    if (!nullToAbsent || completedAt != null) {
+      map['completed_at'] = Variable<int>(
+        $MigrationRunRowsTable.$convertercompletedAtn.toSql(completedAt),
+      );
+    }
+    return map;
+  }
+
+  MigrationRunRowsCompanion toCompanion(bool nullToAbsent) {
+    return MigrationRunRowsCompanion(
+      id: Value(id),
+      sourceKind: Value(sourceKind),
+      sourceHash: Value(sourceHash),
+      status: Value(status),
+      startedAt: Value(startedAt),
+      completedAt: completedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(completedAt),
+    );
+  }
+
+  factory MigrationRunRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MigrationRunRow(
+      id: serializer.fromJson<String>(json['id']),
+      sourceKind: serializer.fromJson<String>(json['sourceKind']),
+      sourceHash: serializer.fromJson<String>(json['sourceHash']),
+      status: serializer.fromJson<String>(json['status']),
+      startedAt: serializer.fromJson<DateTime>(json['startedAt']),
+      completedAt: serializer.fromJson<DateTime?>(json['completedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sourceKind': serializer.toJson<String>(sourceKind),
+      'sourceHash': serializer.toJson<String>(sourceHash),
+      'status': serializer.toJson<String>(status),
+      'startedAt': serializer.toJson<DateTime>(startedAt),
+      'completedAt': serializer.toJson<DateTime?>(completedAt),
+    };
+  }
+
+  MigrationRunRow copyWith({
+    String? id,
+    String? sourceKind,
+    String? sourceHash,
+    String? status,
+    DateTime? startedAt,
+    Value<DateTime?> completedAt = const Value.absent(),
+  }) => MigrationRunRow(
+    id: id ?? this.id,
+    sourceKind: sourceKind ?? this.sourceKind,
+    sourceHash: sourceHash ?? this.sourceHash,
+    status: status ?? this.status,
+    startedAt: startedAt ?? this.startedAt,
+    completedAt: completedAt.present ? completedAt.value : this.completedAt,
+  );
+  MigrationRunRow copyWithCompanion(MigrationRunRowsCompanion data) {
+    return MigrationRunRow(
+      id: data.id.present ? data.id.value : this.id,
+      sourceKind: data.sourceKind.present
+          ? data.sourceKind.value
+          : this.sourceKind,
+      sourceHash: data.sourceHash.present
+          ? data.sourceHash.value
+          : this.sourceHash,
+      status: data.status.present ? data.status.value : this.status,
+      startedAt: data.startedAt.present ? data.startedAt.value : this.startedAt,
+      completedAt: data.completedAt.present
+          ? data.completedAt.value
+          : this.completedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MigrationRunRow(')
+          ..write('id: $id, ')
+          ..write('sourceKind: $sourceKind, ')
+          ..write('sourceHash: $sourceHash, ')
+          ..write('status: $status, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, sourceKind, sourceHash, status, startedAt, completedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MigrationRunRow &&
+          other.id == this.id &&
+          other.sourceKind == this.sourceKind &&
+          other.sourceHash == this.sourceHash &&
+          other.status == this.status &&
+          other.startedAt == this.startedAt &&
+          other.completedAt == this.completedAt);
+}
+
+class MigrationRunRowsCompanion extends UpdateCompanion<MigrationRunRow> {
+  final Value<String> id;
+  final Value<String> sourceKind;
+  final Value<String> sourceHash;
+  final Value<String> status;
+  final Value<DateTime> startedAt;
+  final Value<DateTime?> completedAt;
+  final Value<int> rowid;
+  const MigrationRunRowsCompanion({
+    this.id = const Value.absent(),
+    this.sourceKind = const Value.absent(),
+    this.sourceHash = const Value.absent(),
+    this.status = const Value.absent(),
+    this.startedAt = const Value.absent(),
+    this.completedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MigrationRunRowsCompanion.insert({
+    required String id,
+    required String sourceKind,
+    required String sourceHash,
+    required String status,
+    required DateTime startedAt,
+    this.completedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sourceKind = Value(sourceKind),
+       sourceHash = Value(sourceHash),
+       status = Value(status),
+       startedAt = Value(startedAt);
+  static Insertable<MigrationRunRow> custom({
+    Expression<String>? id,
+    Expression<String>? sourceKind,
+    Expression<String>? sourceHash,
+    Expression<String>? status,
+    Expression<int>? startedAt,
+    Expression<int>? completedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sourceKind != null) 'source_kind': sourceKind,
+      if (sourceHash != null) 'source_hash': sourceHash,
+      if (status != null) 'status': status,
+      if (startedAt != null) 'started_at': startedAt,
+      if (completedAt != null) 'completed_at': completedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MigrationRunRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? sourceKind,
+    Value<String>? sourceHash,
+    Value<String>? status,
+    Value<DateTime>? startedAt,
+    Value<DateTime?>? completedAt,
+    Value<int>? rowid,
+  }) {
+    return MigrationRunRowsCompanion(
+      id: id ?? this.id,
+      sourceKind: sourceKind ?? this.sourceKind,
+      sourceHash: sourceHash ?? this.sourceHash,
+      status: status ?? this.status,
+      startedAt: startedAt ?? this.startedAt,
+      completedAt: completedAt ?? this.completedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sourceKind.present) {
+      map['source_kind'] = Variable<String>(sourceKind.value);
+    }
+    if (sourceHash.present) {
+      map['source_hash'] = Variable<String>(sourceHash.value);
+    }
+    if (status.present) {
+      map['status'] = Variable<String>(status.value);
+    }
+    if (startedAt.present) {
+      map['started_at'] = Variable<int>(
+        $MigrationRunRowsTable.$converterstartedAt.toSql(startedAt.value),
+      );
+    }
+    if (completedAt.present) {
+      map['completed_at'] = Variable<int>(
+        $MigrationRunRowsTable.$convertercompletedAtn.toSql(completedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MigrationRunRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sourceKind: $sourceKind, ')
+          ..write('sourceHash: $sourceHash, ')
+          ..write('status: $status, ')
+          ..write('startedAt: $startedAt, ')
+          ..write('completedAt: $completedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $MigrationIssueRowsTable extends MigrationIssueRows
+    with TableInfo<$MigrationIssueRowsTable, MigrationIssueRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $MigrationIssueRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _migrationRunIdMeta = const VerificationMeta(
+    'migrationRunId',
+  );
+  @override
+  late final GeneratedColumn<String> migrationRunId = GeneratedColumn<String>(
+    'migration_run_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES migration_run_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceEntityIdMeta = const VerificationMeta(
+    'sourceEntityId',
+  );
+  @override
+  late final GeneratedColumn<String> sourceEntityId = GeneratedColumn<String>(
+    'source_entity_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _severityMeta = const VerificationMeta(
+    'severity',
+  );
+  @override
+  late final GeneratedColumn<String> severity = GeneratedColumn<String>(
+    'severity',
+    aliasedName,
+    false,
+    check: () => severity.isIn(const ['warning', 'recovered', 'rejected']),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _detailsJsonMeta = const VerificationMeta(
+    'detailsJson',
+  );
+  @override
+  late final GeneratedColumn<String> detailsJson = GeneratedColumn<String>(
+    'details_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{}'),
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MigrationIssueRowsTable.$convertercreatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    migrationRunId,
+    conversationId,
+    sourceEntityId,
+    kind,
+    severity,
+    detailsJson,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'migration_issue_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<MigrationIssueRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('migration_run_id')) {
+      context.handle(
+        _migrationRunIdMeta,
+        migrationRunId.isAcceptableOrUnknown(
+          data['migration_run_id']!,
+          _migrationRunIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_migrationRunIdMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('source_entity_id')) {
+      context.handle(
+        _sourceEntityIdMeta,
+        sourceEntityId.isAcceptableOrUnknown(
+          data['source_entity_id']!,
+          _sourceEntityIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('severity')) {
+      context.handle(
+        _severityMeta,
+        severity.isAcceptableOrUnknown(data['severity']!, _severityMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_severityMeta);
+    }
+    if (data.containsKey('details_json')) {
+      context.handle(
+        _detailsJsonMeta,
+        detailsJson.isAcceptableOrUnknown(
+          data['details_json']!,
+          _detailsJsonMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  MigrationIssueRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return MigrationIssueRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      migrationRunId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}migration_run_id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      ),
+      sourceEntityId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_entity_id'],
+      ),
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      severity: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}severity'],
+      )!,
+      detailsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}details_json'],
+      )!,
+      createdAt: $MigrationIssueRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $MigrationIssueRowsTable createAlias(String alias) {
+    return $MigrationIssueRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class MigrationIssueRow extends DataClass
+    implements Insertable<MigrationIssueRow> {
+  final String id;
+  final String migrationRunId;
+  final String? conversationId;
+  final String? sourceEntityId;
+  final String kind;
+  final String severity;
+  final String detailsJson;
+  final DateTime createdAt;
+  const MigrationIssueRow({
+    required this.id,
+    required this.migrationRunId,
+    this.conversationId,
+    this.sourceEntityId,
+    required this.kind,
+    required this.severity,
+    required this.detailsJson,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['migration_run_id'] = Variable<String>(migrationRunId);
+    if (!nullToAbsent || conversationId != null) {
+      map['conversation_id'] = Variable<String>(conversationId);
+    }
+    if (!nullToAbsent || sourceEntityId != null) {
+      map['source_entity_id'] = Variable<String>(sourceEntityId);
+    }
+    map['kind'] = Variable<String>(kind);
+    map['severity'] = Variable<String>(severity);
+    map['details_json'] = Variable<String>(detailsJson);
+    {
+      map['created_at'] = Variable<int>(
+        $MigrationIssueRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    return map;
+  }
+
+  MigrationIssueRowsCompanion toCompanion(bool nullToAbsent) {
+    return MigrationIssueRowsCompanion(
+      id: Value(id),
+      migrationRunId: Value(migrationRunId),
+      conversationId: conversationId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(conversationId),
+      sourceEntityId: sourceEntityId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceEntityId),
+      kind: Value(kind),
+      severity: Value(severity),
+      detailsJson: Value(detailsJson),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory MigrationIssueRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return MigrationIssueRow(
+      id: serializer.fromJson<String>(json['id']),
+      migrationRunId: serializer.fromJson<String>(json['migrationRunId']),
+      conversationId: serializer.fromJson<String?>(json['conversationId']),
+      sourceEntityId: serializer.fromJson<String?>(json['sourceEntityId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      severity: serializer.fromJson<String>(json['severity']),
+      detailsJson: serializer.fromJson<String>(json['detailsJson']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'migrationRunId': serializer.toJson<String>(migrationRunId),
+      'conversationId': serializer.toJson<String?>(conversationId),
+      'sourceEntityId': serializer.toJson<String?>(sourceEntityId),
+      'kind': serializer.toJson<String>(kind),
+      'severity': serializer.toJson<String>(severity),
+      'detailsJson': serializer.toJson<String>(detailsJson),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  MigrationIssueRow copyWith({
+    String? id,
+    String? migrationRunId,
+    Value<String?> conversationId = const Value.absent(),
+    Value<String?> sourceEntityId = const Value.absent(),
+    String? kind,
+    String? severity,
+    String? detailsJson,
+    DateTime? createdAt,
+  }) => MigrationIssueRow(
+    id: id ?? this.id,
+    migrationRunId: migrationRunId ?? this.migrationRunId,
+    conversationId: conversationId.present
+        ? conversationId.value
+        : this.conversationId,
+    sourceEntityId: sourceEntityId.present
+        ? sourceEntityId.value
+        : this.sourceEntityId,
+    kind: kind ?? this.kind,
+    severity: severity ?? this.severity,
+    detailsJson: detailsJson ?? this.detailsJson,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  MigrationIssueRow copyWithCompanion(MigrationIssueRowsCompanion data) {
+    return MigrationIssueRow(
+      id: data.id.present ? data.id.value : this.id,
+      migrationRunId: data.migrationRunId.present
+          ? data.migrationRunId.value
+          : this.migrationRunId,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      sourceEntityId: data.sourceEntityId.present
+          ? data.sourceEntityId.value
+          : this.sourceEntityId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      severity: data.severity.present ? data.severity.value : this.severity,
+      detailsJson: data.detailsJson.present
+          ? data.detailsJson.value
+          : this.detailsJson,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MigrationIssueRow(')
+          ..write('id: $id, ')
+          ..write('migrationRunId: $migrationRunId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('sourceEntityId: $sourceEntityId, ')
+          ..write('kind: $kind, ')
+          ..write('severity: $severity, ')
+          ..write('detailsJson: $detailsJson, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    migrationRunId,
+    conversationId,
+    sourceEntityId,
+    kind,
+    severity,
+    detailsJson,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MigrationIssueRow &&
+          other.id == this.id &&
+          other.migrationRunId == this.migrationRunId &&
+          other.conversationId == this.conversationId &&
+          other.sourceEntityId == this.sourceEntityId &&
+          other.kind == this.kind &&
+          other.severity == this.severity &&
+          other.detailsJson == this.detailsJson &&
+          other.createdAt == this.createdAt);
+}
+
+class MigrationIssueRowsCompanion extends UpdateCompanion<MigrationIssueRow> {
+  final Value<String> id;
+  final Value<String> migrationRunId;
+  final Value<String?> conversationId;
+  final Value<String?> sourceEntityId;
+  final Value<String> kind;
+  final Value<String> severity;
+  final Value<String> detailsJson;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const MigrationIssueRowsCompanion({
+    this.id = const Value.absent(),
+    this.migrationRunId = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.sourceEntityId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.severity = const Value.absent(),
+    this.detailsJson = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  MigrationIssueRowsCompanion.insert({
+    required String id,
+    required String migrationRunId,
+    this.conversationId = const Value.absent(),
+    this.sourceEntityId = const Value.absent(),
+    required String kind,
+    required String severity,
+    this.detailsJson = const Value.absent(),
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       migrationRunId = Value(migrationRunId),
+       kind = Value(kind),
+       severity = Value(severity),
+       createdAt = Value(createdAt);
+  static Insertable<MigrationIssueRow> custom({
+    Expression<String>? id,
+    Expression<String>? migrationRunId,
+    Expression<String>? conversationId,
+    Expression<String>? sourceEntityId,
+    Expression<String>? kind,
+    Expression<String>? severity,
+    Expression<String>? detailsJson,
+    Expression<int>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (migrationRunId != null) 'migration_run_id': migrationRunId,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (sourceEntityId != null) 'source_entity_id': sourceEntityId,
+      if (kind != null) 'kind': kind,
+      if (severity != null) 'severity': severity,
+      if (detailsJson != null) 'details_json': detailsJson,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  MigrationIssueRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? migrationRunId,
+    Value<String?>? conversationId,
+    Value<String?>? sourceEntityId,
+    Value<String>? kind,
+    Value<String>? severity,
+    Value<String>? detailsJson,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return MigrationIssueRowsCompanion(
+      id: id ?? this.id,
+      migrationRunId: migrationRunId ?? this.migrationRunId,
+      conversationId: conversationId ?? this.conversationId,
+      sourceEntityId: sourceEntityId ?? this.sourceEntityId,
+      kind: kind ?? this.kind,
+      severity: severity ?? this.severity,
+      detailsJson: detailsJson ?? this.detailsJson,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (migrationRunId.present) {
+      map['migration_run_id'] = Variable<String>(migrationRunId.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (sourceEntityId.present) {
+      map['source_entity_id'] = Variable<String>(sourceEntityId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (severity.present) {
+      map['severity'] = Variable<String>(severity.value);
+    }
+    if (detailsJson.present) {
+      map['details_json'] = Variable<String>(detailsJson.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $MigrationIssueRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('MigrationIssueRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('migrationRunId: $migrationRunId, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('sourceEntityId: $sourceEntityId, ')
+          ..write('kind: $kind, ')
+          ..write('severity: $severity, ')
+          ..write('detailsJson: $detailsJson, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5281,6 +6245,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MessagePartRowsTable messagePartRows = $MessagePartRowsTable(
     this,
   );
+  late final $MigrationRunRowsTable migrationRunRows = $MigrationRunRowsTable(
+    this,
+  );
+  late final $MigrationIssueRowsTable migrationIssueRows =
+      $MigrationIssueRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -5325,6 +6294,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_message_parts_revision_ordinal',
     'CREATE INDEX idx_message_parts_revision_ordinal ON message_part_rows (conversation_id, revision_id, ordinal)',
   );
+  late final Index idxMigrationIssuesRunKind = Index(
+    'idx_migration_issues_run_kind',
+    'CREATE INDEX idx_migration_issues_run_kind ON migration_issue_rows (migration_run_id, kind, id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5341,6 +6314,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     conversationBranchRows,
     conversationStateRows,
     messagePartRows,
+    migrationRunRows,
+    migrationIssueRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -5352,6 +6327,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxConversationBranchesLeaf,
     idxConversationBranchesParent,
     idxMessagePartsRevisionOrdinal,
+    idxMigrationIssuesRunKind,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5416,6 +6392,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('conversation_state_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'migration_run_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('migration_issue_rows', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -9977,6 +10960,750 @@ typedef $$MessagePartRowsTableProcessedTableManager =
       MessagePartRow,
       PrefetchHooks Function()
     >;
+typedef $$MigrationRunRowsTableCreateCompanionBuilder =
+    MigrationRunRowsCompanion Function({
+      required String id,
+      required String sourceKind,
+      required String sourceHash,
+      required String status,
+      required DateTime startedAt,
+      Value<DateTime?> completedAt,
+      Value<int> rowid,
+    });
+typedef $$MigrationRunRowsTableUpdateCompanionBuilder =
+    MigrationRunRowsCompanion Function({
+      Value<String> id,
+      Value<String> sourceKind,
+      Value<String> sourceHash,
+      Value<String> status,
+      Value<DateTime> startedAt,
+      Value<DateTime?> completedAt,
+      Value<int> rowid,
+    });
+
+final class $$MigrationRunRowsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $MigrationRunRowsTable, MigrationRunRow> {
+  $$MigrationRunRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$MigrationIssueRowsTable, List<MigrationIssueRow>>
+  _migrationIssueRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.migrationIssueRows,
+        aliasName:
+            'migration_run_rows__id__migration_issue_rows__migration_run_id',
+      );
+
+  $$MigrationIssueRowsTableProcessedTableManager get migrationIssueRowsRefs {
+    final manager = $$MigrationIssueRowsTableTableManager(
+      $_db,
+      $_db.migrationIssueRows,
+    ).filter((f) => f.migrationRunId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _migrationIssueRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$MigrationRunRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $MigrationRunRowsTable> {
+  $$MigrationRunRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceKind => $composableBuilder(
+    column: $table.sourceKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get startedAt =>
+      $composableBuilder(
+        column: $table.startedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get completedAt =>
+      $composableBuilder(
+        column: $table.completedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  Expression<bool> migrationIssueRowsRefs(
+    Expression<bool> Function($$MigrationIssueRowsTableFilterComposer f) f,
+  ) {
+    final $$MigrationIssueRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.migrationIssueRows,
+      getReferencedColumn: (t) => t.migrationRunId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MigrationIssueRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.migrationIssueRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$MigrationRunRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MigrationRunRowsTable> {
+  $$MigrationRunRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceKind => $composableBuilder(
+    column: $table.sourceKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get status => $composableBuilder(
+    column: $table.status,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get startedAt => $composableBuilder(
+    column: $table.startedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get completedAt => $composableBuilder(
+    column: $table.completedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$MigrationRunRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MigrationRunRowsTable> {
+  $$MigrationRunRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceKind => $composableBuilder(
+    column: $table.sourceKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceHash => $composableBuilder(
+    column: $table.sourceHash,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get status =>
+      $composableBuilder(column: $table.status, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get startedAt =>
+      $composableBuilder(column: $table.startedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get completedAt =>
+      $composableBuilder(
+        column: $table.completedAt,
+        builder: (column) => column,
+      );
+
+  Expression<T> migrationIssueRowsRefs<T extends Object>(
+    Expression<T> Function($$MigrationIssueRowsTableAnnotationComposer a) f,
+  ) {
+    final $$MigrationIssueRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.migrationIssueRows,
+          getReferencedColumn: (t) => t.migrationRunId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$MigrationIssueRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.migrationIssueRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$MigrationRunRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MigrationRunRowsTable,
+          MigrationRunRow,
+          $$MigrationRunRowsTableFilterComposer,
+          $$MigrationRunRowsTableOrderingComposer,
+          $$MigrationRunRowsTableAnnotationComposer,
+          $$MigrationRunRowsTableCreateCompanionBuilder,
+          $$MigrationRunRowsTableUpdateCompanionBuilder,
+          (MigrationRunRow, $$MigrationRunRowsTableReferences),
+          MigrationRunRow,
+          PrefetchHooks Function({bool migrationIssueRowsRefs})
+        > {
+  $$MigrationRunRowsTableTableManager(
+    _$AppDatabase db,
+    $MigrationRunRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MigrationRunRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MigrationRunRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MigrationRunRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> sourceKind = const Value.absent(),
+                Value<String> sourceHash = const Value.absent(),
+                Value<String> status = const Value.absent(),
+                Value<DateTime> startedAt = const Value.absent(),
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MigrationRunRowsCompanion(
+                id: id,
+                sourceKind: sourceKind,
+                sourceHash: sourceHash,
+                status: status,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String sourceKind,
+                required String sourceHash,
+                required String status,
+                required DateTime startedAt,
+                Value<DateTime?> completedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MigrationRunRowsCompanion.insert(
+                id: id,
+                sourceKind: sourceKind,
+                sourceHash: sourceHash,
+                status: status,
+                startedAt: startedAt,
+                completedAt: completedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MigrationRunRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({migrationIssueRowsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (migrationIssueRowsRefs) db.migrationIssueRows,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (migrationIssueRowsRefs)
+                    await $_getPrefetchedData<
+                      MigrationRunRow,
+                      $MigrationRunRowsTable,
+                      MigrationIssueRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$MigrationRunRowsTableReferences
+                          ._migrationIssueRowsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$MigrationRunRowsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).migrationIssueRowsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where(
+                            (e) => e.migrationRunId == item.id,
+                          ),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MigrationRunRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MigrationRunRowsTable,
+      MigrationRunRow,
+      $$MigrationRunRowsTableFilterComposer,
+      $$MigrationRunRowsTableOrderingComposer,
+      $$MigrationRunRowsTableAnnotationComposer,
+      $$MigrationRunRowsTableCreateCompanionBuilder,
+      $$MigrationRunRowsTableUpdateCompanionBuilder,
+      (MigrationRunRow, $$MigrationRunRowsTableReferences),
+      MigrationRunRow,
+      PrefetchHooks Function({bool migrationIssueRowsRefs})
+    >;
+typedef $$MigrationIssueRowsTableCreateCompanionBuilder =
+    MigrationIssueRowsCompanion Function({
+      required String id,
+      required String migrationRunId,
+      Value<String?> conversationId,
+      Value<String?> sourceEntityId,
+      required String kind,
+      required String severity,
+      Value<String> detailsJson,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$MigrationIssueRowsTableUpdateCompanionBuilder =
+    MigrationIssueRowsCompanion Function({
+      Value<String> id,
+      Value<String> migrationRunId,
+      Value<String?> conversationId,
+      Value<String?> sourceEntityId,
+      Value<String> kind,
+      Value<String> severity,
+      Value<String> detailsJson,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+final class $$MigrationIssueRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $MigrationIssueRowsTable,
+          MigrationIssueRow
+        > {
+  $$MigrationIssueRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $MigrationRunRowsTable _migrationRunIdTable(_$AppDatabase db) =>
+      db.migrationRunRows.createAlias(
+        'migration_issue_rows__migration_run_id__migration_run_rows__id',
+      );
+
+  $$MigrationRunRowsTableProcessedTableManager get migrationRunId {
+    final $_column = $_itemColumn<String>('migration_run_id')!;
+
+    final manager = $$MigrationRunRowsTableTableManager(
+      $_db,
+      $_db.migrationRunRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_migrationRunIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$MigrationIssueRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $MigrationIssueRowsTable> {
+  $$MigrationIssueRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceEntityId => $composableBuilder(
+    column: $table.sourceEntityId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get detailsJson => $composableBuilder(
+    column: $table.detailsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$MigrationRunRowsTableFilterComposer get migrationRunId {
+    final $$MigrationRunRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.migrationRunId,
+      referencedTable: $db.migrationRunRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MigrationRunRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.migrationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MigrationIssueRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $MigrationIssueRowsTable> {
+  $$MigrationIssueRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceEntityId => $composableBuilder(
+    column: $table.sourceEntityId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get severity => $composableBuilder(
+    column: $table.severity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get detailsJson => $composableBuilder(
+    column: $table.detailsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$MigrationRunRowsTableOrderingComposer get migrationRunId {
+    final $$MigrationRunRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.migrationRunId,
+      referencedTable: $db.migrationRunRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MigrationRunRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.migrationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MigrationIssueRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $MigrationIssueRowsTable> {
+  $$MigrationIssueRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get sourceEntityId => $composableBuilder(
+    column: $table.sourceEntityId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get severity =>
+      $composableBuilder(column: $table.severity, builder: (column) => column);
+
+  GeneratedColumn<String> get detailsJson => $composableBuilder(
+    column: $table.detailsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$MigrationRunRowsTableAnnotationComposer get migrationRunId {
+    final $$MigrationRunRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.migrationRunId,
+      referencedTable: $db.migrationRunRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$MigrationRunRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.migrationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$MigrationIssueRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $MigrationIssueRowsTable,
+          MigrationIssueRow,
+          $$MigrationIssueRowsTableFilterComposer,
+          $$MigrationIssueRowsTableOrderingComposer,
+          $$MigrationIssueRowsTableAnnotationComposer,
+          $$MigrationIssueRowsTableCreateCompanionBuilder,
+          $$MigrationIssueRowsTableUpdateCompanionBuilder,
+          (MigrationIssueRow, $$MigrationIssueRowsTableReferences),
+          MigrationIssueRow,
+          PrefetchHooks Function({bool migrationRunId})
+        > {
+  $$MigrationIssueRowsTableTableManager(
+    _$AppDatabase db,
+    $MigrationIssueRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$MigrationIssueRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$MigrationIssueRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$MigrationIssueRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> migrationRunId = const Value.absent(),
+                Value<String?> conversationId = const Value.absent(),
+                Value<String?> sourceEntityId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> severity = const Value.absent(),
+                Value<String> detailsJson = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => MigrationIssueRowsCompanion(
+                id: id,
+                migrationRunId: migrationRunId,
+                conversationId: conversationId,
+                sourceEntityId: sourceEntityId,
+                kind: kind,
+                severity: severity,
+                detailsJson: detailsJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String migrationRunId,
+                Value<String?> conversationId = const Value.absent(),
+                Value<String?> sourceEntityId = const Value.absent(),
+                required String kind,
+                required String severity,
+                Value<String> detailsJson = const Value.absent(),
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => MigrationIssueRowsCompanion.insert(
+                id: id,
+                migrationRunId: migrationRunId,
+                conversationId: conversationId,
+                sourceEntityId: sourceEntityId,
+                kind: kind,
+                severity: severity,
+                detailsJson: detailsJson,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$MigrationIssueRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({migrationRunId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (migrationRunId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.migrationRunId,
+                                referencedTable:
+                                    $$MigrationIssueRowsTableReferences
+                                        ._migrationRunIdTable(db),
+                                referencedColumn:
+                                    $$MigrationIssueRowsTableReferences
+                                        ._migrationRunIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$MigrationIssueRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $MigrationIssueRowsTable,
+      MigrationIssueRow,
+      $$MigrationIssueRowsTableFilterComposer,
+      $$MigrationIssueRowsTableOrderingComposer,
+      $$MigrationIssueRowsTableAnnotationComposer,
+      $$MigrationIssueRowsTableCreateCompanionBuilder,
+      $$MigrationIssueRowsTableUpdateCompanionBuilder,
+      (MigrationIssueRow, $$MigrationIssueRowsTableReferences),
+      MigrationIssueRow,
+      PrefetchHooks Function({bool migrationRunId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -10013,4 +11740,8 @@ class $AppDatabaseManager {
       $$ConversationStateRowsTableTableManager(_db, _db.conversationStateRows);
   $$MessagePartRowsTableTableManager get messagePartRows =>
       $$MessagePartRowsTableTableManager(_db, _db.messagePartRows);
+  $$MigrationRunRowsTableTableManager get migrationRunRows =>
+      $$MigrationRunRowsTableTableManager(_db, _db.migrationRunRows);
+  $$MigrationIssueRowsTableTableManager get migrationIssueRows =>
+      $$MigrationIssueRowsTableTableManager(_db, _db.migrationIssueRows);
 }

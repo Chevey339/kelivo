@@ -372,6 +372,59 @@ class MessagePartRows extends Table {
   ];
 }
 
+class MigrationRunRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get sourceKind =>
+      text()
+      // ignore: recursive_getters
+      .check(sourceKind.isIn(const ['hive', 'sqlite_v1', 'legacy_json']))();
+  TextColumn get sourceHash => text()();
+  TextColumn get status =>
+      text()
+      // ignore: recursive_getters
+      .check(status.isIn(const ['building', 'completed', 'failed']))();
+  IntColumn get startedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get completedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {sourceKind, sourceHash},
+  ];
+
+  @override
+  List<String> get customConstraints => [
+    'CHECK (completed_at IS NULL OR completed_at >= started_at)',
+  ];
+}
+
+@TableIndex(
+  name: 'idx_migration_issues_run_kind',
+  columns: {#migrationRunId, #kind, #id},
+)
+class MigrationIssueRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get migrationRunId =>
+      text().references(MigrationRunRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get conversationId => text().nullable()();
+  TextColumn get sourceEntityId => text().nullable()();
+  TextColumn get kind => text()();
+  TextColumn get severity =>
+      text()
+      // ignore: recursive_getters
+      .check(severity.isIn(const ['warning', 'recovered', 'rejected']))();
+  TextColumn get detailsJson => text().withDefault(const Constant('{}'))();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -385,6 +438,8 @@ class MessagePartRows extends Table {
     ConversationBranchRows,
     ConversationStateRows,
     MessagePartRows,
+    MigrationRunRows,
+    MigrationIssueRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -398,7 +453,8 @@ class AppDatabase extends _$AppDatabase {
   // v3 rows remain available as an unpublished legacy migration source.
   static const messageGraphSchemaVersion = 4;
   static const messagePartsSchemaVersion = 5;
-  static const currentSchemaVersion = messagePartsSchemaVersion;
+  static const legacyGraphAdapterSchemaVersion = 6;
+  static const currentSchemaVersion = legacyGraphAdapterSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -577,6 +633,13 @@ FROM probe;
         await transaction(() async {
           await migrator.createTable(messagePartRows);
           await migrator.createIndex(idxMessagePartsRevisionOrdinal);
+        });
+      },
+      from5To6: (migrator, schema) async {
+        await transaction(() async {
+          await migrator.createTable(migrationRunRows);
+          await migrator.createTable(migrationIssueRows);
+          await migrator.createIndex(idxMigrationIssuesRunKind);
         });
       },
     ),
