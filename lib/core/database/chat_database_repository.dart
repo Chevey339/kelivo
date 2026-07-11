@@ -31,6 +31,18 @@ class BackupMergeReport {
   int get remappedConversations => remappedConversationIds.length;
 }
 
+class SandboxPathMigrationResult {
+  const SandboxPathMigrationResult({
+    required this.ran,
+    required this.scannedMessages,
+    required this.updatedMessages,
+  });
+
+  final bool ran;
+  final int scannedMessages;
+  final int updatedMessages;
+}
+
 class ChatDatabaseRepository {
   ChatDatabaseRepository(this._db, [this._syncDb]);
 
@@ -463,6 +475,106 @@ class ChatDatabaseRepository {
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+  }
+
+  Future<SandboxPathMigrationResult> migrateSandboxPaths({
+    required int targetVersion,
+    required String targetRoot,
+    required String Function(String content) rewriteContent,
+    int batchSize = 360,
+  }) async {
+    if (targetVersion <= 0) {
+      throw ArgumentError.value(targetVersion, 'targetVersion');
+    }
+    if (targetRoot.trim().isEmpty) {
+      throw ArgumentError.value(targetRoot, 'targetRoot');
+    }
+    if (batchSize <= 0) throw ArgumentError.value(batchSize, 'batchSize');
+    return _db.transaction(() async {
+      final receipt =
+          await (_db.select(_db.chatStorageMetaRows)..where(
+                (row) => row.key.equals(ChatStorageMetaKeys.sandboxPathVersion),
+              ))
+              .getSingleOrNull();
+      var currentVersion = 0;
+      String? currentRoot;
+      if (receipt != null) {
+        final Object? decoded;
+        try {
+          decoded = jsonDecode(receipt.value);
+        } on FormatException {
+          throw StateError('sandbox_path_migration_receipt');
+        }
+        if (decoded is! Map<String, dynamic> ||
+            decoded.length != 2 ||
+            decoded['version'] is! int ||
+            decoded['targetRoot'] is! String) {
+          throw StateError('sandbox_path_migration_receipt');
+        }
+        currentVersion = decoded['version'] as int;
+        currentRoot = decoded['targetRoot'] as String;
+      }
+      if (currentVersion > targetVersion) {
+        throw StateError('sandbox_path_migration_version');
+      }
+      if (currentVersion == targetVersion && currentRoot == targetRoot) {
+        return const SandboxPathMigrationResult(
+          ran: false,
+          scannedMessages: 0,
+          updatedMessages: 0,
+        );
+      }
+
+      var scanned = 0;
+      var updated = 0;
+      var cursor = '';
+      while (true) {
+        final rows = await _db
+            .customSelect(
+              'SELECT id, content FROM message_rows '
+              'WHERE id > ? AND (content LIKE ? OR content LIKE ?) '
+              'ORDER BY id LIMIT ?;',
+              variables: [
+                Variable<String>(cursor),
+                const Variable<String>('%[image:%'),
+                const Variable<String>('%[file:%'),
+                Variable<int>(batchSize),
+              ],
+            )
+            .get();
+        if (rows.isEmpty) break;
+        for (final row in rows) {
+          final id = row.read<String>('id');
+          final content = row.read<String>('content');
+          final rewritten = rewriteContent(content);
+          scanned += 1;
+          if (rewritten != content) {
+            await _db.customStatement(
+              'UPDATE message_rows SET content = ? WHERE id = ?;',
+              [rewritten, id],
+            );
+            updated += 1;
+          }
+          cursor = id;
+        }
+      }
+      await _db
+          .into(_db.chatStorageMetaRows)
+          .insertOnConflictUpdate(
+            ChatStorageMetaRowsCompanion.insert(
+              key: ChatStorageMetaKeys.sandboxPathVersion,
+              value: jsonEncode({
+                'version': targetVersion,
+                'targetRoot': targetRoot,
+              }),
+            ),
+          );
+      return SandboxPathMigrationResult(
+        ran: true,
+        scannedMessages: scanned,
+        updatedMessages: updated,
+      );
+    });
   }
 
   Future<void> checkpoint() async {
@@ -1990,4 +2102,5 @@ class ChatStorageMetaKeys {
   static const activeStreamingIds = 'active_streaming_ids';
   static const hiveMigrationComplete = 'hive_migration_complete_v1';
   static const databaseIdentity = 'database_identity_v1';
+  static const sandboxPathVersion = 'sandbox_path_migration_version';
 }

@@ -56,10 +56,10 @@ class ChatService extends ChangeNotifier {
     _databaseFile = File(p.join(appDataDir.path, AppDatabase.databaseFileName));
     _repo = ChatDatabaseRepository.open(file: _databaseFile);
     await _repo.ensureReady();
-    await _loadConversationsCache();
 
-    // Migrate any persisted message content that references old iOS sandbox paths
+    // Versioned and transactional: normal launches return before scanning rows.
     await _migrateSandboxPaths();
+    await _loadConversationsCache();
 
     // Reset any stale isStreaming flags left over from a previous app crash or
     // force-quit.  After a fresh launch no message can be actively streaming.
@@ -504,55 +504,32 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _migrateSandboxPaths() async {
-    try {
-      // No-op if empty
-      final count = getMessageCount(_currentConversationId ?? '');
-      if (count == 0 && _conversationsCache.isEmpty) return;
-      final imgRe = RegExp(r"\[image:(.+?)\]");
-      final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
-
-      for (final conversation in _conversationsCache.values) {
-        final total = getMessageCount(conversation.id);
-        for (var start = 0; start < total; start += defaultLoadedWindowMax) {
-          final messages = getMessagesRange(
-            conversation.id,
-            start: start,
-            limit: defaultLoadedWindowMax,
-          );
-          for (final msg in messages) {
-            final content = msg.content;
-            String updated = content;
-            bool changed = false;
-
-            // Rewrite image paths
-            updated = updated.replaceAllMapped(imgRe, (m) {
-              final raw = (m.group(1) ?? '').trim();
-              final fixed = SandboxPathResolver.fix(raw);
-              if (fixed != raw) changed = true;
-              return '[image:$fixed]';
-            });
-
-            // Rewrite file attachment paths
-            updated = updated.replaceAllMapped(fileRe, (m) {
-              final raw = (m.group(1) ?? '').trim();
-              final name = (m.group(2) ?? '').trim();
-              final mime = (m.group(3) ?? '').trim();
-              final fixed = SandboxPathResolver.fix(raw);
-              if (fixed != raw) changed = true;
-              return '[file:$fixed|$name|$mime]';
-            });
-
-            if (changed && updated != content) {
-              final newMsg = msg.copyWith(content: updated);
-              await _repo.updateMessage(newMsg);
-              _replaceCachedMessage(newMsg);
-            }
-          }
-        }
-      }
-    } catch (_) {
-      // best-effort migration; ignore errors
+    if (SandboxPathResolver.docsDir == null) {
+      await SandboxPathResolver.init();
     }
+    final targetRoot = SandboxPathResolver.docsDir;
+    if (targetRoot == null || targetRoot.isEmpty) {
+      throw StateError('sandbox_path_resolver_not_ready');
+    }
+    final imgRe = RegExp(r"\[image:(.+?)\]");
+    final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
+    await _repo.migrateSandboxPaths(
+      targetVersion: 1,
+      targetRoot: targetRoot,
+      rewriteContent: (content) {
+        var updated = content.replaceAllMapped(imgRe, (match) {
+          final raw = (match.group(1) ?? '').trim();
+          return '[image:${SandboxPathResolver.fix(raw)}]';
+        });
+        updated = updated.replaceAllMapped(fileRe, (match) {
+          final raw = (match.group(1) ?? '').trim();
+          final name = (match.group(2) ?? '').trim();
+          final mime = (match.group(3) ?? '').trim();
+          return '[file:${SandboxPathResolver.fix(raw)}|$name|$mime]';
+        });
+        return updated;
+      },
+    );
   }
 
   /// Reset stale isStreaming flags left over from a previous app crash or
