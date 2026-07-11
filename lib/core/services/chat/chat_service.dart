@@ -664,16 +664,6 @@ class ChatService extends ChangeNotifier {
     await _repo.resetStaleStreamingState();
   }
 
-  /// Record a message ID as actively streaming.
-  Future<void> _trackStreamingId(String messageId) async {
-    await _repo.trackActiveStreamingId(messageId);
-  }
-
-  /// Remove a message ID from the active streaming set.
-  Future<void> _untrackStreamingId(String messageId) async {
-    await _repo.untrackActiveStreamingId(messageId);
-  }
-
   Future<void> _cleanupOrphanUploads() async {
     try {
       final uploadDir = await AppDirectories.getUploadDirectory();
@@ -742,10 +732,15 @@ class ChatService extends ChangeNotifier {
       lastSummarizedMessageCount: conversation.lastSummarizedMessageCount,
       chatSuggestions: List<String>.of(conversation.chatSuggestions),
     );
-    await _saveConversation(restored);
-    for (var i = 0; i < messages.length; i++) {
-      await _repo.putMessage(messages[i], messageOrder: i);
-    }
+    await _repo.putMigrationBatch(
+      conversations: [restored],
+      messages: [
+        for (final (index, message) in messages.indexed)
+          (message: message, messageOrder: index),
+      ],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
     await _refreshConversation(restored.id);
 
     // Update caches
@@ -832,20 +827,15 @@ class ChatService extends ChangeNotifier {
   ) async {
     if (!_initialized) await init();
 
-    // Update conversation
     final conversation = _conversationsCache[conversationId];
-    if (conversation != null) {
-      if (!conversation.messageIds.contains(message.id)) {
-        conversation.messageIds.add(message.id);
-        // Keep original updatedAt during restore
-        await _saveConversation(conversation);
-      }
-    }
-    await _repo.putMessage(
-      message,
-      messageOrder: conversation?.messageIds.indexOf(message.id),
+    if (conversation == null) return;
+    if (conversation.messageIds.contains(message.id)) return;
+    final persisted = await _repo.appendMessageToConversation(
+      conversation: conversation,
+      message: message,
+      touchUpdatedAt: false,
     );
-    await _refreshConversation(conversationId);
+    _conversationsCache[conversationId] = persisted;
 
     // Update cache
     if (_messagesCache.containsKey(conversationId)) {
@@ -1057,30 +1047,24 @@ class ChatService extends ChangeNotifier {
     DateTime? reasoningFinishedAt,
     String? groupId,
     int? version,
+    bool selectVersion = false,
   }) async {
     if (!_initialized) await init();
 
     var conversation = _conversationsCache[conversationId];
     final temporary = _temporaryConversationIds.contains(conversationId);
-    // If conversation doesn't exist yet, persist draft (if any)
     if (conversation == null) {
       final draft = temporary
           ? _draftConversations[conversationId]
-          : _draftConversations.remove(conversationId);
+          : _draftConversations[conversationId];
       if (draft != null) {
-        if (!temporary) {
-          await _saveConversation(draft);
-        }
         conversation = draft;
       } else {
-        // Create a new one on the fly as a fallback
         conversation = Conversation(
           id: conversationId,
           title: _defaultConversationTitle,
         );
-        if (!temporary) {
-          await _saveConversation(conversation);
-        } else {
+        if (temporary) {
           _draftConversations[conversationId] = conversation;
         }
       }
@@ -1101,24 +1085,23 @@ class ChatService extends ChangeNotifier {
       version: version,
     );
 
-    if (!temporary) {
-      await _repo.putMessage(
-        message,
-        messageOrder: getMessageCount(conversationId),
-      );
-    }
-
-    // Track streaming state for crash-recovery cleanup
-    if (isStreaming && !temporary) {
-      await _trackStreamingId(message.id);
-    }
-
-    conversation.messageIds.add(message.id);
-    conversation.updatedAt = DateTime.now();
     if (temporary) {
+      conversation.messageIds.add(message.id);
+      conversation.updatedAt = DateTime.now();
+      if (selectVersion) {
+        conversation.versionSelections[message.groupId ?? message.id] =
+            message.version;
+      }
       _messagesCache.putIfAbsent(conversationId, () => <ChatMessage>[]);
     } else {
-      await _saveConversation(conversation);
+      final persisted = await _repo.appendMessageToConversation(
+        conversation: conversation,
+        message: message,
+        selectVersion: selectVersion,
+      );
+      _draftConversations.remove(conversationId);
+      _conversationsCache[conversationId] = persisted;
+      conversation = persisted;
     }
 
     // Update cache
@@ -1196,12 +1179,10 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    await _repo.updateMessage(updatedMessage);
-
-    // Update streaming tracking for crash-recovery
-    if (isStreaming == false) {
-      await _untrackStreamingId(messageId);
-    }
+    await _repo.updateMessageAndStreamingState(
+      updatedMessage,
+      untrackStreaming: isStreaming == false,
+    );
 
     // Update cache
     final conversationId = message.conversationId;
@@ -1261,12 +1242,10 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    await _repo.updateMessage(updatedMessage);
-
-    // Update streaming tracking for crash-recovery
-    if (isStreaming == false) {
-      await _untrackStreamingId(messageId);
-    }
+    await _repo.updateMessageAndStreamingState(
+      updatedMessage,
+      untrackStreaming: isStreaming == false,
+    );
 
     // Update cache
     final conversationId = message.conversationId;
@@ -1298,9 +1277,6 @@ class ChatService extends ChangeNotifier {
     await _repo.updateStreamingCheckpoint(message, toolEvents);
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
-    if (!message.isStreaming) {
-      await _untrackStreamingId(message.id);
-    }
   }
 
   // Tool events persistence (per assistant message)
@@ -1429,12 +1405,8 @@ class ChatService extends ChangeNotifier {
     required List<ChatMessage> sourceMessages,
   }) async {
     if (!_initialized) await init();
-    // Create new conversation first
-    final convo = await createConversation(
-      title: title,
-      assistantId: assistantId,
-    );
-    final ids = <String>[];
+    _discardTemporaryConversation(_currentConversationId);
+    final convo = Conversation(title: title, assistantId: assistantId);
     final clones = <ChatMessage>[];
     for (final src in sourceMessages) {
       final clone = ChatMessage(
@@ -1452,24 +1424,22 @@ class ChatService extends ChangeNotifier {
         translation: src.translation,
         reasoningSegmentsJson: src.reasoningSegmentsJson,
       );
-      await _repo.putMessage(clone, messageOrder: ids.length);
-      ids.add(clone.id);
       clones.add(clone);
     }
-    // Attach to conversation in storage
-    final c = _conversationsCache[convo.id];
-    if (c != null) {
-      c.messageIds
-        ..clear()
-        ..addAll(ids);
-      c.versionSelections = <String, int>{};
-      c.updatedAt = DateTime.now();
-      await _saveConversation(c);
-    }
-    // Cache
+    final persisted = convo.copyWith(
+      messageIds: clones.map((message) => message.id).toList(growable: false),
+      versionSelections: <String, int>{},
+      updatedAt: DateTime.now(),
+    );
+    await _repo.createConversationWithMessages(
+      conversation: persisted,
+      messages: clones,
+    );
+    _conversationsCache[persisted.id] = persisted;
     _messagesCache[convo.id] = clones;
+    _currentConversationId = persisted.id;
     notifyListeners();
-    return _conversationsCache[convo.id]!;
+    return persisted;
   }
 
   Future<ChatMessage?> appendMessageVersion({
@@ -1477,53 +1447,14 @@ class ChatService extends ChangeNotifier {
     required String content,
   }) async {
     if (!_initialized) await init();
-    final original = await _repo.getMessage(messageId);
-    if (original == null) return null;
-
-    final cid = original.conversationId;
-    final convo = _conversationsCache[cid] ?? _draftConversations[cid];
-    if (convo == null) return null;
-
-    final gid = (original.groupId ?? original.id);
-    // Find current max version within this group in this conversation
-    int maxVersion = -1;
-    final groupMessages = await loadMessagesForGroups(cid, [gid]);
-    for (final m in groupMessages) {
-      final mg = (m.groupId ?? m.id);
-      if (mg == gid) {
-        if (m.version > maxVersion) maxVersion = m.version;
-      }
-    }
-    final nextVersion = maxVersion + 1;
-
-    final newMsg = ChatMessage(
-      role: original.role,
+    final result = await _repo.appendMessageVersion(
+      messageId: messageId,
       content: content,
-      conversationId: cid,
-      modelId: original.modelId,
-      providerId: original.providerId,
-      totalTokens: null,
-      isStreaming: false,
-      groupId: gid,
-      version: nextVersion,
     );
-    // Append to conversation order at the end (we'll group when rendering)
-    if (_draftConversations.containsKey(cid)) {
-      final draft = _draftConversations[cid]!;
-      draft.messageIds.add(newMsg.id);
-      draft.updatedAt = DateTime.now();
-      draft.versionSelections[gid] = nextVersion;
-    } else {
-      final c = _conversationsCache[cid];
-      if (c != null) {
-        await _repo.putMessage(newMsg, messageOrder: getMessageCount(cid));
-        c.messageIds.add(newMsg.id);
-        c.updatedAt = DateTime.now();
-        // Persist selection of latest version for this group
-        c.versionSelections[gid] = nextVersion;
-        await _saveConversation(c);
-      }
-    }
+    if (result == null) return null;
+    final newMsg = result.message;
+    final cid = newMsg.conversationId;
+    _conversationsCache[cid] = result.conversation;
     // Update caches
     final arr = _messagesCache[cid];
     if (arr != null) arr.add(newMsg);
@@ -1550,11 +1481,13 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final c = _conversationsCache[conversationId];
-    if (c == null) return;
-    c.versionSelections[groupId] = version;
-    c.updatedAt = DateTime.now();
-    await _saveConversation(c);
+    final conversation = await _repo.setSelectedVersion(
+      conversationId: conversationId,
+      groupId: groupId,
+      version: version,
+    );
+    if (conversation == null) return;
+    _conversationsCache[conversationId] = conversation;
     notifyListeners();
   }
 
@@ -1569,11 +1502,13 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    final c = _conversationsCache[conversationId];
-    if (c == null) return;
-    c.versionSelections.remove(groupId);
-    c.updatedAt = DateTime.now();
-    await _saveConversation(c);
+    final conversation = await _repo.setSelectedVersion(
+      conversationId: conversationId,
+      groupId: groupId,
+      version: null,
+    );
+    if (conversation == null) return;
+    _conversationsCache[conversationId] = conversation;
     notifyListeners();
   }
 
@@ -1627,77 +1562,35 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    final conversation = _conversationsCache[message.conversationId];
+    if (conversation == null) return;
+    await deleteMessages(
+      conversationId: conversation.id,
+      messageIds: {messageId},
+      versionSelectionChanges: const {},
+    );
+  }
 
-    final conversation = getCompleteConversation(message.conversationId);
-    if (conversation != null) {
-      final gid = message.groupId ?? message.id;
-      final ids = conversation.messageIds;
-      final messagesById = {
-        for (final item in await _repo.getMessagesByIds(ids)) item.id: item,
-      };
+  Future<void> deleteMessages({
+    required String conversationId,
+    required Set<String> messageIds,
+    required Map<String, int?> versionSelectionChanges,
+  }) async {
+    if (!_initialized || messageIds.isEmpty) return;
+    final result = await _repo.deleteMessages(
+      conversationId: conversationId,
+      messageIds: messageIds,
+      versionSelectionChanges: versionSelectionChanges,
+    );
+    if (result == null) return;
 
-      // Find the earliest position of this message group before removal so we
-      // can keep the group anchored when deleting one of its versions.
-      int anchorIndex = -1;
-      for (int i = 0; i < ids.length; i++) {
-        final mid = ids[i];
-        final m = messagesById[mid];
-        if (m == null) continue;
-        final mgid = m.groupId ?? m.id;
-        if (mgid == gid) {
-          anchorIndex = i;
-          break;
-        }
-      }
-
-      ids.remove(messageId);
-
-      // If we removed the earliest version but other versions remain, move the
-      // earliest remaining one back to the original anchor index to preserve
-      // the group's relative order in the conversation.
-      if (anchorIndex >= 0) {
-        int? earliestRemaining;
-        for (int i = 0; i < ids.length; i++) {
-          final mid = ids[i];
-          final m = messagesById[mid];
-          if (m == null) continue;
-          final mgid = m.groupId ?? m.id;
-          if (mgid == gid) {
-            earliestRemaining = i;
-            break;
-          }
-        }
-
-        if (earliestRemaining != null && earliestRemaining > anchorIndex) {
-          final replacementId = ids.removeAt(earliestRemaining);
-          final insertAt = anchorIndex <= ids.length ? anchorIndex : ids.length;
-          ids.insert(insertAt, replacementId);
-        }
-      }
-
-      await _saveConversation(conversation);
-      await _repo.updateMessageOrder(conversation.id, ids);
+    _conversationsCache[conversationId] = result.conversation;
+    for (final message in result.messages) {
+      _toolEventsCache.remove(message.id);
+      _geminiThoughtSigsCache.remove(message.id);
     }
-
-    await _repo.deleteMessage(messageId);
-    _toolEventsCache.remove(messageId);
-    _geminiThoughtSigsCache.remove(messageId);
-    await _refreshConversation(message.conversationId);
-    // Remove any tool events linked to this assistant message
-    if (message.role == 'assistant') {
-      try {
-        await _repo.deleteToolEvents(message.id);
-        await _repo.deleteGeminiThoughtSignature(message.id);
-      } catch (_) {}
-    }
-
-    // Update cache: clear this conversation so that next getMessages()
-    // reloads messages in the updated order from conversation.messageIds.
-    _messagesCache.remove(message.conversationId);
-
-    // Clean up orphaned upload files that are no longer referenced by any message
+    _messagesCache.remove(conversationId);
     await _cleanupOrphanUploads();
-
     notifyListeners();
   }
 

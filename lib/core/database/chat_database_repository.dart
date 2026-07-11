@@ -17,6 +17,16 @@ typedef ChatDatabaseSnapshotInfo = ({
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
 
+typedef AppendedMessageVersion = ({
+  Conversation conversation,
+  ChatMessage message,
+});
+
+typedef DeletedMessagesResult = ({
+  Conversation conversation,
+  List<ChatMessage> messages,
+});
+
 class BackupMergeReport {
   const BackupMergeReport({
     required this.importedConversations,
@@ -922,6 +932,191 @@ class ChatDatabaseRepository {
         .insertOnConflictUpdate(_messageCompanion(message, order));
   }
 
+  Future<Conversation> appendMessageToConversation({
+    required Conversation conversation,
+    required ChatMessage message,
+    bool selectVersion = false,
+    bool touchUpdatedAt = true,
+  }) async {
+    if (message.conversationId != conversation.id) {
+      throw ArgumentError.value(
+        message.conversationId,
+        'message.conversationId',
+        'Message and conversation IDs must match.',
+      );
+    }
+    late final Conversation persisted;
+    await _db.transaction(() async {
+      final existingRow = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(conversation.id))).getSingleOrNull();
+      final current = existingRow == null
+          ? conversation
+          : await _conversationFromRow(existingRow);
+      final selections = Map<String, int>.from(current.versionSelections);
+      if (selectVersion) {
+        selections[message.groupId ?? message.id] = message.version;
+      }
+      persisted = current.copyWith(
+        messageIds: [...current.messageIds, message.id],
+        versionSelections: selections,
+        updatedAt: touchUpdatedAt ? DateTime.now() : current.updatedAt,
+      );
+      await _db
+          .into(_db.conversationRows)
+          .insertOnConflictUpdate(_conversationCompanion(persisted));
+      if (existingRow == null) {
+        await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
+      }
+      final order = await _nextMessageOrder(persisted.id);
+      await _db
+          .into(_db.messageRows)
+          .insert(_messageCompanion(message, order), mode: InsertMode.insert);
+      if (message.isStreaming) {
+        await trackActiveStreamingId(message.id);
+      }
+    });
+    return persisted;
+  }
+
+  Future<void> createConversationWithMessages({
+    required Conversation conversation,
+    required List<ChatMessage> messages,
+  }) async {
+    for (final message in messages) {
+      if (message.conversationId != conversation.id) {
+        throw ArgumentError.value(
+          message.conversationId,
+          'messages',
+          'Every message must belong to the new conversation.',
+        );
+      }
+    }
+    if (messages.map((message) => message.id).toSet().length !=
+        messages.length) {
+      throw ArgumentError.value(
+        messages,
+        'messages',
+        'Message IDs must be unique.',
+      );
+    }
+    final persisted = conversation.copyWith(
+      messageIds: messages.map((message) => message.id).toList(growable: false),
+    );
+    await _db.transaction(() async {
+      await _db
+          .into(_db.conversationRows)
+          .insert(_conversationCompanion(persisted), mode: InsertMode.insert);
+      await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
+      for (final (index, message) in messages.indexed) {
+        await _db
+            .into(_db.messageRows)
+            .insert(_messageCompanion(message, index), mode: InsertMode.insert);
+        if (message.isStreaming) {
+          await trackActiveStreamingId(message.id);
+        }
+      }
+    });
+  }
+
+  Future<AppendedMessageVersion?> appendMessageVersion({
+    required String messageId,
+    required String content,
+  }) async {
+    return _db.transaction(() async {
+      final originalRow = await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.id.equals(messageId))).getSingleOrNull();
+      if (originalRow == null) return null;
+      final conversationRow =
+          await (_db.select(_db.conversationRows)
+                ..where((row) => row.id.equals(originalRow.conversationId)))
+              .getSingleOrNull();
+      if (conversationRow == null) return null;
+
+      final original = _messageFromRow(originalRow);
+      final groupId = original.groupId ?? original.id;
+      final maxVersion = _db.messageRows.version.max();
+      final maxVersionRow =
+          await (_db.selectOnly(_db.messageRows)
+                ..addColumns([maxVersion])
+                ..where(
+                  _db.messageRows.conversationId.equals(
+                        original.conversationId,
+                      ) &
+                      (_db.messageRows.groupId.equals(groupId) |
+                          (_db.messageRows.groupId.isNull() &
+                              _db.messageRows.id.equals(groupId))),
+                ))
+              .getSingle();
+      final nextVersion = (maxVersionRow.read(maxVersion) ?? -1) + 1;
+      final message = ChatMessage(
+        role: original.role,
+        content: content,
+        conversationId: original.conversationId,
+        modelId: original.modelId,
+        providerId: original.providerId,
+        totalTokens: null,
+        isStreaming: false,
+        groupId: groupId,
+        version: nextVersion,
+      );
+      final currentConversation = await _conversationFromRow(conversationRow);
+      final selections = Map<String, int>.from(
+        currentConversation.versionSelections,
+      )..[groupId] = nextVersion;
+      final conversation = currentConversation.copyWith(
+        messageIds: [...currentConversation.messageIds, message.id],
+        versionSelections: selections,
+        updatedAt: DateTime.now(),
+      );
+      final order = await _nextMessageOrder(conversation.id);
+      await _db
+          .into(_db.messageRows)
+          .insert(_messageCompanion(message, order), mode: InsertMode.insert);
+      await (_db.update(_db.conversationRows)
+            ..where((row) => row.id.equals(conversation.id)))
+          .write(_conversationCompanion(conversation));
+      return (conversation: conversation, message: message);
+    });
+  }
+
+  Future<Conversation?> setSelectedVersion({
+    required String conversationId,
+    required String groupId,
+    required int? version,
+  }) async {
+    if (groupId.isEmpty) {
+      throw ArgumentError.value(groupId, 'groupId', 'must not be empty');
+    }
+    if (version != null && version < 0) {
+      throw ArgumentError.value(version, 'version', 'must not be negative');
+    }
+    return _db.transaction(() async {
+      final row =
+          await (_db.select(_db.conversationRows)..where(
+                (conversation) => conversation.id.equals(conversationId),
+              ))
+              .getSingleOrNull();
+      if (row == null) return null;
+      final current = await _conversationFromRow(row);
+      final selections = Map<String, int>.from(current.versionSelections);
+      if (version == null) {
+        selections.remove(groupId);
+      } else {
+        selections[groupId] = version;
+      }
+      final conversation = current.copyWith(
+        versionSelections: selections,
+        updatedAt: DateTime.now(),
+      );
+      await (_db.update(_db.conversationRows)
+            ..where((conversation) => conversation.id.equals(conversationId)))
+          .write(_conversationCompanion(conversation));
+      return conversation;
+    });
+  }
+
   Future<void> putMigrationBatch({
     required List<Conversation> conversations,
     required List<({ChatMessage message, int messageOrder})> messages,
@@ -1454,6 +1649,18 @@ class ChatDatabaseRepository {
     )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
   }
 
+  Future<void> updateMessageAndStreamingState(
+    ChatMessage message, {
+    required bool untrackStreaming,
+  }) async {
+    await _db.transaction(() async {
+      await updateMessage(message);
+      if (untrackStreaming) {
+        await untrackActiveStreamingId(message.id);
+      }
+    });
+  }
+
   Future<void> updateStreamingCheckpoint(
     ChatMessage message,
     List<Map<String, dynamic>> toolEvents,
@@ -1470,6 +1677,9 @@ class ChatDatabaseRepository {
               eventsJson: jsonEncode(toolEvents),
             ),
           );
+      if (!message.isStreaming) {
+        await untrackActiveStreamingId(message.id);
+      }
     });
   }
 
@@ -1497,15 +1707,103 @@ class ChatDatabaseRepository {
   }
 
   Future<void> deleteMessage(String messageId) async {
-    await _db.transaction(() async {
-      final row = await (_db.select(
-        _db.messageRows,
-      )..where((t) => t.id.equals(messageId))).getSingleOrNull();
-      if (row == null) return;
+    final row = await getMessage(messageId);
+    if (row == null) return;
+    await deleteMessages(
+      conversationId: row.conversationId,
+      messageIds: {messageId},
+      versionSelectionChanges: const {},
+    );
+  }
+
+  Future<DeletedMessagesResult?> deleteMessages({
+    required String conversationId,
+    required Set<String> messageIds,
+    required Map<String, int?> versionSelectionChanges,
+  }) async {
+    if (messageIds.isEmpty) return null;
+    for (final entry in versionSelectionChanges.entries) {
+      if (entry.key.isEmpty || (entry.value != null && entry.value! < 0)) {
+        throw ArgumentError.value(
+          versionSelectionChanges,
+          'versionSelectionChanges',
+          'Group IDs must be non-empty and versions non-negative.',
+        );
+      }
+    }
+    return _db.transaction(() async {
+      final conversationRow = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+      if (conversationRow == null) return null;
+      final rows =
+          await (_db.select(_db.messageRows)
+                ..where((row) => row.conversationId.equals(conversationId))
+                ..orderBy([(row) => OrderingTerm.asc(row.messageOrder)]))
+              .get();
+      final byId = {for (final row in rows) row.id: row};
+      final deletedRows = rows
+          .where((row) => messageIds.contains(row.id))
+          .toList(growable: false);
+      if (deletedRows.isEmpty) return null;
+      if (deletedRows.length != messageIds.length) {
+        throw StateError('delete_messages_not_found');
+      }
+
+      final orderedIds = rows.map((row) => row.id).toList(growable: true);
+      for (final deletedRow in deletedRows) {
+        final groupId = deletedRow.groupId ?? deletedRow.id;
+        final anchorIndex = orderedIds.indexWhere((id) {
+          final row = byId[id];
+          return row != null && (row.groupId ?? row.id) == groupId;
+        });
+        orderedIds.remove(deletedRow.id);
+        if (anchorIndex < 0) continue;
+        final replacementIndex = orderedIds.indexWhere((id) {
+          final row = byId[id];
+          return row != null && (row.groupId ?? row.id) == groupId;
+        });
+        if (replacementIndex > anchorIndex) {
+          final replacementId = orderedIds.removeAt(replacementIndex);
+          orderedIds.insert(
+            anchorIndex.clamp(0, orderedIds.length),
+            replacementId,
+          );
+        }
+      }
+
       await (_db.delete(
         _db.messageRows,
-      )..where((t) => t.id.equals(messageId))).go();
-      await _compactMessageOrder(row.conversationId);
+      )..where((row) => row.id.isIn(deletedRows.map((row) => row.id)))).go();
+      await _rewriteMessageOrder(conversationId, orderedIds);
+      final currentConversation = await _conversationFromRow(
+        conversationRow,
+        includeMessageIds: false,
+      );
+      final selections = Map<String, int>.from(
+        currentConversation.versionSelections,
+      );
+      for (final entry in versionSelectionChanges.entries) {
+        final version = entry.value;
+        if (version == null) {
+          selections.remove(entry.key);
+        } else {
+          selections[entry.key] = version;
+        }
+      }
+      final conversation = currentConversation.copyWith(
+        messageIds: orderedIds,
+        versionSelections: selections,
+        chatSuggestions: const <String>[],
+        updatedAt: DateTime.now(),
+      );
+      await (_db.update(_db.conversationRows)
+            ..where((row) => row.id.equals(conversationId)))
+          .write(_conversationCompanion(conversation));
+      return (
+        conversation: conversation,
+        messages: deletedRows.map(_messageFromRow).toList(growable: false),
+      );
     });
   }
 
@@ -1723,18 +2021,6 @@ class ChatDatabaseRepository {
         );
       }
     });
-  }
-
-  Future<void> _compactMessageOrder(String conversationId) async {
-    final rows =
-        await (_db.select(_db.messageRows)
-              ..where((t) => t.conversationId.equals(conversationId))
-              ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
-            .get();
-    await _rewriteMessageOrder(
-      conversationId,
-      rows.map((row) => row.id).toList(growable: false),
-    );
   }
 
   Future<void> _rewriteMessageOrder(

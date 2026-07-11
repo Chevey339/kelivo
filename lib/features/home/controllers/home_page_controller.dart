@@ -987,16 +987,6 @@ class HomePageController extends ChangeNotifier {
     versionSelections[gid] = newMsg.version;
     notifyListeners();
 
-    if (currentConversation != null) {
-      try {
-        await _chatService.setSelectedVersion(
-          currentConversation!.id,
-          gid,
-          newMsg.version,
-        );
-      } catch (_) {}
-    }
-
     if (!result.shouldSend) return;
     if (message.role == 'assistant') {
       await regenerateAtMessage(newMsg, assistantAsNewReply: true);
@@ -1118,13 +1108,6 @@ class HomePageController extends ChangeNotifier {
     }
     final gid = newMsg.groupId ?? newMsg.id;
     versionSelections[gid] = newMsg.version;
-    try {
-      await _chatService.setSelectedVersion(
-        conversation.id,
-        gid,
-        newMsg.version,
-      );
-    } catch (_) {}
     notifyListeners();
     return newMsg;
   }

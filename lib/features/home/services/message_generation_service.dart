@@ -276,6 +276,7 @@ class MessageGenerationService {
       isStreaming: true,
       groupId: groupId,
       version: version,
+      selectVersion: groupId != null,
     );
   }
 
@@ -467,10 +468,22 @@ class MessageGenerationService {
       targetGroupId: targetGroupId,
     );
 
+    if (removeIds.isNotEmpty && messages.isNotEmpty) {
+      final removeIdSet = removeIds.toSet();
+      final conversationId = messages.first.conversationId;
+      final selectionChanges = <String, int?>{};
+      for (final message in messages) {
+        if (removeIdSet.contains(message.id)) {
+          selectionChanges[message.groupId ?? message.id] = null;
+        }
+      }
+      await chatService.deleteMessages(
+        conversationId: conversationId,
+        messageIds: removeIdSet,
+        versionSelectionChanges: selectionChanges,
+      );
+    }
     for (final id in removeIds) {
-      try {
-        await chatService.deleteMessage(id);
-      } catch (_) {}
       streamController.reasoning.remove(id);
       streamController.toolParts.remove(id);
       streamController.reasoningSegments.remove(id);

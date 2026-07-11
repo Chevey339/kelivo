@@ -862,19 +862,8 @@ class ChatActions {
     // so that MessageListView can detect it's streaming on first render
     streamController.markStreamingStarted(assistantMessage.id);
 
-    // Persist version selection
     final gid = assistantMessage.groupId ?? assistantMessage.id;
     _versionSelections[gid] = assistantMessage.version;
-    try {
-      await chatService.setSelectedVersion(
-        conversation.id,
-        gid,
-        assistantMessage.version,
-      );
-    } catch (e) {
-      await _finishPreparingMessage(conversation.id, assistantMessage);
-      return ChatActionResult.error(e.toString());
-    }
 
     final regenerationMessages = ChatActions.buildRegenerationMessages(
       messages: completeMessages,
