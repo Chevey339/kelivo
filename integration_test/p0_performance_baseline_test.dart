@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
@@ -26,7 +27,23 @@ void main() {
     SchedulerBinding.instance.addTimingsCallback(collect);
     var peakRss = ProcessInfo.currentRss;
     final rssBefore = peakRss;
+    final databaseRoot = await Directory.systemTemp.createTemp(
+      'kelivo_p0_profile_database_',
+    );
     try {
+      final database = AppDatabase.open(
+        file: File('${databaseRoot.path}/${AppDatabase.databaseFileName}'),
+      );
+      late final SqliteExecutionIsolateProbeResult executionProbe;
+      try {
+        executionProbe = await database.probeExecutionIsolate();
+      } finally {
+        await database.close();
+      }
+      expect(executionProbe.samples, 64);
+      expect(executionProbe.openingIsolateCalls, 0);
+      expect(executionProbe.backgroundIsolateCalls, 64);
+
       final markdown = ValueNotifier<String>('');
       await tester.pumpWidget(_markdownSurface(markdown));
       await tester.pumpAndSettle();
@@ -75,6 +92,11 @@ void main() {
         'rssBeforeBytes': rssBefore,
         'rssPeakBytes': peakRss,
         'rssAfterBytes': ProcessInfo.currentRss,
+        'sqliteExecutionIsolate': {
+          'samples': executionProbe.samples,
+          'openingIsolateCalls': executionProbe.openingIsolateCalls,
+          'backgroundIsolateCalls': executionProbe.backgroundIsolateCalls,
+        },
         'd4': _summarize(d4Timings),
         'd5': _summarize(d5Timings),
       };
@@ -82,6 +104,9 @@ void main() {
       expect(d5Timings, isNotEmpty);
     } finally {
       SchedulerBinding.instance.removeTimingsCallback(collect);
+      if (await databaseRoot.exists()) {
+        await databaseRoot.delete(recursive: true);
+      }
     }
   });
 }

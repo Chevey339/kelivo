@@ -1,12 +1,20 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:sqlite3/common.dart' show AllowedArgumentCount;
 
 import '../../utils/app_directories.dart';
 import 'app_database.steps.dart';
 
 part 'app_database.g.dart';
+
+typedef SqliteExecutionIsolateProbeResult = ({
+  int samples,
+  int openingIsolateCalls,
+  int backgroundIsolateCalls,
+});
 
 class MicrosecondDateTimeConverter extends TypeConverter<DateTime, int> {
   const MicrosecondDateTimeConverter();
@@ -198,6 +206,9 @@ class AppDatabase extends _$AppDatabase {
   static const journalSizeLimitBytes = 16 << 20;
   static const busyTimeoutMillis = 5000;
   static const synchronousFull = 2;
+  static const _executionIsolateProbeFunction =
+      'kelivo_sqlite_on_opening_isolate';
+  static const _maxExecutionIsolateProbeSamples = 1000;
 
   factory AppDatabase.open({File? file}) {
     final databaseFile = file;
@@ -216,9 +227,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   static QueryExecutor _openExecutor(File file) {
+    final openingIsolatePort = Isolate.current.controlPort;
     return NativeDatabase.createInBackground(
       file,
       setup: (database) {
+        // This callback is registered and invoked by SQLite on drift's worker
+        // isolate. Keep it non-deterministic so a multi-row profile query
+        // cannot be folded into a single callback by SQLite.
+        database.createFunction(
+          functionName: _executionIsolateProbeFunction,
+          argumentCount: const AllowedArgumentCount(0),
+          deterministic: false,
+          directOnly: true,
+          function: (_) =>
+              Isolate.current.controlPort == openingIsolatePort ? 1 : 0,
+        );
         database.execute('PRAGMA journal_mode = WAL;');
         database.execute('PRAGMA foreign_keys = ON;');
         database.execute('PRAGMA busy_timeout = $busyTimeoutMillis;');
@@ -228,6 +251,42 @@ class AppDatabase extends _$AppDatabase {
         );
         database.execute('PRAGMA journal_size_limit = $journalSizeLimitBytes;');
       },
+    );
+  }
+
+  /// Samples the isolate executing callbacks on the live SQLite connection.
+  ///
+  /// The opening isolate is the Flutter UI isolate in the profile harness.
+  Future<SqliteExecutionIsolateProbeResult> probeExecutionIsolate({
+    int samples = 64,
+  }) async {
+    RangeError.checkValueInInterval(
+      samples,
+      1,
+      _maxExecutionIsolateProbeSamples,
+      'samples',
+    );
+    final row = await customSelect(
+      '''
+WITH RECURSIVE probe(sample) AS (
+  VALUES (1)
+  UNION ALL
+  SELECT sample + 1 FROM probe WHERE sample < ?
+)
+SELECT
+  COUNT(*) AS sample_count,
+  COALESCE(SUM($_executionIsolateProbeFunction()), 0)
+    AS opening_isolate_calls
+FROM probe;
+''',
+      variables: [Variable.withInt(samples)],
+    ).getSingle();
+    final sampleCount = row.read<int>('sample_count');
+    final openingIsolateCalls = row.read<int>('opening_isolate_calls');
+    return (
+      samples: sampleCount,
+      openingIsolateCalls: openingIsolateCalls,
+      backgroundIsolateCalls: sampleCount - openingIsolateCalls,
     );
   }
 

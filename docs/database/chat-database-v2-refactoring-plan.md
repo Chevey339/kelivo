@@ -788,7 +788,7 @@ flowchart LR
 - `MSG-01`：批准 PD-01、PD-02、PD-04 及消息图 ADR。
 - `MSG-02`：实现 conversation/branch/slot/revision schema 和不变量。
 - `MSG-03`：实现 active path projector 和稳定 context boundary。
-- `MSG-04`：实现 edit/regenerate/select/delete/fork 的事务语义。
+- `MSG-04`：实现 edit/regenerate/select/delete/fork 的事务语义；删除不得复用旧 `_rewriteMessageOrder` 或把整个会话 compact 为连续 order，必须使用稳定稀疏序号/图路径，使删除写放大不随会话总消息数线性增长。
 - `MSG-05`：实现 Hive/SQLite v1 → graph 的确定性 adapter、orphans/rejects。
 - `MSG-06`：以真实旧 fixture 对比可见序列、selected revision 和 prompt digest。
 - `MSG-07`：切换后删除 `messageIds`、`versionSelectionsJson`、`truncateIndex` 的业务依赖。
