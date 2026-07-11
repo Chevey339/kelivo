@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 0 已完成 P0-01～P0-08；继续推进 P0-09 基线）
-> - 当前结论：Phase 0 止血实现仅剩 P0-09 基线。P0-03/P0-04 已消除逐 chunk 等待与永久 loading，P0-05 已开放事务化 hash 去重/remap merge，P0-06 已在业务启动前用 DB UUID + installation receipt 阻止缺失/损坏/未来 schema 被静默空库覆盖。P0-07 将 sandbox path 修复改为事务化、批量、显式 version + AppData root receipt：同版本同根的正常启动在查询消息前返回；容器根变化或跨安装 restore 时重跑一次；失败回滚且可见。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/P0-09/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 0：P0-01～P0-09 全部完成）
+> - 当前结论：Phase 0 止血与基线闭环。逐 chunk SQLite 等待、永久 loading、非事务 merge、缺库静默空库与每次启动 path 全库扫描均已处理；正常备份为 secret-free SQLite snapshot ZIP，旧 JSON 仍只读兼容。P0-09 已冻结 seed `20260711` 的 D1～D6、36 项快速回归和当前 M4 Pro/macOS profile 起点。基线同时暴露 D4 1 MiB 流式 Markdown 仍严重超标（build+raster p95 712.627 ms、Runner RSS peak 1.56 GiB），因此 Phase 0 完成不等于列表/renderer 性能完成；该问题进入后续 TL/renderer 工作流。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 8 / 9 | `进行中` | P0-01～P0-08 已完成；正常启动不再扫描全库做 path migration；仅剩 P0-09 |
+| Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -70,6 +70,7 @@
 | `flutter gen-l10n` + `flutter analyze` + `flutter test`（本轮 P0-05） | `已完成` | untranslated `{}`；No issues found；1112/1112 tests passed | 2026-07-11 | merge repository/DataSync 定向 52 项通过；覆盖无冲突、hash 去重、conversation/message ID 冲突整会话 remap、重复导入幂等、非法 order 事务回滚及本机凭据保留；按范围纪律未运行真实进程/断电矩阵 |
 | `flutter analyze` + `flutter test`（本轮 P0-06） | `已完成` | No issues found；1121/1121 tests passed | 2026-07-11 | installation gate 定向 9 项通过；覆盖首次安装、旧库 adoption、重复启动、缺库、坏库、未来 schema、坏 receipt、identity 替换/恢复轮换；按范围纪律未运行真实进程/断电矩阵 |
 | `flutter analyze` + `flutter test`（本轮 P0-07） | `已完成` | No issues found；1126/1126 tests passed | 2026-07-11 | sandbox path migration 定向 5 项通过；覆盖首次批量迁移、同根零扫描、失败事务回滚/重试、容器根变化重跑和未来 version 拒绝；按范围纪律未运行真实进程/断电矩阵 |
+| P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；快速门禁 analyze + 36 tests；全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
@@ -227,7 +228,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | 验证 | 状态 | 未执行原因 | 风险 |
 | --- | --- | --- | --- |
-| 真实设备 profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 harness、参考设备和数据 seed 尚未建立 | 尚不能冻结性能 SLO 或 cache budget |
+| Android/iOS/Windows/Linux profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 已完成当前 M4 Pro/macOS profile；其余四平台尚无本轮设备/runner | macOS 结果不能外推；继续作为 DB2-07/五平台发布门禁 |
 | Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 本轮只运行当前 macOS 主机的根目录分析与单测，未运行五平台 runner | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
 | kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | macOS 已完成 25 个 forward、两个 terminal projection 各 6 个、18 个 verified-origin rollback 与 3 个 legacy archiving marker 独立 Runner SIGKILL case；其余 rollback 拓扑、raw write/rename/fsync/F_FULLFSYNC、旧 canonical 空/截断的真实进程场景和资源故障尚未覆盖 | 已证明列明的高层 forward/cold-ack/archive/rollback/legacy marker durability 边界可跨真实进程 SIGKILL 收敛；仍不能宣称硬件断电、任意子步骤、所有 rollback 拓扑或五平台安全 |
 | 真实旧 Hive/SQLite v1/备份 fixture 全矩阵 | `未开始` | fixture 尚未整理 | 不能证明已发布数据可无损迁移 |
@@ -266,7 +267,7 @@ dart run tool/run_restore_process_harness.dart \
 | P0-06 | DB identity/installation receipt 与安全拒绝 | 无 | `已完成` | 既有 DB 缺失/损坏/版本过新时不自动创建或写入空库 | 本里程碑提交（2026-07-11） | `database_identity_v1` UUID 与 installation receipt 在 `runApp(MyApp)` 前匹配；旧库无 receipt 时只在完整只读校验后 adoption，首次安装才创建新库。已有 receipt 时 missing/corrupt/identity missing or mismatch/future schema/坏 receipt 全部进入 persistence-free 恢复页；verified restore 先耐久发布新 identity receipt、再清理旧 receipt并保留 installation ID。`flutter analyze`；`flutter test`（1121）；定向 9 项通过 |
 | P0-07 | sandbox path migration version 化 | 无 | `已完成` | 正常启动不扫描全库；migration 幂等且失败可见 | 本里程碑提交（2026-07-11） | receipt 绑定 migration version + 当前 AppData root；同版本同根在任何 message SELECT 前返回。首次/根变化使用稳定 ID cursor、360 条批次仅扫描含 image/file marker 的候选行，在同一事务更新内容并最后写 receipt；rewrite/receipt 异常整体回滚并上抛，未来 version fail-closed。`flutter analyze`；`flutter test`（1126）；定向 5 项通过 |
 | P0-08 | 普通备份排除秘密 | 无 | `已完成` | ZIP 默认不含应用已知 API key/password/token；secret-free overwrite 清理目标旧凭据；旧 JSON/迁移灾备兼容明确 | `6c3618b8`（2026-07-09） | `flutter analyze`；`flutter test`（820）；相关定向 50 项通过；manifest 标记 `secretsIncluded: false`，结构化 provider/search/TTS/MCP/WebDAV/S3/assistant 与 URL 凭据均覆盖 |
-| P0-09 | 基准生成器、legacy fixture 与性能基线 | PD-13 | `未开始` | D1～D6、参考设备、before metrics 和 failpoint harness 可重复 | — | — |
+| P0-09 | 基准生成器、legacy fixture 与性能基线 | PD-13 | `已完成` | D1～D6、参考设备、before metrics 和 failpoint harness 可重复 | 本里程碑提交（2026-07-11） | 固定 seed `20260711` 生成 D1～D6 与 deterministic digest；D6 含 orphan/重复 order-version/坏 JSON/缺附件/截断 WAL-ZIP/legacy JSON 缺引用。`run_p0_regression.dart` 一键 analyze + 36 项 P0 快速测试；全量 1130 项通过；macOS profile 记录 SQL/query/WAL/frame/RSS。重构前没有同 harness 可比数值，报告保留为“未测”而不伪造；当前结果成为后续 before baseline。详见独立报告 |
 
 推荐实施顺序：
 
@@ -382,18 +383,18 @@ dart run tool/run_restore_process_harness.dart \
 
 | 数据集/指标 | 设备 | 重构前 | 目标 | 重构后 | 状态 | 证据 |
 | --- | --- | ---: | ---: | ---: | --- | --- |
-| D2 打开会话 p95 | 待定 | 未测 | <300ms | 未测 | `未开始` | — |
-| 50 slot 分页 p95 | 待定 | 未测 | <100ms | 未测 | `未开始` | — |
+| D2 打开会话 p95 | M4 Pro/macOS profile 起点 | 未测 | <300ms | SQL open50 0.263ms；完整页面未测 | `进行中` | P0-09 报告；不得把 SQL 值当页面值 |
+| 50 slot 分页 p95 | M4 Pro/macOS profile 起点 | 未测 | <100ms | D2 SQL 0.263ms；D4 大行 2.854ms | `进行中` | P0-09 报告；timeline cursor 未实现 |
 | UI isolate SQLite calls | 全平台 | 未测 | 0 | 未测 | `未开始` | — |
-| 60Hz build+raster p95 | 待定 | 未测 | <12ms | 未测 | `未开始` | — |
-| >16.7ms frame 比例 | 待定 | 未测 | <1% | 未测 | `未开始` | — |
+| 60Hz build+raster p95 | M4 Pro/macOS profile | 未测 | <12ms | D4 712.627ms；D5 3.335ms | `进行中` | D4 严重不达标；D5 隔离 surface 达标 |
+| >16.7ms frame 比例 | M4 Pro/macOS profile | 未测 | <1% | D4 31/33；D5 0/27 | `进行中` | D4 严重不达标 |
 | Anchor drift | 待定 | 已知算法错误，未量化 | ≤1 logical px | 未测 | `未开始` | — |
-| D4 chunk→visible p95 | 待定 | 未测 | <100ms | 未测 | `未开始` | — |
-| D4 DB writes/s | 待定 | 当前逐 chunk，未量化 | ≤4 + final | 未测 | `未开始` | — |
+| D4 chunk→visible p95 | M4 Pro/macOS profile | 未测 | <100ms | build+raster p95 712.627ms | `进行中` | 隔离 surface 只测 frame，不含网络时间 |
+| D4 DB writes/s | 单元时钟 | 当前逐 chunk，未量化 | ≤4 + final | ≤4 + final | `已完成` | P0-03 250ms 起始间隔 + final barrier 测试 |
 | D3 双向浏览 RSS | 待定 | 未测 | 回落且不单调增长 | 未测 | `未开始` | — |
-| D2 搜索 p95 | 待定 | 未测 | <150ms | 未测 | `未开始` | — |
+| D2 搜索 p95 | M4 Pro/macOS SQL | 未测 | <150ms | 中文 2 字 0.109ms；4 字 0.063ms；尾部稀有命中 7.043ms | `进行中` | 当前 LIKE microbenchmark；正确率/FTS/navigation 未完成 |
 | Backup/restore extra RSS | 待定 | 未测 | 新 SQLite snapshot 为 O(page/chunk)，初始 <32MiB | 未测 | `进行中` | 新默认格式移除全库 JSON；v2 settings 在复制前限制 16 MiB，并以 1 MiB chunk 有界读取，但 JSON DOM 仍需 profile；旧 `chats.json`/迁移 JSON 仍可能全量解码，允许较慢但继续优化 OOM 边界 |
-| WAL peak/checkpoint p95 | 全平台 | 未测 | Phase 0 冻结 | 未测 | `未开始` | — |
+| WAL peak/checkpoint p95 | M4 Pro/macOS fixture | 未测 | 记录起点 | D2 21,819,552 bytes；单次 checkpoint 0.243ms | `进行中` | 生成器单事务压力值，非正常 stream WAL；其他平台未测 |
 
 ## 15. 故障注入台账
 
@@ -466,22 +467,18 @@ dart run tool/run_restore_process_harness.dart \
 
 PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1），产品决策不再阻塞任何阶段。剩余待输入：
 
-1. 指定五平台参考设备、最低支持 OS 和可用 CI runner（阻塞 P0-09 基线冻结与 DB2-07）。
+1. 指定 Android/iOS/Windows/Linux 参考设备、最低支持 OS 和可用 CI runner（macOS P0-09 已冻结；其余平台阻塞 DB2-07/发布门禁）。
 2. MSG-01 仍需把已冻结的 PD-01/02/04 落成带交互实例的 ADR（实现口径，非产品决策）。
 
 ## 19. 下一步
 
-推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
-
-1. `P0-02` 应用层实现已完成；raw durability、资源故障、其余 topology 的外部 kill 和五平台验证继续留在 OPS-02、DB2-07、P0-09/发布门禁，不回填为 P0-02 未完成。
-2. `P0-03/P0-04` 已完成；下一实施项按 Phase 0 顺序进入 `P0-05` 事务化 merge ID/order 与冲突诊断，同时可独立建立 P0-09 fixture/性能基线。PD-13 已核实（Hive 为公开主源）。
-3. 按已冻结的 PD-10（≥3 次成功冷启动且 ≥30 天）/PD-12（只读恢复页）实现 completed evidence 的成功启动 acknowledgement、保留周期、脱敏诊断与可恢复清理；在此之前保留受限 evidence，不无记录删除 previous。
-4. 保留旧 `chats.json` 只读 adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 做 OOM/坏数据回归。`P0-05` v2 merge 按已冻结的 PD-09（hash 去重 + remap + 冲突报告）实现，实现前继续安全拒绝。
+Phase 0 已结束。下一轮按方案进入 Phase 1 `DB2-01`（schema snapshots 与逐版本 migration tests），然后收敛单一异步 gateway；D4 renderer/RSS 超标作为 TL/renderer 的明确 before baseline，不在 Database Kernel 中顺手扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成 P0-09：新增固定 seed D1～D6 SQLite/assets/fault fixture 生成器、deterministic plan digest、SQL/WAL/RSS 采样、macOS profile integration surface 与一键 P0 快速门禁。M4 Pro baseline 明确记录 D4 build+raster p95 712.627ms、31/33 长帧、RSS peak 1.56GiB，未把严重超标粉饰为通过；D5 surface 3.335ms。其他平台与完整 HomePage/timeline/backup RSS 继续在对应工作流追踪。Phase 0 9/9 完成 | P0-09 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 sandbox path migration version 化：ChatService 不再先加载 conversation 再逐会话扫描；repository 用 version + AppData root receipt 在正常启动零消息查询返回，首次、iOS 容器根变化或跨安装 restore 才按稳定 message ID cursor、360 条批次扫描 image/file 候选。内容更新与 receipt 在同一事务，rewrite/坏 receipt 失败整体回滚并上抛，未来 version 拒绝。定向 5 项、全量 1126 项与 analyze 通过 | P0-07 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成数据库 identity/installation admission：数据库 meta 持久化 UUID，AppData 使用受限权限、flush/full barrier、无覆盖 rename 发布 identity 命名 receipt；业务启动前只读执行 schema/integrity/FK/required schema/identity 校验。首次安装可建库，旧有效库可一次 adoption；已有 receipt 的缺库、损坏、未来 schema、身份缺失/不符和 receipt 损坏均 fail-closed 到恢复页且不创建空库。P0-02 验证过的 DB restore 可轮换 DB identity 并保留 installation ID，新 receipt 先发布再清旧 receipt。定向 9 项、全量 1121 项与 analyze 通过 | P0-06 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 v2 SQLite merge：使用 ATTACH + 单事务逐会话计算规范化 SHA-256，内容相同去重，conversation/message ID 冲突时确定性整会话 remap，连续 order、MCP、tool events、Gemini signature、group/version selection 与 FK 同步校验；重复导入保持幂等，失败整体回滚。移动端与桌面本地/WebDAV/S3 恢复显示导入/去重/remap 报告且 merge 后不要求重启。secret-free settings merge 应用导入侧非秘密配置并保留本机认证凭据。四份 ARB/l10n 已同步；定向 52 项、全量 1112 项与 analyze 通过 | P0-05 | 本里程碑提交 | Codex |
