@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 1：DB2-01～06、DB2-08 已完成；DB2-07 capability runner 2/5 平台实跑）
-> - 当前结论：Database Kernel 的 schema、异步 gateway、事务 command、recovery 和脱敏观测已闭环。live connection 显式冻结并启动断言 WAL、FK ON、busy timeout 5000ms、FULL、auto-checkpoint 1000 pages、journal limit 16 MiB，移除未经基准证明的额外 read pool；关键 query/command/checkpoint 使用每 operation 最多 256 个耗时样本计算 p50/p95，WAL/checkpoint 与失败只保留白名单数值/类别。macOS 与 iOS simulator 的 live contract/capability 再次实跑通过。Phase 1 现在 7/8，唯一未完成项是 DB2-07 的 Android/Windows/Linux 3/5 真实 runner 证据，整体按合同阻塞，不能从 Apple 平台外推。D4 renderer/RSS 超标留在 Phase 4，raw durability 与资源故障继续由 OPS-02/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 1：DB2-01～06、DB2-08 已完成；DB2-07 capability runner 3/5 平台实跑）
+> - 当前结论：Database Kernel 的 schema、异步 gateway、事务 command、recovery 和脱敏观测已闭环。live connection 显式冻结并启动断言 WAL、FK ON、busy timeout 5000ms、FULL、auto-checkpoint 1000 pages、journal limit 16 MiB，移除未经基准证明的额外 read pool；关键 query/command/checkpoint 使用每 operation 最多 256 个耗时样本计算 p50/p95，WAL/checkpoint 与失败只保留白名单数值/类别。macOS、iOS simulator 与 Android 11 arm64 物理设备的 live contract/capability 已实跑通过。Phase 1 现在 7/8，唯一未完成项是 DB2-07 的 Windows/Linux 2/5 真实 runner 证据，整体按合同阻塞，不能从现有三平台外推。D4 renderer/RSS 超标留在 Phase 4，raw durability 与资源故障继续由 OPS-02/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -37,7 +37,7 @@
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
-| Phase 1：Database Kernel v2 | 7 / 8 | `阻塞` | kernel/observability 已闭环；DB2-07 缺 Android/Windows/Linux 3/5 真实平台证据 |
+| Phase 1：Database Kernel v2 | 7 / 8 | `阻塞` | kernel/observability 已闭环；DB2-07 缺 Windows/Linux 2/5 真实平台证据 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
@@ -77,7 +77,7 @@
 | DB2-04 constraints/microsecond/indexes | `已完成` | analyze 通过；migration/constraints/order/snapshot/merge 定向 24 项；全量 1153/1153 通过 | 2026-07-11 | schema v3 冻结；FK/UNIQUE/CHECK、微秒 DateTime converter、稳定 tiebreaker 索引与 EXPLAIN QUERY PLAN 覆盖；v2→v3 秒值换算和三表重建处于同一事务，约束失败保持 v2；删除/版本重排使用两阶段临时 order，删除+压缩处于同一事务，避免唯一约束瞬时冲突与半提交 |
 | DB2-05 transactional domain commands | `已完成` | analyze 通过；command/service/version/delete 定向 60 项；全量 1162/1162 通过 | 2026-07-11 | add 原子写 conversation/message/selection/streaming receipt；version 在事务内分配版本并更新 selection；batch delete 原子校验完整目标集、更新 selection/suggestion、级联 artifact 与重排；fork 任一消息失败整会话回滚；final checkpoint 同事务清 active receipt。12 路并发 append order 唯一，并发 version 得到 1/2，并发 selection+append 不丢无关状态；缓存仅在 commit 后替换 |
 | DB2-06 identity/session/integrity recovery | `已完成` | analyze 通过；admission/gateway 定向 21 项；全量 1171/1171 通过 | 2026-07-11 | installation identity/receipt 沿用 P0-06；新增 gateway live session receipt，首 lease 发布、最后 lease 在 DB close 成功后清除。unclean/open error/identity mismatch 触发 quick_check/FK/schema/identity，成功才耐久消费；已验证 restore 可在复验新库后消费绑定旧 identity 的 session。missing/corrupt/FK/identity/receipt 异常保留 DB 与 receipt 并进入既有 persistence-free 恢复页。gateway identity 查询仍走后台 Drift，未重引入主 isolate raw SQLite |
-| DB2-07 platform capability runner | `阻塞` | macOS + iOS simulator 2/5 PASS | 2026-07-11 | 统一 integration runner 实跑 migration、FTS5/unicode61、WAL/FULL、Online Backup、SQLite lock contention、文件锁/full-barrier rename、ABI；Apple 两目标均为 SQLite 3.53.2。Android 无 system image/设备，Windows/Linux 无 runner；证据见 `docs/database/baselines/db2-07-platform-capabilities-2026-07-11.md` |
+| DB2-07 platform capability runner | `阻塞` | macOS + iOS simulator + Android 物理设备 3/5 PASS | 2026-07-11 | 统一 integration runner 实跑 migration、FTS5/unicode61、WAL/FULL、Online Backup、SQLite lock contention、文件锁/full-barrier rename、ABI；三目标均为 SQLite 3.53.2。Android 11/API 30 arm64 真机通过；Windows/Linux 无 runner；证据见 `docs/database/baselines/db2-07-platform-capabilities-2026-07-11.md` |
 | DB2-08 sanitized DB observability | `已完成` | analyze 通过；observer/repository/gateway/migration/command/checkpoint 定向 29 项；全量 1178/1178 通过 | 2026-07-11 | live connection contract 启动断言 WAL/FK/FULL/busy timeout/auto-checkpoint/journal limit；按 operation 有界保存 256 个 latency samples 并计算 p50/p95/max，累计 result/failure；checkpoint 记录 WAL 前后 bytes 与 busy/log/checkpointed。snapshot/event schema 无 SQL、参数、正文、ID、secret 或 path 字段，失败只保留分类与可选数值码；原异常继续上抛 |
 | P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；当前快速门禁 analyze + 49 tests；里程碑全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
@@ -238,7 +238,7 @@ dart run tool/run_restore_process_harness.dart \
 | 验证 | 状态 | 未执行原因 | 风险 |
 | --- | --- | --- | --- |
 | Android/iOS/Windows/Linux profile 与 RSS/frame/DB/WAL 基线 | `未开始` | P0-09 已完成当前 M4 Pro/macOS profile；其余四平台尚无本轮设备/runner | macOS 结果不能外推；继续作为 DB2-07/五平台发布门禁 |
-| Android/iOS/macOS/Windows/Linux 五平台能力验证 | `未开始` | 本轮只运行当前 macOS 主机的根目录分析与单测，未运行五平台 runner | FTS5、Backup API、rename/fsync、SQLite ABI 仍有平台边界 |
+| Android/iOS/macOS/Windows/Linux 五平台能力验证 | `进行中` | macOS 主机、iOS simulator、Android 11 arm64 物理设备 3/5 runner 已通过；Windows/Linux 待运行 | 已验证三平台 FTS5、Backup API、rename barrier 与 SQLite ABI；不能外推 Windows/Linux |
 | kill -9/断电/磁盘满/权限/锁库故障注入 | `进行中` | macOS 已完成 25 个 forward、两个 terminal projection 各 6 个、18 个 verified-origin rollback 与 3 个 legacy archiving marker 独立 Runner SIGKILL case；其余 rollback 拓扑、raw write/rename/fsync/F_FULLFSYNC、旧 canonical 空/截断的真实进程场景和资源故障尚未覆盖 | 已证明列明的高层 forward/cold-ack/archive/rollback/legacy marker durability 边界可跨真实进程 SIGKILL 收敛；仍不能宣称硬件断电、任意子步骤、所有 rollback 拓扑或五平台安全 |
 | 真实旧 Hive/SQLite v1/备份 fixture 全矩阵 | `未开始` | fixture 尚未整理 | 不能证明已发布数据可无损迁移 |
 | 稳定 slot + localDy 的 widget/integration test | `未开始` | 目标 timeline 尚未实现 | 当前列表跳动问题无自动化保护 |
@@ -295,7 +295,7 @@ dart run tool/run_restore_process_harness.dart \
 | DB2-04 | FK/UNIQUE/CHECK/微秒时间/索引 | DB2-01 | `已完成` | schema 强制领域不变量；query plan 使用索引 | 本里程碑提交（2026-07-11） | schema v3 对 conversation/message/MCP 数值、role、order、group-version、ordinal 强制 CHECK/UNIQUE/FK；时间按 epoch 微秒无损往返，v2 秒时间原子换算；会话、消息时间、版本组查询均由 EXPLAIN 证明使用稳定复合索引；两阶段 order 改写与删除事务避免短暂 UNIQUE 冲突/半提交。逐版本 migration、失败原子性、约束 happy/boundary/error、order/snapshot/merge 定向 24 项，全量 1153 项与 analyze 通过 |
 | DB2-05 | 事务化领域 commands | DB2-03/04 | `已完成` | send/version/delete/fork 等不再由 service 拼多步提交 | 本里程碑提交（2026-07-11） | repository 提供 add/version/selection/batch-delete/fork/final-checkpoint 原子 commands；service/controller 不再自行执行 order/version MAX、selection JSON RMW、逐条批删或先建空 fork。覆盖 happy/boundary/failure、12 路并发 append、2 路并发 version、selection+append 无丢更新、append/fork 约束失败全回滚、partial delete 目标全回滚、artifact/receipt 一致性；定向 60 项、全量 1162 项与 analyze 通过。user+assistant+generation run 的跨消息原子 begin send 按方案留给 GEN-01/02，不在 DB2-05 预造状态机 |
 | DB2-06 | DB identity、receipt、integrity/recovery | P0-06、DB2-03 | `已完成` | unclean/missing/corrupt DB 进入确定性恢复流程 | 本里程碑提交（2026-07-11） | P0-06 installation identity/receipt 保持；gateway 首个 live lease 以受限权限、full barrier、rename 发布 session receipt，最后 lease 关闭 DB 后才耐久删除。unclean、open error 与 identity mismatch 执行 quick_check、FK、schema、identity 复验，正常启动不全库扫描；授权 restore 仅在新库复验并确认旧 session 绑定旧 installation receipt 后消费旧 session。损坏/缺失/不匹配均保留证据并路由既有只读恢复入口。happy/boundary/failure/state transition 定向 21 项、全量 1171 项与 analyze 通过 |
-| DB2-07 | 五平台 SQLite/FTS/Backup/文件能力 | DB2-03 | `阻塞` | 五平台能力矩阵有实际运行证据 | 本里程碑提交（部分，2026-07-11） | 设备内统一 runner 已落地；macOS arm64 真实主机与 iOS arm64 simulator 2/5 实跑 PASS，均为 SQLite 3.53.2，migration/FTS5/WAL+FULL/Online Backup/锁/full-barrier rename 通过；短中文查询实测 0 命中并转 OPS-04。Android 无 system image/设备，Windows/Linux 无当前 runner，缺少 3/5 实际证据，按验收合同保持阻塞。详见 [DB2-07 平台证据](./baselines/db2-07-platform-capabilities-2026-07-11.md) |
+| DB2-07 | 五平台 SQLite/FTS/Backup/文件能力 | DB2-03 | `阻塞` | 五平台能力矩阵有实际运行证据 | 本里程碑提交（部分，2026-07-11） | 设备内统一 runner 已落地；macOS arm64 真实主机、iOS arm64 simulator 与 Android 11/API 30 `android_arm64` 物理设备 3/5 实跑 PASS，均为 SQLite 3.53.2，migration/FTS5/WAL+FULL/Online Backup/锁/full-barrier rename 通过；短中文查询实测 0 命中并转 OPS-04。Windows/Linux 无当前 runner，缺少 2/5 实际证据，按验收合同保持阻塞。Android app 的 NDK 已从 27 对齐 `integration_test`/`jni` 要求的 28.2.13676358。详见 [DB2-07 平台证据](./baselines/db2-07-platform-capabilities-2026-07-11.md) |
 | DB2-08 | DB/query/WAL/checkpoint 脱敏观测 | DB2-03 | `已完成` | 可测 p50/p95、WAL 和失败，不记录正文/秘密 | 本里程碑提交（2026-07-11） | `ChatDatabaseObserver` 按固定 operation 枚举做 O(1) 有界聚合，每 operation 最多 256 个耗时样本，snapshot 计算 p50/p95/max/result/failure；query window/search、transaction command、stream/final checkpoint、gateway open、integrity 和 WAL checkpoint 已接线。WAL 记录 before/after bytes、busy/log/checkpointed 与失败；失败仅分类为 sqlite/remoteDatabase/filesystem/state/input/unknown 和数值码，原异常不吞。live gateway 启动断言连接 PRAGMA，并移除未获基准支持的 read pool。秘密/path/SQL/参数反例通过；定向 29 项、全量 1178 项、macOS/iOS capability 与 analyze 通过 |
 
 ## 8. Phase 2：Message Graph
@@ -438,15 +438,15 @@ dart run tool/run_restore_process_harness.dart \
 | 验证 | Android | iOS | macOS | Windows | Linux |
 | --- | --- | --- | --- | --- | --- |
 | `flutter analyze` / unit tests | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| Drift schema migration | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| FTS5/tokenizer | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| Online Backup API | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| WAL/FULL 实际 PRAGMA | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| File close/rename/fsync | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
+| Drift schema migration | PASS：v2→v3 真机 | PASS：simulator | PASS：主机 | 未开始 | 未开始 |
+| FTS5/tokenizer | PASS：FTS5/unicode61；短中文 0 | PASS：FTS5/unicode61；短中文 0 | PASS：FTS5/unicode61；短中文 0 | 未开始 | 未开始 |
+| Online Backup API | PASS | PASS：simulator | PASS：主机 | 未开始 | 未开始 |
+| WAL/FULL 实际 PRAGMA | PASS | PASS：simulator | PASS：主机 | 未开始 | 未开始 |
+| File close/rename/fsync | PASS：capability barrier | PASS：simulator capability barrier | PASS：主机 capability barrier | 未开始 | 未开始 |
 | Kill/restart recovery | 未开始 | 未开始 | 进行中：25/25 forward + committed/target terminal 6/6 + verified-origin rollback 18/18 + `rolledBack/before` terminal 6/6 + legacy archiving marker 3/3 高层 SIGKILL，以及 settings cold-readback 2/2 正常跨进程 case 通过；其余 rollback topology 与 raw 子窗口未覆盖 | 未开始 | 未开始 |
 | Timeline profile/anchor | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Secure storage/backup boundary | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
-| Build/package ABI | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
+| Build/package ABI | PASS：`android_arm64` | PASS：`ios_arm64` simulator | PASS：`macos_arm64` | 未开始 | 未开始 |
 
 说明：本轮根目录 `flutter analyze` 和 `flutter test` 仅作为当前主机的代码基线，不等于上述五平台目标验证已完成。
 
@@ -476,17 +476,18 @@ dart run tool/run_restore_process_harness.dart \
 
 PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1），产品决策不再阻塞任何阶段。剩余待输入：
 
-1. 提供 Android、Windows、Linux 可执行 runner/设备（或授权触发对应外部 CI）。DB2-07 runner 已在 macOS 真实主机和 iOS simulator 2/5 通过；剩余 3/5 阻塞工作项完成和五平台发布门禁。iOS 物理设备证据仍未覆盖。
+1. 提供 Windows、Linux 可执行 runner/设备（或授权触发对应外部 CI）。DB2-07 runner 已在 macOS 真实主机、iOS simulator 和 Android 11 arm64 物理设备 3/5 通过；剩余 2/5 阻塞工作项完成和五平台发布门禁。iOS 物理设备证据仍未覆盖。
 2. MSG-01 仍需把已冻结的 PD-01/02/04 落成带交互实例的 ADR（实现口径，非产品决策）。
 
 ## 19. 下一步
 
-Phase 1 已完成 `DB2-01～06、DB2-08`，当前 7/8。唯一下一步是让既有 DB2-07 runner 在 Android、Windows、Linux 实际运行并记录 3/5 剩余证据；在获得 runner/设备或外部 CI 授权前，Phase 1 保持阻塞，不能关闭。D4 renderer/RSS 超标不在 Database Kernel 中扩 scope。
+Phase 1 已完成 `DB2-01～06、DB2-08`，当前 7/8。唯一下一步是让既有 DB2-07 runner 在 Windows、Linux 实际运行并记录 2/5 剩余证据；在获得 runner/设备或外部 CI 授权前，Phase 1 保持阻塞，不能关闭。D4 renderer/RSS 超标不在 Database Kernel 中扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 补齐 DB2-07 Android 真机证据：2112123AC / Android 11（API 30）/ `android_arm64` 在设备进程通过 v2→v3 migration、live PRAGMA contract、FTS5/unicode61、WAL+FULL、Online Backup、SQLite 双连接写锁、Dart 文件锁与 full-barrier rename，SQLite 3.53.2，短中文仍为 0。Android app NDK 从 27 对齐 `integration_test`/`jni` 所需 28.2.13676358；debug APK 构建、安装和 runner 通过。DB2-07 更新为 3/5，Windows/Linux 仍待用户侧 runner，不提前关闭 Phase 1 | DB2-07、OPS-04 | 本里程碑提交（Android 证据） | Codex |
 | 2026-07-11 | 完成 DB2-08：新增无正文/SQL/参数/ID/path 承载字段的 `ChatDatabaseObserver`，固定 operation 与失败类别，每 operation 有界保留 256 个 latency samples，snapshot 计算 p50/p95/max/result/failure。gateway/query window/search/transaction command/stream+final checkpoint/integrity/WAL checkpoint 接线；真实 checkpoint 记录 WAL 前后 bytes、busy/log/checkpointed，失败保留原异常。live connection 显式设置并启动断言 WAL、FK ON、busy timeout 5000、FULL、auto-checkpoint 1000、journal limit 16 MiB，删除无基准支持的额外 read pool。敏感值反例、rollback/checkpoint failure、connection contract 通过；定向 29、全量 1178、macOS/iOS capability 与 analyze 通过 | DB2-08 | 本里程碑提交 | Codex |
 | 2026-07-11 | DB2-07 部分完成并因平台输入阻塞：新增设备内统一 capability integration runner，实际执行 v2→v3 migration、FTS5/unicode61、WAL+FULL、Online Backup、SQLite 写锁冲突、Dart 文件锁、full-barrier rename 和 ABI/version 输出。macOS 26.5.2 arm64 真实主机与 iPhone 17 / iOS 26.5 arm64 simulator 2/5 PASS，SQLite 3.53.2；短中文 `中文` 为 0 命中，转 OPS-04。Flutter 实验性 SPM 因既有 iOS 插件依赖范围冲突，项目显式保持 CocoaPods 后 iOS 通过。Android 无 system image/设备、Windows/Linux 无 runner，未虚报完成 | DB2-07、OPS-04 | 本里程碑提交（部分） | Codex |
 | 2026-07-11 | 完成 DB2-06：沿用 P0-06 database identity/installation receipt，并以 gateway lease 生命周期新增 durable session receipt；首个 live lease 发布、最后 lease 在 DB close 成功后清除。unclean、open error 与 identity mismatch admission 执行 quick_check、FK、schema 与 identity 复验，成功才删除 session receipt；授权 restore 只在新库复验且旧 session 精确绑定旧 installation receipt 后消费旧 session。缺库、物理/FK 损坏、identity/receipt 不符均保留证据并进入现有只读恢复页。identity 通过后台 Drift Future 获取，未恢复主 isolate raw SQLite。定向 21 项、全量 1171 项与 analyze 通过 | DB2-06 | 本里程碑提交 | Codex |
