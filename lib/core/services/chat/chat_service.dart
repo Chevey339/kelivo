@@ -5,6 +5,7 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../../database/app_database.dart';
+import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -12,6 +13,9 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
 class ChatService extends ChangeNotifier {
+  ChatService({ChatDatabaseGateway? databaseGateway})
+    : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance;
+
   static const int defaultInitialMessageMin = 2;
   static const int defaultInitialMessageMax = 240;
   static const int defaultInitialTextBudget = 20000;
@@ -20,6 +24,8 @@ class ChatService extends ChangeNotifier {
 
   late ChatDatabaseRepository _repo;
   late File _databaseFile;
+  final ChatDatabaseGateway _databaseGateway;
+  ChatDatabaseLease? _databaseLease;
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -41,6 +47,7 @@ class ChatService extends ChangeNotifier {
   }
 
   bool _initialized = false;
+  Future<void>? _initFuture;
   bool get initialized => _initialized;
 
   String? get currentConversationId => _currentConversationId;
@@ -49,39 +56,64 @@ class ChatService extends ChangeNotifier {
     return id != null && _temporaryConversationIds.contains(id);
   }
 
-  Future<void> init() async {
-    if (_initialized) return;
+  Future<void> init() {
+    if (_initialized) return Future<void>.value();
+    final inFlight = _initFuture;
+    if (inFlight != null) return inFlight;
+    final initialization = _initialize();
+    _initFuture = initialization;
+    return initialization.whenComplete(() {
+      if (identical(_initFuture, initialization)) _initFuture = null;
+    });
+  }
 
+  Future<void> _initialize() async {
     final appDataDir = await AppDirectories.getAppDataDirectory();
     if (!await appDataDir.exists()) {
       await appDataDir.create(recursive: true);
     }
     _databaseFile = File(p.join(appDataDir.path, AppDatabase.databaseFileName));
-    _repo = ChatDatabaseRepository.open(file: _databaseFile);
-    await _repo.ensureReady();
+    final lease = await _databaseGateway.acquire(_databaseFile);
+    _databaseLease = lease;
+    _repo = lease.repository;
+    try {
+      // Versioned and transactional: normal launches return before scanning rows.
+      await _migrateSandboxPaths();
+      await _loadConversationsCache();
 
-    // Versioned and transactional: normal launches return before scanning rows.
-    await _migrateSandboxPaths();
-    await _loadConversationsCache();
+      // Reset any stale isStreaming flags left over from a previous app crash or
+      // force-quit. After a fresh launch no message can be actively streaming.
+      await _resetStaleStreamingFlags();
 
-    // Reset any stale isStreaming flags left over from a previous app crash or
-    // force-quit.  After a fresh launch no message can be actively streaming.
-    await _resetStaleStreamingFlags();
-
-    _initialized = true;
-    notifyListeners();
+      _initialized = true;
+      notifyListeners();
+    } catch (_) {
+      _databaseLease = null;
+      await lease.release();
+      rethrow;
+    }
   }
 
   Future<void> close() async {
+    final initialization = _initFuture;
+    if (initialization != null) {
+      try {
+        await initialization;
+      } catch (_) {
+        return;
+      }
+    }
     if (!_initialized) return;
-    await _repo.close();
     _initialized = false;
+    final lease = _databaseLease;
+    _databaseLease = null;
+    await lease?.release();
   }
 
   @override
   void dispose() {
-    if (_initialized) {
-      unawaited(_repo.close());
+    if (_initialized || _initFuture != null) {
+      unawaited(close());
     }
     super.dispose();
   }

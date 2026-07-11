@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/database/chat_database_gateway.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/cherry_importer.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -79,7 +80,7 @@ void main() {
             ], compressed: true),
       });
 
-      final chatService = ChatService();
+      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -178,7 +179,7 @@ void main() {
         ),
       });
 
-      final chatService = ChatService();
+      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -210,7 +211,7 @@ void main() {
           file: backup,
           mode: RestoreMode.overwrite,
           settings: SettingsProvider(),
-          chatService: ChatService(),
+          chatService: ChatService(databaseGateway: ChatDatabaseGateway()),
         ),
         throwsA(anything),
       );
