@@ -1,0 +1,183 @@
+{
+  "format": "kelivo-legacy-chat-fixture-v1",
+  "source": "released-hive-json-projection",
+  "conversation": {
+    "id": "legacy-conversation-1",
+    "title": "Legacy fixture",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:10.000Z",
+    "messageIds": ["u1", "a1-v1", "u2", "a2", "a1-v7"],
+    "isPinned": false,
+    "mcpServerIds": [],
+    "assistantId": null,
+    "truncateIndex": 2,
+    "versionSelections": {"a1": 1},
+    "summary": null,
+    "lastSummarizedMessageCount": 0,
+    "chatSuggestions": []
+  },
+  "messages": [
+    {
+      "order": 0,
+      "value": {
+        "id": "u1",
+        "role": "user",
+        "content": "U1",
+        "timestamp": "2025-01-01T00:00:01.000Z",
+        "modelId": null,
+        "providerId": null,
+        "totalTokens": null,
+        "conversationId": "legacy-conversation-1",
+        "isStreaming": false,
+        "reasoningText": null,
+        "reasoningStartAt": null,
+        "reasoningFinishedAt": null,
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "u1",
+        "version": 0,
+        "promptTokens": null,
+        "completionTokens": null,
+        "cachedTokens": null,
+        "durationMs": null
+      }
+    },
+    {
+      "order": 1,
+      "value": {
+        "id": "a1-v1",
+        "role": "assistant",
+        "content": "A1-v1",
+        "timestamp": "2025-01-01T00:00:02.000Z",
+        "modelId": "legacy-model",
+        "providerId": "legacy-provider",
+        "totalTokens": 10,
+        "conversationId": "legacy-conversation-1",
+        "isStreaming": false,
+        "reasoningText": null,
+        "reasoningStartAt": null,
+        "reasoningFinishedAt": null,
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "a1",
+        "version": 1,
+        "promptTokens": 4,
+        "completionTokens": 6,
+        "cachedTokens": 0,
+        "durationMs": 100
+      }
+    },
+    {
+      "order": 2,
+      "value": {
+        "id": "u2",
+        "role": "user",
+        "content": "U2 ![asset](upload/image.png)",
+        "timestamp": "2025-01-01T00:00:03.000Z",
+        "modelId": null,
+        "providerId": null,
+        "totalTokens": null,
+        "conversationId": "legacy-conversation-1",
+        "isStreaming": false,
+        "reasoningText": null,
+        "reasoningStartAt": null,
+        "reasoningFinishedAt": null,
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "u2",
+        "version": 0,
+        "promptTokens": null,
+        "completionTokens": null,
+        "cachedTokens": null,
+        "durationMs": null
+      }
+    },
+    {
+      "order": 3,
+      "value": {
+        "id": "a2",
+        "role": "assistant",
+        "content": "A2",
+        "timestamp": "2025-01-01T00:00:04.000Z",
+        "modelId": "legacy-model",
+        "providerId": "legacy-provider",
+        "totalTokens": 8,
+        "conversationId": "legacy-conversation-1",
+        "isStreaming": false,
+        "reasoningText": null,
+        "reasoningStartAt": null,
+        "reasoningFinishedAt": null,
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "a2",
+        "version": 0,
+        "promptTokens": 3,
+        "completionTokens": 5,
+        "cachedTokens": 0,
+        "durationMs": 90
+      }
+    },
+    {
+      "order": 4,
+      "value": {
+        "id": "a1-v7",
+        "role": "assistant",
+        "content": "A1-v7",
+        "timestamp": "2025-01-01T00:00:05.000Z",
+        "modelId": "legacy-model",
+        "providerId": "legacy-provider",
+        "totalTokens": 12,
+        "conversationId": "legacy-conversation-1",
+        "isStreaming": false,
+        "reasoningText": "thinking-v7",
+        "reasoningStartAt": "2025-01-01T00:00:04.500Z",
+        "reasoningFinishedAt": "2025-01-01T00:00:04.900Z",
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "a1",
+        "version": 7,
+        "promptTokens": 4,
+        "completionTokens": 8,
+        "cachedTokens": 0,
+        "durationMs": 120
+      }
+    }
+  ],
+  "orphans": [
+    {
+      "order": 0,
+      "value": {
+        "id": "orphan-1",
+        "role": "assistant",
+        "content": "Recovered orphan",
+        "timestamp": "2025-01-01T00:00:06.000Z",
+        "modelId": null,
+        "providerId": null,
+        "totalTokens": null,
+        "conversationId": "missing-conversation",
+        "isStreaming": true,
+        "reasoningText": null,
+        "reasoningStartAt": null,
+        "reasoningFinishedAt": null,
+        "translation": null,
+        "reasoningSegmentsJson": null,
+        "groupId": "orphan-1",
+        "version": 0,
+        "promptTokens": null,
+        "completionTokens": null,
+        "cachedTokens": null,
+        "durationMs": null
+      }
+    }
+  ],
+  "assets": ["upload/image.png"],
+  "expected": {
+    "activeRevisionIds": ["u1", "a1-v7", "u2", "a2"],
+    "selectedRevisionByGroup": {"a1": "a1-v7"},
+    "contextStartRevisionId": "a1-v7",
+    "visibleDigest": "832ec28594e775da90c0b950dc0c1bda6e7b4d624bec1233522cb2962c0a7d83",
+    "selectionDigest": "db078e752d5edb5d08da9821c9c11362bb54498f02a98ce44f991b70f006a05f",
+    "promptDigest": "289d8872e4400bc902ad11f89b7fb294411d4ef0e33b99b77ce803f74132204c",
+    "assetDigest": "47066c37d2050feca169cf73831aed12d2da769b0b2b0b6787f55119c2399cb5"
+  }
+}
