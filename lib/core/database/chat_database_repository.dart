@@ -137,6 +137,45 @@ class ChatDatabaseRepository {
     }
   }
 
+  static InstalledChatDatabaseInfo inspectUncleanInstalledDatabase(File file) {
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      final quickCheckRows = database.select('PRAGMA quick_check;');
+      if (quickCheckRows.length != 1 ||
+          quickCheckRows.single.values.single != 'ok') {
+        throw StateError('quick_check');
+      }
+      if (database.select('PRAGMA foreign_key_check;').isNotEmpty) {
+        throw StateError('foreign_key_check');
+      }
+      _validateRawStructure(database);
+      if (database.userVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
+      }
+      final identityRows = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?;',
+        [ChatStorageMetaKeys.databaseIdentity],
+      );
+      if (identityRows.length > 1) {
+        throw StateError('database_identity_duplicate');
+      }
+      final databaseId = identityRows.isEmpty
+          ? null
+          : identityRows.single['value'] as String?;
+      if (databaseId != null && !_isUuid(databaseId)) {
+        throw StateError('database_identity_invalid');
+      }
+      return (schemaVersion: database.userVersion, databaseId: databaseId);
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    } finally {
+      database.close();
+    }
+  }
+
   static void assignInstalledDatabaseIdentity(File file, String databaseId) {
     if (!_isUuid(databaseId)) throw StateError('database_identity_invalid');
     final database = sqlite.sqlite3.open(file.absolute.path);
@@ -507,6 +546,15 @@ class ChatDatabaseRepository {
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+  }
+
+  Future<String?> getDatabaseIdentity() async {
+    final row =
+        await (_db.select(_db.chatStorageMetaRows)..where(
+              (table) => table.key.equals(ChatStorageMetaKeys.databaseIdentity),
+            ))
+            .getSingleOrNull();
+    return row?.value;
   }
 
   Future<SandboxPathMigrationResult> migrateSandboxPaths({

@@ -1,6 +1,8 @@
 import 'dart:io';
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_gateway.dart';
+import 'package:Kelivo/core/database/database_installation_gate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -69,6 +71,23 @@ void main() {
         final lease = await gateway.acquire(file);
         expect(await lease.repository.getConversationCount(), 0);
         await lease.release();
+      },
+    );
+
+    test(
+      'installed database lease publishes and cleanly removes session receipt',
+      () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final file = File('${directory.path}/${AppDatabase.databaseFileName}');
+        final sessionFile = File(
+          '${directory.path}/.database_session_receipt.json',
+        );
+
+        final lease = await gateway.acquire(file);
+        expect(await sessionFile.exists(), isTrue);
+
+        await lease.release();
+        expect(await sessionFile.exists(), isFalse);
       },
     );
   });

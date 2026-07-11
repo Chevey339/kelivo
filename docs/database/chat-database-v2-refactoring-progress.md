@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 1：DB2-01～05 已完成）
-> - 当前结论：Phase 1 已冻结逐版本 schema migration、删除同步业务查询、建立 single-flight `ChatDatabaseGateway`、以 schema v3 强制领域约束，并将 add/version/delete/fork/final checkpoint 收口为 repository 单事务 commands。`MAX(order/version)+1`、selection JSON 更新、批量删除重排、artifact cascade 和 streaming receipt 不再由 service/controller 拼多步提交；事务成功后才发布内存缓存。下一步 DB2-06 审计并补齐 database identity、installation receipt 与 integrity/recovery 的统一入口。D4 renderer/RSS 超标留在 Phase 4；raw durability、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 1：DB2-01～06 已完成）
+> - 当前结论：Phase 1 已完成 schema/migration、异步 single-flight gateway、领域约束、事务化 commands，以及 identity/installation/session receipt 与确定性 integrity/recovery 入口。gateway 首个 live lease 耐久发布 session receipt，数据库成功关闭后才清除；残留 receipt 只在下次 admission 触发 `quick_check`、FK、schema 和 identity 复验，正常启动不做全库扫描。missing/corrupt/identity/receipt 异常继续 fail-closed 到只读恢复页且保留证据。下一步 DB2-07 建立并实跑五平台能力矩阵；当前主机只能提供 macOS 证据，其余平台仍受 runner/设备输入阻塞。D4 renderer/RSS 超标留在 Phase 4；raw durability 与资源故障继续由 OPS-02/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -37,7 +37,7 @@
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
-| Phase 1：Database Kernel v2 | 5 / 8 | `进行中` | schema/migration、异步 gateway、领域约束与事务化 commands 已闭环；identity/integrity/recovery 入口待审计收口 |
+| Phase 1：Database Kernel v2 | 6 / 8 | `进行中` | kernel 数据通路与 unclean recovery 已闭环；五平台能力证据和脱敏观测待完成 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
@@ -76,6 +76,7 @@
 | DB2-03 single-flight gateway | `已完成` | analyze 通过；gateway/chat/lazy history 定向 31 项；全量 1142/1142 通过 | 2026-07-11 | 3 路并发 acquire 复用同一 repository；引用计数最后释放才 close；异路径拒绝；坏库初始化保留证据并可重试；ChatService init/失败/close/dispose 接入 lease |
 | DB2-04 constraints/microsecond/indexes | `已完成` | analyze 通过；migration/constraints/order/snapshot/merge 定向 24 项；全量 1153/1153 通过 | 2026-07-11 | schema v3 冻结；FK/UNIQUE/CHECK、微秒 DateTime converter、稳定 tiebreaker 索引与 EXPLAIN QUERY PLAN 覆盖；v2→v3 秒值换算和三表重建处于同一事务，约束失败保持 v2；删除/版本重排使用两阶段临时 order，删除+压缩处于同一事务，避免唯一约束瞬时冲突与半提交 |
 | DB2-05 transactional domain commands | `已完成` | analyze 通过；command/service/version/delete 定向 60 项；全量 1162/1162 通过 | 2026-07-11 | add 原子写 conversation/message/selection/streaming receipt；version 在事务内分配版本并更新 selection；batch delete 原子校验完整目标集、更新 selection/suggestion、级联 artifact 与重排；fork 任一消息失败整会话回滚；final checkpoint 同事务清 active receipt。12 路并发 append order 唯一，并发 version 得到 1/2，并发 selection+append 不丢无关状态；缓存仅在 commit 后替换 |
+| DB2-06 identity/session/integrity recovery | `已完成` | analyze 通过；admission/gateway 定向 21 项；全量 1171/1171 通过 | 2026-07-11 | installation identity/receipt 沿用 P0-06；新增 gateway live session receipt，首 lease 发布、最后 lease 在 DB close 成功后清除。unclean/open error/identity mismatch 触发 quick_check/FK/schema/identity，成功才耐久消费；已验证 restore 可在复验新库后消费绑定旧 identity 的 session。missing/corrupt/FK/identity/receipt 异常保留 DB 与 receipt 并进入既有 persistence-free 恢复页。gateway identity 查询仍走后台 Drift，未重引入主 isolate raw SQLite |
 | P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；当前快速门禁 analyze + 49 tests；里程碑全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
@@ -291,7 +292,7 @@ dart run tool/run_restore_process_harness.dart \
 | DB2-03 | 单一 gateway、single-flight init、异步 DAO | DB2-02 | `已完成` | 应用内只有一个受控数据库通路 | 本里程碑提交（2026-07-11） | `ChatDatabaseGateway.instance` 是 live DB 唯一入口；同 canonical path 的并发 acquire 与 ChatService init single-flight，lease 引用归零后串行关闭，关闭期间新 acquire 等待，持有 lease 时拒绝另一 DB；open/init 失败关闭 handle、清除 flight 后可重试且不覆盖坏文件。candidate/restore 保持明确 maintenance API。定向 31 项、全量 1142 项与 analyze 通过 |
 | DB2-04 | FK/UNIQUE/CHECK/微秒时间/索引 | DB2-01 | `已完成` | schema 强制领域不变量；query plan 使用索引 | 本里程碑提交（2026-07-11） | schema v3 对 conversation/message/MCP 数值、role、order、group-version、ordinal 强制 CHECK/UNIQUE/FK；时间按 epoch 微秒无损往返，v2 秒时间原子换算；会话、消息时间、版本组查询均由 EXPLAIN 证明使用稳定复合索引；两阶段 order 改写与删除事务避免短暂 UNIQUE 冲突/半提交。逐版本 migration、失败原子性、约束 happy/boundary/error、order/snapshot/merge 定向 24 项，全量 1153 项与 analyze 通过 |
 | DB2-05 | 事务化领域 commands | DB2-03/04 | `已完成` | send/version/delete/fork 等不再由 service 拼多步提交 | 本里程碑提交（2026-07-11） | repository 提供 add/version/selection/batch-delete/fork/final-checkpoint 原子 commands；service/controller 不再自行执行 order/version MAX、selection JSON RMW、逐条批删或先建空 fork。覆盖 happy/boundary/failure、12 路并发 append、2 路并发 version、selection+append 无丢更新、append/fork 约束失败全回滚、partial delete 目标全回滚、artifact/receipt 一致性；定向 60 项、全量 1162 项与 analyze 通过。user+assistant+generation run 的跨消息原子 begin send 按方案留给 GEN-01/02，不在 DB2-05 预造状态机 |
-| DB2-06 | DB identity、receipt、integrity/recovery | P0-06、DB2-03 | `未开始` | unclean/missing/corrupt DB 进入确定性恢复流程 | — | — |
+| DB2-06 | DB identity、receipt、integrity/recovery | P0-06、DB2-03 | `已完成` | unclean/missing/corrupt DB 进入确定性恢复流程 | 本里程碑提交（2026-07-11） | P0-06 installation identity/receipt 保持；gateway 首个 live lease 以受限权限、full barrier、rename 发布 session receipt，最后 lease 关闭 DB 后才耐久删除。unclean、open error 与 identity mismatch 执行 quick_check、FK、schema、identity 复验，正常启动不全库扫描；授权 restore 仅在新库复验并确认旧 session 绑定旧 installation receipt 后消费旧 session。损坏/缺失/不匹配均保留证据并路由既有只读恢复入口。happy/boundary/failure/state transition 定向 21 项、全量 1171 项与 analyze 通过 |
 | DB2-07 | 五平台 SQLite/FTS/Backup/文件能力 | DB2-03 | `未开始` | 五平台能力矩阵有实际运行证据 | — | — |
 | DB2-08 | DB/query/WAL/checkpoint 脱敏观测 | DB2-03 | `未开始` | 可测 p50/p95、WAL 和失败，不记录正文/秘密 | — | — |
 
@@ -478,12 +479,15 @@ PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1
 
 ## 19. 下一步
 
-Phase 1 已完成 `DB2-01/02/03`。下一步执行 `DB2-04`，通过新 schema snapshot/migration 加入领域约束、微秒时间与必要索引，并用 `EXPLAIN QUERY PLAN` 验证关键查询；D4 renderer/RSS 超标不在 Database Kernel 中扩 scope。
+Phase 1 已完成 `DB2-01～06`。下一步执行 `DB2-07`：先固化 SQLite/FTS/online backup/文件锁/ABI capability runner，并在当前 macOS 实跑；Android/iOS/Windows/Linux 必须取得真实 runner/设备证据才能标记完成，不以 macOS 结果外推。随后执行不依赖其他平台的 `DB2-08` 脱敏观测；D4 renderer/RSS 超标不在 Database Kernel 中扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成 DB2-06：沿用 P0-06 database identity/installation receipt，并以 gateway lease 生命周期新增 durable session receipt；首个 live lease 发布、最后 lease 在 DB close 成功后清除。unclean、open error 与 identity mismatch admission 执行 quick_check、FK、schema 与 identity 复验，成功才删除 session receipt；授权 restore 只在新库复验且旧 session 精确绑定旧 installation receipt 后消费旧 session。缺库、物理/FK 损坏、identity/receipt 不符均保留证据并进入现有只读恢复页。identity 通过后台 Drift Future 获取，未恢复主 isolate raw SQLite。定向 21 项、全量 1171 项与 analyze 通过 | DB2-06 | 本里程碑提交 | Codex |
+| 2026-07-11 | 完成 DB2-05：repository 收口 add/version/selection/batch-delete/fork/final-checkpoint 单事务 commands，service/controller 不再拼接 MAX/order、selection JSON RMW、逐条删除或空 fork；并发分配、回滚、artifact/receipt 与 commit 后缓存发布均有回归。定向 60 项、全量 1162 项与 analyze 通过 | DB2-05 | 本里程碑提交 | Codex |
+| 2026-07-11 | 完成 DB2-04：schema v3 加入 FK/UNIQUE/CHECK、微秒时间与稳定复合索引；v2→v3 原子重建和秒值换算，约束失败保留 v2；关键查询以 EXPLAIN 验证索引，两阶段 order 改写避免瞬时唯一冲突。定向 24 项、全量 1153 项与 analyze 通过 | DB2-04 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 DB2-03：新增进程级 ChatDatabaseGateway/lease；同一路径并发 acquire 与 ChatService init single-flight，共享 repository，最后 lease 才关闭；关闭与新 acquire 串行，持有 live lease 时拒绝路径切换；初始化失败关闭 handle、保留坏库证据并允许修复后重试。定向 31 项、全量 1142 项与 analyze 通过 | DB2-03 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 DB2-02：移除 `_syncDb`、同步 repository query/count/search/tool/signature API 和 raw row mapper；ChatService/Controller 将窗口分页、版本组补载、完整 prompt、搜索、统计和导入改为后台 Drift 异步读取，渲染 getter 只读内存 cache；相关滚动锚定回调改为 await 后修正。analyze、定向 111 项、全量 1139 项通过 | DB2-02 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 DB2-01：冻结 Drift v1/v2 schema JSON、生成 step-by-step migration 与测试 schema helper；Database Kernel v2 以显式 v1→v2 format step 建立迁移边界，installation gate 在 identity/adoption 前迁移完整校验通过的开发版 v1 并复验，保留会话/meta 数据；未来、过旧和损坏 schema 继续拒绝。定向 64 项、全量 1139 项与 analyze 通过 | DB2-01 | 本里程碑提交 | Codex |
