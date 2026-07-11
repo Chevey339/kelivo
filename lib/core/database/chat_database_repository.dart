@@ -799,14 +799,7 @@ class ChatDatabaseRepository {
     List<String> messageIds,
   ) async {
     await _db.transaction(() async {
-      for (var i = 0; i < messageIds.length; i++) {
-        await (_db.update(_db.messageRows)..where(
-              (t) =>
-                  t.conversationId.equals(conversationId) &
-                  t.id.equals(messageIds[i]),
-            ))
-            .write(MessageRowsCompanion(messageOrder: Value(i)));
-      }
+      await _rewriteMessageOrder(conversationId, messageIds);
     });
   }
 
@@ -1133,6 +1126,13 @@ class ChatDatabaseRepository {
           .getSingleOrNull();
       final data = Map<String, Object?>.from(row.data)..remove('id');
       data['is_streaming'] = 0;
+      for (final field in const [
+        'timestamp',
+        'reasoning_start_at',
+        'reasoning_finished_at',
+      ]) {
+        data[field] = _fingerprintTimestamp(data[field]);
+      }
       final groupId = data.remove('group_id')?.toString() ?? '';
       data['group_ordinal'] = groupOrdinals.putIfAbsent(
         groupId,
@@ -1165,6 +1165,8 @@ class ChatDatabaseRepository {
     Map<String, int> groupOrdinals,
   ) {
     final normalized = Map<String, Object?>.from(data);
+    normalized['created_at'] = _fingerprintTimestamp(normalized['created_at']);
+    normalized['updated_at'] = _fingerprintTimestamp(normalized['updated_at']);
     final rawSelections = normalized['version_selections_json'];
     if (rawSelections is String) {
       final decoded = _decodeStringIntMap(rawSelections);
@@ -1176,6 +1178,14 @@ class ChatDatabaseRepository {
       normalized['version_selections_json'] = selections;
     }
     return normalized;
+  }
+
+  Object? _fingerprintTimestamp(Object? value) {
+    if (value is int) return value ~/ Duration.microsecondsPerSecond;
+    if (value is num) {
+      return value.toInt() ~/ Duration.microsecondsPerSecond;
+    }
+    return value;
   }
 
   Future<List<String>> _messageIds(String schema, String conversationId) async {
@@ -1476,11 +1486,7 @@ class ChatDatabaseRepository {
             ),
           );
       await _replaceMcpServers(conversation.id, conversation.mcpServerIds);
-      for (var i = 0; i < messageIds.length; i++) {
-        await (_db.update(_db.messageRows)
-              ..where((t) => t.id.equals(messageIds[i])))
-            .write(MessageRowsCompanion(messageOrder: Value(i)));
-      }
+      await _rewriteMessageOrder(conversation.id, messageIds);
     });
   }
 
@@ -1491,14 +1497,16 @@ class ChatDatabaseRepository {
   }
 
   Future<void> deleteMessage(String messageId) async {
-    final row = await (_db.select(
-      _db.messageRows,
-    )..where((t) => t.id.equals(messageId))).getSingleOrNull();
-    if (row == null) return;
-    await (_db.delete(
-      _db.messageRows,
-    )..where((t) => t.id.equals(messageId))).go();
-    await _compactMessageOrder(row.conversationId);
+    await _db.transaction(() async {
+      final row = await (_db.select(
+        _db.messageRows,
+      )..where((t) => t.id.equals(messageId))).getSingleOrNull();
+      if (row == null) return;
+      await (_db.delete(
+        _db.messageRows,
+      )..where((t) => t.id.equals(messageId))).go();
+      await _compactMessageOrder(row.conversationId);
+    });
   }
 
   Future<void> clearAllData() async {
@@ -1723,9 +1731,46 @@ class ChatDatabaseRepository {
               ..where((t) => t.conversationId.equals(conversationId))
               ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
             .get();
-    for (var i = 0; i < rows.length; i++) {
-      if (rows[i].messageOrder == i) continue;
-      await (_db.update(_db.messageRows)..where((t) => t.id.equals(rows[i].id)))
+    await _rewriteMessageOrder(
+      conversationId,
+      rows.map((row) => row.id).toList(growable: false),
+    );
+  }
+
+  Future<void> _rewriteMessageOrder(
+    String conversationId,
+    List<String> messageIds,
+  ) async {
+    if (messageIds.isEmpty) return;
+    if (messageIds.toSet().length != messageIds.length) {
+      throw ArgumentError.value(
+        messageIds,
+        'messageIds',
+        'Message IDs must be unique when rewriting order.',
+      );
+    }
+
+    final maxOrder = _db.messageRows.messageOrder.max();
+    final maxRow =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([maxOrder])
+              ..where(_db.messageRows.conversationId.equals(conversationId)))
+            .getSingle();
+    final temporaryStart = (maxRow.read(maxOrder) ?? -1) + 1;
+    for (var i = 0; i < messageIds.length; i++) {
+      await (_db.update(_db.messageRows)..where(
+            (t) =>
+                t.conversationId.equals(conversationId) &
+                t.id.equals(messageIds[i]),
+          ))
+          .write(MessageRowsCompanion(messageOrder: Value(temporaryStart + i)));
+    }
+    for (var i = 0; i < messageIds.length; i++) {
+      await (_db.update(_db.messageRows)..where(
+            (t) =>
+                t.conversationId.equals(conversationId) &
+                t.id.equals(messageIds[i]),
+          ))
           .write(MessageRowsCompanion(messageOrder: Value(i)));
     }
   }
@@ -1807,14 +1852,10 @@ class ChatDatabaseRepository {
 
   DateTime _dateTimeFromSqlite(Object? value) {
     if (value is int) {
-      return DateTime.fromMillisecondsSinceEpoch(
-        value * Duration.millisecondsPerSecond,
-      );
+      return DateTime.fromMicrosecondsSinceEpoch(value);
     }
     if (value is num) {
-      return DateTime.fromMillisecondsSinceEpoch(
-        value.toInt() * Duration.millisecondsPerSecond,
-      );
+      return DateTime.fromMicrosecondsSinceEpoch(value.toInt());
     }
     throw StateError('Invalid SQLite DateTime value: $value.');
   }

@@ -568,8 +568,247 @@ i1.GeneratedColumn<String> _column_37(String aliasedName) =>
       type: i1.DriftSqlType.string,
       $customConstraints: 'NOT NULL',
     );
+
+final class Schema3 extends i0.VersionedSchema {
+  Schema3({required super.database}) : super(version: 3);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    conversationRows,
+    messageRows,
+    conversationMcpServerRows,
+    toolEventRows,
+    geminiThoughtSignatureRows,
+    chatStorageMetaRows,
+    idxConversationsUpdatedAt,
+    idxConversationsAssistant,
+    idxMessagesConversationOrder,
+    idxMessagesConversationTimestamp,
+    idxMessagesGroup,
+  ];
+  late final Shape0 conversationRows = Shape0(
+    source: i0.VersionedTable(
+      entityName: 'conversation_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_38,
+        _column_7,
+        _column_8,
+        _column_39,
+        _column_10,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape1 messageRows = Shape1(
+    source: i0.VersionedTable(
+      entityName: 'message_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(id)',
+        'UNIQUE(conversation_id, message_order)',
+        'UNIQUE(conversation_id, group_id, version)',
+      ],
+      columns: [
+        _column_0,
+        _column_11,
+        _column_40,
+        _column_13,
+        _column_14,
+        _column_15,
+        _column_16,
+        _column_41,
+        _column_18,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+        _column_23,
+        _column_24,
+        _column_42,
+        _column_43,
+        _column_44,
+        _column_45,
+        _column_46,
+        _column_47,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape2 conversationMcpServerRows = Shape2(
+    source: i0.VersionedTable(
+      entityName: 'conversation_mcp_server_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(conversation_id, server_id)',
+        'UNIQUE(conversation_id, ordinal)',
+      ],
+      columns: [_column_11, _column_31, _column_48],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape3 toolEventRows = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'tool_event_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(message_id)'],
+      columns: [_column_33, _column_34],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape4 geminiThoughtSignatureRows = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'gemini_thought_signature_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(message_id)'],
+      columns: [_column_33, _column_35],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape5 chatStorageMetaRows = Shape5(
+    source: i0.VersionedTable(
+      entityName: 'chat_storage_meta_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_36, _column_37],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index idxConversationsUpdatedAt = i1.Index(
+    'idx_conversations_updated_at',
+    'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
+  );
+  final i1.Index idxConversationsAssistant = i1.Index(
+    'idx_conversations_assistant',
+    'CREATE INDEX idx_conversations_assistant ON conversation_rows (assistant_id)',
+  );
+  final i1.Index idxMessagesConversationOrder = i1.Index(
+    'idx_messages_conversation_order',
+    'CREATE INDEX idx_messages_conversation_order ON message_rows (conversation_id, message_order, id)',
+  );
+  final i1.Index idxMessagesConversationTimestamp = i1.Index(
+    'idx_messages_conversation_timestamp',
+    'CREATE INDEX idx_messages_conversation_timestamp ON message_rows (conversation_id, timestamp, id)',
+  );
+  final i1.Index idxMessagesGroup = i1.Index(
+    'idx_messages_group',
+    'CREATE INDEX idx_messages_group ON message_rows (conversation_id, group_id, version, id)',
+  );
+}
+
+i1.GeneratedColumn<int> _column_38(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'truncate_index',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL DEFAULT (-1) CHECK (truncate_index >= -1)',
+      defaultValue: const i1.CustomExpression('-1'),
+    );
+i1.GeneratedColumn<int> _column_39(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'last_summarized_message_count',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints:
+          'NOT NULL DEFAULT 0 CHECK (last_summarized_message_count >= 0)',
+      defaultValue: const i1.CustomExpression('0'),
+    );
+i1.GeneratedColumn<String> _column_40(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'role',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL CHECK (role IS NOT \'\')',
+    );
+i1.GeneratedColumn<int> _column_41(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'total_tokens',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL CHECK (total_tokens >= 0)',
+    );
+i1.GeneratedColumn<int> _column_42(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'version',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL DEFAULT 0 CHECK (version >= 0)',
+      defaultValue: const i1.CustomExpression('0'),
+    );
+i1.GeneratedColumn<int> _column_43(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'prompt_tokens',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL CHECK (prompt_tokens >= 0)',
+    );
+i1.GeneratedColumn<int> _column_44(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'completion_tokens',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL CHECK (completion_tokens >= 0)',
+    );
+i1.GeneratedColumn<int> _column_45(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'cached_tokens',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL CHECK (cached_tokens >= 0)',
+    );
+i1.GeneratedColumn<int> _column_46(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'duration_ms',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL CHECK (duration_ms >= 0)',
+    );
+i1.GeneratedColumn<int> _column_47(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'message_order',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL CHECK (message_order >= 0)',
+    );
+i1.GeneratedColumn<int> _column_48(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'ordinal',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL CHECK (ordinal >= 0)',
+    );
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
+  required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -578,6 +817,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from1To2(migrator, schema);
         return 2;
+      case 2:
+        final schema = Schema3(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from2To3(migrator, schema);
+        return 3;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -586,6 +830,7 @@ i0.MigrationStepWithVersion migrationSteps({
 
 i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
+  required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
 }) => i0.VersionedSchema.stepByStepHelper(
-  step: migrationSteps(from1To2: from1To2),
+  step: migrationSteps(from1To2: from1To2, from2To3: from2To3),
 );

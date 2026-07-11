@@ -8,21 +8,44 @@ import 'app_database.steps.dart';
 
 part 'app_database.g.dart';
 
-@TableIndex(name: 'idx_conversations_updated_at', columns: {#updatedAt})
+class MicrosecondDateTimeConverter extends TypeConverter<DateTime, int> {
+  const MicrosecondDateTimeConverter();
+
+  @override
+  DateTime fromSql(int fromDb) => DateTime.fromMicrosecondsSinceEpoch(fromDb);
+
+  @override
+  int toSql(DateTime value) => value.microsecondsSinceEpoch;
+}
+
+@TableIndex(
+  name: 'idx_conversations_updated_at',
+  columns: {
+    IndexedColumn(#updatedAt, orderBy: OrderingMode.desc),
+    IndexedColumn(#id, orderBy: OrderingMode.asc),
+  },
+)
 @TableIndex(name: 'idx_conversations_assistant', columns: {#assistantId})
 class ConversationRows extends Table {
   TextColumn get id => text()();
   TextColumn get title => text()();
-  DateTimeColumn get createdAt => dateTime()();
-  DateTimeColumn get updatedAt => dateTime()();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
   BoolColumn get isPinned => boolean().withDefault(const Constant(false))();
   TextColumn get assistantId => text().nullable()();
-  IntColumn get truncateIndex => integer().withDefault(const Constant(-1))();
+  IntColumn get truncateIndex => integer()
+      // ignore: recursive_getters
+      .check(truncateIndex.isBiggerOrEqualValue(-1))
+      .withDefault(const Constant(-1))();
   TextColumn get versionSelectionsJson =>
       text().withDefault(const Constant('{}'))();
   TextColumn get summary => text().nullable()();
-  IntColumn get lastSummarizedMessageCount =>
-      integer().withDefault(const Constant(0))();
+  IntColumn get lastSummarizedMessageCount => integer()
+      // ignore: recursive_getters
+      .check(lastSummarizedMessageCount.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
   TextColumn get chatSuggestionsJson =>
       text().withDefault(const Constant('[]'))();
 
@@ -32,49 +55,93 @@ class ConversationRows extends Table {
 
 @TableIndex(
   name: 'idx_messages_conversation_order',
-  columns: {#conversationId, #messageOrder},
+  columns: {#conversationId, #messageOrder, #id},
 )
 @TableIndex(
   name: 'idx_messages_conversation_timestamp',
-  columns: {#conversationId, #timestamp},
+  columns: {#conversationId, #timestamp, #id},
 )
-@TableIndex(name: 'idx_messages_group', columns: {#groupId})
+@TableIndex(
+  name: 'idx_messages_group',
+  columns: {#conversationId, #groupId, #version, #id},
+)
 class MessageRows extends Table {
   TextColumn get id => text()();
   TextColumn get conversationId =>
       text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
-  TextColumn get role => text()();
+  TextColumn get role =>
+      text()
+      // ignore: recursive_getters
+      .check(role.isNotValue(''))();
   TextColumn get content => text()();
-  DateTimeColumn get timestamp => dateTime()();
+  IntColumn get timestamp =>
+      integer().map(const MicrosecondDateTimeConverter())();
   TextColumn get modelId => text().nullable()();
   TextColumn get providerId => text().nullable()();
-  IntColumn get totalTokens => integer().nullable()();
+  IntColumn get totalTokens => integer()
+      // ignore: recursive_getters
+      .check(totalTokens.isBiggerOrEqualValue(0))
+      .nullable()();
   BoolColumn get isStreaming => boolean().withDefault(const Constant(false))();
   TextColumn get reasoningText => text().nullable()();
-  DateTimeColumn get reasoningStartAt => dateTime().nullable()();
-  DateTimeColumn get reasoningFinishedAt => dateTime().nullable()();
+  IntColumn get reasoningStartAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+  IntColumn get reasoningFinishedAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
   TextColumn get translation => text().nullable()();
   TextColumn get reasoningSegmentsJson => text().nullable()();
   TextColumn get groupId => text().nullable()();
-  IntColumn get version => integer().withDefault(const Constant(0))();
-  IntColumn get promptTokens => integer().nullable()();
-  IntColumn get completionTokens => integer().nullable()();
-  IntColumn get cachedTokens => integer().nullable()();
-  IntColumn get durationMs => integer().nullable()();
-  IntColumn get messageOrder => integer()();
+  IntColumn get version => integer()
+      // ignore: recursive_getters
+      .check(version.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+  IntColumn get promptTokens => integer()
+      // ignore: recursive_getters
+      .check(promptTokens.isBiggerOrEqualValue(0))
+      .nullable()();
+  IntColumn get completionTokens => integer()
+      // ignore: recursive_getters
+      .check(completionTokens.isBiggerOrEqualValue(0))
+      .nullable()();
+  IntColumn get cachedTokens => integer()
+      // ignore: recursive_getters
+      .check(cachedTokens.isBiggerOrEqualValue(0))
+      .nullable()();
+  IntColumn get durationMs => integer()
+      // ignore: recursive_getters
+      .check(durationMs.isBiggerOrEqualValue(0))
+      .nullable()();
+  IntColumn get messageOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(messageOrder.isBiggerOrEqualValue(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, messageOrder},
+    {conversationId, groupId, version},
+  ];
 }
 
 class ConversationMcpServerRows extends Table {
   TextColumn get conversationId =>
       text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
   TextColumn get serverId => text()();
-  IntColumn get ordinal => integer()();
+  IntColumn get ordinal =>
+      integer()
+      // ignore: recursive_getters
+      .check(ordinal.isBiggerOrEqualValue(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {conversationId, serverId};
+
+  @override
+  List<Set<Column<Object>>> get uniqueKeys => [
+    {conversationId, ordinal},
+  ];
 }
 
 class ToolEventRows extends Table {
@@ -118,9 +185,9 @@ class AppDatabase extends _$AppDatabase {
 
   static const databaseFileName = 'kelivo.sqlite';
 
-  // Version 2 establishes the Database Kernel v2 format boundary. Its physical
-  // tables intentionally match unpublished v1; future changes use snapshots.
-  static const currentSchemaVersion = 2;
+  // Version 2 established the Database Kernel v2 format boundary. Version 3
+  // adds enforced invariants, stable ordering indexes, and microsecond time.
+  static const currentSchemaVersion = 3;
   static const oldestMigratableSchemaVersion = 1;
 
   factory AppDatabase.open({File? file}) {
@@ -160,6 +227,63 @@ class AppDatabase extends _$AppDatabase {
       from1To2: (migrator, schema) async {
         // No physical schema change: v2 freezes the first supported migration
         // boundary before later kernel versions add constraints and indexes.
+      },
+      from2To3: (migrator, schema) async {
+        final foreignKeysEnabled = (await customSelect(
+          'PRAGMA foreign_keys;',
+        ).getSingle()).read<bool>('foreign_keys');
+        if (foreignKeysEnabled) {
+          await customStatement('PRAGMA foreign_keys = OFF;');
+        }
+        try {
+          await transaction(() async {
+            await migrator.alterTable(
+              TableMigration(
+                conversationRows,
+                columnTransformer: {
+                  conversationRows.createdAt: const CustomExpression<int>(
+                    'created_at * 1000000',
+                  ),
+                  conversationRows.updatedAt: const CustomExpression<int>(
+                    'updated_at * 1000000',
+                  ),
+                },
+              ),
+            );
+            await migrator.alterTable(
+              TableMigration(
+                messageRows,
+                columnTransformer: {
+                  messageRows.timestamp: const CustomExpression<int>(
+                    'timestamp * 1000000',
+                  ),
+                  messageRows.reasoningStartAt: const CustomExpression<int>(
+                    'reasoning_start_at * 1000000',
+                  ),
+                  messageRows.reasoningFinishedAt: const CustomExpression<int>(
+                    'reasoning_finished_at * 1000000',
+                  ),
+                },
+              ),
+            );
+            await migrator.alterTable(
+              TableMigration(conversationMcpServerRows),
+            );
+
+            await migrator.drop(idxConversationsUpdatedAt);
+            await migrator.drop(idxMessagesConversationOrder);
+            await migrator.drop(idxMessagesConversationTimestamp);
+            await migrator.drop(idxMessagesGroup);
+            await migrator.createIndex(idxConversationsUpdatedAt);
+            await migrator.createIndex(idxMessagesConversationOrder);
+            await migrator.createIndex(idxMessagesConversationTimestamp);
+            await migrator.createIndex(idxMessagesGroup);
+          });
+        } finally {
+          if (foreignKeysEnabled) {
+            await customStatement('PRAGMA foreign_keys = ON;');
+          }
+        }
       },
     ),
     beforeOpen: (details) async {

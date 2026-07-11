@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 1：DB2-01/02/03 已完成）
-> - 当前结论：Phase 1 已冻结 schema migration、删除同步业务查询，并建立进程级 `ChatDatabaseGateway`：同一路径并发 acquire/simultaneous `ChatService.init()` single-flight，共享一个 repository，lease 归零才关闭，初始化失败释放并可重试，live lease 期间拒绝路径切换。下一步 DB2-04 将用 schema v3 强制 FK/UNIQUE/CHECK、微秒时间、稳定排序与查询索引。D4 renderer/RSS 超标留在 Phase 4；raw durability、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 1：DB2-01～04 已完成）
+> - 当前结论：Phase 1 已冻结逐版本 schema migration、删除同步业务查询、建立 single-flight `ChatDatabaseGateway`，并以 schema v3 强制 FK/UNIQUE/CHECK、微秒时间和稳定查询索引。v2→v3 在单一事务内重建约束并换算秒→微秒，失败保持 v2 原样；现有消息重排使用两阶段序号，不与唯一约束冲突。下一步 DB2-05 将把 service/controller 的多步写收口为 repository 事务化领域 commands。D4 renderer/RSS 超标留在 Phase 4；raw durability、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -37,7 +37,7 @@
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
-| Phase 1：Database Kernel v2 | 3 / 8 | `进行中` | schema/migration、异步查询和 single-flight gateway 已闭环；领域约束尚待 schema v3 |
+| Phase 1：Database Kernel v2 | 4 / 8 | `进行中` | schema/migration、异步查询、single-flight gateway 与 schema v3 领域约束已闭环；事务化领域 commands 待收口 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
@@ -74,6 +74,7 @@
 | DB2-01 schema snapshots/migration | `已完成` | analyze 通过；migration/install/snapshot/backup 定向 64 项；全量 1139/1139 通过 | 2026-07-11 | 冻结 v1/v2 JSON snapshot 与生成式 schema helper；逐版本 `migrateAndValidate`、数据保留、磁盘 v1→v2 installation gate、future schema 拒绝均覆盖 |
 | DB2-02 async database path | `已完成` | analyze 通过；lazy history/chat/import/backup/stats 定向 111 项；全量 1139/1139 通过 | 2026-07-11 | `_syncDb`、同步 repository query/count/search/artifact API 与 raw row mapper 全部删除；业务 SQLite executor 唯一为 `NativeDatabase.createInBackground`；窗口分页和版本补载均 await，渲染 getter 只读内存，不执行 SQLite |
 | DB2-03 single-flight gateway | `已完成` | analyze 通过；gateway/chat/lazy history 定向 31 项；全量 1142/1142 通过 | 2026-07-11 | 3 路并发 acquire 复用同一 repository；引用计数最后释放才 close；异路径拒绝；坏库初始化保留证据并可重试；ChatService init/失败/close/dispose 接入 lease |
+| DB2-04 constraints/microsecond/indexes | `已完成` | analyze 通过；migration/constraints/order/snapshot/merge 定向 24 项；全量 1153/1153 通过 | 2026-07-11 | schema v3 冻结；FK/UNIQUE/CHECK、微秒 DateTime converter、稳定 tiebreaker 索引与 EXPLAIN QUERY PLAN 覆盖；v2→v3 秒值换算和三表重建处于同一事务，约束失败保持 v2；删除/版本重排使用两阶段临时 order，删除+压缩处于同一事务，避免唯一约束瞬时冲突与半提交 |
 | P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；当前快速门禁 analyze + 49 tests；里程碑全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
@@ -287,7 +288,7 @@ dart run tool/run_restore_process_harness.dart \
 | DB2-01 | Schema snapshots 与逐版本 migration tests | PD-13、P0-09 | `已完成` | v1→每个 v2 版本 migrateAndValidate | 本里程碑提交（2026-07-11） | `drift_schema_v1/v2.json` + 生成式 step/schema helper；v1→v2 显式格式边界，物理表在 DB2-04 前保持一致；installation gate 只迁移完整校验通过的 1..current，未来/过旧/损坏 schema 拒绝。定向 64 项、全量 1139 项与 analyze 通过 |
 | DB2-02 | 删除 `_syncDb` 和同步数据库 API | P0-03 | `已完成` | profile 中 UI isolate SQLite 调用为 0 | 本里程碑提交（2026-07-11） | 删除第二个 raw handle、全部同步 repository query/count/search/tool/signature API 与 sqlite row mapper；聊天分页/完整上下文/版本组、全局搜索、统计、导入/merge 改走后台 Drift Future，UI 同步 getter 仅访问已加载内存。静态通路审计无业务同步 SQLite 入口；analyze、定向 111 项、全量 1139 项通过。恢复/备份专用 raw SQLite 能力继续隔离在 maintenance API，并由 DB2-03/07 收口生命周期与平台证据 |
 | DB2-03 | 单一 gateway、single-flight init、异步 DAO | DB2-02 | `已完成` | 应用内只有一个受控数据库通路 | 本里程碑提交（2026-07-11） | `ChatDatabaseGateway.instance` 是 live DB 唯一入口；同 canonical path 的并发 acquire 与 ChatService init single-flight，lease 引用归零后串行关闭，关闭期间新 acquire 等待，持有 lease 时拒绝另一 DB；open/init 失败关闭 handle、清除 flight 后可重试且不覆盖坏文件。candidate/restore 保持明确 maintenance API。定向 31 项、全量 1142 项与 analyze 通过 |
-| DB2-04 | FK/UNIQUE/CHECK/微秒时间/索引 | DB2-01 | `未开始` | schema 强制领域不变量；query plan 使用索引 | — | — |
+| DB2-04 | FK/UNIQUE/CHECK/微秒时间/索引 | DB2-01 | `已完成` | schema 强制领域不变量；query plan 使用索引 | 本里程碑提交（2026-07-11） | schema v3 对 conversation/message/MCP 数值、role、order、group-version、ordinal 强制 CHECK/UNIQUE/FK；时间按 epoch 微秒无损往返，v2 秒时间原子换算；会话、消息时间、版本组查询均由 EXPLAIN 证明使用稳定复合索引；两阶段 order 改写与删除事务避免短暂 UNIQUE 冲突/半提交。逐版本 migration、失败原子性、约束 happy/boundary/error、order/snapshot/merge 定向 24 项，全量 1153 项与 analyze 通过 |
 | DB2-05 | 事务化领域 commands | DB2-03/04 | `未开始` | send/version/delete/fork 等不再由 service 拼多步提交 | — | — |
 | DB2-06 | DB identity、receipt、integrity/recovery | P0-06、DB2-03 | `未开始` | unclean/missing/corrupt DB 进入确定性恢复流程 | — | — |
 | DB2-07 | 五平台 SQLite/FTS/Backup/文件能力 | DB2-03 | `未开始` | 五平台能力矩阵有实际运行证据 | — | — |

@@ -27,28 +27,24 @@ class $ConversationRowsTable extends ConversationRows
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _createdAtMeta = const VerificationMeta(
-    'createdAt',
-  );
   @override
-  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
-    'updatedAt',
-  );
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ConversationRowsTable.$convertercreatedAt);
   @override
-  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
-    'updated_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ConversationRowsTable.$converterupdatedAt);
   static const VerificationMeta _isPinnedMeta = const VerificationMeta(
     'isPinned',
   );
@@ -83,6 +79,7 @@ class $ConversationRowsTable extends ConversationRows
     'truncate_index',
     aliasedName,
     false,
+    check: () => ComparableExpr(truncateIndex).isBiggerOrEqualValue(-1),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
     defaultValue: const Constant(-1),
@@ -118,6 +115,8 @@ class $ConversationRowsTable extends ConversationRows
         'last_summarized_message_count',
         aliasedName,
         false,
+        check: () =>
+            ComparableExpr(lastSummarizedMessageCount).isBiggerOrEqualValue(0),
         type: DriftSqlType.int,
         requiredDuringInsert: false,
         defaultValue: const Constant(0),
@@ -172,22 +171,6 @@ class $ConversationRowsTable extends ConversationRows
       );
     } else if (isInserting) {
       context.missing(_titleMeta);
-    }
-    if (data.containsKey('created_at')) {
-      context.handle(
-        _createdAtMeta,
-        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_createdAtMeta);
-    }
-    if (data.containsKey('updated_at')) {
-      context.handle(
-        _updatedAtMeta,
-        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_updatedAtMeta);
     }
     if (data.containsKey('is_pinned')) {
       context.handle(
@@ -263,14 +246,18 @@ class $ConversationRowsTable extends ConversationRows
         DriftSqlType.string,
         data['${effectivePrefix}title'],
       )!,
-      createdAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}created_at'],
-      )!,
-      updatedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}updated_at'],
-      )!,
+      createdAt: $ConversationRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $ConversationRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
       isPinned: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_pinned'],
@@ -306,6 +293,11 @@ class $ConversationRowsTable extends ConversationRows
   $ConversationRowsTable createAlias(String alias) {
     return $ConversationRowsTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
 }
 
 class ConversationRow extends DataClass implements Insertable<ConversationRow> {
@@ -338,8 +330,16 @@ class ConversationRow extends DataClass implements Insertable<ConversationRow> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['title'] = Variable<String>(title);
-    map['created_at'] = Variable<DateTime>(createdAt);
-    map['updated_at'] = Variable<DateTime>(updatedAt);
+    {
+      map['created_at'] = Variable<int>(
+        $ConversationRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $ConversationRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
     map['is_pinned'] = Variable<bool>(isPinned);
     if (!nullToAbsent || assistantId != null) {
       map['assistant_id'] = Variable<String>(assistantId);
@@ -569,8 +569,8 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
   static Insertable<ConversationRow> custom({
     Expression<String>? id,
     Expression<String>? title,
-    Expression<DateTime>? createdAt,
-    Expression<DateTime>? updatedAt,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
     Expression<bool>? isPinned,
     Expression<String>? assistantId,
     Expression<int>? truncateIndex,
@@ -641,10 +641,14 @@ class ConversationRowsCompanion extends UpdateCompanion<ConversationRow> {
       map['title'] = Variable<String>(title.value);
     }
     if (createdAt.present) {
-      map['created_at'] = Variable<DateTime>(createdAt.value);
+      map['created_at'] = Variable<int>(
+        $ConversationRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
     }
     if (updatedAt.present) {
-      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+      map['updated_at'] = Variable<int>(
+        $ConversationRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
     }
     if (isPinned.present) {
       map['is_pinned'] = Variable<bool>(isPinned.value);
@@ -734,6 +738,7 @@ class $MessageRowsTable extends MessageRows
     'role',
     aliasedName,
     false,
+    check: () => role.isNotValue(''),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
@@ -748,17 +753,15 @@ class $MessageRowsTable extends MessageRows
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _timestampMeta = const VerificationMeta(
-    'timestamp',
-  );
   @override
-  late final GeneratedColumn<DateTime> timestamp = GeneratedColumn<DateTime>(
-    'timestamp',
-    aliasedName,
-    false,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumnWithTypeConverter<DateTime, int> timestamp =
+      GeneratedColumn<int>(
+        'timestamp',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($MessageRowsTable.$convertertimestamp);
   static const VerificationMeta _modelIdMeta = const VerificationMeta(
     'modelId',
   );
@@ -789,6 +792,7 @@ class $MessageRowsTable extends MessageRows
     'total_tokens',
     aliasedName,
     true,
+    check: () => ComparableExpr(totalTokens).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -818,29 +822,24 @@ class $MessageRowsTable extends MessageRows
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _reasoningStartAtMeta = const VerificationMeta(
-    'reasoningStartAt',
-  );
   @override
-  late final GeneratedColumn<DateTime> reasoningStartAt =
-      GeneratedColumn<DateTime>(
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> reasoningStartAt =
+      GeneratedColumn<int>(
         'reasoning_start_at',
         aliasedName,
         true,
-        type: DriftSqlType.dateTime,
+        type: DriftSqlType.int,
         requiredDuringInsert: false,
-      );
-  static const VerificationMeta _reasoningFinishedAtMeta =
-      const VerificationMeta('reasoningFinishedAt');
+      ).withConverter<DateTime?>($MessageRowsTable.$converterreasoningStartAtn);
   @override
-  late final GeneratedColumn<DateTime> reasoningFinishedAt =
-      GeneratedColumn<DateTime>(
-        'reasoning_finished_at',
-        aliasedName,
-        true,
-        type: DriftSqlType.dateTime,
-        requiredDuringInsert: false,
-      );
+  late final GeneratedColumnWithTypeConverter<DateTime?, int>
+  reasoningFinishedAt = GeneratedColumn<int>(
+    'reasoning_finished_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  ).withConverter<DateTime?>($MessageRowsTable.$converterreasoningFinishedAtn);
   static const VerificationMeta _translationMeta = const VerificationMeta(
     'translation',
   );
@@ -882,6 +881,7 @@ class $MessageRowsTable extends MessageRows
     'version',
     aliasedName,
     false,
+    check: () => ComparableExpr(version).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
@@ -894,6 +894,7 @@ class $MessageRowsTable extends MessageRows
     'prompt_tokens',
     aliasedName,
     true,
+    check: () => ComparableExpr(promptTokens).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -905,6 +906,7 @@ class $MessageRowsTable extends MessageRows
     'completion_tokens',
     aliasedName,
     true,
+    check: () => ComparableExpr(completionTokens).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -916,6 +918,7 @@ class $MessageRowsTable extends MessageRows
     'cached_tokens',
     aliasedName,
     true,
+    check: () => ComparableExpr(cachedTokens).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -927,6 +930,7 @@ class $MessageRowsTable extends MessageRows
     'duration_ms',
     aliasedName,
     true,
+    check: () => ComparableExpr(durationMs).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
@@ -938,6 +942,7 @@ class $MessageRowsTable extends MessageRows
     'message_order',
     aliasedName,
     false,
+    check: () => ComparableExpr(messageOrder).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
@@ -1009,14 +1014,6 @@ class $MessageRowsTable extends MessageRows
     } else if (isInserting) {
       context.missing(_contentMeta);
     }
-    if (data.containsKey('timestamp')) {
-      context.handle(
-        _timestampMeta,
-        timestamp.isAcceptableOrUnknown(data['timestamp']!, _timestampMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_timestampMeta);
-    }
     if (data.containsKey('model_id')) {
       context.handle(
         _modelIdMeta,
@@ -1053,24 +1050,6 @@ class $MessageRowsTable extends MessageRows
         reasoningText.isAcceptableOrUnknown(
           data['reasoning_text']!,
           _reasoningTextMeta,
-        ),
-      );
-    }
-    if (data.containsKey('reasoning_start_at')) {
-      context.handle(
-        _reasoningStartAtMeta,
-        reasoningStartAt.isAcceptableOrUnknown(
-          data['reasoning_start_at']!,
-          _reasoningStartAtMeta,
-        ),
-      );
-    }
-    if (data.containsKey('reasoning_finished_at')) {
-      context.handle(
-        _reasoningFinishedAtMeta,
-        reasoningFinishedAt.isAcceptableOrUnknown(
-          data['reasoning_finished_at']!,
-          _reasoningFinishedAtMeta,
         ),
       );
     }
@@ -1154,6 +1133,11 @@ class $MessageRowsTable extends MessageRows
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {conversationId, messageOrder},
+    {conversationId, groupId, version},
+  ];
+  @override
   MessageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return MessageRow(
@@ -1173,10 +1157,12 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.string,
         data['${effectivePrefix}content'],
       )!,
-      timestamp: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}timestamp'],
-      )!,
+      timestamp: $MessageRowsTable.$convertertimestamp.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}timestamp'],
+        )!,
+      ),
       modelId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}model_id'],
@@ -1197,14 +1183,19 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.string,
         data['${effectivePrefix}reasoning_text'],
       ),
-      reasoningStartAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}reasoning_start_at'],
+      reasoningStartAt: $MessageRowsTable.$converterreasoningStartAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}reasoning_start_at'],
+        ),
       ),
-      reasoningFinishedAt: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}reasoning_finished_at'],
-      ),
+      reasoningFinishedAt: $MessageRowsTable.$converterreasoningFinishedAtn
+          .fromSql(
+            attachedDatabase.typeMapping.read(
+              DriftSqlType.int,
+              data['${effectivePrefix}reasoning_finished_at'],
+            ),
+          ),
       translation: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}translation'],
@@ -1248,6 +1239,17 @@ class $MessageRowsTable extends MessageRows
   $MessageRowsTable createAlias(String alias) {
     return $MessageRowsTable(attachedDatabase, alias);
   }
+
+  static TypeConverter<DateTime, int> $convertertimestamp =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterreasoningStartAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterreasoningStartAtn =
+      NullAwareTypeConverter.wrap($converterreasoningStartAt);
+  static TypeConverter<DateTime, int> $converterreasoningFinishedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterreasoningFinishedAtn =
+      NullAwareTypeConverter.wrap($converterreasoningFinishedAt);
 }
 
 class MessageRow extends DataClass implements Insertable<MessageRow> {
@@ -1302,7 +1304,11 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     map['conversation_id'] = Variable<String>(conversationId);
     map['role'] = Variable<String>(role);
     map['content'] = Variable<String>(content);
-    map['timestamp'] = Variable<DateTime>(timestamp);
+    {
+      map['timestamp'] = Variable<int>(
+        $MessageRowsTable.$convertertimestamp.toSql(timestamp),
+      );
+    }
     if (!nullToAbsent || modelId != null) {
       map['model_id'] = Variable<String>(modelId);
     }
@@ -1317,10 +1323,16 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       map['reasoning_text'] = Variable<String>(reasoningText);
     }
     if (!nullToAbsent || reasoningStartAt != null) {
-      map['reasoning_start_at'] = Variable<DateTime>(reasoningStartAt);
+      map['reasoning_start_at'] = Variable<int>(
+        $MessageRowsTable.$converterreasoningStartAtn.toSql(reasoningStartAt),
+      );
     }
     if (!nullToAbsent || reasoningFinishedAt != null) {
-      map['reasoning_finished_at'] = Variable<DateTime>(reasoningFinishedAt);
+      map['reasoning_finished_at'] = Variable<int>(
+        $MessageRowsTable.$converterreasoningFinishedAtn.toSql(
+          reasoningFinishedAt,
+        ),
+      );
     }
     if (!nullToAbsent || translation != null) {
       map['translation'] = Variable<String>(translation);
@@ -1734,14 +1746,14 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<String>? conversationId,
     Expression<String>? role,
     Expression<String>? content,
-    Expression<DateTime>? timestamp,
+    Expression<int>? timestamp,
     Expression<String>? modelId,
     Expression<String>? providerId,
     Expression<int>? totalTokens,
     Expression<bool>? isStreaming,
     Expression<String>? reasoningText,
-    Expression<DateTime>? reasoningStartAt,
-    Expression<DateTime>? reasoningFinishedAt,
+    Expression<int>? reasoningStartAt,
+    Expression<int>? reasoningFinishedAt,
     Expression<String>? translation,
     Expression<String>? reasoningSegmentsJson,
     Expression<String>? groupId,
@@ -1848,7 +1860,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       map['content'] = Variable<String>(content.value);
     }
     if (timestamp.present) {
-      map['timestamp'] = Variable<DateTime>(timestamp.value);
+      map['timestamp'] = Variable<int>(
+        $MessageRowsTable.$convertertimestamp.toSql(timestamp.value),
+      );
     }
     if (modelId.present) {
       map['model_id'] = Variable<String>(modelId.value);
@@ -1866,11 +1880,17 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       map['reasoning_text'] = Variable<String>(reasoningText.value);
     }
     if (reasoningStartAt.present) {
-      map['reasoning_start_at'] = Variable<DateTime>(reasoningStartAt.value);
+      map['reasoning_start_at'] = Variable<int>(
+        $MessageRowsTable.$converterreasoningStartAtn.toSql(
+          reasoningStartAt.value,
+        ),
+      );
     }
     if (reasoningFinishedAt.present) {
-      map['reasoning_finished_at'] = Variable<DateTime>(
-        reasoningFinishedAt.value,
+      map['reasoning_finished_at'] = Variable<int>(
+        $MessageRowsTable.$converterreasoningFinishedAtn.toSql(
+          reasoningFinishedAt.value,
+        ),
       );
     }
     if (translation.present) {
@@ -1977,6 +1997,7 @@ class $ConversationMcpServerRowsTable extends ConversationMcpServerRows
     'ordinal',
     aliasedName,
     false,
+    check: () => ComparableExpr(ordinal).isBiggerOrEqualValue(0),
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
@@ -2026,6 +2047,10 @@ class $ConversationMcpServerRowsTable extends ConversationMcpServerRows
 
   @override
   Set<GeneratedColumn> get $primaryKey => {conversationId, serverId};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {conversationId, ordinal},
+  ];
   @override
   ConversationMcpServerRow map(
     Map<String, dynamic> data, {
@@ -2902,7 +2927,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $ChatStorageMetaRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
-    'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at)',
+    'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
   );
   late final Index idxConversationsAssistant = Index(
     'idx_conversations_assistant',
@@ -2910,15 +2935,15 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final Index idxMessagesConversationOrder = Index(
     'idx_messages_conversation_order',
-    'CREATE INDEX idx_messages_conversation_order ON message_rows (conversation_id, message_order)',
+    'CREATE INDEX idx_messages_conversation_order ON message_rows (conversation_id, message_order, id)',
   );
   late final Index idxMessagesConversationTimestamp = Index(
     'idx_messages_conversation_timestamp',
-    'CREATE INDEX idx_messages_conversation_timestamp ON message_rows (conversation_id, timestamp)',
+    'CREATE INDEX idx_messages_conversation_timestamp ON message_rows (conversation_id, timestamp, id)',
   );
   late final Index idxMessagesGroup = Index(
     'idx_messages_group',
-    'CREATE INDEX idx_messages_group ON message_rows (group_id)',
+    'CREATE INDEX idx_messages_group ON message_rows (conversation_id, group_id, version, id)',
   );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
@@ -3079,15 +3104,17 @@ class $$ConversationRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get createdAt => $composableBuilder(
-    column: $table.createdAt,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
-  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
-    column: $table.updatedAt,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<bool> get isPinned => $composableBuilder(
     column: $table.isPinned,
@@ -3196,12 +3223,12 @@ class $$ConversationRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+  ColumnOrderings<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3257,10 +3284,10 @@ class $$ConversationRowsTableAnnotationComposer
   GeneratedColumn<String> get title =>
       $composableBuilder(column: $table.title, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get createdAt =>
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get updatedAt =>
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 
   GeneratedColumn<bool> get isPinned =>
@@ -3666,10 +3693,11 @@ class $$MessageRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get timestamp => $composableBuilder(
-    column: $table.timestamp,
-    builder: (column) => ColumnFilters(column),
-  );
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get timestamp =>
+      $composableBuilder(
+        column: $table.timestamp,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
 
   ColumnFilters<String> get modelId => $composableBuilder(
     column: $table.modelId,
@@ -3696,14 +3724,16 @@ class $$MessageRowsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<DateTime> get reasoningStartAt => $composableBuilder(
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int>
+  get reasoningStartAt => $composableBuilder(
     column: $table.reasoningStartAt,
-    builder: (column) => ColumnFilters(column),
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
-  ColumnFilters<DateTime> get reasoningFinishedAt => $composableBuilder(
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int>
+  get reasoningFinishedAt => $composableBuilder(
     column: $table.reasoningFinishedAt,
-    builder: (column) => ColumnFilters(column),
+    builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
   ColumnFilters<String> get translation => $composableBuilder(
@@ -3851,7 +3881,7 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get timestamp => $composableBuilder(
+  ColumnOrderings<int> get timestamp => $composableBuilder(
     column: $table.timestamp,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3881,12 +3911,12 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get reasoningStartAt => $composableBuilder(
+  ColumnOrderings<int> get reasoningStartAt => $composableBuilder(
     column: $table.reasoningStartAt,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<DateTime> get reasoningFinishedAt => $composableBuilder(
+  ColumnOrderings<int> get reasoningFinishedAt => $composableBuilder(
     column: $table.reasoningFinishedAt,
     builder: (column) => ColumnOrderings(column),
   );
@@ -3978,7 +4008,7 @@ class $$MessageRowsTableAnnotationComposer
   GeneratedColumn<String> get content =>
       $composableBuilder(column: $table.content, builder: (column) => column);
 
-  GeneratedColumn<DateTime> get timestamp =>
+  GeneratedColumnWithTypeConverter<DateTime, int> get timestamp =>
       $composableBuilder(column: $table.timestamp, builder: (column) => column);
 
   GeneratedColumn<String> get modelId =>
@@ -4004,15 +4034,17 @@ class $$MessageRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<DateTime> get reasoningStartAt => $composableBuilder(
-    column: $table.reasoningStartAt,
-    builder: (column) => column,
-  );
+  GeneratedColumnWithTypeConverter<DateTime?, int> get reasoningStartAt =>
+      $composableBuilder(
+        column: $table.reasoningStartAt,
+        builder: (column) => column,
+      );
 
-  GeneratedColumn<DateTime> get reasoningFinishedAt => $composableBuilder(
-    column: $table.reasoningFinishedAt,
-    builder: (column) => column,
-  );
+  GeneratedColumnWithTypeConverter<DateTime?, int> get reasoningFinishedAt =>
+      $composableBuilder(
+        column: $table.reasoningFinishedAt,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<String> get translation => $composableBuilder(
     column: $table.translation,
