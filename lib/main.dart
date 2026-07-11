@@ -34,6 +34,7 @@ import 'core/providers/backup_provider.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
+import 'core/database/database_installation_gate.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
@@ -117,12 +118,31 @@ Future<void> main() async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
-      final migrationDecision = await HiveToSqliteMigrationService.check();
-      if (migrationDecision.needsMigration) {
+      try {
+        final migrationDecision = await HiveToSqliteMigrationService.check();
+        if (migrationDecision.needsMigration) {
+          runApp(
+            MigrationApp(
+              service: HiveToSqliteMigrationService(migrationDecision),
+              restoreOutcome: restoreOutcome?.state,
+            ),
+          );
+          return;
+        }
+        await DatabaseInstallationGate.ensureReady(
+          appDataDirectory: appDataDirectory,
+          allowDatabaseIdentityChange:
+              restoreOutcome?.selectedComponents.contains(
+                RestoreComponent.database,
+              ) ??
+              false,
+        );
+      } catch (error, stackTrace) {
+        stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
+        await _initRestoreFailureWindow();
         runApp(
-          MigrationApp(
-            service: HiveToSqliteMigrationService(migrationDecision),
-            restoreOutcome: restoreOutcome?.state,
+          _RestoreFailureApp(
+            diagnosticCode: restoreFailureDiagnosticCode(error),
           ),
         );
         return;

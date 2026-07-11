@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 0 已完成 P0-01～P0-05/P0-08；继续推进 P0-06）
-> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 的 P0-02 应用层实现已完成：运行期同卷 durable preparation 不改 live，启动 gate 以 operation-ahead 切换/回滚、PID+lease cold ACK 和 terminal archive 在业务开放前只放行完整 target/before；selected missing DB 与 unselected DB/assets 均有 commit/rollback 回归。P0-03 已将普通流式更新合并为单 writer latest-wins 事务 checkpoint，P0-04 已把 active generation 身份从消息窗口分离并清理冷启动 stale streaming。P0-05 已开放 v2 merge：在单个数据库事务中按逻辑 hash 去重、对 conversation/message ID 冲突确定性整会话 remap、保持 order/工具事件/Gemini signature/version selection，并提供用户可见报告；secret-free settings merge 保留本机凭据。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/P0-09/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 0 已完成 P0-01～P0-06/P0-08；继续推进 P0-07）
+> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。P0-03/P0-04 已消除逐 chunk 等待与永久 loading，P0-05 已开放事务化 hash 去重/remap merge。P0-06 在业务 `runApp` 前建立数据库 UUID + installation receipt admission：首次安装/旧库升级可建立身份；已有 receipt 时缺库、坏库、未来 schema、receipt 损坏或未授权 identity 替换均 fail-closed 进入只读恢复页且不创建空库；经 P0-02 验证的 DB restore 可保留 installation ID 并轮换 DB identity。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/P0-09/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -36,7 +36,7 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 6 / 9 | `进行中` | P0-01～P0-05/P0-08 已完成；流式持久化、loading 与事务 merge 止血闭环；下一项 P0-06 |
+| Phase 0：止血与基线 | 7 / 9 | `进行中` | P0-01～P0-06/P0-08 已完成；数据库缺失/损坏不再静默空库；下一项 P0-07 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
@@ -68,6 +68,7 @@
 | `flutter analyze` + `flutter test`（本轮 P0-03） | `已完成` | No issues found；1100/1100 tests passed | 2026-07-10 | 当前 macOS 主机全量通过；另有 checkpoint writer + repository + stream/controller 定向 31 项通过；按 Phase 0 范围纪律未运行真实进程/断电矩阵 |
 | `flutter analyze` + `flutter test`（本轮 P0-04） | `已完成` | No issues found；1107/1107 tests passed | 2026-07-10 | 当前 macOS 主机全量通过；另有 lifecycle/store/repository/service/stream 定向 44 项通过；按 Phase 0 范围纪律未运行真实进程/断电矩阵 |
 | `flutter gen-l10n` + `flutter analyze` + `flutter test`（本轮 P0-05） | `已完成` | untranslated `{}`；No issues found；1112/1112 tests passed | 2026-07-11 | merge repository/DataSync 定向 52 项通过；覆盖无冲突、hash 去重、conversation/message ID 冲突整会话 remap、重复导入幂等、非法 order 事务回滚及本机凭据保留；按范围纪律未运行真实进程/断电矩阵 |
+| `flutter analyze` + `flutter test`（本轮 P0-06） | `已完成` | No issues found；1121/1121 tests passed | 2026-07-11 | installation gate 定向 9 项通过；覆盖首次安装、旧库 adoption、重复启动、缺库、坏库、未来 schema、坏 receipt、identity 替换/恢复轮换；按范围纪律未运行真实进程/断电矩阵 |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
@@ -261,7 +262,7 @@ dart run tool/run_restore_process_harness.dart \
 | P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `已完成` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | 本里程碑提交（2026-07-10） | content/reasoning/tool events 合为完整事务快照；250ms 最小写入起始间隔、in-flight latest-wins、final 丢弃 pending 并等待在途写；final/cancel/error/切会话 flush 均经过 barrier；repository 更新移除 read-before-write。`flutter analyze`；`flutter test`（1100）；相关定向 31 项通过 |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `已完成` | prepare failure、off-window cancel、重启均无永久 loading | 本里程碑提交（2026-07-10） | send/regenerate/tool continuation 的 prepare 异常统一把 placeholder、notifier、loading 与持久 flag 收尾；会话级 active message store 使取消不依赖分页窗口，并阻止取消后的旧 prepare 重启；冷启动以单事务清除所有 stale flag 与 tracking metadata，失败向上抛。`flutter analyze`；`flutter test`（1107）；相关定向 44 项通过 |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `已完成` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | 本里程碑提交（2026-07-11） | SQLite snapshot 以 ATTACH + 单事务按会话处理；逻辑 hash 相同去重，不同内容或任一 message ID 冲突时确定性整会话 remap，关联 group/version/tool/signature 同步映射，非法 order/FK 失败整体回滚，重复导入幂等。移动端、桌面本地/WebDAV/S3 均显示 imported/deduplicated/remapped 报告；secret-free settings merge 保留本机凭据。`flutter analyze`；`flutter test`（1112）；merge/DataSync 定向 52 项通过 |
-| P0-06 | DB identity/installation receipt 与安全拒绝 | 无 | `未开始` | 既有 DB 缺失/损坏/版本过新时不自动创建或写入空库 | — | — |
+| P0-06 | DB identity/installation receipt 与安全拒绝 | 无 | `已完成` | 既有 DB 缺失/损坏/版本过新时不自动创建或写入空库 | 本里程碑提交（2026-07-11） | `database_identity_v1` UUID 与 installation receipt 在 `runApp(MyApp)` 前匹配；旧库无 receipt 时只在完整只读校验后 adoption，首次安装才创建新库。已有 receipt 时 missing/corrupt/identity missing or mismatch/future schema/坏 receipt 全部进入 persistence-free 恢复页；verified restore 先耐久发布新 identity receipt、再清理旧 receipt并保留 installation ID。`flutter analyze`；`flutter test`（1121）；定向 9 项通过 |
 | P0-07 | sandbox path migration version 化 | 无 | `未开始` | 正常启动不扫描全库；migration 幂等且失败可见 | — | — |
 | P0-08 | 普通备份排除秘密 | 无 | `已完成` | ZIP 默认不含应用已知 API key/password/token；secret-free overwrite 清理目标旧凭据；旧 JSON/迁移灾备兼容明确 | `6c3618b8`（2026-07-09） | `flutter analyze`；`flutter test`（820）；相关定向 50 项通过；manifest 标记 `secretsIncluded: false`，结构化 provider/search/TTS/MCP/WebDAV/S3/assistant 与 URL 凭据均覆盖 |
 | P0-09 | 基准生成器、legacy fixture 与性能基线 | PD-13 | `未开始` | D1～D6、参考设备、before metrics 和 failpoint harness 可重复 | — | — |
@@ -481,6 +482,7 @@ PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成数据库 identity/installation admission：数据库 meta 持久化 UUID，AppData 使用受限权限、flush/full barrier、无覆盖 rename 发布 identity 命名 receipt；业务启动前只读执行 schema/integrity/FK/required schema/identity 校验。首次安装可建库，旧有效库可一次 adoption；已有 receipt 的缺库、损坏、未来 schema、身份缺失/不符和 receipt 损坏均 fail-closed 到恢复页且不创建空库。P0-02 验证过的 DB restore 可轮换 DB identity 并保留 installation ID，新 receipt 先发布再清旧 receipt。定向 9 项、全量 1121 项与 analyze 通过 | P0-06 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 v2 SQLite merge：使用 ATTACH + 单事务逐会话计算规范化 SHA-256，内容相同去重，conversation/message ID 冲突时确定性整会话 remap，连续 order、MCP、tool events、Gemini signature、group/version selection 与 FK 同步校验；重复导入保持幂等，失败整体回滚。移动端与桌面本地/WebDAV/S3 恢复显示导入/去重/remap 报告且 merge 后不要求重启。secret-free settings merge 应用导入侧非秘密配置并保留本机认证凭据。四份 ARB/l10n 已同步；定向 52 项、全量 1112 项与 analyze 通过 | P0-05 | 本里程碑提交 | Codex |
 | 2026-07-10 | 完成 prepare/cancel/stale streaming 收尾：send、regenerate 与 tool-answer continuation 在 placeholder 建立后的任一 prepare/初始化失败都会保留 partial/占位但清除 streaming、notifier 和 conversation loading；active assistant identity 以会话级 store 独立于 lazy window，off-window cancel 仍能按稳定 ID 经 P0-03 barrier final，且 cancel 后恢复的旧 prepare 不再启动网络请求。ChatService 冷启动改为数据库单事务清除全部 `isStreaming=true` 与 tracking metadata，覆盖未登记 flag、孤儿 ID 和并发 tracking；清理失败不再 best-effort 吞掉。按范围纪律仅做逻辑/集成验收：定向 44 项、全量 1107 项与 analyze 通过 | P0-04 | 本里程碑提交 | Codex |
 | 2026-07-10 | 完成单 writer latest-wins 流式 checkpoint：普通 content/reasoning/tool events 在内存聚合为完整快照，网络 chunk 只入队不等待 SQLite；writer 以 250ms 最小起始间隔限制为 ≤4 writes/s，在途写期间只保留最新 pending。final/cancel/error 关闭入队、丢弃被终态覆盖的 pending、等待旧写后提交 final；切会话 flush 走同一 barrier。repository 使用直接 UPDATE，消息与 tool events 单事务提交，移除逐 checkpoint read-before-write；checkpoint 失败可观察，后续 chunk/flush 失败上抛，成功 final 可恢复。按 Phase 0 范围纪律仅做逻辑/集成验收：定向 31 项、全量 1100 项与 analyze 通过，未复制真实进程矩阵 | P0-03 | 本里程碑提交 | Codex |

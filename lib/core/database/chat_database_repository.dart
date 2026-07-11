@@ -15,6 +15,8 @@ typedef ChatDatabaseSnapshotInfo = ({
   int messageCount,
 });
 
+typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
+
 class BackupMergeReport {
   const BackupMergeReport({
     required this.importedConversations,
@@ -47,6 +49,82 @@ class ChatDatabaseRepository {
     db.execute('PRAGMA busy_timeout = 5000;');
     return db;
   }
+
+  static InstalledChatDatabaseInfo inspectInstalledDatabase(
+    File file, {
+    bool validateContents = false,
+  }) {
+    final database = sqlite.sqlite3.open(
+      file.absolute.path,
+      mode: sqlite.OpenMode.readOnly,
+    );
+    try {
+      final schemaVersion = database.userVersion;
+      if (schemaVersion > AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_too_new');
+      }
+      if (validateContents) {
+        _validateRawSnapshot(database);
+      } else {
+        _validateRawStructure(database);
+      }
+      if (schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
+      }
+      final identityRows = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?;',
+        [ChatStorageMetaKeys.databaseIdentity],
+      );
+      if (identityRows.length > 1) {
+        throw StateError('database_identity_duplicate');
+      }
+      final databaseId = identityRows.isEmpty
+          ? null
+          : identityRows.single['value'] as String?;
+      if (databaseId != null && !_isUuid(databaseId)) {
+        throw StateError('database_identity_invalid');
+      }
+      return (schemaVersion: schemaVersion, databaseId: databaseId);
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    } finally {
+      database.close();
+    }
+  }
+
+  static void assignInstalledDatabaseIdentity(File file, String databaseId) {
+    if (!_isUuid(databaseId)) throw StateError('database_identity_invalid');
+    final database = sqlite.sqlite3.open(file.absolute.path);
+    try {
+      database.execute('PRAGMA foreign_keys = ON;');
+      database.execute('PRAGMA synchronous = FULL;');
+      final info = _validateRawSnapshot(database);
+      if (info.schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
+      }
+      final existing = database.select(
+        'SELECT value FROM chat_storage_meta_rows WHERE key = ?;',
+        [ChatStorageMetaKeys.databaseIdentity],
+      );
+      if (existing.isNotEmpty && existing.single['value'] != databaseId) {
+        throw StateError('database_identity_mismatch');
+      }
+      database.execute(
+        'INSERT OR IGNORE INTO chat_storage_meta_rows (key, value) VALUES (?, ?);',
+        [ChatStorageMetaKeys.databaseIdentity, databaseId],
+      );
+      database.execute('PRAGMA wal_checkpoint(TRUNCATE);');
+    } on sqlite.SqliteException {
+      throw StateError('database_corrupt');
+    } finally {
+      database.close();
+    }
+  }
+
+  static bool _isUuid(String value) => RegExp(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+    caseSensitive: false,
+  ).hasMatch(value);
 
   static Future<ChatDatabaseSnapshotInfo> createConsistentSnapshot({
     required File sourceFile,
@@ -232,6 +310,16 @@ class ChatDatabaseRepository {
       throw StateError('foreign_key_check');
     }
 
+    _validateRawStructure(database);
+
+    return (
+      schemaVersion: database.userVersion,
+      conversationCount: _rawTableCount(database, 'conversation_rows'),
+      messageCount: _rawTableCount(database, 'message_rows'),
+    );
+  }
+
+  static void _validateRawStructure(sqlite.Database database) {
     const requiredTables = {
       'conversation_rows',
       'conversation_mcp_server_rows',
@@ -251,12 +339,6 @@ class ChatDatabaseRepository {
       throw StateError('required_tables');
     }
     _validateRawSchema(database);
-
-    return (
-      schemaVersion: database.userVersion,
-      conversationCount: _rawTableCount(database, 'conversation_rows'),
-      messageCount: _rawTableCount(database, 'message_rows'),
-    );
   }
 
   static void _validateRawSchema(sqlite.Database database) {
@@ -1907,4 +1989,5 @@ class ChatStorageMetaKeys {
 
   static const activeStreamingIds = 'active_streaming_ids';
   static const hiveMigrationComplete = 'hive_migration_complete_v1';
+  static const databaseIdentity = 'database_identity_v1';
 }
