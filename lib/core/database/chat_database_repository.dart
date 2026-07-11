@@ -44,22 +44,13 @@ class SandboxPathMigrationResult {
 }
 
 class ChatDatabaseRepository {
-  ChatDatabaseRepository(this._db, [this._syncDb]);
+  ChatDatabaseRepository(this._db);
 
   final AppDatabase _db;
-  final sqlite.Database? _syncDb;
 
   static ChatDatabaseRepository open({File? file}) {
     final db = AppDatabase.open(file: file);
-    return ChatDatabaseRepository(db, file == null ? null : _openSync(file));
-  }
-
-  static sqlite.Database _openSync(File file) {
-    final db = sqlite.sqlite3.open(file.path);
-    db.execute('PRAGMA journal_mode = WAL;');
-    db.execute('PRAGMA foreign_keys = ON;');
-    db.execute('PRAGMA busy_timeout = 5000;');
-    return db;
+    return ChatDatabaseRepository(db);
   }
 
   static Future<bool> migrateInstalledDatabase(File file) async {
@@ -501,7 +492,6 @@ class ChatDatabaseRepository {
   }
 
   Future<void> close() async {
-    _syncDb?.close();
     await _db.close();
   }
 
@@ -664,51 +654,12 @@ class ChatDatabaseRepository {
     return out;
   }
 
-  List<Conversation> getAllConversationsSync() {
-    final db = _syncDb;
-    if (db == null) return const <Conversation>[];
-    final rows = db.select(
-      'SELECT * FROM conversation_rows ORDER BY updated_at DESC',
-    );
-    return rows
-        .map((row) => _conversationFromSqliteRow(row, includeMessageIds: false))
-        .toList(growable: false);
-  }
-
-  List<Conversation> getAllCompleteConversationsSync() {
-    final db = _syncDb;
-    if (db == null) return const <Conversation>[];
-    final rows = db.select(
-      'SELECT * FROM conversation_rows ORDER BY updated_at DESC',
-    );
-    return rows
-        .map((row) => _conversationFromSqliteRow(row, includeMessageIds: true))
-        .toList(growable: false);
-  }
-
   Future<Conversation?> getConversation(String id) async {
     final row = await (_db.select(
       _db.conversationRows,
     )..where((t) => t.id.equals(id))).getSingleOrNull();
     if (row == null) return null;
     return _conversationFromRow(row);
-  }
-
-  Conversation? getConversationSync(
-    String id, {
-    bool includeMessageIds = true,
-  }) {
-    final db = _syncDb;
-    if (db == null) return null;
-    final rows = db.select(
-      'SELECT * FROM conversation_rows WHERE id = ? LIMIT 1',
-      [id],
-    );
-    if (rows.isEmpty) return null;
-    return _conversationFromSqliteRow(
-      rows.first,
-      includeMessageIds: includeMessageIds,
-    );
   }
 
   Future<int> getMessageCount(String conversationId) async {
@@ -721,28 +672,20 @@ class ChatDatabaseRepository {
     return row.read(count) ?? 0;
   }
 
-  int getMessageCountSync(String conversationId) {
-    final db = _syncDb;
-    if (db == null) return 0;
-    final rows = db.select(
-      'SELECT COUNT(*) AS count FROM message_rows WHERE conversation_id = ?',
-      [conversationId],
-    );
-    return (rows.first['count'] as int?) ?? 0;
+  Future<int> getConversationCount() async {
+    final count = _db.conversationRows.id.count();
+    final row = await (_db.selectOnly(
+      _db.conversationRows,
+    )..addColumns([count])).getSingle();
+    return row.read(count) ?? 0;
   }
 
-  int getConversationCountSync() {
-    final db = _syncDb;
-    if (db == null) return 0;
-    final rows = db.select('SELECT COUNT(*) AS count FROM conversation_rows');
-    return (rows.first['count'] as int?) ?? 0;
-  }
-
-  int getTotalMessageCountSync() {
-    final db = _syncDb;
-    if (db == null) return 0;
-    final rows = db.select('SELECT COUNT(*) AS count FROM message_rows');
-    return (rows.first['count'] as int?) ?? 0;
+  Future<int> getTotalMessageCount() async {
+    final count = _db.messageRows.id.count();
+    final row = await (_db.selectOnly(
+      _db.messageRows,
+    )..addColumns([count])).getSingle();
+    return row.read(count) ?? 0;
   }
 
   Future<int> getMessageIndex(String conversationId, String messageId) async {
@@ -758,31 +701,11 @@ class ChatDatabaseRepository {
     return row?.messageOrder ?? -1;
   }
 
-  int getMessageIndexSync(String conversationId, String messageId) {
-    final db = _syncDb;
-    if (db == null) return -1;
-    final rows = db.select(
-      'SELECT message_order FROM message_rows '
-      'WHERE conversation_id = ? AND id = ? LIMIT 1',
-      [conversationId, messageId],
-    );
-    return rows.isEmpty ? -1 : rows.first['message_order'] as int;
-  }
-
   Future<ChatMessage?> getMessage(String messageId) async {
     final row = await (_db.select(
       _db.messageRows,
     )..where((t) => t.id.equals(messageId))).getSingleOrNull();
     return row == null ? null : _messageFromRow(row);
-  }
-
-  ChatMessage? getMessageSync(String messageId) {
-    final db = _syncDb;
-    if (db == null) return null;
-    final rows = db.select('SELECT * FROM message_rows WHERE id = ? LIMIT 1', [
-      messageId,
-    ]);
-    return rows.isEmpty ? null : _messageFromSqliteRow(rows.first);
   }
 
   Future<List<ChatMessage>> getMessagesRange(
@@ -799,22 +722,6 @@ class ChatDatabaseRepository {
               ..limit(limit, offset: safeStart))
             .get();
     return rows.map(_messageFromRow).toList(growable: false);
-  }
-
-  List<ChatMessage> getMessagesRangeSync(
-    String conversationId, {
-    required int start,
-    required int limit,
-  }) {
-    final db = _syncDb;
-    if (db == null || limit <= 0) return const <ChatMessage>[];
-    final safeStart = start < 0 ? 0 : start;
-    final rows = db.select(
-      'SELECT * FROM message_rows WHERE conversation_id = ? '
-      'ORDER BY message_order ASC LIMIT ? OFFSET ?',
-      [conversationId, limit, safeStart],
-    );
-    return rows.map(_messageFromSqliteRow).toList(growable: false);
   }
 
   Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
@@ -857,29 +764,6 @@ class ChatDatabaseRepository {
     };
   }
 
-  Map<String, int> getFirstMessageIndicesForGroupsSync(
-    String conversationId,
-    Iterable<String> groupIds,
-  ) {
-    final db = _syncDb;
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
-    if (db == null || ids.isEmpty) return const <String, int>{};
-    final placeholders = List.filled(ids.length, '?').join(',');
-    final rows = db.select(
-      'SELECT COALESCE(group_id, id) AS group_key, '
-      'MIN(message_order) AS message_order FROM message_rows '
-      'WHERE conversation_id = ? '
-      'AND (group_id IN ($placeholders) OR id IN ($placeholders)) '
-      'GROUP BY group_key',
-      [conversationId, ...ids, ...ids],
-    );
-    return {
-      for (final row in rows)
-        if (row['group_key'] != null && row['message_order'] != null)
-          row['group_key'] as String: row['message_order'] as int,
-    };
-  }
-
   Future<List<ChatMessage>> getMessagesForGroups(
     String conversationId,
     Iterable<String> groupIds,
@@ -898,32 +782,16 @@ class ChatDatabaseRepository {
     return rows.map(_messageFromRow).toList(growable: false);
   }
 
-  List<ChatMessage> getMessagesForGroupsSync(
-    String conversationId,
-    Iterable<String> groupIds,
-  ) {
-    final db = _syncDb;
-    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
-    if (db == null || ids.isEmpty) return const <ChatMessage>[];
-    final placeholders = List.filled(ids.length, '?').join(',');
-    final rows = db.select(
-      'SELECT * FROM message_rows WHERE conversation_id = ? '
-      'AND (group_id IN ($placeholders) OR id IN ($placeholders)) '
-      'ORDER BY message_order ASC',
-      [conversationId, ...ids, ...ids],
-    );
-    return rows.map(_messageFromSqliteRow).toList(growable: false);
-  }
-
-  List<String> getMessageIdsSync(String conversationId) {
-    final db = _syncDb;
-    if (db == null) return const <String>[];
-    final rows = db.select(
-      'SELECT id FROM message_rows WHERE conversation_id = ? '
-      'ORDER BY message_order ASC',
-      [conversationId],
-    );
-    return rows.map((row) => row['id'] as String).toList(growable: false);
+  Future<List<String>> getMessageIds(String conversationId) async {
+    final rows =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([_db.messageRows.id])
+              ..where(_db.messageRows.conversationId.equals(conversationId))
+              ..orderBy([OrderingTerm.asc(_db.messageRows.messageOrder)]))
+            .get();
+    return rows
+        .map((row) => row.read(_db.messageRows.id)!)
+        .toList(growable: false);
   }
 
   Future<void> updateMessageOrder(
@@ -942,17 +810,16 @@ class ChatDatabaseRepository {
     });
   }
 
-  List<ConversationSearchMatch> searchConversationMatchesSync({
+  Future<List<ConversationSearchMatch>> searchConversationMatches({
     required List<String> tokens,
     int limit = 200,
     int candidateMultiplier = 8,
-  }) {
-    final db = _syncDb;
+  }) async {
     final cleanTokens = tokens
         .map((token) => token.trim().toLowerCase())
         .where((token) => token.isNotEmpty)
         .toList(growable: false);
-    if (db == null || cleanTokens.isEmpty || limit <= 0) {
+    if (cleanTokens.isEmpty || limit <= 0) {
       return const <ConversationSearchMatch>[];
     }
 
@@ -987,8 +854,9 @@ class ChatDatabaseRepository {
     final candidateLimit = (limit * candidateMultiplier)
         .clamp(limit, 2000)
         .toInt();
-    final rows = db.select(
-      '''
+    final rows = await _db
+        .customSelect(
+          '''
       SELECT
         c.id AS conversation_id,
         c.title AS conversation_title,
@@ -1015,24 +883,30 @@ class ChatDatabaseRepository {
       ORDER BY c.updated_at DESC, m.message_order ASC
       LIMIT ?
       ''',
-      [...messageArgs, ...titleArgs, ...existsArgs, candidateLimit],
-    );
+          variables: [
+            ...messageArgs.map((value) => Variable<String>(value! as String)),
+            ...titleArgs.map((value) => Variable<String>(value! as String)),
+            ...existsArgs.map((value) => Variable<String>(value! as String)),
+            Variable<int>(candidateLimit),
+          ],
+        )
+        .get();
 
     return rows
         .map((row) {
           return ConversationSearchMatch(
-            conversationId: row['conversation_id'] as String,
-            conversationTitle: row['conversation_title'] as String,
-            updatedAt: _dateTimeFromSqlite(row['updated_at']),
+            conversationId: row.read<String>('conversation_id'),
+            conversationTitle: row.read<String>('conversation_title'),
+            updatedAt: _dateTimeFromSqlite(row.read<int>('updated_at')),
             versionSelections: _decodeStringIntMap(
-              row['version_selections_json'] as String? ?? '{}',
+              row.readNullable<String>('version_selections_json') ?? '{}',
             ),
-            messageId: row['message_id'] as String?,
-            messageContent: row['message_content'] as String?,
-            messageRole: row['message_role'] as String?,
-            groupId: row['group_id'] as String?,
-            version: row['version'] as int?,
-            maxVersion: row['max_version'] as int?,
+            messageId: row.readNullable<String>('message_id'),
+            messageContent: row.readNullable<String>('message_content'),
+            messageRole: row.readNullable<String>('message_role'),
+            groupId: row.readNullable<String>('group_id'),
+            version: row.readNullable<int>('version'),
+            maxVersion: row.readNullable<int>('max_version'),
           );
         })
         .toList(growable: false);
@@ -1645,32 +1519,21 @@ class ChatDatabaseRepository {
   }
 
   Future<List<Map<String, dynamic>>> getToolEvents(String messageId) async {
-    final row = await (_db.select(
-      _db.toolEventRows,
-    )..where((t) => t.messageId.equals(messageId))).getSingleOrNull();
-    if (row == null) return const <Map<String, dynamic>>[];
-    final decoded = jsonDecode(row.eventsJson);
-    if (decoded is! List) return const <Map<String, dynamic>>[];
-    return decoded
-        .whereType<Map>()
-        .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-        .toList();
+    return (await getToolEventsForMessages([messageId]))[messageId] ??
+        const <Map<String, dynamic>>[];
   }
 
-  List<Map<String, dynamic>> getToolEventsSync(String messageId) {
-    final db = _syncDb;
-    if (db == null) return const <Map<String, dynamic>>[];
-    final rows = db.select(
-      'SELECT events_json FROM tool_event_rows WHERE message_id = ? LIMIT 1',
-      [messageId],
-    );
-    if (rows.isEmpty) return const <Map<String, dynamic>>[];
-    final decoded = jsonDecode(rows.first['events_json'] as String);
-    if (decoded is! List) return const <Map<String, dynamic>>[];
-    return decoded
-        .whereType<Map>()
-        .map((e) => e.map((k, v) => MapEntry(k.toString(), v)))
-        .toList();
+  Future<Map<String, List<Map<String, dynamic>>>> getToolEventsForMessages(
+    Iterable<String> messageIds,
+  ) async {
+    final ids = messageIds.toSet();
+    if (ids.isEmpty) return const {};
+    final rows = await (_db.select(
+      _db.toolEventRows,
+    )..where((row) => row.messageId.isIn(ids))).get();
+    return {
+      for (final row in rows) row.messageId: _decodeToolEvents(row.eventsJson),
+    };
   }
 
   Future<void> setToolEvents(
@@ -1694,24 +1557,24 @@ class ChatDatabaseRepository {
   }
 
   Future<String?> getGeminiThoughtSignature(String messageId) async {
-    final row = await (_db.select(
-      _db.geminiThoughtSignatureRows,
-    )..where((t) => t.messageId.equals(messageId))).getSingleOrNull();
-    final value = row?.signature.trim();
-    return value == null || value.isEmpty ? null : value;
+    return (await getGeminiThoughtSignaturesForMessages([
+      messageId,
+    ]))[messageId];
   }
 
-  String? getGeminiThoughtSignatureSync(String messageId) {
-    final db = _syncDb;
-    if (db == null) return null;
-    final rows = db.select(
-      'SELECT signature FROM gemini_thought_signature_rows '
-      'WHERE message_id = ? LIMIT 1',
-      [messageId],
-    );
-    if (rows.isEmpty) return null;
-    final value = (rows.first['signature'] as String?)?.trim();
-    return value == null || value.isEmpty ? null : value;
+  Future<Map<String, String>> getGeminiThoughtSignaturesForMessages(
+    Iterable<String> messageIds,
+  ) async {
+    final ids = messageIds.toSet();
+    if (ids.isEmpty) return const {};
+    final rows = await (_db.select(
+      _db.geminiThoughtSignatureRows,
+    )..where((row) => row.messageId.isIn(ids))).get();
+    return {
+      for (final row in rows)
+        if (row.signature.trim().isNotEmpty)
+          row.messageId: row.signature.trim(),
+    };
   }
 
   Future<void> setGeminiThoughtSignature(
@@ -1899,52 +1762,6 @@ class ChatDatabaseRepository {
     );
   }
 
-  Conversation _conversationFromSqliteRow(
-    sqlite.Row row, {
-    bool includeMessageIds = true,
-  }) {
-    final db = _syncDb;
-    final id = row['id'] as String;
-    final mcpRows = db?.select(
-      'SELECT server_id FROM conversation_mcp_server_rows '
-      'WHERE conversation_id = ? ORDER BY ordinal ASC',
-      [id],
-    );
-    final messageRows = includeMessageIds
-        ? db?.select(
-            'SELECT id FROM message_rows WHERE conversation_id = ? '
-            'ORDER BY message_order ASC',
-            [id],
-          )
-        : null;
-    return Conversation(
-      id: id,
-      title: row['title'] as String,
-      createdAt: _dateTimeFromSqlite(row['created_at']),
-      updatedAt: _dateTimeFromSqlite(row['updated_at']),
-      messageIds:
-          messageRows?.map((m) => m['id'] as String).toList(growable: false) ??
-          const <String>[],
-      isPinned: row['is_pinned'] == 1,
-      mcpServerIds:
-          mcpRows
-              ?.map((m) => m['server_id'] as String)
-              .toList(growable: false) ??
-          const <String>[],
-      assistantId: row['assistant_id'] as String?,
-      truncateIndex: row['truncate_index'] as int? ?? -1,
-      versionSelections: _decodeStringIntMap(
-        row['version_selections_json'] as String? ?? '{}',
-      ),
-      summary: row['summary'] as String?,
-      lastSummarizedMessageCount:
-          row['last_summarized_message_count'] as int? ?? 0,
-      chatSuggestions: _decodeStringList(
-        row['chat_suggestions_json'] as String? ?? '[]',
-      ),
-    );
-  }
-
   ConversationRowsCompanion _conversationCompanion(Conversation conversation) {
     return ConversationRowsCompanion.insert(
       id: conversation.id,
@@ -1985,36 +1802,6 @@ class ChatDatabaseRepository {
       completionTokens: row.completionTokens,
       cachedTokens: row.cachedTokens,
       durationMs: row.durationMs,
-    );
-  }
-
-  ChatMessage _messageFromSqliteRow(sqlite.Row row) {
-    DateTime? nullableDate(String key) {
-      final value = row[key];
-      return value == null ? null : _dateTimeFromSqlite(value);
-    }
-
-    return ChatMessage(
-      id: row['id'] as String,
-      role: row['role'] as String,
-      content: row['content'] as String,
-      timestamp: _dateTimeFromSqlite(row['timestamp']),
-      modelId: row['model_id'] as String?,
-      providerId: row['provider_id'] as String?,
-      totalTokens: row['total_tokens'] as int?,
-      conversationId: row['conversation_id'] as String,
-      isStreaming: row['is_streaming'] == 1,
-      reasoningText: row['reasoning_text'] as String?,
-      reasoningStartAt: nullableDate('reasoning_start_at'),
-      reasoningFinishedAt: nullableDate('reasoning_finished_at'),
-      translation: row['translation'] as String?,
-      reasoningSegmentsJson: row['reasoning_segments_json'] as String?,
-      groupId: row['group_id'] as String?,
-      version: row['version'] as int? ?? 0,
-      promptTokens: row['prompt_tokens'] as int?,
-      completionTokens: row['completion_tokens'] as int?,
-      cachedTokens: row['cached_tokens'] as int?,
-      durationMs: row['duration_ms'] as int?,
     );
   }
 
@@ -2089,6 +1876,15 @@ class ChatDatabaseRepository {
     } catch (_) {
       return <String, int>{};
     }
+  }
+
+  List<Map<String, dynamic>> _decodeToolEvents(String raw) {
+    final decoded = jsonDecode(raw);
+    if (decoded is! List) return const <Map<String, dynamic>>[];
+    return decoded
+        .whereType<Map>()
+        .map((event) => event.map((key, value) => MapEntry('$key', value)))
+        .toList(growable: false);
   }
 
   List<String> _decodeStringList(String raw) {

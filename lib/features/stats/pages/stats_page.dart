@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -32,6 +33,8 @@ class StatsPage extends StatefulWidget {
 
 class _StatsPageState extends State<StatsPage> {
   late StatsDateRange _range;
+  String? _loadedMessageSignature;
+  bool _loadingMessages = false;
 
   @override
   void initState() {
@@ -162,6 +165,7 @@ class _StatsPageState extends State<StatsPage> {
     final settings = context.watch<SettingsProvider>();
     final assistantProvider = context.watch<AssistantProvider>();
     final conversations = chatService.getAllCompleteConversations();
+    _loadStatsMessages(chatService, conversations);
     final messagesByConversation = {
       for (final conversation in conversations)
         conversation.id: chatService.getMessages(conversation.id),
@@ -190,6 +194,37 @@ class _StatsPageState extends State<StatsPage> {
       providerNames: providerNames,
       unknownProviderLabel: l10n.statsPageUnknownProvider,
       unknownTopicLabel: l10n.statsPageUnknownTopic,
+    );
+  }
+
+  void _loadStatsMessages(
+    ChatService chatService,
+    List<Conversation> conversations,
+  ) {
+    final signature = conversations
+        .map(
+          (conversation) =>
+              '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
+              '${conversation.messageIds.length}',
+        )
+        .join('|');
+    if (_loadingMessages || _loadedMessageSignature == signature) return;
+    _loadingMessages = true;
+    Future.wait<void>([
+      for (final conversation in conversations)
+        chatService.loadMessages(conversation.id).then((_) {}),
+    ]).then(
+      (_) {
+        if (!mounted) return;
+        setState(() {
+          _loadedMessageSignature = signature;
+          _loadingMessages = false;
+        });
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _loadingMessages = false;
+        Error.throwWithStackTrace(error, stackTrace);
+      },
     );
   }
 

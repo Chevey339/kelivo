@@ -1047,8 +1047,8 @@ class HiveToSqliteMigrationService {
     int expectedConversations,
     int expectedMessages,
   ) async {
-    final conversationCount = repo.getConversationCountSync();
-    final messageCount = repo.getTotalMessageCountSync();
+    final conversationCount = await repo.getConversationCount();
+    final messageCount = await repo.getTotalMessageCount();
     if (conversationCount != expectedConversations ||
         messageCount != expectedMessages) {
       throw StateError(

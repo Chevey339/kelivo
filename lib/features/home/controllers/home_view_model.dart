@@ -683,11 +683,7 @@ class HomeViewModel extends ChangeNotifier {
 
     await _clearSuggestionsFor(conversation.id);
 
-    final allMessages = _chatService.getMessagesRange(
-      conversation.id,
-      start: 0,
-      limit: _chatService.getMessageCount(conversation.id),
-    );
+    final allMessages = await _chatService.loadMessages(conversation.id);
     final plan = buildBatchDeletePlan(
       messages: allMessages,
       selectedMessageIds: messageIds,
@@ -720,7 +716,7 @@ class HomeViewModel extends ChangeNotifier {
       await _chatService.deleteMessage(message.id);
     }
 
-    _chatController.reloadMessages();
+    await _chatController.reloadMessages();
     notifyListeners();
   }
 
@@ -779,7 +775,7 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     // Reload messages
-    _chatController.reloadMessages();
+    await _chatController.reloadMessages();
     notifyListeners();
   }
 
@@ -808,7 +804,7 @@ class HomeViewModel extends ChangeNotifier {
           assistantProvider.getById(convoAssistantId) != null) {
         await assistantProvider.setCurrentAssistant(convoAssistantId);
       }
-      _chatController.setCurrentConversation(convo);
+      await _chatController.setCurrentConversationAndLoad(convo);
       _streamController.clearGeminiThoughtSigs();
       notifyListeners();
       onConversationSwitched?.call();
@@ -851,7 +847,7 @@ class HomeViewModel extends ChangeNotifier {
             role: role,
             content: content,
           );
-          _chatController.reloadMessages();
+          await _chatController.reloadMessages();
           notifyListeners();
         }
       }
@@ -889,7 +885,9 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    final allMessages = _chatController
+    final title = getTitleForLocale(_contextProvider);
+    final assistantId = currentConversation?.assistantId;
+    final allMessages = await _chatController
         .allMessagesForCurrentConversationContext();
     final selected = selectForkConversationMessages(
       messages: allMessages,
@@ -899,14 +897,14 @@ class HomeViewModel extends ChangeNotifier {
     if (selected.isEmpty) return;
 
     final newConvo = await _chatService.forkConversation(
-      title: getTitleForLocale(_contextProvider),
-      assistantId: currentConversation?.assistantId,
+      title: title,
+      assistantId: assistantId,
       sourceMessages: selected,
     );
 
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
-    _chatController.setCurrentConversation(newConvo);
+    await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
     notifyListeners();
     onConversationSwitched?.call();
@@ -938,8 +936,16 @@ class HomeViewModel extends ChangeNotifier {
     final convo = currentConversation;
     if (convo == null) return 'no_conversation';
 
+    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
+    final settings = _contextProvider.read<SettingsProvider>();
+    final ap = _contextProvider.read<AssistantProvider>();
+    final assistant = convo.assistantId != null
+        ? ap.getById(convo.assistantId!)
+        : ap.currentAssistant;
+
     // Get messages and collapse to selected versions
-    final allMsgs = _chatController.allMessagesForCurrentConversationContext();
+    final allMsgs = await _chatController
+        .allMessagesForCurrentConversationContext();
     final collapsed = collapseVersions(allMsgs);
     if (collapsed.isEmpty) return 'no_messages';
 
@@ -948,15 +954,7 @@ class HomeViewModel extends ChangeNotifier {
     if (joined.trim().isEmpty) return 'no_messages';
 
     final content = buildCompressContextContent(joined, options);
-    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-
     // Resolve model: compress model → summary model → title model → assistant model → global default
-    final settings = _contextProvider.read<SettingsProvider>();
-    final ap = _contextProvider.read<AssistantProvider>();
-    final assistant = convo.assistantId != null
-        ? ap.getById(convo.assistantId!)
-        : ap.currentAssistant;
-
     final provKey =
         settings.compressModelProvider ??
         settings.summaryModelProvider ??
@@ -1001,7 +999,7 @@ class HomeViewModel extends ChangeNotifier {
 
       // Switch to the new conversation
       _chatService.setCurrentConversation(newConvo.id);
-      _chatController.setCurrentConversation(
+      await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
       _streamController.clearAllState();
@@ -1022,29 +1020,29 @@ class HomeViewModel extends ChangeNotifier {
   }
 
   /// Reload messages from storage.
-  void reloadMessages() {
-    _chatController.reloadMessages();
+  Future<void> reloadMessages() async {
+    await _chatController.reloadMessages();
     notifyListeners();
   }
 
-  bool loadMoreBefore() {
-    final loaded = _chatController.loadMoreBefore();
+  Future<bool> loadMoreBefore() async {
+    final loaded = await _chatController.loadMoreBefore();
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
     return true;
   }
 
-  bool loadMoreAfter() {
-    final loaded = _chatController.loadMoreAfter();
+  Future<bool> loadMoreAfter() async {
+    final loaded = await _chatController.loadMoreAfter();
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
     return true;
   }
 
-  bool loadUntilMessageVisible(String messageId) {
-    final loaded = _chatController.loadUntilMessageVisible(messageId);
+  Future<bool> loadUntilMessageVisible(String messageId) async {
+    final loaded = await _chatController.loadUntilMessageVisible(messageId);
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
@@ -1131,8 +1129,9 @@ class HomeViewModel extends ChangeNotifier {
     final configured = (assistant?.limitContextMessages ?? true)
         ? (assistant?.contextMessageSize ?? 0)
         : 0;
-    final completeMessages = _chatController
-        .allMessagesForCurrentConversationContext();
+    final completeMessages = _chatService.getMessages(
+      currentConversation?.id ?? '',
+    );
     final collapsed = collapseVersions(completeMessages);
     final remaining = computeClearContextRemainingMessageCount(
       completeMessages: completeMessages,

@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 1：DB2-01 已完成）
-> - 当前结论：Phase 1 已建立 SQLite v1/v2 schema snapshots、生成式逐版本 migration 和 `migrateAndValidate` 门禁；未发布开发版 v1 可由 installation gate 原地升级到 v2，保留数据，未来 schema 继续 fail-closed。下一步删除 `_syncDb` 与同步 repository API，随后收敛 single-flight gateway。Phase 0 的输出/恢复止血、secret-free SQLite ZIP 和 D1～D6/macOS baseline 保持闭环；D4 renderer/RSS 超标留在 Phase 4，不在 Database Kernel 中扩 scope。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
+> - 最后更新：2026-07-11（Phase 1：DB2-01/02 已完成）
+> - 当前结论：Phase 1 已冻结 SQLite v1/v2 schema migration，并删除 `_syncDb` 与同步 repository 查询；聊天分页、版本组、完整上下文、搜索、统计和导入读取均经 `NativeDatabase.createInBackground` 的异步 Drift 通路，渲染侧只读取内存窗口/cache。下一步以 DB2-03 收敛唯一 gateway、single-flight init 和异步 DAO 生命周期。Phase 0 的输出/恢复止血、secret-free SQLite ZIP 和 D1～D6/macOS baseline 保持闭环；D4 renderer/RSS 超标留在 Phase 4。raw durability、硬件断电、资源故障及其他平台证据继续由 OPS-02/DB2-07/五平台门禁追踪
 
 ## 1. 文档使用规则
 
@@ -37,7 +37,7 @@
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
-| Phase 1：Database Kernel v2 | 1 / 8 | `进行中` | DB2-01 已冻结 v1/v2 snapshots 与迁移门禁；同步数据库通路尚待删除 |
+| Phase 1：Database Kernel v2 | 2 / 8 | `进行中` | DB2-01/02 已完成 schema migration 与异步业务查询；gateway 生命周期尚待收敛 |
 | Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
@@ -72,6 +72,7 @@
 | `flutter analyze` + `flutter test`（本轮 P0-07） | `已完成` | No issues found；1126/1126 tests passed | 2026-07-11 | sandbox path migration 定向 5 项通过；覆盖首次批量迁移、同根零扫描、失败事务回滚/重试、容器根变化重跑和未来 version 拒绝；按范围纪律未运行真实进程/断电矩阵 |
 | P0-03 iOS MethodChannel 残留修复 | `已完成` | analyze 通过；iOS background + checkpoint 定向 22 项、P0 快速门禁 49 项、全量 1136/1136 通过 | 2026-07-11 | chunk update 非阻塞入队；原生 update 起始间隔 ≥500ms；在途期间 latest-wins；finish/cancel barrier、错误可观察、非 iOS no-op 均有测试 |
 | DB2-01 schema snapshots/migration | `已完成` | analyze 通过；migration/install/snapshot/backup 定向 64 项；全量 1139/1139 通过 | 2026-07-11 | 冻结 v1/v2 JSON snapshot 与生成式 schema helper；逐版本 `migrateAndValidate`、数据保留、磁盘 v1→v2 installation gate、future schema 拒绝均覆盖 |
+| DB2-02 async database path | `已完成` | analyze 通过；lazy history/chat/import/backup/stats 定向 111 项；全量 1139/1139 通过 | 2026-07-11 | `_syncDb`、同步 repository query/count/search/artifact API 与 raw row mapper 全部删除；业务 SQLite executor 唯一为 `NativeDatabase.createInBackground`；窗口分页和版本补载均 await，渲染 getter 只读内存，不执行 SQLite |
 | P0-09 fixture/quick gate/macOS profile | `已完成` | D1～D6 full 生成成功；当前快速门禁 analyze + 49 tests；里程碑全量 1130/1130；profile integration passed | 2026-07-11 | seed `20260711`；M4 Pro/macOS 26.5.2；D2 100k、D3 10k slots/10,617 revisions、D4 1 MiB、D5 100×4K + 100 attachments、D6 fault artifacts；报告见 `docs/database/baselines/p0-09-macos-m4-pro-2026-07-11.md` |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
@@ -283,7 +284,7 @@ dart run tool/run_restore_process_harness.dart \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | DB2-01 | Schema snapshots 与逐版本 migration tests | PD-13、P0-09 | `已完成` | v1→每个 v2 版本 migrateAndValidate | 本里程碑提交（2026-07-11） | `drift_schema_v1/v2.json` + 生成式 step/schema helper；v1→v2 显式格式边界，物理表在 DB2-04 前保持一致；installation gate 只迁移完整校验通过的 1..current，未来/过旧/损坏 schema 拒绝。定向 64 项、全量 1139 项与 analyze 通过 |
-| DB2-02 | 删除 `_syncDb` 和同步数据库 API | P0-03 | `未开始` | profile 中 UI isolate SQLite 调用为 0 | — | — |
+| DB2-02 | 删除 `_syncDb` 和同步数据库 API | P0-03 | `已完成` | profile 中 UI isolate SQLite 调用为 0 | 本里程碑提交（2026-07-11） | 删除第二个 raw handle、全部同步 repository query/count/search/tool/signature API 与 sqlite row mapper；聊天分页/完整上下文/版本组、全局搜索、统计、导入/merge 改走后台 Drift Future，UI 同步 getter 仅访问已加载内存。静态通路审计无业务同步 SQLite 入口；analyze、定向 111 项、全量 1139 项通过。恢复/备份专用 raw SQLite 能力继续隔离在 maintenance API，并由 DB2-03/07 收口生命周期与平台证据 |
 | DB2-03 | 单一 gateway、single-flight init、异步 DAO | DB2-02 | `未开始` | 应用内只有一个受控数据库通路 | — | — |
 | DB2-04 | FK/UNIQUE/CHECK/微秒时间/索引 | DB2-01 | `未开始` | schema 强制领域不变量；query plan 使用索引 | — | — |
 | DB2-05 | 事务化领域 commands | DB2-03/04 | `未开始` | send/version/delete/fork 等不再由 service 拼多步提交 | — | — |
@@ -474,12 +475,13 @@ PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1
 
 ## 19. 下一步
 
-Phase 1 已完成 `DB2-01`。下一步执行 `DB2-02`，删除 `_syncDb` 和同步数据库 API并验证主 isolate 不再执行 SQLite；随后执行 `DB2-03` 收敛 single-flight gateway。D4 renderer/RSS 超标作为 TL/renderer 的明确 before baseline，不在 Database Kernel 中顺手扩 scope。
+Phase 1 已完成 `DB2-01/02`。下一步执行 `DB2-03`，建立唯一 database gateway、single-flight init 与受控 maintenance lease；D4 renderer/RSS 超标作为 TL/renderer 的明确 before baseline，不在 Database Kernel 中顺手扩 scope。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | 完成 DB2-02：移除 `_syncDb`、同步 repository query/count/search/tool/signature API 和 raw row mapper；ChatService/Controller 将窗口分页、版本组补载、完整 prompt、搜索、统计和导入改为后台 Drift 异步读取，渲染 getter 只读内存 cache；相关滚动锚定回调改为 await 后修正。analyze、定向 111 项、全量 1139 项通过 | DB2-02 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 DB2-01：冻结 Drift v1/v2 schema JSON、生成 step-by-step migration 与测试 schema helper；Database Kernel v2 以显式 v1→v2 format step 建立迁移边界，installation gate 在 identity/adoption 前迁移完整校验通过的开发版 v1 并复验，保留会话/meta 数据；未来、过旧和损坏 schema 继续拒绝。定向 64 项、全量 1139 项与 analyze 通过 | DB2-01 | 本里程碑提交 | Codex |
 | 2026-07-11 | 清除 P0-03 的 iOS 残留阻塞：`chat_actions` 不再逐 chunk await `MethodChannel update`，service 内新增 500ms 起始间隔的单 writer latest-wins 队列；首个 update 可立即发送，在途期间只保留最新 token，finish/cancel 经 barrier 后才发送终态，update 异常通过回调记录且不阻止终态。覆盖高频合并、真实 500ms 间隔、finish/cancel 顺序、失败可观察、disabled/non-iOS no-op；定向 22 项、P0 快速门禁 49 项、全量 1136 项与 analyze 通过 | P0-03、GEN-03 | 本残留修复提交 | Codex |
 | 2026-07-11 | 完成 P0-09：新增固定 seed D1～D6 SQLite/assets/fault fixture 生成器、deterministic plan digest、SQL/WAL/RSS 采样、macOS profile integration surface 与一键 P0 快速门禁。M4 Pro baseline 明确记录 D4 build+raster p95 712.627ms、31/33 长帧、RSS peak 1.56GiB，未把严重超标粉饰为通过；D5 surface 3.335ms。其他平台与完整 HomePage/timeline/backup RSS 继续在对应工作流追踪。Phase 0 9/9 完成 | P0-09 | 本里程碑提交 | Codex |

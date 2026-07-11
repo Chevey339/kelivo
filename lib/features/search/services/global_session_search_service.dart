@@ -38,11 +38,11 @@ class GlobalSessionSearchService {
     caseSensitive: false,
   );
 
-  static List<GlobalSessionSearchResult> search({
+  static Future<List<GlobalSessionSearchResult>> search({
     required ChatService chatService,
     required String query,
     int limit = 200,
-  }) {
+  }) async {
     final normalized = query.trim();
     if (normalized.isEmpty) return const <GlobalSessionSearchResult>[];
 
@@ -50,7 +50,7 @@ class GlobalSessionSearchService {
     if (tokens.isEmpty) return const <GlobalSessionSearchResult>[];
 
     final out = <GlobalSessionSearchResult>[];
-    final candidates = chatService.searchConversationMatches(
+    final candidates = await chatService.searchConversationMatches(
       tokens: tokens,
       limit: limit,
     );

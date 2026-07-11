@@ -584,7 +584,7 @@ class HomePageController extends ChangeNotifier {
           } catch (_) {}
         }
         _chatService.setCurrentConversation(recent.id);
-        _chatController.setCurrentConversation(recent);
+        await _chatController.setCurrentConversationAndLoad(recent);
         _streamController.clearGeminiThoughtSigs();
         _restoreMessageUiState();
         notifyListeners();
@@ -899,7 +899,7 @@ class HomePageController extends ChangeNotifier {
     final selectedMessageIds = Set<String>.of(_selectedItems);
     if (selectedMessageIds.isEmpty) return;
 
-    final deletedMessageIds = _selectedMessageIdsForDeletion(
+    final deletedMessageIds = await _selectedMessageIdsForDeletion(
       selectedMessageIds,
       deleteAllVersions: deleteAllVersions,
     );
@@ -915,14 +915,14 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Set<String> _selectedMessageIdsForDeletion(
+  Future<Set<String>> _selectedMessageIdsForDeletion(
     Set<String> selectedMessageIds, {
     required bool deleteAllVersions,
-  }) {
+  }) async {
     if (!deleteAllVersions) return selectedMessageIds;
 
     final selectedGroupIds = <String>{};
-    final allMessages = _allCurrentConversationMessages();
+    final allMessages = await _loadAllCurrentConversationMessages();
     for (final message in allMessages) {
       if (selectedMessageIds.contains(message.id)) {
         selectedGroupIds.add(message.groupId ?? message.id);
@@ -980,7 +980,7 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return;
 
-    if (_chatController.appendPersistedTailMessage(newMsg)) {
+    if (await _chatController.appendPersistedTailMessage(newMsg)) {
       _viewModel.restoreMessageUiState();
     }
     final gid = (newMsg.groupId ?? newMsg.id);
@@ -1113,7 +1113,7 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return null;
 
-    if (_chatController.appendPersistedTailMessage(newMsg)) {
+    if (await _chatController.appendPersistedTailMessage(newMsg)) {
       _viewModel.restoreMessageUiState();
     }
     final gid = newMsg.groupId ?? newMsg.id;
@@ -1354,6 +1354,12 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
+  Future<List<ChatMessage>> _loadAllCurrentConversationMessages() async {
+    final conversation = currentConversation;
+    if (conversation == null) return const [];
+    return _chatService.loadMessages(conversation.id);
+  }
+
   void selectAll() {
     final collapsed = _chatController
         .allCollapsedMessagesForCurrentConversation();
@@ -1412,14 +1418,10 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<ChatMessage> _selectedCollapsedMessages() {
+  Future<List<ChatMessage>> _selectedCollapsedMessages() async {
     final convo = currentConversation;
     if (convo == null) return const <ChatMessage>[];
-    final storedMessages = _chatService.getMessagesRange(
-      convo.id,
-      start: 0,
-      limit: _chatService.getMessageCount(convo.id),
-    );
+    final storedMessages = await _chatService.loadMessages(convo.id);
     return ChatController.selectedCollapsedMessagesForExport(
       collapsedMessages: _chatController.collapseVersions(storedMessages),
       selectedIds: _selectedItems,
@@ -1430,12 +1432,14 @@ class HomePageController extends ChangeNotifier {
   Future<void> exportSelectedAsMarkdown() async {
     final convo = currentConversation;
     if (convo == null) return;
+    final context = _context;
 
-    final selected = _selectedCollapsedMessages();
+    final selected = await _selectedCollapsedMessages();
+    if (!context.mounted) return;
     if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(_context)!;
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
-        _context,
+        context,
         message: l10n.homePageSelectMessagesToShare,
         type: NotificationType.info,
       );
@@ -1446,7 +1450,7 @@ class HomePageController extends ChangeNotifier {
     final showThinkingContent = _showThinkingContent;
     cancelSelection();
     await exportChatMessagesMarkdown(
-      _context,
+      context,
       conversation: convo,
       messages: selected,
       showThinkingAndToolCards: showThinkingTools,
@@ -1457,12 +1461,14 @@ class HomePageController extends ChangeNotifier {
   Future<void> exportSelectedAsTxt() async {
     final convo = currentConversation;
     if (convo == null) return;
+    final context = _context;
 
-    final selected = _selectedCollapsedMessages();
+    final selected = await _selectedCollapsedMessages();
+    if (!context.mounted) return;
     if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(_context)!;
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
-        _context,
+        context,
         message: l10n.homePageSelectMessagesToShare,
         type: NotificationType.info,
       );
@@ -1473,7 +1479,7 @@ class HomePageController extends ChangeNotifier {
     final showThinkingContent = _showThinkingContent;
     cancelSelection();
     await exportChatMessagesTxt(
-      _context,
+      context,
       conversation: convo,
       messages: selected,
       showThinkingAndToolCards: showThinkingTools,
@@ -1484,12 +1490,14 @@ class HomePageController extends ChangeNotifier {
   Future<void> exportSelectedAsImage() async {
     final convo = currentConversation;
     if (convo == null) return;
+    final context = _context;
 
-    final selected = _selectedCollapsedMessages();
+    final selected = await _selectedCollapsedMessages();
+    if (!context.mounted) return;
     if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(_context)!;
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
-        _context,
+        context,
         message: l10n.homePageSelectMessagesToShare,
         type: NotificationType.info,
       );
@@ -1500,7 +1508,7 @@ class HomePageController extends ChangeNotifier {
     final showThinkingContent = _showThinkingContent;
     cancelSelection();
     await exportChatMessagesImage(
-      _context,
+      context,
       conversation: convo,
       messages: selected,
       showThinkingAndToolCards: showThinkingTools,
@@ -1511,11 +1519,13 @@ class HomePageController extends ChangeNotifier {
   Future<void> confirmSelection() async {
     final convo = currentConversation;
     if (convo == null) return;
-    final selected = _selectedCollapsedMessages();
+    final context = _context;
+    final selected = await _selectedCollapsedMessages();
+    if (!context.mounted) return;
     if (selected.isEmpty) {
-      final l10n = AppLocalizations.of(_context)!;
+      final l10n = AppLocalizations.of(context)!;
       showAppSnackBar(
-        _context,
+        context,
         message: l10n.homePageSelectMessagesToShare,
         type: NotificationType.info,
       );
@@ -1524,7 +1534,7 @@ class HomePageController extends ChangeNotifier {
     _selecting = false;
     notifyListeners();
     await showChatExportSheet(
-      _context,
+      context,
       conversation: convo,
       selectedMessages: selected,
     );
@@ -1788,16 +1798,16 @@ class HomePageController extends ChangeNotifier {
         postSwitchDelay: _postSwitchScrollDelay,
       );
 
-  bool loadMoreBefore() => _viewModel.loadMoreBefore();
+  Future<bool> loadMoreBefore() => _viewModel.loadMoreBefore();
 
-  bool loadMoreAfter() => _viewModel.loadMoreAfter();
+  Future<bool> loadMoreAfter() => _viewModel.loadMoreAfter();
 
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() =>
       _chatController.allCollapsedMessagesForCurrentConversation();
 
   Future<void> scrollToMessageId(String targetId) async {
     if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
-      final loaded = _viewModel.loadUntilMessageVisible(targetId);
+      final loaded = await _viewModel.loadUntilMessageVisible(targetId);
       if (loaded) {
         _scrollCtrl.clearObserverCache();
       }
@@ -1824,9 +1834,9 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
-  void scrollToTop({bool animate = true}) {
+  Future<void> scrollToTop({bool animate = true}) async {
     if (_chatController.hasMoreBefore) {
-      final loaded = _chatController.loadStartWindow();
+      final loaded = await _chatController.loadStartWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
         _scrollCtrl.clearObserverCache();
@@ -1835,9 +1845,9 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.scrollToTop(animate: animate);
   }
 
-  void forceScrollToBottom({bool animate = true}) {
+  Future<void> forceScrollToBottom({bool animate = true}) async {
     if (_chatController.hasMoreAfter) {
-      final loaded = _chatController.loadEndWindow();
+      final loaded = await _chatController.loadEndWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
         _scrollCtrl.clearObserverCache();

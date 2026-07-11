@@ -738,13 +738,13 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     }
   }
 
-  void _runGlobalSearch() {
+  Future<void> _runGlobalSearch() async {
     if (_query.trim().isEmpty) {
       _clearGlobalSearchState(clearText: false);
       return;
     }
     final chatService = context.read<ChatService>();
-    final results = GlobalSessionSearchService.search(
+    final results = await GlobalSessionSearchService.search(
       chatService: chatService,
       query: _query,
     );

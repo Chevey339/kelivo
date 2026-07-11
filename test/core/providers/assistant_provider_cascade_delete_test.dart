@@ -111,7 +111,7 @@ void main() {
         );
 
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'unique-test-keyword-123',
           ),
@@ -123,14 +123,14 @@ void main() {
         expect(chatService.getConversation(deletedConversation.id), isNull);
         expect(chatService.getMessages(deletedConversation.id), isEmpty);
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'unique-test-keyword-123',
           ),
           isEmpty,
         );
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'keep-assistant-keyword-456',
           ),
@@ -236,7 +236,7 @@ void main() {
 
         expect(chatService.getConversation(conversation.id), isNotNull);
         expect(
-          GlobalSessionSearchService.search(
+          await GlobalSessionSearchService.search(
             chatService: chatService,
             query: 'last-assistant-keyword-789',
           ),

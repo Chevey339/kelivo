@@ -905,9 +905,9 @@ void main() {
         chatService.getConversation('restored-conversation')?.title,
         'Restored',
       );
-      final restoredMessage = chatService
-          .getMessages('restored-conversation')
-          .single;
+      final restoredMessage = (await chatService.loadMessages(
+        'restored-conversation',
+      )).single;
       expect(restoredMessage.content, 'restored from sqlite');
       expect(restoredMessage.isStreaming, isFalse);
       expect(chatService.getToolEvents('restored-message'), const [
@@ -2207,7 +2207,7 @@ void main() {
         ],
       );
       expect(
-        chatService.getMessages('cache-conversation').single.content,
+        (await chatService.loadMessages('cache-conversation')).single.content,
         'old content',
       );
 
@@ -2247,11 +2247,13 @@ void main() {
 
       expect(chatService.getConversation('cache-conversation')?.title, 'New');
       expect(
-        chatService.getMessages('cache-conversation').single.content,
+        (await chatService.loadMessages('cache-conversation')).single.content,
         'new content',
       );
       expect(
-        chatService.getMessages('cache-conversation').single.isStreaming,
+        (await chatService.loadMessages(
+          'cache-conversation',
+        )).single.isStreaming,
         isFalse,
       );
     });

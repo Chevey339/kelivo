@@ -626,13 +626,13 @@ class ChatActions {
     final modelId = modelConfig.modelId!;
 
     if (chatController.hasMoreAfter) {
-      final loaded = chatController.loadEndWindow();
+      final loaded = await chatController.loadEndWindow();
       if (loaded) {
         viewModel.restoreMessageUiState();
       }
     }
 
-    final existingContextMessages = chatController
+    final existingContextMessages = await chatController
         .messagesForCompleteHistoryContext(conversation);
     if (_hasUnsupportedAudioAttachments(
       messages: existingContextMessages,
@@ -652,7 +652,7 @@ class ChatActions {
       input: input,
       assistant: assistant,
     );
-    if (chatController.appendPersistedTailMessage(userMessage)) {
+    if (await chatController.appendPersistedTailMessage(userMessage)) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
@@ -676,7 +676,7 @@ class ChatActions {
     // so that MessageListView can detect it's streaming on first render
     streamController.markStreamingStarted(assistantMessage.id);
 
-    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+    if (await chatController.appendPersistedTailMessage(assistantMessage)) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
@@ -698,7 +698,7 @@ class ChatActions {
         messageId: assistantMessage.id,
         enableReasoning: enableReasoning,
       );
-      final apiContextMessages = chatController
+      final apiContextMessages = await chatController
           .messagesForCompleteHistoryContext(conversation);
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
@@ -788,9 +788,8 @@ class ChatActions {
 
     await cancelStreaming(conversation);
 
-    final completeMessages = chatController.messagesForCompleteHistoryContext(
-      conversation,
-    );
+    final completeMessages = await chatController
+        .messagesForCompleteHistoryContext(conversation);
     final idx = completeMessages.indexWhere((m) => m.id == message.id);
     if (idx < 0) {
       return ChatActionResult.error('message_not_found');
@@ -842,7 +841,7 @@ class ChatActions {
         targetGroupId: versioning.targetGroupId,
       );
       if (removeIds.isNotEmpty) {
-        chatController.reloadMessages();
+        await chatController.reloadMessages();
         viewModel.restoreMessageUiState();
         onMessagesChanged?.call();
       }
@@ -884,7 +883,7 @@ class ChatActions {
       assistantPlaceholder: assistantMessage,
     );
 
-    if (chatController.appendPersistedTailMessage(assistantMessage)) {
+    if (await chatController.appendPersistedTailMessage(assistantMessage)) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
@@ -982,9 +981,8 @@ class ChatActions {
     if (visibleIndex < 0 || message.role != 'assistant') {
       return ChatActionResult.error('message_not_found');
     }
-    final completeMessages = chatController.messagesForCompleteHistoryContext(
-      conversation,
-    );
+    final completeMessages = await chatController
+        .messagesForCompleteHistoryContext(conversation);
     final contextIndex = completeMessages.indexWhere(
       (candidate) => candidate.id == message.id,
     );

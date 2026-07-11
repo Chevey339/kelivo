@@ -195,9 +195,9 @@ class MessageListView extends StatefulWidget {
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
-  final bool Function()? onLoadMoreBefore;
+  final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
-  final bool Function()? onLoadMoreAfter;
+  final Future<bool> Function()? onLoadMoreAfter;
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
@@ -450,17 +450,21 @@ class _MessageListViewState extends State<MessageListView> {
   void _scheduleHistoryLoad({
     required bool keepAnchorFromTop,
     required double beforeExtent,
-    required bool Function() load,
+    required Future<bool> Function() load,
   }) {
     _historyLoadScheduled = true;
     _lastHistoryLoadAt = DateTime.now();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) {
         _historyLoadScheduled = false;
         return;
       }
 
-      final loaded = load();
+      final loaded = await load();
+      if (!mounted) {
+        _historyLoadScheduled = false;
+        return;
+      }
       if (!loaded) {
         _historyLoadScheduled = false;
         return;

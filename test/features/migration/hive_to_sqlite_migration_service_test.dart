@@ -232,7 +232,7 @@ void main() {
     expect(migratedConversation!.createdAt, conversation.createdAt);
     expect(migratedConversation.updatedAt, conversation.updatedAt);
     expect(chatService.getMessageCount(conversation.id), 2);
-    final migratedMessages = chatService.getMessages(conversation.id);
+    final migratedMessages = await chatService.loadMessages(conversation.id);
     expect(migratedMessages.map((m) => m.content), [
       'hello from hive',
       'hello from sqlite',
@@ -347,7 +347,7 @@ void main() {
     expect(migratedConversation.lastSummarizedMessageCount, 64);
     expect(migratedConversation.chatSuggestions, ['next']);
 
-    final migratedMessages = chatService.getMessages(conversation.id);
+    final migratedMessages = await chatService.loadMessages(conversation.id);
     expect(migratedMessages, hasLength(messageCount));
     expect(migratedMessages.first.id, 'message-0');
     expect(migratedMessages[127].id, 'message-127');

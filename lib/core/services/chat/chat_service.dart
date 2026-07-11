@@ -29,6 +29,9 @@ class ChatService extends ChangeNotifier {
   final Map<String, List<Map<String, dynamic>>> _temporaryToolEvents =
       <String, List<Map<String, dynamic>>>{};
   final Map<String, String> _temporaryGeminiThoughtSigs = <String, String>{};
+  final Map<String, List<Map<String, dynamic>>> _toolEventsCache = {};
+  final Map<String, String> _geminiThoughtSigsCache = {};
+  final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
@@ -84,13 +87,50 @@ class ChatService extends ChangeNotifier {
   }
 
   Future<void> _loadConversationsCache() async {
+    final conversations = await _repo.getAllConversations();
+    _toolEventsCache.clear();
+    _geminiThoughtSigsCache.clear();
     _conversationsCache
       ..clear()
       ..addEntries(
-        _repo.getAllConversationsSync().map(
+        conversations.map(
           (conversation) => MapEntry(conversation.id, conversation),
         ),
       );
+  }
+
+  Future<void> _cacheMessageArtifacts(Iterable<ChatMessage> messages) async {
+    final ids = messages.map((message) => message.id).toSet();
+    if (ids.isEmpty) return;
+    final results = await Future.wait([
+      _repo.getToolEventsForMessages(ids),
+      _repo.getGeminiThoughtSignaturesForMessages(ids),
+    ]);
+    for (final id in ids) {
+      _toolEventsCache.remove(id);
+      _geminiThoughtSigsCache.remove(id);
+    }
+    _toolEventsCache.addAll(
+      results[0] as Map<String, List<Map<String, dynamic>>>,
+    );
+    _geminiThoughtSigsCache.addAll(results[1] as Map<String, String>);
+  }
+
+  void _cacheLoadedMessages(
+    String conversationId,
+    Iterable<ChatMessage> messages,
+  ) {
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null) return;
+    final byId = <String, ChatMessage>{
+      for (final message in _messagesCache[conversationId] ?? const [])
+        message.id: message,
+      for (final message in messages) message.id: message,
+    };
+    _messagesCache[conversationId] = [
+      for (final id in conversation.messageIds)
+        if (byId[id] != null) byId[id]!,
+    ];
   }
 
   List<Conversation> getAllConversations() {
@@ -101,9 +141,7 @@ class ChatService extends ChangeNotifier {
   }
 
   List<Conversation> getAllCompleteConversations() {
-    if (!_initialized) return [];
-    final conversations = _repo.getAllCompleteConversationsSync();
-    return conversations;
+    return getAllConversations();
   }
 
   List<Conversation> getPinnedConversations() {
@@ -119,12 +157,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return null;
     final draft = _draftConversations[id];
     if (draft != null) return draft;
-    final conversation = _repo.getConversationSync(id, includeMessageIds: true);
-    if (conversation == null) {
-      _conversationsCache.remove(id);
-      return null;
-    }
-    return conversation;
+    return _conversationsCache[id];
   }
 
   Conversation? _conversationForMessages(String conversationId) {
@@ -138,9 +171,6 @@ class ChatService extends ChangeNotifier {
       return _messagesCache[conversationId]?.length ?? 0;
     }
     if (!_initialized) return 0;
-    if (_conversationsCache.containsKey(conversationId)) {
-      return _repo.getMessageCountSync(conversationId);
-    }
     final conversation = _conversationForMessages(conversationId);
     return conversation?.messageIds.length ?? 0;
   }
@@ -151,13 +181,10 @@ class ChatService extends ChangeNotifier {
       if (messages == null) return -1;
       return messages.indexWhere((message) => message.id == messageId);
     }
-    if (_initialized && _conversationsCache.containsKey(conversationId)) {
-      return _repo.getMessageIndexSync(conversationId, messageId);
-    }
-    if (_draftConversations.containsKey(conversationId)) {
-      return _draftConversations[conversationId]!.messageIds.indexOf(messageId);
-    }
-    return -1;
+    return _conversationForMessages(
+          conversationId,
+        )?.messageIds.indexOf(messageId) ??
+        -1;
   }
 
   Map<String, int> getFirstMessageIndicesForGroups(
@@ -165,19 +192,39 @@ class ChatService extends ChangeNotifier {
     Iterable<String> groupIds,
   ) {
     if (!_initialized) return const <String, int>{};
+    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return const <String, int>{};
+    final cached = _firstGroupIndicesCache[conversationId] ?? const {};
+    return {
+      for (final id in ids)
+        if (cached[id] != null) id: cached[id]!,
+    };
+  }
+
+  Future<Map<String, int>> loadFirstMessageIndicesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) async {
+    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return const {};
     if (_temporaryConversationIds.contains(conversationId) ||
         _draftConversations.containsKey(conversationId)) {
-      final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
-      if (remaining.isEmpty) return const <String, int>{};
-      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
       final result = <String, int>{};
-      for (var i = 0; i < messages.length && remaining.isNotEmpty; i++) {
+      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+      for (var i = 0; i < messages.length; i++) {
         final groupId = messages[i].groupId ?? messages[i].id;
-        if (remaining.remove(groupId)) result[groupId] = i;
+        if (ids.contains(groupId)) result.putIfAbsent(groupId, () => i);
       }
       return result;
     }
-    return _repo.getFirstMessageIndicesForGroupsSync(conversationId, groupIds);
+    final loaded = await _repo.getFirstMessageIndicesForGroups(
+      conversationId,
+      ids,
+    );
+    _firstGroupIndicesCache
+        .putIfAbsent(conversationId, () => {})
+        .addAll(loaded);
+    return loaded;
   }
 
   List<ChatMessage> getMessagesForGroups(
@@ -185,38 +232,47 @@ class ChatService extends ChangeNotifier {
     Iterable<String> groupIds,
   ) {
     if (!_initialized) return const <ChatMessage>[];
-    if (_temporaryConversationIds.contains(conversationId) ||
-        _draftConversations.containsKey(conversationId)) {
-      final remaining = groupIds.where((id) => id.isNotEmpty).toSet();
-      if (remaining.isEmpty) return const <ChatMessage>[];
-      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
-      return messages
-          .where((message) {
-            final groupId = message.groupId ?? message.id;
-            return remaining.contains(groupId);
-          })
-          .toList(growable: false);
-    }
-    return _repo.getMessagesForGroupsSync(conversationId, groupIds);
+    final ids = groupIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return const <ChatMessage>[];
+    final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+    return messages
+        .where((message) => ids.contains(message.groupId ?? message.id))
+        .toList(growable: false);
   }
 
-  List<ConversationSearchMatch> searchConversationMatches({
+  Future<List<ChatMessage>> loadMessagesForGroups(
+    String conversationId,
+    Iterable<String> groupIds,
+  ) async {
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return getMessagesForGroups(conversationId, groupIds);
+    }
+    final messages = await _repo.getMessagesForGroups(conversationId, groupIds);
+    _cacheLoadedMessages(conversationId, messages);
+    await _cacheMessageArtifacts(messages);
+    return messages;
+  }
+
+  Future<List<ConversationSearchMatch>> searchConversationMatches({
     required List<String> tokens,
     int limit = 200,
-  }) {
+  }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
-    return _repo.searchConversationMatchesSync(tokens: tokens, limit: limit);
+    return _repo.searchConversationMatches(tokens: tokens, limit: limit);
   }
 
   List<ChatMessage> getMessages(String conversationId) {
-    if (!_initialized) return [];
+    if (!_initialized) return const [];
+    return _messagesCache[conversationId] ?? const [];
+  }
 
-    // Check cache first
-    if (_messagesCache.containsKey(conversationId)) {
-      return _messagesCache[conversationId]!;
+  Future<List<ChatMessage>> loadMessages(String conversationId) async {
+    if (!_initialized) return const [];
+    final cached = _messagesCache[conversationId];
+    if (cached != null && cached.length == getMessageCount(conversationId)) {
+      return cached;
     }
-
-    // Load from storage
     final conversation =
         _conversationsCache[conversationId] ??
         _draftConversations[conversationId];
@@ -224,11 +280,15 @@ class ChatService extends ChangeNotifier {
 
     final messages = _temporaryConversationIds.contains(conversationId)
         ? (_messagesCache[conversationId] ?? const <ChatMessage>[])
-        : _repo.getMessagesRangeSync(
+        : await _repo.getMessagesRange(
             conversationId,
             start: 0,
-            limit: _repo.getMessageCountSync(conversationId),
+            limit: conversation.messageIds.length,
           );
+
+    if (!_temporaryConversationIds.contains(conversationId)) {
+      await _cacheMessageArtifacts(messages);
+    }
 
     // Cache the result
     _messagesCache[conversationId] = List.of(messages);
@@ -240,6 +300,27 @@ class ChatService extends ChangeNotifier {
     required int start,
     required int limit,
   }) {
+    if (!_initialized || limit <= 0) return const [];
+    final conversation = _conversationForMessages(conversationId);
+    if (conversation == null) return const [];
+    final ids = conversation.messageIds;
+    final safeStart = start.clamp(0, ids.length).toInt();
+    final end = (safeStart + limit).clamp(safeStart, ids.length).toInt();
+    final byId = {
+      for (final message in _messagesCache[conversationId] ?? const [])
+        message.id: message,
+    };
+    return [
+      for (final id in ids.sublist(safeStart, end))
+        if (byId[id] != null) byId[id]!,
+    ];
+  }
+
+  Future<List<ChatMessage>> loadMessagesRange(
+    String conversationId, {
+    required int start,
+    required int limit,
+  }) async {
     if (!_initialized || limit <= 0) return const <ChatMessage>[];
 
     if (_temporaryConversationIds.contains(conversationId)) {
@@ -256,11 +337,14 @@ class ChatService extends ChangeNotifier {
       return const <ChatMessage>[];
     }
 
-    return _repo.getMessagesRangeSync(
+    final messages = await _repo.getMessagesRange(
       conversationId,
       start: start,
       limit: limit,
     );
+    _cacheLoadedMessages(conversationId, messages);
+    await _cacheMessageArtifacts(messages);
+    return messages;
   }
 
   List<ChatMessage> getRecentMessages(
@@ -269,6 +353,17 @@ class ChatService extends ChangeNotifier {
     int textBudget = defaultInitialTextBudget,
     int maxMessages = defaultInitialMessageMax,
   }) {
+    final cached = _messagesCache[conversationId] ?? const <ChatMessage>[];
+    if (cached.length <= maxMessages) return List.of(cached);
+    return cached.sublist(cached.length - maxMessages);
+  }
+
+  Future<List<ChatMessage>> loadRecentMessages(
+    String conversationId, {
+    int minMessages = defaultInitialMessageMin,
+    int textBudget = defaultInitialTextBudget,
+    int maxMessages = defaultInitialMessageMax,
+  }) async {
     if (!_initialized) return const <ChatMessage>[];
 
     final conversation = _conversationForMessages(conversationId);
@@ -290,7 +385,7 @@ class ChatService extends ChangeNotifier {
       final batchStart = (start - defaultHistoryPageSize)
           .clamp(0, start)
           .toInt();
-      final batch = getMessagesRange(
+      final batch = await loadMessagesRange(
         conversationId,
         start: batchStart,
         limit: start - batchStart,
@@ -307,7 +402,7 @@ class ChatService extends ChangeNotifier {
     }
 
     if (selected.isNotEmpty && selected.length.isOdd && start > 0) {
-      final previous = getMessagesRange(
+      final previous = await loadMessagesRange(
         conversationId,
         start: start - 1,
         limit: 1,
@@ -357,11 +452,7 @@ class ChatService extends ChangeNotifier {
 
   Future<void> _refreshConversation(String conversationId) async {
     if (_temporaryConversationIds.contains(conversationId)) return;
-    final conversation = _repo.getConversationSync(
-      conversationId,
-      includeMessageIds:
-          _conversationsCache[conversationId]?.messageIds.isNotEmpty == true,
-    );
+    final conversation = await _repo.getConversation(conversationId);
     if (conversation == null) {
       _conversationsCache.remove(conversationId);
     } else {
@@ -569,7 +660,7 @@ class ChatService extends ChangeNotifier {
       for (final conversation in _conversationsCache.values) {
         final total = getMessageCount(conversation.id);
         for (var start = 0; start < total; start += defaultLoadedWindowMax) {
-          final messages = getMessagesRange(
+          final messages = await loadMessagesRange(
             conversation.id,
             start: start,
             limit: defaultLoadedWindowMax,
@@ -695,6 +786,8 @@ class ChatService extends ChangeNotifier {
     _temporaryConversationIds.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
+    _toolEventsCache.clear();
+    _geminiThoughtSigsCache.clear();
     _currentConversationId = null;
     await _loadConversationsCache();
     notifyListeners();
@@ -1046,7 +1139,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _repo.getMessageSync(messageId) ?? _cachedTemporaryMessage(messageId);
+        await _repo.getMessage(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -1112,7 +1205,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _repo.getMessageSync(messageId) ?? _cachedTemporaryMessage(messageId);
+        await _repo.getMessage(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     final updatedMessage = message.copyWith(
@@ -1172,6 +1265,7 @@ class ChatService extends ChangeNotifier {
 
     await _repo.updateStreamingCheckpoint(message, toolEvents);
     _replaceCachedMessage(message);
+    _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
     if (!message.isStreaming) {
       await _untrackStreamingId(message.id);
     }
@@ -1182,7 +1276,9 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return const <Map<String, dynamic>>[];
     final temporary = _temporaryToolEvents[assistantMessageId];
     if (temporary != null) return List<Map<String, dynamic>>.of(temporary);
-    return _repo.getToolEventsSync(assistantMessageId);
+    return List<Map<String, dynamic>>.of(
+      _toolEventsCache[assistantMessageId] ?? const [],
+    );
   }
 
   Future<void> setToolEvents(
@@ -1198,6 +1294,9 @@ class ChatService extends ChangeNotifier {
       return;
     }
     await _repo.setToolEvents(assistantMessageId, events);
+    _toolEventsCache[assistantMessageId] = List<Map<String, dynamic>>.of(
+      events,
+    );
     notifyListeners();
   }
 
@@ -1253,6 +1352,7 @@ class ChatService extends ChangeNotifier {
       return;
     }
     await _repo.setToolEvents(assistantMessageId, list);
+    _toolEventsCache[assistantMessageId] = list;
     notifyListeners();
   }
 
@@ -1261,7 +1361,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return null;
     final temporary = _temporaryGeminiThoughtSigs[assistantMessageId];
     if (temporary != null && temporary.trim().isNotEmpty) return temporary;
-    return _repo.getGeminiThoughtSignatureSync(assistantMessageId);
+    return _geminiThoughtSigsCache[assistantMessageId];
   }
 
   Future<void> setGeminiThoughtSignature(
@@ -1275,6 +1375,7 @@ class ChatService extends ChangeNotifier {
       return;
     }
     await _repo.setGeminiThoughtSignature(assistantMessageId, signature);
+    _geminiThoughtSigsCache[assistantMessageId] = signature;
     notifyListeners();
   }
 
@@ -1286,6 +1387,7 @@ class ChatService extends ChangeNotifier {
     }
     try {
       await _repo.deleteGeminiThoughtSignature(assistantMessageId);
+      _geminiThoughtSigsCache.remove(assistantMessageId);
     } catch (_) {}
   }
 
@@ -1343,7 +1445,7 @@ class ChatService extends ChangeNotifier {
     required String content,
   }) async {
     if (!_initialized) await init();
-    final original = _repo.getMessageSync(messageId);
+    final original = await _repo.getMessage(messageId);
     if (original == null) return null;
 
     final cid = original.conversationId;
@@ -1353,7 +1455,7 @@ class ChatService extends ChangeNotifier {
     final gid = (original.groupId ?? original.id);
     // Find current max version within this group in this conversation
     int maxVersion = -1;
-    final groupMessages = getMessagesForGroups(cid, [gid]);
+    final groupMessages = await loadMessagesForGroups(cid, [gid]);
     for (final m in groupMessages) {
       final mg = (m.groupId ?? m.id);
       if (mg == gid) {
@@ -1480,7 +1582,7 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) return;
 
     final message =
-        _repo.getMessageSync(messageId) ?? _cachedTemporaryMessage(messageId);
+        await _repo.getMessage(messageId) ?? _cachedTemporaryMessage(messageId);
     if (message == null) return;
 
     if (isTemporaryConversation(message.conversationId)) {
@@ -1498,13 +1600,16 @@ class ChatService extends ChangeNotifier {
     if (conversation != null) {
       final gid = message.groupId ?? message.id;
       final ids = conversation.messageIds;
+      final messagesById = {
+        for (final item in await _repo.getMessagesByIds(ids)) item.id: item,
+      };
 
       // Find the earliest position of this message group before removal so we
       // can keep the group anchored when deleting one of its versions.
       int anchorIndex = -1;
       for (int i = 0; i < ids.length; i++) {
         final mid = ids[i];
-        final m = _repo.getMessageSync(mid);
+        final m = messagesById[mid];
         if (m == null) continue;
         final mgid = m.groupId ?? m.id;
         if (mgid == gid) {
@@ -1522,7 +1627,7 @@ class ChatService extends ChangeNotifier {
         int? earliestRemaining;
         for (int i = 0; i < ids.length; i++) {
           final mid = ids[i];
-          final m = _repo.getMessageSync(mid);
+          final m = messagesById[mid];
           if (m == null) continue;
           final mgid = m.groupId ?? m.id;
           if (mgid == gid) {
@@ -1543,6 +1648,8 @@ class ChatService extends ChangeNotifier {
     }
 
     await _repo.deleteMessage(messageId);
+    _toolEventsCache.remove(messageId);
+    _geminiThoughtSigsCache.remove(messageId);
     await _refreshConversation(message.conversationId);
     // Remove any tool events linked to this assistant message
     if (message.role == 'assistant') {
@@ -1580,6 +1687,8 @@ class ChatService extends ChangeNotifier {
     _temporaryConversationIds.clear();
     _temporaryToolEvents.clear();
     _temporaryGeminiThoughtSigs.clear();
+    _toolEventsCache.clear();
+    _geminiThoughtSigsCache.clear();
     _currentConversationId = null;
     if (deleteUploads) {
       final uploadDir = await AppDirectories.getUploadDirectory();

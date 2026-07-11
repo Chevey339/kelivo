@@ -71,7 +71,7 @@ void main() {
     final restarted = createService();
     await restarted.init();
 
-    final messages = restarted.getMessages(conversation.id);
+    final messages = await restarted.loadMessages(conversation.id);
     expect(messages, hasLength(1));
     expect(messages.single.content, 'partial');
     expect(messages.single.isStreaming, isFalse);
@@ -90,7 +90,7 @@ void main() {
       );
 
       expect(service.getAllConversations().map((c) => c.id), [conversation.id]);
-      expect(service.getMessages(conversation.id), hasLength(1));
+      expect(await service.loadMessages(conversation.id), hasLength(1));
     });
 
     test(

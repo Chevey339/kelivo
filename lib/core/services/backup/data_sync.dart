@@ -1778,7 +1778,7 @@ class DataSync {
             // Create a map of message IDs to avoid duplicates
             final existingMsgIds = <String>{};
             for (final conv in existingConvs) {
-              final messages = chatService.getMessages(conv.id);
+              final messages = await chatService.loadMessages(conv.id);
               existingMsgIds.addAll(messages.map((m) => m.id));
             }
 

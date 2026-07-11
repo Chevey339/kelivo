@@ -98,12 +98,26 @@ class ChatController extends ChangeNotifier {
     _currentConversation = conversation;
     if (conversation != null) {
       _loadVersionSelections();
-      _loadInitialMessageWindow(conversation.id);
+      _loadCachedInitialMessageWindow(conversation.id);
     } else {
       _messages = [];
       _loadedStartIndex = 0;
       _totalMessageCount = 0;
       _versionSelections = <String, int>{};
+    }
+    notifyListeners();
+  }
+
+  Future<void> setCurrentConversationAndLoad(Conversation? conversation) async {
+    _currentConversation = conversation;
+    if (conversation == null) {
+      _messages = [];
+      _loadedStartIndex = 0;
+      _totalMessageCount = 0;
+      _versionSelections = <String, int>{};
+    } else {
+      _loadVersionSelections();
+      await _loadInitialMessageWindow(conversation.id);
     }
     notifyListeners();
   }
@@ -161,7 +175,7 @@ class ChatController extends ChangeNotifier {
     if (convo != null) {
       _currentConversation = convo;
       _loadVersionSelections();
-      _loadInitialMessageWindow(id);
+      await _loadInitialMessageWindow(id);
       notifyListeners();
     }
   }
@@ -180,14 +194,24 @@ class ChatController extends ChangeNotifier {
     _versionSelections = <String, int>{};
   }
 
-  void _loadInitialMessageWindow(String conversationId) {
+  Future<void> _loadInitialMessageWindow(String conversationId) async {
+    _totalMessageCount = _chatService.getMessageCount(conversationId);
+    _messages = List.of(await _chatService.loadRecentMessages(conversationId));
+    _loadedStartIndex = (_totalMessageCount - _messages.length)
+        .clamp(0, _totalMessageCount)
+        .toInt();
+    invalidateCache();
+    await _preloadVisibleGroupData();
+    await _ensureLoadedWindowHasVisibleMessages();
+  }
+
+  void _loadCachedInitialMessageWindow(String conversationId) {
     _totalMessageCount = _chatService.getMessageCount(conversationId);
     _messages = List.of(_chatService.getRecentMessages(conversationId));
     _loadedStartIndex = (_totalMessageCount - _messages.length)
         .clamp(0, _totalMessageCount)
         .toInt();
     invalidateCache();
-    _ensureLoadedWindowHasVisibleMessages();
   }
 
   void refreshLoadedMessageCount() {
@@ -201,7 +225,9 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
   }
 
-  bool loadMoreBefore({int limit = ChatService.defaultHistoryPageSize}) {
+  Future<bool> loadMoreBefore({
+    int limit = ChatService.defaultHistoryPageSize,
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null || _loadedStartIndex <= 0 || limit <= 0) {
       return false;
@@ -210,7 +236,7 @@ class ChatController extends ChangeNotifier {
     final newStart = (_loadedStartIndex - limit)
         .clamp(0, _loadedStartIndex)
         .toInt();
-    final older = _chatService.getMessagesRange(
+    final older = await _chatService.loadMessagesRange(
       conversation.id,
       start: newStart,
       limit: _loadedStartIndex - newStart,
@@ -223,18 +249,21 @@ class ChatController extends ChangeNotifier {
     final merged = <ChatMessage>[...older, ..._messages];
     _messages = _trimWindowEnd(merged);
     _loadedStartIndex = newStart;
+    await _preloadVisibleGroupData();
     notifyListeners();
     return true;
   }
 
-  bool loadMoreAfter({int limit = ChatService.defaultHistoryPageSize}) {
+  Future<bool> loadMoreAfter({
+    int limit = ChatService.defaultHistoryPageSize,
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null || !hasMoreAfter || limit <= 0) {
       return false;
     }
 
     final currentEnd = _loadedStartIndex + _messages.length;
-    final newer = _chatService.getMessagesRange(
+    final newer = await _chatService.loadMessagesRange(
       conversation.id,
       start: currentEnd,
       limit: limit,
@@ -250,17 +279,18 @@ class ChatController extends ChangeNotifier {
       _messages = merged;
     }
     invalidateCache();
-    final fallbackLoaded = _ensureLoadedWindowHasVisibleMessages();
+    await _preloadVisibleGroupData();
+    final fallbackLoaded = await _ensureLoadedWindowHasVisibleMessages();
     if (fallbackLoaded) return true;
     notifyListeners();
     return true;
   }
 
-  bool loadStartWindow() {
+  Future<bool> loadStartWindow() {
     return _loadWindow(start: 0, limit: ChatService.defaultLoadedWindowMax);
   }
 
-  bool loadEndWindow() {
+  Future<bool> loadEndWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
     _totalMessageCount = _chatService.getMessageCount(conversation.id);
@@ -276,21 +306,24 @@ class ChatController extends ChangeNotifier {
     );
   }
 
-  bool loadUntilMessageVisible(
+  Future<bool> loadUntilMessageVisible(
     String messageId, {
     int pageSize = ChatService.defaultHistoryPageSize,
     int maxPages = 256,
-  }) {
+  }) async {
     if (_messages.any((message) => message.id == messageId)) return true;
 
-    final loaded = loadWindowAroundMessage(messageId, leadingContext: pageSize);
+    final loaded = await loadWindowAroundMessage(
+      messageId,
+      leadingContext: pageSize,
+    );
     return loaded && _messages.any((message) => message.id == messageId);
   }
 
-  bool loadWindowAroundMessage(
+  Future<bool> loadWindowAroundMessage(
     String messageId, {
     int leadingContext = ChatService.defaultHistoryPageSize,
-  }) {
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
 
@@ -303,11 +336,11 @@ class ChatController extends ChangeNotifier {
     return _loadWindowAroundIndex(targetIndex, leadingContext: leadingContext);
   }
 
-  bool _loadWindowAroundIndex(
+  Future<bool> _loadWindowAroundIndex(
     int targetIndex, {
     int leadingContext = ChatService.defaultHistoryPageSize,
     bool ensureVisible = true,
-  }) {
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null || targetIndex < 0) return false;
 
@@ -357,20 +390,16 @@ class ChatController extends ChangeNotifier {
     );
   }
 
-  List<ChatMessage> allMessagesForCurrentConversationContext() {
+  Future<List<ChatMessage>> allMessagesForCurrentConversationContext() async {
     final conversation = _currentConversation;
     if (conversation == null) return const <ChatMessage>[];
     return messagesForCompleteHistoryContext(conversation);
   }
 
-  List<ChatMessage> messagesForCompleteHistoryContext(
+  Future<List<ChatMessage>> messagesForCompleteHistoryContext(
     Conversation conversation,
   ) {
-    return _chatService.getMessagesRange(
-      conversation.id,
-      start: 0,
-      limit: _chatService.getMessageCount(conversation.id),
-    );
+    return _chatService.loadMessages(conversation.id);
   }
 
   Conversation conversationForCompleteHistoryContext(
@@ -384,17 +413,17 @@ class ChatController extends ChangeNotifier {
     return messages.sublist(0, ChatService.defaultLoadedWindowMax);
   }
 
-  bool _loadWindow({
+  Future<bool> _loadWindow({
     required int start,
     required int limit,
     bool ensureVisible = false,
-  }) {
+  }) async {
     final conversation = _currentConversation;
     if (conversation == null || limit <= 0) return false;
 
     _totalMessageCount = _chatService.getMessageCount(conversation.id);
     final safeStart = start.clamp(0, _totalMessageCount).toInt();
-    final range = _chatService.getMessagesRange(
+    final range = await _chatService.loadMessagesRange(
       conversation.id,
       start: safeStart,
       limit: limit,
@@ -404,12 +433,15 @@ class ChatController extends ChangeNotifier {
     _messages = List.of(range);
     _loadedStartIndex = safeStart;
     invalidateCache();
-    if (ensureVisible && _ensureLoadedWindowHasVisibleMessages()) return true;
+    await _preloadVisibleGroupData();
+    if (ensureVisible && await _ensureLoadedWindowHasVisibleMessages()) {
+      return true;
+    }
     notifyListeners();
     return true;
   }
 
-  bool _ensureLoadedWindowHasVisibleMessages() {
+  Future<bool> _ensureLoadedWindowHasVisibleMessages() async {
     final conversation = _currentConversation;
     if (conversation == null || _messages.isEmpty) return false;
     if (collapsedMessages.isNotEmpty) return false;
@@ -418,6 +450,29 @@ class ChatController extends ChangeNotifier {
     if (anchorIndex == null) return false;
 
     return _loadWindowAroundIndex(anchorIndex, ensureVisible: false);
+  }
+
+  Future<void> _preloadVisibleGroupData() async {
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty) return;
+    final groupIds = <String>{
+      for (final message in _messages)
+        if (message.version > 0 ||
+            _versionSelections.containsKey(message.groupId ?? message.id))
+          message.groupId ?? message.id,
+    };
+    if (groupIds.isEmpty) return;
+    await Future.wait([
+      _chatService.loadMessagesForGroups(conversation.id, groupIds),
+      _chatService.loadFirstMessageIndicesForGroups(conversation.id, groupIds),
+      if (_loadedStartIndex > 0)
+        _chatService.loadMessagesRange(
+          conversation.id,
+          start: _loadedStartIndex - 1,
+          limit: 1,
+        ),
+    ]);
+    invalidateCache();
   }
 
   int? _latestGroupAnchorIndexForLoadedWindow(String conversationId) {
@@ -469,7 +524,7 @@ class ChatController extends ChangeNotifier {
     }
 
     if (hasMoreAfter) {
-      loadEndWindow();
+      await loadEndWindow();
     }
 
     final message = await _chatService.addMessage(
@@ -500,7 +555,7 @@ class ChatController extends ChangeNotifier {
   /// persisted conversation before callers update UI state. This method keeps
   /// [_messages] as a real contiguous persisted range instead of mixing a tail
   /// message into an older loaded window.
-  bool appendPersistedTailMessage(ChatMessage message) {
+  Future<bool> appendPersistedTailMessage(ChatMessage message) async {
     final conversation = _currentConversation;
     if (conversation == null || message.conversationId != conversation.id) {
       return false;
@@ -512,7 +567,7 @@ class ChatController extends ChangeNotifier {
 
     if (!wasAtTail) {
       final groupId = message.groupId ?? message.id;
-      final firstIndices = _chatService.getFirstMessageIndicesForGroups(
+      final firstIndices = await _chatService.loadFirstMessageIndicesForGroups(
         conversation.id,
         <String>{groupId},
       );
@@ -523,7 +578,7 @@ class ChatController extends ChangeNotifier {
           notifyListeners();
           return false;
         }
-        if (_loadWindowAroundIndex(anchorIndex)) {
+        if (await _loadWindowAroundIndex(anchorIndex)) {
           return true;
         }
       }
@@ -601,7 +656,7 @@ class ChatController extends ChangeNotifier {
   }
 
   /// Reload messages from storage.
-  void reloadMessages() {
+  Future<void> reloadMessages() async {
     if (_currentConversation == null) return;
     final conversationId = _currentConversation!.id;
     _totalMessageCount = _chatService.getMessageCount(conversationId);
@@ -621,13 +676,14 @@ class ChatController extends ChangeNotifier {
         .toInt();
     final safeStart = start > maxStart ? maxStart : start;
     _messages = List.of(
-      _chatService.getMessagesRange(
+      await _chatService.loadMessagesRange(
         conversationId,
         start: safeStart,
         limit: visibleCount,
       ),
     );
     _loadedStartIndex = safeStart;
+    await _preloadVisibleGroupData();
     notifyListeners();
   }
 
