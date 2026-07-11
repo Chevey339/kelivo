@@ -5539,6 +5539,143 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsPageDiagnostics => 'Cache Diagnostics';
+
+  @override
+  String get diagSelectTitle => 'Select a conversation to diagnose';
+
+  @override
+  String get diagSelectEmpty => 'No conversations available';
+
+  @override
+  String get diagSelectButton => 'Diagnose';
+
+  @override
+  String get diagUntitled => 'Untitled';
+
+  @override
+  String get diagInsufficientBadge => 'Insufficient data';
+
+  @override
+  String get diagResultTitle => 'Diagnostic Result';
+
+  @override
+  String diagSampleWindow(int assistant, int user) {
+    return 'Sampled $assistant assistant / $user user messages in the last 24h';
+  }
+
+  @override
+  String get diagMetricTotal => 'Total tokens';
+
+  @override
+  String get diagMetricCached => 'Cached';
+
+  @override
+  String get diagMetricUncached => 'Uncached';
+
+  @override
+  String get diagAllGood => 'No issues detected';
+
+  @override
+  String get diagSeverityUrgent => 'Urgent';
+
+  @override
+  String get diagSeverityRisk => 'Risk';
+
+  @override
+  String get diagA1Title => 'Context overflow';
+
+  @override
+  String get diagA1Subtitle =>
+      'This conversation has more user messages than the assistant\'s contextMessageSize, so the prefix is being trimmed and cache cannot be reused across turns.';
+
+  @override
+  String get diagA1Solution =>
+      'Set contextMessageSize to unlimited (turn off the limit, or set the cap to a very large number).';
+
+  @override
+  String get diagA2Title => 'Time variable in system prompt';
+
+  @override
+  String get diagA2Subtitle =>
+      'Your system prompt contains the cur_time / cur_datetime / cur_date placeholders, which change on every request and invalidate the cache.';
+
+  @override
+  String get diagA2Solution =>
+      'Remove the time placeholders from the system prompt, or move the time variable to after the message placeholder in the message template.';
+
+  @override
+  String get diagA3Title => 'Time variable in front of message';
+
+  @override
+  String get diagA3Subtitle =>
+      'Your message template places the time / date placeholders before the message, so the prefix around the user message changes every request.';
+
+  @override
+  String get diagA3Solution =>
+      'Move the time placeholders to after the message so they appear as a suffix on the user message.';
+
+  @override
+  String get diagA4Title => 'Memory feature breaking cache';
+
+  @override
+  String get diagA4SubContent =>
+      'Memory content has changed within the window, rewriting the system prompt.';
+
+  @override
+  String get diagA4SubHour =>
+      'Memory hint hard-codes the current hour (currentHour), changing once per hour.';
+
+  @override
+  String get diagA4Solution =>
+      'Move long-term content to a world book (constantActive). Remove the current hour from the system prompt and inject it after the message instead.';
+
+  @override
+  String get diagA6Title => 'World book: non-bottom, high trigger';
+
+  @override
+  String get diagA6Subtitle =>
+      'Frequently triggered world book entries are inserted in non-bottom positions, shifting the conversation sequence.';
+
+  @override
+  String get diagA6Solution =>
+      'Switch the entry to constantActive (always in the prompt) or move its injection position to bottomOfChat.';
+
+  @override
+  String get diagT1Title => 'Tool / MCP output tokens too high';
+
+  @override
+  String get diagT1Subtitle =>
+      'Tool results consume more than 60% of the total input tokens, leaving little prefix for caching.';
+
+  @override
+  String get diagT1Solution =>
+      'Disable the dominant tool, or scope it to fewer triggers.';
+
+  @override
+  String get diagF1aTitle => 'Conversation interval too long';
+
+  @override
+  String get diagF1aSubtitle =>
+      'More than half of the message gaps exceed 5 minutes, so the provider\'s cache TTL has expired between turns.';
+
+  @override
+  String get diagF1aSolution =>
+      'This is normal behaviour. Provider cache TTLs are typically 5 minutes; sparse conversations cannot build cache.';
+
+  @override
+  String get diagF1bTitle => 'Upstream issue';
+
+  @override
+  String get diagF1bSubtitle =>
+      'No specific configuration issue was detected, but the cache hit rate is still low.';
+
+  @override
+  String get diagF1bSolution =>
+      'Your upstream provider may not have prompt caching enabled. Try OpenAI, Anthropic, or Gemini, which expose prompt cache.';
+
+  @override
+  String get settingsPageToolsSection => 'Tools';
   String get workspaceEnableTitle => 'Enable Workspace';
 
   @override

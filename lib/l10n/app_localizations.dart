@@ -10190,6 +10190,245 @@ abstract class AppLocalizations {
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
 
+  /// No description provided for @settingsPageDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Cache Diagnostics'**
+  String get settingsPageDiagnostics;
+
+  /// No description provided for @diagSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a conversation to diagnose'**
+  String get diagSelectTitle;
+
+  /// No description provided for @diagSelectEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations available'**
+  String get diagSelectEmpty;
+
+  /// No description provided for @diagSelectButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnose'**
+  String get diagSelectButton;
+
+  /// No description provided for @diagUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get diagUntitled;
+
+  /// No description provided for @diagInsufficientBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient data'**
+  String get diagInsufficientBadge;
+
+  /// No description provided for @diagResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic Result'**
+  String get diagResultTitle;
+
+  /// No description provided for @diagSampleWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Sampled {assistant} assistant / {user} user messages in the last 24h'**
+  String diagSampleWindow(int assistant, int user);
+
+  /// No description provided for @diagMetricTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tokens'**
+  String get diagMetricTotal;
+
+  /// No description provided for @diagMetricCached.
+  ///
+  /// In en, this message translates to:
+  /// **'Cached'**
+  String get diagMetricCached;
+
+  /// No description provided for @diagMetricUncached.
+  ///
+  /// In en, this message translates to:
+  /// **'Uncached'**
+  String get diagMetricUncached;
+
+  /// No description provided for @diagAllGood.
+  ///
+  /// In en, this message translates to:
+  /// **'No issues detected'**
+  String get diagAllGood;
+
+  /// No description provided for @diagSeverityUrgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Urgent'**
+  String get diagSeverityUrgent;
+
+  /// No description provided for @diagSeverityRisk.
+  ///
+  /// In en, this message translates to:
+  /// **'Risk'**
+  String get diagSeverityRisk;
+
+  /// No description provided for @diagA1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Context overflow'**
+  String get diagA1Title;
+
+  /// No description provided for @diagA1Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation has more user messages than the assistant\'s contextMessageSize, so the prefix is being trimmed and cache cannot be reused across turns.'**
+  String get diagA1Subtitle;
+
+  /// No description provided for @diagA1Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Set contextMessageSize to unlimited (turn off the limit, or set the cap to a very large number).'**
+  String get diagA1Solution;
+
+  /// No description provided for @diagA2Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Time variable in system prompt'**
+  String get diagA2Title;
+
+  /// No description provided for @diagA2Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your system prompt contains the cur_time / cur_datetime / cur_date placeholders, which change on every request and invalidate the cache.'**
+  String get diagA2Subtitle;
+
+  /// No description provided for @diagA2Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the time placeholders from the system prompt, or move the time variable to after the message placeholder in the message template.'**
+  String get diagA2Solution;
+
+  /// No description provided for @diagA3Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Time variable in front of message'**
+  String get diagA3Title;
+
+  /// No description provided for @diagA3Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your message template places the time / date placeholders before the message, so the prefix around the user message changes every request.'**
+  String get diagA3Subtitle;
+
+  /// No description provided for @diagA3Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Move the time placeholders to after the message so they appear as a suffix on the user message.'**
+  String get diagA3Solution;
+
+  /// No description provided for @diagA4Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory feature breaking cache'**
+  String get diagA4Title;
+
+  /// No description provided for @diagA4SubContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory content has changed within the window, rewriting the system prompt.'**
+  String get diagA4SubContent;
+
+  /// No description provided for @diagA4SubHour.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory hint hard-codes the current hour (currentHour), changing once per hour.'**
+  String get diagA4SubHour;
+
+  /// No description provided for @diagA4Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Move long-term content to a world book (constantActive). Remove the current hour from the system prompt and inject it after the message instead.'**
+  String get diagA4Solution;
+
+  /// No description provided for @diagA6Title.
+  ///
+  /// In en, this message translates to:
+  /// **'World book: non-bottom, high trigger'**
+  String get diagA6Title;
+
+  /// No description provided for @diagA6Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequently triggered world book entries are inserted in non-bottom positions, shifting the conversation sequence.'**
+  String get diagA6Subtitle;
+
+  /// No description provided for @diagA6Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch the entry to constantActive (always in the prompt) or move its injection position to bottomOfChat.'**
+  String get diagA6Solution;
+
+  /// No description provided for @diagT1Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool / MCP output tokens too high'**
+  String get diagT1Title;
+
+  /// No description provided for @diagT1Subtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tool results consume more than 60% of the total input tokens, leaving little prefix for caching.'**
+  String get diagT1Subtitle;
+
+  /// No description provided for @diagT1Solution.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable the dominant tool, or scope it to fewer triggers.'**
+  String get diagT1Solution;
+
+  /// No description provided for @diagF1aTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation interval too long'**
+  String get diagF1aTitle;
+
+  /// No description provided for @diagF1aSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'More than half of the message gaps exceed 5 minutes, so the provider\'s cache TTL has expired between turns.'**
+  String get diagF1aSubtitle;
+
+  /// No description provided for @diagF1aSolution.
+  ///
+  /// In en, this message translates to:
+  /// **'This is normal behaviour. Provider cache TTLs are typically 5 minutes; sparse conversations cannot build cache.'**
+  String get diagF1aSolution;
+
+  /// No description provided for @diagF1bTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upstream issue'**
+  String get diagF1bTitle;
+
+  /// No description provided for @diagF1bSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No specific configuration issue was detected, but the cache hit rate is still low.'**
+  String get diagF1bSubtitle;
+
+  /// No description provided for @diagF1bSolution.
+  ///
+  /// In en, this message translates to:
+  /// **'Your upstream provider may not have prompt caching enabled. Try OpenAI, Anthropic, or Gemini, which expose prompt cache.'**
+  String get diagF1bSolution;
+
+  /// No description provided for @settingsPageToolsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools'**
+  String get settingsPageToolsSection;
   /// No description provided for @workspaceEnableTitle.
   ///
   /// In en, this message translates to:

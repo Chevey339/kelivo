@@ -25,6 +25,7 @@ import '../../../core/services/storage/storage_usage_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../../diagnostics/pages/conversation_select_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -334,6 +335,25 @@ class SettingsPage extends StatelessWidget {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const StorageSpacePage()),
+                  );
+                },
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          header(l10n.settingsPageToolsSection),
+          _iosSectionCard(
+            children: [
+              _iosNavRow(
+                context,
+                icon: Lucide.Activity,
+                label: l10n.settingsPageDiagnostics,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const ConversationSelectPage(),
+                    ),
                   );
                 },
               ),
