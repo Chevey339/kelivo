@@ -1998,7 +1998,7 @@
   "diagF1bTitle": "上游問題",
   "diagF1bSubtitle": "沒有檢測到具體的設定問題,但快取命中率仍然很低。",
   "diagF1bSolution": "上游 provider 可能未啟用 prompt cache,建議換到 OpenAI / Anthropic / Gemini 等明確支援的 provider。",
-  "settingsPageToolsSection": "工具"
+  "settingsPageToolsSection": "工具",
   "workspaceEnableTitle": "啟用工作區",
   "workspaceDisableTitle": "關閉工作區",
   "workspaceEnableFailed": "工作區開啟失敗",

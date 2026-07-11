@@ -2421,7 +2421,7 @@
   "diagF1bTitle": "Upstream issue",
   "diagF1bSubtitle": "No specific configuration issue was detected, but the cache hit rate is still low.",
   "diagF1bSolution": "Your upstream provider may not have prompt caching enabled. Try OpenAI, Anthropic, or Gemini, which expose prompt cache.",
-  "settingsPageToolsSection": "Tools"
+  "settingsPageToolsSection": "Tools",
   "workspaceEnableTitle": "Enable Workspace",
   "workspaceDisableTitle": "Close Workspace",
   "workspaceEnableFailed": "Failed to enable workspace",
