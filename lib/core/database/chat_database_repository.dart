@@ -9,6 +9,7 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import 'app_database.dart';
 import 'chat_database_observer.dart';
+import 'message_graph_projector.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -415,7 +416,7 @@ class ChatDatabaseRepository {
   }
 
   static void _validateRawStructure(sqlite.Database database) {
-    const requiredTables = {
+    final requiredTables = <String>{
       'conversation_rows',
       'conversation_mcp_server_rows',
       'message_rows',
@@ -423,6 +424,16 @@ class ChatDatabaseRepository {
       'gemini_thought_signature_rows',
       'chat_storage_meta_rows',
     };
+    final includesMessageGraph =
+        database.userVersion >= AppDatabase.messageGraphSchemaVersion;
+    if (includesMessageGraph) {
+      requiredTables.addAll(const {
+        'message_slot_rows',
+        'message_revision_rows',
+        'conversation_branch_rows',
+        'conversation_state_rows',
+      });
+    }
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -433,11 +444,14 @@ class ChatDatabaseRepository {
     if (!tables.containsAll(requiredTables)) {
       throw StateError('required_tables');
     }
-    _validateRawSchema(database);
+    _validateRawSchema(database, includesMessageGraph: includesMessageGraph);
   }
 
-  static void _validateRawSchema(sqlite.Database database) {
-    const expectedColumns = <String, List<String>>{
+  static void _validateRawSchema(
+    sqlite.Database database, {
+    required bool includesMessageGraph,
+  }) {
+    final expectedColumns = <String, List<String>>{
       'conversation_rows': [
         'id',
         'title',
@@ -483,6 +497,38 @@ class ChatDatabaseRepository {
       'gemini_thought_signature_rows': ['message_id', 'signature'],
       'chat_storage_meta_rows': ['key', 'value'],
     };
+    if (includesMessageGraph) {
+      expectedColumns.addAll(const {
+        'message_slot_rows': ['id', 'conversation_id', 'role', 'created_at'],
+        'message_revision_rows': [
+          'id',
+          'conversation_id',
+          'slot_id',
+          'parent_revision_id',
+          'revision_no',
+          'created_at',
+          'updated_at',
+          'finalized_at',
+          'deleted_at',
+        ],
+        'conversation_branch_rows': [
+          'id',
+          'conversation_id',
+          'parent_branch_id',
+          'forked_from_revision_id',
+          'leaf_revision_id',
+          'causality_kind',
+          'created_at',
+          'deleted_at',
+        ],
+        'conversation_state_rows': [
+          'conversation_id',
+          'active_branch_id',
+          'context_start_revision_id',
+          'state_revision',
+        ],
+      });
+    }
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -494,7 +540,7 @@ class ChatDatabaseRepository {
       }
     }
 
-    const expectedForeignKeys = <String, Set<String>>{
+    final expectedForeignKeys = <String, Set<String>>{
       'conversation_mcp_server_rows': {
         'conversation_id->conversation_rows.id:CASCADE',
       },
@@ -502,6 +548,33 @@ class ChatDatabaseRepository {
       'tool_event_rows': {'message_id->message_rows.id:CASCADE'},
       'gemini_thought_signature_rows': {'message_id->message_rows.id:CASCADE'},
     };
+    if (includesMessageGraph) {
+      expectedForeignKeys.addAll(const {
+        'message_slot_rows': {'conversation_id->conversation_rows.id:CASCADE'},
+        'message_revision_rows': {
+          'conversation_id->conversation_rows.id:CASCADE',
+          'conversation_id->message_slot_rows.conversation_id:NO ACTION',
+          'slot_id->message_slot_rows.id:NO ACTION',
+          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
+          'parent_revision_id->message_revision_rows.id:NO ACTION',
+        },
+        'conversation_branch_rows': {
+          'conversation_id->conversation_rows.id:CASCADE',
+          'conversation_id->conversation_branch_rows.conversation_id:NO ACTION',
+          'parent_branch_id->conversation_branch_rows.id:NO ACTION',
+          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
+          'forked_from_revision_id->message_revision_rows.id:NO ACTION',
+          'leaf_revision_id->message_revision_rows.id:NO ACTION',
+        },
+        'conversation_state_rows': {
+          'conversation_id->conversation_rows.id:CASCADE',
+          'conversation_id->conversation_branch_rows.conversation_id:NO ACTION',
+          'active_branch_id->conversation_branch_rows.id:NO ACTION',
+          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
+          'context_start_revision_id->message_revision_rows.id:NO ACTION',
+        },
+      });
+    }
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
           .select('PRAGMA foreign_key_list(${entry.key});')
@@ -557,6 +630,105 @@ class ChatDatabaseRepository {
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
+  }
+
+  Future<ActiveMessageGraphProjection?> projectActiveMessageGraph({
+    required String conversationId,
+    String? targetRevisionId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessageGraphPath,
+      () => MessageGraphProjector(_db).projectActivePath(
+        conversationId: conversationId,
+        targetRevisionId: targetRevisionId,
+      ),
+      resultCount: (projection) => projection?.revisions.length ?? 0,
+    );
+  }
+
+  Future<MessageGraphPath> projectMessageGraphBranch({
+    required String conversationId,
+    required String branchId,
+    String? targetRevisionId,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessageGraphPath,
+      () => MessageGraphProjector(_db).projectBranchPath(
+        conversationId: conversationId,
+        branchId: branchId,
+        targetRevisionId: targetRevisionId,
+      ),
+      resultCount: (path) => path.revisions.length,
+    );
+  }
+
+  Future<MessageGraphValidationResult> validateMessageGraph(
+    String conversationId,
+  ) {
+    return _observer.measure(
+      ChatDatabaseOperation.queryMessageGraphPath,
+      () =>
+          MessageGraphProjector(_db).validateConversationGraph(conversationId),
+      resultCount: (result) => result.pathRevisionCount,
+    );
+  }
+
+  Future<ActiveMessageGraphProjection?> setMessageGraphContextBoundary({
+    required String conversationId,
+    required String? revisionId,
+    int? expectedStateRevision,
+  }) {
+    return _observer.measure(
+      ChatDatabaseOperation.commandSetContextBoundary,
+      () => _setMessageGraphContextBoundary(
+        conversationId: conversationId,
+        revisionId: revisionId,
+        expectedStateRevision: expectedStateRevision,
+      ),
+      resultCount: (projection) => projection?.contextRevisions.length ?? 0,
+    );
+  }
+
+  Future<ActiveMessageGraphProjection?> _setMessageGraphContextBoundary({
+    required String conversationId,
+    required String? revisionId,
+    int? expectedStateRevision,
+  }) {
+    return _db.transaction(() async {
+      final projector = MessageGraphProjector(_db);
+      final current = await projector.projectActivePath(
+        conversationId: conversationId,
+      );
+      if (current == null) return null;
+      if (expectedStateRevision != null &&
+          current.stateRevision != expectedStateRevision) {
+        throw StateError('message_graph_state_conflict');
+      }
+      if (revisionId != null &&
+          !current.revisions.any((revision) => revision.id == revisionId)) {
+        throw ArgumentError.value(
+          revisionId,
+          'revisionId',
+          'must identify a revision on the active path',
+        );
+      }
+      if (current.contextStartRevisionId == revisionId) return current;
+
+      final updated =
+          await (_db.update(_db.conversationStateRows)..where(
+                (row) =>
+                    row.conversationId.equals(conversationId) &
+                    row.stateRevision.equals(current.stateRevision),
+              ))
+              .write(
+                ConversationStateRowsCompanion(
+                  contextStartRevisionId: Value(revisionId),
+                  stateRevision: Value(current.stateRevision + 1),
+                ),
+              );
+      if (updated != 1) throw StateError('message_graph_state_conflict');
+      return projector.projectActivePath(conversationId: conversationId);
+    });
   }
 
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {

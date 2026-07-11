@@ -357,7 +357,8 @@ class AppDatabase extends _$AppDatabase {
   // adds enforced invariants, stable ordering indexes, and microsecond time.
   // Version 4 adds the Message Graph identity and ancestry kernel while the
   // v3 rows remain available as an unpublished legacy migration source.
-  static const currentSchemaVersion = 4;
+  static const messageGraphSchemaVersion = 4;
+  static const currentSchemaVersion = messageGraphSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the

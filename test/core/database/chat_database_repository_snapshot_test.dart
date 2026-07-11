@@ -3,6 +3,7 @@ import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -213,6 +214,32 @@ void main() {
             (error) => error.message,
             'message',
             'database_sidecar:-wal',
+          ),
+        ),
+      );
+    });
+
+    test('rejects a v4 database missing a graph kernel table', () async {
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('PRAGMA foreign_keys = OFF;');
+        raw.execute('DROP TABLE conversation_state_rows;');
+      } finally {
+        raw.close();
+      }
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(
+          sourceFile,
+          validateContents: true,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'required_tables',
           ),
         ),
       );
