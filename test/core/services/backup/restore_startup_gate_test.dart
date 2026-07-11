@@ -576,6 +576,215 @@ Future<RestoreReceipt?> _recoverAcrossColdRestart({
   throw StateError('restore_test_cold_restart_limit');
 }
 
+typedef _MarkerlessRestoreFixture = ({
+  Directory activeRun,
+  PreparedRestoreBundle prepared,
+  SharedPreferences preferences,
+  RestoreWorkspaceLock workspaceLock,
+});
+
+Future<_MarkerlessRestoreFixture> _prepareMarkerlessTerminalFixture({
+  required Directory root,
+  required String directoryName,
+}) async {
+  SharedPreferences.setMockInitialValues({'theme': 'old'});
+  final preferences = await SharedPreferences.getInstance();
+  final bundle = await _createBundle(
+    root,
+    theme: 'new',
+    secretsIncluded: true,
+    directoryName: directoryName,
+  );
+  final prepared = await RestoreBundlePreparation.prepare(
+    appDataDirectory: root,
+    extractedDirectory: bundle.directory,
+    sourceManifestSha256: bundle.manifestSha256,
+    bundleIncludesChats: false,
+    bundleIncludesFiles: false,
+    restoreChats: false,
+    restoreFiles: false,
+    createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+  );
+
+  await expectLater(
+    RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: root,
+      preferences: preferences,
+    ),
+    throwsA(isA<RestoreColdRestartRequired>()),
+  );
+  await simulateRestoreColdProcessBoundary(root);
+
+  final workspaceLock = RestoreWorkspaceLock(appDataDirectory: root);
+  await _removeMarkerAndSync(
+    workspaceLock: workspaceLock,
+    markerFileName: RestoreWorkspaceLock.publishingRunFileName,
+    runId: prepared.runId,
+  );
+  final activeRun = Directory(
+    p.join(workspaceLock.workspaceRoot.path, 'run_${prepared.runId}'),
+  );
+  expect(await activeRun.exists(), isTrue);
+  final markerless = await RestoreStartupGate.inspect(appDataDirectory: root);
+  expect(markerless?.runId, prepared.runId);
+  expect(markerless?.receipt.state, RestoreReceiptState.committed);
+  expect(markerless?.markerFileName, isNull);
+
+  return (
+    activeRun: activeRun,
+    prepared: prepared,
+    preferences: preferences,
+    workspaceLock: workspaceLock,
+  );
+}
+
+Future<_MarkerlessRestoreFixture> _prepareMarkerlessNonterminalFixture({
+  required Directory root,
+  required String directoryName,
+}) async {
+  SharedPreferences.setMockInitialValues({'theme': 'old'});
+  final preferences = await SharedPreferences.getInstance();
+  final bundle = await _createBundle(
+    root,
+    theme: 'new',
+    secretsIncluded: true,
+    directoryName: directoryName,
+  );
+  final prepared = await RestoreBundlePreparation.prepare(
+    appDataDirectory: root,
+    extractedDirectory: bundle.directory,
+    sourceManifestSha256: bundle.manifestSha256,
+    bundleIncludesChats: false,
+    bundleIncludesFiles: false,
+    restoreChats: false,
+    restoreFiles: false,
+    createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+  );
+  final workspaceLock = RestoreWorkspaceLock(appDataDirectory: root);
+  await _removeMarkerAndSync(
+    workspaceLock: workspaceLock,
+    markerFileName: RestoreWorkspaceLock.activeRunFileName,
+    runId: prepared.runId,
+  );
+  final activeRun = Directory(
+    p.join(workspaceLock.workspaceRoot.path, 'run_${prepared.runId}'),
+  );
+  expect(await activeRun.exists(), isTrue);
+  expect(
+    (await RestoreReceiptStore(
+      appDataDirectory: root,
+      runId: prepared.runId,
+    ).readLatest())?.state,
+    RestoreReceiptState.prepared,
+  );
+  return (
+    activeRun: activeRun,
+    prepared: prepared,
+    preferences: preferences,
+    workspaceLock: workspaceLock,
+  );
+}
+
+Future<void> _removeMarkerAndSync({
+  required RestoreWorkspaceLock workspaceLock,
+  required String markerFileName,
+  required String runId,
+}) => workspaceLock.synchronized(() async {
+  final marker = File(p.join(workspaceLock.workspaceRoot.path, markerFileName));
+  expect(await marker.readAsString(), runId);
+  await marker.delete();
+  await RestorePlatformDurability().syncDirectory(
+    workspaceLock.workspaceRoot,
+    fullBarrier: true,
+  );
+});
+
+String _markerPayload(String kind, String runId) => switch (kind) {
+  'empty' => '',
+  'truncated' => runId.substring(0, runId.length ~/ 2),
+  'full' => runId,
+  'wrongPrefix' => _differentRunId(runId).substring(0, runId.length ~/ 2),
+  'wrongId' => _differentRunId(runId),
+  _ => throw ArgumentError.value(kind, 'kind'),
+};
+
+String _differentRunId(String runId) =>
+    '${runId.startsWith('0') ? '1' : '0'}${runId.substring(1)}';
+
+Future<void> _writeDurableMarkerArtifact({
+  required File file,
+  required String contents,
+  required Directory workspaceRoot,
+}) async {
+  final durability = RestorePlatformDurability();
+  await file.create(exclusive: true);
+  await durability.restrictFile(file);
+  await file.writeAsString(contents, flush: true);
+  await durability.syncFile(file, fullBarrier: true);
+  await durability.syncDirectory(workspaceRoot, fullBarrier: true);
+}
+
+Future<void> _expectMarkerlessTerminalConverges({
+  required Directory root,
+  required _MarkerlessRestoreFixture fixture,
+}) async {
+  final recovered = await RestoreStartupGate.recoverAndRequireBusinessReady(
+    appDataDirectory: root,
+    preferences: fixture.preferences,
+  );
+
+  expect(recovered?.state, RestoreReceiptState.committed);
+  await fixture.preferences.reload();
+  expect(fixture.preferences.getString('theme'), 'new');
+  expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
+  expect(await fixture.activeRun.exists(), isFalse);
+  expect(
+    (await RestoreReceiptStore(
+      appDataDirectory: root,
+      runId: fixture.prepared.runId,
+      archived: true,
+    ).readLatest())?.state,
+    RestoreReceiptState.committed,
+  );
+}
+
+Future<void> _expectMarkerArtifactsRemainFailClosed({
+  required Directory root,
+  required _MarkerlessRestoreFixture fixture,
+  required RestoreReceiptState expectedReceiptState,
+  required Map<File, String> artifacts,
+}) async {
+  await expectLater(
+    RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: root,
+      preferences: fixture.preferences,
+    ),
+    throwsA(isA<StateError>()),
+  );
+
+  for (final entry in artifacts.entries) {
+    expect(await entry.key.exists(), isTrue, reason: entry.key.path);
+    expect(await entry.key.readAsString(), entry.value, reason: entry.key.path);
+  }
+  expect(await fixture.activeRun.exists(), isTrue);
+  expect(await fixture.prepared.candidateDirectory.exists(), isTrue);
+  expect(
+    (await RestoreReceiptStore(
+      appDataDirectory: root,
+      runId: fixture.prepared.runId,
+    ).readLatest())?.state,
+    expectedReceiptState,
+  );
+  expect(
+    await RestoreReceiptStore(
+      appDataDirectory: root,
+      runId: fixture.prepared.runId,
+      archived: true,
+    ).runDirectory.exists(),
+    isFalse,
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -1727,6 +1936,216 @@ void main() {
         );
       },
     );
+
+    group('legacy archiving marker recovery', () {
+      for (final payloadKind in const ['empty', 'truncated', 'full']) {
+        test('discards an exact $payloadKind archiving temp beside an active '
+            'terminal run and converges', () async {
+          final fixture = await _prepareMarkerlessTerminalFixture(
+            root: root,
+            directoryName: 'archiving_temp_$payloadKind',
+          );
+          final temporary = File(
+            p.join(
+              fixture.workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunTemporaryFileName,
+            ),
+          );
+          final canonical = File(
+            p.join(
+              fixture.workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunFileName,
+            ),
+          );
+          await _writeDurableMarkerArtifact(
+            file: temporary,
+            contents: _markerPayload(payloadKind, fixture.prepared.runId),
+            workspaceRoot: fixture.workspaceLock.workspaceRoot,
+          );
+          expect(await canonical.exists(), isFalse);
+
+          await _expectMarkerlessTerminalConverges(
+            root: root,
+            fixture: fixture,
+          );
+
+          expect(await temporary.exists(), isFalse);
+          expect(await canonical.exists(), isFalse);
+        });
+      }
+
+      for (final payloadKind in const ['empty', 'truncated']) {
+        test(
+          'downgrades a malformed $payloadKind canonical archiving marker '
+          'to markerless only for one active terminal run and converges',
+          () async {
+            final fixture = await _prepareMarkerlessTerminalFixture(
+              root: root,
+              directoryName: 'archiving_canonical_$payloadKind',
+            );
+            final canonical = File(
+              p.join(
+                fixture.workspaceLock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunFileName,
+              ),
+            );
+            await _writeDurableMarkerArtifact(
+              file: canonical,
+              contents: _markerPayload(payloadKind, fixture.prepared.runId),
+              workspaceRoot: fixture.workspaceLock.workspaceRoot,
+            );
+
+            await _expectMarkerlessTerminalConverges(
+              root: root,
+              fixture: fixture,
+            );
+
+            expect(await canonical.exists(), isFalse);
+          },
+        );
+      }
+
+      for (final scenario in const [
+        (
+          name: 'wrong-prefix exact temp',
+          temporaryPayload: 'wrongPrefix',
+          canonicalPayload: null,
+        ),
+        (
+          name: 'wrong-prefix truncated canonical',
+          temporaryPayload: null,
+          canonicalPayload: 'wrongPrefix',
+        ),
+        (
+          name: 'wrong-ID full canonical',
+          temporaryPayload: null,
+          canonicalPayload: 'wrongId',
+        ),
+        (
+          name: 'coexisting exact temp and canonical',
+          temporaryPayload: 'full',
+          canonicalPayload: 'full',
+        ),
+      ]) {
+        test(
+          'keeps ${scenario.name} beside an active terminal run fail-closed',
+          () async {
+            final fixture = await _prepareMarkerlessTerminalFixture(
+              root: root,
+              directoryName: 'archiving_strict_${scenario.name}',
+            );
+            final temporary = File(
+              p.join(
+                fixture.workspaceLock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunTemporaryFileName,
+              ),
+            );
+            final canonical = File(
+              p.join(
+                fixture.workspaceLock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunFileName,
+              ),
+            );
+            final artifacts = <File, String>{};
+            final temporaryPayload = scenario.temporaryPayload;
+            if (temporaryPayload != null) {
+              final contents = _markerPayload(
+                temporaryPayload,
+                fixture.prepared.runId,
+              );
+              await _writeDurableMarkerArtifact(
+                file: temporary,
+                contents: contents,
+                workspaceRoot: fixture.workspaceLock.workspaceRoot,
+              );
+              artifacts[temporary] = contents;
+            }
+            final canonicalPayload = scenario.canonicalPayload;
+            if (canonicalPayload != null) {
+              final contents = _markerPayload(
+                canonicalPayload,
+                fixture.prepared.runId,
+              );
+              await _writeDurableMarkerArtifact(
+                file: canonical,
+                contents: contents,
+                workspaceRoot: fixture.workspaceLock.workspaceRoot,
+              );
+              artifacts[canonical] = contents;
+            }
+
+            await _expectMarkerArtifactsRemainFailClosed(
+              root: root,
+              fixture: fixture,
+              expectedReceiptState: RestoreReceiptState.committed,
+              artifacts: artifacts,
+            );
+          },
+        );
+      }
+
+      test('keeps an exact archiving temp and its active nonterminal run '
+          'fail-closed without deleting evidence', () async {
+        final fixture = await _prepareMarkerlessNonterminalFixture(
+          root: root,
+          directoryName: 'archiving_temp_nonterminal',
+        );
+        final temporary = File(
+          p.join(
+            fixture.workspaceLock.workspaceRoot.path,
+            RestoreWorkspaceLock.archivingRunTemporaryFileName,
+          ),
+        );
+        final contents = fixture.prepared.runId;
+        await _writeDurableMarkerArtifact(
+          file: temporary,
+          contents: contents,
+          workspaceRoot: fixture.workspaceLock.workspaceRoot,
+        );
+
+        await _expectMarkerArtifactsRemainFailClosed(
+          root: root,
+          fixture: fixture,
+          expectedReceiptState: RestoreReceiptState.prepared,
+          artifacts: {temporary: contents},
+        );
+      });
+
+      for (final payloadKind in const ['empty', 'truncated']) {
+        test(
+          'keeps a malformed $payloadKind canonical archiving marker and its '
+          'active nonterminal run fail-closed',
+          () async {
+            final fixture = await _prepareMarkerlessNonterminalFixture(
+              root: root,
+              directoryName: 'archiving_canonical_nonterminal_$payloadKind',
+            );
+            final canonical = File(
+              p.join(
+                fixture.workspaceLock.workspaceRoot.path,
+                RestoreWorkspaceLock.archivingRunFileName,
+              ),
+            );
+            final contents = _markerPayload(
+              payloadKind,
+              fixture.prepared.runId,
+            );
+            await _writeDurableMarkerArtifact(
+              file: canonical,
+              contents: contents,
+              workspaceRoot: fixture.workspaceLock.workspaceRoot,
+            );
+
+            await _expectMarkerArtifactsRemainFailClosed(
+              root: root,
+              fixture: fixture,
+              expectedReceiptState: RestoreReceiptState.prepared,
+              artifacts: {canonical: contents},
+            );
+          },
+        );
+      }
+    });
 
     for (final point in const [
       _LogicalCutoverInterruption.claimed,

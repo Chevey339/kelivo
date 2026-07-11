@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
 void main() {
@@ -267,6 +268,171 @@ void main() {
     );
 
     test(
+      'durably stages a markerless archiving marker before canonical publish',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        final durability = _InterruptingArchivingMarkerDurability(
+          delegate: RestorePlatformDurability(),
+          workspaceRoot: lock.workspaceRoot,
+          runId: runId,
+          boundary: _ArchivingMarkerBoundary.temporaryDurable,
+        );
+        final guardedLock = RestoreWorkspaceLock(
+          appDataDirectory: appDataDirectory,
+          durability: durability,
+        );
+        final activeRun = Directory(
+          p.join(guardedLock.workspaceRoot.path, 'run_$runId'),
+        );
+
+        await expectLater(
+          guardedLock.synchronized(() async {
+            await activeRun.create();
+            await guardedLock.archiveTerminalRunWhileWorkspaceLocked(
+              runId: runId,
+              observedMarkerFileName: null,
+            );
+          }),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_archiving_marker_temporary_durable',
+            ),
+          ),
+        );
+
+        expect(durability.didInterrupt, isTrue);
+        expect(durability.temporaryPath, isNotNull);
+        expect(_isArchivingMarkerTemporary(durability.temporaryPath!), isTrue);
+        expect(durability.temporaryTypeAtBoundary, FileSystemEntityType.file);
+        expect(durability.temporaryContentsAtBoundary, runId);
+        expect(
+          durability.canonicalTypeAtBoundary,
+          FileSystemEntityType.notFound,
+        );
+        expect(await File(durability.temporaryPath!).readAsString(), runId);
+        expect(await activeRun.exists(), isTrue);
+      },
+    );
+
+    test(
+      'publishes a complete markerless archiving marker before moving the run',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        final durability = _InterruptingArchivingMarkerDurability(
+          delegate: RestorePlatformDurability(),
+          workspaceRoot: lock.workspaceRoot,
+          runId: runId,
+          boundary: _ArchivingMarkerBoundary.canonicalPublished,
+        );
+        final guardedLock = RestoreWorkspaceLock(
+          appDataDirectory: appDataDirectory,
+          durability: durability,
+        );
+        final activeRun = Directory(
+          p.join(guardedLock.workspaceRoot.path, 'run_$runId'),
+        );
+        final completedRun = Directory(
+          p.join(guardedLock.completedRunsRoot.path, 'run_$runId'),
+        );
+        final canonical = File(
+          p.join(
+            guardedLock.workspaceRoot.path,
+            RestoreWorkspaceLock.archivingRunFileName,
+          ),
+        );
+
+        await expectLater(
+          guardedLock.synchronized(() async {
+            await activeRun.create();
+            await guardedLock.archiveTerminalRunWhileWorkspaceLocked(
+              runId: runId,
+              observedMarkerFileName: null,
+            );
+          }),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_archiving_marker_canonical_published',
+            ),
+          ),
+        );
+
+        expect(durability.didInterrupt, isTrue);
+        expect(await canonical.readAsString(), runId);
+        expect(await activeRun.exists(), isTrue);
+        expect(await completedRun.exists(), isFalse);
+        expect(
+          await _archivingMarkerTemporaries(guardedLock.workspaceRoot),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'stops after legacy artifact deletion when its directory barrier fails',
+      () async {
+        const runId = '0123456789abcdef0123456789abcdef';
+        final temporary = File(
+          p.join(
+            lock.workspaceRoot.path,
+            RestoreWorkspaceLock.archivingRunTemporaryFileName,
+          ),
+        );
+        final activeRun = Directory(
+          p.join(lock.workspaceRoot.path, 'run_$runId'),
+        );
+        final durability = _FailingArtifactDeleteBarrierDurability(
+          delegate: RestorePlatformDurability(),
+          workspaceRoot: lock.workspaceRoot,
+          artifact: temporary,
+        );
+        final guardedLock = RestoreWorkspaceLock(
+          appDataDirectory: appDataDirectory,
+          durability: durability,
+        );
+
+        await expectLater(
+          guardedLock.synchronized(() async {
+            await activeRun.create();
+            await temporary.writeAsString(runId, flush: true);
+            durability.arm();
+            await guardedLock
+                .reconcileLegacyArchivingArtifactWhileWorkspaceLocked(
+                  runId: runId,
+                  artifactFileName:
+                      RestoreWorkspaceLock.archivingRunTemporaryFileName,
+                );
+          }),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'injected_archiving_artifact_delete_barrier',
+            ),
+          ),
+        );
+
+        expect(durability.didInterrupt, isTrue);
+        expect(await temporary.exists(), isFalse);
+        expect(await activeRun.exists(), isTrue);
+        expect(await lock.completedRunsRoot.exists(), isFalse);
+
+        late Directory archivedRun;
+        await lock.synchronized(() async {
+          archivedRun = await lock.archiveTerminalRunWhileWorkspaceLocked(
+            runId: runId,
+            observedMarkerFileName: null,
+          );
+        });
+        expect(await activeRun.exists(), isFalse);
+        expect(await archivedRun.exists(), isTrue);
+      },
+    );
+
+    test(
       'rejects a linked workspace root without running the action',
       () async {
         final linkedTarget = Directory(p.join(appDataDirectory.path, 'target'));
@@ -325,4 +491,161 @@ void main() {
       await expectLater(lock.synchronized<void>(() async {}), throwsStateError);
     });
   });
+}
+
+enum _ArchivingMarkerBoundary { temporaryDurable, canonicalPublished }
+
+final class _InterruptingArchivingMarkerDurability
+    implements RestoreDurability {
+  _InterruptingArchivingMarkerDurability({
+    required this.delegate,
+    required Directory workspaceRoot,
+    required this.runId,
+    required this.boundary,
+  }) : workspaceRootPath = p.normalize(p.absolute(workspaceRoot.path));
+
+  final RestoreDurability delegate;
+  final String workspaceRootPath;
+  final String runId;
+  final _ArchivingMarkerBoundary boundary;
+
+  bool didInterrupt = false;
+  String? temporaryPath;
+  FileSystemEntityType? temporaryTypeAtBoundary;
+  String? temporaryContentsAtBoundary;
+  FileSystemEntityType? canonicalTypeAtBoundary;
+
+  String get _canonicalPath =>
+      p.join(workspaceRootPath, RestoreWorkspaceLock.archivingRunFileName);
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    final normalizedSource = p.normalize(p.absolute(source.path));
+    final normalizedTarget = p.normalize(p.absolute(targetPath));
+    final shouldInterrupt =
+        boundary == _ArchivingMarkerBoundary.canonicalPublished &&
+        source is File &&
+        _isArchivingMarkerTemporary(normalizedSource) &&
+        p.equals(p.dirname(normalizedSource), workspaceRootPath) &&
+        p.equals(normalizedTarget, _canonicalPath);
+
+    await delegate.renameAndSync(source: source, targetPath: targetPath);
+    if (!shouldInterrupt) return;
+
+    didInterrupt = true;
+    temporaryPath = normalizedSource;
+    throw StateError('injected_archiving_marker_canonical_published');
+  }
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+
+  @override
+  Future<void> syncDirectory(Directory directory, {bool fullBarrier = false}) =>
+      delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) async {
+    await delegate.syncFile(file, fullBarrier: fullBarrier);
+    final normalizedPath = p.normalize(p.absolute(file.path));
+    if (boundary != _ArchivingMarkerBoundary.temporaryDurable ||
+        !fullBarrier ||
+        !_isArchivingMarkerTemporary(normalizedPath) ||
+        !p.equals(p.dirname(normalizedPath), workspaceRootPath)) {
+      return;
+    }
+
+    didInterrupt = true;
+    temporaryPath = normalizedPath;
+    temporaryTypeAtBoundary = await FileSystemEntity.type(
+      normalizedPath,
+      followLinks: false,
+    );
+    temporaryContentsAtBoundary = await File(normalizedPath).readAsString();
+    canonicalTypeAtBoundary = await FileSystemEntity.type(
+      _canonicalPath,
+      followLinks: false,
+    );
+    if (temporaryContentsAtBoundary != runId) {
+      throw StateError('unexpected_archiving_marker_temporary_contents');
+    }
+    throw StateError('injected_archiving_marker_temporary_durable');
+  }
+}
+
+final class _FailingArtifactDeleteBarrierDurability
+    implements RestoreDurability {
+  _FailingArtifactDeleteBarrierDurability({
+    required this.delegate,
+    required Directory workspaceRoot,
+    required File artifact,
+  }) : workspaceRootPath = p.normalize(p.absolute(workspaceRoot.path)),
+       artifactPath = p.normalize(p.absolute(artifact.path));
+
+  final RestoreDurability delegate;
+  final String workspaceRootPath;
+  final String artifactPath;
+
+  bool _armed = false;
+  bool didInterrupt = false;
+
+  void arm() => _armed = true;
+
+  @override
+  Future<void> renameAndSync({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) => delegate.renameAndSync(source: source, targetPath: targetPath);
+
+  @override
+  Future<void> restrictDirectory(Directory directory) =>
+      delegate.restrictDirectory(directory);
+
+  @override
+  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+
+  @override
+  Future<void> syncDirectory(
+    Directory directory, {
+    bool fullBarrier = false,
+  }) async {
+    if (_armed &&
+        !didInterrupt &&
+        fullBarrier &&
+        p.equals(p.normalize(p.absolute(directory.path)), workspaceRootPath) &&
+        await FileSystemEntity.type(artifactPath, followLinks: false) ==
+            FileSystemEntityType.notFound) {
+      didInterrupt = true;
+      throw StateError('injected_archiving_artifact_delete_barrier');
+    }
+    await delegate.syncDirectory(directory, fullBarrier: fullBarrier);
+  }
+
+  @override
+  Future<void> syncFile(File file, {bool fullBarrier = false}) =>
+      delegate.syncFile(file, fullBarrier: fullBarrier);
+}
+
+bool _isArchivingMarkerTemporary(String path) {
+  return p.basename(path) == RestoreWorkspaceLock.archivingRunTemporaryFileName;
+}
+
+Future<List<String>> _archivingMarkerTemporaries(
+  Directory workspaceRoot,
+) async {
+  final names = <String>[];
+  await for (final entity in workspaceRoot.list(followLinks: false)) {
+    if (_isArchivingMarkerTemporary(entity.path)) {
+      names.add(p.basename(entity.path));
+    }
+  }
+  names.sort();
+  return names;
 }

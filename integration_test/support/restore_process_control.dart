@@ -12,6 +12,8 @@ const restoreTerminalHarnessScenario = 'terminalRecoveryMatrix';
 const restoreRollbackHarnessScenario = 'rollbackRecoveryMatrix';
 const restoreRolledBackTerminalHarnessScenario =
     'rolledBackTerminalRecoveryMatrix';
+const restoreLegacyArchivingMarkerHarnessScenario =
+    'legacyArchivingMarkerRecoveryMatrix';
 const restoreHarnessFormat = 'kelivo.restore-process-harness';
 
 abstract interface class RestoreHarnessControl {
@@ -58,6 +60,8 @@ abstract interface class RestoreHarnessControl {
         RestoreRollbackProcessHarnessControl.fromJson(source),
       restoreRolledBackTerminalHarnessScenario =>
         RestoreRolledBackTerminalProcessHarnessControl.fromJson(source),
+      restoreLegacyArchivingMarkerHarnessScenario =>
+        RestoreLegacyArchivingMarkerProcessHarnessControl.fromJson(source),
       _ => throw const FormatException('restore_harness_control_scenario'),
     };
   }
@@ -129,6 +133,19 @@ enum RestoreRolledBackTerminalProcessHarnessPhase {
   rollbackToColdAck,
   recoverTerminal,
   verifyBusinessReady,
+}
+
+enum RestoreLegacyArchivingMarkerProcessHarnessPhase {
+  setup,
+  commitToColdAck,
+  killLegacyMarkerPublish,
+  verifyBusinessReady,
+}
+
+enum RestoreLegacyArchivingMarkerProcessFailpoint {
+  archivingMarkerEmptyRestricted,
+  archivingMarkerTempDurable,
+  archivingMarkerPublished,
 }
 
 enum RestoreRollbackProcessHarnessPhase {
@@ -220,6 +237,17 @@ String restoreRolledBackTerminalProcessPreferencesPrefix({
   _requireIdentifier(scenarioId, 'scenarioId');
   return 'kelivo.restore.rolledback.terminal.harness.$matrixRunId.$scenarioId.'
       '${failpoint.name}.';
+}
+
+String restoreLegacyArchivingMarkerProcessPreferencesPrefix({
+  required String matrixRunId,
+  required String scenarioId,
+  required RestoreLegacyArchivingMarkerProcessFailpoint failpoint,
+}) {
+  _requireIdentifier(matrixRunId, 'matrixRunId');
+  _requireIdentifier(scenarioId, 'scenarioId');
+  return 'kelivo.restore.legacy.archiving.marker.harness.$matrixRunId.'
+      '$scenarioId.${failpoint.name}.';
 }
 
 String restoreRollbackProcessPreferencesPrefix({
@@ -734,6 +762,185 @@ final class RestoreRolledBackTerminalProcessHarnessControl
       throw StateError('restore_harness_control_define');
     }
     return RestoreRolledBackTerminalProcessHarnessControl.fromJson(
+      await readHarnessJson(File(controlPath)),
+    );
+  }
+}
+
+final class RestoreLegacyArchivingMarkerProcessHarnessControl
+    implements RestoreHarnessControl {
+  RestoreLegacyArchivingMarkerProcessHarnessControl({
+    required this.generation,
+    required this.matrixRunId,
+    required this.scenarioId,
+    required this.phase,
+    required this.failpoint,
+    required String scenarioRoot,
+    required this.preferencesPrefix,
+  }) : scenarioRoot = p.normalize(p.absolute(scenarioRoot)) {
+    if (generation < 1 ||
+        generation >
+            RestoreLegacyArchivingMarkerProcessHarnessPhase.values.length) {
+      throw ArgumentError.value(generation, 'generation');
+    }
+    if (generation != phase.index + 1) {
+      throw ArgumentError.value(generation, 'generation');
+    }
+    _requireIdentifier(matrixRunId, 'matrixRunId');
+    _requireIdentifier(scenarioId, 'scenarioId');
+    if (!p.isAbsolute(scenarioRoot) ||
+        p.normalize(scenarioRoot) != scenarioRoot ||
+        p.basename(scenarioRoot) != 'kelivo_restore_process_$scenarioId') {
+      throw ArgumentError.value(scenarioRoot, 'scenarioRoot');
+    }
+    if (preferencesPrefix !=
+        restoreLegacyArchivingMarkerProcessPreferencesPrefix(
+          matrixRunId: matrixRunId,
+          scenarioId: scenarioId,
+          failpoint: failpoint,
+        )) {
+      throw ArgumentError.value(preferencesPrefix, 'preferencesPrefix');
+    }
+  }
+
+  static const version = 1;
+
+  @override
+  final int generation;
+  @override
+  final String matrixRunId;
+  @override
+  final String scenarioId;
+  final RestoreLegacyArchivingMarkerProcessHarnessPhase phase;
+  final RestoreLegacyArchivingMarkerProcessFailpoint failpoint;
+  @override
+  final String scenarioRoot;
+  @override
+  final String preferencesPrefix;
+
+  @override
+  String get scenario => restoreLegacyArchivingMarkerHarnessScenario;
+
+  @override
+  String get phaseName => phase.name;
+
+  @override
+  String get failpointName => failpoint.name;
+
+  @override
+  Directory get rootDirectory => Directory(scenarioRoot);
+
+  @override
+  Directory get appDataDirectory => Directory(p.join(scenarioRoot, 'app_data'));
+
+  @override
+  Directory get sourceDirectory => Directory(p.join(scenarioRoot, 'source'));
+
+  @override
+  Directory get eventsDirectory => Directory(p.join(scenarioRoot, 'events'));
+
+  @override
+  File get stateFile => File(p.join(scenarioRoot, 'state.json'));
+
+  @override
+  File get eventFile => File(
+    p.join(
+      eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'format': restoreHarnessFormat,
+    'version': version,
+    'generation': generation,
+    'matrixRunId': matrixRunId,
+    'scenario': restoreLegacyArchivingMarkerHarnessScenario,
+    'scenarioId': scenarioId,
+    'phase': phase.name,
+    'failpoint': failpoint.name,
+    'scenarioRoot': scenarioRoot,
+    'preferencesPrefix': preferencesPrefix,
+  };
+
+  factory RestoreLegacyArchivingMarkerProcessHarnessControl.fromJson(
+    Map<dynamic, dynamic> source,
+  ) {
+    const expectedKeys = {
+      'format',
+      'version',
+      'generation',
+      'matrixRunId',
+      'scenario',
+      'scenarioId',
+      'phase',
+      'failpoint',
+      'scenarioRoot',
+      'preferencesPrefix',
+    };
+    if (source.keys.any((key) => key is! String) ||
+        source.length != expectedKeys.length ||
+        !source.keys.toSet().containsAll(expectedKeys)) {
+      throw const FormatException(
+        'restore_legacy_archiving_marker_harness_control_fields',
+      );
+    }
+    final json = source.cast<String, dynamic>();
+    if (json['format'] != restoreHarnessFormat ||
+        json['version'] != version ||
+        json['scenario'] != restoreLegacyArchivingMarkerHarnessScenario ||
+        json['generation'] is! int ||
+        json['matrixRunId'] is! String ||
+        json['scenarioId'] is! String ||
+        json['phase'] is! String ||
+        json['failpoint'] is! String ||
+        json['scenarioRoot'] is! String ||
+        json['preferencesPrefix'] is! String) {
+      throw const FormatException(
+        'restore_legacy_archiving_marker_harness_control_types',
+      );
+    }
+    final rawPhase = json['phase'] as String;
+    final phase = RestoreLegacyArchivingMarkerProcessHarnessPhase.values
+        .firstWhere(
+          (candidate) => candidate.name == rawPhase,
+          orElse: () => throw const FormatException(
+            'restore_legacy_archiving_marker_harness_control_phase',
+          ),
+        );
+    final rawFailpoint = json['failpoint'] as String;
+    final failpoint = RestoreLegacyArchivingMarkerProcessFailpoint.values
+        .firstWhere(
+          (candidate) => candidate.name == rawFailpoint,
+          orElse: () => throw const FormatException(
+            'restore_legacy_archiving_marker_harness_control_failpoint',
+          ),
+        );
+    try {
+      return RestoreLegacyArchivingMarkerProcessHarnessControl(
+        generation: json['generation'] as int,
+        matrixRunId: json['matrixRunId'] as String,
+        scenarioId: json['scenarioId'] as String,
+        phase: phase,
+        failpoint: failpoint,
+        scenarioRoot: json['scenarioRoot'] as String,
+        preferencesPrefix: json['preferencesPrefix'] as String,
+      );
+    } on ArgumentError {
+      throw const FormatException(
+        'restore_legacy_archiving_marker_harness_control_value',
+      );
+    }
+  }
+
+  static Future<RestoreLegacyArchivingMarkerProcessHarnessControl>
+  readFromEnvironment() async {
+    const controlPath = String.fromEnvironment(restoreHarnessControlDefine);
+    if (controlPath.isEmpty || !p.isAbsolute(controlPath)) {
+      throw StateError('restore_harness_control_define');
+    }
+    return RestoreLegacyArchivingMarkerProcessHarnessControl.fromJson(
       await readHarnessJson(File(controlPath)),
     );
   }

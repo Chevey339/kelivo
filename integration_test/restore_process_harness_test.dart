@@ -87,6 +87,22 @@ void main() {
           case RestoreRolledBackTerminalProcessHarnessPhase.verifyBusinessReady:
             await _runRolledBackTerminalVerify(control, preferences);
         }
+      case RestoreLegacyArchivingMarkerProcessHarnessControl():
+        switch (control.phase) {
+          case RestoreLegacyArchivingMarkerProcessHarnessPhase.setup:
+            await _runSetup(control, preferences);
+          case RestoreLegacyArchivingMarkerProcessHarnessPhase.commitToColdAck:
+            await _runLegacyArchivingMarkerCommitToColdAck(
+              control,
+              preferences,
+            );
+          case RestoreLegacyArchivingMarkerProcessHarnessPhase
+              .killLegacyMarkerPublish:
+            await _runLegacyArchivingMarkerKill(control, preferences);
+          case RestoreLegacyArchivingMarkerProcessHarnessPhase
+              .verifyBusinessReady:
+            await _runLegacyArchivingMarkerVerify(control, preferences);
+        }
     }
   });
 }
@@ -1872,6 +1888,419 @@ Future<void> _runRolledBackTerminalVerify(
   expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
 }
 
+Future<void> _runLegacyArchivingMarkerCommitToColdAck(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final setupEvent = await _readLegacyArchivingMarkerSetupEvent(control, state);
+  expect(setupEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectBeforePreferences(preferences, state);
+  final pending = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(pending?.runId, state.runId);
+  expect(pending?.receipt.state, RestoreReceiptState.prepared);
+  expect(pending?.markerFileName, RestoreWorkspaceLock.activeRunFileName);
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(setupEvent['pid']));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationCounter = CountingMutationPreferencesStore(preferenceDelegate);
+  try {
+    SharedPreferencesStorePlatform.instance = mutationCounter;
+    try {
+      await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      throw StateError('restore_legacy_archiving_marker_arm_returned');
+    } on RestoreColdRestartRequired catch (error) {
+      expect(error.state, RestoreReceiptState.committed);
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(mutationCounter.mutationAttempts, greaterThan(0));
+
+    final armed = await RestoreStartupGate.inspect(
+      appDataDirectory: control.appDataDirectory,
+    );
+    expect(armed?.runId, state.runId);
+    expect(armed?.receipt.state, RestoreReceiptState.committed);
+    expect(armed?.markerFileName, RestoreWorkspaceLock.publishingRunFileName);
+    final receiptStore = _activeReceiptStore(control, state);
+    final ack = await RestoreSettingsColdAckStore(
+      runDirectory: receiptStore.runDirectory,
+      durability: durability,
+    ).read();
+    expect(ack, isNotNull);
+    expect(ack!.terminalReceiptChecksum, armed!.receipt.checksum);
+    expect(ack.expected, RestoreSettingsColdAckExpected.target);
+    expect(ack.processId, lease.processId);
+    expect(ack.leaseInstanceId, lease.instanceId);
+    await preferences.reload();
+    _expectTargetPreferences(preferences, state);
+    await _expectInstalledBundle(control, receiptStore, state);
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': armed.receipt.state.name,
+      'leaseInstanceId': lease.instanceId,
+      'coldAckProcessId': ack.processId,
+      'coldAckLeaseInstanceId': ack.leaseInstanceId,
+      'coldAckChecksum': ack.checksum,
+      'terminalReceiptChecksum': ack.terminalReceiptChecksum,
+      'settingsMutationAttempts': mutationCounter.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+}
+
+Future<void> _runLegacyArchivingMarkerKill(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final armEvent = await _readLegacyArchivingMarkerCommitEvent(control, state);
+  expect(armEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectTargetPreferences(preferences, state);
+  final receiptStore = _activeReceiptStore(control, state);
+  final observedAck = await RestoreSettingsColdAckStore(
+    runDirectory: receiptStore.runDirectory,
+  ).read();
+  expect(observedAck, isNotNull);
+  expect(observedAck!.checksum, armEvent['coldAckChecksum']);
+  expect(observedAck.processId, armEvent['coldAckProcessId']);
+  expect(observedAck.leaseInstanceId, armEvent['coldAckLeaseInstanceId']);
+  await _expectInstalledBundle(control, receiptStore, state);
+
+  final platformDurability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: platformDurability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(observedAck.processId));
+  expect(lease.instanceId, isNot(observedAck.leaseInstanceId));
+  final workspaceLock = RestoreWorkspaceLock(
+    appDataDirectory: control.appDataDirectory,
+    durability: platformDurability,
+  );
+  await workspaceLock.synchronized(() async {
+    final publishing = File(
+      p.join(
+        workspaceLock.workspaceRoot.path,
+        RestoreWorkspaceLock.publishingRunFileName,
+      ),
+    );
+    expect(await publishing.readAsString(), state.runId);
+    await publishing.delete();
+    await platformDurability.syncDirectory(
+      workspaceLock.workspaceRoot,
+      fullBarrier: true,
+    );
+  });
+  final markerless = await RestoreStartupGate.inspect(
+    appDataDirectory: control.appDataDirectory,
+  );
+  expect(markerless?.runId, state.runId);
+  expect(markerless?.receipt.state, RestoreReceiptState.committed);
+  expect(markerless?.markerFileName, isNull);
+
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  final matcher = RestoreLegacyArchivingMarkerMatcher(
+    workspaceRootPath: receiptStore.workspaceRoot.path,
+    runId: state.runId,
+    boundary: _legacyArchivingMarkerBoundary(control.failpoint),
+  );
+  final durability = OneShotBlockingRestoreDurability(
+    delegate: platformDurability,
+    matcher: matcher,
+    onMatched: (rawObservation) async {
+      final observation =
+          rawObservation as RestoreLegacyArchivingMarkerObservation;
+      expect(mutationGuard.mutationAttempts, 0);
+      await preferences.reload();
+      _expectTargetPreferences(preferences, state);
+      await _expectLegacyArchivingMarkerCrashTopology(
+        control: control,
+        state: state,
+        expectedAck: observedAck,
+        observation: observation,
+      );
+      await _publishEvent(control, {
+        'status': 'readyForKill',
+        'marker': control.failpoint.name,
+        'runId': state.runId,
+        'leaseInstanceId': lease.instanceId,
+        'observedReceiptState': RestoreReceiptState.committed.name,
+        'legacyPublishingMarkerRemoved': true,
+        'coldAckProcessId': observedAck.processId,
+        'coldAckLeaseInstanceId': observedAck.leaseInstanceId,
+        'coldAckChecksum': observedAck.checksum,
+        'terminalReceiptChecksum': observedAck.terminalReceiptChecksum,
+        'settingsMutationAttempts': mutationGuard.mutationAttempts,
+        ..._durabilityObservationJson(observation),
+      });
+    },
+  );
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    await RestoreStartupGate.recoverAndRequireBusinessReady(
+      appDataDirectory: control.appDataDirectory,
+      preferences: preferences,
+      businessLease: lease,
+      durability: durability,
+    );
+    throw StateError('restore_legacy_archiving_marker_kill_returned');
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+}
+
+Future<void> _runLegacyArchivingMarkerVerify(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  SharedPreferences preferences,
+) async {
+  final state = await _readBoundState(control);
+  final killEvent = await _readLegacyArchivingMarkerKillEvent(control, state);
+  expect(killEvent['pid'], isNot(pid));
+  await preferences.reload();
+  _expectTargetPreferences(preferences, state);
+  final expectedAck = RestoreSettingsColdAck(
+    runId: state.runId,
+    terminalReceiptChecksum: killEvent['terminalReceiptChecksum'] as String,
+    expected: RestoreSettingsColdAckExpected.target,
+    leaseInstanceId: killEvent['coldAckLeaseInstanceId'] as String,
+    processId: killEvent['coldAckProcessId'] as int,
+  );
+  expect(expectedAck.checksum, killEvent['coldAckChecksum']);
+  await _expectLegacyArchivingMarkerCrashTopologyFromEvent(
+    control: control,
+    state: state,
+    expectedAck: expectedAck,
+    event: killEvent,
+  );
+
+  final durability = RestorePlatformDurability();
+  final lease = await RestoreBusinessLease.acquire(
+    appDataDirectory: control.appDataDirectory,
+    durability: durability,
+  );
+  expect(lease.processId, pid);
+  expect(lease.processId, isNot(killEvent['pid']));
+  expect(lease.instanceId, isNot(killEvent['leaseInstanceId']));
+  expect(lease.processId, isNot(expectedAck.processId));
+  expect(lease.instanceId, isNot(expectedAck.leaseInstanceId));
+  final preferenceDelegate = SharedPreferencesStorePlatform.instance;
+  final mutationGuard = RejectingMutationPreferencesStore(preferenceDelegate);
+  late final RestoreReceipt terminal;
+  try {
+    SharedPreferencesStorePlatform.instance = mutationGuard;
+    try {
+      final result = await RestoreStartupGate.recoverAndRequireBusinessReady(
+        appDataDirectory: control.appDataDirectory,
+        preferences: preferences,
+        businessLease: lease,
+        durability: durability,
+      );
+      expect(result?.state, RestoreReceiptState.committed);
+      terminal = result!;
+    } finally {
+      SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    }
+    expect(mutationGuard.mutationAttempts, 0);
+    await preferences.reload();
+    _expectTargetPreferences(preferences, state);
+    final evidence = await _expectArchivedTerminalEvidence(
+      control: control,
+      state: state,
+      expectedAck: expectedAck,
+    );
+    expect(terminal.checksum, evidence.terminal.checksum);
+    await _publishEvent(control, {
+      'status': 'completed',
+      'runId': state.runId,
+      'receiptState': terminal.state.name,
+      'gateResult': terminal.state.name,
+      'archiveState': 'archived',
+      'observedAckProcessId': evidence.ack.processId,
+      'observedAckLeaseInstanceId': evidence.ack.leaseInstanceId,
+      'observedAckChecksum': evidence.ack.checksum,
+      'leaseInstanceId': lease.instanceId,
+      'settingsMutationAttempts': mutationGuard.mutationAttempts,
+    });
+  } finally {
+    SharedPreferencesStorePlatform.instance = preferenceDelegate;
+    await lease.close();
+  }
+  await _expectNoLeaseOwnerFiles(control);
+  for (final key in [
+    state.primaryPreferenceKey,
+    state.secondaryPreferenceKey,
+    state.secretPreferenceKey,
+    state.targetOnlyPreferenceKey,
+  ]) {
+    if (preferences.containsKey(key) && !await preferences.remove(key)) {
+      throw StateError('restore_legacy_archiving_marker_cleanup:$key');
+    }
+  }
+  await preferences.reload();
+  expect(preferences.containsKey(state.primaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secondaryPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.secretPreferenceKey), isFalse);
+  expect(preferences.containsKey(state.targetOnlyPreferenceKey), isFalse);
+}
+
+RestoreLegacyArchivingMarkerBoundary _legacyArchivingMarkerBoundary(
+  RestoreLegacyArchivingMarkerProcessFailpoint failpoint,
+) => switch (failpoint) {
+  RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerEmptyRestricted =>
+    RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+  RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerTempDurable =>
+    RestoreLegacyArchivingMarkerBoundary.tempDurable,
+  RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerPublished =>
+    RestoreLegacyArchivingMarkerBoundary.published,
+};
+
+Future<void> _expectLegacyArchivingMarkerCrashTopology({
+  required RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreSettingsColdAck expectedAck,
+  required RestoreLegacyArchivingMarkerObservation observation,
+}) async {
+  expect(observation.runId, state.runId);
+  expect(
+    observation.boundary,
+    _legacyArchivingMarkerBoundary(control.failpoint),
+  );
+  final store = _activeReceiptStore(control, state);
+  expect(
+    observation.workspaceRootPath,
+    _absolutePath(store.workspaceRoot.path),
+  );
+  expect(observation.activeRunPath, _absolutePath(store.runDirectory.path));
+  expect(
+    observation.temporaryPath,
+    _absolutePath(
+      p.join(
+        store.workspaceRoot.path,
+        RestoreWorkspaceLock.archivingRunTemporaryFileName,
+      ),
+    ),
+  );
+  expect(
+    observation.canonicalPath,
+    _absolutePath(
+      p.join(
+        store.workspaceRoot.path,
+        RestoreWorkspaceLock.archivingRunFileName,
+      ),
+    ),
+  );
+  await _expectLegacyArchivingMarkerCrashFiles(
+    control.failpoint,
+    state.runId,
+    store.workspaceRoot,
+  );
+  final history = await store.readHistoryWhileWorkspaceLocked();
+  expect(history.map((receipt) => receipt.state), [
+    RestoreReceiptState.prepared,
+    RestoreReceiptState.oldRenamed,
+    RestoreReceiptState.newInstalled,
+    RestoreReceiptState.verified,
+    RestoreReceiptState.committed,
+  ]);
+  expect(history.first.checksum, state.preparedReceiptChecksum);
+  expect(history.last.checksum, expectedAck.terminalReceiptChecksum);
+  await _expectNoReceiptTemporaries(store);
+  await _expectNoColdAckTemporaries(store.runDirectory);
+  final ack = await RestoreSettingsColdAckStore(
+    runDirectory: store.runDirectory,
+  ).read();
+  expect(ack?.checksum, expectedAck.checksum);
+  await _expectInstalledBundle(control, store, state);
+}
+
+Future<void> _expectLegacyArchivingMarkerCrashTopologyFromEvent({
+  required RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  required RestoreCompleteBundleFixtureState state,
+  required RestoreSettingsColdAck expectedAck,
+  required Map<String, dynamic> event,
+}) {
+  final observation = RestoreLegacyArchivingMarkerObservation(
+    boundary: _legacyArchivingMarkerBoundary(control.failpoint),
+    runId: event['runId'] as String,
+    workspaceRootPath: event['workspaceRootPath'] as String,
+    temporaryPath: event['temporaryPath'] as String,
+    canonicalPath: event['canonicalPath'] as String,
+    activeRunPath: event['activeRunPath'] as String,
+    temporaryContents: event['temporaryContents'] as String,
+  );
+  return _expectLegacyArchivingMarkerCrashTopology(
+    control: control,
+    state: state,
+    expectedAck: expectedAck,
+    observation: observation,
+  );
+}
+
+Future<void> _expectLegacyArchivingMarkerCrashFiles(
+  RestoreLegacyArchivingMarkerProcessFailpoint failpoint,
+  String runId,
+  Directory workspaceRoot,
+) async {
+  final temporary = File(
+    p.join(
+      workspaceRoot.path,
+      RestoreWorkspaceLock.archivingRunTemporaryFileName,
+    ),
+  );
+  final canonical = File(
+    p.join(workspaceRoot.path, RestoreWorkspaceLock.archivingRunFileName),
+  );
+  for (final name in const {
+    RestoreWorkspaceLock.activeRunFileName,
+    RestoreWorkspaceLock.publishingRunFileName,
+    RestoreWorkspaceLock.discardingRunFileName,
+  }) {
+    expect(
+      await FileSystemEntity.type(
+        p.join(workspaceRoot.path, name),
+        followLinks: false,
+      ),
+      FileSystemEntityType.notFound,
+    );
+  }
+  switch (failpoint) {
+    case RestoreLegacyArchivingMarkerProcessFailpoint
+        .archivingMarkerEmptyRestricted:
+      expect(await temporary.readAsString(), isEmpty);
+      expect(await canonical.exists(), isFalse);
+    case RestoreLegacyArchivingMarkerProcessFailpoint
+        .archivingMarkerTempDurable:
+      expect(await temporary.readAsString(), runId);
+      expect(await canonical.exists(), isFalse);
+    case RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerPublished:
+      expect(await temporary.exists(), isFalse);
+      expect(await canonical.readAsString(), runId);
+  }
+}
+
 Future<void> _expectRollbackCrashTopology({
   required RestoreRollbackProcessHarnessControl control,
   required RestoreCompleteBundleFixtureState state,
@@ -2904,6 +3333,8 @@ void _requireControlSequence(RestoreHarnessControl control) {
     RestoreTerminalProcessHarnessControl() => control.phase.index + 1,
     RestoreRollbackProcessHarnessControl() => control.phase.index + 1,
     RestoreRolledBackTerminalProcessHarnessControl() => control.phase.index + 1,
+    RestoreLegacyArchivingMarkerProcessHarnessControl() =>
+      control.phase.index + 1,
     _ => throw StateError('restore_harness_control_type'),
   };
   if (control.generation != expectedGeneration) {
@@ -3338,6 +3769,16 @@ Map<String, dynamic> _durabilityObservationJson(
       'boundary': observation.boundary.name,
       'path': observation.workspaceRootPath,
       'fullBarrier': observation.fullBarrier,
+    },
+    RestoreLegacyArchivingMarkerObservation() => {
+      'operationKind': 'legacyArchivingMarkerAfter',
+      'boundary': observation.boundary.name,
+      'runId': observation.runId,
+      'workspaceRootPath': observation.workspaceRootPath,
+      'temporaryPath': observation.temporaryPath,
+      'canonicalPath': observation.canonicalPath,
+      'activeRunPath': observation.activeRunPath,
+      'temporaryContents': observation.temporaryContents,
     },
   };
 }
@@ -3854,6 +4295,183 @@ Future<Map<String, dynamic>> _readTerminalSetupEvent(
       event['runId'] != state.runId ||
       event['receiptState'] != RestoreReceiptState.prepared.name) {
     throw const FormatException('restore_terminal_harness_setup_event');
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readLegacyArchivingMarkerSetupEvent(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readLegacyArchivingMarkerPriorEvent(
+    control,
+    generation: 1,
+    phase: RestoreLegacyArchivingMarkerProcessHarnessPhase.setup,
+    phaseKeys: const {'runId', 'receiptState'},
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.prepared.name) {
+    throw const FormatException(
+      'restore_legacy_archiving_marker_harness_setup_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readLegacyArchivingMarkerCommitEvent(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final event = await _readLegacyArchivingMarkerPriorEvent(
+    control,
+    generation: 2,
+    phase: RestoreLegacyArchivingMarkerProcessHarnessPhase.commitToColdAck,
+    phaseKeys: const {
+      'runId',
+      'receiptState',
+      'leaseInstanceId',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'coldAckChecksum',
+      'terminalReceiptChecksum',
+      'settingsMutationAttempts',
+    },
+  );
+  if (event['status'] != 'completed' ||
+      event['runId'] != state.runId ||
+      event['receiptState'] != RestoreReceiptState.committed.name ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['coldAckProcessId'] != event['pid'] ||
+      event['coldAckLeaseInstanceId'] != event['leaseInstanceId'] ||
+      !_isSha256(event['coldAckChecksum']) ||
+      !_isSha256(event['terminalReceiptChecksum']) ||
+      event['settingsMutationAttempts'] is! int ||
+      (event['settingsMutationAttempts'] as int) < 1) {
+    throw const FormatException(
+      'restore_legacy_archiving_marker_harness_commit_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readLegacyArchivingMarkerKillEvent(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control,
+  RestoreCompleteBundleFixtureState state,
+) async {
+  final armed = await _readLegacyArchivingMarkerCommitEvent(control, state);
+  final event = await _readLegacyArchivingMarkerPriorEvent(
+    control,
+    generation: 3,
+    phase:
+        RestoreLegacyArchivingMarkerProcessHarnessPhase.killLegacyMarkerPublish,
+    phaseKeys: const {
+      'marker',
+      'runId',
+      'leaseInstanceId',
+      'observedReceiptState',
+      'legacyPublishingMarkerRemoved',
+      'coldAckProcessId',
+      'coldAckLeaseInstanceId',
+      'coldAckChecksum',
+      'terminalReceiptChecksum',
+      'settingsMutationAttempts',
+      'operationKind',
+      'boundary',
+      'workspaceRootPath',
+      'temporaryPath',
+      'canonicalPath',
+      'activeRunPath',
+      'temporaryContents',
+    },
+  );
+  final workspaceRoot = _absolutePath(
+    RestoreReceiptStore(
+      appDataDirectory: control.appDataDirectory,
+      runId: state.runId,
+    ).workspaceRoot.path,
+  );
+  final expectedTemporaryContents =
+      control.failpoint ==
+          RestoreLegacyArchivingMarkerProcessFailpoint
+              .archivingMarkerEmptyRestricted
+      ? ''
+      : state.runId;
+  if (event['status'] != 'readyForKill' ||
+      event['marker'] != control.failpoint.name ||
+      event['runId'] != state.runId ||
+      !_isIdentifier(event['leaseInstanceId']) ||
+      event['leaseInstanceId'] == armed['leaseInstanceId'] ||
+      event['observedReceiptState'] != RestoreReceiptState.committed.name ||
+      event['legacyPublishingMarkerRemoved'] != true ||
+      event['coldAckProcessId'] != armed['coldAckProcessId'] ||
+      event['coldAckLeaseInstanceId'] != armed['coldAckLeaseInstanceId'] ||
+      event['coldAckChecksum'] != armed['coldAckChecksum'] ||
+      event['terminalReceiptChecksum'] != armed['terminalReceiptChecksum'] ||
+      event['settingsMutationAttempts'] != 0 ||
+      event['operationKind'] != 'legacyArchivingMarkerAfter' ||
+      event['boundary'] !=
+          _legacyArchivingMarkerBoundary(control.failpoint).name ||
+      event['workspaceRootPath'] != workspaceRoot ||
+      event['temporaryPath'] !=
+          p.join(
+            workspaceRoot,
+            RestoreWorkspaceLock.archivingRunTemporaryFileName,
+          ) ||
+      event['canonicalPath'] !=
+          p.join(workspaceRoot, RestoreWorkspaceLock.archivingRunFileName) ||
+      event['activeRunPath'] != p.join(workspaceRoot, 'run_${state.runId}') ||
+      event['temporaryContents'] != expectedTemporaryContents) {
+    throw const FormatException(
+      'restore_legacy_archiving_marker_harness_kill_event',
+    );
+  }
+  return event;
+}
+
+Future<Map<String, dynamic>> _readLegacyArchivingMarkerPriorEvent(
+  RestoreLegacyArchivingMarkerProcessHarnessControl control, {
+  required int generation,
+  required RestoreLegacyArchivingMarkerProcessHarnessPhase phase,
+  required Set<String> phaseKeys,
+}) async {
+  final eventFile = File(
+    p.join(
+      control.eventsDirectory.path,
+      '${generation.toString().padLeft(2, '0')}_${phase.name}.json',
+    ),
+  );
+  final event = await readHarnessJson(eventFile);
+  final expectedKeys = {
+    'format',
+    'version',
+    'generation',
+    'matrixRunId',
+    'scenario',
+    'scenarioId',
+    'phase',
+    'failpoint',
+    'pid',
+    'status',
+    ...phaseKeys,
+  };
+  if (event.length != expectedKeys.length ||
+      !event.keys.toSet().containsAll(expectedKeys) ||
+      event['format'] != restoreHarnessFormat ||
+      event['version'] !=
+          RestoreLegacyArchivingMarkerProcessHarnessControl.version ||
+      event['generation'] != generation ||
+      event['matrixRunId'] != control.matrixRunId ||
+      event['scenario'] != restoreLegacyArchivingMarkerHarnessScenario ||
+      event['scenarioId'] != control.scenarioId ||
+      event['phase'] != phase.name ||
+      event['failpoint'] != control.failpoint.name ||
+      event['pid'] is! int ||
+      (event['pid'] as int) < 1 ||
+      event['status'] is! String) {
+    throw const FormatException(
+      'restore_legacy_archiving_marker_harness_event',
+    );
   }
   return event;
 }
@@ -4974,6 +5592,8 @@ Future<void> _publishEvent(
       RestoreRollbackProcessHarnessControl.version,
     RestoreRolledBackTerminalProcessHarnessControl() =>
       RestoreRolledBackTerminalProcessHarnessControl.version,
+    RestoreLegacyArchivingMarkerProcessHarnessControl() =>
+      RestoreLegacyArchivingMarkerProcessHarnessControl.version,
     _ => throw StateError('restore_harness_control_type'),
   };
   return writeDurableHarnessJson(control.eventFile, {

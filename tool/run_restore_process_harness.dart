@@ -53,25 +53,34 @@ enum _MatrixTier {
   }
 }
 
-enum _MatrixScenario { forward, terminal, rollback, rolledBackTerminal }
+enum _MatrixScenario {
+  forward,
+  terminal,
+  rollback,
+  rolledBackTerminal,
+  legacyArchivingMarker,
+}
 
 final class _MatrixFailpoint {
   const _MatrixFailpoint.forward(RestoreProcessFailpoint value)
     : forward = value,
       terminal = null,
       rollback = null,
+      legacyArchivingMarker = null,
       scenario = _MatrixScenario.forward;
 
   const _MatrixFailpoint.terminal(RestoreTerminalProcessFailpoint value)
     : forward = null,
       terminal = value,
       rollback = null,
+      legacyArchivingMarker = null,
       scenario = _MatrixScenario.terminal;
 
   const _MatrixFailpoint.rollback(RestoreRollbackProcessFailpoint value)
     : forward = null,
       terminal = null,
       rollback = value,
+      legacyArchivingMarker = null,
       scenario = _MatrixScenario.rollback;
 
   const _MatrixFailpoint.rolledBackTerminal(
@@ -79,18 +88,29 @@ final class _MatrixFailpoint {
   ) : forward = null,
       terminal = value,
       rollback = null,
+      legacyArchivingMarker = null,
       scenario = _MatrixScenario.rolledBackTerminal;
+
+  const _MatrixFailpoint.legacyArchivingMarker(
+    RestoreLegacyArchivingMarkerProcessFailpoint value,
+  ) : forward = null,
+      terminal = null,
+      rollback = null,
+      legacyArchivingMarker = value,
+      scenario = _MatrixScenario.legacyArchivingMarker;
 
   final _MatrixScenario scenario;
   final RestoreProcessFailpoint? forward;
   final RestoreTerminalProcessFailpoint? terminal;
   final RestoreRollbackProcessFailpoint? rollback;
+  final RestoreLegacyArchivingMarkerProcessFailpoint? legacyArchivingMarker;
 
   String get name => switch (scenario) {
     _MatrixScenario.forward => forward!.name,
     _MatrixScenario.terminal => terminal!.name,
     _MatrixScenario.rollback => rollback!.name,
     _MatrixScenario.rolledBackTerminal => terminal!.name,
+    _MatrixScenario.legacyArchivingMarker => legacyArchivingMarker!.name,
   };
 
   String get scenarioName => switch (scenario) {
@@ -99,6 +119,8 @@ final class _MatrixFailpoint {
     _MatrixScenario.rollback => restoreRollbackHarnessScenario,
     _MatrixScenario.rolledBackTerminal =>
       restoreRolledBackTerminalHarnessScenario,
+    _MatrixScenario.legacyArchivingMarker =>
+      restoreLegacyArchivingMarkerHarnessScenario,
   };
 }
 
@@ -131,6 +153,13 @@ final class _MatrixSelection {
        tier = _MatrixTier.full,
        forwardStartAt = null,
        rollbackStartAt = null;
+
+  const _MatrixSelection.legacyArchivingMarker({this.singleFailpoint})
+    : scenario = _MatrixScenario.legacyArchivingMarker,
+      tier = _MatrixTier.full,
+      forwardStartAt = null,
+      rollbackStartAt = null,
+      rolledBackTerminalStartAt = null;
 
   final _MatrixScenario scenario;
   final _MatrixTier tier;
@@ -174,6 +203,12 @@ final class _MatrixSelection {
           for (final failpoint in all.sublist(index))
             _MatrixFailpoint.rolledBackTerminal(failpoint),
         ]);
+      case _MatrixScenario.legacyArchivingMarker:
+        return [
+          for (final failpoint
+              in RestoreLegacyArchivingMarkerProcessFailpoint.values)
+            _MatrixFailpoint.legacyArchivingMarker(failpoint),
+        ];
       case _MatrixScenario.forward:
         break;
     }
@@ -206,6 +241,8 @@ final class _MatrixSelection {
             ? 'rolledback-terminal'
             : 'rolledback-terminal-from='
                   '${rolledBackTerminalStartAt!.name}'
+      : scenario == _MatrixScenario.legacyArchivingMarker
+      ? 'legacy-archiving-marker'
       : forwardStartAt == null
       ? tier.name
       : '${tier.name}-from=${forwardStartAt!.name}';
@@ -216,6 +253,8 @@ final class _MatrixSelection {
     _MatrixScenario.rollback => restoreRollbackHarnessScenario,
     _MatrixScenario.rolledBackTerminal =>
       restoreRolledBackTerminalHarnessScenario,
+    _MatrixScenario.legacyArchivingMarker =>
+      restoreLegacyArchivingMarkerHarnessScenario,
   };
 
   static _MatrixSelection parse(List<String> arguments) {
@@ -231,6 +270,10 @@ final class _MatrixSelection {
     if (arguments.length == 1 &&
         arguments.single == '--scenario=rolledback-terminal') {
       return const _MatrixSelection.rolledBackTerminal();
+    }
+    if (arguments.length == 1 &&
+        arguments.single == '--scenario=legacy-archiving-marker') {
+      return const _MatrixSelection.legacyArchivingMarker();
     }
     if (arguments.length == 2 && arguments.contains('--scenario=rollback')) {
       final fromArguments = arguments
@@ -274,6 +317,25 @@ final class _MatrixSelection {
       }
       throw ArgumentError.value(option, 'argument');
     }
+    if (arguments.length == 2 &&
+        arguments.contains('--scenario=legacy-archiving-marker')) {
+      final options = arguments
+          .where((argument) => argument != '--scenario=legacy-archiving-marker')
+          .toList(growable: false);
+      if (options.length != 1 || !options.single.startsWith('--failpoint=')) {
+        throw ArgumentError(
+          'legacy-archiving-marker scenario accepts exactly one '
+          '--failpoint=<legacy-archiving-marker-name>',
+        );
+      }
+      return _MatrixSelection.legacyArchivingMarker(
+        singleFailpoint: _MatrixFailpoint.legacyArchivingMarker(
+          _parseLegacyArchivingMarkerFailpoint(
+            options.single.substring('--failpoint='.length),
+          ),
+        ),
+      );
+    }
     if (arguments.length == 1 && arguments.single.startsWith('--failpoint=')) {
       final name = arguments.single.substring('--failpoint='.length);
       final forward = _tryParseForwardFailpoint(name);
@@ -305,6 +367,9 @@ final class _MatrixSelection {
         _MatrixScenario.rolledBackTerminal => throw StateError(
           'restore_harness_global_failpoint_scenario',
         ),
+        _MatrixScenario.legacyArchivingMarker => throw StateError(
+          'restore_harness_global_failpoint_scenario',
+        ),
       };
     }
     if (arguments.length > 2 || arguments.toSet().length != arguments.length) {
@@ -315,6 +380,8 @@ final class _MatrixSelection {
         'or --scenario=rollback [--from=<rollback-name>] '
         'or --scenario=rolledback-terminal '
         '[--failpoint=<terminal-name>|--from=<terminal-name>] '
+        'or --scenario=legacy-archiving-marker '
+        '[--failpoint=<legacy-archiving-marker-name>] '
         'or --failpoint=<unique-name>',
       );
     }
@@ -396,6 +463,19 @@ final class _MatrixSelection {
       if (candidate.name == name) return candidate;
     }
     return null;
+  }
+
+  static RestoreLegacyArchivingMarkerProcessFailpoint
+  _parseLegacyArchivingMarkerFailpoint(String name) {
+    for (final candidate
+        in RestoreLegacyArchivingMarkerProcessFailpoint.values) {
+      if (candidate.name == name) return candidate;
+    }
+    throw ArgumentError.value(
+      name,
+      'failpoint',
+      'unknown legacy archiving marker restore process failpoint',
+    );
   }
 }
 
@@ -625,6 +705,12 @@ final class _RestoreProcessHarnessHost {
         scenarioId: scenarioId,
         failpoint: failpoint.terminal!,
       ),
+    _MatrixScenario.legacyArchivingMarker =>
+      restoreLegacyArchivingMarkerProcessPreferencesPrefix(
+        matrixRunId: matrixRunId,
+        scenarioId: scenarioId,
+        failpoint: failpoint.legacyArchivingMarker!,
+      ),
   };
 
   Future<void> releaseHostLock() async {
@@ -793,6 +879,8 @@ final class _RestoreProcessHarnessHost {
         await _runRollbackCasePhases();
       case _MatrixScenario.rolledBackTerminal:
         await _runRolledBackTerminalCasePhases();
+      case _MatrixScenario.legacyArchivingMarker:
+        await _runLegacyArchivingMarkerCasePhases();
     }
   }
 
@@ -1134,6 +1222,69 @@ final class _RestoreProcessHarnessHost {
     );
   }
 
+  Future<void> _runLegacyArchivingMarkerCasePhases() async {
+    final setup = await _runNormalPhase(
+      await _writeLegacyArchivingMarkerControl(
+        RestoreLegacyArchivingMarkerProcessHarnessPhase.setup,
+      ),
+      _validateSetupEvent,
+    );
+    final runId = setup.requireIdentifier('runId');
+
+    final arm = await _runNormalPhase(
+      await _writeLegacyArchivingMarkerControl(
+        RestoreLegacyArchivingMarkerProcessHarnessPhase.commitToColdAck,
+      ),
+      (event, control, process) => _validateLegacyArchivingMarkerArmEvent(
+        event,
+        control as RestoreLegacyArchivingMarkerProcessHarnessControl,
+        process,
+        runId: runId,
+      ),
+    );
+    final armLease = arm.requireIdentifier('leaseInstanceId');
+    final ackProcessId = arm.requireProcessId('coldAckProcessId');
+    final ackLease = arm.requireIdentifier('coldAckLeaseInstanceId');
+    final ackChecksum = arm.requireSha256('coldAckChecksum');
+    final terminalReceiptChecksum = arm.requireSha256(
+      'terminalReceiptChecksum',
+    );
+
+    final markerKill = await _runKillPhase(
+      await _writeLegacyArchivingMarkerControl(
+        RestoreLegacyArchivingMarkerProcessHarnessPhase.killLegacyMarkerPublish,
+      ),
+      (event, control, process) => _validateLegacyArchivingMarkerKillEvent(
+        event,
+        control as RestoreLegacyArchivingMarkerProcessHarnessControl,
+        process,
+        runId: runId,
+        armProcessId: arm.pid,
+        armLeaseInstanceId: armLease,
+        expectedAckChecksum: ackChecksum,
+        terminalReceiptChecksum: terminalReceiptChecksum,
+      ),
+    );
+    final markerKillLease = markerKill.requireIdentifier('leaseInstanceId');
+
+    await _runNormalPhase(
+      await _writeLegacyArchivingMarkerControl(
+        RestoreLegacyArchivingMarkerProcessHarnessPhase.verifyBusinessReady,
+      ),
+      (event, control, process) => _validateLegacyArchivingMarkerVerifyEvent(
+        event,
+        control as RestoreLegacyArchivingMarkerProcessHarnessControl,
+        process,
+        runId: runId,
+        expectedAckProcessId: ackProcessId,
+        expectedAckLeaseInstanceId: ackLease,
+        expectedAckChecksum: ackChecksum,
+        priorProcessIds: {arm.pid, markerKill.pid},
+        priorLeaseInstanceIds: {armLease, markerKillLease},
+      ),
+    );
+  }
+
   bool _isColdAckFailpoint(RestoreTerminalProcessFailpoint value) =>
       value == RestoreTerminalProcessFailpoint.coldAckTempDurable ||
       value == RestoreTerminalProcessFailpoint.coldAckPublished;
@@ -1192,6 +1343,11 @@ final class _RestoreProcessHarnessHost {
         case RestoreRolledBackTerminalProcessHarnessControl():
           throw StateError(
             'restore_rolled_back_terminal_harness_kill_outer_succeeded:'
+            '${control.phaseName}',
+          );
+        case RestoreLegacyArchivingMarkerProcessHarnessControl():
+          throw StateError(
+            'restore_legacy_archiving_marker_harness_kill_outer_succeeded:'
             '${control.phaseName}',
           );
         default:
@@ -1256,6 +1412,22 @@ final class _RestoreProcessHarnessHost {
       scenarioId: scenarioId,
       phase: phase,
       failpoint: failpoint.terminal!,
+      scenarioRoot: scenarioRoot.path,
+      preferencesPrefix: _preferencesPrefix,
+    );
+    return _persistControl(control);
+  }
+
+  Future<RestoreLegacyArchivingMarkerProcessHarnessControl>
+  _writeLegacyArchivingMarkerControl(
+    RestoreLegacyArchivingMarkerProcessHarnessPhase phase,
+  ) async {
+    final control = RestoreLegacyArchivingMarkerProcessHarnessControl(
+      generation: phase.index + 1,
+      matrixRunId: matrixRunId,
+      scenarioId: scenarioId,
+      phase: phase,
+      failpoint: failpoint.legacyArchivingMarker!,
       scenarioRoot: scenarioRoot.path,
       preferencesPrefix: _preferencesPrefix,
     );
@@ -1401,6 +1573,208 @@ final class _RestoreProcessHarnessHost {
     event.requireIdentifier('runId');
     event.requireExactString('receiptState', 'prepared');
   }
+
+  void _validateLegacyArchivingMarkerArmEvent(
+    _HarnessEvent event,
+    RestoreLegacyArchivingMarkerProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'leaseInstanceId',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'committed');
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (event.requireProcessId('coldAckProcessId') != event.pid) {
+      throw StateError('restore_legacy_archiving_marker_arm_ack_pid');
+    }
+    if (event.requireIdentifier('coldAckLeaseInstanceId') != leaseInstanceId) {
+      throw StateError('restore_legacy_archiving_marker_arm_ack_lease');
+    }
+    event.requireSha256('coldAckChecksum');
+    event.requireSha256('terminalReceiptChecksum');
+    if (event.requireInt('settingsMutationAttempts') < 1) {
+      throw StateError('restore_legacy_archiving_marker_arm_settings_mutation');
+    }
+  }
+
+  void _validateLegacyArchivingMarkerKillEvent(
+    _HarnessEvent event,
+    RestoreLegacyArchivingMarkerProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int armProcessId,
+    required String armLeaseInstanceId,
+    required String expectedAckChecksum,
+    required String terminalReceiptChecksum,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'readyForKill',
+      phaseSpecificKeys: const {
+        'marker',
+        'runId',
+        'leaseInstanceId',
+        'observedReceiptState',
+        'legacyPublishingMarkerRemoved',
+        'coldAckProcessId',
+        'coldAckLeaseInstanceId',
+        'coldAckChecksum',
+        'terminalReceiptChecksum',
+        'settingsMutationAttempts',
+        'operationKind',
+        'boundary',
+        'workspaceRootPath',
+        'temporaryPath',
+        'canonicalPath',
+        'activeRunPath',
+        'temporaryContents',
+      },
+    );
+    event.requireExactString('marker', control.failpoint.name);
+    event.requireExactString('runId', runId);
+    event.requireExactString('observedReceiptState', 'committed');
+    if (event.pid == armProcessId) {
+      throw StateError('restore_legacy_archiving_marker_kill_pid_reused');
+    }
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (leaseInstanceId == armLeaseInstanceId) {
+      throw StateError('restore_legacy_archiving_marker_kill_lease_reused');
+    }
+    if (!event.requireBool('legacyPublishingMarkerRemoved')) {
+      throw StateError(
+        'restore_legacy_archiving_marker_publishing_marker_present',
+      );
+    }
+    if (event.requireProcessId('coldAckProcessId') != armProcessId ||
+        event.requireIdentifier('coldAckLeaseInstanceId') !=
+            armLeaseInstanceId ||
+        event.requireSha256('coldAckChecksum') != expectedAckChecksum ||
+        event.requireSha256('terminalReceiptChecksum') !=
+            terminalReceiptChecksum) {
+      throw StateError('restore_legacy_archiving_marker_kill_ack');
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError(
+        'restore_legacy_archiving_marker_kill_settings_mutation',
+      );
+    }
+    event.requireExactString('operationKind', 'legacyArchivingMarkerAfter');
+    event.requireExactString(
+      'boundary',
+      _legacyArchivingMarkerBoundaryName(control.failpoint),
+    );
+    final workspace = p.join(
+      p.normalize(p.absolute(control.appDataDirectory.path)),
+      '.kelivo_restore',
+    );
+    event.requirePath('workspaceRootPath', expected: workspace);
+    event.requirePath(
+      'temporaryPath',
+      expected: p.join(workspace, '.active_run.archiving.tmp'),
+    );
+    event.requirePath(
+      'canonicalPath',
+      expected: p.join(workspace, '.active_run.archiving'),
+    );
+    event.requirePath(
+      'activeRunPath',
+      expected: p.join(workspace, 'run_$runId'),
+    );
+    final temporaryContents = event.json['temporaryContents'];
+    final expectedTemporaryContents =
+        control.failpoint ==
+            RestoreLegacyArchivingMarkerProcessFailpoint
+                .archivingMarkerEmptyRestricted
+        ? ''
+        : runId;
+    if (temporaryContents is! String ||
+        temporaryContents != expectedTemporaryContents) {
+      throw const FormatException(
+        'restore_legacy_archiving_marker_temporary_contents',
+      );
+    }
+  }
+
+  void _validateLegacyArchivingMarkerVerifyEvent(
+    _HarnessEvent event,
+    RestoreLegacyArchivingMarkerProcessHarnessControl control,
+    _ManagedProcess process, {
+    required String runId,
+    required int expectedAckProcessId,
+    required String expectedAckLeaseInstanceId,
+    required String expectedAckChecksum,
+    required Set<int> priorProcessIds,
+    required Set<String> priorLeaseInstanceIds,
+  }) {
+    event.requireCommon(
+      control,
+      process,
+      expectedStatus: 'completed',
+      phaseSpecificKeys: const {
+        'runId',
+        'receiptState',
+        'gateResult',
+        'archiveState',
+        'observedAckProcessId',
+        'observedAckLeaseInstanceId',
+        'observedAckChecksum',
+        'leaseInstanceId',
+        'settingsMutationAttempts',
+      },
+    );
+    event.requireExactString('runId', runId);
+    event.requireExactString('receiptState', 'committed');
+    event.requireExactString('gateResult', 'committed');
+    event.requireExactString('archiveState', 'archived');
+    if (event.requireProcessId('observedAckProcessId') !=
+            expectedAckProcessId ||
+        event.requireIdentifier('observedAckLeaseInstanceId') !=
+            expectedAckLeaseInstanceId ||
+        event.requireSha256('observedAckChecksum') != expectedAckChecksum) {
+      throw StateError('restore_legacy_archiving_marker_verify_ack');
+    }
+    if (priorProcessIds.length != 2 || priorProcessIds.contains(event.pid)) {
+      throw StateError('restore_legacy_archiving_marker_verify_pid_reused');
+    }
+    final leaseInstanceId = event.requireIdentifier('leaseInstanceId');
+    if (priorLeaseInstanceIds.length != 2 ||
+        priorLeaseInstanceIds.contains(leaseInstanceId) ||
+        leaseInstanceId == expectedAckLeaseInstanceId) {
+      throw StateError('restore_legacy_archiving_marker_verify_lease_reused');
+    }
+    if (event.requireInt('settingsMutationAttempts') != 0) {
+      throw StateError(
+        'restore_legacy_archiving_marker_verify_settings_mutation',
+      );
+    }
+  }
+
+  String _legacyArchivingMarkerBoundaryName(
+    RestoreLegacyArchivingMarkerProcessFailpoint failpoint,
+  ) => switch (failpoint) {
+    RestoreLegacyArchivingMarkerProcessFailpoint
+        .archivingMarkerEmptyRestricted =>
+      'emptyRestricted',
+    RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerTempDurable =>
+      'tempDurable',
+    RestoreLegacyArchivingMarkerProcessFailpoint.archivingMarkerPublished =>
+      'published',
+  };
 
   void _validateTerminalArmEvent(
     _HarnessEvent event,
@@ -2999,6 +3373,8 @@ int _controlVersion(RestoreHarnessControl control) => switch (control) {
     RestoreRollbackProcessHarnessControl.version,
   RestoreRolledBackTerminalProcessHarnessControl() =>
     RestoreRolledBackTerminalProcessHarnessControl.version,
+  RestoreLegacyArchivingMarkerProcessHarnessControl() =>
+    RestoreLegacyArchivingMarkerProcessHarnessControl.version,
   _ => throw StateError('restore_harness_control_runtime_type'),
 };
 

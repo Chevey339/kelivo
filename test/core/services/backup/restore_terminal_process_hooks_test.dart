@@ -279,6 +279,343 @@ void main() {
     });
   });
 
+  group('legacy archiving marker durability matcher', () {
+    late Directory temporary;
+    late Directory workspaceRoot;
+    late Directory activeRun;
+    late Directory completedRun;
+    late File archivingTemporary;
+    late File archivingCanonical;
+
+    setUp(() async {
+      temporary = await Directory.systemTemp.createTemp(
+        'kelivo_restore_legacy_archiving_hook_',
+      );
+      workspaceRoot = Directory(
+        p.join(temporary.path, RestoreWorkspaceLock.workspaceRootName),
+      );
+      activeRun = Directory(p.join(workspaceRoot.path, 'run_$_runId'));
+      completedRun = Directory(
+        p.join(
+          workspaceRoot.path,
+          RestoreWorkspaceLock.completedRunsDirectoryName,
+          'run_$_runId',
+        ),
+      );
+      archivingTemporary = File(
+        p.join(
+          workspaceRoot.path,
+          RestoreWorkspaceLock.archivingRunTemporaryFileName,
+        ),
+      );
+      archivingCanonical = File(
+        p.join(workspaceRoot.path, RestoreWorkspaceLock.archivingRunFileName),
+      );
+      await completedRun.parent.create(recursive: true);
+      await activeRun.create();
+    });
+
+    tearDown(() async {
+      if (await temporary.exists()) {
+        await temporary.delete(recursive: true);
+      }
+    });
+
+    test('matches empty, durable, and published marker boundaries', () async {
+      final emptyMatcher = _legacyArchivingMatcher(
+        workspaceRoot,
+        RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+      );
+      final durableMatcher = _legacyArchivingMatcher(
+        workspaceRoot,
+        RestoreLegacyArchivingMarkerBoundary.tempDurable,
+      );
+      final publishedMatcher = _legacyArchivingMatcher(
+        workspaceRoot,
+        RestoreLegacyArchivingMarkerBoundary.published,
+      );
+      await archivingTemporary.create();
+
+      final emptyObservation = await emptyMatcher.matchFileRestriction(
+        file: archivingTemporary,
+      );
+      expect(emptyObservation, isA<RestoreLegacyArchivingMarkerObservation>());
+      final empty =
+          emptyObservation! as RestoreLegacyArchivingMarkerObservation;
+      expect(
+        empty.boundary,
+        RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+      );
+      expect(empty.runId, _runId);
+      expect(empty.workspaceRootPath, workspaceRoot.path);
+      expect(empty.temporaryPath, archivingTemporary.path);
+      expect(empty.canonicalPath, archivingCanonical.path);
+      expect(empty.activeRunPath, activeRun.path);
+      expect(empty.temporaryContents, isEmpty);
+
+      await archivingTemporary.writeAsString(_runId);
+      final durableObservation = await durableMatcher.matchFileSync(
+        file: archivingTemporary,
+        fullBarrier: true,
+      );
+      expect(
+        durableObservation,
+        isA<RestoreLegacyArchivingMarkerObservation>(),
+      );
+      final durable =
+          durableObservation! as RestoreLegacyArchivingMarkerObservation;
+      expect(
+        durable.boundary,
+        RestoreLegacyArchivingMarkerBoundary.tempDurable,
+      );
+      expect(durable.temporaryContents, _runId);
+
+      final publishedObservation = await publishedMatcher.matchRename(
+        source: archivingTemporary,
+        targetPath: archivingCanonical.path,
+      );
+      expect(
+        publishedObservation,
+        isA<RestoreLegacyArchivingMarkerObservation>(),
+      );
+      final published =
+          publishedObservation! as RestoreLegacyArchivingMarkerObservation;
+      expect(
+        published.boundary,
+        RestoreLegacyArchivingMarkerBoundary.published,
+      );
+      expect(published.temporaryContents, _runId);
+    });
+
+    test(
+      'rejects non-full, wrong paths, bad contents, and unsafe topology',
+      () async {
+        final emptyMatcher = _legacyArchivingMatcher(
+          workspaceRoot,
+          RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+        );
+        final durableMatcher = _legacyArchivingMatcher(
+          workspaceRoot,
+          RestoreLegacyArchivingMarkerBoundary.tempDurable,
+        );
+        final publishedMatcher = _legacyArchivingMatcher(
+          workspaceRoot,
+          RestoreLegacyArchivingMarkerBoundary.published,
+        );
+        final wrongPath = File(
+          p.join(
+            temporary.path,
+            RestoreWorkspaceLock.archivingRunTemporaryFileName,
+          ),
+        );
+        await wrongPath.create();
+
+        expect(
+          await emptyMatcher.matchFileRestriction(file: wrongPath),
+          isNull,
+        );
+        expect(
+          await emptyMatcher.matchFileRestriction(file: archivingTemporary),
+          isNull,
+        );
+
+        await Directory(archivingTemporary.path).create();
+        expect(
+          await emptyMatcher.matchFileRestriction(file: archivingTemporary),
+          isNull,
+        );
+        await Directory(archivingTemporary.path).delete();
+        if (!Platform.isWindows) {
+          final linkTarget = File(p.join(temporary.path, 'link_target'));
+          await linkTarget.create();
+          await Link(archivingTemporary.path).create(linkTarget.path);
+          expect(
+            await emptyMatcher.matchFileRestriction(file: archivingTemporary),
+            isNull,
+          );
+          await Link(archivingTemporary.path).delete();
+        }
+
+        await archivingTemporary.create();
+        await archivingTemporary.writeAsString('truncated');
+        expect(
+          await durableMatcher.matchFileSync(
+            file: archivingTemporary,
+            fullBarrier: true,
+          ),
+          isNull,
+        );
+        await archivingTemporary.writeAsString(_runId);
+        expect(
+          await durableMatcher.matchFileSync(
+            file: archivingTemporary,
+            fullBarrier: false,
+          ),
+          isNull,
+        );
+        expect(
+          await durableMatcher.matchFileSync(
+            file: wrongPath,
+            fullBarrier: true,
+          ),
+          isNull,
+        );
+        expect(
+          await publishedMatcher.matchRename(
+            source: archivingTemporary,
+            targetPath: '${archivingCanonical.path}.wrong',
+          ),
+          isNull,
+        );
+
+        await archivingCanonical.writeAsString(_runId);
+        expect(
+          await durableMatcher.matchFileSync(
+            file: archivingTemporary,
+            fullBarrier: true,
+          ),
+          isNull,
+        );
+        await archivingCanonical.delete();
+
+        final publishingMarker = File(
+          p.join(
+            workspaceRoot.path,
+            RestoreWorkspaceLock.publishingRunFileName,
+          ),
+        );
+        await publishingMarker.writeAsString(_runId);
+        expect(
+          await publishedMatcher.matchRename(
+            source: archivingTemporary,
+            targetPath: archivingCanonical.path,
+          ),
+          isNull,
+        );
+        await publishingMarker.delete();
+
+        await activeRun.delete();
+        expect(
+          await durableMatcher.matchFileSync(
+            file: archivingTemporary,
+            fullBarrier: true,
+          ),
+          isNull,
+        );
+        await activeRun.create();
+        await completedRun.create();
+        expect(
+          await publishedMatcher.matchRename(
+            source: archivingTemporary,
+            targetPath: archivingCanonical.path,
+          ),
+          isNull,
+        );
+      },
+    );
+
+    test(
+      'notifies empty and published boundaries after delegate success',
+      () async {
+        await archivingTemporary.create();
+        final restrictDelegate = _ControllableDurability();
+        final restricted = Completer<RestoreLegacyArchivingMarkerObservation>();
+        final restrictHook = OneShotBlockingRestoreDurability(
+          delegate: restrictDelegate,
+          matcher: _legacyArchivingMatcher(
+            workspaceRoot,
+            RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+          ),
+          onMatched: (observation) async {
+            expect(restrictDelegate.fileRestrictionCompleted, isTrue);
+            restricted.complete(
+              observation as RestoreLegacyArchivingMarkerObservation,
+            );
+          },
+        );
+
+        final blockedRestriction = restrictHook.restrictFile(
+          archivingTemporary,
+        );
+        expect(
+          (await restricted.future).boundary,
+          RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+        );
+        expect(restrictHook.didMatch, isTrue);
+        expect(blockedRestriction, doesNotComplete);
+
+        await archivingTemporary.writeAsString(_runId);
+        final renameDelegate = _ControllableDurability();
+        final published = Completer<RestoreLegacyArchivingMarkerObservation>();
+        final renameHook = OneShotBlockingRestoreDurability(
+          delegate: renameDelegate,
+          matcher: _legacyArchivingMatcher(
+            workspaceRoot,
+            RestoreLegacyArchivingMarkerBoundary.published,
+          ),
+          onMatched: (observation) async {
+            expect(renameDelegate.renameCompleted, isTrue);
+            published.complete(
+              observation as RestoreLegacyArchivingMarkerObservation,
+            );
+          },
+        );
+
+        final blockedRename = renameHook.renameAndSync(
+          source: archivingTemporary,
+          targetPath: archivingCanonical.path,
+        );
+        expect(
+          (await published.future).boundary,
+          RestoreLegacyArchivingMarkerBoundary.published,
+        );
+        expect(renameHook.didMatch, isTrue);
+        expect(blockedRename, doesNotComplete);
+
+        final failedRestrictionDelegate = _ControllableDurability(
+          failFileRestriction: true,
+        );
+        var restrictionCallbackCalled = false;
+        final failedRestrictionHook = OneShotBlockingRestoreDurability(
+          delegate: failedRestrictionDelegate,
+          matcher: _legacyArchivingMatcher(
+            workspaceRoot,
+            RestoreLegacyArchivingMarkerBoundary.emptyRestricted,
+          ),
+          onMatched: (_) async => restrictionCallbackCalled = true,
+        );
+        await archivingTemporary.writeAsString('');
+        await expectLater(
+          failedRestrictionHook.restrictFile(archivingTemporary),
+          throwsStateError,
+        );
+        expect(restrictionCallbackCalled, isFalse);
+        expect(failedRestrictionHook.didMatch, isFalse);
+
+        await archivingTemporary.writeAsString(_runId);
+        final failedRenameDelegate = _ControllableDurability(failRename: true);
+        var renameCallbackCalled = false;
+        final failedRenameHook = OneShotBlockingRestoreDurability(
+          delegate: failedRenameDelegate,
+          matcher: _legacyArchivingMatcher(
+            workspaceRoot,
+            RestoreLegacyArchivingMarkerBoundary.published,
+          ),
+          onMatched: (_) async => renameCallbackCalled = true,
+        );
+        await expectLater(
+          failedRenameHook.renameAndSync(
+            source: archivingTemporary,
+            targetPath: archivingCanonical.path,
+          ),
+          throwsStateError,
+        );
+        expect(renameCallbackCalled, isFalse);
+        expect(failedRenameHook.didMatch, isFalse);
+      },
+    );
+  });
+
   group('terminal workspace sync matcher', () {
     late Directory temporary;
     late Directory workspaceRoot;
@@ -523,6 +860,17 @@ RestoreColdAckPublishedMatcher _publishMatcher(Directory runDirectory) {
   );
 }
 
+RestoreLegacyArchivingMarkerMatcher _legacyArchivingMatcher(
+  Directory workspaceRoot,
+  RestoreLegacyArchivingMarkerBoundary boundary,
+) {
+  return RestoreLegacyArchivingMarkerMatcher(
+    workspaceRootPath: workspaceRoot.path,
+    runId: _runId,
+    boundary: boundary,
+  );
+}
+
 RestoreSettingsColdAck _coldAck({
   String terminalReceiptChecksum = _receiptChecksum,
   RestoreSettingsColdAckExpected expected =
@@ -566,22 +914,38 @@ Future<File> _writeColdAckTemporary(
 }
 
 final class _ControllableDurability implements RestoreDurability {
-  _ControllableDurability({this.failFileSync = false});
+  _ControllableDurability({
+    this.failFileSync = false,
+    this.failFileRestriction = false,
+    this.failRename = false,
+  });
 
   final bool failFileSync;
+  final bool failFileRestriction;
+  final bool failRename;
   bool fileSyncCompleted = false;
+  bool fileRestrictionCompleted = false;
+  bool renameCompleted = false;
 
   @override
   Future<void> renameAndSync({
     required FileSystemEntity source,
     required String targetPath,
-  }) async {}
+  }) async {
+    if (failRename) throw StateError('injected_rename_failure');
+    renameCompleted = true;
+  }
 
   @override
   Future<void> restrictDirectory(Directory directory) async {}
 
   @override
-  Future<void> restrictFile(File file) async {}
+  Future<void> restrictFile(File file) async {
+    if (failFileRestriction) {
+      throw StateError('injected_file_restriction_failure');
+    }
+    fileRestrictionCompleted = true;
+  }
 
   @override
   Future<void> syncDirectory(

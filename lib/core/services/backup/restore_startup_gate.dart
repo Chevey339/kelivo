@@ -71,15 +71,17 @@ final class RestoreStartupGate {
     return workspaceLock.synchronized(
       () => _inspectLocked(
         appDataDirectory: appDataDirectory,
-        workspaceRoot: workspaceLock.workspaceRoot,
+        workspaceLock: workspaceLock,
       ),
     );
   }
 
   static Future<PendingRestoreRun?> _inspectLocked({
     required Directory appDataDirectory,
-    required Directory workspaceRoot,
+    required RestoreWorkspaceLock workspaceLock,
+    bool allowArchivingArtifactReconcile = true,
   }) async {
+    final workspaceRoot = workspaceLock.workspaceRoot;
     final rootType = await FileSystemEntity.type(
       workspaceRoot.path,
       followLinks: false,
@@ -94,6 +96,7 @@ final class RestoreStartupGate {
     Directory? runDirectory;
     String? directoryRunId;
     Directory? completedRunsRoot;
+    File? archivingTemporary;
     await for (final entity in workspaceRoot.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -119,6 +122,12 @@ final class RestoreStartupGate {
         markerFileName = name;
         continue;
       }
+      if (name == RestoreWorkspaceLock.archivingRunTemporaryFileName &&
+          type == FileSystemEntityType.file &&
+          archivingTemporary == null) {
+        archivingTemporary = File(entity.path);
+        continue;
+      }
       final match = RegExp(_runPattern).firstMatch(name);
       if (match != null &&
           type == FileSystemEntityType.directory &&
@@ -130,14 +139,28 @@ final class RestoreStartupGate {
       throw StateError('restore_startup_workspace_entry');
     }
 
-    if (markerFile == null && runDirectory == null) return null;
+    if (markerFile == null &&
+        runDirectory == null &&
+        archivingTemporary == null) {
+      return null;
+    }
     if (markerFile != null && markerFileName == null) {
       throw StateError('restore_startup_run_topology');
     }
+    if (markerFile != null && archivingTemporary != null) {
+      throw StateError('restore_startup_archiving_artifact_collision');
+    }
 
-    final markerRunId = markerFile == null
-        ? null
-        : await _readRunId(markerFile);
+    String? markerRunId;
+    var malformedArchivingMarker = false;
+    if (markerFile != null) {
+      if (markerFileName == RestoreWorkspaceLock.archivingRunFileName &&
+          await markerFile.length() < 32) {
+        malformedArchivingMarker = true;
+      } else {
+        markerRunId = await _readRunId(markerFile);
+      }
+    }
     if (runDirectory == null || directoryRunId == null) {
       if (markerFileName != RestoreWorkspaceLock.archivingRunFileName ||
           markerRunId == null ||
@@ -223,6 +246,25 @@ final class RestoreStartupGate {
         receipt: receipt,
       );
     }
+    final artifactFileName = archivingTemporary != null
+        ? RestoreWorkspaceLock.archivingRunTemporaryFileName
+        : malformedArchivingMarker
+        ? RestoreWorkspaceLock.archivingRunFileName
+        : null;
+    if (artifactFileName != null) {
+      if (!terminal || !allowArchivingArtifactReconcile) {
+        throw StateError('restore_startup_archiving_artifact_topology');
+      }
+      await workspaceLock.reconcileLegacyArchivingArtifactWhileWorkspaceLocked(
+        runId: runId,
+        artifactFileName: artifactFileName,
+      );
+      return _inspectLocked(
+        appDataDirectory: appDataDirectory,
+        workspaceLock: workspaceLock,
+        allowArchivingArtifactReconcile: false,
+      );
+    }
     return PendingRestoreRun(
       runId: runId,
       markerFileName: markerFileName,
@@ -278,7 +320,7 @@ final class RestoreStartupGate {
         if (discardedUnpublished) {
           final remaining = await _inspectLocked(
             appDataDirectory: appDataDirectory,
-            workspaceRoot: workspaceLock.workspaceRoot,
+            workspaceLock: workspaceLock,
           );
           if (remaining != null) {
             throw StateError('restore_startup_unpublished_discard');
@@ -287,7 +329,7 @@ final class RestoreStartupGate {
         }
         final pending = await _inspectLocked(
           appDataDirectory: appDataDirectory,
-          workspaceRoot: workspaceLock.workspaceRoot,
+          workspaceLock: workspaceLock,
         );
         if (pending == null) return null;
         final executor = RestoreCutoverExecutor(

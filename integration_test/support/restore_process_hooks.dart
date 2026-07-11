@@ -18,6 +18,12 @@ enum RestoreReceiptDurabilityBoundary { tempDurable, published }
 
 enum RestoreColdAckDurabilityBoundary { tempDurable, published }
 
+enum RestoreLegacyArchivingMarkerBoundary {
+  emptyRestricted,
+  tempDurable,
+  published,
+}
+
 enum RestoreTerminalWorkspaceSyncBoundary {
   completedRunsRootDurable,
   archivingMarkerRemovedDurable,
@@ -102,6 +108,27 @@ final class RestoreColdAckDurabilityObservation
   final String? targetPath;
 }
 
+final class RestoreLegacyArchivingMarkerObservation
+    extends RestoreDurabilityObservation {
+  const RestoreLegacyArchivingMarkerObservation({
+    required this.boundary,
+    required this.runId,
+    required this.workspaceRootPath,
+    required this.temporaryPath,
+    required this.canonicalPath,
+    required this.activeRunPath,
+    required this.temporaryContents,
+  });
+
+  final RestoreLegacyArchivingMarkerBoundary boundary;
+  final String runId;
+  final String workspaceRootPath;
+  final String temporaryPath;
+  final String canonicalPath;
+  final String activeRunPath;
+  final String temporaryContents;
+}
+
 final class RestoreTerminalWorkspaceSyncObservation
     extends RestoreDurabilityObservation {
   const RestoreTerminalWorkspaceSyncObservation({
@@ -125,6 +152,10 @@ final class RestoreTerminalWorkspaceSyncObservation
 
 abstract class RestoreDurabilityMatcher {
   const RestoreDurabilityMatcher();
+
+  Future<RestoreDurabilityObservation?> matchFileRestriction({
+    required File file,
+  }) async => null;
 
   Future<RestoreDurabilityObservation?> matchRename({
     required FileSystemEntity source,
@@ -461,6 +492,141 @@ final class RestoreColdAckPublishedMatcher extends RestoreDurabilityMatcher {
   }
 }
 
+final class RestoreLegacyArchivingMarkerMatcher
+    extends RestoreDurabilityMatcher {
+  factory RestoreLegacyArchivingMarkerMatcher({
+    required String workspaceRootPath,
+    required String runId,
+    required RestoreLegacyArchivingMarkerBoundary boundary,
+  }) {
+    return RestoreLegacyArchivingMarkerMatcher._(
+      workspaceRootPath: _requireWorkspaceRootPath(workspaceRootPath),
+      runId: _requireRunId(runId),
+      boundary: boundary,
+    );
+  }
+
+  RestoreLegacyArchivingMarkerMatcher._({
+    required this.workspaceRootPath,
+    required this.runId,
+    required this.boundary,
+  }) : temporaryPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.archivingRunTemporaryFileName,
+       ),
+       canonicalPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.archivingRunFileName,
+       ),
+       activeRunPath = p.join(workspaceRootPath, 'run_$runId'),
+       completedRunsRootPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.completedRunsDirectoryName,
+       ),
+       completedRunPath = p.join(
+         workspaceRootPath,
+         RestoreWorkspaceLock.completedRunsDirectoryName,
+         'run_$runId',
+       );
+
+  final String workspaceRootPath;
+  final String runId;
+  final RestoreLegacyArchivingMarkerBoundary boundary;
+  final String temporaryPath;
+  final String canonicalPath;
+  final String activeRunPath;
+  final String completedRunsRootPath;
+  final String completedRunPath;
+
+  @override
+  Future<RestoreDurabilityObservation?> matchFileRestriction({
+    required File file,
+  }) async {
+    if (boundary != RestoreLegacyArchivingMarkerBoundary.emptyRestricted ||
+        !p.equals(_normalizeObservedPath(file.path), temporaryPath)) {
+      return null;
+    }
+    return _matchExpectedTopology(expectedTemporaryContents: '');
+  }
+
+  @override
+  Future<RestoreDurabilityObservation?> matchFileSync({
+    required File file,
+    required bool fullBarrier,
+  }) async {
+    if (boundary != RestoreLegacyArchivingMarkerBoundary.tempDurable ||
+        !fullBarrier ||
+        !p.equals(_normalizeObservedPath(file.path), temporaryPath)) {
+      return null;
+    }
+    return _matchExpectedTopology(expectedTemporaryContents: runId);
+  }
+
+  @override
+  Future<RestoreDurabilityObservation?> matchRename({
+    required FileSystemEntity source,
+    required String targetPath,
+  }) async {
+    if (boundary != RestoreLegacyArchivingMarkerBoundary.published ||
+        source is! File ||
+        !p.equals(_normalizeObservedPath(source.path), temporaryPath) ||
+        !p.equals(_normalizeObservedPath(targetPath), canonicalPath)) {
+      return null;
+    }
+    return _matchExpectedTopology(expectedTemporaryContents: runId);
+  }
+
+  Future<RestoreLegacyArchivingMarkerObservation?> _matchExpectedTopology({
+    required String expectedTemporaryContents,
+  }) async {
+    final activeMarkerPath = p.join(
+      workspaceRootPath,
+      RestoreWorkspaceLock.activeRunFileName,
+    );
+    final publishingMarkerPath = p.join(
+      workspaceRootPath,
+      RestoreWorkspaceLock.publishingRunFileName,
+    );
+    final discardingMarkerPath = p.join(
+      workspaceRootPath,
+      RestoreWorkspaceLock.discardingRunFileName,
+    );
+    final types = await Future.wait([
+      FileSystemEntity.type(workspaceRootPath, followLinks: false),
+      FileSystemEntity.type(temporaryPath, followLinks: false),
+      FileSystemEntity.type(canonicalPath, followLinks: false),
+      FileSystemEntity.type(activeMarkerPath, followLinks: false),
+      FileSystemEntity.type(publishingMarkerPath, followLinks: false),
+      FileSystemEntity.type(discardingMarkerPath, followLinks: false),
+      FileSystemEntity.type(activeRunPath, followLinks: false),
+      FileSystemEntity.type(completedRunsRootPath, followLinks: false),
+      FileSystemEntity.type(completedRunPath, followLinks: false),
+    ]);
+    if (types[0] != FileSystemEntityType.directory ||
+        types[1] != FileSystemEntityType.file ||
+        types[2] != FileSystemEntityType.notFound ||
+        types[3] != FileSystemEntityType.notFound ||
+        types[4] != FileSystemEntityType.notFound ||
+        types[5] != FileSystemEntityType.notFound ||
+        types[6] != FileSystemEntityType.directory ||
+        types[7] != FileSystemEntityType.directory ||
+        types[8] != FileSystemEntityType.notFound) {
+      return null;
+    }
+    final contents = await _readStableRegularFile(File(temporaryPath));
+    if (contents == null || contents != expectedTemporaryContents) return null;
+    return RestoreLegacyArchivingMarkerObservation(
+      boundary: boundary,
+      runId: runId,
+      workspaceRootPath: workspaceRootPath,
+      temporaryPath: temporaryPath,
+      canonicalPath: canonicalPath,
+      activeRunPath: activeRunPath,
+      temporaryContents: contents,
+    );
+  }
+}
+
 final class RestoreTerminalWorkspaceSyncMatcher
     extends RestoreDurabilityMatcher {
   factory RestoreTerminalWorkspaceSyncMatcher({
@@ -606,7 +772,11 @@ final class OneShotBlockingRestoreDurability implements RestoreDurability {
       delegate.restrictDirectory(directory);
 
   @override
-  Future<void> restrictFile(File file) => delegate.restrictFile(file);
+  Future<void> restrictFile(File file) async {
+    await delegate.restrictFile(file);
+    final observation = await matcher.matchFileRestriction(file: file);
+    if (observation != null) await _notifyAndBlock(observation);
+  }
 
   @override
   Future<void> syncDirectory(
@@ -912,6 +1082,22 @@ Future<RestoreSettingsColdAck> _readCanonicalColdAck(File file) async {
     throw const FormatException('restore_harness_cold_ack_temp_canonical');
   }
   return ack;
+}
+
+Future<String?> _readStableRegularFile(File file) async {
+  if (await FileSystemEntity.type(file.path, followLinks: false) !=
+      FileSystemEntityType.file) {
+    return null;
+  }
+  final expectedLength = await file.length();
+  final contents = await file.readAsString();
+  if (await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.file ||
+      await file.length() != expectedLength ||
+      contents.length != expectedLength) {
+    return null;
+  }
+  return contents;
 }
 
 String _requireRunDirectoryPath(String path) {
