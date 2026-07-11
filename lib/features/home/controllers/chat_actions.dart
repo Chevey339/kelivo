@@ -162,20 +162,18 @@ class ChatActions {
     }
   }
 
-  Future<void> _updateIosBackgroundGeneration(
+  void _scheduleIosBackgroundGenerationUpdate(
     stream_ctrl.StreamingState state,
-  ) async {
+  ) {
     final l10n = _l10n;
     if (l10n == null) return;
-    try {
-      await IosBackgroundGenerationService.instance.update(
-        detail: l10n.iosBackgroundGenerationStreamingDetail,
-        tokenLabel: l10n.iosBackgroundGenerationTokenCount(state.totalTokens),
-        tokenCount: state.totalTokens,
-      );
-    } catch (error, stackTrace) {
-      _logIosBackgroundGenerationFailure('update', error, stackTrace);
-    }
+    IosBackgroundGenerationService.instance.scheduleUpdate(
+      detail: l10n.iosBackgroundGenerationStreamingDetail,
+      tokenLabel: l10n.iosBackgroundGenerationTokenCount(state.totalTokens),
+      tokenCount: state.totalTokens,
+      onError: (error, stackTrace) =>
+          _logIosBackgroundGenerationFailure('update', error, stackTrace),
+    );
   }
 
   Future<void> _finishIosBackgroundGeneration({
@@ -1411,7 +1409,7 @@ class ChatActions {
       await _finishReasoningOnContent(state);
     }
 
-    await _updateIosBackgroundGeneration(state);
+    _scheduleIosBackgroundGenerationUpdate(state);
 
     // Re-check before scheduling timer — timer creation after _finishStreaming
     // would create a new timer that periodically overwrites _messages[index]
