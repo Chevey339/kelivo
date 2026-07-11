@@ -560,42 +560,18 @@ class ChatService extends ChangeNotifier {
   /// so any persisted `isStreaming: true` is stale and must be cleared to
   /// avoid stuck loading indicators.
   ///
-  /// Uses a tracked set of streaming message IDs for O(1) lookup instead of
-  /// scanning every message in the box.
   Future<void> _resetStaleStreamingFlags() async {
-    try {
-      final ids = await _repo.getActiveStreamingIds();
-      if (ids.isEmpty) return;
-      for (final id in ids) {
-        final msg = _repo.getMessageSync(id);
-        if (msg != null && msg.isStreaming) {
-          await _repo.updateMessage(msg.copyWith(isStreaming: false));
-        }
-      }
-      await _repo.clearActiveStreamingIds();
-    } catch (_) {
-      // best-effort; ignore errors
-    }
+    await _repo.resetStaleStreamingState();
   }
 
   /// Record a message ID as actively streaming.
-  void _trackStreamingId(String messageId) {
-    try {
-      final ids = _repo.getActiveStreamingIds().then((value) => value.toList());
-      ids.then((list) {
-        if (!list.contains(messageId)) {
-          list.add(messageId);
-          _repo.setActiveStreamingIds(list);
-        }
-      });
-    } catch (_) {}
+  Future<void> _trackStreamingId(String messageId) async {
+    await _repo.trackActiveStreamingId(messageId);
   }
 
   /// Remove a message ID from the active streaming set.
-  void _untrackStreamingId(String messageId) {
-    try {
-      _repo.untrackActiveStreamingId(messageId);
-    } catch (_) {}
+  Future<void> _untrackStreamingId(String messageId) async {
+    await _repo.untrackActiveStreamingId(messageId);
   }
 
   Future<void> _cleanupOrphanUploads() async {
@@ -1023,7 +999,7 @@ class ChatService extends ChangeNotifier {
 
     // Track streaming state for crash-recovery cleanup
     if (isStreaming && !temporary) {
-      _trackStreamingId(message.id);
+      await _trackStreamingId(message.id);
     }
 
     conversation.messageIds.add(message.id);
@@ -1113,7 +1089,7 @@ class ChatService extends ChangeNotifier {
 
     // Update streaming tracking for crash-recovery
     if (isStreaming == false) {
-      _untrackStreamingId(messageId);
+      await _untrackStreamingId(messageId);
     }
 
     // Update cache
@@ -1178,7 +1154,7 @@ class ChatService extends ChangeNotifier {
 
     // Update streaming tracking for crash-recovery
     if (isStreaming == false) {
-      _untrackStreamingId(messageId);
+      await _untrackStreamingId(messageId);
     }
 
     // Update cache
@@ -1211,7 +1187,7 @@ class ChatService extends ChangeNotifier {
     await _repo.updateStreamingCheckpoint(message, toolEvents);
     _replaceCachedMessage(message);
     if (!message.isStreaming) {
-      _untrackStreamingId(message.id);
+      await _untrackStreamingId(message.id);
     }
   }
 

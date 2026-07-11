@@ -55,6 +55,28 @@ void main() {
     return service;
   }
 
+  test('cold init clears every stale streaming flag', () async {
+    final first = createService();
+    await first.init();
+    final conversation = await first.createConversation(title: 'Chat');
+    await first.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: 'partial',
+      isStreaming: true,
+    );
+    await first.close();
+    services.remove(first);
+
+    final restarted = createService();
+    await restarted.init();
+
+    final messages = restarted.getMessages(conversation.id);
+    expect(messages, hasLength(1));
+    expect(messages.single.content, 'partial');
+    expect(messages.single.isStreaming, isFalse);
+  });
+
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {
       final service = createService();

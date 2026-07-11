@@ -1182,11 +1182,34 @@ class ChatDatabaseRepository {
     )..where((t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds))).go();
   }
 
+  /// Clears every persisted streaming projection after a cold application start.
+  Future<void> resetStaleStreamingState() async {
+    await _db.transaction(() async {
+      await (_db.update(_db.messageRows)
+            ..where((row) => row.isStreaming.equals(true)))
+          .write(const MessageRowsCompanion(isStreaming: Value(false)));
+      await clearActiveStreamingIds();
+    });
+  }
+
   Future<void> untrackActiveStreamingId(String messageId) async {
-    final ids = await getActiveStreamingIds();
-    if (!ids.contains(messageId)) return;
-    final updated = ids.where((id) => id != messageId).toList(growable: false);
-    await setActiveStreamingIds(updated);
+    await _db.transaction(() async {
+      final ids = await getActiveStreamingIds();
+      if (!ids.contains(messageId)) return;
+      final updated = ids
+          .where((id) => id != messageId)
+          .toList(growable: false);
+      await setActiveStreamingIds(updated);
+    });
+  }
+
+  Future<void> trackActiveStreamingId(String messageId) async {
+    await _db.transaction(() async {
+      final ids = (await getActiveStreamingIds()).toList();
+      if (ids.contains(messageId)) return;
+      ids.add(messageId);
+      await setActiveStreamingIds(ids);
+    });
   }
 
   Future<void> markMigrationComplete() async {

@@ -117,5 +117,30 @@ void main() {
 
       expect(await repository.getMessagesByIds(const ['missing']), isEmpty);
     });
+
+    test('cold start 一次事务清理未登记 flag 和孤儿 tracking metadata', () async {
+      await repository.setActiveStreamingIds(const [
+        'different-message',
+        'missing-message',
+      ]);
+
+      await repository.resetStaleStreamingState();
+
+      final message = await repository.getMessage('streaming');
+      expect(message?.isStreaming, isFalse);
+      expect(await repository.getActiveStreamingIds(), isEmpty);
+    });
+
+    test('并发 generation 的 tracking 更新不会互相覆盖', () async {
+      await Future.wait([
+        repository.trackActiveStreamingId('first-stream'),
+        repository.trackActiveStreamingId('second-stream'),
+      ]);
+
+      expect(
+        await repository.getActiveStreamingIds(),
+        containsAll(['first-stream', 'second-stream']),
+      );
+    });
   });
 }
