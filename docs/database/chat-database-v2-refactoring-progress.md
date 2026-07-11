@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-10
-> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 的 P0-02 应用层实现已完成：运行期同卷 durable preparation 不改 live，启动 gate 以 operation-ahead 切换/回滚、PID+lease cold ACK 和 terminal archive 在业务开放前只放行完整 target/before；selected missing DB 与 unselected DB/assets 均有 commit/rollback 回归。macOS forward 25/25、两个 terminal projection 各 6/6、verified-origin rollback 18/18、legacy archiving marker 3/3 共累计 232 个成功 Runner phase、58 次外部 SIGKILL；新增 `terminalSettingsReadbackRecoveryMatrix` 以 2/2、8 个正常 Runner phase、0 kill（244.594 秒）显式验证 committed/target 与 rolledBack/before 混合设置可跨进程冷读修复、轮换 ACK 并在下一 Runner 零写归档。全部真实进程证据累计 240 phases/58 kills。raw write/rename/fsync/F_FULLFSYNC、硬件断电、资源故障、其余 rollback topology 的外部 kill 与其他平台继续由 OPS-02/DB2-07/P0-09/五平台门禁追踪，不因 P0-02 完成而视为已验证
+> - 最后更新：2026-07-10（PD-01～PD-13 决策已全部冻结，见 §5；PD-13 核实 SQLite v1 从未发布，公开迁移主源为 Hive → v2）
+> - 当前结论：正常备份使用自校验、默认排除应用已知认证凭据的 SQLite snapshot + settings/assets ZIP，不再生成 `chats.json`；旧 JSON ZIP 仍只读导入，迁移页灾难备份仍使用 JSON。v2 overwrite 的 P0-02 应用层实现已完成：运行期同卷 durable preparation 不改 live，启动 gate 以 operation-ahead 切换/回滚、PID+lease cold ACK 和 terminal archive 在业务开放前只放行完整 target/before；selected missing DB 与 unselected DB/assets 均有 commit/rollback 回归。macOS forward 25/25、两个 terminal projection 各 6/6、verified-origin rollback 18/18、legacy archiving marker 3/3 共累计 232 个成功 Runner phase、58 次外部 SIGKILL；新增 `terminalSettingsReadbackRecoveryMatrix` 以 2/2、8 个正常 Runner phase、0 kill（244.594 秒）显式验证 committed/target 与 rolledBack/before 混合设置可跨进程冷读修复、轮换 ACK 并在下一 Runner 零写归档。全部真实进程证据累计 240 phases/58 kills。P0-03 已将普通流式 content/reasoning/tool events 合并为单 writer latest-wins 事务 checkpoint：网络 chunk 不等待 SQLite commit，写入起始频率上限 4 次/秒，final/cancel/error 与切会话 flush 均有 barrier，消息更新不再逐次 read-before-write。raw write/rename/fsync/F_FULLFSYNC、硬件断电、资源故障、其余 rollback topology 的外部 kill 与其他平台继续由 OPS-02/DB2-07/P0-09/五平台门禁追踪，不因 P0-02/P0-03 完成而视为已验证
 
 ## 1. 文档使用规则
 
@@ -36,9 +36,9 @@
 | --- | ---: | --- | --- |
 | 架构与代码审计 | 6 / 6 | `已完成` | 数据完整性、消息版本、timeline/渲染、迁移、测试覆盖和目标架构已审计 |
 | 正式方案与进度文档 | 1 / 1 | `已完成` | 两份 Markdown 已创建并通过 whitespace、相对链接、ID 和表格结构检查 |
-| Phase 0：止血与基线 | 3 / 9 | `进行中` | P0-01/P0-02/P0-08 已完成；overwrite 主链、macOS 高层 SIGKILL、两种 terminal settings 部分态跨进程修复、selected missing 与 unselected payload 回归均通过；跨平台/raw durability 继续由 OPS/发布门禁追踪 |
+| Phase 0：止血与基线 | 4 / 9 | `进行中` | P0-01/P0-02/P0-03/P0-08 已完成；流式消息改为 ≤4 writes/s 的 latest-wins 单 writer + final barrier；跨平台/raw durability 继续由 OPS/发布门禁追踪 |
 | Phase 1：Database Kernel v2 | 0 / 8 | `未开始` | 尚未建立 v2 schema snapshot 或单一异步通路 |
-| Phase 2：Message Graph | 0 / 7 | `未开始` | 受 PD-01/02/04 和 PD-13 影响 |
+| Phase 2：Message Graph | 0 / 7 | `未开始` | PD-01/02/04/13 已冻结（真实分支 + Hive 主源），可在 Database Kernel 后进入实现 |
 | Phase 3：Generation State Machine | 0 / 7 | `未开始` | 依赖 Message Graph 与 Database Kernel |
 | Phase 4：Timeline 与 Renderer | 0 / 8 | `未开始` | 依赖逻辑 slot/cursor；不继续扩展物理 revision 滑窗 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
@@ -65,6 +65,7 @@
 | `flutter analyze` | `已完成` | No issues found | 2026-07-09 | 当前工作区静态分析通过 |
 | `flutter test` | `已完成` | 874 tests passed | 2026-07-09 | `b232ad8b` 提交前当前工作区全量测试通过 |
 | `flutter analyze` + `flutter test`（本轮 P0-02） | `已完成` | No issues found；1093/1093 tests passed | 2026-07-10 | 当前 macOS 主机全量通过；真实进程矩阵证据见下方独立宿主行，仍不等于硬件断电或其他平台验证 |
+| `flutter analyze` + `flutter test`（本轮 P0-03） | `已完成` | No issues found；1100/1100 tests passed | 2026-07-10 | 当前 macOS 主机全量通过；另有 checkpoint writer + repository + stream/controller 定向 31 项通过；按 Phase 0 范围纪律未运行真实进程/断电矩阵 |
 | `flutter build macos --debug` | `已完成` | Debug `kelivo.app` 构建成功 | 2026-07-10 | 覆盖 main 启动 gate、fail-closed/cold-restart shell、迁移提示 overlay 与桌面窗口接线；其他桌面/移动平台未由本机构建 |
 | 迁移、懒加载、滚动、版本选择、重生成上下文、流订阅等定向测试 | `已完成` | 73 tests passed | 2026-07-09 | 只证明现有断言成立，不覆盖审计反例 |
 | SQLite bundle/秘密边界/legacy/migration 灾备定向测试 | `已完成` | 55 tests passed | 2026-07-09 | 覆盖 snapshot round trip、manifest/hash/schema/count、秘密清洗、settings 补偿、同卷 staging/链接拒绝/空资源根、v2 merge 安全拒绝、旧 JSON 与迁移灾备兼容 |
@@ -234,19 +235,19 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 决策 | 当前推荐 | 状态 | 阻塞工作项 | 最终决定/证据 |
 | --- | --- | --- | --- | --- | --- |
-| PD-01 | 多版本是否采用真实分支 | 真实分支；旧未来保留在旧 branch | `未开始` | MSG-01～07 | — |
-| PD-02 | 编辑、重生成、删除 revision 后的后代策略 | 新建/切换 branch，旧后代延迟 GC | `未开始` | MSG-01、MSG-04 | — |
-| PD-03 | 中断输出的展示和重试策略 | 保留 partial，显示 interrupted，可重试/删除 | `未开始` | GEN-01～07 | — |
-| PD-04 | 在历史位置发送时的交互 | 创建 branch，不强制立即跳底部 | `未开始` | MSG-01、TL-03/04 | — |
-| PD-05 | 离开底部时的新内容提示 | 保持 anchor，显示“有新内容” | `未开始` | TL-04、TL-08 | — |
-| PD-06 | 搜索当前 branch 还是全部 revision | 默认当前 branch，可显式扩大范围 | `未开始` | OPS-04 | — |
-| PD-07 | 统计当前 branch 还是全部版本 | 分开呈现 active usage 与 total generation usage | `未开始` | OPS-05 | — |
-| PD-08 | 完整备份是否含失败/中断 revision 和全部 branch | 完整备份包含，便携导出可裁剪 | `未开始` | OPS-01～03 | — |
-| PD-09 | restore merge 的同 ID 冲突规则 | hash 相同去重，不同则 remap + report | `未开始` | P0-05、OPS-02/03 | — |
-| PD-10 | 旧 DB 保留期与清理授权 | 至少一次成功启动 + 明确保留周期 | `未开始` | DB2-06、OPS-08/09 | — |
-| PD-11 | 聊天 DB 加密和秘密导出政策 | 独立评估；普通备份排除秘密是无需等待该决定的安全底线 | `未开始` | OPS-07 | — |
-| PD-12 | 损坏数据恢复体验 | 只读恢复页 + rejects/脱敏诊断包 | `未开始` | DB2-06、OPS-02 | — |
-| PD-13 | SQLite v1 是否已发布给真实用户 | 以发布事实为准；若已发布，v1 为主源 | `未开始` | P0-09、DB2-01、MSG-05 | — |
+| PD-01 | 多版本是否采用真实分支 | 真实分支；旧未来保留在旧 branch | `已完成` | MSG-01～07 | 2026-07-10 冻结：真实分支；版本切换即 branch head 切换，`< n/m >` 控件；对齐 ChatGPT/Claude 语义。详见方案 §5.1 |
+| PD-02 | 编辑、重生成、删除 revision 后的后代策略 | 新建/切换 branch，旧后代延迟 GC | `已完成` | MSG-01、MSG-04 | 2026-07-10 冻结：编辑/重生成创建新 branch，不物理删除旧后代；删除为显式操作（删当前选中版本自动切最新剩余；删 slot 最后 revision 提示连带后代）；延迟批量 GC。详见方案 §5.1 |
+| PD-03 | 中断输出的展示和重试策略 | 保留 partial，显示 interrupted，可重试/删除 | `已完成` | GEN-01～07 | 2026-07-10 冻结：保留 partial + "已中断"标识 + 重新生成/删除；不做"继续生成"（provider 续写不可靠，列为 v2 后评估）。详见方案 §5.1 |
+| PD-04 | 在历史位置发送时的交互 | 创建 branch，不强制立即跳底部 | `已完成` | MSG-01、TL-03/04 | 2026-07-10 冻结：发送永远追加到 active leaf 并 programmaticJump 把新 user 消息置于 viewport 顶部附近；编辑历史消息走分支语义并保持原锚定。详见方案 §5.1/§7.4 |
+| PD-05 | 离开底部时的新内容提示 | 保持 anchor，显示“有新内容” | `已完成` | TL-04、TL-08 | 2026-07-10 冻结：绝不违背用户意图移动 viewport；滚动/选择文本/键盘/链接/搜索均退出尾随；"跳到最新"胶囊 + 流式指示；重开会话定位最后一条 user 消息。详见方案 §5.1/§7.4 |
+| PD-06 | 搜索当前 branch 还是全部 revision | 默认当前 branch，可显式扩大范围 | `已完成` | OPS-04 | 2026-07-10 冻结：默认 active branch，显式"包含所有版本"开关；结果携带 branch/revision identity。详见方案 §5.1 |
+| PD-07 | 统计当前 branch 还是全部版本 | 分开呈现 active usage 与 total generation usage | `已完成` | OPS-05 | 2026-07-10 冻结：默认 active branch 口径，同页另列全部生成消耗，两口径注明定义。详见方案 §5.1 |
+| PD-08 | 完整备份是否含失败/中断 revision 和全部 branch | 完整备份包含，便携导出可裁剪 | `已完成` | OPS-01～03 | 2026-07-10 冻结：完整备份含全部 branch/revision/run；便携导出默认 active branch + completed，可选全量。详见方案 §5.1 |
+| PD-09 | restore merge 的同 ID 冲突规则 | hash 相同去重，不同则 remap + report | `已完成` | P0-05、OPS-02/03 | 2026-07-10 冻结：hash 相同去重；不同则导入侧整会话 remap 新 ID + 用户可见冲突报告；绝不静默覆盖。详见方案 §5.1 |
+| PD-10 | 旧 DB 保留期与清理授权 | 至少一次成功启动 + 明确保留周期 | `已完成` | DB2-06、OPS-08/09 | 2026-07-10 冻结：≥3 次成功冷启动且 ≥30 天双条件；清理前可导出诊断包；清理写 retention receipt。详见方案 §5.1 |
+| PD-11 | 聊天 DB 加密和秘密导出政策 | 独立评估；普通备份排除秘密是无需等待该决定的安全底线 | `已完成` | OPS-07 | 2026-07-10 冻结：v2 不引入应用层 DB 加密，依赖平台沙箱；凭据迁入安全存储（OPS-07）；SQLCipher 列为 v2 后独立评估。详见方案 §5.1 |
+| PD-12 | 损坏数据恢复体验 | 只读恢复页 + rejects/脱敏诊断包 | `已完成` | DB2-06、OPS-02 | 2026-07-10 冻结：只读恢复页 + 诊断摘要 + 脱敏诊断包/rejects 导出 + 用户显式选择恢复或继续；绝不静默建空库。详见方案 §5.1 |
+| PD-13 | SQLite v1 是否已发布给真实用户 | 以发布事实为准；若已发布，v1 为主源 | `已完成` | P0-09、DB2-01、MSG-05 | 2026-07-10 以 git 证据核实：全部发布 tag（≤`v1.1.17`）与 `origin/master`/`origin/beta` 均无 drift/sqlite 依赖，v1 仅存在于未发布开发分支。公开迁移主源为 Hive → v2；v1→v2 仅开发机尽力迁移；不再向用户发布 v1。详见方案 §5.1/§9.1 |
 | PD-14 | 正常完整备份的聊天主数据格式 | SQLite 一致快照 ZIP；不再写 `chats.json` | `已完成` | P0-02、OPS-01～03 | `4d810e21`；2026-07-09 用户确认，旧 JSON 只读导入，迁移页灾难备份继续 JSON |
 
 ## 6. Phase 0：止血与基线
@@ -255,7 +256,7 @@ dart run tool/run_restore_process_harness.dart \
 | --- | --- | --- | --- | --- | --- | --- |
 | P0-01 | 恢复错误向上传播，移除假成功 | 无 | `已完成` | 任一聊天/设置/资源失败时 provider 返回失败且 live 数据不被误报成功 | `117f8386`（2026-07-09） | `flutter analyze`；`flutter test`（801）；相关定向 34 项通过 |
 | P0-02 | overwrite staging restore | 无 | `已完成` | 运行期 durable prepare 不改 live；下次启动在业务放行前收敛为完整新 bundle 或经验证旧 bundle，并跨冷启动确认 settings | 既有提交 + 本里程碑提交（2026-07-10） | DataSync v2 只生成同卷 selected-only candidate + prepared receipt；main/gate 持有 business lease，经 operation-ahead forward/rollingBack、PID+token cold ack 和 terminal archive 收敛。macOS 25/25 forward、两个 terminal projection 各 6/6、verified-origin rollback 18/18、legacy marker 3/3 共 232 phases/58 kills；settings readback 2/2 再增加 8 个正常 Runner phase，证明两种 terminal projection 的真实混合设置可跨进程修复、轮换 ACK、再冷启并零写归档。selected missing DB 与 unselected main/WAL/SHM/journal/assets 的 commit/rollback 回归通过。应用层验收完成；raw syscall/断电/资源故障/其他平台继续由 OPS-02、DB2-07、P0-09 和发布门禁追踪，不视为已验证 |
-| P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `未开始` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | — | — |
+| P0-03 | 单 writer latest-wins checkpoint + final barrier | 无 | `已完成` | 网络不等待 commit；≤4 writes/s + final；旧 checkpoint 不可越过 final | 本里程碑提交（2026-07-10） | content/reasoning/tool events 合为完整事务快照；250ms 最小写入起始间隔、in-flight latest-wins、final 丢弃 pending 并等待在途写；final/cancel/error/切会话 flush 均经过 barrier；repository 更新移除 read-before-write。`flutter analyze`；`flutter test`（1100）；相关定向 31 项通过 |
 | P0-04 | prepare/cancel/stale streaming 收尾 | 无 | `未开始` | prepare failure、off-window cancel、重启均无永久 loading | — | — |
 | P0-05 | 事务化 merge ID/order 与冲突诊断 | PD-09 | `进行中` | merge 不生成重复 ID/order；冲突有报告和确定性处理 | `900811ec`、`6c3618b8`（安全门） | 所有 v2 bundle merge（含 settings-only）在冲突/凭据语义完成前显式拒绝且不修改目标；hash 去重、remap、report 和事务化 merge 尚未实现 |
 | P0-06 | DB identity/installation receipt 与安全拒绝 | 无 | `未开始` | 既有 DB 缺失/损坏/版本过新时不自动创建或写入空库 | — | — |
@@ -440,8 +441,8 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 风险 | 严重度 | 检测方式 | 缓解/回滚 | 状态 |
 | --- | --- | --- | --- | --- | --- |
-| R-01 | Branch 产品语义未定导致 schema 返工 | 高 | PD-01/02/04 未批准 | Phase 2 前用交互实例批准 ADR | `未开始` |
-| R-02 | SQLite v1 已发布却错误以 Hive 为主源 | 高 | 发布记录/真实用户数据核对 | 先完成 PD-13；source precedence 测试 | `未开始` |
+| R-01 | Branch 产品语义未定导致 schema 返工 | 高 | PD-01/02/04 未批准 | PD-01/02/04 已于 2026-07-10 冻结；MSG-01 仍需交互实例 ADR | `进行中` |
+| R-02 | SQLite v1 已发布却错误以 Hive 为主源 | 高 | 发布记录/真实用户数据核对 | PD-13 已核实 v1 从未发布，Hive 即公开主源；开发机 v1/Hive 双源 precedence 仍需迁移测试 | `进行中` |
 | R-03 | v2 写入后直接回 previous 丢新消息 | 高 | 记录 cutover 后 write epoch | v2-compatible rollback build | `未开始` |
 | R-04 | Windows handle/杀软导致 swap 失败 | 高 | Windows failpoint/锁库测试 | 单一连接、关闭 handle、receipt 恢复 | `未开始` |
 | R-05 | `synchronous=FULL` 低端设备延迟 | 中 | 五平台 benchmark | 合并 checkpoint；公开记录取舍 | `未开始` |
@@ -460,28 +461,26 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-以下事项尚未阻塞 Phase 0 的全部工作，但会阻塞对应阶段进入实现或验收：
+PD-01～PD-14 已全部冻结（2026-07-10，见 §5 决策登记与方案 §5.1），产品决策不再阻塞任何阶段。剩余待输入：
 
-1. 确认 SQLite v1 是否已发布及覆盖的 app version（PD-13）。
-2. 确认真实 branch 与后代处理语义（PD-01/02）。
-3. 确认 interruption、历史位置发送和离底提示 UX（PD-03/04/05）。
-4. 指定五平台参考设备、最低支持 OS 和可用 CI runner。
-5. 确认旧数据库保留周期、恢复支持流程和清理授权（PD-10/12）。
-6. 确认秘密备份、平台安全存储和聊天数据库加密政策（PD-11）。
+1. 指定五平台参考设备、最低支持 OS 和可用 CI runner（阻塞 P0-09 基线冻结与 DB2-07）。
+2. MSG-01 仍需把已冻结的 PD-01/02/04 落成带交互实例的 ADR（实现口径，非产品决策）。
 
 ## 19. 下一步
 
 推荐下一轮只启动 Phase 0，不同时改消息图和 timeline：
 
 1. `P0-02` 应用层实现已完成；raw durability、资源故障、其余 topology 的外部 kill 和五平台验证继续留在 OPS-02、DB2-07、P0-09/发布门禁，不回填为 P0-02 未完成。
-2. 下一实施项是 `P0-03` 单 writer latest-wins checkpoint + final barrier；同时完成 PD-13 调查和 P0-09 fixture/性能基线。
-3. 按 PD-10/12 设计 completed evidence 的成功启动 acknowledgement、保留周期、脱敏诊断与可恢复清理；在此之前保留受限 evidence，不无记录删除 previous。
-4. 保留旧 `chats.json` 只读 adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 做 OOM/坏数据回归。`P0-05` v2 merge 继续安全拒绝，待 PD-09 后单独实现 hash 去重、remap 与 report。
+2. `P0-03` 已完成；下一实施项是 `P0-04`，覆盖 prepare failure、off-window cancel 与启动 stale streaming 的确定性收尾。PD-13 已核实（Hive 为公开主源），P0-09 fixture/性能基线可并行启动。
+3. 按已冻结的 PD-10（≥3 次成功冷启动且 ≥30 天）/PD-12（只读恢复页）实现 completed evidence 的成功启动 acknowledgement、保留周期、脱敏诊断与可恢复清理；在此之前保留受限 evidence，不无记录删除 previous。
+4. 保留旧 `chats.json` 只读 adapter 与迁移页 JSON 灾难备份；用真实 legacy fixture 做 OOM/坏数据回归。`P0-05` v2 merge 按已冻结的 PD-09（hash 去重 + remap + 冲突报告）实现，实现前继续安全拒绝。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-10 | 完成单 writer latest-wins 流式 checkpoint：普通 content/reasoning/tool events 在内存聚合为完整快照，网络 chunk 只入队不等待 SQLite；writer 以 250ms 最小起始间隔限制为 ≤4 writes/s，在途写期间只保留最新 pending。final/cancel/error 关闭入队、丢弃被终态覆盖的 pending、等待旧写后提交 final；切会话 flush 走同一 barrier。repository 使用直接 UPDATE，消息与 tool events 单事务提交，移除逐 checkpoint read-before-write；checkpoint 失败可观察，后续 chunk/flush 失败上抛，成功 final 可恢复。按 Phase 0 范围纪律仅做逻辑/集成验收：定向 31 项、全量 1100 项与 analyze 通过，未复制真实进程矩阵 | P0-03 | 本里程碑提交 | Codex |
+| 2026-07-10 | 冻结 PD-01～PD-13 全部产品决策：真实分支（PD-01/02）、interrupted 保留 partial 不做继续生成（PD-03）、发送追加 leaf + 新轮次置顶（PD-04）、绝不违背用户意图移动 viewport 的滚动合同（PD-05，对齐 shadcn Scroll Engineering/ChatGPT/Claude）、搜索/统计默认 active branch（PD-06/07）、完整备份全量（PD-08）、merge hash 去重 + remap（PD-09）、双条件保留期（PD-10）、v2 不做 DB 加密（PD-11）、只读恢复页（PD-12）；并以 git 证据核实 SQLite v1 从未发布（PD-13），公开迁移主源改为 Hive → v2，方案 §5.1/§7.4/§9.1/§10/§15 同步修订 | PD-01～13、MSG-01、TL-04 | 本次文档提交 | 用户 / Fable |
 | 2026-07-10 | 完成 P0-02 应用层验收收尾：新增 `terminalSettingsReadbackRecoveryMatrix` v1，以四个隔离 Runner 正常退出方式一次完整通过 committed/target 与 rolledBack/before 两种真实混合设置的 2/2、8 phases、0 kill（244.594 秒）；R3 新 PID/token 冷读后必须有写修复并轮换 ACK，R4 mutation rejector 零写归档。新增 selected old DB family missing 与 settings-only/unselected main+WAL+SHM+journal+四类 assets 的 commit/rollback 回归，control+topology 29/29。真实进程累计 240 phases/58 kills。P0-02 标记完成；raw syscall/断电/资源故障/其余 topology 外部 kill/五平台继续由 OPS-02、DB2-07、P0-09 和发布门禁跟踪，不视为已验证 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-10 | 将 legacy markerless terminal 的 archiving marker 从直接 create/write canonical 改为 fixed temp 的 restrict→write/full barrier→readback→`renameAndSync`→canonical readback；startup 仅在唯一 active terminal、无 completed 同 ID/碰撞/未知项且 artifact 为空或匹配 runId 前缀时耐久删除并重扫，错误前缀/ID、temp+canonical 与非终态保留现场 fail-closed。新增独立 `legacyArchivingMarkerRecoveryMatrix` control v1，一次未中断完成 empty restricted/temp durable/canonical published 3/3、12 Runner phases、3 次外部 SIGKILL，耗时 381.084 秒；R3/R4 settings 零写并复验 ACK/receipt/bundle/archive。裸同名 terminal exact route 另以 120.107 秒通过，不计入主口径；累计真实进程证据 232 phases/58 kills。旧 canonical 空/截断只有 fixture 单测，raw write/rename 内部窗口、断电和其他平台仍未覆盖 | P0-02、OPS-02 | 本里程碑提交 | Codex |
 | 2026-07-10 | 新增独立 `rolledBackTerminalRecoveryMatrix` control v1，以 `--scenario=rolledback-terminal` 复用六个 terminal 物理高层边界验证 `rolledBack/before` projection；一次未中断完整运行通过 6/6、24 Runner phases、6 次外部 SIGKILL，耗时 728.342 秒。ACK temp 的 R3 必须 mutation>0 并轮换新 PID/token ACK，ACK published 与 archive R3 settings 零写；R4 对六点均以 mutation rejector 复验 archived/business-ready、旧 bundle live、新 bundle candidate、previous 仅余 control evidence。裸 committed terminal 与 verified-origin rollback 各 exact 回归通过，旧 CLI 路由未被新场景抢占；前置 exact rerun 不计入主口径。全部真实进程证据累计 220 phases/55 kills；仍不宣称显式 settings 部分态、其他 rollback 起点/topology、raw durability、硬件断电、资源故障或其他平台 | P0-02、OPS-02 | 本里程碑提交 | Codex |

@@ -1193,6 +1193,28 @@ class ChatService extends ChangeNotifier {
     // NOTE: Do NOT call notifyListeners() here to avoid UI rebuilds during streaming
   }
 
+  /// Persists one complete streaming snapshot without a read-before-write.
+  Future<void> updateStreamingCheckpointSilent(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents,
+  ) async {
+    if (!_initialized) return;
+
+    if (isTemporaryConversation(message.conversationId)) {
+      _replaceCachedMessage(message);
+      _temporaryToolEvents[message.id] = List<Map<String, dynamic>>.of(
+        toolEvents,
+      );
+      return;
+    }
+
+    await _repo.updateStreamingCheckpoint(message, toolEvents);
+    _replaceCachedMessage(message);
+    if (!message.isStreaming) {
+      _untrackStreamingId(message.id);
+    }
+  }
+
   // Tool events persistence (per assistant message)
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {
     if (!_initialized) return const <Map<String, dynamic>>[];

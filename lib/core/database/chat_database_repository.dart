@@ -980,15 +980,28 @@ class ChatDatabaseRepository {
   }
 
   Future<void> updateMessage(ChatMessage message) async {
-    final existing = await (_db.select(
+    await (_db.update(
       _db.messageRows,
-    )..where((t) => t.id.equals(message.id))).getSingleOrNull();
-    if (existing == null) return;
-    await _db
-        .into(_db.messageRows)
-        .insertOnConflictUpdate(
-          _messageCompanion(message, existing.messageOrder),
-        );
+    )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+  }
+
+  Future<void> updateStreamingCheckpoint(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents,
+  ) async {
+    await _db.transaction(() async {
+      await (_db.update(
+        _db.messageRows,
+      )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+      await _db
+          .into(_db.toolEventRows)
+          .insertOnConflictUpdate(
+            ToolEventRowsCompanion.insert(
+              messageId: message.id,
+              eventsJson: jsonEncode(toolEvents),
+            ),
+          );
+    });
   }
 
   Future<void> updateConversationMessages({
@@ -1437,6 +1450,23 @@ class ChatDatabaseRepository {
       cachedTokens: Value(message.cachedTokens),
       durationMs: Value(message.durationMs),
       messageOrder: messageOrder,
+    );
+  }
+
+  MessageRowsCompanion _messageUpdate(ChatMessage message) {
+    return MessageRowsCompanion(
+      content: Value(message.content),
+      totalTokens: Value(message.totalTokens),
+      isStreaming: Value(message.isStreaming),
+      reasoningText: Value(message.reasoningText),
+      reasoningStartAt: Value(message.reasoningStartAt),
+      reasoningFinishedAt: Value(message.reasoningFinishedAt),
+      translation: Value(message.translation),
+      reasoningSegmentsJson: Value(message.reasoningSegmentsJson),
+      promptTokens: Value(message.promptTokens),
+      completionTokens: Value(message.completionTokens),
+      cachedTokens: Value(message.cachedTokens),
+      durationMs: Value(message.durationMs),
     );
   }
 
