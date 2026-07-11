@@ -10441,6 +10441,7 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tools'**
   String get settingsPageToolsSection;
+
   /// No description provided for @workspaceEnableTitle.
   ///
   /// In en, this message translates to:

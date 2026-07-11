@@ -5457,6 +5457,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPageToolsSection => '工具';
+
+  @override
   String get workspaceEnableTitle => '开启工作区';
 
   @override
@@ -11110,6 +11112,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageToolsSection => '工具';
+
+  @override
   String get workspaceEnableTitle => '开启工作区';
 
   @override
@@ -16763,6 +16767,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageToolsSection => '工具';
+
+  @override
   String get workspaceEnableTitle => '啟用工作區';
 
   @override

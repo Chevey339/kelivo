@@ -5683,6 +5683,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPageToolsSection => 'Tools';
+
+  @override
   String get workspaceEnableTitle => 'Enable Workspace';
 
   @override
