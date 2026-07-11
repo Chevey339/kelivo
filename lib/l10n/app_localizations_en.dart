@@ -5544,4 +5544,343 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get settingsPageDiagnostics => 'Cache Diagnostics';
+
+  @override
+  String get diagSelectTitle => 'Select a conversation to diagnose';
+
+  @override
+  String get diagSelectEmpty => 'No conversations available';
+
+  @override
+  String get diagSelectButton => 'Diagnose';
+
+  @override
+  String get diagUntitled => 'Untitled';
+
+  @override
+  String get diagInsufficientBadge => 'Insufficient data';
+
+  @override
+  String get diagResultTitle => 'Diagnostic Result';
+
+  @override
+  String diagSampleWindow(int assistant, int user) {
+    return 'Sampled $assistant assistant / $user user messages in the last 24h';
+  }
+
+  @override
+  String get diagMetricTotal => 'Total tokens';
+
+  @override
+  String get diagMetricCached => 'Cached';
+
+  @override
+  String get diagMetricUncached => 'Uncached';
+
+  @override
+  String get diagAllGood => 'No issues detected';
+
+  @override
+  String get diagSeverityUrgent => 'Urgent';
+
+  @override
+  String get diagSeverityRisk => 'Risk';
+
+  @override
+  String get diagA1Title => 'Context overflow';
+
+  @override
+  String get diagA1Subtitle =>
+      'This conversation has more user messages than the assistant\'s contextMessageSize, so the prefix is being trimmed and cache cannot be reused across turns.';
+
+  @override
+  String get diagA1Solution =>
+      'Set contextMessageSize to unlimited (turn off the limit, or set the cap to a very large number).';
+
+  @override
+  String get diagA2Title => 'Time variable in system prompt';
+
+  @override
+  String get diagA2Subtitle =>
+      'Your system prompt contains the cur_time / cur_datetime / cur_date placeholders, which change on every request and invalidate the cache.';
+
+  @override
+  String get diagA2Solution =>
+      'Remove the time placeholders from the system prompt, or move the time variable to after the message placeholder in the message template.';
+
+  @override
+  String get diagA3Title => 'Time variable in front of message';
+
+  @override
+  String get diagA3Subtitle =>
+      'Your message template places the time / date placeholders before the message, so the prefix around the user message changes every request.';
+
+  @override
+  String get diagA3Solution =>
+      'Move the time placeholders to after the message so they appear as a suffix on the user message.';
+
+  @override
+  String get diagA4Title => 'Memory feature breaking cache';
+
+  @override
+  String get diagA4SubContent =>
+      'Memory content has changed within the window, rewriting the system prompt.';
+
+  @override
+  String get diagA4SubHour =>
+      'Memory hint hard-codes the current hour (currentHour), changing once per hour.';
+
+  @override
+  String get diagA4Solution =>
+      'Move long-term content to a world book (constantActive). Remove the current hour from the system prompt and inject it after the message instead.';
+
+  @override
+  String get diagA6Title => 'World book: non-bottom, high trigger';
+
+  @override
+  String get diagA6Subtitle =>
+      'Frequently triggered world book entries are inserted in non-bottom positions, shifting the conversation sequence.';
+
+  @override
+  String get diagA6Solution =>
+      'Switch the entry to constantActive (always in the prompt) or move its injection position to bottomOfChat.';
+
+  @override
+  String get diagT1Title => 'Tool / MCP output tokens too high';
+
+  @override
+  String get diagT1Subtitle =>
+      'Tool results consume more than 60% of the total input tokens, leaving little prefix for caching.';
+
+  @override
+  String get diagT1Solution =>
+      'Disable the dominant tool, or scope it to fewer triggers.';
+
+  @override
+  String get diagF1aTitle => 'Conversation interval too long';
+
+  @override
+  String get diagF1aSubtitle =>
+      'More than half of the message gaps exceed 5 minutes, so the provider\'s cache TTL has expired between turns.';
+
+  @override
+  String get diagF1aSolution =>
+      'This is normal behaviour. Provider cache TTLs are typically 5 minutes; sparse conversations cannot build cache.';
+
+  @override
+  String get diagF1bTitle => 'Upstream issue';
+
+  @override
+  String get diagF1bSubtitle =>
+      'No specific configuration issue was detected, but the cache hit rate is still low.';
+
+  @override
+  String get diagF1bSolution =>
+      'Your upstream provider may not have prompt caching enabled. Try OpenAI, Anthropic, or Gemini, which expose prompt cache.';
+
+  @override
+  String get settingsPageToolsSection => 'Tools';
+  String get workspaceEnableTitle => 'Enable Workspace';
+
+  @override
+  String get workspaceDisableTitle => 'Close Workspace';
+
+  @override
+  String get workspaceEnableFailed => 'Failed to enable workspace';
+
+  @override
+  String get workspaceEnabledMessage => 'Workspace enabled';
+
+  @override
+  String get workspaceDisableConfirmTitle => 'Close Workspace';
+
+  @override
+  String get workspaceDisableConfirmContent =>
+      'Closing the workspace will permanently delete all files inside, and the AI will lose file operation capabilities. Continue?';
+
+  @override
+  String get workspaceDisableConfirmCancel => 'Cancel';
+
+  @override
+  String get workspaceDisableConfirmDelete => 'Close and Delete';
+
+  @override
+  String get workspaceDisableFailed => 'Failed to close workspace';
+
+  @override
+  String get workspaceDisabledMessage => 'Workspace closed';
+
+  @override
+  String get workspaceArtifactsTooltip => 'Artifacts';
+
+  @override
+  String get workspaceArtifactsLabel => 'Artifacts';
+
+  @override
+  String get workspaceBrowserTitleSuffix => ' - Artifacts';
+
+  @override
+  String get workspaceBrowserBackTooltip => 'Back';
+
+  @override
+  String get workspaceBrowserRefreshTooltip => 'Refresh';
+
+  @override
+  String get workspaceBrowserClearTooltip => 'Clear workspace';
+
+  @override
+  String get workspaceClearConfirmTitle => 'Clear Workspace';
+
+  @override
+  String get workspaceClearConfirmContent =>
+      'This will permanently delete all files in the workspace. Continue?';
+
+  @override
+  String get workspaceClearedMessage => 'Workspace cleared';
+
+  @override
+  String workspaceBrowserLoadFailed(String error) {
+    return 'Failed to load: $error';
+  }
+
+  @override
+  String get workspaceBrowserEmpty =>
+      'Workspace is empty, waiting for AI to create files';
+
+  @override
+  String get workspaceBrowserEmptyFolder => 'Empty folder';
+
+  @override
+  String get workspaceFilePreviewBackTooltip => 'Back';
+
+  @override
+  String get workspaceFilePreviewDownloadTooltip => 'Download';
+
+  @override
+  String get workspaceFilePreviewInvalidPath => 'Invalid path';
+
+  @override
+  String get workspaceFilePreviewImageLoadFailed => 'Failed to load image';
+
+  @override
+  String workspaceFilePreviewUnsupported(String ext, String size) {
+    return 'Preview not supported for this file format ($ext)\nSize: $size';
+  }
+
+  @override
+  String workspaceFilePreviewReadFailed(String error) {
+    return 'Failed to read: $error';
+  }
+
+  @override
+  String get workspaceFilePreviewEmpty => 'File is empty';
+
+  @override
+  String get workspaceFilePreviewSaveDialogTitle => 'Save to…';
+
+  @override
+  String workspaceFilePreviewSaveFailed(String error) {
+    return 'Failed to save: $error';
+  }
+
+  @override
+  String get workspaceFilePreviewSaveSuccess => 'Saved';
+
+  @override
+  String get workspaceFilePreviewFileNotFound => 'File does not exist';
+
+  @override
+  String workspaceFilePreviewShareFailed(String error) {
+    return 'Failed to share: $error';
+  }
+
+  @override
+  String get settingsSkillsTitle => 'Skills';
+
+  @override
+  String get skillsPageTitle => 'Skills';
+
+  @override
+  String get skillsBackTooltip => 'Back';
+
+  @override
+  String get skillsImportTooltip => 'Import';
+
+  @override
+  String get skillsImportMd => 'Import SKILL.md';
+
+  @override
+  String get skillsImportZip => 'Import zip';
+
+  @override
+  String skillsImportSuccess(String name) {
+    return 'Skill imported: $name';
+  }
+
+  @override
+  String get skillsImportErrorDialogTitle => 'Import failed';
+
+  @override
+  String get skillsImportErrorDialogClose => 'Close';
+
+  @override
+  String get skillsDeleteConfirmTitle => 'Delete Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return 'Delete Skill \'$name\'? This action cannot be undone.';
+  }
+
+  @override
+  String get skillsDeleteConfirmCancel => 'Cancel';
+
+  @override
+  String get skillsDeleteConfirmDelete => 'Delete';
+
+  @override
+  String skillsDeletedSnackbar(String name) {
+    return 'Deleted: $name';
+  }
+
+  @override
+  String get skillsEmptyState => 'No Skills yet, tap the top-right to import';
+
+  @override
+  String get skillsDetailEmptyMd => 'SKILL.md is empty or failed to load';
+
+  @override
+  String get skillsMetaName => 'Name';
+
+  @override
+  String get skillsMetaVersion => 'Version';
+
+  @override
+  String get skillsMetaLicense => 'License';
+
+  @override
+  String get skillsMetaCompatibility => 'Compatibility';
+
+  @override
+  String get skillsMetaAllowedTools => 'Allowed Tools';
+
+  @override
+  String get skillsMetaEnabled => 'Status';
+
+  @override
+  String get skillsMetaEnabledValue => 'Enabled';
+
+  @override
+  String get skillsMetaDisabledValue => 'Disabled';
+
+  @override
+  String get skillsListDeleteTooltip => 'Delete';
+
+  @override
+  String get skillsListSlidableDelete => 'Delete';
+
+  @override
+  String get skillsDetailDeleteButton => 'Delete';
 }

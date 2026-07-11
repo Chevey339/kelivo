@@ -165,7 +165,16 @@ class MessageGenerationService {
     onFileProcessingFinished?.call();
 
     // Inject prompts
-    messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
+    messageBuilderService.injectSystemPrompt(
+      apiMessages,
+      assistant,
+      modelId,
+      currentConversation: currentConversation,
+    );
+    await messageBuilderService.injectSkillPrompts(
+      apiMessages,
+      currentConversation: currentConversation,
+    );
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
       assistant,
@@ -197,12 +206,13 @@ class MessageGenerationService {
     await messageBuilderService.inlineLocalImages(apiMessages);
 
     // Prepare tools
-    final toolDefs = generationController.buildToolDefinitions(
+    final toolDefs = await generationController.buildToolDefinitions(
       settings,
       assistant,
       providerKey,
       modelId,
       hasBuiltInSearch,
+      conversation: currentConversation,
     );
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
@@ -210,6 +220,7 @@ class MessageGenerationService {
             assistant,
             approvalService: approvalService,
             askUserService: askUserService,
+            conversation: currentConversation,
           )
         : null;
 

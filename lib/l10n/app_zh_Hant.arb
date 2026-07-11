@@ -1957,5 +1957,166 @@
         "type": "int"
       }
     }
-  }
+  },
+  "settingsPageDiagnostics": "快取診斷",
+  "diagSelectTitle": "選擇一條對話用於診斷",
+  "diagSelectEmpty": "暫無對話",
+  "diagSelectButton": "開始診斷",
+  "diagUntitled": "未命名",
+  "diagInsufficientBadge": "資料不足",
+  "diagResultTitle": "診斷結果",
+  "diagSampleWindow": "近 24 小時取樣 {assistant} 條助手 / {user} 條使用者訊息",
+  "@diagSampleWindow": {"placeholders": {"assistant": {"type": "int"}, "user": {"type": "int"}}},
+  "diagMetricTotal": "總 token",
+  "diagMetricCached": "已快取",
+  "diagMetricUncached": "未快取",
+  "diagAllGood": "未發現異常",
+  "diagSeverityUrgent": "緊急",
+  "diagSeverityRisk": "隱患",
+  "diagA1Title": "上下文超限",
+  "diagA1Subtitle": "本對話的使用者訊息數超過了助手設定的 contextMessageSize,舊訊息被裁剪,導致前綴無法在多輪之間複用。",
+  "diagA1Solution": "把 contextMessageSize 調到無限(關閉 limitContextMessages,或把上限設得很大)。",
+  "diagA2Title": "系統提示裡含時間變數",
+  "diagA2Subtitle": "系統提示中包含 cur_time / cur_datetime / cur_date 占位符,每次請求都會變,導致快取失效。",
+  "diagA2Solution": "把時間占位符從系統提示裡刪掉,或挪到訊息範本中 message 占位符的後面。",
+  "diagA3Title": "時間變數位於 message 之前",
+  "diagA3Subtitle": "訊息範本把 time / date 占位符放在了 message 前面,導致使用者訊息附近的前綴每次都變化。",
+  "diagA3Solution": "把時間占位符挪到 message 之後,作為使用者訊息的後綴。",
+  "diagA4Title": "記憶功能破壞快取",
+  "diagA4SubContent": "在取樣視窗內記憶內容發生了變化,系統提示被重寫。",
+  "diagA4SubHour": "記憶提示裡寫死了當前小時(currentHour),每小時都會變。",
+  "diagA4Solution": "把長期不變的內容挪到世界書(常駐);把當前小時從系統提示裡刪掉,改為在 message 後面注入。",
+  "diagA6Title": "世界書:非底部 + 高頻觸發",
+  "diagA6Subtitle": "被高頻觸發的世界書條目被插入到非底部位置,導致訊息序列整體前移。",
+  "diagA6Solution": "把對應條目改為常駐(constantActive),或把插入位置改為 bottomOfChat。",
+  "diagT1Title": "工具 / MCP 輸出 token 佔比過高",
+  "diagT1Subtitle": "工具結果佔用了超過 60% 的輸入 token,留給快取的前綴空間很小。",
+  "diagT1Solution": "關閉貢獻最大的那個工具,或把它的觸發範圍收窄。",
+  "diagF1aTitle": "對話時間間距過長",
+  "diagF1aSubtitle": "超過一半的訊息間隔超過 5 分鐘,provider 的快取 TTL 已經在兩次請求之間過期。",
+  "diagF1aSolution": "這是正常現象。常見 TTL 只有 5 分鐘左右,稀疏對話很難建立快取。",
+  "diagF1bTitle": "上游問題",
+  "diagF1bSubtitle": "沒有檢測到具體的設定問題,但快取命中率仍然很低。",
+  "diagF1bSolution": "上游 provider 可能未啟用 prompt cache,建議換到 OpenAI / Anthropic / Gemini 等明確支援的 provider。",
+  "settingsPageToolsSection": "工具"
+  "workspaceEnableTitle": "啟用工作區",
+  "workspaceDisableTitle": "關閉工作區",
+  "workspaceEnableFailed": "工作區開啟失敗",
+  "workspaceEnabledMessage": "工作區已開啟",
+  "workspaceDisableConfirmTitle": "關閉工作區",
+  "workspaceDisableConfirmContent": "關閉工作區將永久刪除工作區內所有檔案，且 AI 將失去檔案操作能力。確定繼續？",
+  "workspaceDisableConfirmCancel": "取消",
+  "workspaceDisableConfirmDelete": "關閉並刪除",
+  "workspaceDisableFailed": "工作區關閉失敗",
+  "workspaceDisabledMessage": "工作區已關閉",
+  "workspaceArtifactsTooltip": "產物",
+  "workspaceArtifactsLabel": "產物",
+  "workspaceBrowserTitleSuffix": " - 產物",
+  "workspaceBrowserBackTooltip": "返回",
+  "workspaceBrowserRefreshTooltip": "重新整理",
+  "workspaceBrowserClearTooltip": "清空工作區",
+  "workspaceClearConfirmTitle": "清空工作區",
+  "workspaceClearConfirmContent": "這將永久刪除工作區中的所有檔案，確定要清空嗎？",
+  "workspaceClearedMessage": "工作區已清空",
+  "workspaceBrowserLoadFailed": "載入失敗：{error}",
+  "@workspaceBrowserLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceBrowserEmpty": "工作區為空，等待 AI 建立檔案",
+  "workspaceBrowserEmptyFolder": "空資料夾",
+  "workspaceFilePreviewBackTooltip": "返回",
+  "workspaceFilePreviewDownloadTooltip": "下載",
+  "workspaceFilePreviewInvalidPath": "路徑無效",
+  "workspaceFilePreviewImageLoadFailed": "圖片載入失敗",
+  "workspaceFilePreviewUnsupported": "不支援預覽此檔案格式（{ext}）\n大小：{size}",
+  "@workspaceFilePreviewUnsupported": {
+    "placeholders": {
+      "ext": {
+        "type": "String"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewReadFailed": "讀取失敗：{error}",
+  "@workspaceFilePreviewReadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewEmpty": "檔案為空",
+  "workspaceFilePreviewSaveDialogTitle": "儲存到…",
+  "workspaceFilePreviewSaveFailed": "儲存失敗：{error}",
+  "@workspaceFilePreviewSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "workspaceFilePreviewSaveSuccess": "已儲存",
+  "workspaceFilePreviewFileNotFound": "檔案不存在",
+  "workspaceFilePreviewShareFailed": "分享失敗：{error}",
+  "@workspaceFilePreviewShareFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsSkillsTitle": "Skills",
+  "skillsPageTitle": "Skills",
+  "skillsBackTooltip": "返回",
+  "skillsImportTooltip": "匯入",
+  "skillsImportMd": "匯入 SKILL.md",
+  "skillsImportZip": "匯入 zip",
+  "skillsImportSuccess": "Skill 已匯入：{name}",
+  "@skillsImportSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportErrorDialogTitle": "匯入失敗",
+  "skillsImportErrorDialogClose": "關閉",
+  "skillsDeleteConfirmTitle": "刪除 Skill",
+  "skillsDeleteConfirmMessage": "確定刪除 Skill '{name}'？該操作不可恢復。",
+  "@skillsDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsDeleteConfirmCancel": "取消",
+  "skillsDeleteConfirmDelete": "刪除",
+  "skillsDeletedSnackbar": "已刪除：{name}",
+  "@skillsDeletedSnackbar": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsEmptyState": "還沒有 Skills，點擊右上角匯入",
+  "skillsDetailEmptyMd": "SKILL.md 內容為空或讀取失敗",
+  "skillsMetaName": "名稱",
+  "skillsMetaVersion": "版本",
+  "skillsMetaLicense": "許可證",
+  "skillsMetaCompatibility": "相容性",
+  "skillsMetaAllowedTools": "允許工具",
+  "skillsMetaEnabled": "啟用狀態",
+  "skillsMetaEnabledValue": "已啟用",
+  "skillsMetaDisabledValue": "已停用",
+  "skillsListDeleteTooltip": "刪除",
+  "skillsListSlidableDelete": "刪除",
+  "skillsDetailDeleteButton": "刪除"
 }

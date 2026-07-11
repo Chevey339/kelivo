@@ -701,9 +701,11 @@ class DataSync {
             // Keys that should be merged as JSON arrays/objects
             const mergeableKeys = {
               'assistants_v1', // Assistant configurations
+              'assistant_memories_v1', // Assistant memory entries
               'provider_configs_v1', // Provider configurations
               'pinned_models_v1', // Pinned models list
               'providers_order_v1', // Provider order list
+              'mcp_servers_v1', // MCP server configurations
               'provider_groups_v1', // provider group list
               'provider_group_map_v1', // providerKey -> groupId
               'provider_group_collapsed_v1', // groupId|__ungrouped__ -> bool
@@ -819,6 +821,28 @@ class DataSync {
                   } catch (e) {
                     // If merge fails, keep existing
                   }
+                } else if (key == 'assistant_memories_v1' &&
+                    existing.containsKey(key)) {
+                  try {
+                    await prefs.restoreSingle(
+                      key,
+                      _mergeAssistantMemories(
+                        existing[key] as String,
+                        newValue as String,
+                      ),
+                    );
+                  } catch (_) {}
+                } else if (key == 'mcp_servers_v1' &&
+                    existing.containsKey(key)) {
+                  try {
+                    await prefs.restoreSingle(
+                      key,
+                      _mergeJsonListById(
+                        existing[key] as String,
+                        newValue as String,
+                      ),
+                    );
+                  } catch (_) {}
                 } else if (key == 'pinned_models_v1' &&
                     existing.containsKey(key)) {
                   // Merge pinned models: combine and deduplicate
@@ -1312,6 +1336,85 @@ class DataSync {
     } finally {
       await _deleteDirectoryQuietly(extractDir);
     }
+  }
+
+  static String _mergeJsonListById(String existingRaw, String incomingRaw) {
+    final existingList = jsonDecode(existingRaw) as List;
+    final incomingList = jsonDecode(incomingRaw) as List;
+    final byId = <String, Map<String, dynamic>>{};
+    final order = <String>[];
+
+    void addIfNew(dynamic item) {
+      if (item is! Map || item['id'] == null) return;
+      final id = item['id'].toString();
+      if (id.isEmpty || byId.containsKey(id)) return;
+      byId[id] = Map<String, dynamic>.from(item);
+      order.add(id);
+    }
+
+    for (final item in existingList) {
+      addIfNew(item);
+    }
+    for (final item in incomingList) {
+      addIfNew(item);
+    }
+
+    return jsonEncode([for (final id in order) byId[id]]);
+  }
+
+  static String _mergeAssistantMemories(
+    String existingRaw,
+    String incomingRaw,
+  ) {
+    final existingList = jsonDecode(existingRaw) as List;
+    final incomingList = jsonDecode(incomingRaw) as List;
+    final merged = <Map<String, dynamic>>[];
+    final contentKeys = <String>{};
+    var maxId = 0;
+
+    void addExisting(dynamic item) {
+      if (item is! Map) return;
+      final map = Map<String, dynamic>.from(item);
+      final id = (map['id'] as num?)?.toInt() ?? 0;
+      if (id > maxId) maxId = id;
+      final key = _assistantMemoryContentKey(map);
+      if (key != null) contentKeys.add(key);
+      merged.add(map);
+    }
+
+    for (final item in existingList) {
+      addExisting(item);
+    }
+
+    for (final item in incomingList) {
+      if (item is! Map) continue;
+      final incoming = Map<String, dynamic>.from(item);
+      final key = _assistantMemoryContentKey(incoming);
+      if (key != null && contentKeys.contains(key)) continue;
+
+      final id = (incoming['id'] as num?)?.toInt() ?? 0;
+      final idTaken = merged.any(
+        (e) => ((e['id'] as num?)?.toInt() ?? 0) == id,
+      );
+      if (id <= 0 || idTaken) {
+        maxId += 1;
+        incoming['id'] = maxId;
+      } else if (id > maxId) {
+        maxId = id;
+      }
+
+      if (key != null) contentKeys.add(key);
+      merged.add(incoming);
+    }
+
+    return jsonEncode(merged);
+  }
+
+  static String? _assistantMemoryContentKey(Map<String, dynamic> memory) {
+    final assistantId = (memory['assistantId'] ?? '').toString().trim();
+    final content = (memory['content'] ?? '').toString().trim();
+    if (assistantId.isEmpty || content.isEmpty) return null;
+    return '$assistantId\n$content';
   }
 }
 

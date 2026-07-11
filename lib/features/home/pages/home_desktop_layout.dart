@@ -23,6 +23,7 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../models/workspace_button_config.dart';
 
 /// Desktop/Tablet layout scaffold for the home page
 /// Handles the overall structure: left sidebar, main content, optional right sidebar
@@ -62,6 +63,7 @@ class HomeDesktopScaffold extends StatelessWidget {
     required this.onRightSidebarWidthChanged,
     required this.onRightSidebarWidthChangeEnd,
     required this.buildAssistantBackground,
+    this.workspaceButtonConfig,
     this.appBarOverride,
     required this.body,
   });
@@ -101,6 +103,10 @@ class HomeDesktopScaffold extends StatelessWidget {
   final void Function(double dx) onRightSidebarWidthChanged;
   final VoidCallback onRightSidebarWidthChangeEnd;
   final Widget Function(BuildContext context) buildAssistantBackground;
+
+  /// Workspace button state and actions for the current conversation.
+  /// When null, the button is not rendered (no conversation or temporary).
+  final WorkspaceButtonConfig? workspaceButtonConfig;
   final PreferredSizeWidget? appBarOverride;
   final Widget body;
 
@@ -540,7 +546,48 @@ class HomeDesktopScaffold extends StatelessWidget {
   }
 
   List<Widget> _buildActions(BuildContext context, bool topicsOnRight) {
+    final l10n = AppLocalizations.of(context)!;
     return [
+      if (workspaceButtonConfig != null)
+        workspaceButtonConfig!.isEnabled
+            ? Tooltip(
+                message: l10n.workspaceArtifactsTooltip,
+                child: IosCardPress(
+                  baseColor: Colors.transparent,
+                  pressedBlendStrength: 0.12,
+                  borderRadius: BorderRadius.circular(8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  onTap: workspaceButtonConfig!.onPrimaryAction,
+                  onLongPress: workspaceButtonConfig!.onDisableWithConfirm,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                          Lucide.FileText, size: 16, color: Colors.blue),
+                      const SizedBox(width: 4),
+                      Text(
+                        l10n.workspaceArtifactsLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue,
+                          fontWeight: AppFontWeights.medium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : Tooltip(
+                message: l10n.workspaceEnableTitle,
+                child: IosIconButton(
+                  size: 20,
+                  minSize: 40,
+                  semanticLabel: l10n.workspaceEnableTitle,
+                  onTap: workspaceButtonConfig!.onPrimaryAction,
+                  icon: Lucide.FileText,
+                ),
+              ),
       // Right sidebar toggle (desktop + topics on right)
       if (_isDesktop && topicsOnRight)
         IosIconButton(

@@ -1,5 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,12 +23,45 @@ class _FakeBuildContext implements BuildContext {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('per-assistant search behavior', () {
-    test('injects search prompt only when the assistant enables search', () {
+    late Directory tempDir;
+
+    setUp(() async {
       SharedPreferences.setMockInitialValues({});
+      tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_assistant_search_test_',
+      );
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      Hive.init(tempDir.path);
+    });
+
+    tearDown(() async {
+      await Hive.close();
+      await tempDir.delete(recursive: true);
+    });
+
+    test('injects search prompt only when the assistant enables search', () {
       final service = MessageBuilderService(
         chatService: ChatService(),
         contextProvider: _FakeBuildContext(),
@@ -63,8 +101,6 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final settings = SettingsProvider();
 
-      late List<Map<String, dynamic>> disabledTools;
-      late List<Map<String, dynamic>> enabledTools;
       await tester.pumpWidget(
         MultiProvider(
           providers: [
@@ -76,34 +112,32 @@ void main() {
               create: (_) => McpToolService(),
             ),
           ],
-          child: Builder(
-            builder: (context) {
-              final service = ToolHandlerService(contextProvider: context);
-              disabledTools = service.buildToolDefinitions(
-                settings,
-                const Assistant(id: 'assistant-a', name: 'A'),
-                'openai',
-                'gpt-4.1',
-                false,
-                isToolModel: (_, _) => true,
-              );
-              enabledTools = service.buildToolDefinitions(
-                settings,
-                const Assistant(
-                  id: 'assistant-b',
-                  name: 'B',
-                  searchEnabled: true,
-                ),
-                'openai',
-                'gpt-4.1',
-                false,
-                isToolModel: (_, _) => true,
-              );
-              return const SizedBox.shrink();
-            },
-          ),
+          child: const SizedBox.shrink(),
         ),
       );
+
+      final context = tester.element(find.byType(SizedBox));
+      final service = ToolHandlerService(contextProvider: context);
+      late List<Map<String, dynamic>> disabledTools;
+      late List<Map<String, dynamic>> enabledTools;
+      await tester.runAsync(() async {
+        disabledTools = await service.buildToolDefinitions(
+          settings,
+          const Assistant(id: 'assistant-a', name: 'A'),
+          'openai',
+          'gpt-4.1',
+          false,
+          isToolModel: (_, _) => true,
+        );
+        enabledTools = await service.buildToolDefinitions(
+          settings,
+          const Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
+          'openai',
+          'gpt-4.1',
+          false,
+          isToolModel: (_, _) => true,
+        );
+      });
 
       expect(disabledTools, isEmpty);
       expect(enabledTools.map((tool) => tool['function']['name']), [

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -150,6 +151,126 @@ void main() {
         List<int>.filled(128, 5),
       );
     });
+
+    test(
+      'merge restore imports assistant memories and mcp servers without clobbering local entries',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'assistant_memories_v1': jsonEncode([
+            {'id': 1, 'assistantId': 'local', 'content': 'keep local'},
+            {'id': 2, 'assistantId': 'dup', 'content': 'same memory'},
+          ]),
+          'mcp_servers_v1': jsonEncode([
+            {
+              'id': 'local-server',
+              'enabled': true,
+              'name': 'Local Server',
+              'transport': 'sse',
+              'url': 'http://local.example/sse',
+              'tools': [],
+            },
+            {
+              'id': 'shared-server',
+              'enabled': true,
+              'name': 'Local Shared Server',
+              'transport': 'sse',
+              'url': 'http://local-shared.example/sse',
+              'tools': [],
+            },
+          ]),
+        });
+
+        final settingsFile = File('${root.path}/settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({
+            'assistant_memories_v1': jsonEncode([
+              {'id': 1, 'assistantId': 'remote', 'content': 'remote memory'},
+              {'id': 2, 'assistantId': 'dup', 'content': 'same memory'},
+              {'id': 4, 'assistantId': 'new', 'content': 'new memory'},
+            ]),
+            'mcp_servers_v1': jsonEncode([
+              {
+                'id': 'shared-server',
+                'enabled': false,
+                'name': 'Imported Shared Server',
+                'transport': 'sse',
+                'url': 'http://imported-shared.example/sse',
+                'tools': [],
+              },
+              {
+                'id': 'remote-server',
+                'enabled': true,
+                'name': 'Remote Server',
+                'transport': 'http',
+                'url': 'http://remote.example/mcp',
+                'tools': [],
+              },
+            ]),
+          }),
+        );
+
+        final zipFile = File('${root.path}/settings_merge_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+
+        final sync = DataSync(chatService: ChatService());
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.merge,
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        final memories =
+            jsonDecode(prefs.getString('assistant_memories_v1')!) as List;
+        expect(memories, hasLength(4));
+        expect(
+          memories.where(
+            (e) =>
+                (e as Map)['assistantId'] == 'dup' &&
+                e['content'] == 'same memory',
+          ),
+          hasLength(1),
+        );
+        expect(
+          memories.any(
+            (e) =>
+                (e as Map)['assistantId'] == 'remote' &&
+                e['content'] == 'remote memory' &&
+                e['id'] != 1,
+          ),
+          isTrue,
+        );
+        expect(
+          memories.any(
+            (e) =>
+                (e as Map)['assistantId'] == 'new' &&
+                e['content'] == 'new memory' &&
+                e['id'] == 4,
+          ),
+          isTrue,
+        );
+
+        final servers = jsonDecode(prefs.getString('mcp_servers_v1')!) as List;
+        expect(servers, hasLength(3));
+        expect(
+          servers
+              .where((e) => (e as Map)['id'] == 'shared-server')
+              .single['name'],
+          'Local Shared Server',
+        );
+        expect(
+          servers.any(
+            (e) =>
+                (e as Map)['id'] == 'remote-server' &&
+                e['name'] == 'Remote Server',
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test('cleans temporary restore files when WebDAV restore fails', () async {
       final sourceDir = Directory('${root.path}/source_upload');
