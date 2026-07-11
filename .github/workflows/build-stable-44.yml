@@ -393,7 +393,7 @@ jobs:
           #define MyAppPublisher "Psyche"
           #define MyAppExeName "cuplivo.exe"
           [Setup]
-          AppId={{A7B8C9D0-E1F2-4A5B-8C9D-0E1F2A3B4C5D}}
+          AppId={{3DB01FC7-0467-4D5B-A7BC-346083F29D7E}}
           AppName={#MyAppName}
           AppVersion={#MyAppVersion}
           AppPublisher={#MyAppPublisher}
