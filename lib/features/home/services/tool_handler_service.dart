@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
@@ -165,14 +166,15 @@ class ToolHandlerService {
   /// - Search tool (if enabled and model supports tools)
   /// - Memory tools (if assistant has memory enabled)
   /// - MCP tools (from selected servers for the assistant)
-  List<Map<String, dynamic>> buildToolDefinitions(
+  Future<List<Map<String, dynamic>>> buildToolDefinitions(
     SettingsProvider settings,
     Assistant? assistant,
     String providerKey,
     String modelId,
     bool hasBuiltInSearch, {
     required bool Function(String providerKey, String modelId) isToolModel,
-  }) {
+    Conversation? conversation,
+  }) async {
     final List<Map<String, dynamic>> toolDefs = <Map<String, dynamic>>[];
     final supportsTools = isToolModel(providerKey, modelId);
 
@@ -190,9 +192,10 @@ class ToolHandlerService {
 
     // Local tools
     toolDefs.addAll(
-      LocalToolsService.buildToolDefinitions(
+      await LocalToolsService.buildToolDefinitions(
         assistant: assistant,
         supportsTools: supportsTools,
+        conversation: conversation,
       ),
     );
 
@@ -342,6 +345,7 @@ class ToolHandlerService {
     Assistant? assistant, {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    Conversation? conversation,
   }) {
     final mcp = contextProvider.read<McpProvider>();
     final toolSvc = contextProvider.read<McpToolService>();
@@ -369,6 +373,7 @@ class ToolHandlerService {
           name,
           args,
           assistant,
+          conversation: conversation,
           onSpeakText: (text) async {
             final tts = contextProvider.read<TtsProvider>();
             if (!tts.isAvailable) {

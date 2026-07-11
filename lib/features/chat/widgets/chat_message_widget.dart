@@ -127,6 +127,8 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     },
     LocalToolNames.textToSpeech => Lucide.Volume2,
     LocalToolNames.calculate => Lucide.Calculator,
+    LocalToolNames.useSkill => Lucide.BookOpen,
+    LocalToolNames.readSkillResource => Lucide.FileText,
     _ => null,
   };
 }
