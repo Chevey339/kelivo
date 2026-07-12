@@ -120,7 +120,7 @@ class KelivoFetcher {
     try {
       final resp = await _fetch(payload);
       final html = resp.body;
-      final md = html2md.convert(html);
+      final md = html2md.convert(html, ignore: ['script', 'style']);
       return _ok(md);
     } catch (e) {
       return _err(e.toString());
