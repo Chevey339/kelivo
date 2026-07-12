@@ -334,7 +334,7 @@ class TimelineCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  void replaceMessage(ChatMessage message) {
+  void replaceMessage(ChatMessage message, {bool notify = true}) {
     final index = _slots.indexWhere(
       (slot) => slot.identity.revisionId == message.id,
     );
@@ -346,7 +346,7 @@ class TimelineCoordinator extends ChangeNotifier {
     );
     _slots = List.unmodifiable(updated);
     _decodedBytes = _slots.fold<int>(0, (sum, slot) => sum + _slotBytes(slot));
-    notifyListeners();
+    if (notify) notifyListeners();
   }
 
   bool _accepts(int epoch, String conversationId) =>

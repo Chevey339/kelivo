@@ -314,6 +314,57 @@ void main() {
       expect(controller.hasMoreBefore, isTrue);
     });
 
+    test(
+      'streaming and final snapshots survive viewport intent changes',
+      () async {
+        final placeholder = ChatMessage(
+          id: 'streaming-assistant',
+          role: 'assistant',
+          content: '',
+          conversationId: conversation.id,
+          isStreaming: true,
+        );
+        messages = <ChatMessage>[
+          ...List<ChatMessage>.generate(50, _message),
+          placeholder,
+        ];
+        conversation = Conversation(
+          id: conversation.id,
+          title: conversation.title,
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        final partial = placeholder.copyWith(content: 'partial answer');
+        controller.replaceMessageSnapshot(partial);
+        controller.timelineCoordinator.userAnchored();
+        expect(await controller.loadMoreBefore(), isTrue);
+        expect(controller.messages.last.content, 'partial answer');
+        expect(controller.messages.last.isStreaming, isTrue);
+
+        final completed = partial.copyWith(
+          content: 'complete answer',
+          isStreaming: false,
+        );
+        controller.updateMessageInList(completed.id, completed);
+        controller.timelineCoordinator.followTail();
+
+        expect(controller.messages.last.content, 'complete answer');
+        expect(controller.messages.last.isStreaming, isFalse);
+        expect(
+          controller.timelineCoordinator.slots.last.message.content,
+          'complete answer',
+        );
+        expect(
+          controller.timelineCoordinator.slots.last.message.isStreaming,
+          isFalse,
+        );
+      },
+    );
+
     test('clears current conversation when the service deletes it', () async {
       chatService.knownConversationIds.add(conversation.id);
       controller.setCurrentConversation(conversation);

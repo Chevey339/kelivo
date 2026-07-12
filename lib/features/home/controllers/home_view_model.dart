@@ -249,11 +249,9 @@ class HomeViewModel extends ChangeNotifier {
   void _onContentUpdated(String messageId, String content, int totalTokens) {
     final index = messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      messages[index] = messages[index].copyWith(
-        content: content,
-        totalTokens: totalTokens,
+      _chatController.replaceMessageSnapshot(
+        messages[index].copyWith(content: content, totalTokens: totalTokens),
       );
-      _chatController.invalidateCache();
       // NOTE: Do NOT call notifyListeners() here!
       // Streaming content updates are now handled by StreamingContentNotifier
       // via ValueListenableBuilder, which only rebuilds the streaming message widget.
@@ -1003,7 +1001,7 @@ class HomeViewModel extends ChangeNotifier {
         );
         if (cleanedContent != m.content) {
           final updated = m.copyWith(content: cleanedContent);
-          messages[i] = updated;
+          _chatController.replaceMessageSnapshot(updated);
           unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
         }
 

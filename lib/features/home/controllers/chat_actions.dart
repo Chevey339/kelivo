@@ -430,9 +430,7 @@ class ChatActions {
       );
     } finally {
       _clearGenerationRuntimeState(message);
-      final index = _messages.indexWhere((item) => item.id == message.id);
-      if (index >= 0) {
-        _messages[index] = message;
+      if (chatController.replaceMessageSnapshot(message)) {
         onMessagesChanged?.call();
       }
       _setConversationLoading(conversationId, false);
@@ -1145,7 +1143,7 @@ class ChatActions {
       isStreaming: true,
     );
     _activeAssistantMessages.put(streamingMessage);
-    _messages[visibleIndex] = streamingMessage;
+    chatController.replaceMessageSnapshot(streamingMessage);
     await chatService.updateMessage(streamingMessage.id, isStreaming: true);
     onMessagesChanged?.call();
     _setConversationLoading(conversation.id, true);
@@ -1263,8 +1261,7 @@ class ChatActions {
         );
       } finally {
         _clearGenerationRuntimeState(finalizedMessage);
-        if (idx != -1) {
-          _messages[idx] = finalizedMessage;
+        if (chatController.replaceMessageSnapshot(finalizedMessage)) {
           onMessagesChanged?.call();
         }
         streamController.removeStreamingNotifier(streaming.id);
@@ -1588,9 +1585,11 @@ class ChatActions {
     if (state.ctx.streamOutput && _currentConversation?.id == conversationId) {
       final index = _messages.indexWhere((m) => m.id == messageId);
       if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
-          content: streamingProcessed,
-          totalTokens: state.totalTokens,
+        chatController.replaceMessageSnapshot(
+          _messages[index].copyWith(
+            content: streamingProcessed,
+            totalTokens: state.totalTokens,
+          ),
         );
       }
     }
@@ -1800,9 +1799,7 @@ class ChatActions {
         terminalState: GenerationRunState.completed,
       );
 
-      final index = _messages.indexWhere((m) => m.id == messageId);
-      if (index != -1) {
-        _messages[index] = finalizedMessage;
+      if (chatController.replaceMessageSnapshot(finalizedMessage)) {
         onMessagesChanged?.call();
       }
       onAssistantMessageFinished?.call(finalizedMessage);
@@ -1859,10 +1856,12 @@ class ChatActions {
 
       final index = currentIndex;
       if (index != -1) {
-        _messages[index] = _messages[index].copyWith(
-          content: displayContent,
-          isStreaming: false,
-          totalTokens: state.totalTokens,
+        chatController.replaceMessageSnapshot(
+          _messages[index].copyWith(
+            content: displayContent,
+            isStreaming: false,
+            totalTokens: state.totalTokens,
+          ),
         );
         onMessagesChanged?.call();
       }

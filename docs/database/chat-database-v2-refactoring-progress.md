@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 2：MSG-01～07 已完成）
-> - 当前结论：Message Graph 已成为正式 Hive 迁移和运行期 append/edit/regenerate/select/context/delete/fork/checkpoint 的权威路径；UI/service 选择与上下文来自 stable revision projection，不再读取 conversation selection/truncate JSON，conversation `messageIds` 也退出持久业务计数/分页。旧字段只保留于 Hive/legacy JSON/备份兼容模型与 adapter；Phase 2 已 7/7 关闭
+> - 最后更新：2026-07-11（Phase 4 复审：真机实测暴露结构性缺陷，Phase 4 重新打开，见 §10.1 返工清单）
+> - 当前结论：Phase 0～3 保持关闭。Phase 4 在真机实测中暴露两个结构性缺陷：(1) 流式/终态内容从不写回 TimelineCoordinator 窗口，而任何 coordinator 通知都会用过期 slots 整体覆盖 `ChatController._messages`，导致滑动后消息内容永久退化为空壳加载动画；(2) 生成期 bottom-pin 自动跟随与 programmatic anchor + spacer 两套滚动范式并存、spacer 修正晚一帧，导致自动滚动持续小幅上下弹跳。Phase 4 从 8/8 回退为返工状态，进入 Phase 5 前必须先闭环 §10.1
 
 ## 1. 文档使用规则
 
@@ -40,7 +40,7 @@
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
 | Phase 2：Message Graph | 7 / 7 | `已完成` | graph timeline 与 stable-ID commands 已接管业务；Hive/legacy JSON 兼容输入保留只读解释边界 |
 | Phase 3：Generation State Machine | 7 / 7 | `已完成` | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 与竞态/长响应矩阵全部闭环 |
-| Phase 4：Timeline 与 Renderer | 8 / 8 | `已完成` | stable timeline、双预算、统一锚点、滚动意图、增量/有界 renderer 与五 TargetPlatform 交互契约全部闭环；启动顺序、retained-cache 可写性与生成期动态 jump spacer 回归修复后全量 1274/1274 |
+| Phase 4：Timeline 与 Renderer | 6 / 8 | `进行中` | 真机实测暴露单一真相源违规与滚动范式冲突两类结构性缺陷（§10.1 TL-R1～R6）；TL-02/04 重新打开返工，测试全绿不代表验收通过（R-10 实例） |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
 
 ## 3. 已完成的审计工作
@@ -343,13 +343,28 @@ dart run tool/run_restore_process_harness.dart \
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
 | TL-01 | Active ancestry cursor 逻辑分页 | MSG-03、DB2-03 | `已完成` | page 单位为 slot；无 OFFSET/物理 revision 坐标 | 本里程碑提交（2026-07-11） | 新 `ActiveTimelinePage/Slot` 契约从 active leaf 递归 ancestry，以 `beforeRevisionId`/`afterRevisionId` 查询相邻逻辑 slot，cursor 不在 active path 时拒绝；page 只加载 selected revision identity，版本仅聚合 `versionCount`，500 alternates 证明仍为单 slot。`LoadedTimelinePage` 在 service 层批量装配权威 message/parts/artifacts；`TimelineCoordinator` 只持 stable slot/revision cursor，不暴露数据库 OFFSET。按“契约先行”暂未改 View，TL-02 起由 coordinator 接管窗口 |
-| TL-02 | 行数 + 字节双预算窗口 | TL-01 | `已完成` | 版本数不击穿窗口；切会话/浏览后内存回落 | 本里程碑提交（2026-07-11） | `TimelineWindowBudget` 同时限制 logical slots/decoded bytes；page merge 后从视觉移动相反一侧裁窗并恢复相应 cursor，至少保留一个超大 slot。retainer 立即清理 ChatService 窗口外 selected message/tool/signature cache，但 retained message cache 必须保持 growable，因为 generation begin/append 会在 commit 后继续发布到同一工作集；该不变量已有“裁窗后再次发送”真实 service 回归。open/clear 递增 epoch，陈旧 conversation page 与 stateRevision 不一致结果不发布。ChatController 的打开、向前/向后、首/尾窗口切到 coordinator；固定初始 40 slots，版本不参与容量。双预算 eviction、旧会话晚到结果、5000 slot 双向有界浏览均有测试 |
+| TL-02 | 行数 + 字节双预算窗口 | TL-01 | `进行中`（因 §10.1 TL-R1/R2/R5/R6 重新打开） | 版本数不击穿窗口；切会话/浏览后内存回落 | 本里程碑提交（2026-07-11） | `TimelineWindowBudget` 同时限制 logical slots/decoded bytes；page merge 后从视觉移动相反一侧裁窗并恢复相应 cursor，至少保留一个超大 slot。retainer 立即清理 ChatService 窗口外 selected message/tool/signature cache，但 retained message cache 必须保持 growable，因为 generation begin/append 会在 commit 后继续发布到同一工作集；该不变量已有“裁窗后再次发送”真实 service 回归。open/clear 递增 epoch，陈旧 conversation page 与 stateRevision 不一致结果不发布。ChatController 的打开、向前/向后、首/尾窗口切到 coordinator；固定初始 40 slots，版本不参与容量。双预算 eviction、旧会话晚到结果、5000 slot 双向有界浏览均有测试 |
 | TL-03 | Slot ID + localDy 锚点协调器 | TL-01/02 | `已完成` | 规定 mutation 后漂移 ≤1 logical px | 本里程碑提交（2026-07-11） | coordinator 新增 geometry→首个完整可见 slot capture 与同 slot correction；localDy 漂移 `≤1` 视为稳定，测试覆盖 0.75 px 不动与 137.25 px 精确补偿。MessageList 用 `groupId/slotId` GlobalKey 测量 RenderBox，在所有双向分页前后统一 capture/restore，不再按 content extent 猜 prepend 高度；预算裁剪绝不删除当前 anchor。窗口 resize、版本/reasoning/图片 mutation 的主动触发在 TL-04/06/08 接入同契约 |
-| TL-04 | Following/user anchored/jump 状态机 | PD-04/05、TL-03 | `已完成` | 用户阅读历史时 stream 不强制跳动；coordinator/scroll/widget/lazy 聚焦回归通过 | 本里程碑提交（2026-07-11） | `TimelineViewportMode` 冻结 followingTail/userAnchored/programmaticJump/loading 四态；滚轮/触摸离底立即退出尾随，分页 loading 恢复原意图，stream 只更新未读/生成态而不移动 anchored viewport。新发送持久化后以 stable user slot programmatic jump 并建立本轮会话专属 anchor；`0.75 × viewport` 仅作为初始可用尾部高度上限，实际 spacer 会扣除从 user 顶部到当前回复尾部的真实占用，streaming widget 每次尺寸变化都在下一帧缩减差额，正文足够长时只剩基础 bottom padding，终态/切会话后清零。这样短回复不会因 target 清除立即 clamp，真实输出也不会被固定大空白推离视口。coordinator 从 loaded streaming slot 初始化 generation 状态，覆盖首 chunk 前及重开活跃会话场景；显式到底才恢复 following。新增带生成指示、live-region/button semantics 与中英本地化的“跳到最新”胶囊 |
+| TL-04 | Following/user anchored/jump 状态机 | PD-04/05、TL-03 | `进行中`（因 §10.1 TL-R1/R3/R4 重新打开） | 用户阅读历史时 stream 不强制跳动；coordinator/scroll/widget/lazy 聚焦回归通过 | 本里程碑提交（2026-07-11） | `TimelineViewportMode` 冻结 followingTail/userAnchored/programmaticJump/loading 四态；滚轮/触摸离底立即退出尾随，分页 loading 恢复原意图，stream 只更新未读/生成态而不移动 anchored viewport。新发送持久化后以 stable user slot programmatic jump 并建立本轮会话专属 anchor；`0.75 × viewport` 仅作为初始可用尾部高度上限，实际 spacer 会扣除从 user 顶部到当前回复尾部的真实占用，streaming widget 每次尺寸变化都在下一帧缩减差额，正文足够长时只剩基础 bottom padding，终态/切会话后清零。这样短回复不会因 target 清除立即 clamp，真实输出也不会被固定大空白推离视口。coordinator 从 loaded streaming slot 初始化 generation 状态，覆盖首 chunk 前及重开活跃会话场景；显式到底才恢复 following。新增带生成指示、live-region/button semantics 与中英本地化的“跳到最新”胶囊 |
 | TL-05 | `MessageRenderModel` 与细粒度订阅 | TL-01 | `已完成` | 无每行全列表扫描和无关整页 rebuild；render/lazy/widget 聚焦 35/35 | 本里程碑提交（2026-07-11） | `ChatController.messageRenderModels` 对 bounded snapshot 一次性投影 stable slot、排序 revisions、selected index、context divider 与 latest complete assistant，并随既有 snapshot cache 一起失效；row builder 删除反向全列表扫描、逐行 revision sort 和逐行 provider watch。Settings/Assistant 值只在 Home 列表边界订阅并作为窄 presentation 输入下传；每个非 stream slot 使用 stable-key RepaintBoundary，stream 继续只由对应 notifier 刷新 |
 | TL-06 | 增量 Markdown、字节 LRU、图片尺寸 | TL-05 | `已完成` | 长输出无平方级退化；图片不造成无控高度跳变；analyze + markdown/cache/stream 109/109 | 本里程碑提交（2026-07-11） | 4 KiB+ streaming Markdown 按 fence-aware blank boundary 切 stable source blocks，completed block 保持 identity/已渲染子树，仅 tail 随 120ms publish checkpoint 重建；1 MiB append 证明 scanner 累计只读 1 MiB 而非前缀和。新增通用 `ByteLruCache`，normalization 输入按 4 MiB decoded bytes、Mermaid bitmap 按 24 MiB 管理并暴露 bytes/evictions。Markdown 有宽高元数据时继续固定预留布局；所有支持图片按实际 logical size × DPR 包装 `ResizeImage`，避免 4K 原图按原尺寸 decode |
 | TL-07 | 长表格/代码/tool 虚拟化 | TL-05/06 | `已完成` | D5 不一次构造全部大 widget 树；analyze + markdown/tool/chat 128/128 | 本里程碑提交（2026-07-11） | 完成态 Markdown 表格默认只构造 header+39 body rows，按 100 rows 显式增量展开，copy/CSV/image export 仍使用全量数据；10,000 行 code 无论用户是否禁用自动折叠，超过 1,000 行即进入固定 420 px、每 chunk 200 行的 lazy ListView，高亮与选择仅作用于可见 chunks。tool arguments/result 超过 40 行或 12 KiB 默认 preview，展开为每 40 行/16 KiB chunk 的独立 selectable lazy viewport；桌面 dialog 与移动 bottom sheet 的两套 detail 路径全部接入。折叠/展开按钮含中英本地化与 expanded semantics |
 | TL-08 | 移动/桌面交互与可访问性 | TL-03～07 | `已完成` | 5/5 TargetPlatform contract；analyze + 全量 1271/1271 | 本里程碑提交（2026-07-11） | Android/iOS 保持 drag-dismiss keyboard，macOS/Windows/Linux 保持 manual dismiss 并验证平台 ScrollBehavior scrollbar；桌面 timeline Focus 捕获 Arrow/Page/Home/End 并退出 followingTail，滚轮、主键拖选、右键、问题导航、mini-map/search jump 同样冻结 user anchor。`WidgetsBindingObserver.didChangeMetrics` 在 userAnchored/programmatic 状态下执行 mutation 前 capture + 下一 frame slotId/localDy correction，followingTail resize 不与 bottom pin 竞争。跳到最新、超长内容 toggle 均具 button/live/expanded semantics。5/5 指 TargetPlatform widget contract matrix；真实五 OS 的 touch/mouse/keyboard/resize 复测仍按 §16 发布门禁记录，不伪装为本机实测。Phase 4 提交后的真实启动发现 scroll callbacks 早于 `_chatController` 初始化，已交换为 chat/controller → scroll 顺序并用直接构造 `HomePageController` 的 widget regression 锁定 |
+
+### 10.1 Phase 4 复审返工清单（2026-07-11，真机实测反馈驱动）
+
+用户真机实测报告两类症状：(a) 输出中或输出完成后一滑动，消息内容消失，只剩加载动画；(b) 自动滚动时不断小幅上下弹跳。复审确认这些不是零散 bug，而是 Phase 4 集成层的两个结构性缺陷，以下缺陷全部闭环并由用户复测确认前，Phase 4 不得视为完成，Phase 5 不得开工。
+
+| ID | 缺陷 | 严重度 | 根因链（已核实到行级） | 验收标准 |
+| --- | --- | --- | --- | --- |
+| TL-R1 | 单一真相源违规：流式与终态内容从不写回 coordinator 窗口，任何 coordinator 通知都会用过期 slots 覆盖 UI，内容永久退化为加载动画 | P0（用户可见数据"丢失"） | 发送时 `appendPersistedTailMessages` → `open()` 载入的 assistant slot 是数据库空壳（content 为空、`isStreaming=true`）。此后整个流式期间与 `_finishStreaming`（`chat_actions.dart` `_messages[index] = finalizedMessage`）只原地改 `ChatController._messages` 与 StreamingContentNotifier，**没有任何路径调用 `timelineCoordinator.replaceMessage`**，slots 永久过期。终态后 notifier 被 `removeStreamingNotifier` 移除。用户一滑动 → `userAnchored()` → `notifyListeners()` → `_syncTimelineWindow()` 把 `_messages` 整体替换为过期 slots → 助手消息变回空内容 + `isStreaming=true` 且无 notifier → `chat_message_widget.dart` 空内容 streaming 分支只渲染 `LoadingIndicator`，且无自愈路径 | 窗口内消息必须只有一个真相源：要么 checkpoint/final/流式 UI tick 同步更新 coordinator slot，要么 slots 成为唯一窗口数据、ChatActions/HomeViewModel 不再绕开 coordinator 原地改 `_messages`。新增回归：发送 → 流式 → 完成 → 依次触发 `userAnchored()`/`followTail()`/`loadBefore` → 断言可见内容与终态一致、无 `isStreaming` 残留、无空壳行 |
+| TL-R2 | 视口模式通知与数据窗口通知混流：每个 pointer move 都触发全窗口重同步 + 整页 rebuild | P0（性能 + 放大 TL-R1） | `userAnchored()`/`followTail()`/`noteContentChanged()` 与 slots 数据变更共用同一个 `notifyListeners()`；`ChatController._syncTimelineWindow` 对每次通知无条件重建 `_messages` + `invalidateCache` + `notifyListeners`。`MessageListView.onPointerMove` 每个拖动事件都调 `userAnchored()`，拖动期间每帧全量重建。`updateMessageInList` 一次调用连发 `replaceMessage` + `noteContentChanged` 两次通知，双重 resync | 视口模式变化与窗口数据变化分离（独立 Listenable 或 slots revision 对比短路）；纯模式切换不得触发 `_syncTimelineWindow`/整页 rebuild；拖动期间帧构建成本有 profile 证据 |
+| TL-R3 | 生成期两套滚动范式并存 + spacer 修正晚一帧 → 自动滚动持续小幅上下弹跳 | P0（用户可见抖动） | ① spacer 收缩依赖 `SizeChangedLayoutNotifier` → post-frame `setState`：第 N 帧内容长高 X（extent +X），第 N+1 帧 spacer 收缩 X（extent −X），offset 处于 max 附近时被反复 clamp。② `ChatAutoFollowScrollController` 在 layout 期把 pixels 钉到含 spacer 空白的 `maxScrollExtent`，与"用户消息置顶 + spacer"锚定范式直接冲突：jump 后 offset 天然贴近 max，`_handleUserScrollActivity` 以"距底 ≤24px"判定重新 `followTail()`，把视口钉进 spacer 空白。③ `UserScrollNotification` 对程序驱动动画也报非 idle 方向，`scrollToBottom` 的 animateTo 中途误触发 `userAnchored()`，模式在 followTail/userAnchored 间来回翻转，每次翻转又经 TL-R2 触发整页 rebuild | 生成期锚定模式下：bottom-pin 与 followTail 重入必须禁用，followTail 只能由显式"跳到最新"或用户真实拖到**内容底部**（判定排除 spacer 区域）触发；spacer 调整必须与内容增长同帧生效（layout 期计算），或生成期保持恒定、终态一次性回收并做锚点补偿；程序驱动滚动不得被当作用户滚动改变视口模式。验收含真机流式输出全程无 ±1 帧以上的 extent/offset 振荡证据 |
+| TL-R4 | 流结束后 coordinator `isGenerating` 永久为 true | P1 | 终态路径不调用 `noteContentChanged(isGenerating: false)` 也不更新 slot 的 `isStreaming`（TL-R1 同源）；`_isGenerating` 只会在下次 `open()`/`clear()` 重置。后果：终态后底部 spacer 永不回收（大片空白）、`didUpdateWidget` 的 spacer 清理分支永不生效 | 生成终态（completed/failed/cancelled）必须同步 coordinator 生成态；spacer 回收伴随锚点补偿，不产生可见跳动 |
+| TL-R5 | `open()` 先同步清空 slots 再异步加载 → 每次发送整页闪空 | P1 | `open()` 同步 `_slots = const []` + `notifyListeners()`，DB roundtrip 期间 `_syncTimelineWindow` 已把 `_messages` 清空，UI 显示空列表直到 page 返回 | 换窗口期间保留旧窗口内容（stale-while-revalidate）；发送路径优先增量 append 新 slot 而不是全量 reopen；无可见空白帧 |
+| TL-R6 | `stateRevision` 守卫使分页在图变更后静默失效 | P2 | regenerate/edit/selection 推进 `conversation_state.state_revision`，coordinator 只在 `open()/seed()` 刷新 `_stateRevision`；此后 `loadBefore/loadAfter` 命中 `page.stateRevision != _stateRevision` 永远返回 false 且无任何重载动作，分页悄悄卡死 | 守卫失败必须触发窗口重建（保持视觉锚点）而不是静默丢弃；新增"regenerate 后继续向上分页"回归 |
+
+复审结论：Phase 4 各 TL 工作项的单元测试全部为绿（1274/1274），但集成断层（ChatActions 流式路径 ↔ coordinator 窗口）没有任何测试覆盖，正是 R-10 所述"测试全绿掩盖需求反例未覆盖"的实例。返工顺序建议：TL-R1/R2 一起做（真相源与通知分离是同一改动面），然后 TL-R3/R4（滚动范式收敛），最后 TL-R5/R6。每项修复必须先写红色回归再修，且最终以用户真机复测（流式长输出 + 滑动 + 自动跟随）作为关闭证据。
 
 ## 11. Phase 5：Data Operations 与退役
 
@@ -479,7 +494,7 @@ dart run tool/run_restore_process_harness.dart \
 | R-07 | Graph ancestry 查询在超长会话退化 | 中 | D3 query plan/benchmark | parent 索引；必要时受控物化 view | `未开始` |
 | R-08 | Cache 只限制条目不限制字节再次 OOM | 高 | RSS/cache bytes telemetry | 所有 cache 字节 LRU | `未开始` |
 | R-09 | 普通备份继续泄露秘密 | 高 | ZIP 内容审计 | P0-08 + OPS-07 | `进行中`：应用已知认证凭据已排除；自由文本与 secure storage 边界待 OPS-07 |
-| R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿 | `进行中` |
+| R-10 | 测试全绿掩盖需求反例未覆盖 | 高 | 需求矩阵与现有测试 diff | 已补恢复/candidate/rollback 反例；其余按工作项继续先红后绿。已发生实例：Phase 4 全量 1274/1274 绿但真机流式+滑动即触发 §10.1 TL-R1/R3，集成断层（ChatActions 流式路径 ↔ coordinator 窗口）无任何测试；返工必须补齐该层集成回归 | `进行中` |
 | R-11 | overwrite 直接依次写 settings/DB/assets 形成混合 bundle | 高 | settings、DB、各资源目录 failpoint 与重启指纹 | 同卷 staging + previous + durable receipt + business lease + 启动恢复 | `进行中`：P0-02 应用层实现已移除运行期在线覆盖并完成 operation-ahead 主链；macOS 25/25 forward、两个 terminal projection 各 6/6、rollback 18/18、legacy marker 3/3 高层 SIGKILL，以及 terminal settings 混合态 2/2 跨进程修复均收敛；selected missing/unselected payload 回归通过。风险仍保留为进行中，因为 raw durability、硬件断电、其余 topology、五平台与升级时旧版本进程退出策略属于 OPS/发布门禁且尚未完成 |
 | R-12 | 受损 Hive 迁移 ZIP 被严格引用校验整体拒绝 | 高 | 缺 message/orphan 的真实旧备份 fixture | Recovered conversation/rejects adapter，保留原始问题报告 | `未开始` |
 | R-13 | 旧 `chats.json`/迁移 JSON 全量解码导致 OOM/主 isolate 卡顿 | 高 | 600–800MB legacy fixture 的 RSS/frame profile | 新备份改 SQLite snapshot；legacy adapter 使用 chunk reader 与增量导入 | `进行中` |
@@ -490,16 +505,18 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2～4 已完成且无产品决策阻塞。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，TL-08 的非 macOS 实机交互也仍需发布门禁补证；这些不重新打开已经由 capability/TargetPlatform contract matrix 通过的实现工作项。
+PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2～3 保持关闭。Phase 4 因真机实测暴露的 §10.1 结构性缺陷重新打开：TL-R1～R6 是当前唯一阻塞项，全部闭环并经用户真机复测确认前，Phase 5 不得开工。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行与 TL-08 非 macOS 实机交互仍留在发布门禁。
 
 ## 19. 下一步
 
-Phase 4 已完成 8/8：Timeline 与 Renderer 实现阶段关闭。下一步按方案进入 Phase 5 `OPS-01`，先冻结 SQLite bundle backup/restore/merge 的 manifest、hash、兼容 JSON 导入与 portable export 契约；真实五平台交互/profile 继续作为发布门禁证据补齐，不阻塞 Phase 5 的数据操作实现。
+立即执行 §10.1 返工：先 TL-R1/R2（流式/终态内容写回 coordinator 单一真相源 + 视口模式与数据窗口通知分离），再 TL-R3/R4（生成期滚动范式收敛为单一锚定范式、spacer 同帧修正与终态回收），最后 TL-R5/R6（open 闪空与 stateRevision 分页自愈）。每项先写红色回归再修复，关闭证据必须包含用户真机复测（流式长输出 + 输出中/输出后滑动 + 自动跟随全程无弹跳）。Phase 5 `OPS-01` 在此之后再恢复推进。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-11 | Phase 4 复审重新打开：用户真机实测（内容滑动后消失变加载动画、自动滚动小幅弹跳）驱动的行级根因分析确认两个结构性缺陷——流式/终态内容从不写回 coordinator 窗口且任何 coordinator 通知都会用过期 slots 覆盖 `_messages`（TL-R1/R2）、生成期 bottom-pin 与 programmatic anchor+spacer 两套滚动范式并存且 spacer 修正晚一帧（TL-R3/R4），另登记发送闪空（TL-R5）与 stateRevision 分页静默失效（TL-R6）。TL-02/TL-04 状态回退为进行中，§10.1 冻结返工验收标准与顺序，Phase 5 暂缓 | TL-R1～R6、TL-02、TL-04、R-10 | 本复审提交 | 用户 / Fable |
+| 2026-07-11 | 完成 TL-R1 实现：新增统一窗口 snapshot 更新入口，同时写入 `ChatController._messages` 与 coordinator slot；ChatActions 的 preparing/regenerate/cancel/chunk/completed/failed 和 HomeViewModel 的 throttled tick/restore cleanup 不再绕开 coordinator 原地改消息。流式高频镜像不发布全窗口通知，终态 notifier 移除前 slot 已含完整正文与 `isStreaming=false`。红绿回归覆盖 partial→`userAnchored`→`loadBefore`→completed→`followTail`，可见正文和 slot 终态均不回退；controller/stream 32/32 与 analyze 通过。真机复测仍作为 Phase 4 总关闭证据 | TL-R1 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 generation terminal 收口：新增单事务 final command，把最终 legacy shadow、graph parts、tool events、最后 checkpoint seq、兼容 active receipt 清理和 run terminal CAS 一起提交；准备失败不伪造 checkpoint，terminal CAS 故障整包回滚，late checkpoint 不能覆盖 final。ChatActions 持有 run state/revision cursor，complete/failed/cancelled 均经 final barrier；错误详情只走 UI error channel，正文保留真实 partial 或空串；所有 loading/notifier/iOS/runtime cursor 清理置于 finally，持久化失败也不永久 loading | GEN-04 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 generation 三链解耦：stream listener 不再 pause/resume source，网络事件只进入本地 FIFO，由单 consumer 顺序处理，terminal event 排在已接收 chunk 后；UI 继续 50ms coalesced、DB 继续 250ms latest-wins/final barrier、iOS 继续 500ms latest-wins，三者不阻塞网络读取。run 在请求/首 chunk 以 CAS 进入 requesting/streaming；checkpoint cursor 单调前进，message/graph parts/tool snapshot 与 `checkpoint_seq` 同事务，stale checkpoint 失败时正文也回滚 | GEN-03 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 atomic generation begin：persistent send 的 user/assistant legacy shadow、graph slots/revisions/parts、branch/state、兼容 active receipt 和 preparing run 在同一外层事务提交；regeneration 的 alternate revision/native branch/run 同事务提交。ChatService commit 后才发布 cache，ChatActions 将 user/assistant pair 作为一次 tail mutation，避免原子落库后被逐条 UI 更新误判为缺口；重复 run ID fault 证明所有 message/part/branch/state 回滚。temporary conversation 保持明确的内存路径 | GEN-02 | 本里程碑提交 | Codex |

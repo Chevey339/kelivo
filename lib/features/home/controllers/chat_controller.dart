@@ -668,15 +668,23 @@ class ChatController extends ChangeNotifier {
 
   /// Update a message in the list.
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
+    if (!replaceMessageSnapshot(updatedMessage)) return;
+    timelineCoordinator.noteContentChanged(
+      isGenerating: updatedMessage.isStreaming,
+    );
+    notifyListeners();
+  }
+
+  /// Mirrors an in-memory message snapshot into the timeline window without
+  /// publishing a full-window change. Streaming UI has its own narrow notifier.
+  bool replaceMessageSnapshot(ChatMessage updatedMessage) {
+    final messageId = updatedMessage.id;
     final index = _messages.indexWhere((m) => m.id == messageId);
-    if (index != -1) {
-      _messages[index] = updatedMessage;
-      timelineCoordinator.replaceMessage(updatedMessage);
-      timelineCoordinator.noteContentChanged(
-        isGenerating: updatedMessage.isStreaming,
-      );
-      notifyListeners();
-    }
+    if (index == -1) return false;
+    _messages[index] = updatedMessage;
+    timelineCoordinator.replaceMessage(updatedMessage, notify: false);
+    invalidateCache();
+    return true;
   }
 
   /// Update a message by ID with optional new values.
