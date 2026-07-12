@@ -887,6 +887,10 @@ class ChatController extends ChangeNotifier {
       messages: collapsedMessages,
       byGroup: groupedMessages,
       versionSelections: _versionSelections,
+      versionCounts: {
+        for (final slot in timelineCoordinator.slots)
+          slot.identity.slotId: slot.identity.versionCount,
+      },
       contextDividerIndex: _collapsedContextDividerIndex(),
     );
   }

@@ -830,7 +830,7 @@ class _MessageListViewState extends State<MessageListView>
     final useAssistName = assistant?.useAssistantName == true;
     final gid = model.slotId;
     final selectedIdx = model.selectedVersionIndex;
-    final total = model.versions.length;
+    final total = model.versionCount;
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&

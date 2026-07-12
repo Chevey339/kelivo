@@ -163,8 +163,12 @@ u1, a1-v0, u2, a2-v0, a1-v1
 
 以下决策已确认为本次重构的产品语义基线。后续若要更改，必须先修订本节并评估 schema/迁移影响。
 
-- **PD-01：采用真实分支。** 编辑 user 或重生成 assistant 都创建新 branch，旧后续对话完整保留在旧 branch，不无条件把"未来消息"续在新版本后面。同一 slot 的版本切换即 branch head 切换，UI 使用 ChatGPT 式 `< n/m >` 版本分页控件表达。这是 ChatGPT/Claude 的共同语义，也是唯一能保证"重生成旧回答不把未来轮次吃进上下文"的模型。
-- **PD-02：不物理删除旧后代。** 编辑 user 从其 parent revision fork 新 branch（新 user revision + 新 assistant generation）；重生成 assistant 在同 slot 创建新 revision 并成为新 branch head。删除是显式操作：删除单个 revision 时，若它是当前选中版本则自动切换到同 slot 最新剩余 revision；删除 slot 最后一个 revision 前必须提示将一并移除依赖它的后代 branch 段。物理 GC 延迟、批量执行并留审计记录。
+- **PD-01（2026-07-12 修订）：schema 保留真实分支，默认产品语义为"同 slot 版本 + 保留后代"。** 用户真机反馈证明纯 ChatGPT fork 语义与 Kelivo 既有产品合同冲突："仅保存"编辑 user 消息、默认关闭的"重新生成时删除下面的消息"开关都要求变更某个 slot 的内容后**下方对话原样保留**。因此：
+  - 默认变更（"仅保存"、"保存并发送"、`regenerateDeleteTrailingMessages=false` 的重生成、版本切换）在同一 slot 创建/选择 sibling revision，并把该 slot 在 active path 上的直接 child re-parent 到新选中 revision（graft），branch 与下方所有 slot 不变；UI 仍用 `< n/m >` 版本分页控件表达同 slot 的 siblings。
+  - 只有 `regenerateDeleteTrailingMessages=true` 的重生成与显式"截断到此处"操作才走 fork：创建截止于新 revision 的新 branch，旧后续对话完整保留在旧 branch。
+  - 两种语义下，生成 prompt 的上下文都只来自目标 slot 的真实祖先（graft 的 descendants 不进入该次生成的 prompt），原不变量 3 不受影响。
+  - graft 会改写共享路径段上其它 branch 看到的该 slot 内容，这与旧版"版本切换作用于整个会话"的语义一致，属预期行为并记录于此。
+- **PD-02（2026-07-12 修订）：不物理删除旧后代。** 默认（graft）语义下旧 revision 作为同 slot sibling 保留，随时可 graft-select 切回；fork 语义下旧后续保留在旧 branch。删除是显式操作：删除单个 revision 时，若它是当前选中版本则自动 graft-select 到同 slot 最新剩余 revision；删除 slot 最后一个 revision 前必须提示将一并移除依赖它的后代段。物理 GC 延迟、批量执行并留审计记录。
 - **PD-03：中断保留 partial，不做"继续生成"。** 用户取消、断网或崩溃恢复后的输出保留 partial content，气泡显示"已中断"标识，提供"重新生成"（同 slot 新 revision）和"删除"。partial 被后续轮次引用时按原样纳入上下文并保持标注（与 Claude 行为一致）。"继续生成"依赖 provider 侧不可靠的续写语义，列为 v2 之后的评估项，不进入本次范围。
 - **PD-04：发送永远追加到 active branch leaf。** 用户在历史位置阅读时发送，执行一次 programmatic jump，把新 user 消息定位到 viewport 顶部附近（而不是贴底），assistant 回答随后向下流入，保证新一轮从头可读。编辑历史 user 消息走 PD-02 分支语义，该消息保持原 viewport 锚定，直到新回答首帧可见。
 - **PD-05：绝不违背用户意图移动 viewport。** 滚动离开底部、选择文本、使用键盘、打开链接、触发搜索都视为阅读信号，立即退出 followingTail；流式内容在屏外继续，不改变用户所见位置；复用右侧既有“到底”导航按钮恢复尾随，不新增重复胶囊。会话重新打开时定位到最后一条 user 消息顶部，而非绝对底部。
@@ -376,12 +380,17 @@ erDiagram
 7. final 先关闭新 checkpoint 入队，等待/取消旧 snapshot，并用 barrier 串行执行最终 parts、usage、finalized time、provider artifacts 和 `completed` 事务；旧 checkpoint 永远不能越过 final。
 8. prepare、网络、解析、工具或持久化失败统一进入明确终态并清理 loading；错误信息不写入权威 message parts。
 
-### 7.2 重生成和编辑
+### 7.2 重生成和编辑（2026-07-12 按 PD-01 修订）
 
-- 重生成 assistant：在同一 slot 创建新 revision，其 parent 指向目标 assistant 之前的真实 revision；创建新 branch head。
-- 编辑 user：从该 user 之前的 revision fork，创建新的 user revision，再创建新的 assistant generation。
-- 旧 branch 和旧后代不进入新 prompt，但在用户切回旧 revision 时仍可访问。
-- 删除后续不是逐行物理删除和全表 compact，而是创建/切换到截止于目标 revision 的 branch；物理 GC 延迟执行。
+- 默认语义（graft，保留后代）：
+  - 重生成 assistant（`regenerateDeleteTrailingMessages=false`）：同 slot 创建新 revision（parent 与被替换 revision 相同），把被替换 revision 在 active path 上的直接 child re-parent 到新 revision；branch leaf 仅在目标是 leaf 时前移，其余 slot 不变。
+  - "仅保存"/"保存并发送"编辑 user：同上创建新 user revision 并 graft；"保存并发送"随后对其下方 assistant slot 走重生成语义。
+  - 版本切换：graft-select——把该 slot 的 on-path child re-parent 到用户选中的 sibling revision，下方对话不变；不再等于 branch head 切换。
+  - 以上操作均为单一事务：新 revision + re-parent + stateRevision 递增。
+- fork 语义（截断，仅两种入口）：
+  - `regenerateDeleteTrailingMessages=true` 的重生成：创建截止于新 revision 的新 branch 并激活，旧后续对话保留在旧 branch，不做物理删除。
+  - 显式删除后续/截断操作：同上创建/切换到截止于目标 revision 的 branch；物理 GC 延迟执行。
+- 任一语义下，重生成/编辑的 prompt 上下文只包含目标 slot 的真实祖先，不包含 graft 保留的后代。
 - fork conversation 初期可以复制 graph 元数据引用或批量克隆；不得逐条大内容同步写并构造半个会话。
 
 上下文构建必须只接受 branch/revision 身份，不接受 raw list index：
@@ -470,6 +479,12 @@ stateDiagram-v2
 - **窗口唯一真相源**：可见窗口的唯一数据源是 timeline coordinator 的 slots；controller 的消息列表只是派生视图。任何图变更（发送、编辑、重生成、版本切换、删除、fork、跨窗口定位）都必须通过 coordinator 的 stable-cursor 操作（open/openAround/refresh/remove）发布，禁止任何 offset seed 或绕过 coordinator 的直接列表写入。
 - **generation 生命周期按会话隔离**：终态/开始信号只允许写入 `conversationId` 匹配的 coordinator 状态，后台会话的生成事件不得触碰前台会话的视口与 spacer。
 
+实现要点（2026-07-12 第三轮复审补充）：
+
+- **同一帧只允许一个滚动执行器写位置**：layout 阶段的 bottom-pin（`correctPixels`）、`animateTo` 驱动动画、visual anchor 修正 `jumpTo`、observer `animateTo`、`ensureVisible` 五种执行器互斥。followingTail 且流式增长期间禁止发起 `animateTo` 到底（由 layout pin 直接接管，必要时一次 `jumpTo`）；任何驱动动画存活期间挂起 layout pin，动画结束后再按模式恢复。违反本条会产生"动画目标 vs layout 修正"逐帧对抗，即无限上下跳动。
+- **手势内不翻转意图**：一次手势（pointer down→up / 一段滚轮序列）内只在手势结束时结算一次意图（距内容底部阈值内 → followingTail，否则 userAnchored）；pointer move 与 scroll notification 不得在同一手势内交替发布 `userAnchored`/`followTail`。生成期 anchor/spacer 状态只能被手势结算销毁，不能被手势中间态销毁。
+- **jump 管线的测量与执行必须使用同一帧的输入**：spacer 测量捕获当帧的 `bottomContentPadding`/viewport 高度/键盘 inset；若 jump 执行帧任一输入已变化（输入框收缩、键盘动画、首个流式 chunk），重新测量而不是沿用陈旧 spacer。目标 slot 未布局时不得静默停摆：先按估算 offset `jumpTo` 迫使目标进入布局，再做精确修正。
+
 正确锚点算法：
 
 1. 数据变化前记录第一个完整可见 slot 的 `slotId` 和相对 viewport 顶部的 `localDy`。
@@ -532,7 +547,7 @@ stateDiagram-v2
 下列操作必须各自在单一事务中完成：
 
 - append user + assistant placeholder + run + branch head；
-- append revision + 创建/切换 branch；
+- append revision + graft re-parent（默认语义）或创建/切换 branch（fork 语义）；
 - generation final authoritative parts + usage + finalized time + run state；
 - fail/cancel/interruption收尾；
 - 删除 revision/branch 并修复 active head；

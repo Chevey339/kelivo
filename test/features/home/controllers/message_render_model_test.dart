@@ -33,6 +33,7 @@ void main() {
         'tail': [streaming],
       },
       versionSelections: const {'answer': 1},
+      versionCounts: const {'answer': 2},
       contextDividerIndex: 1,
     );
 
@@ -52,10 +53,29 @@ void main() {
         'only': [only],
       },
       versionSelections: const {'only': 99},
+      versionCounts: const {'only': 1},
       contextDividerIndex: -1,
     );
 
     expect(models.single.selectedVersionIndex, 0);
     expect(models.single.versionCount, 1);
+  });
+
+  test('uses authoritative slot count when sibling revisions are evicted', () {
+    final selected = message('a1', 'assistant', groupId: 'answer', version: 1);
+
+    final models = MessageRenderModelProjector.project(
+      messages: [selected],
+      byGroup: {
+        'answer': [selected],
+      },
+      versionSelections: const {'answer': 1},
+      versionCounts: const {'answer': 2},
+      contextDividerIndex: -1,
+    );
+
+    expect(models.single.versions, [selected]);
+    expect(models.single.versionCount, 2);
+    expect(models.single.selectedVersionIndex, 1);
   });
 }
