@@ -2036,5 +2036,8 @@
   "migrationUnknownError": "未知遷移錯誤。",
   "migrationFailureLogTitle": "失敗日誌",
   "migrationRetryButton": "重試遷移",
-  "timelineJumpToLatest": "跳到最新"
+  "timelineJumpToLatest": "跳到最新",
+  "largeContentShowMore": "再顯示 {count} 項",
+  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "largeContentCollapse": "收起"
 }

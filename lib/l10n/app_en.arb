@@ -2466,5 +2466,8 @@
   "migrationUnknownError": "Unknown migration error.",
   "migrationFailureLogTitle": "Failure log",
   "migrationRetryButton": "Retry Migration",
-  "timelineJumpToLatest": "Jump to latest"
+  "timelineJumpToLatest": "Jump to latest",
+  "largeContentShowMore": "Show {count} more",
+  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "largeContentCollapse": "Collapse"
 }

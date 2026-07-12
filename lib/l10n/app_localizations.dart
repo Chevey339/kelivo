@@ -10511,6 +10511,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Jump to latest'**
   String get timelineJumpToLatest;
+
+  /// No description provided for @largeContentShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more'**
+  String largeContentShowMore(int count);
+
+  /// No description provided for @largeContentCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get largeContentCollapse;
 }
 
 class _AppLocalizationsDelegate

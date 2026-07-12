@@ -5722,4 +5722,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get timelineJumpToLatest => 'Jump to latest';
+
+  @override
+  String largeContentShowMore(int count) {
+    return 'Show $count more';
+  }
+
+  @override
+  String get largeContentCollapse => 'Collapse';
 }

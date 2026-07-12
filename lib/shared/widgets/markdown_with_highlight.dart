@@ -2204,6 +2204,18 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     final highlightEnabled = !_shouldSkipHighlightWhileStreaming();
 
     Widget buildCodeView(String visibleCode) {
+      final bool isDesktop =
+          Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+      if (_exceedsLineThreshold(visibleCode, 1000)) {
+        return _VirtualizedCodeView(
+          code: visibleCode,
+          language: codeLanguage,
+          theme: codeTheme,
+          textStyle: codeTextStyle,
+          enableHighlight: highlightEnabled,
+          wrap: isDesktop || settings.mobileCodeBlockWrap,
+        );
+      }
       final codeView = SelectableHighlightView(
         visibleCode,
         language: codeLanguage,
@@ -2213,8 +2225,6 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
         enableHighlight: highlightEnabled,
       );
 
-      final bool isDesktop =
-          Platform.isMacOS || Platform.isWindows || Platform.isLinux;
       if (isDesktop || settings.mobileCodeBlockWrap) {
         return codeView;
       }
@@ -2540,6 +2550,80 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
   }
 }
 
+class _VirtualizedCodeView extends StatefulWidget {
+  const _VirtualizedCodeView({
+    required this.code,
+    required this.language,
+    required this.theme,
+    required this.textStyle,
+    required this.enableHighlight,
+    required this.wrap,
+  });
+
+  final String code;
+  final String language;
+  final Map<String, TextStyle> theme;
+  final TextStyle textStyle;
+  final bool enableHighlight;
+  final bool wrap;
+
+  @override
+  State<_VirtualizedCodeView> createState() => _VirtualizedCodeViewState();
+}
+
+class _VirtualizedCodeViewState extends State<_VirtualizedCodeView> {
+  static const int _linesPerChunk = 200;
+  late List<String> _chunks;
+
+  @override
+  void initState() {
+    super.initState();
+    _chunks = _chunkLines(widget.code);
+  }
+
+  @override
+  void didUpdateWidget(covariant _VirtualizedCodeView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.code != widget.code) _chunks = _chunkLines(widget.code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      key: const ValueKey('virtualized-code-view'),
+      height: 420,
+      child: ListView.builder(
+        primary: false,
+        itemCount: _chunks.length,
+        itemBuilder: (context, index) {
+          final code = SelectableHighlightView(
+            _chunks[index],
+            language: widget.language,
+            theme: widget.theme,
+            padding: EdgeInsets.zero,
+            textStyle: widget.textStyle,
+            enableHighlight: widget.enableHighlight,
+          );
+          if (widget.wrap) return code;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            primary: false,
+            child: code,
+          );
+        },
+      ),
+    );
+  }
+
+  static List<String> _chunkLines(String code) {
+    final lines = code.split(RegExp(r'\r\n|\r|\n'));
+    return [
+      for (var start = 0; start < lines.length; start += _linesPerChunk)
+        lines.skip(start).take(_linesPerChunk).join('\n'),
+    ];
+  }
+}
+
 class _CodeBlockCollapsedTailFade extends StatelessWidget {
   const _CodeBlockCollapsedTailFade({required this.color});
 
@@ -2837,19 +2921,33 @@ String markdownTableRowsToMarkdownForTesting(List<List<String>> rows) =>
 @visibleForTesting
 TargetPlatform? markdownTableTargetPlatformOverride;
 
-class _MarkdownTableBlock extends StatelessWidget {
-  _MarkdownTableBlock({
+class _MarkdownTableBlock extends StatefulWidget {
+  const _MarkdownTableBlock({
     required this.rows,
     required this.style,
     required this.config,
     required this.appFontFamily,
-  }) : _tableBoundaryKey = GlobalKey();
+  });
 
   final _MarkdownTableData rows;
   final TextStyle style;
   final GptMarkdownConfig config;
   final String? appFontFamily;
-  final GlobalKey _tableBoundaryKey;
+
+  @override
+  State<_MarkdownTableBlock> createState() => _MarkdownTableBlockState();
+}
+
+class _MarkdownTableBlockState extends State<_MarkdownTableBlock> {
+  static const int _initialRows = 40;
+  static const int _rowPageSize = 100;
+  final GlobalKey _tableBoundaryKey = GlobalKey();
+  int _visibleRows = _initialRows;
+
+  _MarkdownTableData get rows => widget.rows;
+  TextStyle get style => widget.style;
+  GptMarkdownConfig get config => widget.config;
+  String? get appFontFamily => widget.appFontFamily;
 
   @override
   Widget build(BuildContext context) {
@@ -2895,6 +2993,9 @@ class _MarkdownTableBlock extends StatelessWidget {
           compact: useCompactTable,
           columnWidth: columnWidth,
           fixedColumns: shouldScrollHorizontally,
+          rowCount: isExporting
+              ? rows.rows.length
+              : math.min(rows.rows.length, _visibleRows),
         );
 
         final tableSurface = _buildTableSurface(
@@ -2908,7 +3009,14 @@ class _MarkdownTableBlock extends StatelessWidget {
         if (!useCompactTable) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: tableSurface,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                tableSurface,
+                if (!isExporting) _buildRowPager(context),
+              ],
+            ),
           );
         }
 
@@ -2958,6 +3066,7 @@ class _MarkdownTableBlock extends StatelessWidget {
                     child: tableSurface,
                   ),
                 ),
+                if (!isExporting) _buildRowPager(context),
               ],
             ),
           ),
@@ -2973,6 +3082,7 @@ class _MarkdownTableBlock extends StatelessWidget {
     required bool compact,
     required double columnWidth,
     required bool fixedColumns,
+    required int rowCount,
   }) {
     final columnWidths = <int, TableColumnWidth>{
       for (int i = 0; i < rows.columnCount; i++)
@@ -2992,7 +3102,7 @@ class _MarkdownTableBlock extends StatelessWidget {
       ),
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: [
-        for (int r = 0; r < rows.rows.length; r++)
+        for (int r = 0; r < rowCount; r++)
           TableRow(
             decoration: r == 0 ? BoxDecoration(color: headerBg) : null,
             children: [
@@ -3006,6 +3116,34 @@ class _MarkdownTableBlock extends StatelessWidget {
                   selectable: !compact,
                 ),
             ],
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRowPager(BuildContext context) {
+    if (rows.rows.length <= _initialRows) return const SizedBox.shrink();
+    final remaining = rows.rows.length - _visibleRows;
+    final l10n = AppLocalizations.of(context)!;
+    return Row(
+      key: const ValueKey('markdown-table-row-pager'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (_visibleRows > _initialRows)
+          TextButton(
+            onPressed: () => setState(() => _visibleRows = _initialRows),
+            child: Text(l10n.largeContentCollapse),
+          ),
+        if (remaining > 0)
+          TextButton(
+            key: const ValueKey('markdown-table-show-more'),
+            onPressed: () => setState(
+              () => _visibleRows = math.min(
+                rows.rows.length,
+                _visibleRows + _rowPageSize,
+              ),
+            ),
+            child: Text(l10n.largeContentShowMore(remaining)),
           ),
       ],
     );
