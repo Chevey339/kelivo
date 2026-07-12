@@ -1335,6 +1335,27 @@ class ChatDatabaseRepository {
     if (updated != 1) throw StateError('migration_run_missing');
   }
 
+  Future<Map<String, int>> legacyMigrationIssueCounts(
+    String migrationRunId,
+  ) async {
+    final rows = await _db
+        .customSelect(
+          'SELECT severity, COUNT(*) AS issue_count '
+          'FROM migration_issue_rows WHERE migration_run_id = ? '
+          'GROUP BY severity;',
+          variables: [Variable.withString(migrationRunId)],
+          readsFrom: {_db.migrationIssueRows},
+        )
+        .get();
+    return Map.unmodifiable({
+      'warning': 0,
+      'recovered': 0,
+      'rejected': 0,
+      for (final row in rows)
+        row.read<String>('severity'): row.read<int>('issue_count'),
+    });
+  }
+
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
     final stopwatch = Stopwatch()..start();
     try {

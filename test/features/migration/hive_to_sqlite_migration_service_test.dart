@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -222,6 +223,11 @@ void main() {
 
     final afterMigration = await HiveToSqliteMigrationService.check();
     expect(afterMigration.needsMigration, isFalse);
+    final rollout = await DatabaseV2RolloutLedger(tempDir).read();
+    expect(rollout, isNotNull);
+    expect(rollout!.conversationCount, 1);
+    expect(rollout.messageCount, 2);
+    expect(rollout.issueCounts.keys, {'warning', 'recovered', 'rejected'});
 
     final chatService = ChatService();
     await chatService.init();

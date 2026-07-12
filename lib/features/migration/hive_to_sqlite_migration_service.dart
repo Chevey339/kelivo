@@ -13,6 +13,7 @@ import '../../core/database/chat_database_repository.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/conversation.dart';
 import '../../core/services/backup/data_sync.dart' as backup_sync;
+import '../../core/services/database_v2_rollout_ledger.dart';
 import '../../utils/app_directories.dart';
 
 enum HiveToSqliteMigrationStage {
@@ -482,6 +483,9 @@ class HiveToSqliteMigrationService {
         migrationRunId: graphMigrationRunId,
         completedAt: DateTime.now().toUtc(),
       );
+      final migrationIssueCounts = await repo.legacyMigrationIssueCounts(
+        graphMigrationRunId,
+      );
 
       _emit(
         HiveToSqliteMigrationStage.migrating,
@@ -510,6 +514,24 @@ class HiveToSqliteMigrationService {
       repo = null;
 
       await _replaceSqlite(tempFile, decision.sqliteFile);
+      try {
+        await DatabaseV2RolloutLedger(
+          decision.appDataDir,
+        ).recordMigrationCompleted(
+          migrationRunId: graphMigrationRunId,
+          sourceKind: 'hive',
+          sourceHash: graphSourceHash,
+          migratedAtUtc: DateTime.now().toUtc(),
+          conversationCount: conversations.length,
+          messageCount: totalMessages,
+          issueCounts: migrationIssueCounts,
+        );
+      } catch (error) {
+        // Rollout evidence must never turn an already verified and installed
+        // database into a false migration failure. Missing evidence keeps the
+        // later retirement gate closed, which is the safe fallback.
+        _logLine('rollout-ledger: $error');
+      }
       _emit(
         HiveToSqliteMigrationStage.complete,
         1,

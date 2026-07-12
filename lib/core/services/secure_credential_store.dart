@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,18 @@ import 'backup/backup_settings_sanitizer.dart';
 /// non-secret configuration shape in SharedPreferences.
 final class SecureCredentialStore {
   const SecureCredentialStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage();
+    : _storage =
+          storage ??
+          const FlutterSecureStorage(
+            // The data-protection keychain requires a provisioned Keychain
+            // Sharing entitlement on macOS and makes unsigned development
+            // builds unusable. The legacy macOS Keychain is still the platform
+            // secure store and works for signed releases and local builds.
+            mOptions: MacOsOptions(
+              accessibility: null,
+              usesDataProtectionKeychain: false,
+            ),
+          );
 
   final FlutterSecureStorage _storage;
   static const _prefix = 'kelivo.credentials.v1.';
@@ -107,6 +119,11 @@ final class SecureCredentialStore {
       return await _storage.read(key: key);
     } on MissingPluginException {
       return _missingPluginFallback[key];
+    } on PlatformException catch (error) {
+      if (_requiresMacOsLoginKeychainFallback(error)) {
+        return _MacOsLoginKeychain.read(key);
+      }
+      rethrow;
     }
   }
 
@@ -117,6 +134,12 @@ final class SecureCredentialStore {
       // Unit-test and unsupported-runner fallback remains memory-only. Never
       // fall back to plaintext preferences.
       _missingPluginFallback[key] = value;
+    } on PlatformException catch (error) {
+      if (_requiresMacOsLoginKeychainFallback(error)) {
+        await _MacOsLoginKeychain.write(key, value);
+        return;
+      }
+      rethrow;
     }
   }
 
@@ -125,8 +148,20 @@ final class SecureCredentialStore {
       await _storage.delete(key: key);
     } on MissingPluginException {
       _missingPluginFallback.remove(key);
+    } on PlatformException catch (error) {
+      if (_requiresMacOsLoginKeychainFallback(error)) {
+        await _MacOsLoginKeychain.delete(key);
+        return;
+      }
+      rethrow;
     }
   }
+
+  static bool _requiresMacOsLoginKeychainFallback(PlatformException error) =>
+      Platform.isMacOS &&
+      (error.details == -34018 ||
+          error.message?.contains('-34018') == true ||
+          error.message?.contains('entitlement') == true);
 
   static void _collectDifferences(
     Object? original,
@@ -179,6 +214,67 @@ final class SecureCredentialStore {
         list[item] = value;
       default:
         throw const FormatException('credential_overlay_path');
+    }
+  }
+}
+
+/// Unsigned macOS development builds cannot use the data-protection Keychain
+/// because Apple requires a provisioned Keychain Sharing entitlement. The
+/// login Keychain remains available through Apple's `/usr/bin/security` tool.
+/// Values are base64-encoded and sent through stdin so credentials never
+/// appear in process arguments or logs.
+abstract final class _MacOsLoginKeychain {
+  static const _service = 'psyche.kelivo.credentials.v1';
+  static const _executable = '/usr/bin/security';
+
+  static Future<String?> read(String key) async {
+    final result = await Process.run(_executable, [
+      'find-generic-password',
+      '-a',
+      key,
+      '-s',
+      _service,
+      '-w',
+    ]);
+    if (result.exitCode == 44) return null;
+    if (result.exitCode != 0) throw StateError('macos_keychain_read');
+    final encoded = (result.stdout as String).trim();
+    try {
+      return utf8.decode(base64Decode(encoded));
+    } on FormatException {
+      throw StateError('macos_keychain_value');
+    }
+  }
+
+  static Future<void> write(String key, String value) async {
+    final process = await Process.start(_executable, [
+      'add-generic-password',
+      '-U',
+      '-a',
+      key,
+      '-s',
+      _service,
+      '-w',
+    ]);
+    final stdout = process.stdout.drain<void>();
+    final stderr = process.stderr.drain<void>();
+    process.stdin.writeln(base64Encode(utf8.encode(value)));
+    await process.stdin.close();
+    final exitCode = await process.exitCode;
+    await Future.wait([stdout, stderr]);
+    if (exitCode != 0) throw StateError('macos_keychain_write');
+  }
+
+  static Future<void> delete(String key) async {
+    final result = await Process.run(_executable, [
+      'delete-generic-password',
+      '-a',
+      key,
+      '-s',
+      _service,
+    ]);
+    if (result.exitCode != 0 && result.exitCode != 44) {
+      throw StateError('macos_keychain_delete');
     }
   }
 }

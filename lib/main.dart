@@ -36,6 +36,7 @@ import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/database/database_installation_gate.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/database_v2_rollout_ledger.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
@@ -54,7 +55,10 @@ import 'shared/widgets/restore_outcome_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
-    show Platform, stderr; // kept for global override usage inside provider
+    show
+        Platform,
+        pid,
+        stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -129,7 +133,7 @@ Future<void> main() async {
           );
           return;
         }
-        await DatabaseInstallationGate.ensureReady(
+        final installationReceipt = await DatabaseInstallationGate.ensureReady(
           appDataDirectory: appDataDirectory,
           allowDatabaseIdentityChange:
               restoreOutcome?.selectedComponents.contains(
@@ -137,6 +141,29 @@ Future<void> main() async {
               ) ??
               false,
         );
+        try {
+          final rollout = DatabaseV2RolloutLedger.rolloutDecision(
+            installationId: installationReceipt.installationId,
+            enabledBasisPoints: const int.fromEnvironment(
+              'KELIVO_DATABASE_V2_ROLLOUT_BASIS_POINTS',
+              defaultValue: 10000,
+            ),
+          );
+          if (rollout.enabled) {
+            await DatabaseV2RolloutLedger(
+              appDataDirectory,
+            ).recordSuccessfulColdStart(
+              coldStartId:
+                  '$pid:${DateTime.now().toUtc().microsecondsSinceEpoch}',
+              atUtc: DateTime.now().toUtc(),
+            );
+          }
+        } catch (error) {
+          // Local rollout evidence is support/retirement metadata. The
+          // database admission result remains authoritative; a ledger failure
+          // keeps legacy cleanup disabled instead of blocking the user.
+          stderr.writeln('[DatabaseV2Rollout] $error');
+        }
       } catch (error, stackTrace) {
         stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
         await _initRestoreFailureWindow();
