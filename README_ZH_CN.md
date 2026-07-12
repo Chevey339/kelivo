@@ -3,13 +3,8 @@
   <h1>为什么选择 Cuplivo？</h1>
 
   一个 Flutter LLM 聊天客户端 — 社区分支
-
-  <a href="https://discord.gg/Tb8DyvvV5T" target="_blank">
-    <img src="https://img.shields.io/badge/Join%20our%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="加入 Discord"/>
-  </a>
-  <a href="https://qm.qq.com/q/OQaXetKssC" target="_blank" style="margin-left: 6px;">
-    <img src="https://img.shields.io/badge/Join%20QQ%20Group-%230366CC?style=for-the-badge&logo=qq&logoColor=white" alt="加入 QQ 群"/>
-  </a>
+  
+  Kelivo 二群 (QQ) `856321431`
 
   [Read the English version](README.md)
 </div>

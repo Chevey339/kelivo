@@ -3,13 +3,8 @@
   <h1>Why Cuplivo?</h1>
 
   A Flutter LLM Chat Client — A community fork
-
-  <a href="...Discord...">
-    <img src="...discord-badge..." alt="Join Discord"/>
-  </a>
-  <a href="...QQ..." style="margin-left: 6px;">
-    <img src="...qq-badge..." alt="Join QQ Group"/>
-  </a>
+  
+  See [Kelivo](https://github.com/Chevey339/kelivo) for community links
 
   [阅读简体中文文档](README_ZH_CN.md)快速查看特性
 </div>
