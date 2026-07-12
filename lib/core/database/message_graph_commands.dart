@@ -321,6 +321,75 @@ final class MessageGraphCommands {
       if (revision == null) {
         throw StateError('message_graph_revision_missing');
       }
+      final currentSlotIndex = current.revisions.indexWhere(
+        (candidate) => candidate.slotId == revision.slotId,
+      );
+      if (currentSlotIndex >= 0) {
+        final selected = current.revisions[currentSlotIndex];
+        if (selected.id == revision.id) return current;
+        if (current.causalityKind == 'native' &&
+            selected.parentRevisionId == revision.parentRevisionId) {
+          final timestamp = _now();
+          if (currentSlotIndex + 1 < current.revisions.length) {
+            final child = current.revisions[currentSlotIndex + 1];
+            final updatedChild =
+                await (_db.update(_db.messageRevisionRows)..where(
+                      (row) =>
+                          row.conversationId.equals(conversationId) &
+                          row.id.equals(child.id) &
+                          row.parentRevisionId.equals(selected.id),
+                    ))
+                    .write(
+                      MessageRevisionRowsCompanion(
+                        parentRevisionId: Value(revision.id),
+                        updatedAt: Value(timestamp),
+                      ),
+                    );
+            if (updatedChild != 1) {
+              throw StateError('message_graph_graft_child_conflict');
+            }
+          } else {
+            final updatedBranch =
+                await (_db.update(_db.conversationBranchRows)..where(
+                      (row) =>
+                          row.conversationId.equals(conversationId) &
+                          row.id.equals(current.branchId!) &
+                          row.leafRevisionId.equals(selected.id) &
+                          row.deletedAt.isNull(),
+                    ))
+                    .write(
+                      ConversationBranchRowsCompanion(
+                        leafRevisionId: Value(revision.id),
+                      ),
+                    );
+            if (updatedBranch != 1) {
+              throw StateError('message_graph_graft_leaf_conflict');
+            }
+          }
+          final boundary = current.contextStartRevisionId == selected.id
+              ? revision.id
+              : current.contextStartRevisionId;
+          final updatedState =
+              await (_db.update(_db.conversationStateRows)..where(
+                    (row) =>
+                        row.conversationId.equals(conversationId) &
+                        row.activeBranchId.equals(current.branchId!) &
+                        row.stateRevision.equals(current.stateRevision),
+                  ))
+                  .write(
+                    ConversationStateRowsCompanion(
+                      contextStartRevisionId: Value(boundary),
+                      stateRevision: Value(current.stateRevision + 1),
+                    ),
+                  );
+          if (updatedState != 1) {
+            throw StateError('message_graph_state_conflict');
+          }
+          return (await projector.projectActivePath(
+            conversationId: conversationId,
+          ))!;
+        }
+      }
       final activation = await _findOrCreateBranchForRevision(
         projector: projector,
         current: current,

@@ -235,7 +235,7 @@ void main() {
   });
 
   test(
-    'stable revision selection activates the exact alternate path',
+    'native revision selection grafts the alternate and preserves the future',
     () async {
       await insertFixture();
 
@@ -244,9 +244,13 @@ void main() {
         revisionId: 'a1-v7',
       );
 
-      expect(revisionIds(projection.revisions), ['u1', 'a1-v7']);
-      expect(projection.branchId, 'branch-alt');
+      expect(revisionIds(projection.revisions), ['u1', 'a1-v7', 'u2', 'a2']);
+      expect(projection.branchId, 'branch-main');
       expect(projection.stateRevision, 1);
+      final child = await (database.select(
+        database.messageRevisionRows,
+      )..where((row) => row.id.equals('u2'))).getSingle();
+      expect(child.parentRevisionId, 'a1-v7');
     },
   );
 
