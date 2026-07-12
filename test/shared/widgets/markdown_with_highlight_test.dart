@@ -534,6 +534,7 @@ Inline ***strong emphasis*** text.
     final image = tester.widget<Image>(find.byType(Image));
     expect(image.width, 42.0);
     expect(image.height, 24.0);
+    expect(image.image, isA<ResizeImage>());
   });
 
   testWidgets(
