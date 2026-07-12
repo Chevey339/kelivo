@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-11（Phase 4 §10.1 TL-R1～R6 实现与自动化回归完成，等待用户真机复测）
-> - 当前结论：Phase 0～3 保持关闭。Phase 4 复审发现的单一真相源、通知混流、滚动范式冲突、终态 generation 残留、发送闪空和 revision 分页失效均已按 TL-R1～R6 修复；`flutter analyze` 与全量 1279/1279 通过。依照复审冻结的验收纪律，Phase 4 在用户完成“长流式 + 输出中/后滑动 + 暂停 + 自动跟随”真机矩阵前仍保持进行中，Phase 5 暂不启动
+> - 最后更新：2026-07-12（第二轮真机复测：内容消失/流式抖动已消除，新登记 §10.2 TL-R7～R13）
+> - 当前结论：Phase 0～3 保持关闭。TL-R1～R6 修复经用户真机确认对原症状有效，但第二轮复测暴露：发送路径同时下达置顶与到底两个互斥滚动指令且 spacer 上限/顺序错误（"顶上去又弹回来"，TL-R7/R8）、迷你地图跳转因同步 cache 驱逐与 legacy offset seed 断裂（TL-R9/R10）、generation 信号未按会话隔离（TL-R11）、删除路径仍绕开 coordinator（TL-R12）、"跳到最新"胶囊与既有到底按钮重复（TL-R13）。消息系统最终形态合同已冻结于 §10.2 与方案 §7.4；全部闭环并经用户复测前 Phase 4 保持进行中，Phase 5 暂不启动
 
 ## 1. 文档使用规则
 
@@ -40,7 +40,7 @@
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
 | Phase 2：Message Graph | 7 / 7 | `已完成` | graph timeline 与 stable-ID commands 已接管业务；Hive/legacy JSON 兼容输入保留只读解释边界 |
 | Phase 3：Generation State Machine | 7 / 7 | `已完成` | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 与竞态/长响应矩阵全部闭环 |
-| Phase 4：Timeline 与 Renderer | 6 / 8 | `进行中` | §10.1 TL-R1～R6 实现与自动化回归已完成（全量 1279/1279）；TL-02/04 等待用户真机矩阵确认后恢复完成计数，避免再次把测试全绿提前等同于验收通过 |
+| Phase 4：Timeline 与 Renderer | 6 / 8 | `进行中` | TL-R1～R6 经真机确认有效；第二轮复测新登记 §10.2 TL-R7～R13（发送弹回、迷你地图断裂、会话隔离、删除幽灵、胶囊去重）；消息系统最终形态合同已冻结，按 §10.2 顺序返工 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
 
 ## 3. 已完成的审计工作
@@ -368,6 +368,28 @@ dart run tool/run_restore_process_harness.dart \
 
 实现收敛（2026-07-11）：TL-R1～R6 均已按上述顺序先补失败回归再修复；新增回归覆盖 snapshot 经视口/分页不回退、纯 intent 不重发窗口、恒定生成 spacer、全 terminal generation 收口、同会话 refresh 不闪空、graph revision 变化后重建并继续分页。`flutter analyze` 与全量 1279/1279 通过。此处只记录“实现与自动化完成”，用户真机复测前不把 Phase 4 标为完成。
 
+### 10.2 Phase 4 第二轮返工清单（2026-07-12，用户真机复测反馈驱动）
+
+用户真机复测确认：内容消失与流式抖动已消除，但仍存在 (a) 发送新消息"顶上去又弹回来"；(b) 迷你地图点击不能正常跳转；(c) "跳到最新"胶囊与既有右侧导航"到底"按钮功能重复。复审定位如下，全部闭环并经用户复测前 Phase 4 保持进行中。
+
+| ID | 缺陷 | 严重度 | 根因链（已核实到行级） | 验收标准 |
+| --- | --- | --- | --- | --- |
+| TL-R7 | 发送路径同时下达"置顶"与"到底"两个互斥滚动指令 → 顶上去又弹回来（主因） | P0 | `HomeViewModel.sendMessage` 在 `_chatActions.sendMessage` 前后**各调一次** `onScrollToBottom?.call()`（home_view_model.dart 367/383 行）→ `_scrollToBottomSoon()` → `scrollToBottomSoon` 注册 post-frame **加 120ms 延迟**两次 `scrollToBottom`，每次都 `_autoStickToBottom = true` + `onFollowingTail()`（= `coordinator.followTail()`）并 animateTo 底部。与此同时 `appendPersistedTailMessages` 正确执行 `programmaticJump(user slot)` 置顶。结果：跳到顶（programmaticJump）→ 延迟的 scrollToBottom 到达 → followTail 清空 anchor/spacer（`didUpdateWidget` followingTail 分支）→ extent 收缩 + animateTo 底部 → 弹回。辅因：`ChatScrollController._onScrollControllerChanged`（scroll_controller.dart 208 行）以 `userScrollDirection != idle` 判定用户滚动，而 `animateTo` 的 DrivenScrollActivity 同样产生非 idle 方向 → 程序动画途中误触发 `onUserAnchored` → 模式再次翻转 | 发送路径**彻底移除**两处 `onScrollToBottom`（PD-04 置顶是发送滚动行为的唯一所有者）；`_onScrollControllerChanged` 的用户滚动判定改为只认真实手势（drag/wheel/键盘），程序驱动滚动不得进入 `userAnchored`/`_isUserScrolling`。回归：发送 → 断言 400ms 内无任何 followTail/scrollToBottom 被调度、user slot 稳定位于 viewport 顶部 |
+| TL-R8 | spacer 数学上限 0.75×viewport + "先跳后缩"两阶段顺序 → 置顶物理上不可达且必然回弹（次因） | P0 | `_programmaticTailViewportFraction = 0.75`：`_calculateProgrammaticSpacer` 返回 `0.75v − occupied − fixedBottom`，使锚点以下内容恒等于 0.75v < viewport 高度 v，user 消息**最高只能停在离顶部 0.25v 处**。且 `_scheduleProgrammaticJump` 的顺序是：frame A 以临时 0.75v spacer jumpTo（能到更高处）→ 同一 post-frame `setState` 把 spacer 缩到测量值 → frame B extent 收缩 `occupied + fixedBottom` → offset clamp，可见回弹幅度等于 user 消息+占位高度 | spacer 目标改为 `v − occupied − fixedBottom`（clamp `[0, v]`），使锚点可达 viewport 顶部；顺序改为**先 setState spacer、下一帧再 jump**，jump 后不再改 spacer；生成期恒定，终态按现有 `_requiredTerminalAnchorSpacer` 收敛。回归：短/长 user 消息发送后 user slot 顶到 viewport 顶部 ±1px 且后续 3 帧 offset 零位移 |
+| TL-R9 | 迷你地图跳转断裂：同步数据源被窗口保留驱逐 + off-window 跳转走 legacy offset seed | P0 | ① `_openMiniMap` 用 `allCollapsedMessagesForCurrentConversation()` → 同步 `getMessagesRange(0, count)`，其结果按 `_messagesCache` 过滤，而 `retainTimelineWindow` 已把窗口外消息全部驱逐 → 地图列表缺失旧消息；`getMessageIndex` 依赖懒加载的 `_messageOrderIds`，纯 coordinator 路径打开的会话可能从未填充 → 返回 -1 → 跳转静默失败。② 目标在窗口外时走 `loadWindowAroundMessage` → `_loadWindow` → `_seedTimelineFromMessages` → `seed(stateRevision: 0)`；落点靠近窗口顶部立即触发 `loadBefore` → revision 0 ≠ 真实值 → TL-R6 的 `_rebuildAfterStateRevisionChange` 固定 `fromStart:false` 重载**尾部窗口** → 视口被弹回底部，表现为"跳了又弹回去/跳不动" | coordinator 新增 `openAround(revisionId)` stable-cursor API（目标 slot 居中 + 双向 hasMore），跨窗口定位（迷你地图、搜索、问题导航、spotlight）全部走它；迷你地图数据源改为异步全量投影（graph timeline），不依赖被驱逐的同步 cache；退役 `_loadWindow`/`_seedTimelineFromMessages`/`reloadMessages` 的 legacy offset 窗口。回归：500 条会话跳转第 10 条 → 落点正确、继续向上分页不弹回 |
+| TL-R10 | `_rebuildAfterStateRevisionChange` 固定重载尾部窗口 → 任何图变更后的下一次分页把阅读位置弹回底部 | P1 | TL-R6 修复选择了 `fromStart:false`（尾部）作为重建目标；用户在历史位置切版本/编辑/删除后继续滚动 → 窗口整体替换为尾部 → 视口跳底 | 重建必须围绕当前视觉 anchor（或触发分页的 cursor）恢复窗口并保持 `slotId+localDy`；回归：中部锚定 + regenerate → loadBefore → 视口漂移 ≤1px |
+| TL-R11 | generation 生命周期信号未按会话隔离 → 后台会话终态清掉前台会话的生成态/spacer | P1 | `publishTerminalMessage` 无条件调 `timelineCoordinator.noteContentChanged(isGenerating:false)`；`continueAssistantMessageAfterToolAnswer` 无条件调 `noteContentChanged(isGenerating:true)`。coordinator 只属于当前会话：会话 A 后台完成会关闭正在生成的会话 B 的 isGenerating → `didUpdateWidget` 收 spacer → extent 收缩 clamp 跳动 | 所有 generation 信号先校验 `coordinator.conversationId == message.conversationId` 才写入；回归：双会话并发流式，后台终态不改变前台 viewport/spacer/isGenerating |
+| TL-R12 | 删除/局部重载仍绕开 coordinator → 幽灵消息复活 | P1 | `deleteMessages`/`_deleteMessageVersions` → `chatController.reloadMessages()` 直接改 `_messages`，不更新 slots；`removeMessageIds`/`removeMessagesAfter` 同样只改 `_messages`。下一次 windowRevision 变更的 resync 会从仍含已删消息的 slots 重建 → 已删除消息重新出现 | 删除走 coordinator（移除对应 slot 或 stable-cursor 窗口重建 + anchor 保持）；`reloadMessages`/`removeMessageIds`/`removeMessagesAfter` 与 TL-R9 的 legacy 窗口一并退役。回归：删除中部消息 → 触发分页/模式切换 → 无幽灵行 |
+| TL-R13 | 产品重复："跳到最新"胶囊与右侧导航"到底"按钮功能重复 | P2 | TL-04 新增 `TimelineJumpToLatest` overlay，但既有 `_buildScrollButtons` 的到底按钮已覆盖该场景（用户明确不需要胶囊） | 移除胶囊（home_page.dart `showJumpToLatest` 分支与 `timeline_jump_to_latest.dart`）；未读/生成中提示如需保留，以现有到底按钮 badge 呈现。纪律：新增任何 UI 控件前必须先盘点既有等价物并在进度文档记录取舍 |
+
+第二轮复审结论（消息系统最终形态合同，方案 §7.4 已同步修订）：
+1. **窗口唯一真相源**——coordinator slots 是可见窗口唯一数据；`ChatController._messages` 只是派生视图，禁止任何绕过 coordinator 的写入（发送/流式/终态/删除/重载全部收口，TL-R1 已收口流式与终态，TL-R9/R12 收口其余）。
+2. **滚动唯一指挥**——视口意图只有三种来源：用户真实手势、显式按钮、PD-04 发送置顶；程序动画与布局修正永不产生意图（TL-R7）；同一轮交互内互斥指令（置顶 vs 到底）只允许一个所有者。
+3. **extent 变化同帧原则**——spacer/padding 任何调整与触发它的布局变化同帧生效，禁止 post-frame 二段修正（TL-R8）。
+4. **跨窗口定位统一 stable cursor**——openAround 是唯一跨窗口定位入口，legacy offset 窗口全部退役（TL-R9/R10）。
+5. **会话隔离**——generation 信号、spacer、anchor 全部绑定 conversationId（TL-R11）。
+返工顺序：TL-R7/R8（发送弹回，改动面最小、用户感知最强）→ TL-R13（删胶囊，顺手）→ TL-R9/R10（openAround + legacy 窗口退役）→ TL-R11/R12。每项先写红色回归再修，关闭证据为用户真机复测。
+
 ## 11. Phase 5：Data Operations 与退役
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
@@ -507,16 +529,18 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2～3 保持关闭。Phase 4 §10.1 TL-R1～R6 的实现与自动化证据已闭环，当前唯一关闭门槛是用户真机复测原始症状矩阵；确认前 Phase 5 不开工。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行与 TL-08 非 macOS 实机交互仍留在发布门禁。
+PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2～3 保持关闭。§10.1 TL-R1～R6 经用户真机确认有效；当前阻塞项为 §10.2 TL-R7～R13，全部闭环并经用户复测前 Phase 5 不开工。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行与 TL-08 非 macOS 实机交互仍留在发布门禁。
 
 ## 19. 下一步
 
-等待用户真机复测 §10.1 关闭矩阵：长流式输出期间滑动离开/返回、输出完成后再次滑动、生成中暂停、连续发送下一轮、短回复与长回复的用户消息置顶/自动跟随；验收正文不回退为空壳、无永久 loading、发送不闪空、生成全程无可见上下弹跳且终态无可继续滚入的大块空白。确认后把 TL-02/TL-04 与 Phase 4 恢复为完成，再进入 Phase 5 `OPS-01`。
+按 §10.2 顺序执行第二轮返工：TL-R7/R8（移除发送路径两处 `onScrollToBottom` + 程序滚动不产生用户意图 + spacer 目标改满 viewport 且先放 spacer 后 jump）→ TL-R13（移除"跳到最新"胶囊，复用右侧到底按钮）→ TL-R9/R10（coordinator `openAround(revisionId)` + 迷你地图异步数据源 + 退役 legacy offset 窗口 + revision 重建保持 anchor）→ TL-R11/R12（generation 信号会话隔离 + 删除走 coordinator）。每项先写红色回归再修；关闭矩阵新增：发送后 user 消息稳定置顶无回弹、迷你地图跳中部消息后继续向上分页不弹回、双会话并发流式后台终态不影响前台、删除中部消息后无幽灵行。全部经用户真机复测确认后把 TL-02/TL-04 与 Phase 4 恢复为完成，再进入 Phase 5 `OPS-01`。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-12 | Phase 4 第二轮复审：确认 TL-R1～R6 对原症状有效后，用户真机复测暴露发送弹回与迷你地图断裂。定位发送路径在 programmaticJump 置顶同时两次调度 scrollToBottom（含 120ms 延迟）且程序动画被误判为用户滚动（TL-R7）、spacer 0.75×viewport 上限使置顶物理不可达且"先跳后缩"两阶段必然回弹（TL-R8）、迷你地图依赖被窗口保留驱逐的同步 cache 且 off-window 跳转走 legacy `seed(stateRevision:0)` 触发尾部重建弹回（TL-R9）、revision 变更重建固定回尾部（TL-R10）、generation 信号未按会话隔离（TL-R11）、删除路径绕开 coordinator 产生幽灵复活风险（TL-R12）、"跳到最新"胶囊与既有到底按钮重复（TL-R13）。§10.2 冻结消息系统最终形态五条合同，方案 §7.4 实现要点同步修订 | TL-R7～R13、TL-02、TL-04 | 本复审提交 | 用户 / Fable |
+| 2026-07-12 | 完成 TL-R7 实现：发送入口删除调用前/成功后的两处 `onScrollToBottom`，PD-04 的 coordinator programmaticJump 成为本轮唯一滚动所有者，120ms 延迟到底不再夺取锚点。ChatScrollController 不再从 position direction 推测用户意图，新增只由 MessageList 真实 drag/wheel/keyboard 输入调用的显式入口；程序 animate/jump/layout correction 只更新位置与按钮可见性，不发布 userAnchored。红绿回归覆盖发送后 400ms 仍保持 anchored、程序到底动画不产生用户意图、显式真实输入才进入 user scrolling；相关 startup/scroll/widget/platform 23/23 与 analyze 通过 | TL-R7 | 本里程碑提交 | Codex |
 | 2026-07-11 | Phase 4 复审重新打开：用户真机实测（内容滑动后消失变加载动画、自动滚动小幅弹跳）驱动的行级根因分析确认两个结构性缺陷——流式/终态内容从不写回 coordinator 窗口且任何 coordinator 通知都会用过期 slots 覆盖 `_messages`（TL-R1/R2）、生成期 bottom-pin 与 programmatic anchor+spacer 两套滚动范式并存且 spacer 修正晚一帧（TL-R3/R4），另登记发送闪空（TL-R5）与 stateRevision 分页静默失效（TL-R6）。TL-02/TL-04 状态回退为进行中，§10.1 冻结返工验收标准与顺序，Phase 5 暂缓 | TL-R1～R6、TL-02、TL-04、R-10 | 本复审提交 | 用户 / Fable |
 | 2026-07-11 | 完成 TL-R1 实现：新增统一窗口 snapshot 更新入口，同时写入 `ChatController._messages` 与 coordinator slot；ChatActions 的 preparing/regenerate/cancel/chunk/completed/failed 和 HomeViewModel 的 throttled tick/restore cleanup 不再绕开 coordinator 原地改消息。流式高频镜像不发布全窗口通知，终态 notifier 移除前 slot 已含完整正文与 `isStreaming=false`。红绿回归覆盖 partial→`userAnchored`→`loadBefore`→completed→`followTail`，可见正文和 slot 终态均不回退；controller/stream 32/32 与 analyze 通过。真机复测仍作为 Phase 4 总关闭证据 | TL-R1 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 TL-R2 实现：TimelineCoordinator 增加结构窗口 revision，ChatController 仅在 revision 推进时执行 `_syncTimelineWindow`；follow/userAnchored/programmatic/content intent 改为幂等，纯视口通知不再重建 `_messages`、失效 render cache 或通知整页。确定性 profile contract 连续触发 120 次 anchored + 120 次 follow，controller window publish 为 0、coordinator 仅发布两次真实状态转换；coordinator/controller 32/32 与 analyze 通过 | TL-R2 | 本里程碑提交 | Codex |

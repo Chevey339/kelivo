@@ -1141,6 +1141,7 @@ class _HomePageState extends State<HomePage>
         hasMoreAfter: _controller.chatController.hasMoreAfter,
         onLoadMoreAfter: _controller.loadMoreAfter,
         timelineCoordinator: _controller.chatController.timelineCoordinator,
+        onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
         chatFontScale: settings.chatFontScale,
         showModelIcon: settings.showModelIcon,
         showUserAvatar: settings.showUserAvatar,

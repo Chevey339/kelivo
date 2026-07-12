@@ -733,7 +733,7 @@ class ChatActions {
   /// UI is responsible for:
   /// - Adding messages to the list (user + assistant)
   /// - Showing snackbars on errors
-  /// - Scrolling to bottom
+  /// - Rendering the coordinator-owned user-message programmatic jump
   /// - Haptic feedback
   Future<ChatActionResult> sendMessage({
     required ChatInputData input,

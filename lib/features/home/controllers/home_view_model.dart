@@ -364,7 +364,6 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     onHapticFeedback?.call();
-    onScrollToBottom?.call();
 
     final result = await _chatActions.sendMessage(
       input: input,
@@ -380,7 +379,6 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    onScrollToBottom?.call();
     return true;
   }
 

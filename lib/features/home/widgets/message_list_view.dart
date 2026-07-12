@@ -133,6 +133,7 @@ class MessageListView extends StatefulWidget {
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
     this.timelineCoordinator,
+    this.onUserScrollIntent,
     this.chatFontScale = 1,
     this.showModelIcon = true,
     this.showUserAvatar = true,
@@ -210,6 +211,7 @@ class MessageListView extends StatefulWidget {
   final bool hasMoreAfter;
   final Future<bool> Function()? onLoadMoreAfter;
   final TimelineCoordinator? timelineCoordinator;
+  final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
   final bool showModelIcon;
   final bool showUserAvatar;
@@ -460,6 +462,7 @@ class _MessageListViewState extends State<MessageListView>
               },
               onPointerMove: (event) {
                 if (event.buttons == 0) return;
+                widget.onUserScrollIntent?.call();
                 _captureVisualAnchor();
                 widget.timelineCoordinator?.userAnchored();
               },
@@ -504,6 +507,7 @@ class _MessageListViewState extends State<MessageListView>
       return KeyEventResult.ignored;
     }
     _captureVisualAnchor();
+    widget.onUserScrollIntent?.call();
     widget.timelineCoordinator?.userAnchored();
     return KeyEventResult.ignored;
   }
@@ -573,6 +577,7 @@ class _MessageListViewState extends State<MessageListView>
   }
 
   void _handleUserScrollActivity([ScrollMetrics? metrics]) {
+    widget.onUserScrollIntent?.call();
     if (_isWithinStreamingAutoFollowBand(metrics)) {
       widget.timelineCoordinator?.followTail();
       _resumeStreamingMessageUpdates();

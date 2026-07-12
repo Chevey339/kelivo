@@ -5,6 +5,35 @@ import 'package:scrollview_observer/scrollview_observer.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
+    testWidgets('programmatic animation does not publish user scroll intent', (
+      tester,
+    ) async {
+      var userAnchoredCalls = 0;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+        onUserAnchored: () => userAnchoredCalls++,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(scrollController: scrollController, itemCount: 30),
+      );
+
+      chatScrollController.scrollToBottom();
+      await tester.pumpAndSettle();
+      expect(userAnchoredCalls, 0);
+
+      chatScrollController.handleUserScrollIntent();
+      expect(userAnchoredCalls, 1);
+      expect(chatScrollController.isUserScrolling, isTrue);
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('does not follow new content when auto-scroll is disabled', (
       tester,
     ) async {

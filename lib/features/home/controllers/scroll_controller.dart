@@ -204,32 +204,6 @@ class ChatScrollController {
       if (!_scrollController.hasClients) return;
       final autoScrollEnabled = _getAutoScrollEnabled();
 
-      // Detect user scrolling
-      if (_scrollController.position.userScrollDirection !=
-          ScrollDirection.idle) {
-        _isUserScrolling = true;
-        _autoStickToBottom = false;
-        onUserAnchored?.call();
-        // Reset chained jump anchor when user manually scrolls
-        _lastJumpUserMessageId = null;
-
-        // Show navigation buttons on scroll activity
-        if (!_showNavButtons) {
-          _showNavButtons = true;
-          _onStateChanged();
-        }
-        _resetNavButtonsHideTimer();
-
-        // Cancel previous timer and set a new one
-        _userScrollTimer?.cancel();
-        final secs = _getAutoScrollIdleSeconds();
-        _userScrollTimer = Timer(Duration(seconds: secs), () {
-          _isUserScrolling = false;
-          refreshAutoStickToBottom();
-          _onStateChanged();
-        });
-      }
-
       // Only show when not near bottom
       final atBottom = isNearBottom(24);
       if (!atBottom) {
@@ -251,6 +225,27 @@ class ChatScrollController {
         _onStateChanged();
       }
     } catch (_) {}
+  }
+
+  /// Records scroll intent from a real pointer, wheel, or keyboard input.
+  /// Programmatic position changes must never call this method.
+  void handleUserScrollIntent() {
+    _isUserScrolling = true;
+    _autoStickToBottom = false;
+    onUserAnchored?.call();
+    _lastJumpUserMessageId = null;
+    if (!_showNavButtons) {
+      _showNavButtons = true;
+      _onStateChanged();
+    }
+    _resetNavButtonsHideTimer();
+    _userScrollTimer?.cancel();
+    final secs = _getAutoScrollIdleSeconds();
+    _userScrollTimer = Timer(Duration(seconds: secs), () {
+      _isUserScrolling = false;
+      refreshAutoStickToBottom();
+      _onStateChanged();
+    });
   }
 
   /// Reset the auto-hide timer for navigation buttons.

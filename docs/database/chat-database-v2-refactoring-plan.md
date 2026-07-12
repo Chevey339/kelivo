@@ -457,11 +457,18 @@ stateDiagram-v2
 - 重新打开会话定位到最后一条 user 消息顶部，不是绝对底部。
 - 停止、重试、重生成、版本切换、branch 切换和错误提示都不得移动用户当前阅读位置（目标消息在视口内时按其 slot 锚定）。
 
-实现要点：
+实现要点（2026-07-11 第二轮复审修订）：
 
-- "新轮次置顶"要求列表尾部有可伸缩的 trailing spacer（约一屏高度），使最后一个 slot 能被定位到 viewport 顶部附近而不受内容总高度限制；assistant 回答增长时 spacer 相应收缩，避免 clamp 反弹。
+- "新轮次置顶"要求列表尾部有 trailing spacer，目标尺寸为 `viewport 高度 −（user 消息顶部到当前尾部的实际高度）− 固定 bottom padding`（clamp 到 `[0, viewport]`），保证 user 消息能真正到达 viewport 顶部而不是停在 25% 处。
+- spacer 必须**先于 jump 生效**：先在同一帧布局中放入目标 spacer，下一帧再执行 jump；禁止"先 jump 再缩 spacer"的两阶段顺序，那会在第二帧因 extent 收缩触发 clamp 回弹。
+- **生成期 spacer 恒定**：assistant 回答增长时 spacer 不收缩（内容在视口下方增长，不影响锚定位置）；只在生成终态一次性把 spacer 收敛到保持当前 offset 合法所需的最小残量，显式回到底部后归零。任何 spacer/extent 调整必须与触发它的布局变化同帧。
+- **发送路径是 `programmaticJump` 的唯一所有者**：send 流程不得调用任何 scroll-to-bottom（一次都不行）；置顶与到底是互斥指令，同一轮交互只能有一个。
+- **程序驱动滚动不产生用户意图**：`animateTo`/`jumpTo`/layout 修正引发的滚动方向变化不得进入 `userAnchored`/`followingTail` 判定；用户意图只来自真实手势（drag/wheel/键盘）与显式按钮。
+- "跳到最新"复用现有右侧导航的"到底"按钮（可加未读/生成态 badge），不新增独立 overlay 控件；新增任何 UI 元素前必须先盘点现有等价物。
 - "重开会话定位"不需要持久化滚动像素位置；由最后一条 user 消息的 slot ID 在打开时计算，分页初始窗口必须覆盖该 slot。
-- followingTail 的进入/退出判定使用滚动方向 + 距底阈值 + 交互信号，不使用单一 `atEdge` 布尔，防止流式抖动导致状态震荡。
+- followingTail 的进入/退出判定使用滚动方向 + 距**内容底部**（扣除 spacer）阈值 + 交互信号，不使用单一 `atEdge` 布尔，防止流式抖动导致状态震荡。
+- **窗口唯一真相源**：可见窗口的唯一数据源是 timeline coordinator 的 slots；controller 的消息列表只是派生视图。任何图变更（发送、编辑、重生成、版本切换、删除、fork、跨窗口定位）都必须通过 coordinator 的 stable-cursor 操作（open/openAround/refresh/remove）发布，禁止任何 offset seed 或绕过 coordinator 的直接列表写入。
+- **generation 生命周期按会话隔离**：终态/开始信号只允许写入 `conversationId` 匹配的 coordinator 状态，后台会话的生成事件不得触碰前台会话的视口与 spacer。
 
 正确锚点算法：
 
