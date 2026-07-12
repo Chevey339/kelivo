@@ -1,6 +1,7 @@
 import 'dart:async' as async;
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 
 void main() {
@@ -111,6 +112,35 @@ void main() {
       final error = await errorSeen.future.timeout(const Duration(seconds: 1));
       expect(error, isA<StateError>());
     });
+
+    test(
+      'error handler secondary failure is reported without escaping drain',
+      () async {
+        final controller = async.StreamController<int>();
+        final reported = async.Completer<FlutterErrorDetails>();
+        final previousHandler = FlutterError.onError;
+        FlutterError.onError = (details) => reported.complete(details);
+        addTearDown(() {
+          FlutterError.onError = previousHandler;
+        });
+
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: controller.stream,
+          onData: (_) async => throw StateError('primary'),
+          onError: (_, _) async => throw StateError('secondary'),
+          onDone: () async {},
+        );
+        addTearDown(subscription.cancel);
+
+        controller.add(1);
+        await controller.close();
+        final details = await reported.future.timeout(
+          const Duration(seconds: 1),
+        );
+        expect(details.exception, isA<StateError>());
+        expect(details.exception.toString(), contains('secondary'));
+      },
+    );
 
     test('异步 handler 未完成前不会并发处理后续 chunk', () async {
       final controller = async.StreamController<int>();

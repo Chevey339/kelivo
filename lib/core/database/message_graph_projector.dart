@@ -142,6 +142,53 @@ final class MessageGraphTimelineProjection {
   }
 }
 
+final class ActiveTimelineSlot {
+  const ActiveTimelineSlot({
+    required this.slotId,
+    required this.revisionId,
+    required this.parentRevisionId,
+    required this.role,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.finalizedAt,
+    required this.versionCount,
+  });
+
+  final String slotId;
+  final String revisionId;
+  final String? parentRevisionId;
+  final String role;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? finalizedAt;
+  final int versionCount;
+}
+
+final class ActiveTimelinePage {
+  ActiveTimelinePage({
+    required this.conversationId,
+    required this.branchId,
+    required this.stateRevision,
+    required this.contextStartRevisionId,
+    required List<ActiveTimelineSlot> slots,
+    required this.hasMoreBefore,
+    required this.hasMoreAfter,
+  }) : slots = UnmodifiableListView(slots);
+
+  final String conversationId;
+  final String? branchId;
+  final int stateRevision;
+  final String? contextStartRevisionId;
+  final List<ActiveTimelineSlot> slots;
+  final bool hasMoreBefore;
+  final bool hasMoreAfter;
+
+  String? get beforeRevisionId =>
+      hasMoreBefore && slots.isNotEmpty ? slots.first.revisionId : null;
+  String? get afterRevisionId =>
+      hasMoreAfter && slots.isNotEmpty ? slots.last.revisionId : null;
+}
+
 final class MessageGraphValidationResult {
   const MessageGraphValidationResult({
     required this.branchCount,
@@ -160,6 +207,217 @@ final class MessageGraphProjector {
   const MessageGraphProjector(this._db);
 
   final AppDatabase _db;
+
+  Future<ActiveTimelinePage?> projectActiveTimelinePage({
+    required String conversationId,
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    int limit = 40,
+  }) async {
+    if (limit <= 0) throw ArgumentError.value(limit, 'limit');
+    if (beforeRevisionId != null && afterRevisionId != null) {
+      throw ArgumentError('Only one timeline cursor may be supplied.');
+    }
+    final state =
+        await (_db.select(_db.conversationStateRows)
+              ..where((row) => row.conversationId.equals(conversationId)))
+            .getSingleOrNull();
+    if (state == null) {
+      final exists = await (_db.select(
+        _db.conversationRows,
+      )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+      if (exists == null) return null;
+      throw MessageGraphIntegrityException('message_graph_state_missing');
+    }
+    final branchId = state.activeBranchId;
+    if (branchId == null) {
+      return ActiveTimelinePage(
+        conversationId: conversationId,
+        branchId: null,
+        stateRevision: state.stateRevision,
+        contextStartRevisionId: state.contextStartRevisionId,
+        slots: const [],
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+      );
+    }
+    final branch =
+        await (_db.select(_db.conversationBranchRows)..where(
+              (row) =>
+                  row.conversationId.equals(conversationId) &
+                  row.id.equals(branchId) &
+                  row.deletedAt.isNull(),
+            ))
+            .getSingleOrNull();
+    if (branch == null) {
+      throw MessageGraphIntegrityException('message_graph_branch_missing');
+    }
+    final leafRevisionId = branch.leafRevisionId;
+    if (leafRevisionId == null) {
+      return ActiveTimelinePage(
+        conversationId: conversationId,
+        branchId: branchId,
+        stateRevision: state.stateRevision,
+        contextStartRevisionId: state.contextStartRevisionId,
+        slots: const [],
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+      );
+    }
+
+    final cursor = beforeRevisionId ?? afterRevisionId;
+    if (cursor != null &&
+        !await _activePathContains(
+          conversationId: conversationId,
+          leafRevisionId: leafRevisionId,
+          revisionId: cursor,
+        )) {
+      throw MessageGraphIntegrityException(
+        'message_graph_cursor_not_on_active_path',
+      );
+    }
+
+    final cursorPredicate = beforeRevisionId != null
+        ? 'WHERE depth > (SELECT depth FROM active_path WHERE id = ?)'
+        : afterRevisionId != null
+        ? 'WHERE depth < (SELECT depth FROM active_path WHERE id = ?)'
+        : '';
+    final order = afterRevisionId != null ? 'DESC' : 'ASC';
+    final variables = <Variable<Object>>[
+      Variable.withString(leafRevisionId),
+      Variable.withString(conversationId),
+      Variable.withString(conversationId),
+      if (cursor != null) Variable.withString(cursor),
+      Variable.withInt(limit + 1),
+    ];
+    final rows = await _db
+        .customSelect(
+          '''
+WITH RECURSIVE active_path(
+  id, slot_id, parent_revision_id, created_at, updated_at, finalized_at, depth
+) AS (
+  SELECT id, slot_id, parent_revision_id, created_at, updated_at, finalized_at, 0
+  FROM message_revision_rows
+  WHERE id = ? AND conversation_id = ? AND deleted_at IS NULL
+  UNION ALL
+  SELECT parent.id, parent.slot_id, parent.parent_revision_id,
+         parent.created_at, parent.updated_at, parent.finalized_at,
+         child.depth + 1
+  FROM message_revision_rows AS parent
+  JOIN active_path AS child ON child.parent_revision_id = parent.id
+  WHERE parent.conversation_id = ?
+    AND parent.deleted_at IS NULL
+)
+SELECT path.id, path.slot_id, path.parent_revision_id,
+       path.created_at, path.updated_at, path.finalized_at,
+       slot.role, path.depth
+FROM active_path AS path
+JOIN message_slot_rows AS slot ON slot.id = path.slot_id
+$cursorPredicate
+ORDER BY path.depth $order
+LIMIT ?;
+''',
+          variables: variables,
+          readsFrom: {_db.messageRevisionRows, _db.messageSlotRows},
+        )
+        .get();
+    final hasExtra = rows.length > limit;
+    final selectedRows = rows.take(limit).toList(growable: true);
+    final orderedRows = afterRevisionId == null
+        ? selectedRows.reversed.toList(growable: false)
+        : selectedRows;
+    final slotIds = orderedRows
+        .map((row) => row.read<String>('slot_id'))
+        .toSet();
+    final versionCounts = <String, int>{};
+    if (slotIds.isNotEmpty) {
+      final slot = _db.messageRevisionRows.slotId;
+      final count = _db.messageRevisionRows.id.count();
+      final countRows =
+          await (_db.selectOnly(_db.messageRevisionRows)
+                ..addColumns([slot, count])
+                ..where(
+                  _db.messageRevisionRows.conversationId.equals(
+                        conversationId,
+                      ) &
+                      _db.messageRevisionRows.slotId.isIn(slotIds) &
+                      _db.messageRevisionRows.deletedAt.isNull(),
+                )
+                ..groupBy([slot]))
+              .get();
+      for (final row in countRows) {
+        versionCounts[row.read(slot)!] = row.read(count) ?? 0;
+      }
+    }
+    final slots = [
+      for (final row in orderedRows)
+        ActiveTimelineSlot(
+          slotId: row.read<String>('slot_id'),
+          revisionId: row.read<String>('id'),
+          parentRevisionId: row.readNullable<String>('parent_revision_id'),
+          role: row.read<String>('role'),
+          createdAt: _readDateTime(row, 'created_at'),
+          updatedAt: _readDateTime(row, 'updated_at'),
+          finalizedAt: _readNullableDateTime(row, 'finalized_at'),
+          versionCount: versionCounts[row.read<String>('slot_id')] ?? 1,
+        ),
+    ];
+    return ActiveTimelinePage(
+      conversationId: conversationId,
+      branchId: branchId,
+      stateRevision: state.stateRevision,
+      contextStartRevisionId: state.contextStartRevisionId,
+      slots: slots,
+      hasMoreBefore: beforeRevisionId != null
+          ? hasExtra
+          : afterRevisionId != null
+          ? true
+          : hasExtra,
+      hasMoreAfter: afterRevisionId != null
+          ? hasExtra
+          : beforeRevisionId != null,
+    );
+  }
+
+  Future<bool> _activePathContains({
+    required String conversationId,
+    required String leafRevisionId,
+    required String revisionId,
+  }) async {
+    final row = await _db
+        .customSelect(
+          '''
+WITH RECURSIVE active_path(id, parent_revision_id) AS (
+  SELECT id, parent_revision_id
+  FROM message_revision_rows
+  WHERE id = ? AND conversation_id = ? AND deleted_at IS NULL
+  UNION ALL
+  SELECT parent.id, parent.parent_revision_id
+  FROM message_revision_rows AS parent
+  JOIN active_path AS child ON child.parent_revision_id = parent.id
+  WHERE parent.conversation_id = ? AND parent.deleted_at IS NULL
+)
+SELECT EXISTS(SELECT 1 FROM active_path WHERE id = ?) AS found;
+''',
+          variables: [
+            Variable.withString(leafRevisionId),
+            Variable.withString(conversationId),
+            Variable.withString(conversationId),
+            Variable.withString(revisionId),
+          ],
+          readsFrom: {_db.messageRevisionRows},
+        )
+        .getSingle();
+    return row.read<int>('found') != 0;
+  }
+
+  DateTime _readDateTime(QueryRow row, String key) =>
+      DateTime.fromMicrosecondsSinceEpoch(row.read<int>(key));
+
+  DateTime? _readNullableDateTime(QueryRow row, String key) {
+    final value = row.readNullable<int>(key);
+    return value == null ? null : DateTime.fromMicrosecondsSinceEpoch(value);
+  }
 
   Future<MessageGraphPath> projectBranchPath({
     required String conversationId,

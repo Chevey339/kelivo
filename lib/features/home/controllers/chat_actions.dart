@@ -530,13 +530,29 @@ class ChatActions {
     Future<void>? drainFuture;
     var terminalQueued = false;
 
+    Future<void> reportError(Object error, StackTrace stackTrace) async {
+      try {
+        await onError(error, stackTrace);
+      } catch (secondaryError, secondaryStackTrace) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: secondaryError,
+            stack: secondaryStackTrace,
+            context: ErrorDescription(
+              'while handling a sequential stream terminal error',
+            ),
+          ),
+        );
+      }
+    }
+
     Future<void> drain() async {
       try {
         while (events.isNotEmpty) {
           final event = events.removeFirst();
           final error = event.error;
           if (error != null) {
-            await onError(error, event.stackTrace ?? StackTrace.current);
+            await reportError(error, event.stackTrace ?? StackTrace.current);
             await sourceSubscription.cancel();
             events.clear();
             return;
@@ -550,7 +566,7 @@ class ChatActions {
       } catch (error, stackTrace) {
         terminalQueued = true;
         events.clear();
-        await onError(error, stackTrace);
+        await reportError(error, stackTrace);
         await sourceSubscription.cancel();
       }
     }

@@ -1,0 +1,91 @@
+import 'package:Kelivo/core/database/message_graph_projector.dart';
+import 'package:Kelivo/core/models/chat_message.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  LoadedTimelineSlot slot(int index) {
+    final id = 'revision-$index';
+    final timestamp = DateTime(2026, 7, 11);
+    return LoadedTimelineSlot(
+      identity: ActiveTimelineSlot(
+        slotId: 'slot-$index',
+        revisionId: id,
+        parentRevisionId: index == 0 ? null : 'revision-${index - 1}',
+        role: index.isEven ? 'user' : 'assistant',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        finalizedAt: timestamp,
+        versionCount: index == 2 ? 500 : 1,
+      ),
+      message: ChatMessage(
+        id: id,
+        role: index.isEven ? 'user' : 'assistant',
+        content: '$index',
+        conversationId: 'conversation',
+      ),
+    );
+  }
+
+  LoadedTimelinePage page(
+    List<int> indices, {
+    required bool before,
+    required bool after,
+  }) => LoadedTimelinePage(
+    conversationId: 'conversation',
+    stateRevision: 0,
+    contextStartRevisionId: null,
+    slots: indices.map(slot).toList(),
+    hasMoreBefore: before,
+    hasMoreAfter: after,
+  );
+
+  test(
+    'coordinator pages by revision cursor and keeps one row per slot',
+    () async {
+      final calls = <({String? before, String? after})>[];
+      final coordinator = TimelineCoordinator(
+        loadPage:
+            ({
+              required conversationId,
+              beforeRevisionId,
+              afterRevisionId,
+              required limit,
+            }) async {
+              calls.add((before: beforeRevisionId, after: afterRevisionId));
+              if (beforeRevisionId != null) {
+                return page([0, 1], before: false, after: true);
+              }
+              if (afterRevisionId != null) {
+                return page([4, 5], before: true, after: false);
+              }
+              return page([2, 3], before: true, after: true);
+            },
+      );
+
+      await coordinator.open('conversation', limit: 2);
+      expect(coordinator.slots.map((entry) => entry.identity.slotId), [
+        'slot-2',
+        'slot-3',
+      ]);
+      expect(coordinator.slots.first.identity.versionCount, 500);
+
+      expect(await coordinator.loadBefore(limit: 2), isTrue);
+      expect(await coordinator.loadAfter(limit: 2), isTrue);
+      expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
+        'revision-0',
+        'revision-1',
+        'revision-2',
+        'revision-3',
+        'revision-4',
+        'revision-5',
+      ]);
+      expect(calls, [
+        (before: null, after: null),
+        (before: 'revision-2', after: null),
+        (before: null, after: 'revision-3'),
+      ]);
+    },
+  );
+}

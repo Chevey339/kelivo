@@ -15,6 +15,37 @@ import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
 
+final class LoadedTimelineSlot {
+  const LoadedTimelineSlot({required this.identity, required this.message});
+
+  final ActiveTimelineSlot identity;
+  final ChatMessage message;
+}
+
+final class LoadedTimelinePage {
+  LoadedTimelinePage({
+    required this.conversationId,
+    required this.stateRevision,
+    required this.contextStartRevisionId,
+    required List<LoadedTimelineSlot> slots,
+    required this.hasMoreBefore,
+    required this.hasMoreAfter,
+  }) : slots = List.unmodifiable(slots);
+
+  final String conversationId;
+  final int stateRevision;
+  final String? contextStartRevisionId;
+  final List<LoadedTimelineSlot> slots;
+  final bool hasMoreBefore;
+  final bool hasMoreAfter;
+
+  String? get beforeRevisionId => hasMoreBefore && slots.isNotEmpty
+      ? slots.first.identity.revisionId
+      : null;
+  String? get afterRevisionId =>
+      hasMoreAfter && slots.isNotEmpty ? slots.last.identity.revisionId : null;
+}
+
 class ChatService extends ChangeNotifier {
   ChatService({ChatDatabaseGateway? databaseGateway})
     : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance;
@@ -200,6 +231,45 @@ class ChatService extends ChangeNotifier {
       }
     }
     return timeline;
+  }
+
+  Future<LoadedTimelinePage?> loadTimelinePage(
+    String conversationId, {
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    int limit = 40,
+  }) async {
+    if (!_initialized || limit <= 0) return null;
+    final page = await _repo.loadActiveTimelinePage(
+      conversationId: conversationId,
+      beforeRevisionId: beforeRevisionId,
+      afterRevisionId: afterRevisionId,
+      limit: limit,
+    );
+    if (page == null) return null;
+    final revisionIds = page.slots
+        .map((slot) => slot.revisionId)
+        .toList(growable: false);
+    final messages = await _repo.getMessagesByIds(revisionIds);
+    final byId = {for (final message in messages) message.id: message};
+    final loadedSlots = [
+      for (final slot in page.slots)
+        if (byId[slot.revisionId] != null)
+          LoadedTimelineSlot(identity: slot, message: byId[slot.revisionId]!),
+    ];
+    if (loadedSlots.length != page.slots.length) {
+      throw StateError('timeline_selected_revision_shadow_missing');
+    }
+    _cacheLoadedMessages(conversationId, messages);
+    await _cacheMessageArtifacts(messages);
+    return LoadedTimelinePage(
+      conversationId: conversationId,
+      stateRevision: page.stateRevision,
+      contextStartRevisionId: page.contextStartRevisionId,
+      slots: loadedSlots,
+      hasMoreBefore: page.hasMoreBefore,
+      hasMoreAfter: page.hasMoreAfter,
+    );
   }
 
   int getContextStartIndex(String conversationId) =>

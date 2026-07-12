@@ -264,6 +264,79 @@ void main() {
     expect(selected.reasoning, 'thinking');
   });
 
+  test(
+    'active timeline pages use stable ancestry cursors and slot units',
+    () async {
+      await insertMainGraph(boundaryId: 'u2');
+
+      final tail = await repository.loadActiveTimelinePage(
+        conversationId: 'conversation-1',
+        limit: 2,
+      );
+      expect(tail!.slots.map((slot) => slot.revisionId), ['u2', 'a2']);
+      expect(tail.beforeRevisionId, 'u2');
+      expect(tail.afterRevisionId, isNull);
+
+      final before = await repository.loadActiveTimelinePage(
+        conversationId: 'conversation-1',
+        beforeRevisionId: tail.beforeRevisionId,
+        limit: 2,
+      );
+      expect(before!.slots.map((slot) => slot.revisionId), ['u1', 'a1-v1']);
+      expect(before.hasMoreBefore, isFalse);
+      expect(before.hasMoreAfter, isTrue);
+      expect(before.slots.last.versionCount, 2);
+
+      final after = await repository.loadActiveTimelinePage(
+        conversationId: 'conversation-1',
+        afterRevisionId: before.slots.last.revisionId,
+        limit: 2,
+      );
+      expect(after!.slots.map((slot) => slot.revisionId), ['u2', 'a2']);
+      expect(after.hasMoreBefore, isTrue);
+      expect(after.hasMoreAfter, isFalse);
+
+      await expectLater(
+        repository.loadActiveTimelinePage(
+          conversationId: 'conversation-1',
+          beforeRevisionId: 'a1-v7',
+        ),
+        throwsA(
+          isA<MessageGraphIntegrityException>().having(
+            (error) => error.message,
+            'message',
+            'message_graph_cursor_not_on_active_path',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('five hundred alternates consume one active timeline slot', () async {
+    await insertMainGraph();
+    for (var revision = 8; revision < 508; revision++) {
+      await insertRevision(
+        id: 'a1-v$revision',
+        conversationId: 'conversation-1',
+        slotId: 'slot-a1',
+        parentRevisionId: 'u1',
+        revisionNo: revision,
+      );
+    }
+
+    final page = await repository.loadActiveTimelinePage(
+      conversationId: 'conversation-1',
+      limit: 10,
+    );
+
+    expect(page!.slots, hasLength(4));
+    final assistant = page.slots.singleWhere(
+      (slot) => slot.slotId == 'slot-a1',
+    );
+    expect(assistant.revisionId, 'a1-v1');
+    expect(assistant.versionCount, 502);
+  });
+
   test('target revision projection excludes every future revision', () async {
     await insertMainGraph(boundaryId: 'u1');
 

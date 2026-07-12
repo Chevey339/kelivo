@@ -862,6 +862,22 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<ActiveTimelinePage?> loadActiveTimelinePage({
+    required String conversationId,
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    int limit = 40,
+  }) => _observer.measure(
+    ChatDatabaseOperation.queryMessageRange,
+    () => MessageGraphProjector(_db).projectActiveTimelinePage(
+      conversationId: conversationId,
+      beforeRevisionId: beforeRevisionId,
+      afterRevisionId: afterRevisionId,
+      limit: limit,
+    ),
+    resultCount: (page) => page?.slots.length ?? 0,
+  );
+
   Future<MessageGraphPath> projectMessageGraphBranch({
     required String conversationId,
     required String branchId,
