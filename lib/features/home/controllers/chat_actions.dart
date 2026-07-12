@@ -17,6 +17,7 @@ import '../../../utils/markdown_media_sanitizer.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/tool_approval_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
@@ -590,10 +591,10 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(assistantMessage);
     } catch (e) {
+      FlutterLogger.log('[SendMessage] $e', tag: 'ChatActions');
       // Ensure file processing indicator is cleared on error
       onFileProcessingFinished?.call();
-      _setConversationLoading(conversation.id, false);
-      streamController.markStreamingEnded(assistantMessage.id);
+      await _cleanupStreamingError(assistantMessage, conversation.id);
       streamController.cleanupTimers(assistantMessage.id);
       return ChatActionResult.error(e.toString());
     }
@@ -896,10 +897,8 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      streamController.markStreamingEnded(streamingMessage.id);
-      _messages[visibleIndex] = streamingMessage.copyWith(isStreaming: false);
-      await chatService.updateMessage(streamingMessage.id, isStreaming: false);
-      _setConversationLoading(conversation.id, false);
+      FlutterLogger.log('[ContinueAssistantMessageAfterToolAnswer] $e', tag: 'ChatActions');
+      await _cleanupStreamingError(streamingMessage, conversation.id);
       return ChatActionResult.error(e.toString());
     }
   }
@@ -1726,5 +1725,19 @@ class ChatActions {
         immediate: true,
       );
     } catch (_) {}
+  }
+
+  /// Clean up streaming state after an error before streaming started.
+  Future<void> _cleanupStreamingError(
+    ChatMessage message,
+    String conversationId,
+  ) async {
+    streamController.markStreamingEnded(message.id);
+    final msgIdx = _messages.indexWhere((m) => m.id == message.id);
+    if (msgIdx != -1) {
+      _messages[msgIdx] = message.copyWith(isStreaming: false);
+    }
+    await chatService.updateMessage(message.id, isStreaming: false);
+    _setConversationLoading(conversationId, false);
   }
 }
