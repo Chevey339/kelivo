@@ -200,6 +200,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _hasMoreBefore = false;
     _hasMoreAfter = false;
     _decodedBytes = 0;
+    _isGenerating = false;
     _visualAnchor = null;
     notifyListeners();
     final page = await loadPage(
@@ -356,6 +357,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _hasMoreBefore = page.hasMoreBefore;
     _hasMoreAfter = page.hasMoreAfter;
     _enforceBudget(trimFromStart: true);
+    _isGenerating = _slots.any((slot) => slot.message.isStreaming);
     _publishRetainedWindow();
     notifyListeners();
   }

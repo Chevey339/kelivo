@@ -7,7 +7,7 @@ import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  LoadedTimelineSlot slot(int index) {
+  LoadedTimelineSlot slot(int index, {bool isStreaming = false}) {
     final id = 'revision-$index';
     final timestamp = DateTime(2026, 7, 11);
     return LoadedTimelineSlot(
@@ -27,6 +27,7 @@ void main() {
         role: index.isEven ? 'user' : 'assistant',
         content: '$index',
         conversationId: 'conversation',
+        isStreaming: isStreaming,
       ),
     );
   }
@@ -248,6 +249,35 @@ void main() {
     expect(coordinator.programmaticTargetSlotId, isNull);
     coordinator.noteContentChanged(isGenerating: true);
     expect(coordinator.showJumpToLatest, isTrue);
+  });
+
+  test('loaded streaming slot keeps generation layout state active', () {
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => null,
+    );
+
+    coordinator.seed(
+      LoadedTimelinePage(
+        conversationId: 'conversation',
+        stateRevision: 0,
+        contextStartRevisionId: null,
+        slots: [slot(0), slot(1, isStreaming: true)],
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+        totalSlotCount: 2,
+      ),
+    );
+    expect(coordinator.isGenerating, isTrue);
+
+    coordinator.seed(page([0, 1], before: false, after: false));
+    expect(coordinator.isGenerating, isFalse);
   });
 
   test('paging loading state restores the previous viewport intent', () async {

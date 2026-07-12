@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
+import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
@@ -224,6 +225,76 @@ void main() {
     final listView = tester.widget<ListView>(find.byType(ListView));
     expect((listView.padding as EdgeInsets).bottom, 156);
 
+    scrollController.dispose();
+    isProcessingFiles.dispose();
+  });
+
+  testWidgets('程序定位完成后在生成终态前保持底部定位空间', (tester) async {
+    final scrollController = ScrollController();
+    final observerController = ListObserverController(
+      controller: scrollController,
+    );
+    final isProcessingFiles = ValueNotifier<bool>(false);
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => null,
+    );
+    coordinator.programmaticJump('new-user-slot');
+    coordinator.noteContentChanged(isGenerating: true);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ListenableBuilder(
+            listenable: coordinator,
+            builder: (context, child) => MessageListView(
+              scrollController: scrollController,
+              observerController: observerController,
+              messages: const [],
+              byGroup: const {},
+              versionSelections: const {},
+              reasoning: const {},
+              reasoningSegments: const {},
+              contentSplits: const {},
+              toolParts: const {},
+              translations: const {},
+              selecting: false,
+              selectedItems: const {},
+              dividerPadding: EdgeInsets.zero,
+              isProcessingFiles: isProcessingFiles,
+              bottomContentPadding: 16,
+              timelineCoordinator: coordinator,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    double bottomPadding() {
+      final listView = tester.widget<ListView>(find.byType(ListView));
+      return (listView.padding as EdgeInsets).bottom;
+    }
+
+    final reservedBottom =
+        16 + tester.getSize(find.byType(ListView)).height * 0.85;
+    expect(bottomPadding(), reservedBottom);
+
+    coordinator.completeProgrammaticJump();
+    await tester.pump();
+    expect(coordinator.programmaticTargetSlotId, isNull);
+    expect(bottomPadding(), reservedBottom);
+
+    coordinator.noteContentChanged(isGenerating: false);
+    await tester.pump();
+    expect(bottomPadding(), 16);
+
+    coordinator.dispose();
     scrollController.dispose();
     isProcessingFiles.dispose();
   });

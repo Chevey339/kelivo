@@ -351,8 +351,10 @@ class _MessageListViewState extends State<MessageListView>
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
             _scheduleProgrammaticJump();
+            final timelineCoordinator = widget.timelineCoordinator;
             final programmaticSpacer =
-                widget.timelineCoordinator?.programmaticTargetSlotId == null
+                timelineCoordinator?.programmaticTargetSlotId == null &&
+                    timelineCoordinator?.isGenerating != true
                 ? 0.0
                 : constraints.maxHeight * 0.85;
             final list = ListView.builder(
