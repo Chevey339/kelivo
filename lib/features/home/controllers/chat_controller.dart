@@ -604,7 +604,8 @@ class ChatController extends ChangeNotifier {
   /// Update a message in the list.
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
     if (!replaceMessageSnapshot(updatedMessage)) return;
-    timelineCoordinator.noteContentChanged(
+    publishGenerationState(
+      updatedMessage.conversationId,
       isGenerating: updatedMessage.isStreaming,
     );
     notifyListeners();
@@ -614,11 +615,36 @@ class ChatController extends ChangeNotifier {
   /// publishing a full-window change. Streaming UI has its own narrow notifier.
   bool replaceMessageSnapshot(ChatMessage updatedMessage) {
     final messageId = updatedMessage.id;
-    final index = _messages.indexWhere((m) => m.id == messageId);
+    final index = _messages.indexWhere(
+      (message) =>
+          message.id == messageId &&
+          message.conversationId == updatedMessage.conversationId,
+    );
     if (index == -1) return false;
     _messages[index] = updatedMessage;
     timelineCoordinator.replaceMessage(updatedMessage, notify: false);
     invalidateCache();
+    return true;
+  }
+
+  bool publishGenerationStarted(ChatMessage message) {
+    final streamingMessage = message.isStreaming
+        ? message
+        : message.copyWith(isStreaming: true);
+    final replaced = replaceMessageSnapshot(streamingMessage);
+    publishGenerationState(message.conversationId, isGenerating: true);
+    return replaced;
+  }
+
+  bool publishGenerationState(
+    String conversationId, {
+    required bool isGenerating,
+  }) {
+    if (_currentConversation?.id != conversationId ||
+        timelineCoordinator.conversationId != conversationId) {
+      return false;
+    }
+    timelineCoordinator.noteContentChanged(isGenerating: isGenerating);
     return true;
   }
 
@@ -629,7 +655,7 @@ class ChatController extends ChangeNotifier {
         ? message.copyWith(isStreaming: false)
         : message;
     final replaced = replaceMessageSnapshot(terminalMessage);
-    timelineCoordinator.noteContentChanged(isGenerating: false);
+    publishGenerationState(message.conversationId, isGenerating: false);
     return replaced;
   }
 
@@ -656,7 +682,8 @@ class ChatController extends ChangeNotifier {
         isStreaming: isStreaming ?? _messages[index].isStreaming,
       );
       timelineCoordinator.replaceMessage(_messages[index]);
-      timelineCoordinator.noteContentChanged(
+      publishGenerationState(
+        _messages[index].conversationId,
         isGenerating: _messages[index].isStreaming,
       );
       notifyListeners();

@@ -413,26 +413,43 @@ void main() {
       },
     );
 
-    test(
-      'terminal snapshot closes generation outside the loaded window',
-      () async {
-        await controller.setCurrentConversationAndLoad(conversation);
-        controller.timelineCoordinator.noteContentChanged(isGenerating: true);
+    test('generation lifecycle signals are isolated by conversation', () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      final background = ChatMessage(
+        id: 'background-assistant',
+        role: 'assistant',
+        content: '',
+        conversationId: 'background-conversation',
+        isStreaming: true,
+      );
+      final foreground = ChatMessage(
+        id: 'evicted-assistant',
+        role: 'assistant',
+        content: '',
+        conversationId: conversation.id,
+        isStreaming: true,
+      );
 
-        final replaced = controller.publishTerminalMessage(
-          ChatMessage(
-            id: 'evicted-assistant',
-            role: 'assistant',
-            content: 'finished while outside the window',
-            conversationId: conversation.id,
-            isStreaming: false,
-          ),
-        );
+      expect(controller.publishGenerationStarted(background), isFalse);
+      expect(controller.timelineCoordinator.isGenerating, isFalse);
+      expect(controller.publishGenerationStarted(foreground), isFalse);
+      expect(controller.timelineCoordinator.isGenerating, isTrue);
 
-        expect(replaced, isFalse);
-        expect(controller.timelineCoordinator.isGenerating, isFalse);
-      },
-    );
+      expect(
+        controller.publishTerminalMessage(
+          background.copyWith(isStreaming: false),
+        ),
+        isFalse,
+      );
+      expect(controller.timelineCoordinator.isGenerating, isTrue);
+      expect(
+        controller.publishTerminalMessage(
+          foreground.copyWith(isStreaming: false),
+        ),
+        isFalse,
+      );
+      expect(controller.timelineCoordinator.isGenerating, isFalse);
+    });
 
     test('clears current conversation when the service deletes it', () async {
       chatService.knownConversationIds.add(conversation.id);

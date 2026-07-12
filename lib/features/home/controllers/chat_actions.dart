@@ -1143,8 +1143,7 @@ class ChatActions {
       isStreaming: true,
     );
     _activeAssistantMessages.put(streamingMessage);
-    chatController.replaceMessageSnapshot(streamingMessage);
-    chatController.timelineCoordinator.noteContentChanged(isGenerating: true);
+    chatController.publishGenerationStarted(streamingMessage);
     await chatService.updateMessage(streamingMessage.id, isStreaming: true);
     onMessagesChanged?.call();
     _setConversationLoading(conversation.id, true);
@@ -1277,9 +1276,7 @@ class ChatActions {
       );
       await _cancelIosBackgroundGeneration();
     } else {
-      chatController.timelineCoordinator.noteContentChanged(
-        isGenerating: false,
-      );
+      chatController.publishGenerationState(cid, isGenerating: false);
       _setConversationLoading(cid, false);
     }
   }
