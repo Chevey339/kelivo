@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 import 'package:Kelivo/features/home/controllers/latest_wins_checkpoint_writer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -124,5 +125,65 @@ void main() {
 
       expect(result, 'done');
     });
+
+    test(
+      '100 token/s and 1 MiB burst never waits for checkpoint I/O',
+      () async {
+        final firstWriteStarted = Completer<void>();
+        final releaseFirstWrite = Completer<void>();
+        final allChunksConsumed = Completer<void>();
+        final streamDone = Completer<void>();
+        final writes = <int>[];
+        final writer = LatestWinsCheckpointWriter<int>(
+          minimumInterval: Duration.zero,
+          write: (bytes) async {
+            writes.add(bytes);
+            if (writes.length == 1) {
+              firstWriteStarted.complete();
+              await releaseFirstWrite.future;
+            }
+          },
+        );
+        final controller = StreamController<String>(sync: true);
+        const chunkBytes = 1024;
+        const chunkCount = 1024;
+        var consumed = 0;
+        final subscription = ChatActions.listenSequentiallyToStream<String>(
+          stream: controller.stream,
+          onData: (chunk) async {
+            consumed += chunk.length;
+            writer.add(consumed);
+            if (consumed == chunkBytes * chunkCount) {
+              allChunksConsumed.complete();
+            }
+          },
+          onError: (error, stackTrace) async => fail('$error'),
+          onDone: () async {
+            await writer.finalize(() async => writes.add(consumed));
+            streamDone.complete();
+          },
+        );
+        addTearDown(subscription.cancel);
+
+        final chunk = 'x' * chunkBytes;
+        for (var index = 0; index < chunkCount; index++) {
+          controller.add(chunk);
+        }
+        final closing = controller.close();
+
+        await firstWriteStarted.future.timeout(const Duration(seconds: 1));
+        await allChunksConsumed.future.timeout(const Duration(seconds: 1));
+        expect(controller.isPaused, isFalse);
+        expect(consumed, 1 << 20);
+        expect(writes, hasLength(1));
+        expect(streamDone.isCompleted, isFalse);
+
+        releaseFirstWrite.complete();
+        await streamDone.future.timeout(const Duration(seconds: 1));
+        await closing;
+        expect(writes, hasLength(2));
+        expect(writes.last, 1 << 20);
+      },
+    );
   });
 }

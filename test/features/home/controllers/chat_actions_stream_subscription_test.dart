@@ -153,6 +153,7 @@ void main() {
 
     test('异步 handler 未完成时网络订阅保持读取并在本地排队', () async {
       final controller = async.StreamController<int>(sync: true);
+      addTearDown(controller.close);
       final firstStarted = async.Completer<void>();
       final allowFirstToFinish = async.Completer<void>();
       final done = async.Completer<void>();
@@ -188,5 +189,91 @@ void main() {
       await done.future.timeout(const Duration(seconds: 1));
       expect(seen, const [1, 2, 3]);
     });
+
+    test(
+      'cancel waits for in-flight chunk and drops queued late chunks',
+      () async {
+        final controller = async.StreamController<int>(sync: true);
+        final firstStarted = async.Completer<void>();
+        final releaseFirst = async.Completer<void>();
+        final seen = <int>[];
+        var doneCalled = false;
+
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: controller.stream,
+          onData: (value) async {
+            seen.add(value);
+            if (value == 1) {
+              firstStarted.complete();
+              await releaseFirst.future;
+            }
+          },
+          onError: (error, stackTrace) async {
+            fail('unexpected stream error: $error');
+          },
+          onDone: () async {
+            doneCalled = true;
+          },
+        );
+
+        controller
+          ..add(1)
+          ..add(2)
+          ..add(3);
+        await firstStarted.future.timeout(const Duration(seconds: 1));
+        var cancelCompleted = false;
+        final cancelled = subscription.cancel().then((_) {
+          cancelCompleted = true;
+        });
+        await Future<void>.delayed(Duration.zero);
+        expect(cancelCompleted, isFalse);
+
+        releaseFirst.complete();
+        await cancelled.timeout(const Duration(seconds: 1));
+        await controller.close();
+
+        expect(seen, const [1]);
+        expect(doneCalled, isFalse);
+      },
+    );
+
+    test(
+      'error terminal drops chunks already queued behind the error',
+      () async {
+        final controller = async.StreamController<int>(sync: true);
+        addTearDown(controller.close);
+        final firstStarted = async.Completer<void>();
+        final releaseFirst = async.Completer<void>();
+        final errorSeen = async.Completer<Object>();
+        final seen = <int>[];
+
+        final subscription = ChatActions.listenSequentiallyToStream<int>(
+          stream: controller.stream,
+          onData: (value) async {
+            seen.add(value);
+            if (value == 1) {
+              firstStarted.complete();
+              await releaseFirst.future;
+            }
+          },
+          onError: (error, stackTrace) async => errorSeen.complete(error),
+          onDone: () async => fail('error stream must not complete normally'),
+        );
+        addTearDown(subscription.cancel);
+
+        controller.add(1);
+        await firstStarted.future.timeout(const Duration(seconds: 1));
+        controller
+          ..addError(StateError('terminal'))
+          ..add(2);
+        releaseFirst.complete();
+
+        expect(
+          await errorSeen.future.timeout(const Duration(seconds: 1)),
+          isA<StateError>(),
+        );
+        expect(seen, const [1]);
+      },
+    );
   });
 }

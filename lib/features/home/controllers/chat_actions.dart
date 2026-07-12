@@ -26,6 +26,38 @@ import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
+final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
+  _BarrierStreamSubscription(this._delegate, this._cancelWithBarrier);
+
+  final StreamSubscription<T> _delegate;
+  final Future<void> Function() _cancelWithBarrier;
+
+  @override
+  Future<void> cancel() => _cancelWithBarrier();
+
+  @override
+  void onData(void Function(T data)? handleData) =>
+      _delegate.onData(handleData);
+
+  @override
+  void onError(Function? handleError) => _delegate.onError(handleError);
+
+  @override
+  void onDone(void Function()? handleDone) => _delegate.onDone(handleDone);
+
+  @override
+  void pause([Future<void>? resumeSignal]) => _delegate.pause(resumeSignal);
+
+  @override
+  void resume() => _delegate.resume();
+
+  @override
+  bool get isPaused => _delegate.isPaused;
+
+  @override
+  Future<E> asFuture<E>([E? futureValue]) => _delegate.asFuture(futureValue);
+}
+
 class _StreamingCheckpoint {
   const _StreamingCheckpoint({
     required this.message,
@@ -494,20 +526,18 @@ class ChatActions {
   }) {
     final events =
         Queue<({T? data, Object? error, StackTrace? stackTrace, bool done})>();
-    late final StreamSubscription<T> subscription;
-    var draining = false;
+    late final StreamSubscription<T> sourceSubscription;
+    Future<void>? drainFuture;
     var terminalQueued = false;
 
     Future<void> drain() async {
-      if (draining) return;
-      draining = true;
       try {
         while (events.isNotEmpty) {
           final event = events.removeFirst();
           final error = event.error;
           if (error != null) {
             await onError(error, event.stackTrace ?? StackTrace.current);
-            await subscription.cancel();
+            await sourceSubscription.cancel();
             events.clear();
             return;
           }
@@ -521,21 +551,26 @@ class ChatActions {
         terminalQueued = true;
         events.clear();
         await onError(error, stackTrace);
-        await subscription.cancel();
-      } finally {
-        draining = false;
-        if (events.isNotEmpty) unawaited(drain());
+        await sourceSubscription.cancel();
       }
     }
+
+    late final void Function() scheduleDrain;
+    scheduleDrain = () {
+      drainFuture ??= drain().whenComplete(() {
+        drainFuture = null;
+        if (events.isNotEmpty) scheduleDrain();
+      });
+    };
 
     void enqueue(
       ({T? data, Object? error, StackTrace? stackTrace, bool done}) event,
     ) {
       events.add(event);
-      unawaited(drain());
+      scheduleDrain();
     }
 
-    subscription = stream.listen(
+    sourceSubscription = stream.listen(
       (chunk) {
         if (terminalQueued) return;
         enqueue((data: chunk, error: null, stackTrace: null, done: false));
@@ -557,7 +592,12 @@ class ChatActions {
       },
       cancelOnError: true,
     );
-    return subscription;
+    return _BarrierStreamSubscription<T>(sourceSubscription, () async {
+      terminalQueued = true;
+      events.clear();
+      await sourceSubscription.cancel();
+      await drainFuture;
+    });
   }
 
   bool _supportsAudioAttachmentsForProvider(
