@@ -5255,6 +5255,436 @@ class MessagePartRowsCompanion extends UpdateCompanion<MessagePartRow> {
   }
 }
 
+class $ProviderArtifactRowsTable extends ProviderArtifactRows
+    with TableInfo<$ProviderArtifactRowsTable, ProviderArtifactRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProviderArtifactRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _revisionIdMeta = const VerificationMeta(
+    'revisionId',
+  );
+  @override
+  late final GeneratedColumn<String> revisionId = GeneratedColumn<String>(
+    'revision_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _kindMeta = const VerificationMeta('kind');
+  @override
+  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
+    'kind',
+    aliasedName,
+    false,
+    check: () => kind.isNotValue(''),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ProviderArtifactRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ProviderArtifactRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    conversationId,
+    revisionId,
+    kind,
+    payload,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'provider_artifact_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProviderArtifactRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('revision_id')) {
+      context.handle(
+        _revisionIdMeta,
+        revisionId.isAcceptableOrUnknown(data['revision_id']!, _revisionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_revisionIdMeta);
+    }
+    if (data.containsKey('kind')) {
+      context.handle(
+        _kindMeta,
+        kind.isAcceptableOrUnknown(data['kind']!, _kindMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_kindMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {revisionId, kind};
+  @override
+  ProviderArtifactRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProviderArtifactRow(
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      revisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}revision_id'],
+      )!,
+      kind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}kind'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      createdAt: $ProviderArtifactRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $ProviderArtifactRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $ProviderArtifactRowsTable createAlias(String alias) {
+    return $ProviderArtifactRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class ProviderArtifactRow extends DataClass
+    implements Insertable<ProviderArtifactRow> {
+  final String conversationId;
+  final String revisionId;
+  final String kind;
+  final String payload;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const ProviderArtifactRow({
+    required this.conversationId,
+    required this.revisionId,
+    required this.kind,
+    required this.payload,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['revision_id'] = Variable<String>(revisionId);
+    map['kind'] = Variable<String>(kind);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['created_at'] = Variable<int>(
+        $ProviderArtifactRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $ProviderArtifactRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  ProviderArtifactRowsCompanion toCompanion(bool nullToAbsent) {
+    return ProviderArtifactRowsCompanion(
+      conversationId: Value(conversationId),
+      revisionId: Value(revisionId),
+      kind: Value(kind),
+      payload: Value(payload),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProviderArtifactRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProviderArtifactRow(
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      revisionId: serializer.fromJson<String>(json['revisionId']),
+      kind: serializer.fromJson<String>(json['kind']),
+      payload: serializer.fromJson<String>(json['payload']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'conversationId': serializer.toJson<String>(conversationId),
+      'revisionId': serializer.toJson<String>(revisionId),
+      'kind': serializer.toJson<String>(kind),
+      'payload': serializer.toJson<String>(payload),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProviderArtifactRow copyWith({
+    String? conversationId,
+    String? revisionId,
+    String? kind,
+    String? payload,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => ProviderArtifactRow(
+    conversationId: conversationId ?? this.conversationId,
+    revisionId: revisionId ?? this.revisionId,
+    kind: kind ?? this.kind,
+    payload: payload ?? this.payload,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ProviderArtifactRow copyWithCompanion(ProviderArtifactRowsCompanion data) {
+    return ProviderArtifactRow(
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      revisionId: data.revisionId.present
+          ? data.revisionId.value
+          : this.revisionId,
+      kind: data.kind.present ? data.kind.value : this.kind,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderArtifactRow(')
+          ..write('conversationId: $conversationId, ')
+          ..write('revisionId: $revisionId, ')
+          ..write('kind: $kind, ')
+          ..write('payload: $payload, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    conversationId,
+    revisionId,
+    kind,
+    payload,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProviderArtifactRow &&
+          other.conversationId == this.conversationId &&
+          other.revisionId == this.revisionId &&
+          other.kind == this.kind &&
+          other.payload == this.payload &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProviderArtifactRowsCompanion
+    extends UpdateCompanion<ProviderArtifactRow> {
+  final Value<String> conversationId;
+  final Value<String> revisionId;
+  final Value<String> kind;
+  final Value<String> payload;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ProviderArtifactRowsCompanion({
+    this.conversationId = const Value.absent(),
+    this.revisionId = const Value.absent(),
+    this.kind = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProviderArtifactRowsCompanion.insert({
+    required String conversationId,
+    required String revisionId,
+    required String kind,
+    required String payload,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : conversationId = Value(conversationId),
+       revisionId = Value(revisionId),
+       kind = Value(kind),
+       payload = Value(payload),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProviderArtifactRow> custom({
+    Expression<String>? conversationId,
+    Expression<String>? revisionId,
+    Expression<String>? kind,
+    Expression<String>? payload,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (revisionId != null) 'revision_id': revisionId,
+      if (kind != null) 'kind': kind,
+      if (payload != null) 'payload': payload,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProviderArtifactRowsCompanion copyWith({
+    Value<String>? conversationId,
+    Value<String>? revisionId,
+    Value<String>? kind,
+    Value<String>? payload,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ProviderArtifactRowsCompanion(
+      conversationId: conversationId ?? this.conversationId,
+      revisionId: revisionId ?? this.revisionId,
+      kind: kind ?? this.kind,
+      payload: payload ?? this.payload,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (revisionId.present) {
+      map['revision_id'] = Variable<String>(revisionId.value);
+    }
+    if (kind.present) {
+      map['kind'] = Variable<String>(kind.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $ProviderArtifactRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $ProviderArtifactRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderArtifactRowsCompanion(')
+          ..write('conversationId: $conversationId, ')
+          ..write('revisionId: $revisionId, ')
+          ..write('kind: $kind, ')
+          ..write('payload: $payload, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $MigrationRunRowsTable extends MigrationRunRows
     with TableInfo<$MigrationRunRowsTable, MigrationRunRow> {
   @override
@@ -6890,6 +7320,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $MessagePartRowsTable messagePartRows = $MessagePartRowsTable(
     this,
   );
+  late final $ProviderArtifactRowsTable providerArtifactRows =
+      $ProviderArtifactRowsTable(this);
   late final $MigrationRunRowsTable migrationRunRows = $MigrationRunRowsTable(
     this,
   );
@@ -6941,6 +7373,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_message_parts_revision_ordinal',
     'CREATE INDEX idx_message_parts_revision_ordinal ON message_part_rows (conversation_id, revision_id, ordinal)',
   );
+  late final Index idxProviderArtifactsRevisionKind = Index(
+    'idx_provider_artifacts_revision_kind',
+    'CREATE INDEX idx_provider_artifacts_revision_kind ON provider_artifact_rows (conversation_id, revision_id, kind)',
+  );
   late final Index idxMigrationIssuesRunKind = Index(
     'idx_migration_issues_run_kind',
     'CREATE INDEX idx_migration_issues_run_kind ON migration_issue_rows (migration_run_id, kind, id)',
@@ -6969,6 +7405,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     conversationBranchRows,
     conversationStateRows,
     messagePartRows,
+    providerArtifactRows,
     migrationRunRows,
     migrationIssueRows,
     generationRunRows,
@@ -6983,6 +7420,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxConversationBranchesLeaf,
     idxConversationBranchesParent,
     idxMessagePartsRevisionOrdinal,
+    idxProviderArtifactsRevisionKind,
     idxMigrationIssuesRunKind,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
@@ -11723,6 +12161,247 @@ typedef $$MessagePartRowsTableProcessedTableManager =
       MessagePartRow,
       PrefetchHooks Function()
     >;
+typedef $$ProviderArtifactRowsTableCreateCompanionBuilder =
+    ProviderArtifactRowsCompanion Function({
+      required String conversationId,
+      required String revisionId,
+      required String kind,
+      required String payload,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ProviderArtifactRowsTableUpdateCompanionBuilder =
+    ProviderArtifactRowsCompanion Function({
+      Value<String> conversationId,
+      Value<String> revisionId,
+      Value<String> kind,
+      Value<String> payload,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ProviderArtifactRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProviderArtifactRowsTable> {
+  $$ProviderArtifactRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get revisionId => $composableBuilder(
+    column: $table.revisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$ProviderArtifactRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProviderArtifactRowsTable> {
+  $$ProviderArtifactRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get revisionId => $composableBuilder(
+    column: $table.revisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get kind => $composableBuilder(
+    column: $table.kind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProviderArtifactRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProviderArtifactRowsTable> {
+  $$ProviderArtifactRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get conversationId => $composableBuilder(
+    column: $table.conversationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get revisionId => $composableBuilder(
+    column: $table.revisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get kind =>
+      $composableBuilder(column: $table.kind, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProviderArtifactRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProviderArtifactRowsTable,
+          ProviderArtifactRow,
+          $$ProviderArtifactRowsTableFilterComposer,
+          $$ProviderArtifactRowsTableOrderingComposer,
+          $$ProviderArtifactRowsTableAnnotationComposer,
+          $$ProviderArtifactRowsTableCreateCompanionBuilder,
+          $$ProviderArtifactRowsTableUpdateCompanionBuilder,
+          (
+            ProviderArtifactRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ProviderArtifactRowsTable,
+              ProviderArtifactRow
+            >,
+          ),
+          ProviderArtifactRow,
+          PrefetchHooks Function()
+        > {
+  $$ProviderArtifactRowsTableTableManager(
+    _$AppDatabase db,
+    $ProviderArtifactRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProviderArtifactRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProviderArtifactRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$ProviderArtifactRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> conversationId = const Value.absent(),
+                Value<String> revisionId = const Value.absent(),
+                Value<String> kind = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderArtifactRowsCompanion(
+                conversationId: conversationId,
+                revisionId: revisionId,
+                kind: kind,
+                payload: payload,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String conversationId,
+                required String revisionId,
+                required String kind,
+                required String payload,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderArtifactRowsCompanion.insert(
+                conversationId: conversationId,
+                revisionId: revisionId,
+                kind: kind,
+                payload: payload,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProviderArtifactRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProviderArtifactRowsTable,
+      ProviderArtifactRow,
+      $$ProviderArtifactRowsTableFilterComposer,
+      $$ProviderArtifactRowsTableOrderingComposer,
+      $$ProviderArtifactRowsTableAnnotationComposer,
+      $$ProviderArtifactRowsTableCreateCompanionBuilder,
+      $$ProviderArtifactRowsTableUpdateCompanionBuilder,
+      (
+        ProviderArtifactRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ProviderArtifactRowsTable,
+          ProviderArtifactRow
+        >,
+      ),
+      ProviderArtifactRow,
+      PrefetchHooks Function()
+    >;
 typedef $$MigrationRunRowsTableCreateCompanionBuilder =
     MigrationRunRowsCompanion Function({
       required String id,
@@ -12945,6 +13624,8 @@ class $AppDatabaseManager {
       $$ConversationStateRowsTableTableManager(_db, _db.conversationStateRows);
   $$MessagePartRowsTableTableManager get messagePartRows =>
       $$MessagePartRowsTableTableManager(_db, _db.messagePartRows);
+  $$ProviderArtifactRowsTableTableManager get providerArtifactRows =>
+      $$ProviderArtifactRowsTableTableManager(_db, _db.providerArtifactRows);
   $$MigrationRunRowsTableTableManager get migrationRunRows =>
       $$MigrationRunRowsTableTableManager(_db, _db.migrationRunRows);
   $$MigrationIssueRowsTableTableManager get migrationIssueRows =>

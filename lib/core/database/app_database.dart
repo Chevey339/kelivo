@@ -372,6 +372,35 @@ class MessagePartRows extends Table {
   ];
 }
 
+@TableIndex(
+  name: 'idx_provider_artifacts_revision_kind',
+  columns: {#conversationId, #revisionId, #kind},
+)
+class ProviderArtifactRows extends Table {
+  TextColumn get conversationId => text()();
+  TextColumn get revisionId => text()();
+  TextColumn get kind => text().check(
+    // ignore: recursive_getters
+    kind.isNotValue(''),
+  )();
+  TextColumn get payload => text()();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {revisionId, kind};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
+    'CHECK (updated_at >= created_at)',
+  ];
+}
+
 class MigrationRunRows extends Table {
   TextColumn get id => text()();
   TextColumn get sourceKind =>
@@ -500,6 +529,7 @@ class GenerationRunRows extends Table {
     ConversationBranchRows,
     ConversationStateRows,
     MessagePartRows,
+    ProviderArtifactRows,
     MigrationRunRows,
     MigrationIssueRows,
     GenerationRunRows,
@@ -518,7 +548,8 @@ class AppDatabase extends _$AppDatabase {
   static const messagePartsSchemaVersion = 5;
   static const legacyGraphAdapterSchemaVersion = 6;
   static const generationRunSchemaVersion = 7;
-  static const currentSchemaVersion = generationRunSchemaVersion;
+  static const orderedPartsSchemaVersion = 8;
+  static const currentSchemaVersion = orderedPartsSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -711,6 +742,30 @@ FROM probe;
           await migrator.createTable(generationRunRows);
           await migrator.createIndex(idxGenerationRunsActiveTarget);
           await migrator.createIndex(idxGenerationRunsStateUpdated);
+        });
+      },
+      from7To8: (migrator, schema) async {
+        await transaction(() async {
+          await migrator.createTable(providerArtifactRows);
+          await migrator.createIndex(idxProviderArtifactsRevisionKind);
+          await customStatement('''
+INSERT INTO provider_artifact_rows (
+  conversation_id, revision_id, kind, payload, created_at, updated_at
+)
+SELECT
+  revision.conversation_id,
+  signature.message_id,
+  'gemini_thought_signature',
+  signature.signature,
+  revision.created_at,
+  revision.updated_at
+FROM gemini_thought_signature_rows AS signature
+JOIN message_revision_rows AS revision ON revision.id = signature.message_id
+WHERE trim(signature.signature) <> ''
+ON CONFLICT (revision_id, kind) DO UPDATE SET
+  payload = excluded.payload,
+  updated_at = excluded.updated_at;
+''');
         });
       },
     ),

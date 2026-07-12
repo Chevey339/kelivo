@@ -27,7 +27,7 @@ void main() {
       const versions = GeneratedHelper.versions;
       expect(
         versions,
-        orderedEquals([1, 2, 3, 4, 5, 6, AppDatabase.currentSchemaVersion]),
+        orderedEquals([1, 2, 3, 4, 5, 6, 7, AppDatabase.currentSchemaVersion]),
       );
 
       for (final (index, fromVersion) in versions.indexed) {
@@ -296,6 +296,48 @@ void main() {
           await database.select(database.generationRunRows).get(),
           isEmpty,
         );
+      } finally {
+        await database.close();
+        schema.close();
+      }
+    });
+
+    test('v7 to v8 backfills provider artifacts from legacy shadow', () async {
+      final schema = await verifier.schemaAt(7);
+      schema.rawDatabase.execute(
+        "INSERT INTO conversation_rows (id, title, created_at, updated_at) "
+        "VALUES ('conversation', 'title', 1, 1);",
+      );
+      schema.rawDatabase.execute(
+        "INSERT INTO message_rows (id, conversation_id, role, content, "
+        "timestamp, message_order) VALUES "
+        "('message', 'conversation', 'assistant', '', 1, 0);",
+      );
+      schema.rawDatabase.execute(
+        "INSERT INTO message_slot_rows (id, conversation_id, role, created_at) "
+        "VALUES ('slot', 'conversation', 'assistant', 1);",
+      );
+      schema.rawDatabase.execute(
+        "INSERT INTO message_revision_rows (id, conversation_id, slot_id, "
+        "revision_no, created_at, updated_at) VALUES "
+        "('message', 'conversation', 'slot', 0, 1, 1);",
+      );
+      schema.rawDatabase.execute(
+        "INSERT INTO gemini_thought_signature_rows (message_id, signature) "
+        "VALUES ('message', 'signature');",
+      );
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+        );
+        final artifact = await database
+            .select(database.providerArtifactRows)
+            .getSingle();
+        expect(artifact.revisionId, 'message');
+        expect(artifact.kind, 'gemini_thought_signature');
+        expect(artifact.payload, 'signature');
       } finally {
         await database.close();
         schema.close();

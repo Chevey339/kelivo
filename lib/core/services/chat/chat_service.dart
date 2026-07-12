@@ -1532,6 +1532,7 @@ class ChatService extends ChangeNotifier {
       terminalState: terminalState,
       checkpointSeq: checkpointSeq,
       errorCode: errorCode,
+      geminiThoughtSignature: _geminiThoughtSigsCache[message.id],
     );
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);

@@ -138,6 +138,7 @@ class ChatDatabaseRepository {
     required GenerationRunState terminalState,
     int? checkpointSeq,
     String? errorCode,
+    String? geminiThoughtSignature,
   }) {
     if (!terminalState.isTerminal) {
       throw ArgumentError.value(terminalState, 'terminalState');
@@ -151,6 +152,10 @@ class ChatDatabaseRepository {
           generationRunId: checkpointSeq == null ? null : generationRunId,
           checkpointSeq: checkpointSeq,
         );
+        final signature = geminiThoughtSignature?.trim();
+        if (signature != null && signature.isNotEmpty) {
+          await _upsertGeminiThoughtSignature(message.id, signature);
+        }
         return GenerationRunCommands(_db).transition(
           id: generationRunId,
           expectedState: expectedState,
@@ -520,6 +525,8 @@ class ChatDatabaseRepository {
         database.userVersion >= AppDatabase.legacyGraphAdapterSchemaVersion;
     final includesGenerationRuns =
         database.userVersion >= AppDatabase.generationRunSchemaVersion;
+    final includesProviderArtifacts =
+        database.userVersion >= AppDatabase.orderedPartsSchemaVersion;
     if (includesMessageGraph) {
       requiredTables.addAll(const {
         'message_slot_rows',
@@ -536,6 +543,9 @@ class ChatDatabaseRepository {
       });
     }
     if (includesGenerationRuns) requiredTables.add('generation_run_rows');
+    if (includesProviderArtifacts) {
+      requiredTables.add('provider_artifact_rows');
+    }
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -552,6 +562,7 @@ class ChatDatabaseRepository {
       includesMessageParts: includesMessageParts,
       includesMigrationLedger: includesMigrationLedger,
       includesGenerationRuns: includesGenerationRuns,
+      includesProviderArtifacts: includesProviderArtifacts,
     );
   }
 
@@ -561,6 +572,7 @@ class ChatDatabaseRepository {
     required bool includesMessageParts,
     required bool includesMigrationLedger,
     required bool includesGenerationRuns,
+    required bool includesProviderArtifacts,
   }) {
     final expectedColumns = <String, List<String>>{
       'conversation_rows': [
@@ -687,6 +699,16 @@ class ChatDatabaseRepository {
         'terminal_at',
       ];
     }
+    if (includesProviderArtifacts) {
+      expectedColumns['provider_artifact_rows'] = const [
+        'conversation_id',
+        'revision_id',
+        'kind',
+        'payload',
+        'created_at',
+        'updated_at',
+      ];
+    }
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -749,6 +771,12 @@ class ChatDatabaseRepository {
         'conversation_id->conversation_rows.id:CASCADE',
         'conversation_id->message_revision_rows.conversation_id:NO ACTION',
         'target_revision_id->message_revision_rows.id:NO ACTION',
+      };
+    }
+    if (includesProviderArtifacts) {
+      expectedForeignKeys['provider_artifact_rows'] = const {
+        'conversation_id->message_revision_rows.conversation_id:CASCADE',
+        'revision_id->message_revision_rows.id:CASCADE',
       };
     }
     for (final entry in expectedForeignKeys.entries) {
@@ -1647,7 +1675,7 @@ class ChatDatabaseRepository {
     final row = await (_db.select(
       _db.messageRows,
     )..where((t) => t.id.equals(messageId))).getSingleOrNull();
-    return row == null ? null : _messageFromRow(row);
+    return row == null ? null : _messageFromRowWithParts(row);
   }
 
   Future<List<ChatMessage>> getMessagesRange(
@@ -1664,7 +1692,7 @@ class ChatDatabaseRepository {
                 ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)])
                 ..limit(limit, offset: safeStart))
               .get();
-      return rows.map(_messageFromRow).toList(growable: false);
+      return _messagesFromRowsWithParts(rows);
     }, resultCount: (rows) => rows.length);
   }
 
@@ -1676,8 +1704,9 @@ class ChatDatabaseRepository {
         final rows = await (_db.select(
           _db.messageRows,
         )..where((t) => t.id.isIn(ids))).get();
+        final messages = await _messagesFromRowsWithParts(rows);
         final byId = <String, ChatMessage>{
-          for (final row in rows) row.id: _messageFromRow(row),
+          for (final message in messages) message.id: message,
         };
         return [
           for (final id in ids)
@@ -1732,7 +1761,7 @@ class ChatDatabaseRepository {
                   )
                   ..orderBy([(t) => OrderingTerm.asc(t.messageOrder)]))
                 .get();
-        return rows.map(_messageFromRow).toList(growable: false);
+        return _messagesFromRowsWithParts(rows);
       },
       resultCount: (rows) => rows.length,
     );
@@ -1922,9 +1951,12 @@ class ChatDatabaseRepository {
   Future<void> putMessage(ChatMessage message, {int? messageOrder}) async {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
-    await _db
-        .into(_db.messageRows)
-        .insertOnConflictUpdate(_messageCompanion(message, order));
+    await _db.transaction(() async {
+      await _db
+          .into(_db.messageRows)
+          .insertOnConflictUpdate(_messageCompanion(message, order));
+      await _updateGraphRevisionPayload(message);
+    });
   }
 
   Future<Conversation> appendMessageToConversation({
@@ -2288,7 +2320,11 @@ class ChatDatabaseRepository {
     await _replaceGraphParts(message);
   }
 
-  Future<void> _replaceGraphParts(ChatMessage message) async {
+  Future<void> _replaceGraphParts(
+    ChatMessage message, {
+    List<Map<String, dynamic>>? toolEvents,
+  }) async {
+    final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
     await (_db.delete(
       _db.messagePartRows,
     )..where((row) => row.revisionId.equals(message.id))).go();
@@ -2310,6 +2346,39 @@ class ChatDatabaseRepository {
               updatedAt: updatedAt,
             ),
           );
+    }
+    for (final event in preservedToolEvents) {
+      await _db
+          .into(_db.messagePartRows)
+          .insert(
+            MessagePartRowsCompanion.insert(
+              conversationId: message.conversationId,
+              revisionId: message.id,
+              ordinal: ordinal++,
+              kind: 'tool_call',
+              payload: jsonEncode(event),
+              createdAt: message.timestamp,
+              updatedAt: updatedAt,
+            ),
+          );
+      if (event['content'] != null) {
+        await _db
+            .into(_db.messagePartRows)
+            .insert(
+              MessagePartRowsCompanion.insert(
+                conversationId: message.conversationId,
+                revisionId: message.id,
+                ordinal: ordinal++,
+                kind: 'tool_result',
+                payload: jsonEncode({
+                  if (event['id'] != null) 'id': event['id'],
+                  'content': event['content'],
+                }),
+                createdAt: message.timestamp,
+                updatedAt: updatedAt,
+              ),
+            );
+      }
     }
     await _db
         .into(_db.messagePartRows)
@@ -3178,6 +3247,13 @@ class ChatDatabaseRepository {
   }
 
   Future<void> updateMessage(ChatMessage message) async {
+    await _db.transaction(() async {
+      await _updateMessageShadow(message);
+      await _updateGraphRevisionPayload(message);
+    });
+  }
+
+  Future<void> _updateMessageShadow(ChatMessage message) async {
     await (_db.update(
       _db.messageRows,
     )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
@@ -3188,7 +3264,7 @@ class ChatDatabaseRepository {
     required bool untrackStreaming,
   }) async {
     await _db.transaction(() async {
-      await updateMessage(message);
+      await _updateMessageShadow(message);
       await _updateGraphRevisionPayload(message);
       if (untrackStreaming) {
         await untrackActiveStreamingId(message.id);
@@ -3225,10 +3301,8 @@ class ChatDatabaseRepository {
     int? checkpointSeq,
   }) async {
     await _db.transaction(() async {
-      await (_db.update(
-        _db.messageRows,
-      )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
-      await _updateGraphRevisionPayload(message);
+      await _updateMessageShadow(message);
+      await _updateGraphRevisionPayload(message, toolEvents: toolEvents);
       await _db
           .into(_db.toolEventRows)
           .insertOnConflictUpdate(
@@ -3251,7 +3325,10 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<void> _updateGraphRevisionPayload(ChatMessage message) async {
+  Future<void> _updateGraphRevisionPayload(
+    ChatMessage message, {
+    List<Map<String, dynamic>>? toolEvents,
+  }) async {
     final revision =
         await (_db.select(_db.messageRevisionRows)..where(
               (row) =>
@@ -3277,7 +3354,7 @@ class ChatDatabaseRepository {
                 : Value(updatedAt),
           ),
         );
-    await _replaceGraphParts(message);
+    await _replaceGraphParts(message, toolEvents: toolEvents);
   }
 
   Future<void> updateConversationMessages({
@@ -3511,32 +3588,64 @@ class ChatDatabaseRepository {
   ) async {
     final ids = messageIds.toSet();
     if (ids.isEmpty) return const {};
-    final rows = await (_db.select(
-      _db.toolEventRows,
-    )..where((row) => row.messageId.isIn(ids))).get();
-    return {
-      for (final row in rows) row.messageId: _decodeToolEvents(row.eventsJson),
-    };
+    final partRows =
+        await (_db.select(_db.messagePartRows)
+              ..where(
+                (row) =>
+                    row.revisionId.isIn(ids) & row.kind.equals('tool_call'),
+              )
+              ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
+            .get();
+    final result = <String, List<Map<String, dynamic>>>{};
+    for (final row in partRows) {
+      final decoded = jsonDecode(row.payload);
+      if (decoded is Map) {
+        result
+            .putIfAbsent(row.revisionId, () => <Map<String, dynamic>>[])
+            .add(Map<String, dynamic>.from(decoded));
+      }
+    }
+    final missing = ids.difference(result.keys.toSet());
+    if (missing.isNotEmpty) {
+      final legacyRows = await (_db.select(
+        _db.toolEventRows,
+      )..where((row) => row.messageId.isIn(missing))).get();
+      for (final row in legacyRows) {
+        result[row.messageId] = _decodeToolEvents(row.eventsJson);
+      }
+    }
+    return result;
   }
 
   Future<void> setToolEvents(
     String messageId,
     List<Map<String, dynamic>> events,
   ) async {
-    await _db
-        .into(_db.toolEventRows)
-        .insertOnConflictUpdate(
-          ToolEventRowsCompanion.insert(
-            messageId: messageId,
-            eventsJson: jsonEncode(events),
-          ),
-        );
+    await _db.transaction(() async {
+      final message = await getMessage(messageId);
+      if (message == null) throw StateError('tool_event_message_missing');
+      await _replaceGraphParts(message, toolEvents: events);
+      await _db
+          .into(_db.toolEventRows)
+          .insertOnConflictUpdate(
+            ToolEventRowsCompanion.insert(
+              messageId: messageId,
+              eventsJson: jsonEncode(events),
+            ),
+          );
+    });
   }
 
   Future<void> deleteToolEvents(String messageId) async {
-    await (_db.delete(
-      _db.toolEventRows,
-    )..where((t) => t.messageId.equals(messageId))).go();
+    await _db.transaction(() async {
+      final message = await getMessage(messageId);
+      if (message != null) {
+        await _replaceGraphParts(message, toolEvents: const []);
+      }
+      await (_db.delete(
+        _db.toolEventRows,
+      )..where((t) => t.messageId.equals(messageId))).go();
+    });
   }
 
   Future<String?> getGeminiThoughtSignature(String messageId) async {
@@ -3550,20 +3659,65 @@ class ChatDatabaseRepository {
   ) async {
     final ids = messageIds.toSet();
     if (ids.isEmpty) return const {};
-    final rows = await (_db.select(
-      _db.geminiThoughtSignatureRows,
-    )..where((row) => row.messageId.isIn(ids))).get();
-    return {
+    final rows =
+        await (_db.select(_db.providerArtifactRows)..where(
+              (row) =>
+                  row.revisionId.isIn(ids) &
+                  row.kind.equals('gemini_thought_signature'),
+            ))
+            .get();
+    final result = <String, String>{
       for (final row in rows)
-        if (row.signature.trim().isNotEmpty)
-          row.messageId: row.signature.trim(),
+        if (row.payload.trim().isNotEmpty) row.revisionId: row.payload.trim(),
     };
+    final missing = ids.difference(result.keys.toSet());
+    if (missing.isNotEmpty) {
+      final legacyRows = await (_db.select(
+        _db.geminiThoughtSignatureRows,
+      )..where((row) => row.messageId.isIn(missing))).get();
+      for (final row in legacyRows) {
+        if (row.signature.trim().isNotEmpty) {
+          result[row.messageId] = row.signature.trim();
+        }
+      }
+    }
+    return result;
   }
 
   Future<void> setGeminiThoughtSignature(
     String messageId,
     String signature,
   ) async {
+    await _db.transaction(() async {
+      await _upsertGeminiThoughtSignature(messageId, signature);
+    });
+  }
+
+  Future<void> _upsertGeminiThoughtSignature(
+    String messageId,
+    String signature,
+  ) async {
+    final revision = await (_db.select(
+      _db.messageRevisionRows,
+    )..where((row) => row.id.equals(messageId))).getSingleOrNull();
+    if (revision == null) {
+      throw StateError('provider_artifact_revision_missing');
+    }
+    final now = DateTime.now().toUtc();
+    await _db
+        .into(_db.providerArtifactRows)
+        .insertOnConflictUpdate(
+          ProviderArtifactRowsCompanion.insert(
+            conversationId: revision.conversationId,
+            revisionId: messageId,
+            kind: 'gemini_thought_signature',
+            payload: signature,
+            createdAt: revision.createdAt,
+            updatedAt: now.isBefore(revision.createdAt)
+                ? revision.createdAt
+                : now,
+          ),
+        );
     await _db
         .into(_db.geminiThoughtSignatureRows)
         .insertOnConflictUpdate(
@@ -3575,9 +3729,17 @@ class ChatDatabaseRepository {
   }
 
   Future<void> deleteGeminiThoughtSignature(String messageId) async {
-    await (_db.delete(
-      _db.geminiThoughtSignatureRows,
-    )..where((t) => t.messageId.equals(messageId))).go();
+    await _db.transaction(() async {
+      await (_db.delete(_db.providerArtifactRows)..where(
+            (row) =>
+                row.revisionId.equals(messageId) &
+                row.kind.equals('gemini_thought_signature'),
+          ))
+          .go();
+      await (_db.delete(
+        _db.geminiThoughtSignatureRows,
+      )..where((t) => t.messageId.equals(messageId))).go();
+    });
   }
 
   Future<List<String>> getActiveStreamingIds() async {
@@ -3788,18 +3950,62 @@ class ChatDatabaseRepository {
     );
   }
 
-  ChatMessage _messageFromRow(MessageRow row) {
+  Future<ChatMessage> _messageFromRowWithParts(MessageRow row) async {
+    return (await _messagesFromRowsWithParts([row])).single;
+  }
+
+  Future<List<ChatMessage>> _messagesFromRowsWithParts(
+    List<MessageRow> rows,
+  ) async {
+    if (rows.isEmpty) return const [];
+    final ids = rows.map((row) => row.id).toSet();
+    final parts =
+        await (_db.select(_db.messagePartRows)
+              ..where((part) => part.revisionId.isIn(ids))
+              ..orderBy([(part) => OrderingTerm.asc(part.ordinal)]))
+            .get();
+    final byRevision = <String, List<MessagePartRow>>{};
+    for (final part in parts) {
+      byRevision.putIfAbsent(part.revisionId, () => []).add(part);
+    }
+    return [
+      for (final row in rows)
+        _messageFromRow(row, authoritativeParts: byRevision[row.id]),
+    ];
+  }
+
+  /// Legacy row metadata remains as a compatibility shadow. Whenever graph
+  /// parts exist, text/reasoning are projected exclusively from those parts.
+  ChatMessage _messageFromRow(
+    MessageRow row, {
+    List<MessagePartRow>? authoritativeParts,
+  }) {
+    final hasAuthoritativeParts = authoritativeParts?.isNotEmpty ?? false;
+    final text = hasAuthoritativeParts
+        ? authoritativeParts!
+              .where((part) => part.kind == 'text')
+              .map((part) => part.payload)
+              .join()
+        : row.content;
+    final reasoningParts = hasAuthoritativeParts
+        ? authoritativeParts!
+              .where((part) => part.kind == 'reasoning')
+              .map((part) => part.payload)
+              .toList(growable: false)
+        : const <String>[];
     return ChatMessage(
       id: row.id,
       role: row.role,
-      content: row.content,
+      content: text,
       timestamp: row.timestamp,
       modelId: row.modelId,
       providerId: row.providerId,
       totalTokens: row.totalTokens,
       conversationId: row.conversationId,
       isStreaming: row.isStreaming,
-      reasoningText: row.reasoningText,
+      reasoningText: hasAuthoritativeParts
+          ? (reasoningParts.isEmpty ? null : reasoningParts.join())
+          : row.reasoningText,
       reasoningStartAt: row.reasoningStartAt,
       reasoningFinishedAt: row.reasoningFinishedAt,
       translation: row.translation,

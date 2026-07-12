@@ -4,6 +4,7 @@ import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 void main() {
   group('ChatDatabaseRepository streaming checkpoint', () {
@@ -50,6 +51,7 @@ void main() {
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
       );
+      await repository.backfillMissingMessageGraphs();
     });
 
     tearDown(() async {
@@ -98,7 +100,54 @@ void main() {
           'content': 'result',
         },
       ]);
+
+      final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+      try {
+        final parts = raw.select(
+          "SELECT kind FROM message_part_rows WHERE revision_id = "
+          "'streaming' ORDER BY ordinal;",
+        );
+        expect(parts.map((row) => row['kind']), const [
+          'reasoning',
+          'tool_call',
+          'tool_result',
+          'text',
+        ]);
+        raw.execute(
+          "UPDATE message_rows SET content = 'wrong shadow', "
+          "reasoning_text = 'wrong reasoning' WHERE id = 'streaming';",
+        );
+      } finally {
+        raw.close();
+      }
+
+      final authoritative = await repository.getMessage('streaming');
+      expect(authoritative?.content, 'partial answer');
+      expect(authoritative?.reasoningText, 'thinking');
     });
+
+    test(
+      'provider artifact remains authoritative over legacy signature',
+      () async {
+        await repository.setGeminiThoughtSignature(
+          'streaming',
+          'authoritative',
+        );
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          raw.execute(
+            "UPDATE gemini_thought_signature_rows SET signature = 'wrong' "
+            "WHERE message_id = 'streaming';",
+          );
+        } finally {
+          raw.close();
+        }
+        expect(
+          await repository.getGeminiThoughtSignature('streaming'),
+          'authoritative',
+        );
+      },
+    );
 
     test('不存在的消息不会被 checkpoint 意外插入', () async {
       await expectLater(
