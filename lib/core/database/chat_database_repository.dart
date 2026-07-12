@@ -1822,6 +1822,7 @@ class ChatDatabaseRepository {
     }, resultCount: (rows) => rows.length);
   }
 
+  @Deprecated('legacy/test only; rewrites the complete conversation order')
   Future<void> updateMessageOrder(
     String conversationId,
     List<String> messageIds,
@@ -2564,6 +2565,7 @@ class ChatDatabaseRepository {
     });
   }
 
+  @Deprecated('legacy/test only; use graph transaction commands')
   Future<void> putMessage(ChatMessage message, {int? messageOrder}) async {
     final order =
         messageOrder ?? await _nextMessageOrder(message.conversationId);
@@ -2575,6 +2577,7 @@ class ChatDatabaseRepository {
     });
   }
 
+  @Deprecated('legacy/test only; use graph append/generation commands')
   Future<Conversation> appendMessageToConversation({
     required Conversation conversation,
     required ChatMessage message,
@@ -3052,6 +3055,7 @@ class ChatDatabaseRepository {
     return persisted;
   }
 
+  @Deprecated('legacy/test only; use createGraphConversationWithMessages')
   Future<void> createConversationWithMessages({
     required Conversation conversation,
     required List<ChatMessage> messages,
@@ -3969,6 +3973,7 @@ class ChatDatabaseRepository {
     await _replaceGraphParts(message, toolEvents: toolEvents);
   }
 
+  @Deprecated('legacy/test only; rewrites the complete conversation order')
   Future<void> updateConversationMessages({
     required Conversation conversation,
     required List<String> messageIds,
@@ -3992,6 +3997,7 @@ class ChatDatabaseRepository {
     )..where((t) => t.id.equals(id))).go();
   }
 
+  @Deprecated('legacy/test only; use deleteGraphMessages')
   Future<void> deleteMessage(String messageId) async {
     final row = await getMessage(messageId);
     if (row == null) return;
@@ -4002,6 +4008,7 @@ class ChatDatabaseRepository {
     );
   }
 
+  @Deprecated('legacy/test only; use deleteGraphMessages')
   Future<DeletedMessagesResult?> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
