@@ -294,8 +294,8 @@ class HomePageController extends ChangeNotifier {
 
   void _initialize() {
     _initializeAnimations();
-    _initializeScrollController();
     _initializeControllers();
+    _initializeScrollController();
     _initializeServices();
     _initializeViewModel();
     _wireViewModelCallbacks();
