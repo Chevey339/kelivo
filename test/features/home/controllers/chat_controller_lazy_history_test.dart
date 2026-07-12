@@ -340,6 +340,7 @@ void main() {
 
         final partial = placeholder.copyWith(content: 'partial answer');
         controller.replaceMessageSnapshot(partial);
+        controller.timelineCoordinator.noteContentChanged(isGenerating: true);
         controller.timelineCoordinator.userAnchored();
         expect(await controller.loadMoreBefore(), isTrue);
         expect(controller.messages.last.content, 'partial answer');
@@ -349,7 +350,8 @@ void main() {
           content: 'complete answer',
           isStreaming: false,
         );
-        controller.updateMessageInList(completed.id, completed);
+        expect(controller.publishTerminalMessage(completed), isTrue);
+        expect(controller.timelineCoordinator.isGenerating, isFalse);
         controller.timelineCoordinator.followTail();
 
         expect(controller.messages.last.content, 'complete answer');
@@ -387,6 +389,27 @@ void main() {
         expect(controllerNotifications, 0);
         expect(coordinatorNotifications, 2);
         expect(identical(controller.messages, originalMessages), isTrue);
+      },
+    );
+
+    test(
+      'terminal snapshot closes generation outside the loaded window',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        controller.timelineCoordinator.noteContentChanged(isGenerating: true);
+
+        final replaced = controller.publishTerminalMessage(
+          ChatMessage(
+            id: 'evicted-assistant',
+            role: 'assistant',
+            content: 'finished while outside the window',
+            conversationId: conversation.id,
+            isStreaming: false,
+          ),
+        );
+
+        expect(replaced, isFalse);
+        expect(controller.timelineCoordinator.isGenerating, isFalse);
       },
     );
 

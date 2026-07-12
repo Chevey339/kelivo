@@ -342,6 +342,14 @@ void main() {
       closeTo(userTop, 1),
     );
 
+    coordinator.noteContentChanged(isGenerating: false);
+    await tester.pump();
+    expect(bottomPadding(), lessThanOrEqualTo(shortReplyPadding));
+    expect(
+      tester.getTopLeft(find.text('new question')).dy,
+      closeTo(userTop, 1),
+    );
+
     coordinator.followTail();
     await tester.pump();
     scrollController.jumpTo(scrollController.position.maxScrollExtent / 2);
@@ -355,8 +363,6 @@ void main() {
     await tester.pump();
     expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
 
-    coordinator.noteContentChanged(isGenerating: false);
-    await tester.pump();
     expect(bottomPadding(), 16);
 
     await tester.pumpWidget(const SizedBox.shrink());

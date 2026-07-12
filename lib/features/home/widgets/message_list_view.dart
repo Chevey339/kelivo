@@ -237,6 +237,8 @@ class _MessageListViewState extends State<MessageListView>
   String? _programmaticAnchorSlotId;
   String? _programmaticAnchorConversationId;
   double _programmaticSpacer = 0;
+  bool _retainTerminalAnchorSpacer = false;
+  bool _wasGenerating = false;
   late List<MessageRenderModel> _effectiveRenderModels;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
@@ -248,6 +250,7 @@ class _MessageListViewState extends State<MessageListView>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _wasGenerating = widget.timelineCoordinator?.isGenerating == true;
     _refreshRenderModels();
   }
 
@@ -257,11 +260,47 @@ class _MessageListViewState extends State<MessageListView>
     _refreshRenderModels();
     final active = _effectiveRenderModels.map((model) => model.slotId).toSet();
     _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
-    if (widget.timelineCoordinator?.isGenerating != true) {
+    final coordinator = widget.timelineCoordinator;
+    final isGenerating = coordinator?.isGenerating == true;
+    final conversationChanged =
+        _programmaticAnchorConversationId != null &&
+        _programmaticAnchorConversationId != coordinator?.conversationId;
+    if (conversationChanged) {
+      _programmaticAnchorSlotId = null;
+      _programmaticAnchorConversationId = null;
+      _programmaticSpacer = 0;
+      _retainTerminalAnchorSpacer = false;
+    } else if (_wasGenerating && !isGenerating) {
+      _programmaticSpacer = _requiredTerminalAnchorSpacer();
+      _retainTerminalAnchorSpacer = _programmaticSpacer > 0.5;
+      if (!_retainTerminalAnchorSpacer) {
+        _programmaticAnchorSlotId = null;
+        _programmaticAnchorConversationId = null;
+      }
+    }
+    if (coordinator?.viewportMode == TimelineViewportMode.followingTail) {
+      _programmaticAnchorSlotId = null;
+      _programmaticAnchorConversationId = null;
+      _programmaticSpacer = 0;
+      _retainTerminalAnchorSpacer = false;
+    } else if (!isGenerating && !_retainTerminalAnchorSpacer) {
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
       _programmaticSpacer = 0;
     }
+    _wasGenerating = isGenerating;
+  }
+
+  double _requiredTerminalAnchorSpacer() {
+    if (!widget.scrollController.hasClients || _programmaticSpacer <= 0) {
+      return 0;
+    }
+    final position = widget.scrollController.position;
+    final contentMax = (position.maxScrollExtent - _programmaticSpacer).clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    return (position.pixels - contentMax).clamp(0.0, _programmaticSpacer);
   }
 
   void _refreshRenderModels() {
@@ -364,7 +403,8 @@ class _MessageListViewState extends State<MessageListView>
             final targetPending =
                 timelineCoordinator?.programmaticTargetSlotId != null;
             final activeGenerationAnchor =
-                timelineCoordinator?.isGenerating == true &&
+                (timelineCoordinator?.isGenerating == true ||
+                    _retainTerminalAnchorSpacer) &&
                 _programmaticAnchorSlotId != null &&
                 _programmaticAnchorConversationId ==
                     timelineCoordinator?.conversationId &&

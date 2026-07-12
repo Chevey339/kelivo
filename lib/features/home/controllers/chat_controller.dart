@@ -691,6 +691,17 @@ class ChatController extends ChangeNotifier {
     return true;
   }
 
+  /// Publishes a terminal generation snapshot and always closes the timeline's
+  /// generation lifecycle, even when the message is outside the loaded window.
+  bool publishTerminalMessage(ChatMessage message) {
+    final terminalMessage = message.isStreaming
+        ? message.copyWith(isStreaming: false)
+        : message;
+    final replaced = replaceMessageSnapshot(terminalMessage);
+    timelineCoordinator.noteContentChanged(isGenerating: false);
+    return replaced;
+  }
+
   /// Update a message by ID with optional new values.
   Future<void> updateMessage(
     String messageId, {

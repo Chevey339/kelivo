@@ -430,7 +430,7 @@ class ChatActions {
       );
     } finally {
       _clearGenerationRuntimeState(message);
-      if (chatController.replaceMessageSnapshot(message)) {
+      if (chatController.publishTerminalMessage(message)) {
         onMessagesChanged?.call();
       }
       _setConversationLoading(conversationId, false);
@@ -1144,6 +1144,7 @@ class ChatActions {
     );
     _activeAssistantMessages.put(streamingMessage);
     chatController.replaceMessageSnapshot(streamingMessage);
+    chatController.timelineCoordinator.noteContentChanged(isGenerating: true);
     await chatService.updateMessage(streamingMessage.id, isStreaming: true);
     onMessagesChanged?.call();
     _setConversationLoading(conversation.id, true);
@@ -1261,7 +1262,7 @@ class ChatActions {
         );
       } finally {
         _clearGenerationRuntimeState(finalizedMessage);
-        if (chatController.replaceMessageSnapshot(finalizedMessage)) {
+        if (chatController.publishTerminalMessage(finalizedMessage)) {
           onMessagesChanged?.call();
         }
         streamController.removeStreamingNotifier(streaming.id);
@@ -1276,6 +1277,9 @@ class ChatActions {
       );
       await _cancelIosBackgroundGeneration();
     } else {
+      chatController.timelineCoordinator.noteContentChanged(
+        isGenerating: false,
+      );
       _setConversationLoading(cid, false);
     }
   }
@@ -1799,9 +1803,6 @@ class ChatActions {
         terminalState: GenerationRunState.completed,
       );
 
-      if (chatController.replaceMessageSnapshot(finalizedMessage)) {
-        onMessagesChanged?.call();
-      }
       onAssistantMessageFinished?.call(finalizedMessage);
 
       if (shouldGenerateTitle) {
@@ -1816,6 +1817,9 @@ class ChatActions {
       await _finishIosBackgroundGeneration(success: true);
     } finally {
       // UI lifecycle cleanup is independent from terminal persistence success.
+      if (chatController.publishTerminalMessage(finalizedMessage)) {
+        onMessagesChanged?.call();
+      }
       streamController.removeStreamingNotifier(messageId);
       _setConversationLoading(conversationId, false);
     }
@@ -1841,7 +1845,6 @@ class ChatActions {
     final displayContent = state.fullContentRaw.isEmpty
         ? ''
         : _transformAssistantContent(state, state.fullContentRaw);
-    final currentIndex = _messages.indexWhere((m) => m.id == messageId);
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
       content: displayContent,
       totalTokens: state.totalTokens,
@@ -1853,20 +1856,11 @@ class ChatActions {
         terminalState: GenerationRunState.failed,
         errorCode: 'generation_failed',
       );
-
-      final index = currentIndex;
-      if (index != -1) {
-        chatController.replaceMessageSnapshot(
-          _messages[index].copyWith(
-            content: displayContent,
-            isStreaming: false,
-            totalTokens: state.totalTokens,
-          ),
-        );
-        onMessagesChanged?.call();
-      }
     } finally {
       _clearGenerationRuntimeState(errorMessage);
+      if (chatController.publishTerminalMessage(errorMessage)) {
+        onMessagesChanged?.call();
+      }
       streamController.removeStreamingNotifier(messageId);
       _setConversationLoading(conversationId, false);
       await _conversationStreams.remove(conversationId)?.cancel();
