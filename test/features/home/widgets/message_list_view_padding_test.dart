@@ -231,11 +231,17 @@ void main() {
     isProcessingFiles.dispose();
   });
 
-  for (final scenario in <({String label, String content})>[
-    (label: '短 user', content: 'new question'),
+  for (final scenario in <({String label, String content, String targetId})>[
+    (label: '短 user', content: 'new question', targetId: 'new-user-slot'),
     (
       label: '长 user',
       content: List<String>.filled(36, 'long user question').join(' '),
+      targetId: 'new-user-slot',
+    ),
+    (
+      label: 'cacheExtent 外历史 slot',
+      content: 'new question',
+      targetId: 'history-0',
     ),
   ]) {
     testWidgets('程序定位先完成 spacer 布局并稳定置顶（${scenario.label}）', (tester) async {
@@ -245,6 +251,7 @@ void main() {
       );
       final isProcessingFiles = ValueNotifier<bool>(false);
       final streamingNotifier = StreamingContentNotifier();
+      final dynamicBottomPadding = ValueNotifier<double>(16);
       final messages = <ChatMessage>[
         for (var index = 0; index < 12; index++)
           ChatMessage(
@@ -293,7 +300,10 @@ void main() {
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: ListenableBuilder(
-                listenable: coordinator,
+                listenable: Listenable.merge([
+                  coordinator,
+                  dynamicBottomPadding,
+                ]),
                 builder: (context, child) => MessageListView(
                   scrollController: scrollController,
                   observerController: observerController,
@@ -309,7 +319,7 @@ void main() {
                   selectedItems: const {},
                   dividerPadding: EdgeInsets.zero,
                   isProcessingFiles: isProcessingFiles,
-                  bottomContentPadding: 16,
+                  bottomContentPadding: dynamicBottomPadding.value,
                   timelineCoordinator: coordinator,
                   streamingContentNotifier: streamingNotifier,
                 ),
@@ -326,28 +336,42 @@ void main() {
 
       scrollController.jumpTo(scrollController.position.maxScrollExtent);
       await tester.pump();
-      coordinator.programmaticJump('new-user-slot');
+      coordinator.programmaticJump(scenario.targetId);
       coordinator.noteContentChanged(isGenerating: true);
       await tester.pump();
 
       final maximumReservedBottom =
           16 + tester.getSize(find.byType(ListView)).height;
       expect(bottomPadding(), maximumReservedBottom);
-      expect(coordinator.programmaticTargetSlotId, 'new-user-slot');
+      expect(coordinator.programmaticTargetSlotId, scenario.targetId);
+
+      // Simulate the composer collapsing between spacer layout and jump. The
+      // execution frame must remeasure instead of using the stale 16px input.
+      if (scenario.label == '短 user') {
+        dynamicBottomPadding.value = 80;
+      }
 
       await tester.pump();
-      expect(coordinator.programmaticTargetSlotId, 'new-user-slot');
-      await tester.pump();
+      for (
+        var retry = 0;
+        retry < 4 && coordinator.programmaticTargetSlotId != null;
+        retry++
+      ) {
+        await tester.pump();
+      }
       expect(coordinator.programmaticTargetSlotId, isNull);
       final shortReplyPadding = bottomPadding();
-      expect(shortReplyPadding, lessThan(maximumReservedBottom));
-      if (scenario.label == '短 user') {
-        expect(shortReplyPadding, greaterThan(16));
+      if (scenario.targetId != 'new-user-slot') {
+        expect(shortReplyPadding, maximumReservedBottom);
+      } else if (scenario.label == '短 user') {
+        expect(shortReplyPadding, lessThan(maximumReservedBottom));
+        expect(shortReplyPadding, greaterThan(80));
       } else {
+        expect(shortReplyPadding, lessThan(maximumReservedBottom));
         expect(shortReplyPadding, 16);
       }
       await tester.pump();
-      final userFinder = find.byKey(const ValueKey('new-user-slot'));
+      final userFinder = find.byKey(ValueKey(scenario.targetId));
       final listTop = tester.getTopLeft(find.byType(ListView)).dy;
       final userTop = tester.getTopLeft(userFinder).dy;
       expect(
@@ -393,13 +417,14 @@ void main() {
       await tester.pump();
       expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
 
-      expect(bottomPadding(), 16);
+      expect(bottomPadding(), dynamicBottomPadding.value);
 
       await tester.pumpWidget(const SizedBox.shrink());
       coordinator.dispose();
       scrollController.dispose();
       isProcessingFiles.dispose();
       streamingNotifier.dispose();
+      dynamicBottomPadding.dispose();
     });
   }
 

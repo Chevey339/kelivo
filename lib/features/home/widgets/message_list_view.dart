@@ -239,7 +239,6 @@ class _MessageListViewState extends State<MessageListView>
   bool _programmaticJumpScheduled = false;
   String? _preparedProgrammaticTargetSlotId;
   String? _preparedProgrammaticConversationId;
-  bool _programmaticSpacerReadyForJump = false;
   String? _programmaticAnchorSlotId;
   String? _programmaticAnchorConversationId;
   double _programmaticSpacer = 0;
@@ -278,7 +277,6 @@ class _MessageListViewState extends State<MessageListView>
     if (preparedConversationChanged) {
       _preparedProgrammaticTargetSlotId = null;
       _preparedProgrammaticConversationId = null;
-      _programmaticSpacerReadyForJump = false;
     }
     if (conversationChanged) {
       _programmaticAnchorSlotId = null;
@@ -296,7 +294,6 @@ class _MessageListViewState extends State<MessageListView>
     if (coordinator?.viewportMode == TimelineViewportMode.followingTail) {
       _preparedProgrammaticTargetSlotId = null;
       _preparedProgrammaticConversationId = null;
-      _programmaticSpacerReadyForJump = false;
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
       _programmaticSpacer = 0;
@@ -646,8 +643,26 @@ class _MessageListViewState extends State<MessageListView>
       if (!mounted || !widget.scrollController.hasClients) return;
       final target = _slotKeys[targetId]?.currentContext?.findRenderObject();
       final viewport = context.findRenderObject();
-      if (target is! RenderBox || viewport is! RenderBox) return;
+      if (viewport is! RenderBox) return;
       final conversationId = coordinator?.conversationId;
+      if (target is! RenderBox || !target.attached) {
+        final targetIndex = _effectiveRenderModels.indexWhere(
+          (model) => model.slotId == targetId,
+        );
+        if (targetIndex < 0) {
+          coordinator?.completeProgrammaticJump();
+          return;
+        }
+        unawaited(
+          widget.observerController
+              .jumpTo(index: targetIndex, alignment: 0)
+              .then((_) {
+                if (!mounted) return;
+                setState(() {});
+              }),
+        );
+        return;
+      }
       final spacerPrepared =
           _preparedProgrammaticTargetSlotId == targetId &&
           _preparedProgrammaticConversationId == conversationId;
@@ -659,12 +674,12 @@ class _MessageListViewState extends State<MessageListView>
           );
           _preparedProgrammaticTargetSlotId = targetId;
           _preparedProgrammaticConversationId = conversationId;
-          _programmaticSpacerReadyForJump = false;
         });
         return;
       }
-      if (!_programmaticSpacerReadyForJump) {
-        setState(() => _programmaticSpacerReadyForJump = true);
+      final latestSpacer = _calculateProgrammaticSpacer(targetId, viewport);
+      if ((latestSpacer - _programmaticSpacer).abs() > 0.5) {
+        setState(() => _programmaticSpacer = latestSpacer);
         return;
       }
       final position = widget.scrollController.position;
@@ -674,7 +689,6 @@ class _MessageListViewState extends State<MessageListView>
         _programmaticAnchorConversationId = conversationId;
         _preparedProgrammaticTargetSlotId = null;
         _preparedProgrammaticConversationId = null;
-        _programmaticSpacerReadyForJump = false;
       });
       coordinator!.completeProgrammaticJump();
       _captureVisualAnchor();
