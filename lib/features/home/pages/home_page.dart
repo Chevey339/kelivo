@@ -1155,6 +1155,7 @@ class _HomePageState extends State<HomePage>
         onLoadMoreBefore: _controller.loadMoreBefore,
         hasMoreAfter: _controller.chatController.hasMoreAfter,
         onLoadMoreAfter: _controller.loadMoreAfter,
+        timelineCoordinator: _controller.chatController.timelineCoordinator,
         onVersionChange: (groupId, version) async {
           await _controller.setSelectedVersion(groupId, version);
         },

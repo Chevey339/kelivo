@@ -28,6 +28,25 @@ final class TimelineWindowBudget {
   final int maxDecodedBytes;
 }
 
+final class TimelineSlotGeometry {
+  const TimelineSlotGeometry({
+    required this.slotId,
+    required this.top,
+    required this.bottom,
+  });
+
+  final String slotId;
+  final double top;
+  final double bottom;
+}
+
+final class TimelineViewportAnchor {
+  const TimelineViewportAnchor({required this.slotId, required this.localDy});
+
+  final String slotId;
+  final double localDy;
+}
+
 /// Owns stable-cursor timeline paging, request cancellation, and the bounded
 /// decoded window. View widgets never calculate database offsets.
 class TimelineCoordinator extends ChangeNotifier {
@@ -51,6 +70,7 @@ class TimelineCoordinator extends ChangeNotifier {
   int _stateRevision = 0;
   int _totalSlotCount = 0;
   int _decodedBytes = 0;
+  TimelineViewportAnchor? _visualAnchor;
 
   String? get conversationId => _conversationId;
   UnmodifiableListView<LoadedTimelineSlot> get slots =>
@@ -61,6 +81,50 @@ class TimelineCoordinator extends ChangeNotifier {
   bool get loadingAfter => _loadingAfter;
   int get totalSlotCount => _totalSlotCount;
   int get decodedBytes => _decodedBytes;
+  TimelineViewportAnchor? get visualAnchor => _visualAnchor;
+
+  TimelineViewportAnchor? captureVisualAnchor({
+    required Iterable<TimelineSlotGeometry> geometries,
+    required double viewportTop,
+    required double viewportBottom,
+  }) {
+    final ordered = geometries.toList()
+      ..sort((left, right) => left.top.compareTo(right.top));
+    TimelineSlotGeometry? selected;
+    for (final geometry in ordered) {
+      if (geometry.top >= viewportTop - 0.5 &&
+          geometry.bottom <= viewportBottom + 0.5) {
+        selected = geometry;
+        break;
+      }
+    }
+    selected ??= ordered.cast<TimelineSlotGeometry?>().firstWhere(
+      (geometry) =>
+          geometry!.bottom > viewportTop && geometry.top < viewportBottom,
+      orElse: () => null,
+    );
+    _visualAnchor = selected == null
+        ? null
+        : TimelineViewportAnchor(
+            slotId: selected.slotId,
+            localDy: selected.top - viewportTop,
+          );
+    return _visualAnchor;
+  }
+
+  double? resolveVisualAnchorCorrection({
+    required Iterable<TimelineSlotGeometry> geometries,
+    required double viewportTop,
+  }) {
+    final anchor = _visualAnchor;
+    if (anchor == null) return null;
+    for (final geometry in geometries) {
+      if (geometry.slotId != anchor.slotId) continue;
+      final correction = (geometry.top - viewportTop) - anchor.localDy;
+      return correction.abs() <= 1 ? 0 : correction;
+    }
+    return null;
+  }
 
   Future<void> open(String conversationId, {int limit = 40}) async {
     final epoch = ++_requestEpoch;
@@ -69,6 +133,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _hasMoreBefore = false;
     _hasMoreAfter = false;
     _decodedBytes = 0;
+    _visualAnchor = null;
     notifyListeners();
     final page = await loadPage(
       conversationId: conversationId,
@@ -224,11 +289,16 @@ class TimelineCoordinator extends ChangeNotifier {
     final mutable = _slots.toList(growable: true);
     while (mutable.length > 1 &&
         (mutable.length > budget.maxSlots || bytes > budget.maxDecodedBytes)) {
-      final removed = trimFromStart
+      var removeFromStart = trimFromStart;
+      final candidate = removeFromStart ? mutable.first : mutable.last;
+      if (candidate.identity.slotId == _visualAnchor?.slotId) {
+        removeFromStart = !removeFromStart;
+      }
+      final removed = removeFromStart
           ? mutable.removeAt(0)
           : mutable.removeLast();
       bytes -= _slotBytes(removed);
-      if (trimFromStart) {
+      if (removeFromStart) {
         _hasMoreBefore = true;
       } else {
         _hasMoreAfter = true;

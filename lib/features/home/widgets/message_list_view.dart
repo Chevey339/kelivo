@@ -16,6 +16,7 @@ import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
+import '../controllers/timeline_coordinator.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
@@ -130,6 +131,7 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
+    this.timelineCoordinator,
   });
 
   final ScrollController scrollController;
@@ -198,6 +200,7 @@ class MessageListView extends StatefulWidget {
   final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
   final Future<bool> Function()? onLoadMoreAfter;
+  final TimelineCoordinator? timelineCoordinator;
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
@@ -213,6 +216,16 @@ class _MessageListViewState extends State<MessageListView> {
   DateTime? _lastHistoryLoadAt;
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
+  final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
+
+  String _slotId(ChatMessage message) => message.groupId ?? message.id;
+
+  @override
+  void didUpdateWidget(covariant MessageListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final active = widget.messages.map(_slotId).toSet();
+    _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
+  }
 
   bool get _isDesktopPlatform =>
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -380,19 +393,11 @@ class _MessageListViewState extends State<MessageListView> {
         notification.metrics.maxScrollExtent - notification.metrics.pixels <=
         96;
     if (isNearTop && widget.hasMoreBefore && widget.onLoadMoreBefore != null) {
-      _scheduleHistoryLoad(
-        keepAnchorFromTop: true,
-        beforeExtent: notification.metrics.maxScrollExtent,
-        load: widget.onLoadMoreBefore!,
-      );
+      _scheduleHistoryLoad(load: widget.onLoadMoreBefore!);
     } else if (isNearBottom &&
         widget.hasMoreAfter &&
         widget.onLoadMoreAfter != null) {
-      _scheduleHistoryLoad(
-        keepAnchorFromTop: false,
-        beforeExtent: notification.metrics.maxScrollExtent,
-        load: widget.onLoadMoreAfter!,
-      );
+      _scheduleHistoryLoad(load: widget.onLoadMoreAfter!);
     }
     return false;
   }
@@ -447,11 +452,7 @@ class _MessageListViewState extends State<MessageListView> {
     _deferStreamingMessageUpdates.value = false;
   }
 
-  void _scheduleHistoryLoad({
-    required bool keepAnchorFromTop,
-    required double beforeExtent,
-    required Future<bool> Function() load,
-  }) {
+  void _scheduleHistoryLoad({required Future<bool> Function() load}) {
     _historyLoadScheduled = true;
     _lastHistoryLoadAt = DateTime.now();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -459,6 +460,8 @@ class _MessageListViewState extends State<MessageListView> {
         _historyLoadScheduled = false;
         return;
       }
+
+      _captureVisualAnchor();
 
       final loaded = await load();
       if (!mounted) {
@@ -473,17 +476,58 @@ class _MessageListViewState extends State<MessageListView> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _historyLoadScheduled = false;
         if (!mounted || !widget.scrollController.hasClients) return;
-        if (!keepAnchorFromTop) return;
-        final after = widget.scrollController.position.maxScrollExtent;
-        final delta = after - beforeExtent;
-        if (delta <= 0) return;
-        final target = (widget.scrollController.offset + delta).clamp(
+        final correction = _visualAnchorCorrection();
+        if (correction == null || correction.abs() <= 1) return;
+        final target = (widget.scrollController.offset + correction).clamp(
           widget.scrollController.position.minScrollExtent,
           widget.scrollController.position.maxScrollExtent,
         );
         widget.scrollController.jumpTo(target);
       });
     });
+  }
+
+  void _captureVisualAnchor() {
+    final coordinator = widget.timelineCoordinator;
+    final viewport = context.findRenderObject();
+    if (coordinator == null || viewport is! RenderBox || !viewport.attached) {
+      return;
+    }
+    final top = viewport.localToGlobal(Offset.zero).dy;
+    coordinator.captureVisualAnchor(
+      geometries: _slotGeometries(),
+      viewportTop: top,
+      viewportBottom: top + viewport.size.height,
+    );
+  }
+
+  double? _visualAnchorCorrection() {
+    final coordinator = widget.timelineCoordinator;
+    final viewport = context.findRenderObject();
+    if (coordinator == null || viewport is! RenderBox || !viewport.attached) {
+      return null;
+    }
+    return coordinator.resolveVisualAnchorCorrection(
+      geometries: _slotGeometries(),
+      viewportTop: viewport.localToGlobal(Offset.zero).dy,
+    );
+  }
+
+  List<TimelineSlotGeometry> _slotGeometries() {
+    final result = <TimelineSlotGeometry>[];
+    for (final entry in _slotKeys.entries) {
+      final box = entry.value.currentContext?.findRenderObject();
+      if (box is! RenderBox || !box.attached) continue;
+      final top = box.localToGlobal(Offset.zero).dy;
+      result.add(
+        TimelineSlotGeometry(
+          slotId: entry.key,
+          top: top,
+          bottom: top + box.size.height,
+        ),
+      );
+    }
+    return result;
   }
 
   Widget _buildMessageItem(
@@ -527,7 +571,10 @@ class _MessageListViewState extends State<MessageListView> {
         widget.streamingContentNotifier!.hasNotifier(message.id);
 
     final messageColumn = Column(
-      key: ValueKey(message.id),
+      key: _slotKeys.putIfAbsent(
+        _slotId(message),
+        () => GlobalKey(debugLabel: 'timeline-slot:${_slotId(message)}'),
+      ),
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(

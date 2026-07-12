@@ -158,4 +158,46 @@ void main() {
     expect(coordinator.conversationId, 'second');
     expect(coordinator.slots.single.identity.revisionId, 'revision-5');
   });
+
+  test('slot ID and localDy resolve layout drift within one logical pixel', () {
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => null,
+    );
+    final anchor = coordinator.captureVisualAnchor(
+      geometries: const [
+        TimelineSlotGeometry(slotId: 'partial', top: 80, bottom: 130),
+        TimelineSlotGeometry(slotId: 'stable', top: 130, bottom: 220),
+      ],
+      viewportTop: 100,
+      viewportBottom: 500,
+    );
+    expect(anchor?.slotId, 'stable');
+    expect(anchor?.localDy, 30);
+
+    expect(
+      coordinator.resolveVisualAnchorCorrection(
+        geometries: const [
+          TimelineSlotGeometry(slotId: 'stable', top: 267.25, bottom: 357.25),
+        ],
+        viewportTop: 100,
+      ),
+      137.25,
+    );
+    expect(
+      coordinator.resolveVisualAnchorCorrection(
+        geometries: const [
+          TimelineSlotGeometry(slotId: 'stable', top: 130.75, bottom: 220.75),
+        ],
+        viewportTop: 100,
+      ),
+      0,
+    );
+  });
 }
