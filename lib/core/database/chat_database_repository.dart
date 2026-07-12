@@ -2187,6 +2187,301 @@ class ChatDatabaseRepository {
     );
   }
 
+  Future<void> registerAsset({
+    required String id,
+    required String contentHash,
+    required String path,
+    required int byteSize,
+    int? width,
+    int? height,
+    String? thumbnailPath,
+    DateTime? createdAt,
+  }) async {
+    await _ensureAssetGcSchema();
+    final timestamp = (createdAt ?? DateTime.now()).microsecondsSinceEpoch;
+    await _db.customStatement(
+      '''
+      INSERT INTO asset_rows(
+        id, content_hash, path, byte_size, width, height, thumbnail_path,
+        created_at, last_referenced_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        content_hash = excluded.content_hash,
+        path = excluded.path,
+        byte_size = excluded.byte_size,
+        width = excluded.width,
+        height = excluded.height,
+        thumbnail_path = excluded.thumbnail_path;
+    ''',
+      [
+        id,
+        contentHash,
+        path,
+        byteSize,
+        width,
+        height,
+        thumbnailPath,
+        timestamp,
+        timestamp,
+      ],
+    );
+  }
+
+  Future<void> linkMessageAsset({
+    required String conversationId,
+    required String revisionId,
+    required String assetId,
+    required String kind,
+  }) async {
+    await _ensureAssetGcSchema();
+    await _db.transaction(() async {
+      await _db.customStatement(
+        '''
+        INSERT OR IGNORE INTO message_asset_rows(
+          conversation_id, revision_id, asset_id, kind
+        ) VALUES (?, ?, ?, ?);
+      ''',
+        [conversationId, revisionId, assetId, kind],
+      );
+      await _db.customStatement(
+        'UPDATE asset_rows SET last_referenced_at = ? WHERE id = ?;',
+        [DateTime.now().microsecondsSinceEpoch, assetId],
+      );
+      await _db.customStatement(
+        'DELETE FROM asset_gc_rows WHERE asset_id = ?;',
+        [assetId],
+      );
+    });
+  }
+
+  Future<void> unlinkMessageAsset({
+    required String revisionId,
+    required String assetId,
+  }) async {
+    await _ensureAssetGcSchema();
+    await _db.customStatement(
+      'DELETE FROM message_asset_rows WHERE revision_id = ? AND asset_id = ?;',
+      [revisionId, assetId],
+    );
+  }
+
+  Future<int> scheduleUnreferencedAssetGc({required DateTime notBefore}) async {
+    await _ensureAssetGcSchema();
+    await _db.customStatement(
+      '''
+      INSERT OR IGNORE INTO asset_gc_rows(asset_id, not_before, attempts)
+      SELECT a.id, ?, 0 FROM asset_rows a
+      WHERE NOT EXISTS (
+        SELECT 1 FROM message_asset_rows r WHERE r.asset_id = a.id
+      );
+    ''',
+      [notBefore.microsecondsSinceEpoch],
+    );
+    final row = await _db
+        .customSelect('SELECT changes() AS changed;')
+        .getSingle();
+    return row.read<int>('changed');
+  }
+
+  Future<List<AssetGcCandidate>> claimAssetGc({
+    required DateTime now,
+    int limit = 50,
+  }) async {
+    await _ensureAssetGcSchema();
+    if (limit <= 0) return const <AssetGcCandidate>[];
+    final rows = await _db
+        .customSelect(
+          '''
+      SELECT a.id, a.path, a.thumbnail_path, a.byte_size
+      FROM asset_gc_rows g JOIN asset_rows a ON a.id = g.asset_id
+      WHERE g.not_before <= ?
+        AND NOT EXISTS (
+          SELECT 1 FROM message_asset_rows r WHERE r.asset_id = a.id
+        )
+      ORDER BY g.not_before, a.id LIMIT ?;
+    ''',
+          variables: [
+            Variable<int>(now.microsecondsSinceEpoch),
+            Variable<int>(limit),
+          ],
+        )
+        .get();
+    return [
+      for (final row in rows)
+        AssetGcCandidate(
+          assetId: row.read<String>('id'),
+          path: row.read<String>('path'),
+          thumbnailPath: row.readNullable<String>('thumbnail_path'),
+          byteSize: row.read<int>('byte_size'),
+        ),
+    ];
+  }
+
+  Future<bool> completeAssetGc({
+    required String assetId,
+    DateTime? completedAt,
+  }) async {
+    await _ensureAssetGcSchema();
+    return _db.transaction(() async {
+      final references = await _db
+          .customSelect(
+            'SELECT 1 AS found FROM message_asset_rows WHERE asset_id = ? LIMIT 1;',
+            variables: [Variable<String>(assetId)],
+          )
+          .getSingleOrNull();
+      if (references != null) return false;
+      await _db.customStatement('DELETE FROM asset_rows WHERE id = ?;', [
+        assetId,
+      ]);
+      final changed =
+          (await _db.customSelect('SELECT changes() AS changed;').getSingle())
+              .read<int>('changed');
+      if (changed == 0) return false;
+      await _db.customStatement(
+        '''
+        INSERT INTO gc_audit_rows(kind, entity_id, completed_at)
+        VALUES ('asset', ?, ?);
+      ''',
+        [assetId, (completedAt ?? DateTime.now()).microsecondsSinceEpoch],
+      );
+      return true;
+    });
+  }
+
+  Future<GraphGcResult> collectDeletedGraphRows({
+    required DateTime cutoff,
+    int limit = 100,
+  }) async {
+    if (limit <= 0) return const GraphGcResult(branches: 0, revisions: 0);
+    await _ensureAssetGcSchema();
+    return _db.transaction(() async {
+      final branchRows = await _db
+          .customSelect(
+            '''
+        SELECT id FROM conversation_branch_rows
+        WHERE deleted_at IS NOT NULL AND deleted_at <= ?
+        ORDER BY deleted_at, id LIMIT ?;
+      ''',
+            variables: [
+              Variable<int>(cutoff.microsecondsSinceEpoch),
+              Variable<int>(limit),
+            ],
+          )
+          .get();
+      for (final row in branchRows) {
+        final id = row.read<String>('id');
+        await _db.customStatement(
+          'DELETE FROM conversation_branch_rows WHERE id = ?;',
+          [id],
+        );
+        await _db.customStatement(
+          '''
+          INSERT INTO gc_audit_rows(kind, entity_id, completed_at)
+          VALUES ('branch', ?, ?);
+        ''',
+          [id, DateTime.now().microsecondsSinceEpoch],
+        );
+      }
+      final remaining = limit - branchRows.length;
+      if (remaining <= 0) {
+        return GraphGcResult(branches: branchRows.length, revisions: 0);
+      }
+      final revisionRows = await _db
+          .customSelect(
+            '''
+        SELECT r.id FROM message_revision_rows r
+        WHERE r.deleted_at IS NOT NULL AND r.deleted_at <= ?
+          AND NOT EXISTS (
+            SELECT 1 FROM message_revision_rows child
+            WHERE child.parent_revision_id = r.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM conversation_branch_rows b
+            WHERE b.leaf_revision_id = r.id OR b.forked_from_revision_id = r.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM conversation_state_rows s
+            WHERE s.context_start_revision_id = r.id
+          )
+        ORDER BY r.deleted_at, r.id LIMIT ?;
+      ''',
+            variables: [
+              Variable<int>(cutoff.microsecondsSinceEpoch),
+              Variable<int>(remaining),
+            ],
+          )
+          .get();
+      for (final row in revisionRows) {
+        final id = row.read<String>('id');
+        await _db.customStatement('DELETE FROM message_rows WHERE id = ?;', [
+          id,
+        ]);
+        await _db.customStatement(
+          'DELETE FROM message_revision_rows WHERE id = ?;',
+          [id],
+        );
+        await _db.customStatement(
+          '''
+          INSERT INTO gc_audit_rows(kind, entity_id, completed_at)
+          VALUES ('revision', ?, ?);
+        ''',
+          [id, DateTime.now().microsecondsSinceEpoch],
+        );
+      }
+      return GraphGcResult(
+        branches: branchRows.length,
+        revisions: revisionRows.length,
+      );
+    });
+  }
+
+  Future<void> _ensureAssetGcSchema() async {
+    await _db.customStatement('''
+      CREATE TABLE IF NOT EXISTS asset_rows(
+        id TEXT PRIMARY KEY NOT NULL,
+        content_hash TEXT NOT NULL UNIQUE,
+        path TEXT NOT NULL,
+        byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+        width INTEGER CHECK(width IS NULL OR width > 0),
+        height INTEGER CHECK(height IS NULL OR height > 0),
+        thumbnail_path TEXT,
+        created_at INTEGER NOT NULL,
+        last_referenced_at INTEGER NOT NULL
+      );
+    ''');
+    await _db.customStatement('''
+      CREATE TABLE IF NOT EXISTS message_asset_rows(
+        conversation_id TEXT NOT NULL,
+        revision_id TEXT NOT NULL,
+        asset_id TEXT NOT NULL REFERENCES asset_rows(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK(kind <> ''),
+        PRIMARY KEY(revision_id, asset_id, kind),
+        FOREIGN KEY(conversation_id, revision_id)
+          REFERENCES message_revision_rows(conversation_id, id) ON DELETE CASCADE
+      );
+    ''');
+    await _db.customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_message_assets_asset '
+      'ON message_asset_rows(asset_id, revision_id);',
+    );
+    await _db.customStatement('''
+      CREATE TABLE IF NOT EXISTS asset_gc_rows(
+        asset_id TEXT PRIMARY KEY NOT NULL
+          REFERENCES asset_rows(id) ON DELETE CASCADE,
+        not_before INTEGER NOT NULL,
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0)
+      );
+    ''');
+    await _db.customStatement('''
+      CREATE TABLE IF NOT EXISTS gc_audit_rows(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL,
+        entity_id TEXT NOT NULL,
+        completed_at INTEGER NOT NULL
+      );
+    ''');
+  }
+
   bool _requiresCjkFallback(String token) {
     return RegExp(
       r'[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]',
@@ -4511,6 +4806,25 @@ final class ChatStatsAggregate {
   final List<ChatStatsRank> models;
   final List<ChatStatsRank> assistants;
   final List<ChatStatsRank> topics;
+}
+
+final class AssetGcCandidate {
+  const AssetGcCandidate({
+    required this.assetId,
+    required this.path,
+    required this.thumbnailPath,
+    required this.byteSize,
+  });
+  final String assetId;
+  final String path;
+  final String? thumbnailPath;
+  final int byteSize;
+}
+
+final class GraphGcResult {
+  const GraphGcResult({required this.branches, required this.revisions});
+  final int branches;
+  final int revisions;
 }
 
 class ChatStorageMetaKeys {

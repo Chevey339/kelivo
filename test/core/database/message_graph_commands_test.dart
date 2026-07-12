@@ -338,6 +338,33 @@ void main() {
     expect(deletedCount, 1);
   });
 
+  test('delete resolves 200 branch paths with one set query', () async {
+    await insertFixture();
+    for (var index = 0; index < 200; index++) {
+      await insertBranch(
+        id: 'branch-heavy-$index',
+        conversationId: 'conversation-1',
+        leafRevisionId: 'a1-v7',
+        parentBranchId: 'branch-alt',
+        forkedFromRevisionId: 'u1',
+      );
+    }
+
+    final result = await repository.deleteMessageGraphRevision(
+      conversationId: 'conversation-1',
+      revisionId: 'a1-v7',
+      confirmCascade: false,
+    );
+
+    expect(result.deletedBranchCount, 201);
+    expect(revisionIds(result.projection.revisions), [
+      'u1',
+      'a1-v1',
+      'u2',
+      'a2',
+    ]);
+  });
+
   test(
     'fork clones only the requested path with new stable IDs and parts',
     () async {

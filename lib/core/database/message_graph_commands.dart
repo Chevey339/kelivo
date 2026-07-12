@@ -462,30 +462,53 @@ final class MessageGraphCommands {
                     row.deletedAt.isNull(),
               ))
               .get();
-      final directlyAffectedBranchIds = <String>{};
-      for (final branch in liveBranches) {
-        final path = await projector.projectBranchPath(
-          conversationId: conversationId,
-          branchId: branch.id,
-        );
-        if (path.revisions.any(
-          (revision) => descendants.ids.contains(revision.id),
-        )) {
-          directlyAffectedBranchIds.add(branch.id);
-        }
-      }
-      var expanded = true;
-      while (expanded) {
-        expanded = false;
-        for (final branch in liveBranches) {
-          final parentId = branch.parentBranchId;
-          if (parentId != null &&
-              directlyAffectedBranchIds.contains(parentId) &&
-              directlyAffectedBranchIds.add(branch.id)) {
-            expanded = true;
-          }
-        }
-      }
+      final affectedRows = await _db
+          .customSelect(
+            '''
+        WITH RECURSIVE
+        descendants(id) AS (
+          SELECT ?
+          UNION ALL
+          SELECT child.id FROM message_revision_rows child
+          JOIN descendants parent ON child.parent_revision_id = parent.id
+          WHERE child.conversation_id = ? AND child.deleted_at IS NULL
+        ),
+        branch_paths(branch_id, revision_id, parent_revision_id) AS (
+          SELECT b.id, r.id, r.parent_revision_id
+          FROM conversation_branch_rows b
+          JOIN message_revision_rows r ON r.id = b.leaf_revision_id
+          WHERE b.conversation_id = ? AND b.deleted_at IS NULL
+          UNION ALL
+          SELECT path.branch_id, parent.id, parent.parent_revision_id
+          FROM branch_paths path
+          JOIN message_revision_rows parent ON parent.id = path.parent_revision_id
+          WHERE parent.conversation_id = ? AND parent.deleted_at IS NULL
+        ),
+        directly_affected(id) AS (
+          SELECT DISTINCT path.branch_id FROM branch_paths path
+          JOIN descendants deleted ON deleted.id = path.revision_id
+        ),
+        affected(id) AS (
+          SELECT id FROM directly_affected
+          UNION
+          SELECT child.id FROM conversation_branch_rows child
+          JOIN affected parent ON child.parent_branch_id = parent.id
+          WHERE child.conversation_id = ? AND child.deleted_at IS NULL
+        )
+        SELECT id FROM affected;
+        ''',
+            variables: [
+              Variable<String>(revisionId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+            ],
+          )
+          .get();
+      final directlyAffectedBranchIds = affectedRows
+          .map((row) => row.read<String>('id'))
+          .toSet();
       final affectedBranches = liveBranches
           .where((branch) => directlyAffectedBranchIds.contains(branch.id))
           .toList(growable: false);
