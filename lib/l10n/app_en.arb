@@ -2465,5 +2465,6 @@
   "migrationFailedSubtitle": "The original Hive data and your backup are still intact. Review the reason below, then retry.",
   "migrationUnknownError": "Unknown migration error.",
   "migrationFailureLogTitle": "Failure log",
-  "migrationRetryButton": "Retry Migration"
+  "migrationRetryButton": "Retry Migration",
+  "timelineJumpToLatest": "Jump to latest"
 }

@@ -200,4 +200,78 @@ void main() {
       0,
     );
   });
+
+  test('viewport intent preserves history reading while content streams', () {
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => null,
+    );
+
+    expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
+    coordinator.userAnchored();
+    coordinator.noteContentChanged(isGenerating: true);
+    expect(coordinator.viewportMode, TimelineViewportMode.userAnchored);
+    expect(coordinator.showJumpToLatest, isTrue);
+    expect(coordinator.isGenerating, isTrue);
+
+    coordinator.followTail();
+    expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
+    expect(coordinator.hasUnreadContent, isFalse);
+  });
+
+  test('programmatic jump becomes an anchored viewport after placement', () {
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => null,
+    );
+
+    coordinator.programmaticJump('new-user-slot');
+    coordinator.noteContentChanged(isGenerating: true);
+    expect(coordinator.viewportMode, TimelineViewportMode.programmaticJump);
+    expect(coordinator.programmaticTargetSlotId, 'new-user-slot');
+    expect(coordinator.hasUnreadContent, isFalse);
+
+    coordinator.completeProgrammaticJump();
+    expect(coordinator.viewportMode, TimelineViewportMode.userAnchored);
+    expect(coordinator.programmaticTargetSlotId, isNull);
+    coordinator.noteContentChanged(isGenerating: true);
+    expect(coordinator.showJumpToLatest, isTrue);
+  });
+
+  test('paging loading state restores the previous viewport intent', () async {
+    final completer = Completer<LoadedTimelinePage?>();
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async {
+            if (beforeRevisionId != null) return completer.future;
+            return page([2, 3], before: true, after: false);
+          },
+    );
+    await coordinator.open('conversation');
+    coordinator.userAnchored();
+
+    final loading = coordinator.loadBefore();
+    expect(coordinator.viewportMode, TimelineViewportMode.loading);
+    completer.complete(page([0, 1], before: false, after: true));
+    await loading;
+    expect(coordinator.viewportMode, TimelineViewportMode.userAnchored);
+  });
 }

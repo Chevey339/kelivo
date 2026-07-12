@@ -5499,6 +5499,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10996,6 +10999,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16493,4 +16499,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationRetryButton => '重試遷移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
 }

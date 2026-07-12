@@ -2035,5 +2035,6 @@
   "migrationFailedSubtitle": "原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。",
   "migrationUnknownError": "未知迁移错误。",
   "migrationFailureLogTitle": "失败日志",
-  "migrationRetryButton": "重试迁移"
+  "migrationRetryButton": "重试迁移",
+  "timelineJumpToLatest": "跳到最新"
 }

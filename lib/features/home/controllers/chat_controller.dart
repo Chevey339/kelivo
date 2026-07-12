@@ -242,6 +242,11 @@ class ChatController extends ChangeNotifier {
       conversationId,
       limit: ChatService.defaultTimelineInitialSlots,
     );
+    for (final slot in timelineCoordinator.slots.reversed) {
+      if (slot.message.role != 'user') continue;
+      timelineCoordinator.programmaticJump(slot.identity.slotId);
+      break;
+    }
     invalidateCache();
     await _preloadVisibleGroupData();
     await _ensureLoadedWindowHasVisibleMessages();
@@ -308,6 +313,7 @@ class ChatController extends ChangeNotifier {
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
     );
+    timelineCoordinator.followTail();
     await _preloadVisibleGroupData();
     return _messages.isNotEmpty;
   }
@@ -625,30 +631,20 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
-    final wasAtTail =
-        _loadedStartIndex + _messages.length >= _totalMessageCount;
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-
-    if (!wasAtTail) {
-      final message = messages.last;
-      final groupId = message.groupId ?? message.id;
-      final firstIndices = await _chatService.loadFirstMessageIndicesForGroups(
+    if (!_chatService.isTemporaryConversation(conversation.id)) {
+      await timelineCoordinator.open(
         conversation.id,
-        <String>{groupId},
+        limit: ChatService.defaultLoadedWindowMax,
       );
-      final anchorIndex = firstIndices[groupId];
-      if (anchorIndex != null) {
-        final loadedEnd = _loadedStartIndex + _messages.length;
-        if (anchorIndex >= _loadedStartIndex && anchorIndex < loadedEnd) {
-          notifyListeners();
-          return false;
-        }
-        if (await _loadWindowAroundIndex(anchorIndex)) {
-          return true;
-        }
-      }
-      return loadEndWindow();
+      final user = messages.firstWhere(
+        (message) => message.role == 'user',
+        orElse: () => messages.first,
+      );
+      timelineCoordinator.programmaticJump(user.groupId ?? user.id);
+      return true;
     }
+
+    _totalMessageCount = _chatService.getMessageCount(conversation.id);
 
     for (final message in messages) {
       final existingIndex = _messages.indexWhere((m) => m.id == message.id);
@@ -674,6 +670,9 @@ class ChatController extends ChangeNotifier {
     if (index != -1) {
       _messages[index] = updatedMessage;
       timelineCoordinator.replaceMessage(updatedMessage);
+      timelineCoordinator.noteContentChanged(
+        isGenerating: updatedMessage.isStreaming,
+      );
       notifyListeners();
     }
   }
@@ -701,6 +700,9 @@ class ChatController extends ChangeNotifier {
         isStreaming: isStreaming ?? _messages[index].isStreaming,
       );
       timelineCoordinator.replaceMessage(_messages[index]);
+      timelineCoordinator.noteContentChanged(
+        isGenerating: _messages[index].isStreaming,
+      );
       notifyListeners();
     }
   }

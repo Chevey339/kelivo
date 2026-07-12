@@ -84,6 +84,9 @@ class ChatScrollController {
     required this._onStateChanged,
     required this._getAutoScrollEnabled,
     required this._getAutoScrollIdleSeconds,
+    this.onUserAnchored,
+    this.onFollowingTail,
+    this.shouldFollowTail,
   }) {
     final scrollController = _scrollController;
     _scrollController.addListener(_onScrollControllerChanged);
@@ -93,7 +96,10 @@ class ChatScrollController {
     // Wire auto-follow callback for zero-lag bottom pinning
     if (scrollController is ChatAutoFollowScrollController) {
       scrollController.shouldAutoFollow = () =>
-          _getAutoScrollEnabled() && _autoStickToBottom && !_isUserScrolling;
+          _getAutoScrollEnabled() &&
+          _autoStickToBottom &&
+          !_isUserScrolling &&
+          (shouldFollowTail?.call() ?? true);
     }
   }
 
@@ -101,6 +107,9 @@ class ChatScrollController {
   final VoidCallback _onStateChanged;
   final bool Function() _getAutoScrollEnabled;
   final int Function() _getAutoScrollIdleSeconds;
+  final VoidCallback? onUserAnchored;
+  final VoidCallback? onFollowingTail;
+  final bool Function()? shouldFollowTail;
 
   /// Observer controller for precise index-based scroll navigation.
   late final ListObserverController _observerController;
@@ -200,6 +209,7 @@ class ChatScrollController {
           ScrollDirection.idle) {
         _isUserScrolling = true;
         _autoStickToBottom = false;
+        onUserAnchored?.call();
         // Reset chained jump anchor when user manually scrolls
         _lastJumpUserMessageId = null;
 
@@ -231,6 +241,7 @@ class ChatScrollController {
         _isUserScrolling = false;
         _userScrollTimer?.cancel();
         _autoStickToBottom = true;
+        onFollowingTail?.call();
       } else if (autoScrollEnabled || _autoStickToBottom) {
         _autoStickToBottom = true;
       }
@@ -283,6 +294,7 @@ class ChatScrollController {
   /// [animate] - Whether to animate the scroll (default: true).
   void scrollToBottom({bool animate = true}) {
     _autoStickToBottom = true;
+    onFollowingTail?.call();
     _scheduleExplicitScrollToBottom(animate: animate);
   }
 
@@ -292,6 +304,7 @@ class ChatScrollController {
     _userScrollTimer?.cancel();
     _lastJumpUserMessageId = null;
     revealNavButtons();
+    onFollowingTail?.call();
     scrollToBottom();
   }
 

@@ -441,6 +441,10 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
+      onUserAnchored: () => _chatController.timelineCoordinator.userAnchored(),
+      onFollowingTail: _chatController.timelineCoordinator.followTail,
+      shouldFollowTail: () =>
+          _chatController.timelineCoordinator.shouldFollowTail,
     );
   }
 

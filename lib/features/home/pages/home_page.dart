@@ -56,6 +56,7 @@ import '../widgets/chat_selection_app_bar.dart';
 import '../widgets/chat_selection_delete_bar.dart';
 import '../widgets/chat_selection_export_bar.dart';
 import '../widgets/user_message_edit_overlay.dart';
+import '../widgets/timeline_jump_to_latest.dart';
 import '../utils/model_display_helper.dart';
 import '../utils/chat_layout_constants.dart';
 import '../controllers/home_page_controller.dart';
@@ -1362,6 +1363,23 @@ class _HomePageState extends State<HomePage>
       fit: StackFit.expand,
       children: [
         _buildScrollButtons(),
+        ListenableBuilder(
+          listenable: _controller.chatController.timelineCoordinator,
+          builder: (context, _) {
+            final coordinator = _controller.chatController.timelineCoordinator;
+            if (!coordinator.showJumpToLatest || _controller.selecting) {
+              return const SizedBox.shrink();
+            }
+            return TimelineJumpToLatest(
+              label: AppLocalizations.of(context)!.timelineJumpToLatest,
+              isGenerating: coordinator.isGenerating,
+              bottomOffset: _controller.inputBarHeight + 16,
+              onPressed: () {
+                unawaited(_controller.forceScrollToBottom());
+              },
+            );
+          },
+        ),
         UserMessageEditOverlay(
           visible: editState != null && !_controller.selecting,
           previewText: editState?.previewText ?? '',

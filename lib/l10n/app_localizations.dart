@@ -10505,6 +10505,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retry Migration'**
   String get migrationRetryButton;
+
+  /// No description provided for @timelineJumpToLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to latest'**
+  String get timelineJumpToLatest;
 }
 
 class _AppLocalizationsDelegate

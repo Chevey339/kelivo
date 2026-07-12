@@ -5719,4 +5719,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationRetryButton => 'Retry Migration';
+
+  @override
+  String get timelineJumpToLatest => 'Jump to latest';
 }

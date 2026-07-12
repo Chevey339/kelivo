@@ -47,6 +47,13 @@ final class TimelineViewportAnchor {
   final double localDy;
 }
 
+enum TimelineViewportMode {
+  followingTail,
+  userAnchored,
+  programmaticJump,
+  loading,
+}
+
 /// Owns stable-cursor timeline paging, request cancellation, and the bounded
 /// decoded window. View widgets never calculate database offsets.
 class TimelineCoordinator extends ChangeNotifier {
@@ -71,6 +78,11 @@ class TimelineCoordinator extends ChangeNotifier {
   int _totalSlotCount = 0;
   int _decodedBytes = 0;
   TimelineViewportAnchor? _visualAnchor;
+  TimelineViewportMode _viewportMode = TimelineViewportMode.followingTail;
+  TimelineViewportMode _modeBeforeLoading = TimelineViewportMode.followingTail;
+  String? _programmaticTargetSlotId;
+  bool _hasUnreadContent = false;
+  bool _isGenerating = false;
 
   String? get conversationId => _conversationId;
   UnmodifiableListView<LoadedTimelineSlot> get slots =>
@@ -82,6 +94,61 @@ class TimelineCoordinator extends ChangeNotifier {
   int get totalSlotCount => _totalSlotCount;
   int get decodedBytes => _decodedBytes;
   TimelineViewportAnchor? get visualAnchor => _visualAnchor;
+  TimelineViewportMode get viewportMode => _viewportMode;
+  String? get programmaticTargetSlotId => _programmaticTargetSlotId;
+  bool get hasUnreadContent => _hasUnreadContent;
+  bool get isGenerating => _isGenerating;
+  bool get shouldFollowTail =>
+      _viewportMode == TimelineViewportMode.followingTail;
+  bool get showJumpToLatest =>
+      _viewportMode == TimelineViewportMode.userAnchored && _hasUnreadContent;
+
+  void followTail() {
+    _viewportMode = TimelineViewportMode.followingTail;
+    _programmaticTargetSlotId = null;
+    _hasUnreadContent = false;
+    notifyListeners();
+  }
+
+  void userAnchored({bool preserveProgrammaticTarget = false}) {
+    _viewportMode = TimelineViewportMode.userAnchored;
+    if (!preserveProgrammaticTarget) _programmaticTargetSlotId = null;
+    notifyListeners();
+  }
+
+  void programmaticJump(String slotId) {
+    _viewportMode = TimelineViewportMode.programmaticJump;
+    _programmaticTargetSlotId = slotId;
+    _hasUnreadContent = false;
+    notifyListeners();
+  }
+
+  void completeProgrammaticJump() {
+    if (_viewportMode != TimelineViewportMode.programmaticJump) return;
+    userAnchored();
+  }
+
+  void noteContentChanged({required bool isGenerating}) {
+    _isGenerating = isGenerating;
+    if (_viewportMode == TimelineViewportMode.userAnchored &&
+        _programmaticTargetSlotId == null) {
+      _hasUnreadContent = true;
+    }
+    notifyListeners();
+  }
+
+  void _beginLoading() {
+    if (_viewportMode != TimelineViewportMode.loading) {
+      _modeBeforeLoading = _viewportMode;
+    }
+    _viewportMode = TimelineViewportMode.loading;
+  }
+
+  void _endLoading() {
+    if (_viewportMode == TimelineViewportMode.loading) {
+      _viewportMode = _modeBeforeLoading;
+    }
+  }
 
   TimelineViewportAnchor? captureVisualAnchor({
     required Iterable<TimelineSlotGeometry> geometries,
@@ -178,6 +245,7 @@ class TimelineCoordinator extends ChangeNotifier {
     }
     final epoch = _requestEpoch;
     _loadingBefore = true;
+    _beginLoading();
     notifyListeners();
     try {
       final page = await loadPage(
@@ -201,6 +269,7 @@ class TimelineCoordinator extends ChangeNotifier {
     } finally {
       if (_accepts(epoch, conversationId)) {
         _loadingBefore = false;
+        _endLoading();
         notifyListeners();
       }
     }
@@ -216,6 +285,7 @@ class TimelineCoordinator extends ChangeNotifier {
     }
     final epoch = _requestEpoch;
     _loadingAfter = true;
+    _beginLoading();
     notifyListeners();
     try {
       final page = await loadPage(
@@ -239,6 +309,7 @@ class TimelineCoordinator extends ChangeNotifier {
     } finally {
       if (_accepts(epoch, conversationId)) {
         _loadingAfter = false;
+        _endLoading();
         notifyListeners();
       }
     }
@@ -254,6 +325,11 @@ class TimelineCoordinator extends ChangeNotifier {
     _loadingAfter = false;
     _totalSlotCount = 0;
     _decodedBytes = 0;
+    _visualAnchor = null;
+    _viewportMode = TimelineViewportMode.followingTail;
+    _programmaticTargetSlotId = null;
+    _hasUnreadContent = false;
+    _isGenerating = false;
     notifyListeners();
   }
 

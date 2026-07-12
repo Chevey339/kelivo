@@ -217,6 +217,7 @@ class _MessageListViewState extends State<MessageListView> {
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
+  bool _programmaticJumpScheduled = false;
 
   String _slotId(ChatMessage message) => message.groupId ?? message.id;
 
@@ -292,6 +293,11 @@ class _MessageListViewState extends State<MessageListView> {
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
+            _scheduleProgrammaticJump();
+            final programmaticSpacer =
+                widget.timelineCoordinator?.programmaticTargetSlotId == null
+                ? 0.0
+                : constraints.maxHeight * 0.85;
             final list = ListView.builder(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
@@ -299,7 +305,8 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.topContentPadding,
                 horizontalPad,
                 widget.bottomContentPadding +
-                    (widget.isPinnedIndicatorActive ? 12 : 0),
+                    (widget.isPinnedIndicatorActive ? 12 : 0) +
+                    programmaticSpacer,
               ),
               itemCount: widget.messages.length,
               keyboardDismissBehavior: _keyboardDismissBehavior,
@@ -414,11 +421,44 @@ class _MessageListViewState extends State<MessageListView> {
 
   void _handleUserScrollActivity([ScrollMetrics? metrics]) {
     if (_isWithinStreamingAutoFollowBand(metrics)) {
+      widget.timelineCoordinator?.followTail();
       _resumeStreamingMessageUpdates();
       return;
     }
+    _captureVisualAnchor();
+    widget.timelineCoordinator?.userAnchored();
     _setDeferStreamingMessageUpdates(true);
     _scheduleStreamingUpdateResume();
+  }
+
+  void _scheduleProgrammaticJump() {
+    final coordinator = widget.timelineCoordinator;
+    final targetId = coordinator?.programmaticTargetSlotId;
+    if (coordinator?.viewportMode != TimelineViewportMode.programmaticJump ||
+        targetId == null ||
+        _programmaticJumpScheduled) {
+      return;
+    }
+    _programmaticJumpScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _programmaticJumpScheduled = false;
+      if (!mounted || !widget.scrollController.hasClients) return;
+      final target = _slotKeys[targetId]?.currentContext?.findRenderObject();
+      final viewport = context.findRenderObject();
+      if (target is! RenderBox || viewport is! RenderBox) return;
+      final delta =
+          target.localToGlobal(Offset.zero).dy -
+          viewport.localToGlobal(Offset.zero).dy;
+      final position = widget.scrollController.position;
+      widget.scrollController.jumpTo(
+        (widget.scrollController.offset + delta).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+      coordinator!.completeProgrammaticJump();
+      _captureVisualAnchor();
+    });
   }
 
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {

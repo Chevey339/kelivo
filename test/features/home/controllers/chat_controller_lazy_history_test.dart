@@ -780,7 +780,7 @@ void main() {
       },
     );
 
-    test('publishes an atomic send pair without a false tail reload', () async {
+    test('publishes an atomic send pair through the timeline tail', () async {
       controller.setCurrentConversation(conversation);
       final user = chatService.appendPersistedMessage(_message(100));
       final assistant = chatService.appendPersistedMessage(_message(101));
@@ -790,12 +790,10 @@ void main() {
         assistant,
       ]);
 
-      expect(reloaded, isFalse);
-      expect(chatService.rangeLoadCalls, 0);
+      expect(reloaded, isTrue);
+      expect(chatService.rangeLoadCalls, 1);
       expect(controller.messages.map((message) => message.id), [
-        ...messages.sublist(80, 100).map((message) => message.id),
-        'message-100',
-        'message-101',
+        ...messages.map((message) => message.id),
       ]);
       expect(controller.totalMessageCount, 102);
     });
