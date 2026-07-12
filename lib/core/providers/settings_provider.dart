@@ -14,6 +14,8 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
+import '../services/secure_credential_store.dart';
+import '../services/backup/backup_settings_sanitizer.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
@@ -46,6 +48,7 @@ enum MobileMessageNavButtonsMode { always, scroll, never }
 enum _MigrationResult { noChange, applied, failed }
 
 class SettingsProvider extends ChangeNotifier {
+  static const SecureCredentialStore _credentialStore = SecureCredentialStore();
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _providerGroupsKey =
       'provider_groups_v1'; // [{id,name,createdAt}]
@@ -620,8 +623,11 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
       final encoded = jsonEncode(map);
-      final ok = await prefs.setString(_providerConfigsKey, encoded);
-      if (!ok) return _MigrationResult.failed;
+      await _credentialStore.writeProtectedJson(
+        prefs,
+        _providerConfigsKey,
+        encoded,
+      );
     } catch (e, st) {
       assert(() {
         debugPrint(
@@ -660,7 +666,10 @@ class SettingsProvider extends ChangeNotifier {
     _themePaletteId = prefs.getString(_themePaletteKey) ?? 'default';
     _useDynamicColor = prefs.getBool(_useDynamicColorKey) ?? true;
     var providerConfigsLoaded = false;
-    final cfgStr = prefs.getString(_providerConfigsKey);
+    final cfgStr = await _credentialStore.readProtectedJson(
+      prefs,
+      _providerConfigsKey,
+    );
     if (cfgStr != null && cfgStr.isNotEmpty) {
       try {
         final raw = jsonDecode(cfgStr) as Map<String, dynamic>;
@@ -695,9 +704,14 @@ class SettingsProvider extends ChangeNotifier {
           final backup = _providerConfigs.map(
             (k, v) => MapEntry(k, v.toJson()),
           );
+          final sanitizedBackup =
+              BackupSettingsSanitizer.sanitize({
+                    _providerConfigsKey: jsonEncode(backup),
+                  })[_providerConfigsKey]
+                  as String;
           backupOk = await prefs.setString(
             _providerConfigsBackupKey,
-            jsonEncode(backup),
+            sanitizedBackup,
           );
           assert(() {
             debugPrint(
@@ -754,6 +768,7 @@ class SettingsProvider extends ChangeNotifier {
         return true;
       }());
     }
+    await prefs.remove(_providerConfigsBackupKey);
 
     // load provider grouping
     try {
@@ -1164,7 +1179,10 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_iosBackgroundNotificationsEnabledKey) ?? false;
 
     // load search settings
-    final searchServicesStr = prefs.getString(_searchServicesKey);
+    final searchServicesStr = await _credentialStore.readProtectedJson(
+      prefs,
+      _searchServicesKey,
+    );
     if (searchServicesStr != null && searchServicesStr.isNotEmpty) {
       try {
         final list = jsonDecode(searchServicesStr) as List;
@@ -1194,7 +1212,10 @@ class SettingsProvider extends ChangeNotifier {
     _globalProxyHost = prefs.getString(_globalProxyHostKey) ?? '';
     _globalProxyPort = prefs.getString(_globalProxyPortKey) ?? '8080';
     _globalProxyUsername = prefs.getString(_globalProxyUsernameKey) ?? '';
-    _globalProxyPassword = prefs.getString(_globalProxyPasswordKey) ?? '';
+    _globalProxyPassword = await _credentialStore.readSecret(
+      prefs,
+      _globalProxyPasswordKey,
+    );
     final bypass = prefs.getString(_globalProxyBypassKey);
     if (bypass == null) {
       _globalProxyBypass = _defaultGlobalProxyBypassRules;
@@ -1205,7 +1226,9 @@ class SettingsProvider extends ChangeNotifier {
 
     // load network TTS services
     try {
-      final ttsStr = prefs.getString(_ttsServicesKey) ?? '';
+      final ttsStr =
+          await _credentialStore.readProtectedJson(prefs, _ttsServicesKey) ??
+          '';
       if (ttsStr.isNotEmpty) {
         final list = jsonDecode(ttsStr) as List;
         _ttsServices = [
@@ -1232,7 +1255,10 @@ class SettingsProvider extends ChangeNotifier {
       prefs.getString(_ttsTextSelectionModeKey),
     );
     // webdav config
-    final webdavStr = prefs.getString(_webDavConfigKey);
+    final webdavStr = await _credentialStore.readProtectedJson(
+      prefs,
+      _webDavConfigKey,
+    );
     if (webdavStr != null && webdavStr.isNotEmpty) {
       try {
         _webDavConfig = WebDavConfig.fromJson(
@@ -1241,7 +1267,7 @@ class SettingsProvider extends ChangeNotifier {
       } catch (_) {}
     }
     // s3 config
-    final s3Str = prefs.getString(_s3ConfigKey);
+    final s3Str = await _credentialStore.readProtectedJson(prefs, _s3ConfigKey);
     if (s3Str != null && s3Str.isNotEmpty) {
       try {
         _s3Config = S3Config.fromJson(
@@ -1323,7 +1349,11 @@ class SettingsProvider extends ChangeNotifier {
     _globalProxyPassword = v;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_globalProxyPasswordKey, _globalProxyPassword);
+    await _credentialStore.writeSecret(
+      prefs,
+      _globalProxyPasswordKey,
+      _globalProxyPassword,
+    );
   }
 
   Future<void> setGlobalProxyBypass(String v) async {
@@ -1379,7 +1409,11 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     final list = v.map((e) => e.toJson()).toList();
-    await prefs.setString(_ttsServicesKey, jsonEncode(list));
+    await _credentialStore.writeProtectedJson(
+      prefs,
+      _ttsServicesKey,
+      jsonEncode(list),
+    );
     if (_ttsServiceSelected >= _ttsServices.length) {
       _ttsServiceSelected = _ttsServices.isEmpty ? -1 : 0;
       await prefs.setInt(_ttsSelectedKey, _ttsServiceSelected);
@@ -1868,7 +1902,11 @@ class SettingsProvider extends ChangeNotifier {
     _webDavConfig = cfg;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_webDavConfigKey, jsonEncode(cfg.toJson()));
+    await _credentialStore.writeProtectedJson(
+      prefs,
+      _webDavConfigKey,
+      jsonEncode(cfg.toJson()),
+    );
   }
 
   S3Config _s3Config = const S3Config();
@@ -1877,7 +1915,11 @@ class SettingsProvider extends ChangeNotifier {
     _s3Config = cfg;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_s3ConfigKey, jsonEncode(cfg.toJson()));
+    await _credentialStore.writeProtectedJson(
+      prefs,
+      _s3ConfigKey,
+      jsonEncode(cfg.toJson()),
+    );
   }
 
   Future<void> _initSearchConnectivityTests() async {
@@ -2468,7 +2510,11 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
-    await prefs.setString(_providerConfigsKey, jsonEncode(map));
+    await _credentialStore.writeProtectedJson(
+      prefs,
+      _providerConfigsKey,
+      jsonEncode(map),
+    );
   }
 
   Future<int> deleteModels(String providerKey, Set<String> modelIds) async {
@@ -2800,7 +2846,11 @@ class SettingsProvider extends ChangeNotifier {
 
     // Persist updates
     final map = _providerConfigs.map((k, v) => MapEntry(k, v.toJson()));
-    await prefs.setString(_providerConfigsKey, jsonEncode(map));
+    await _credentialStore.writeProtectedJson(
+      prefs,
+      _providerConfigsKey,
+      jsonEncode(map),
+    );
     await prefs.setStringList(_providersOrderKey, _providersOrder);
     await prefs.setString(_providerGroupMapKey, jsonEncode(_providerGroupMap));
     notifyListeners();
@@ -4119,7 +4169,8 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     }
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+    await _credentialStore.writeProtectedJson(
+      prefs,
       _searchServicesKey,
       jsonEncode(_searchServices.map((e) => e.toJson()).toList()),
     );

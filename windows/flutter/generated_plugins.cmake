@@ -8,6 +8,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   desktop_drop
   dynamic_color
   file_selector_windows
+  flutter_secure_storage_windows
   hotkey_manager_windows
   irondash_engine_context
   permission_handler_windows
