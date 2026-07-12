@@ -3102,18 +3102,20 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // execute a tool), these events are purely presentational: they do
           // NOT trigger client-side tool execution and do NOT alter
           // finish_reason. Unknown/absent field costs nothing.
-          final serverToolEvent = json['server_tool_event'] as Map<String, dynamic>?;
+          final serverToolEvent =
+              json['server_tool_event'] as Map<String, dynamic>?;
           if (serverToolEvent != null && config.useResponseApi != true) {
             final evType = (serverToolEvent['type'] ?? '').toString();
             if (evType == 'tool_use') {
-              final evId = (serverToolEvent['id'] ?? 'srv_call').toString();
+              final evId = (serverToolEvent['id'] ?? '').toString();
               final evName = (serverToolEvent['name'] ?? 'tool').toString();
               final evInputRaw =
                   serverToolEvent['input'] ?? serverToolEvent['input_preview'];
               Map<String, dynamic> evArgs;
               try {
                 if (evInputRaw is String && evInputRaw.isNotEmpty) {
-                  evArgs = (jsonDecode(evInputRaw) as Map).cast<String, dynamic>();
+                  evArgs = (jsonDecode(evInputRaw) as Map)
+                      .cast<String, dynamic>();
                 } else if (evInputRaw is Map) {
                   evArgs = evInputRaw.cast<String, dynamic>();
                 } else {
@@ -3133,10 +3135,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             } else if (evType == 'tool_result') {
               final evId = (serverToolEvent['id'] ?? '').toString();
               final evName = (serverToolEvent['name'] ?? '').toString();
-              final evContent = (serverToolEvent['content_preview'] ??
-                      serverToolEvent['content'] ??
-                      '')
-                  .toString();
+              final evContent =
+                  (serverToolEvent['content_preview'] ??
+                          serverToolEvent['content'] ??
+                          '')
+                      .toString();
               final evIsError = serverToolEvent['is_error'] == true;
               yield ChatStreamChunk(
                 content: '',
