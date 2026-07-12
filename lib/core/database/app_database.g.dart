@@ -1938,6 +1938,1765 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   }
 }
 
+class $AssistantRowsTable extends AssistantRows
+    with TableInfo<$AssistantRowsTable, AssistantRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AssistantRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _avatarMeta = const VerificationMeta('avatar');
+  @override
+  late final GeneratedColumn<String> avatar = GeneratedColumn<String>(
+    'avatar',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _useAssistantAvatarMeta =
+      const VerificationMeta('useAssistantAvatar');
+  @override
+  late final GeneratedColumn<bool> useAssistantAvatar = GeneratedColumn<bool>(
+    'use_assistant_avatar',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("use_assistant_avatar" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _useAssistantNameMeta = const VerificationMeta(
+    'useAssistantName',
+  );
+  @override
+  late final GeneratedColumn<bool> useAssistantName = GeneratedColumn<bool>(
+    'use_assistant_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("use_assistant_name" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _backgroundMeta = const VerificationMeta(
+    'background',
+  );
+  @override
+  late final GeneratedColumn<String> background = GeneratedColumn<String>(
+    'background',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _chatModelProviderMeta = const VerificationMeta(
+    'chatModelProvider',
+  );
+  @override
+  late final GeneratedColumn<String> chatModelProvider =
+      GeneratedColumn<String>(
+        'chat_model_provider',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _chatModelIdMeta = const VerificationMeta(
+    'chatModelId',
+  );
+  @override
+  late final GeneratedColumn<String> chatModelId = GeneratedColumn<String>(
+    'chat_model_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _temperatureMeta = const VerificationMeta(
+    'temperature',
+  );
+  @override
+  late final GeneratedColumn<double> temperature = GeneratedColumn<double>(
+    'temperature',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _topPMeta = const VerificationMeta('topP');
+  @override
+  late final GeneratedColumn<double> topP = GeneratedColumn<double>(
+    'top_p',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _contextMessageSizeMeta =
+      const VerificationMeta('contextMessageSize');
+  @override
+  late final GeneratedColumn<int> contextMessageSize = GeneratedColumn<int>(
+    'context_message_size',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(64),
+  );
+  static const VerificationMeta _limitContextMessagesMeta =
+      const VerificationMeta('limitContextMessages');
+  @override
+  late final GeneratedColumn<bool> limitContextMessages = GeneratedColumn<bool>(
+    'limit_context_messages',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("limit_context_messages" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _streamOutputMeta = const VerificationMeta(
+    'streamOutput',
+  );
+  @override
+  late final GeneratedColumn<bool> streamOutput = GeneratedColumn<bool>(
+    'stream_output',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("stream_output" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _thinkingBudgetMeta = const VerificationMeta(
+    'thinkingBudget',
+  );
+  @override
+  late final GeneratedColumn<int> thinkingBudget = GeneratedColumn<int>(
+    'thinking_budget',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _maxTokensMeta = const VerificationMeta(
+    'maxTokens',
+  );
+  @override
+  late final GeneratedColumn<int> maxTokens = GeneratedColumn<int>(
+    'max_tokens',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _customHeadersJsonMeta = const VerificationMeta(
+    'customHeadersJson',
+  );
+  @override
+  late final GeneratedColumn<String> customHeadersJson =
+      GeneratedColumn<String>(
+        'custom_headers_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  static const VerificationMeta _customBodyJsonMeta = const VerificationMeta(
+    'customBodyJson',
+  );
+  @override
+  late final GeneratedColumn<String> customBodyJson = GeneratedColumn<String>(
+    'custom_body_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _systemPromptMeta = const VerificationMeta(
+    'systemPrompt',
+  );
+  @override
+  late final GeneratedColumn<String> systemPrompt = GeneratedColumn<String>(
+    'system_prompt',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _messageTemplateMeta = const VerificationMeta(
+    'messageTemplate',
+  );
+  @override
+  late final GeneratedColumn<String> messageTemplate = GeneratedColumn<String>(
+    'message_template',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('{{ message }}'),
+  );
+  static const VerificationMeta _presetMessagesJsonMeta =
+      const VerificationMeta('presetMessagesJson');
+  @override
+  late final GeneratedColumn<String> presetMessagesJson =
+      GeneratedColumn<String>(
+        'preset_messages_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  static const VerificationMeta _searchEnabledMeta = const VerificationMeta(
+    'searchEnabled',
+  );
+  @override
+  late final GeneratedColumn<bool> searchEnabled = GeneratedColumn<bool>(
+    'search_enabled',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("search_enabled" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _mcpServerIdsJsonMeta = const VerificationMeta(
+    'mcpServerIdsJson',
+  );
+  @override
+  late final GeneratedColumn<String> mcpServerIdsJson = GeneratedColumn<String>(
+    'mcp_server_ids_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _localToolIdsJsonMeta = const VerificationMeta(
+    'localToolIdsJson',
+  );
+  @override
+  late final GeneratedColumn<String> localToolIdsJson = GeneratedColumn<String>(
+    'local_tool_ids_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _regexRulesJsonMeta = const VerificationMeta(
+    'regexRulesJson',
+  );
+  @override
+  late final GeneratedColumn<String> regexRulesJson = GeneratedColumn<String>(
+    'regex_rules_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
+  static const VerificationMeta _enableMemoryMeta = const VerificationMeta(
+    'enableMemory',
+  );
+  @override
+  late final GeneratedColumn<bool> enableMemory = GeneratedColumn<bool>(
+    'enable_memory',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enable_memory" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _enableRecentChatsReferenceMeta =
+      const VerificationMeta('enableRecentChatsReference');
+  @override
+  late final GeneratedColumn<bool> enableRecentChatsReference =
+      GeneratedColumn<bool>(
+        'enable_recent_chats_reference',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("enable_recent_chats_reference" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
+  static const VerificationMeta _recentChatsSummaryMessageCountMeta =
+      const VerificationMeta('recentChatsSummaryMessageCount');
+  @override
+  late final GeneratedColumn<int> recentChatsSummaryMessageCount =
+      GeneratedColumn<int>(
+        'recent_chats_summary_message_count',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(5),
+      );
+  static const VerificationMeta _memoryRecordPromptMeta =
+      const VerificationMeta('memoryRecordPrompt');
+  @override
+  late final GeneratedColumn<String> memoryRecordPrompt =
+      GeneratedColumn<String>(
+        'memory_record_prompt',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    avatar,
+    useAssistantAvatar,
+    useAssistantName,
+    background,
+    chatModelProvider,
+    chatModelId,
+    temperature,
+    topP,
+    contextMessageSize,
+    limitContextMessages,
+    streamOutput,
+    thinkingBudget,
+    maxTokens,
+    customHeadersJson,
+    customBodyJson,
+    systemPrompt,
+    messageTemplate,
+    presetMessagesJson,
+    searchEnabled,
+    mcpServerIdsJson,
+    localToolIdsJson,
+    regexRulesJson,
+    enableMemory,
+    enableRecentChatsReference,
+    recentChatsSummaryMessageCount,
+    memoryRecordPrompt,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'assistant_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AssistantRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('avatar')) {
+      context.handle(
+        _avatarMeta,
+        avatar.isAcceptableOrUnknown(data['avatar']!, _avatarMeta),
+      );
+    }
+    if (data.containsKey('use_assistant_avatar')) {
+      context.handle(
+        _useAssistantAvatarMeta,
+        useAssistantAvatar.isAcceptableOrUnknown(
+          data['use_assistant_avatar']!,
+          _useAssistantAvatarMeta,
+        ),
+      );
+    }
+    if (data.containsKey('use_assistant_name')) {
+      context.handle(
+        _useAssistantNameMeta,
+        useAssistantName.isAcceptableOrUnknown(
+          data['use_assistant_name']!,
+          _useAssistantNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('background')) {
+      context.handle(
+        _backgroundMeta,
+        background.isAcceptableOrUnknown(data['background']!, _backgroundMeta),
+      );
+    }
+    if (data.containsKey('chat_model_provider')) {
+      context.handle(
+        _chatModelProviderMeta,
+        chatModelProvider.isAcceptableOrUnknown(
+          data['chat_model_provider']!,
+          _chatModelProviderMeta,
+        ),
+      );
+    }
+    if (data.containsKey('chat_model_id')) {
+      context.handle(
+        _chatModelIdMeta,
+        chatModelId.isAcceptableOrUnknown(
+          data['chat_model_id']!,
+          _chatModelIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('temperature')) {
+      context.handle(
+        _temperatureMeta,
+        temperature.isAcceptableOrUnknown(
+          data['temperature']!,
+          _temperatureMeta,
+        ),
+      );
+    }
+    if (data.containsKey('top_p')) {
+      context.handle(
+        _topPMeta,
+        topP.isAcceptableOrUnknown(data['top_p']!, _topPMeta),
+      );
+    }
+    if (data.containsKey('context_message_size')) {
+      context.handle(
+        _contextMessageSizeMeta,
+        contextMessageSize.isAcceptableOrUnknown(
+          data['context_message_size']!,
+          _contextMessageSizeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('limit_context_messages')) {
+      context.handle(
+        _limitContextMessagesMeta,
+        limitContextMessages.isAcceptableOrUnknown(
+          data['limit_context_messages']!,
+          _limitContextMessagesMeta,
+        ),
+      );
+    }
+    if (data.containsKey('stream_output')) {
+      context.handle(
+        _streamOutputMeta,
+        streamOutput.isAcceptableOrUnknown(
+          data['stream_output']!,
+          _streamOutputMeta,
+        ),
+      );
+    }
+    if (data.containsKey('thinking_budget')) {
+      context.handle(
+        _thinkingBudgetMeta,
+        thinkingBudget.isAcceptableOrUnknown(
+          data['thinking_budget']!,
+          _thinkingBudgetMeta,
+        ),
+      );
+    }
+    if (data.containsKey('max_tokens')) {
+      context.handle(
+        _maxTokensMeta,
+        maxTokens.isAcceptableOrUnknown(data['max_tokens']!, _maxTokensMeta),
+      );
+    }
+    if (data.containsKey('custom_headers_json')) {
+      context.handle(
+        _customHeadersJsonMeta,
+        customHeadersJson.isAcceptableOrUnknown(
+          data['custom_headers_json']!,
+          _customHeadersJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('custom_body_json')) {
+      context.handle(
+        _customBodyJsonMeta,
+        customBodyJson.isAcceptableOrUnknown(
+          data['custom_body_json']!,
+          _customBodyJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('system_prompt')) {
+      context.handle(
+        _systemPromptMeta,
+        systemPrompt.isAcceptableOrUnknown(
+          data['system_prompt']!,
+          _systemPromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('message_template')) {
+      context.handle(
+        _messageTemplateMeta,
+        messageTemplate.isAcceptableOrUnknown(
+          data['message_template']!,
+          _messageTemplateMeta,
+        ),
+      );
+    }
+    if (data.containsKey('preset_messages_json')) {
+      context.handle(
+        _presetMessagesJsonMeta,
+        presetMessagesJson.isAcceptableOrUnknown(
+          data['preset_messages_json']!,
+          _presetMessagesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('search_enabled')) {
+      context.handle(
+        _searchEnabledMeta,
+        searchEnabled.isAcceptableOrUnknown(
+          data['search_enabled']!,
+          _searchEnabledMeta,
+        ),
+      );
+    }
+    if (data.containsKey('mcp_server_ids_json')) {
+      context.handle(
+        _mcpServerIdsJsonMeta,
+        mcpServerIdsJson.isAcceptableOrUnknown(
+          data['mcp_server_ids_json']!,
+          _mcpServerIdsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('local_tool_ids_json')) {
+      context.handle(
+        _localToolIdsJsonMeta,
+        localToolIdsJson.isAcceptableOrUnknown(
+          data['local_tool_ids_json']!,
+          _localToolIdsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('regex_rules_json')) {
+      context.handle(
+        _regexRulesJsonMeta,
+        regexRulesJson.isAcceptableOrUnknown(
+          data['regex_rules_json']!,
+          _regexRulesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('enable_memory')) {
+      context.handle(
+        _enableMemoryMeta,
+        enableMemory.isAcceptableOrUnknown(
+          data['enable_memory']!,
+          _enableMemoryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('enable_recent_chats_reference')) {
+      context.handle(
+        _enableRecentChatsReferenceMeta,
+        enableRecentChatsReference.isAcceptableOrUnknown(
+          data['enable_recent_chats_reference']!,
+          _enableRecentChatsReferenceMeta,
+        ),
+      );
+    }
+    if (data.containsKey('recent_chats_summary_message_count')) {
+      context.handle(
+        _recentChatsSummaryMessageCountMeta,
+        recentChatsSummaryMessageCount.isAcceptableOrUnknown(
+          data['recent_chats_summary_message_count']!,
+          _recentChatsSummaryMessageCountMeta,
+        ),
+      );
+    }
+    if (data.containsKey('memory_record_prompt')) {
+      context.handle(
+        _memoryRecordPromptMeta,
+        memoryRecordPrompt.isAcceptableOrUnknown(
+          data['memory_record_prompt']!,
+          _memoryRecordPromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AssistantRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AssistantRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      avatar: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar'],
+      ),
+      useAssistantAvatar: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}use_assistant_avatar'],
+      )!,
+      useAssistantName: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}use_assistant_name'],
+      )!,
+      background: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}background'],
+      ),
+      chatModelProvider: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_model_provider'],
+      ),
+      chatModelId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}chat_model_id'],
+      ),
+      temperature: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}temperature'],
+      ),
+      topP: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}top_p'],
+      ),
+      contextMessageSize: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}context_message_size'],
+      )!,
+      limitContextMessages: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}limit_context_messages'],
+      )!,
+      streamOutput: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}stream_output'],
+      )!,
+      thinkingBudget: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}thinking_budget'],
+      ),
+      maxTokens: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}max_tokens'],
+      ),
+      customHeadersJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_headers_json'],
+      )!,
+      customBodyJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}custom_body_json'],
+      )!,
+      systemPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}system_prompt'],
+      )!,
+      messageTemplate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}message_template'],
+      )!,
+      presetMessagesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}preset_messages_json'],
+      )!,
+      searchEnabled: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}search_enabled'],
+      )!,
+      mcpServerIdsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mcp_server_ids_json'],
+      )!,
+      localToolIdsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}local_tool_ids_json'],
+      )!,
+      regexRulesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}regex_rules_json'],
+      )!,
+      enableMemory: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enable_memory'],
+      )!,
+      enableRecentChatsReference: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enable_recent_chats_reference'],
+      )!,
+      recentChatsSummaryMessageCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}recent_chats_summary_message_count'],
+      )!,
+      memoryRecordPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}memory_record_prompt'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $AssistantRowsTable createAlias(String alias) {
+    return $AssistantRowsTable(attachedDatabase, alias);
+  }
+}
+
+class AssistantRow extends DataClass implements Insertable<AssistantRow> {
+  final String id;
+  final String name;
+  final String? avatar;
+  final bool useAssistantAvatar;
+  final bool useAssistantName;
+  final String? background;
+  final String? chatModelProvider;
+  final String? chatModelId;
+  final double? temperature;
+  final double? topP;
+  final int contextMessageSize;
+  final bool limitContextMessages;
+  final bool streamOutput;
+  final int? thinkingBudget;
+  final int? maxTokens;
+  final String customHeadersJson;
+  final String customBodyJson;
+  final String systemPrompt;
+  final String messageTemplate;
+  final String presetMessagesJson;
+  final bool searchEnabled;
+  final String mcpServerIdsJson;
+  final String localToolIdsJson;
+  final String regexRulesJson;
+  final bool enableMemory;
+  final bool enableRecentChatsReference;
+  final int recentChatsSummaryMessageCount;
+  final String memoryRecordPrompt;
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const AssistantRow({
+    required this.id,
+    required this.name,
+    this.avatar,
+    required this.useAssistantAvatar,
+    required this.useAssistantName,
+    this.background,
+    this.chatModelProvider,
+    this.chatModelId,
+    this.temperature,
+    this.topP,
+    required this.contextMessageSize,
+    required this.limitContextMessages,
+    required this.streamOutput,
+    this.thinkingBudget,
+    this.maxTokens,
+    required this.customHeadersJson,
+    required this.customBodyJson,
+    required this.systemPrompt,
+    required this.messageTemplate,
+    required this.presetMessagesJson,
+    required this.searchEnabled,
+    required this.mcpServerIdsJson,
+    required this.localToolIdsJson,
+    required this.regexRulesJson,
+    required this.enableMemory,
+    required this.enableRecentChatsReference,
+    required this.recentChatsSummaryMessageCount,
+    required this.memoryRecordPrompt,
+    required this.sortOrder,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || avatar != null) {
+      map['avatar'] = Variable<String>(avatar);
+    }
+    map['use_assistant_avatar'] = Variable<bool>(useAssistantAvatar);
+    map['use_assistant_name'] = Variable<bool>(useAssistantName);
+    if (!nullToAbsent || background != null) {
+      map['background'] = Variable<String>(background);
+    }
+    if (!nullToAbsent || chatModelProvider != null) {
+      map['chat_model_provider'] = Variable<String>(chatModelProvider);
+    }
+    if (!nullToAbsent || chatModelId != null) {
+      map['chat_model_id'] = Variable<String>(chatModelId);
+    }
+    if (!nullToAbsent || temperature != null) {
+      map['temperature'] = Variable<double>(temperature);
+    }
+    if (!nullToAbsent || topP != null) {
+      map['top_p'] = Variable<double>(topP);
+    }
+    map['context_message_size'] = Variable<int>(contextMessageSize);
+    map['limit_context_messages'] = Variable<bool>(limitContextMessages);
+    map['stream_output'] = Variable<bool>(streamOutput);
+    if (!nullToAbsent || thinkingBudget != null) {
+      map['thinking_budget'] = Variable<int>(thinkingBudget);
+    }
+    if (!nullToAbsent || maxTokens != null) {
+      map['max_tokens'] = Variable<int>(maxTokens);
+    }
+    map['custom_headers_json'] = Variable<String>(customHeadersJson);
+    map['custom_body_json'] = Variable<String>(customBodyJson);
+    map['system_prompt'] = Variable<String>(systemPrompt);
+    map['message_template'] = Variable<String>(messageTemplate);
+    map['preset_messages_json'] = Variable<String>(presetMessagesJson);
+    map['search_enabled'] = Variable<bool>(searchEnabled);
+    map['mcp_server_ids_json'] = Variable<String>(mcpServerIdsJson);
+    map['local_tool_ids_json'] = Variable<String>(localToolIdsJson);
+    map['regex_rules_json'] = Variable<String>(regexRulesJson);
+    map['enable_memory'] = Variable<bool>(enableMemory);
+    map['enable_recent_chats_reference'] = Variable<bool>(
+      enableRecentChatsReference,
+    );
+    map['recent_chats_summary_message_count'] = Variable<int>(
+      recentChatsSummaryMessageCount,
+    );
+    map['memory_record_prompt'] = Variable<String>(memoryRecordPrompt);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  AssistantRowsCompanion toCompanion(bool nullToAbsent) {
+    return AssistantRowsCompanion(
+      id: Value(id),
+      name: Value(name),
+      avatar: avatar == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatar),
+      useAssistantAvatar: Value(useAssistantAvatar),
+      useAssistantName: Value(useAssistantName),
+      background: background == null && nullToAbsent
+          ? const Value.absent()
+          : Value(background),
+      chatModelProvider: chatModelProvider == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chatModelProvider),
+      chatModelId: chatModelId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(chatModelId),
+      temperature: temperature == null && nullToAbsent
+          ? const Value.absent()
+          : Value(temperature),
+      topP: topP == null && nullToAbsent ? const Value.absent() : Value(topP),
+      contextMessageSize: Value(contextMessageSize),
+      limitContextMessages: Value(limitContextMessages),
+      streamOutput: Value(streamOutput),
+      thinkingBudget: thinkingBudget == null && nullToAbsent
+          ? const Value.absent()
+          : Value(thinkingBudget),
+      maxTokens: maxTokens == null && nullToAbsent
+          ? const Value.absent()
+          : Value(maxTokens),
+      customHeadersJson: Value(customHeadersJson),
+      customBodyJson: Value(customBodyJson),
+      systemPrompt: Value(systemPrompt),
+      messageTemplate: Value(messageTemplate),
+      presetMessagesJson: Value(presetMessagesJson),
+      searchEnabled: Value(searchEnabled),
+      mcpServerIdsJson: Value(mcpServerIdsJson),
+      localToolIdsJson: Value(localToolIdsJson),
+      regexRulesJson: Value(regexRulesJson),
+      enableMemory: Value(enableMemory),
+      enableRecentChatsReference: Value(enableRecentChatsReference),
+      recentChatsSummaryMessageCount: Value(recentChatsSummaryMessageCount),
+      memoryRecordPrompt: Value(memoryRecordPrompt),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AssistantRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AssistantRow(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      avatar: serializer.fromJson<String?>(json['avatar']),
+      useAssistantAvatar: serializer.fromJson<bool>(json['useAssistantAvatar']),
+      useAssistantName: serializer.fromJson<bool>(json['useAssistantName']),
+      background: serializer.fromJson<String?>(json['background']),
+      chatModelProvider: serializer.fromJson<String?>(
+        json['chatModelProvider'],
+      ),
+      chatModelId: serializer.fromJson<String?>(json['chatModelId']),
+      temperature: serializer.fromJson<double?>(json['temperature']),
+      topP: serializer.fromJson<double?>(json['topP']),
+      contextMessageSize: serializer.fromJson<int>(json['contextMessageSize']),
+      limitContextMessages: serializer.fromJson<bool>(
+        json['limitContextMessages'],
+      ),
+      streamOutput: serializer.fromJson<bool>(json['streamOutput']),
+      thinkingBudget: serializer.fromJson<int?>(json['thinkingBudget']),
+      maxTokens: serializer.fromJson<int?>(json['maxTokens']),
+      customHeadersJson: serializer.fromJson<String>(json['customHeadersJson']),
+      customBodyJson: serializer.fromJson<String>(json['customBodyJson']),
+      systemPrompt: serializer.fromJson<String>(json['systemPrompt']),
+      messageTemplate: serializer.fromJson<String>(json['messageTemplate']),
+      presetMessagesJson: serializer.fromJson<String>(
+        json['presetMessagesJson'],
+      ),
+      searchEnabled: serializer.fromJson<bool>(json['searchEnabled']),
+      mcpServerIdsJson: serializer.fromJson<String>(json['mcpServerIdsJson']),
+      localToolIdsJson: serializer.fromJson<String>(json['localToolIdsJson']),
+      regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
+      enableMemory: serializer.fromJson<bool>(json['enableMemory']),
+      enableRecentChatsReference: serializer.fromJson<bool>(
+        json['enableRecentChatsReference'],
+      ),
+      recentChatsSummaryMessageCount: serializer.fromJson<int>(
+        json['recentChatsSummaryMessageCount'],
+      ),
+      memoryRecordPrompt: serializer.fromJson<String>(
+        json['memoryRecordPrompt'],
+      ),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'avatar': serializer.toJson<String?>(avatar),
+      'useAssistantAvatar': serializer.toJson<bool>(useAssistantAvatar),
+      'useAssistantName': serializer.toJson<bool>(useAssistantName),
+      'background': serializer.toJson<String?>(background),
+      'chatModelProvider': serializer.toJson<String?>(chatModelProvider),
+      'chatModelId': serializer.toJson<String?>(chatModelId),
+      'temperature': serializer.toJson<double?>(temperature),
+      'topP': serializer.toJson<double?>(topP),
+      'contextMessageSize': serializer.toJson<int>(contextMessageSize),
+      'limitContextMessages': serializer.toJson<bool>(limitContextMessages),
+      'streamOutput': serializer.toJson<bool>(streamOutput),
+      'thinkingBudget': serializer.toJson<int?>(thinkingBudget),
+      'maxTokens': serializer.toJson<int?>(maxTokens),
+      'customHeadersJson': serializer.toJson<String>(customHeadersJson),
+      'customBodyJson': serializer.toJson<String>(customBodyJson),
+      'systemPrompt': serializer.toJson<String>(systemPrompt),
+      'messageTemplate': serializer.toJson<String>(messageTemplate),
+      'presetMessagesJson': serializer.toJson<String>(presetMessagesJson),
+      'searchEnabled': serializer.toJson<bool>(searchEnabled),
+      'mcpServerIdsJson': serializer.toJson<String>(mcpServerIdsJson),
+      'localToolIdsJson': serializer.toJson<String>(localToolIdsJson),
+      'regexRulesJson': serializer.toJson<String>(regexRulesJson),
+      'enableMemory': serializer.toJson<bool>(enableMemory),
+      'enableRecentChatsReference': serializer.toJson<bool>(
+        enableRecentChatsReference,
+      ),
+      'recentChatsSummaryMessageCount': serializer.toJson<int>(
+        recentChatsSummaryMessageCount,
+      ),
+      'memoryRecordPrompt': serializer.toJson<String>(memoryRecordPrompt),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AssistantRow copyWith({
+    String? id,
+    String? name,
+    Value<String?> avatar = const Value.absent(),
+    bool? useAssistantAvatar,
+    bool? useAssistantName,
+    Value<String?> background = const Value.absent(),
+    Value<String?> chatModelProvider = const Value.absent(),
+    Value<String?> chatModelId = const Value.absent(),
+    Value<double?> temperature = const Value.absent(),
+    Value<double?> topP = const Value.absent(),
+    int? contextMessageSize,
+    bool? limitContextMessages,
+    bool? streamOutput,
+    Value<int?> thinkingBudget = const Value.absent(),
+    Value<int?> maxTokens = const Value.absent(),
+    String? customHeadersJson,
+    String? customBodyJson,
+    String? systemPrompt,
+    String? messageTemplate,
+    String? presetMessagesJson,
+    bool? searchEnabled,
+    String? mcpServerIdsJson,
+    String? localToolIdsJson,
+    String? regexRulesJson,
+    bool? enableMemory,
+    bool? enableRecentChatsReference,
+    int? recentChatsSummaryMessageCount,
+    String? memoryRecordPrompt,
+    int? sortOrder,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => AssistantRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    avatar: avatar.present ? avatar.value : this.avatar,
+    useAssistantAvatar: useAssistantAvatar ?? this.useAssistantAvatar,
+    useAssistantName: useAssistantName ?? this.useAssistantName,
+    background: background.present ? background.value : this.background,
+    chatModelProvider: chatModelProvider.present
+        ? chatModelProvider.value
+        : this.chatModelProvider,
+    chatModelId: chatModelId.present ? chatModelId.value : this.chatModelId,
+    temperature: temperature.present ? temperature.value : this.temperature,
+    topP: topP.present ? topP.value : this.topP,
+    contextMessageSize: contextMessageSize ?? this.contextMessageSize,
+    limitContextMessages: limitContextMessages ?? this.limitContextMessages,
+    streamOutput: streamOutput ?? this.streamOutput,
+    thinkingBudget: thinkingBudget.present
+        ? thinkingBudget.value
+        : this.thinkingBudget,
+    maxTokens: maxTokens.present ? maxTokens.value : this.maxTokens,
+    customHeadersJson: customHeadersJson ?? this.customHeadersJson,
+    customBodyJson: customBodyJson ?? this.customBodyJson,
+    systemPrompt: systemPrompt ?? this.systemPrompt,
+    messageTemplate: messageTemplate ?? this.messageTemplate,
+    presetMessagesJson: presetMessagesJson ?? this.presetMessagesJson,
+    searchEnabled: searchEnabled ?? this.searchEnabled,
+    mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
+    localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
+    regexRulesJson: regexRulesJson ?? this.regexRulesJson,
+    enableMemory: enableMemory ?? this.enableMemory,
+    enableRecentChatsReference:
+        enableRecentChatsReference ?? this.enableRecentChatsReference,
+    recentChatsSummaryMessageCount:
+        recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
+    memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AssistantRow copyWithCompanion(AssistantRowsCompanion data) {
+    return AssistantRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      avatar: data.avatar.present ? data.avatar.value : this.avatar,
+      useAssistantAvatar: data.useAssistantAvatar.present
+          ? data.useAssistantAvatar.value
+          : this.useAssistantAvatar,
+      useAssistantName: data.useAssistantName.present
+          ? data.useAssistantName.value
+          : this.useAssistantName,
+      background: data.background.present
+          ? data.background.value
+          : this.background,
+      chatModelProvider: data.chatModelProvider.present
+          ? data.chatModelProvider.value
+          : this.chatModelProvider,
+      chatModelId: data.chatModelId.present
+          ? data.chatModelId.value
+          : this.chatModelId,
+      temperature: data.temperature.present
+          ? data.temperature.value
+          : this.temperature,
+      topP: data.topP.present ? data.topP.value : this.topP,
+      contextMessageSize: data.contextMessageSize.present
+          ? data.contextMessageSize.value
+          : this.contextMessageSize,
+      limitContextMessages: data.limitContextMessages.present
+          ? data.limitContextMessages.value
+          : this.limitContextMessages,
+      streamOutput: data.streamOutput.present
+          ? data.streamOutput.value
+          : this.streamOutput,
+      thinkingBudget: data.thinkingBudget.present
+          ? data.thinkingBudget.value
+          : this.thinkingBudget,
+      maxTokens: data.maxTokens.present ? data.maxTokens.value : this.maxTokens,
+      customHeadersJson: data.customHeadersJson.present
+          ? data.customHeadersJson.value
+          : this.customHeadersJson,
+      customBodyJson: data.customBodyJson.present
+          ? data.customBodyJson.value
+          : this.customBodyJson,
+      systemPrompt: data.systemPrompt.present
+          ? data.systemPrompt.value
+          : this.systemPrompt,
+      messageTemplate: data.messageTemplate.present
+          ? data.messageTemplate.value
+          : this.messageTemplate,
+      presetMessagesJson: data.presetMessagesJson.present
+          ? data.presetMessagesJson.value
+          : this.presetMessagesJson,
+      searchEnabled: data.searchEnabled.present
+          ? data.searchEnabled.value
+          : this.searchEnabled,
+      mcpServerIdsJson: data.mcpServerIdsJson.present
+          ? data.mcpServerIdsJson.value
+          : this.mcpServerIdsJson,
+      localToolIdsJson: data.localToolIdsJson.present
+          ? data.localToolIdsJson.value
+          : this.localToolIdsJson,
+      regexRulesJson: data.regexRulesJson.present
+          ? data.regexRulesJson.value
+          : this.regexRulesJson,
+      enableMemory: data.enableMemory.present
+          ? data.enableMemory.value
+          : this.enableMemory,
+      enableRecentChatsReference: data.enableRecentChatsReference.present
+          ? data.enableRecentChatsReference.value
+          : this.enableRecentChatsReference,
+      recentChatsSummaryMessageCount:
+          data.recentChatsSummaryMessageCount.present
+          ? data.recentChatsSummaryMessageCount.value
+          : this.recentChatsSummaryMessageCount,
+      memoryRecordPrompt: data.memoryRecordPrompt.present
+          ? data.memoryRecordPrompt.value
+          : this.memoryRecordPrompt,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('avatar: $avatar, ')
+          ..write('useAssistantAvatar: $useAssistantAvatar, ')
+          ..write('useAssistantName: $useAssistantName, ')
+          ..write('background: $background, ')
+          ..write('chatModelProvider: $chatModelProvider, ')
+          ..write('chatModelId: $chatModelId, ')
+          ..write('temperature: $temperature, ')
+          ..write('topP: $topP, ')
+          ..write('contextMessageSize: $contextMessageSize, ')
+          ..write('limitContextMessages: $limitContextMessages, ')
+          ..write('streamOutput: $streamOutput, ')
+          ..write('thinkingBudget: $thinkingBudget, ')
+          ..write('maxTokens: $maxTokens, ')
+          ..write('customHeadersJson: $customHeadersJson, ')
+          ..write('customBodyJson: $customBodyJson, ')
+          ..write('systemPrompt: $systemPrompt, ')
+          ..write('messageTemplate: $messageTemplate, ')
+          ..write('presetMessagesJson: $presetMessagesJson, ')
+          ..write('searchEnabled: $searchEnabled, ')
+          ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
+          ..write('localToolIdsJson: $localToolIdsJson, ')
+          ..write('regexRulesJson: $regexRulesJson, ')
+          ..write('enableMemory: $enableMemory, ')
+          ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
+          ..write(
+            'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
+          )
+          ..write('memoryRecordPrompt: $memoryRecordPrompt, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hashAll([
+    id,
+    name,
+    avatar,
+    useAssistantAvatar,
+    useAssistantName,
+    background,
+    chatModelProvider,
+    chatModelId,
+    temperature,
+    topP,
+    contextMessageSize,
+    limitContextMessages,
+    streamOutput,
+    thinkingBudget,
+    maxTokens,
+    customHeadersJson,
+    customBodyJson,
+    systemPrompt,
+    messageTemplate,
+    presetMessagesJson,
+    searchEnabled,
+    mcpServerIdsJson,
+    localToolIdsJson,
+    regexRulesJson,
+    enableMemory,
+    enableRecentChatsReference,
+    recentChatsSummaryMessageCount,
+    memoryRecordPrompt,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ]);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AssistantRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.avatar == this.avatar &&
+          other.useAssistantAvatar == this.useAssistantAvatar &&
+          other.useAssistantName == this.useAssistantName &&
+          other.background == this.background &&
+          other.chatModelProvider == this.chatModelProvider &&
+          other.chatModelId == this.chatModelId &&
+          other.temperature == this.temperature &&
+          other.topP == this.topP &&
+          other.contextMessageSize == this.contextMessageSize &&
+          other.limitContextMessages == this.limitContextMessages &&
+          other.streamOutput == this.streamOutput &&
+          other.thinkingBudget == this.thinkingBudget &&
+          other.maxTokens == this.maxTokens &&
+          other.customHeadersJson == this.customHeadersJson &&
+          other.customBodyJson == this.customBodyJson &&
+          other.systemPrompt == this.systemPrompt &&
+          other.messageTemplate == this.messageTemplate &&
+          other.presetMessagesJson == this.presetMessagesJson &&
+          other.searchEnabled == this.searchEnabled &&
+          other.mcpServerIdsJson == this.mcpServerIdsJson &&
+          other.localToolIdsJson == this.localToolIdsJson &&
+          other.regexRulesJson == this.regexRulesJson &&
+          other.enableMemory == this.enableMemory &&
+          other.enableRecentChatsReference == this.enableRecentChatsReference &&
+          other.recentChatsSummaryMessageCount ==
+              this.recentChatsSummaryMessageCount &&
+          other.memoryRecordPrompt == this.memoryRecordPrompt &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String?> avatar;
+  final Value<bool> useAssistantAvatar;
+  final Value<bool> useAssistantName;
+  final Value<String?> background;
+  final Value<String?> chatModelProvider;
+  final Value<String?> chatModelId;
+  final Value<double?> temperature;
+  final Value<double?> topP;
+  final Value<int> contextMessageSize;
+  final Value<bool> limitContextMessages;
+  final Value<bool> streamOutput;
+  final Value<int?> thinkingBudget;
+  final Value<int?> maxTokens;
+  final Value<String> customHeadersJson;
+  final Value<String> customBodyJson;
+  final Value<String> systemPrompt;
+  final Value<String> messageTemplate;
+  final Value<String> presetMessagesJson;
+  final Value<bool> searchEnabled;
+  final Value<String> mcpServerIdsJson;
+  final Value<String> localToolIdsJson;
+  final Value<String> regexRulesJson;
+  final Value<bool> enableMemory;
+  final Value<bool> enableRecentChatsReference;
+  final Value<int> recentChatsSummaryMessageCount;
+  final Value<String> memoryRecordPrompt;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AssistantRowsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.avatar = const Value.absent(),
+    this.useAssistantAvatar = const Value.absent(),
+    this.useAssistantName = const Value.absent(),
+    this.background = const Value.absent(),
+    this.chatModelProvider = const Value.absent(),
+    this.chatModelId = const Value.absent(),
+    this.temperature = const Value.absent(),
+    this.topP = const Value.absent(),
+    this.contextMessageSize = const Value.absent(),
+    this.limitContextMessages = const Value.absent(),
+    this.streamOutput = const Value.absent(),
+    this.thinkingBudget = const Value.absent(),
+    this.maxTokens = const Value.absent(),
+    this.customHeadersJson = const Value.absent(),
+    this.customBodyJson = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
+    this.messageTemplate = const Value.absent(),
+    this.presetMessagesJson = const Value.absent(),
+    this.searchEnabled = const Value.absent(),
+    this.mcpServerIdsJson = const Value.absent(),
+    this.localToolIdsJson = const Value.absent(),
+    this.regexRulesJson = const Value.absent(),
+    this.enableMemory = const Value.absent(),
+    this.enableRecentChatsReference = const Value.absent(),
+    this.recentChatsSummaryMessageCount = const Value.absent(),
+    this.memoryRecordPrompt = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AssistantRowsCompanion.insert({
+    required String id,
+    required String name,
+    this.avatar = const Value.absent(),
+    this.useAssistantAvatar = const Value.absent(),
+    this.useAssistantName = const Value.absent(),
+    this.background = const Value.absent(),
+    this.chatModelProvider = const Value.absent(),
+    this.chatModelId = const Value.absent(),
+    this.temperature = const Value.absent(),
+    this.topP = const Value.absent(),
+    this.contextMessageSize = const Value.absent(),
+    this.limitContextMessages = const Value.absent(),
+    this.streamOutput = const Value.absent(),
+    this.thinkingBudget = const Value.absent(),
+    this.maxTokens = const Value.absent(),
+    this.customHeadersJson = const Value.absent(),
+    this.customBodyJson = const Value.absent(),
+    this.systemPrompt = const Value.absent(),
+    this.messageTemplate = const Value.absent(),
+    this.presetMessagesJson = const Value.absent(),
+    this.searchEnabled = const Value.absent(),
+    this.mcpServerIdsJson = const Value.absent(),
+    this.localToolIdsJson = const Value.absent(),
+    this.regexRulesJson = const Value.absent(),
+    this.enableMemory = const Value.absent(),
+    this.enableRecentChatsReference = const Value.absent(),
+    this.recentChatsSummaryMessageCount = const Value.absent(),
+    this.memoryRecordPrompt = const Value.absent(),
+    required int sortOrder,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       sortOrder = Value(sortOrder),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<AssistantRow> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? avatar,
+    Expression<bool>? useAssistantAvatar,
+    Expression<bool>? useAssistantName,
+    Expression<String>? background,
+    Expression<String>? chatModelProvider,
+    Expression<String>? chatModelId,
+    Expression<double>? temperature,
+    Expression<double>? topP,
+    Expression<int>? contextMessageSize,
+    Expression<bool>? limitContextMessages,
+    Expression<bool>? streamOutput,
+    Expression<int>? thinkingBudget,
+    Expression<int>? maxTokens,
+    Expression<String>? customHeadersJson,
+    Expression<String>? customBodyJson,
+    Expression<String>? systemPrompt,
+    Expression<String>? messageTemplate,
+    Expression<String>? presetMessagesJson,
+    Expression<bool>? searchEnabled,
+    Expression<String>? mcpServerIdsJson,
+    Expression<String>? localToolIdsJson,
+    Expression<String>? regexRulesJson,
+    Expression<bool>? enableMemory,
+    Expression<bool>? enableRecentChatsReference,
+    Expression<int>? recentChatsSummaryMessageCount,
+    Expression<String>? memoryRecordPrompt,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (avatar != null) 'avatar': avatar,
+      if (useAssistantAvatar != null)
+        'use_assistant_avatar': useAssistantAvatar,
+      if (useAssistantName != null) 'use_assistant_name': useAssistantName,
+      if (background != null) 'background': background,
+      if (chatModelProvider != null) 'chat_model_provider': chatModelProvider,
+      if (chatModelId != null) 'chat_model_id': chatModelId,
+      if (temperature != null) 'temperature': temperature,
+      if (topP != null) 'top_p': topP,
+      if (contextMessageSize != null)
+        'context_message_size': contextMessageSize,
+      if (limitContextMessages != null)
+        'limit_context_messages': limitContextMessages,
+      if (streamOutput != null) 'stream_output': streamOutput,
+      if (thinkingBudget != null) 'thinking_budget': thinkingBudget,
+      if (maxTokens != null) 'max_tokens': maxTokens,
+      if (customHeadersJson != null) 'custom_headers_json': customHeadersJson,
+      if (customBodyJson != null) 'custom_body_json': customBodyJson,
+      if (systemPrompt != null) 'system_prompt': systemPrompt,
+      if (messageTemplate != null) 'message_template': messageTemplate,
+      if (presetMessagesJson != null)
+        'preset_messages_json': presetMessagesJson,
+      if (searchEnabled != null) 'search_enabled': searchEnabled,
+      if (mcpServerIdsJson != null) 'mcp_server_ids_json': mcpServerIdsJson,
+      if (localToolIdsJson != null) 'local_tool_ids_json': localToolIdsJson,
+      if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
+      if (enableMemory != null) 'enable_memory': enableMemory,
+      if (enableRecentChatsReference != null)
+        'enable_recent_chats_reference': enableRecentChatsReference,
+      if (recentChatsSummaryMessageCount != null)
+        'recent_chats_summary_message_count': recentChatsSummaryMessageCount,
+      if (memoryRecordPrompt != null)
+        'memory_record_prompt': memoryRecordPrompt,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AssistantRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String?>? avatar,
+    Value<bool>? useAssistantAvatar,
+    Value<bool>? useAssistantName,
+    Value<String?>? background,
+    Value<String?>? chatModelProvider,
+    Value<String?>? chatModelId,
+    Value<double?>? temperature,
+    Value<double?>? topP,
+    Value<int>? contextMessageSize,
+    Value<bool>? limitContextMessages,
+    Value<bool>? streamOutput,
+    Value<int?>? thinkingBudget,
+    Value<int?>? maxTokens,
+    Value<String>? customHeadersJson,
+    Value<String>? customBodyJson,
+    Value<String>? systemPrompt,
+    Value<String>? messageTemplate,
+    Value<String>? presetMessagesJson,
+    Value<bool>? searchEnabled,
+    Value<String>? mcpServerIdsJson,
+    Value<String>? localToolIdsJson,
+    Value<String>? regexRulesJson,
+    Value<bool>? enableMemory,
+    Value<bool>? enableRecentChatsReference,
+    Value<int>? recentChatsSummaryMessageCount,
+    Value<String>? memoryRecordPrompt,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AssistantRowsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      avatar: avatar ?? this.avatar,
+      useAssistantAvatar: useAssistantAvatar ?? this.useAssistantAvatar,
+      useAssistantName: useAssistantName ?? this.useAssistantName,
+      background: background ?? this.background,
+      chatModelProvider: chatModelProvider ?? this.chatModelProvider,
+      chatModelId: chatModelId ?? this.chatModelId,
+      temperature: temperature ?? this.temperature,
+      topP: topP ?? this.topP,
+      contextMessageSize: contextMessageSize ?? this.contextMessageSize,
+      limitContextMessages: limitContextMessages ?? this.limitContextMessages,
+      streamOutput: streamOutput ?? this.streamOutput,
+      thinkingBudget: thinkingBudget ?? this.thinkingBudget,
+      maxTokens: maxTokens ?? this.maxTokens,
+      customHeadersJson: customHeadersJson ?? this.customHeadersJson,
+      customBodyJson: customBodyJson ?? this.customBodyJson,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      messageTemplate: messageTemplate ?? this.messageTemplate,
+      presetMessagesJson: presetMessagesJson ?? this.presetMessagesJson,
+      searchEnabled: searchEnabled ?? this.searchEnabled,
+      mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
+      localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
+      regexRulesJson: regexRulesJson ?? this.regexRulesJson,
+      enableMemory: enableMemory ?? this.enableMemory,
+      enableRecentChatsReference:
+          enableRecentChatsReference ?? this.enableRecentChatsReference,
+      recentChatsSummaryMessageCount:
+          recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
+      memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (avatar.present) {
+      map['avatar'] = Variable<String>(avatar.value);
+    }
+    if (useAssistantAvatar.present) {
+      map['use_assistant_avatar'] = Variable<bool>(useAssistantAvatar.value);
+    }
+    if (useAssistantName.present) {
+      map['use_assistant_name'] = Variable<bool>(useAssistantName.value);
+    }
+    if (background.present) {
+      map['background'] = Variable<String>(background.value);
+    }
+    if (chatModelProvider.present) {
+      map['chat_model_provider'] = Variable<String>(chatModelProvider.value);
+    }
+    if (chatModelId.present) {
+      map['chat_model_id'] = Variable<String>(chatModelId.value);
+    }
+    if (temperature.present) {
+      map['temperature'] = Variable<double>(temperature.value);
+    }
+    if (topP.present) {
+      map['top_p'] = Variable<double>(topP.value);
+    }
+    if (contextMessageSize.present) {
+      map['context_message_size'] = Variable<int>(contextMessageSize.value);
+    }
+    if (limitContextMessages.present) {
+      map['limit_context_messages'] = Variable<bool>(
+        limitContextMessages.value,
+      );
+    }
+    if (streamOutput.present) {
+      map['stream_output'] = Variable<bool>(streamOutput.value);
+    }
+    if (thinkingBudget.present) {
+      map['thinking_budget'] = Variable<int>(thinkingBudget.value);
+    }
+    if (maxTokens.present) {
+      map['max_tokens'] = Variable<int>(maxTokens.value);
+    }
+    if (customHeadersJson.present) {
+      map['custom_headers_json'] = Variable<String>(customHeadersJson.value);
+    }
+    if (customBodyJson.present) {
+      map['custom_body_json'] = Variable<String>(customBodyJson.value);
+    }
+    if (systemPrompt.present) {
+      map['system_prompt'] = Variable<String>(systemPrompt.value);
+    }
+    if (messageTemplate.present) {
+      map['message_template'] = Variable<String>(messageTemplate.value);
+    }
+    if (presetMessagesJson.present) {
+      map['preset_messages_json'] = Variable<String>(presetMessagesJson.value);
+    }
+    if (searchEnabled.present) {
+      map['search_enabled'] = Variable<bool>(searchEnabled.value);
+    }
+    if (mcpServerIdsJson.present) {
+      map['mcp_server_ids_json'] = Variable<String>(mcpServerIdsJson.value);
+    }
+    if (localToolIdsJson.present) {
+      map['local_tool_ids_json'] = Variable<String>(localToolIdsJson.value);
+    }
+    if (regexRulesJson.present) {
+      map['regex_rules_json'] = Variable<String>(regexRulesJson.value);
+    }
+    if (enableMemory.present) {
+      map['enable_memory'] = Variable<bool>(enableMemory.value);
+    }
+    if (enableRecentChatsReference.present) {
+      map['enable_recent_chats_reference'] = Variable<bool>(
+        enableRecentChatsReference.value,
+      );
+    }
+    if (recentChatsSummaryMessageCount.present) {
+      map['recent_chats_summary_message_count'] = Variable<int>(
+        recentChatsSummaryMessageCount.value,
+      );
+    }
+    if (memoryRecordPrompt.present) {
+      map['memory_record_prompt'] = Variable<String>(memoryRecordPrompt.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('avatar: $avatar, ')
+          ..write('useAssistantAvatar: $useAssistantAvatar, ')
+          ..write('useAssistantName: $useAssistantName, ')
+          ..write('background: $background, ')
+          ..write('chatModelProvider: $chatModelProvider, ')
+          ..write('chatModelId: $chatModelId, ')
+          ..write('temperature: $temperature, ')
+          ..write('topP: $topP, ')
+          ..write('contextMessageSize: $contextMessageSize, ')
+          ..write('limitContextMessages: $limitContextMessages, ')
+          ..write('streamOutput: $streamOutput, ')
+          ..write('thinkingBudget: $thinkingBudget, ')
+          ..write('maxTokens: $maxTokens, ')
+          ..write('customHeadersJson: $customHeadersJson, ')
+          ..write('customBodyJson: $customBodyJson, ')
+          ..write('systemPrompt: $systemPrompt, ')
+          ..write('messageTemplate: $messageTemplate, ')
+          ..write('presetMessagesJson: $presetMessagesJson, ')
+          ..write('searchEnabled: $searchEnabled, ')
+          ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
+          ..write('localToolIdsJson: $localToolIdsJson, ')
+          ..write('regexRulesJson: $regexRulesJson, ')
+          ..write('enableMemory: $enableMemory, ')
+          ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
+          ..write(
+            'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
+          )
+          ..write('memoryRecordPrompt: $memoryRecordPrompt, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ConversationMcpServerRowsTable extends ConversationMcpServerRows
     with TableInfo<$ConversationMcpServerRowsTable, ConversationMcpServerRow> {
   @override
@@ -2677,6 +4436,315 @@ class GeminiThoughtSignatureRowsCompanion
   }
 }
 
+class $CacheRowsTable extends CacheRows
+    with TableInfo<$CacheRowsTable, CacheRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $CacheRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _typeMeta = const VerificationMeta('type');
+  @override
+  late final GeneratedColumn<String> type = GeneratedColumn<String>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [type, key, value, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'cache_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<CacheRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('type')) {
+      context.handle(
+        _typeMeta,
+        type.isAcceptableOrUnknown(data['type']!, _typeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_typeMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {type, key};
+  @override
+  CacheRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return CacheRow(
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}type'],
+      )!,
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $CacheRowsTable createAlias(String alias) {
+    return $CacheRowsTable(attachedDatabase, alias);
+  }
+}
+
+class CacheRow extends DataClass implements Insertable<CacheRow> {
+  final String type;
+  final String key;
+  final String value;
+  final DateTime updatedAt;
+  const CacheRow({
+    required this.type,
+    required this.key,
+    required this.value,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['type'] = Variable<String>(type);
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  CacheRowsCompanion toCompanion(bool nullToAbsent) {
+    return CacheRowsCompanion(
+      type: Value(type),
+      key: Value(key),
+      value: Value(value),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory CacheRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return CacheRow(
+      type: serializer.fromJson<String>(json['type']),
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'type': serializer.toJson<String>(type),
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  CacheRow copyWith({
+    String? type,
+    String? key,
+    String? value,
+    DateTime? updatedAt,
+  }) => CacheRow(
+    type: type ?? this.type,
+    key: key ?? this.key,
+    value: value ?? this.value,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  CacheRow copyWithCompanion(CacheRowsCompanion data) {
+    return CacheRow(
+      type: data.type.present ? data.type.value : this.type,
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CacheRow(')
+          ..write('type: $type, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(type, key, value, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CacheRow &&
+          other.type == this.type &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.updatedAt == this.updatedAt);
+}
+
+class CacheRowsCompanion extends UpdateCompanion<CacheRow> {
+  final Value<String> type;
+  final Value<String> key;
+  final Value<String> value;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const CacheRowsCompanion({
+    this.type = const Value.absent(),
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  CacheRowsCompanion.insert({
+    required String type,
+    required String key,
+    required String value,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : type = Value(type),
+       key = Value(key),
+       value = Value(value),
+       updatedAt = Value(updatedAt);
+  static Insertable<CacheRow> custom({
+    Expression<String>? type,
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (type != null) 'type': type,
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  CacheRowsCompanion copyWith({
+    Value<String>? type,
+    Value<String>? key,
+    Value<String>? value,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return CacheRowsCompanion(
+      type: type ?? this.type,
+      key: key ?? this.key,
+      value: value ?? this.value,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (type.present) {
+      map['type'] = Variable<String>(type.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('CacheRowsCompanion(')
+          ..write('type: $type, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ChatStorageMetaRowsTable extends ChatStorageMetaRows
     with TableInfo<$ChatStorageMetaRowsTable, ChatStorageMetaRow> {
   @override
@@ -2893,11 +4961,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $MessageRowsTable messageRows = $MessageRowsTable(this);
+  late final $AssistantRowsTable assistantRows = $AssistantRowsTable(this);
   late final $ConversationMcpServerRowsTable conversationMcpServerRows =
       $ConversationMcpServerRowsTable(this);
   late final $ToolEventRowsTable toolEventRows = $ToolEventRowsTable(this);
   late final $GeminiThoughtSignatureRowsTable geminiThoughtSignatureRows =
       $GeminiThoughtSignatureRowsTable(this);
+  late final $CacheRowsTable cacheRows = $CacheRowsTable(this);
   late final $ChatStorageMetaRowsTable chatStorageMetaRows =
       $ChatStorageMetaRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
@@ -2927,9 +4997,11 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     conversationRows,
     messageRows,
+    assistantRows,
     conversationMcpServerRows,
     toolEventRows,
     geminiThoughtSignatureRows,
+    cacheRows,
     chatStorageMetaRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
@@ -4384,6 +6456,748 @@ typedef $$MessageRowsTableProcessedTableManager =
         bool geminiThoughtSignatureRowsRefs,
       })
     >;
+typedef $$AssistantRowsTableCreateCompanionBuilder =
+    AssistantRowsCompanion Function({
+      required String id,
+      required String name,
+      Value<String?> avatar,
+      Value<bool> useAssistantAvatar,
+      Value<bool> useAssistantName,
+      Value<String?> background,
+      Value<String?> chatModelProvider,
+      Value<String?> chatModelId,
+      Value<double?> temperature,
+      Value<double?> topP,
+      Value<int> contextMessageSize,
+      Value<bool> limitContextMessages,
+      Value<bool> streamOutput,
+      Value<int?> thinkingBudget,
+      Value<int?> maxTokens,
+      Value<String> customHeadersJson,
+      Value<String> customBodyJson,
+      Value<String> systemPrompt,
+      Value<String> messageTemplate,
+      Value<String> presetMessagesJson,
+      Value<bool> searchEnabled,
+      Value<String> mcpServerIdsJson,
+      Value<String> localToolIdsJson,
+      Value<String> regexRulesJson,
+      Value<bool> enableMemory,
+      Value<bool> enableRecentChatsReference,
+      Value<int> recentChatsSummaryMessageCount,
+      Value<String> memoryRecordPrompt,
+      required int sortOrder,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AssistantRowsTableUpdateCompanionBuilder =
+    AssistantRowsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String?> avatar,
+      Value<bool> useAssistantAvatar,
+      Value<bool> useAssistantName,
+      Value<String?> background,
+      Value<String?> chatModelProvider,
+      Value<String?> chatModelId,
+      Value<double?> temperature,
+      Value<double?> topP,
+      Value<int> contextMessageSize,
+      Value<bool> limitContextMessages,
+      Value<bool> streamOutput,
+      Value<int?> thinkingBudget,
+      Value<int?> maxTokens,
+      Value<String> customHeadersJson,
+      Value<String> customBodyJson,
+      Value<String> systemPrompt,
+      Value<String> messageTemplate,
+      Value<String> presetMessagesJson,
+      Value<bool> searchEnabled,
+      Value<String> mcpServerIdsJson,
+      Value<String> localToolIdsJson,
+      Value<String> regexRulesJson,
+      Value<bool> enableMemory,
+      Value<bool> enableRecentChatsReference,
+      Value<int> recentChatsSummaryMessageCount,
+      Value<String> memoryRecordPrompt,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AssistantRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatar => $composableBuilder(
+    column: $table.avatar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get useAssistantAvatar => $composableBuilder(
+    column: $table.useAssistantAvatar,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get useAssistantName => $composableBuilder(
+    column: $table.useAssistantName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get background => $composableBuilder(
+    column: $table.background,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get temperature => $composableBuilder(
+    column: $table.temperature,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get topP => $composableBuilder(
+    column: $table.topP,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get contextMessageSize => $composableBuilder(
+    column: $table.contextMessageSize,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get limitContextMessages => $composableBuilder(
+    column: $table.limitContextMessages,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get streamOutput => $composableBuilder(
+    column: $table.streamOutput,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get thinkingBudget => $composableBuilder(
+    column: $table.thinkingBudget,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get maxTokens => $composableBuilder(
+    column: $table.maxTokens,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customHeadersJson => $composableBuilder(
+    column: $table.customHeadersJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get customBodyJson => $composableBuilder(
+    column: $table.customBodyJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get messageTemplate => $composableBuilder(
+    column: $table.messageTemplate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get presetMessagesJson => $composableBuilder(
+    column: $table.presetMessagesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get searchEnabled => $composableBuilder(
+    column: $table.searchEnabled,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mcpServerIdsJson => $composableBuilder(
+    column: $table.mcpServerIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get localToolIdsJson => $composableBuilder(
+    column: $table.localToolIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get regexRulesJson => $composableBuilder(
+    column: $table.regexRulesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enableMemory => $composableBuilder(
+    column: $table.enableMemory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enableRecentChatsReference => $composableBuilder(
+    column: $table.enableRecentChatsReference,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get recentChatsSummaryMessageCount => $composableBuilder(
+    column: $table.recentChatsSummaryMessageCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get memoryRecordPrompt => $composableBuilder(
+    column: $table.memoryRecordPrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$AssistantRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get avatar => $composableBuilder(
+    column: $table.avatar,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get useAssistantAvatar => $composableBuilder(
+    column: $table.useAssistantAvatar,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get useAssistantName => $composableBuilder(
+    column: $table.useAssistantName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get background => $composableBuilder(
+    column: $table.background,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get temperature => $composableBuilder(
+    column: $table.temperature,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get topP => $composableBuilder(
+    column: $table.topP,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get contextMessageSize => $composableBuilder(
+    column: $table.contextMessageSize,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get limitContextMessages => $composableBuilder(
+    column: $table.limitContextMessages,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get streamOutput => $composableBuilder(
+    column: $table.streamOutput,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get thinkingBudget => $composableBuilder(
+    column: $table.thinkingBudget,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get maxTokens => $composableBuilder(
+    column: $table.maxTokens,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customHeadersJson => $composableBuilder(
+    column: $table.customHeadersJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get customBodyJson => $composableBuilder(
+    column: $table.customBodyJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get messageTemplate => $composableBuilder(
+    column: $table.messageTemplate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get presetMessagesJson => $composableBuilder(
+    column: $table.presetMessagesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get searchEnabled => $composableBuilder(
+    column: $table.searchEnabled,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mcpServerIdsJson => $composableBuilder(
+    column: $table.mcpServerIdsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get localToolIdsJson => $composableBuilder(
+    column: $table.localToolIdsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get regexRulesJson => $composableBuilder(
+    column: $table.regexRulesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enableMemory => $composableBuilder(
+    column: $table.enableMemory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get enableRecentChatsReference => $composableBuilder(
+    column: $table.enableRecentChatsReference,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get recentChatsSummaryMessageCount => $composableBuilder(
+    column: $table.recentChatsSummaryMessageCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get memoryRecordPrompt => $composableBuilder(
+    column: $table.memoryRecordPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AssistantRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get avatar =>
+      $composableBuilder(column: $table.avatar, builder: (column) => column);
+
+  GeneratedColumn<bool> get useAssistantAvatar => $composableBuilder(
+    column: $table.useAssistantAvatar,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get useAssistantName => $composableBuilder(
+    column: $table.useAssistantName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get background => $composableBuilder(
+    column: $table.background,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatModelProvider => $composableBuilder(
+    column: $table.chatModelProvider,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get chatModelId => $composableBuilder(
+    column: $table.chatModelId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get temperature => $composableBuilder(
+    column: $table.temperature,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get topP =>
+      $composableBuilder(column: $table.topP, builder: (column) => column);
+
+  GeneratedColumn<int> get contextMessageSize => $composableBuilder(
+    column: $table.contextMessageSize,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get limitContextMessages => $composableBuilder(
+    column: $table.limitContextMessages,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get streamOutput => $composableBuilder(
+    column: $table.streamOutput,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get thinkingBudget => $composableBuilder(
+    column: $table.thinkingBudget,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get maxTokens =>
+      $composableBuilder(column: $table.maxTokens, builder: (column) => column);
+
+  GeneratedColumn<String> get customHeadersJson => $composableBuilder(
+    column: $table.customHeadersJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get customBodyJson => $composableBuilder(
+    column: $table.customBodyJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get systemPrompt => $composableBuilder(
+    column: $table.systemPrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get messageTemplate => $composableBuilder(
+    column: $table.messageTemplate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get presetMessagesJson => $composableBuilder(
+    column: $table.presetMessagesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get searchEnabled => $composableBuilder(
+    column: $table.searchEnabled,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get mcpServerIdsJson => $composableBuilder(
+    column: $table.mcpServerIdsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get localToolIdsJson => $composableBuilder(
+    column: $table.localToolIdsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get regexRulesJson => $composableBuilder(
+    column: $table.regexRulesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get enableMemory => $composableBuilder(
+    column: $table.enableMemory,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get enableRecentChatsReference => $composableBuilder(
+    column: $table.enableRecentChatsReference,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get recentChatsSummaryMessageCount => $composableBuilder(
+    column: $table.recentChatsSummaryMessageCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get memoryRecordPrompt => $composableBuilder(
+    column: $table.memoryRecordPrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AssistantRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AssistantRowsTable,
+          AssistantRow,
+          $$AssistantRowsTableFilterComposer,
+          $$AssistantRowsTableOrderingComposer,
+          $$AssistantRowsTableAnnotationComposer,
+          $$AssistantRowsTableCreateCompanionBuilder,
+          $$AssistantRowsTableUpdateCompanionBuilder,
+          (
+            AssistantRow,
+            BaseReferences<_$AppDatabase, $AssistantRowsTable, AssistantRow>,
+          ),
+          AssistantRow,
+          PrefetchHooks Function()
+        > {
+  $$AssistantRowsTableTableManager(_$AppDatabase db, $AssistantRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AssistantRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AssistantRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AssistantRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String?> avatar = const Value.absent(),
+                Value<bool> useAssistantAvatar = const Value.absent(),
+                Value<bool> useAssistantName = const Value.absent(),
+                Value<String?> background = const Value.absent(),
+                Value<String?> chatModelProvider = const Value.absent(),
+                Value<String?> chatModelId = const Value.absent(),
+                Value<double?> temperature = const Value.absent(),
+                Value<double?> topP = const Value.absent(),
+                Value<int> contextMessageSize = const Value.absent(),
+                Value<bool> limitContextMessages = const Value.absent(),
+                Value<bool> streamOutput = const Value.absent(),
+                Value<int?> thinkingBudget = const Value.absent(),
+                Value<int?> maxTokens = const Value.absent(),
+                Value<String> customHeadersJson = const Value.absent(),
+                Value<String> customBodyJson = const Value.absent(),
+                Value<String> systemPrompt = const Value.absent(),
+                Value<String> messageTemplate = const Value.absent(),
+                Value<String> presetMessagesJson = const Value.absent(),
+                Value<bool> searchEnabled = const Value.absent(),
+                Value<String> mcpServerIdsJson = const Value.absent(),
+                Value<String> localToolIdsJson = const Value.absent(),
+                Value<String> regexRulesJson = const Value.absent(),
+                Value<bool> enableMemory = const Value.absent(),
+                Value<bool> enableRecentChatsReference = const Value.absent(),
+                Value<int> recentChatsSummaryMessageCount =
+                    const Value.absent(),
+                Value<String> memoryRecordPrompt = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantRowsCompanion(
+                id: id,
+                name: name,
+                avatar: avatar,
+                useAssistantAvatar: useAssistantAvatar,
+                useAssistantName: useAssistantName,
+                background: background,
+                chatModelProvider: chatModelProvider,
+                chatModelId: chatModelId,
+                temperature: temperature,
+                topP: topP,
+                contextMessageSize: contextMessageSize,
+                limitContextMessages: limitContextMessages,
+                streamOutput: streamOutput,
+                thinkingBudget: thinkingBudget,
+                maxTokens: maxTokens,
+                customHeadersJson: customHeadersJson,
+                customBodyJson: customBodyJson,
+                systemPrompt: systemPrompt,
+                messageTemplate: messageTemplate,
+                presetMessagesJson: presetMessagesJson,
+                searchEnabled: searchEnabled,
+                mcpServerIdsJson: mcpServerIdsJson,
+                localToolIdsJson: localToolIdsJson,
+                regexRulesJson: regexRulesJson,
+                enableMemory: enableMemory,
+                enableRecentChatsReference: enableRecentChatsReference,
+                recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
+                memoryRecordPrompt: memoryRecordPrompt,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                Value<String?> avatar = const Value.absent(),
+                Value<bool> useAssistantAvatar = const Value.absent(),
+                Value<bool> useAssistantName = const Value.absent(),
+                Value<String?> background = const Value.absent(),
+                Value<String?> chatModelProvider = const Value.absent(),
+                Value<String?> chatModelId = const Value.absent(),
+                Value<double?> temperature = const Value.absent(),
+                Value<double?> topP = const Value.absent(),
+                Value<int> contextMessageSize = const Value.absent(),
+                Value<bool> limitContextMessages = const Value.absent(),
+                Value<bool> streamOutput = const Value.absent(),
+                Value<int?> thinkingBudget = const Value.absent(),
+                Value<int?> maxTokens = const Value.absent(),
+                Value<String> customHeadersJson = const Value.absent(),
+                Value<String> customBodyJson = const Value.absent(),
+                Value<String> systemPrompt = const Value.absent(),
+                Value<String> messageTemplate = const Value.absent(),
+                Value<String> presetMessagesJson = const Value.absent(),
+                Value<bool> searchEnabled = const Value.absent(),
+                Value<String> mcpServerIdsJson = const Value.absent(),
+                Value<String> localToolIdsJson = const Value.absent(),
+                Value<String> regexRulesJson = const Value.absent(),
+                Value<bool> enableMemory = const Value.absent(),
+                Value<bool> enableRecentChatsReference = const Value.absent(),
+                Value<int> recentChatsSummaryMessageCount =
+                    const Value.absent(),
+                Value<String> memoryRecordPrompt = const Value.absent(),
+                required int sortOrder,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantRowsCompanion.insert(
+                id: id,
+                name: name,
+                avatar: avatar,
+                useAssistantAvatar: useAssistantAvatar,
+                useAssistantName: useAssistantName,
+                background: background,
+                chatModelProvider: chatModelProvider,
+                chatModelId: chatModelId,
+                temperature: temperature,
+                topP: topP,
+                contextMessageSize: contextMessageSize,
+                limitContextMessages: limitContextMessages,
+                streamOutput: streamOutput,
+                thinkingBudget: thinkingBudget,
+                maxTokens: maxTokens,
+                customHeadersJson: customHeadersJson,
+                customBodyJson: customBodyJson,
+                systemPrompt: systemPrompt,
+                messageTemplate: messageTemplate,
+                presetMessagesJson: presetMessagesJson,
+                searchEnabled: searchEnabled,
+                mcpServerIdsJson: mcpServerIdsJson,
+                localToolIdsJson: localToolIdsJson,
+                regexRulesJson: regexRulesJson,
+                enableMemory: enableMemory,
+                enableRecentChatsReference: enableRecentChatsReference,
+                recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
+                memoryRecordPrompt: memoryRecordPrompt,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AssistantRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AssistantRowsTable,
+      AssistantRow,
+      $$AssistantRowsTableFilterComposer,
+      $$AssistantRowsTableOrderingComposer,
+      $$AssistantRowsTableAnnotationComposer,
+      $$AssistantRowsTableCreateCompanionBuilder,
+      $$AssistantRowsTableUpdateCompanionBuilder,
+      (
+        AssistantRow,
+        BaseReferences<_$AppDatabase, $AssistantRowsTable, AssistantRow>,
+      ),
+      AssistantRow,
+      PrefetchHooks Function()
+    >;
 typedef $$ConversationMcpServerRowsTableCreateCompanionBuilder =
     ConversationMcpServerRowsCompanion Function({
       required String conversationId,
@@ -5243,6 +8057,181 @@ typedef $$GeminiThoughtSignatureRowsTableProcessedTableManager =
       GeminiThoughtSignatureRow,
       PrefetchHooks Function({bool messageId})
     >;
+typedef $$CacheRowsTableCreateCompanionBuilder =
+    CacheRowsCompanion Function({
+      required String type,
+      required String key,
+      required String value,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$CacheRowsTableUpdateCompanionBuilder =
+    CacheRowsCompanion Function({
+      Value<String> type,
+      Value<String> key,
+      Value<String> value,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$CacheRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $CacheRowsTable> {
+  $$CacheRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$CacheRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $CacheRowsTable> {
+  $$CacheRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get type => $composableBuilder(
+    column: $table.type,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$CacheRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $CacheRowsTable> {
+  $$CacheRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get type =>
+      $composableBuilder(column: $table.type, builder: (column) => column);
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$CacheRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $CacheRowsTable,
+          CacheRow,
+          $$CacheRowsTableFilterComposer,
+          $$CacheRowsTableOrderingComposer,
+          $$CacheRowsTableAnnotationComposer,
+          $$CacheRowsTableCreateCompanionBuilder,
+          $$CacheRowsTableUpdateCompanionBuilder,
+          (CacheRow, BaseReferences<_$AppDatabase, $CacheRowsTable, CacheRow>),
+          CacheRow,
+          PrefetchHooks Function()
+        > {
+  $$CacheRowsTableTableManager(_$AppDatabase db, $CacheRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$CacheRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$CacheRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$CacheRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> type = const Value.absent(),
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => CacheRowsCompanion(
+                type: type,
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String type,
+                required String key,
+                required String value,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => CacheRowsCompanion.insert(
+                type: type,
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$CacheRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $CacheRowsTable,
+      CacheRow,
+      $$CacheRowsTableFilterComposer,
+      $$CacheRowsTableOrderingComposer,
+      $$CacheRowsTableAnnotationComposer,
+      $$CacheRowsTableCreateCompanionBuilder,
+      $$CacheRowsTableUpdateCompanionBuilder,
+      (CacheRow, BaseReferences<_$AppDatabase, $CacheRowsTable, CacheRow>),
+      CacheRow,
+      PrefetchHooks Function()
+    >;
 typedef $$ChatStorageMetaRowsTableCreateCompanionBuilder =
     ChatStorageMetaRowsCompanion Function({
       required String key,
@@ -5410,6 +8399,8 @@ class $AppDatabaseManager {
       $$ConversationRowsTableTableManager(_db, _db.conversationRows);
   $$MessageRowsTableTableManager get messageRows =>
       $$MessageRowsTableTableManager(_db, _db.messageRows);
+  $$AssistantRowsTableTableManager get assistantRows =>
+      $$AssistantRowsTableTableManager(_db, _db.assistantRows);
   $$ConversationMcpServerRowsTableTableManager get conversationMcpServerRows =>
       $$ConversationMcpServerRowsTableTableManager(
         _db,
@@ -5423,6 +8414,8 @@ class $AppDatabaseManager {
         _db,
         _db.geminiThoughtSignatureRows,
       );
+  $$CacheRowsTableTableManager get cacheRows =>
+      $$CacheRowsTableTableManager(_db, _db.cacheRows);
   $$ChatStorageMetaRowsTableTableManager get chatStorageMetaRows =>
       $$ChatStorageMetaRowsTableTableManager(_db, _db.chatStorageMetaRows);
 }

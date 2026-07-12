@@ -25,7 +25,7 @@ void main() {
     testWidgets('edit_memory returns updated content when id exists', (
       tester,
     ) async {
-      const assistant = Assistant(
+      final assistant = Assistant(
         id: 'assistant-a',
         name: 'Assistant',
         enableMemory: true,
@@ -63,7 +63,7 @@ void main() {
     testWidgets('edit_memory returns tool error when id does not exist', (
       tester,
     ) async {
-      const assistant = Assistant(
+      final assistant = Assistant(
         id: 'assistant-a',
         name: 'Assistant',
         enableMemory: true,
@@ -99,7 +99,7 @@ void main() {
     testWidgets('edit_memory returns tool error when update throws', (
       tester,
     ) async {
-      const assistant = Assistant(
+      final assistant = Assistant(
         id: 'assistant-a',
         name: 'Assistant',
         enableMemory: true,

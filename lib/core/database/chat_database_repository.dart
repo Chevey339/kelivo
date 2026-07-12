@@ -6,6 +6,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
+import '../models/assistant.dart';
+import '../models/preset_message.dart';
 import 'app_database.dart';
 
 class ChatDatabaseRepository {
@@ -54,6 +56,87 @@ class ChatDatabaseRepository {
       out.add(await _conversationFromRow(row));
     }
     return out;
+  }
+
+  // ===== Assistant CRUD =====
+
+  Future<List<Assistant>> getAllAssistants() async {
+    final rows = await (_db.select(
+      _db.assistantRows,
+    )..orderBy([(t) => OrderingTerm.asc(t.sortOrder)])).get();
+    return rows.map(_assistantFromRow).toList(growable: false);
+  }
+
+  Future<Assistant?> getAssistant(String id) async {
+    final row = await (_db.select(
+      _db.assistantRows,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
+    return row == null ? null : _assistantFromRow(row);
+  }
+
+  Future<void> putAssistant(Assistant assistant, {int? sortOrder}) async {
+    final order = sortOrder ?? 0;
+    await _db
+        .into(_db.assistantRows)
+        .insertOnConflictUpdate(_assistantCompanion(assistant, order));
+  }
+
+  Future<void> putAssistants(List<Assistant> assistants) async {
+    if (assistants.isEmpty) {
+      await _db.delete(_db.assistantRows).go();
+      return;
+    }
+    await _db.transaction(() async {
+      await _db.delete(_db.assistantRows).go();
+      for (var i = 0; i < assistants.length; i++) {
+        await _db
+            .into(_db.assistantRows)
+            .insertOnConflictUpdate(_assistantCompanion(assistants[i], i));
+      }
+    });
+  }
+
+  Future<void> deleteAssistant(String id) async {
+    await (_db.delete(_db.assistantRows)..where((t) => t.id.equals(id))).go();
+  }
+
+  Future<int> getAssistantCount() async {
+    final count = _db.assistantRows.id.count();
+    final row = await (_db.selectOnly(
+      _db.assistantRows,
+    )..addColumns([count])).getSingle();
+    return row.read(count) ?? 0;
+  }
+
+  // ===== Cache CRUD =====
+
+  Future<CacheRow?> getCacheEntry(String type, String key) async {
+    return (_db.select(
+      _db.cacheRows,
+    )..where((t) => t.type.equals(type) & t.key.equals(key))).getSingleOrNull();
+  }
+
+  Future<void> putCacheEntry(String type, String key, String value) async {
+    await _db
+        .into(_db.cacheRows)
+        .insertOnConflictUpdate(
+          CacheRowsCompanion.insert(
+            type: type,
+            key: key,
+            value: value,
+            updatedAt: DateTime.now(),
+          ),
+        );
+  }
+
+  Future<void> deleteCacheEntry(String type, String key) async {
+    await (_db.delete(
+      _db.cacheRows,
+    )..where((t) => t.type.equals(type) & t.key.equals(key))).go();
+  }
+
+  Future<void> clearCacheByType(String type) async {
+    await (_db.delete(_db.cacheRows)..where((t) => t.type.equals(type))).go();
   }
 
   Future<List<Conversation>> getAllConversationSummaries() async {
@@ -648,9 +731,11 @@ class ChatDatabaseRepository {
     await _db.transaction(() async {
       await _db.delete(_db.geminiThoughtSignatureRows).go();
       await _db.delete(_db.toolEventRows).go();
+      await _db.delete(_db.assistantRows).go();
       await _db.delete(_db.conversationMcpServerRows).go();
       await _db.delete(_db.messageRows).go();
       await _db.delete(_db.conversationRows).go();
+      await _db.delete(_db.cacheRows).go();
       await _db.delete(_db.chatStorageMetaRows).go();
     });
   }
@@ -849,6 +934,81 @@ class ChatDatabaseRepository {
       await (_db.update(_db.messageRows)..where((t) => t.id.equals(rows[i].id)))
           .write(MessageRowsCompanion(messageOrder: Value(i)));
     }
+  }
+
+  Assistant _assistantFromRow(AssistantRow row) {
+    return Assistant.fromJson({
+      'id': row.id,
+      'name': row.name,
+      'avatar': row.avatar,
+      'useAssistantAvatar': row.useAssistantAvatar,
+      'useAssistantName': row.useAssistantName,
+      'background': row.background,
+      'chatModelProvider': row.chatModelProvider,
+      'chatModelId': row.chatModelId,
+      'temperature': row.temperature,
+      'topP': row.topP,
+      'contextMessageSize': row.contextMessageSize,
+      'limitContextMessages': row.limitContextMessages,
+      'streamOutput': row.streamOutput,
+      'thinkingBudget': row.thinkingBudget,
+      'maxTokens': row.maxTokens,
+      'systemPrompt': row.systemPrompt,
+      'messageTemplate': row.messageTemplate,
+      'searchEnabled': row.searchEnabled,
+      'mcpServerIds': (jsonDecode(row.mcpServerIdsJson) as List).cast<String>(),
+      'localToolIds': (jsonDecode(row.localToolIdsJson) as List).cast<String>(),
+      'customHeaders': jsonDecode(row.customHeadersJson),
+      'customBody': jsonDecode(row.customBodyJson),
+      'enableMemory': row.enableMemory,
+      'enableRecentChatsReference': row.enableRecentChatsReference,
+      'recentChatsSummaryMessageCount': row.recentChatsSummaryMessageCount,
+      'memoryRecordPrompt': row.memoryRecordPrompt,
+      'presetMessages': jsonDecode(row.presetMessagesJson),
+      'regexRules': jsonDecode(row.regexRulesJson),
+      'createdAt': row.createdAt.toIso8601String(),
+      'updatedAt': row.updatedAt.toIso8601String(),
+    });
+  }
+
+  AssistantRowsCompanion _assistantCompanion(Assistant a, int sortOrder) {
+    return AssistantRowsCompanion.insert(
+      id: a.id,
+      name: a.name,
+      avatar: Value(a.avatar),
+      useAssistantAvatar: Value(a.useAssistantAvatar),
+      useAssistantName: Value(a.useAssistantName),
+      background: Value(a.background),
+      chatModelProvider: Value(a.chatModelProvider),
+      chatModelId: Value(a.chatModelId),
+      temperature: Value(a.temperature),
+      topP: Value(a.topP),
+      contextMessageSize: Value(a.contextMessageSize),
+      limitContextMessages: Value(a.limitContextMessages),
+      streamOutput: Value(a.streamOutput),
+      thinkingBudget: Value(a.thinkingBudget),
+      maxTokens: Value(a.maxTokens),
+      systemPrompt: Value(a.systemPrompt),
+      messageTemplate: Value(a.messageTemplate),
+      searchEnabled: Value(a.searchEnabled),
+      mcpServerIdsJson: Value(jsonEncode(a.mcpServerIds)),
+      localToolIdsJson: Value(jsonEncode(a.localToolIds)),
+      customHeadersJson: Value(jsonEncode(a.customHeaders)),
+      customBodyJson: Value(jsonEncode(a.customBody)),
+      enableMemory: Value(a.enableMemory),
+      enableRecentChatsReference: Value(a.enableRecentChatsReference),
+      recentChatsSummaryMessageCount: Value(a.recentChatsSummaryMessageCount),
+      memoryRecordPrompt: Value(a.memoryRecordPrompt),
+      presetMessagesJson: Value(
+        jsonEncode(PresetMessage.encodeList(a.presetMessages)),
+      ),
+      regexRulesJson: Value(
+        jsonEncode(a.regexRules.map((e) => e.toJson()).toList()),
+      ),
+      sortOrder: sortOrder,
+      createdAt: a.createdAt,
+      updatedAt: a.updatedAt,
+    );
   }
 
   Future<Conversation> _conversationFromRow(

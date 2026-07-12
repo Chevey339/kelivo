@@ -16,7 +16,8 @@ class Assistant {
   ];
 
   /// Default prompt for guiding the model on how to actively record user info.
-  static const String defaultMemoryRecordPrompt = '''Act as a proactive personal secretary. Automatically record and manage user information in your memory during conversations without waiting for explicit requests.
+  static const String defaultMemoryRecordPrompt =
+      '''Act as a proactive personal secretary. Automatically record and manage user information in your memory during conversations without waiting for explicit requests.
 
 **Information to Store**
 *   **User Profile:** Name/nickname, age, gender, interests, and hobbies.
@@ -72,8 +73,10 @@ Do **not** store sensitive information, including:
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
   final List<AssistantRegex> regexRules;
+  final DateTime createdAt;
+  final DateTime updatedAt;
 
-  const Assistant({
+  Assistant({
     required this.id,
     required this.name,
     this.avatar,
@@ -102,7 +105,10 @@ Do **not** store sensitive information, including:
     this.memoryRecordPrompt = defaultMemoryRecordPrompt,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
-  });
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) : createdAt = createdAt ?? DateTime.now(),
+       updatedAt = updatedAt ?? DateTime.now();
 
   Assistant copyWith({
     String? id,
@@ -133,6 +139,8 @@ Do **not** store sensitive information, including:
     String? memoryRecordPrompt,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     bool clearChatModel = false,
     bool clearAvatar = false,
     bool clearTemperature = false,
@@ -176,6 +184,8 @@ Do **not** store sensitive information, including:
       memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -208,6 +218,8 @@ Do **not** store sensitive information, including:
     'memoryRecordPrompt': memoryRecordPrompt,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
   };
 
   static Assistant fromJson(Map<String, dynamic> json) => Assistant(
@@ -273,7 +285,8 @@ Do **not** store sensitive information, including:
       }
       return raw;
     })(),
-    memoryRecordPrompt: (json['memoryRecordPrompt'] as String?) ?? defaultMemoryRecordPrompt,
+    memoryRecordPrompt:
+        (json['memoryRecordPrompt'] as String?) ?? defaultMemoryRecordPrompt,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);
@@ -291,6 +304,12 @@ Do **not** store sensitive information, including:
       }
       return const <AssistantRegex>[];
     })(),
+    createdAt: json['createdAt'] != null
+        ? DateTime.parse(json['createdAt'] as String)
+        : DateTime.now(),
+    updatedAt: json['updatedAt'] != null
+        ? DateTime.parse(json['updatedAt'] as String)
+        : DateTime.now(),
   );
 
   static String encodeList(List<Assistant> list) =>

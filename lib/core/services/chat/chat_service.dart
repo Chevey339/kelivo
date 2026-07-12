@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import '../../database/app_database.dart';
 import '../../database/chat_database_repository.dart';
+import '../../models/assistant.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -17,6 +18,7 @@ class ChatService extends ChangeNotifier {
   static const int defaultLoadedWindowMax = 360;
 
   late ChatDatabaseRepository _repo;
+  ChatDatabaseRepository get repo => _repo;
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -755,6 +757,19 @@ class ChatService extends ChangeNotifier {
     }
     await setConversationMcpServers(conversationId, set.toList());
   }
+
+  Future<List<Assistant>> getAllAssistants() => _repo.getAllAssistants();
+  Future<void> putAssistants(List<Assistant> list) => _repo.putAssistants(list);
+  Future<void> putAssistant(Assistant a) => _repo.putAssistant(a);
+  Future<void> deleteAssistant(String id) => _repo.deleteAssistant(id);
+  // Cache
+  Future<void> putCacheEntry(String type, String key, String value) =>
+      _repo.putCacheEntry(type, key, value);
+  Future<CacheRow?> getCacheEntry(String type, String key) =>
+      _repo.getCacheEntry(type, key);
+  Future<void> deleteCacheEntry(String type, String key) =>
+      _repo.deleteCacheEntry(type, key);
+  Future<void> clearCacheByType(String type) => _repo.clearCacheByType(type);
 
   Future<void> renameConversation(String id, String newTitle) async {
     if (!_initialized) return;

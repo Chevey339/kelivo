@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 
@@ -17,10 +20,11 @@ class OcrCacheEntry {
 /// - 管理 OCR 缓存 (LRU)
 /// - 包装 OCR 结果为 XML 格式
 class OcrService {
-  OcrService({this.maxCacheEntries = 48});
+  OcrService({this.maxCacheEntries = 48, this.chatService});
 
   /// LRU 缓存最大条目数
   final int maxCacheEntries;
+  final ChatService? chatService;
 
   /// OCR 缓存 (path -> cached OCR text)
   final Map<String, OcrCacheEntry> _cache = <String, OcrCacheEntry>{};
@@ -31,10 +35,38 @@ class OcrService {
   /// 获取缓存条目数量（用于测试/调试）
   int get cacheSize => _cache.length;
 
+  bool _validateCacheEntry(String path, DateTime updatedAt) {
+    if (!File(path).existsSync()) return false;
+    if (updatedAt.isBefore(DateTime.now().subtract(const Duration(days: 90)))) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<String?> _loadCacheFromDb(String path) async {
+    if (chatService == null) return null;
+    final entry = await chatService!.getCacheEntry('ocr', path);
+    if (entry == null) return null;
+    if (!_validateCacheEntry(path, entry.updatedAt)) {
+      await chatService!.deleteCacheEntry('ocr', path);
+      return null;
+    }
+    // warm memory cache
+    _cache[path] = OcrCacheEntry(text: entry.value);
+    _cacheOrder.add(path);
+    return entry.value;
+  }
+
+  void _persistCacheEntry(String path, String text) {
+    if (chatService == null) return;
+    unawaited(chatService!.putCacheEntry('ocr', path, text).catchError((_) {}));
+  }
+
   /// 清除缓存
   void clearCache() {
     _cache.clear();
     _cacheOrder.clear();
+    chatService?.clearCacheByType('ocr');
   }
 
   /// 运行 OCR 识别图片内容
@@ -110,6 +142,8 @@ class OcrService {
       final oldest = _cacheOrder.removeAt(0);
       _cache.remove(oldest);
     }
+
+    _persistCacheEntry(path, text);
   }
 
   /// 获取缓存的 OCR 文本
@@ -167,9 +201,19 @@ class OcrService {
     // Fetch OCR for uncached images one-by-one to populate cache
     // and avoid huge combined prompts.
     for (final path in uncached) {
+      String? t;
+      try {
+        t = await _loadCacheFromDb(path);
+      } catch (_) {}
+      if (t != null && t.trim().isNotEmpty) {
+        combined.writeln(t.trim());
+        continue;
+      }
+
+      if (!context.mounted) break;
       final text = await runOcrForImages([path], context);
       if (text != null && text.trim().isNotEmpty) {
-        final t = text.trim();
+        t = text.trim();
         cacheOcrText(path, t);
         combined.writeln(t);
       }

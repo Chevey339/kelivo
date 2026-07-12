@@ -17,10 +17,7 @@ Future<AssistantProvider> _createLoadedAssistantProvider({
   });
 
   final provider = AssistantProvider();
-  for (var i = 0; i < 25; i++) {
-    if (provider.assistants.length == assistants.length) return provider;
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
+  await provider.loadFromPrefs();
   return provider;
 }
 

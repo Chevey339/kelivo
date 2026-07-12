@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
+import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -780,6 +781,15 @@ class DataSync {
   Future<String> _exportSettingsJson() async {
     final prefs = await SharedPreferencesAsync.instance;
     final map = await prefs.snapshot();
+    // `assistants_v1` removed from SharedPreferences
+    if (chatService.initialized) {
+      try {
+        final assistants = await chatService.getAllAssistants();
+        if (assistants.isNotEmpty) {
+          map['assistants_v1'] = Assistant.encodeList(assistants);
+        }
+      } catch (_) {}
+    }
     return jsonEncode(map);
   }
 

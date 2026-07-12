@@ -10,7 +10,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Assistant local tools', () {
-    const localToolsAssistant = Assistant(
+    final localToolsAssistant = Assistant(
       id: 'a1',
       name: 'Assistant',
       localToolIds: [
@@ -32,13 +32,13 @@ void main() {
     });
 
     test('assistant defaults to no local tools', () {
-      const assistant = Assistant(id: 'a1', name: 'Assistant');
+      final assistant = Assistant(id: 'a1', name: 'Assistant');
 
       expect(assistant.localToolIds, isEmpty);
     });
 
     test('assistant defaults to web search disabled', () {
-      const assistant = Assistant(id: 'a1', name: 'Assistant');
+      final assistant = Assistant(id: 'a1', name: 'Assistant');
 
       expect(assistant.searchEnabled, isFalse);
     });
@@ -62,7 +62,7 @@ void main() {
     });
 
     test('assistant json round trips enabled web search', () {
-      const assistant = Assistant(
+      final assistant = Assistant(
         id: 'a1',
         name: 'Assistant',
         searchEnabled: true,
@@ -74,7 +74,7 @@ void main() {
     });
 
     test('assistant json round trips enabled local tools', () {
-      const assistant = Assistant(
+      final assistant = Assistant(
         id: 'a1',
         name: 'Assistant',
         localToolIds: [LocalToolNames.timeInfo, LocalToolNames.clipboard],
@@ -92,7 +92,7 @@ void main() {
       'builds enabled local tool definitions only when model supports tools',
       () {
         final disabled = LocalToolsService.buildToolDefinitions(
-          assistant: const Assistant(id: 'a2', name: 'Assistant'),
+          assistant: Assistant(id: 'a2', name: 'Assistant'),
           supportsTools: true,
         );
         final unsupported = LocalToolsService.buildToolDefinitions(
@@ -266,7 +266,7 @@ void main() {
         await LocalToolsService.tryHandleToolCall(
           LocalToolNames.timeInfo,
           const {},
-          const Assistant(id: 'a1', name: 'Assistant'),
+          Assistant(id: 'a1', name: 'Assistant'),
         ),
         isNull,
       );

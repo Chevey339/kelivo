@@ -16,18 +16,15 @@ const _assistantId = 'assistant-mcp-test';
 
 void _seedPreferences() {
   SharedPreferences.setMockInitialValues({
-    'assistants_v1': Assistant.encodeList(const [
+    'assistants_v1': Assistant.encodeList([
       Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
     ]),
   });
 }
 
-Future<AssistantProvider> _createAssistantProvider(WidgetTester tester) async {
+Future<AssistantProvider> _createAssistantProvider() async {
   final provider = AssistantProvider();
-  for (var i = 0; i < 25; i++) {
-    if (provider.getById(_assistantId) != null) return provider;
-    await tester.pump(const Duration(milliseconds: 10));
-  }
+  await provider.loadFromPrefs();
   return provider;
 }
 
@@ -55,7 +52,7 @@ void main() {
 
   testWidgets('assistant edit page shows MCP tab on mobile', (tester) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    final assistantProvider = await _createAssistantProvider();
 
     await tester.pumpWidget(
       _buildHarness(
@@ -73,7 +70,7 @@ void main() {
     tester,
   ) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    final assistantProvider = await _createAssistantProvider();
 
     await tester.pumpWidget(
       _buildHarness(
@@ -105,7 +102,7 @@ void main() {
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
     _seedPreferences();
-    final assistantProvider = await _createAssistantProvider(tester);
+    final assistantProvider = await _createAssistantProvider();
 
     await tester.pumpWidget(
       _buildHarness(

@@ -35,7 +35,7 @@ void main() {
       service.injectSearchPrompt(
         disabledMessages,
         SettingsProvider(),
-        const Assistant(id: 'assistant-a', name: 'A'),
+        Assistant(id: 'assistant-a', name: 'A'),
         false,
       );
 
@@ -45,7 +45,7 @@ void main() {
       service.injectSearchPrompt(
         enabledMessages,
         SettingsProvider(),
-        const Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
+        Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
         false,
       );
 
@@ -79,7 +79,7 @@ void main() {
               final service = ToolHandlerService(contextProvider: context);
               disabledTools = service.buildToolDefinitions(
                 settings,
-                const Assistant(id: 'assistant-a', name: 'A'),
+                Assistant(id: 'assistant-a', name: 'A'),
                 'openai',
                 'gpt-4.1',
                 false,
@@ -87,11 +87,7 @@ void main() {
               );
               enabledTools = service.buildToolDefinitions(
                 settings,
-                const Assistant(
-                  id: 'assistant-b',
-                  name: 'B',
-                  searchEnabled: true,
-                ),
+                Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
                 'openai',
                 'gpt-4.1',
                 false,
