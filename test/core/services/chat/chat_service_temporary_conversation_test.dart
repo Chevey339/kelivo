@@ -77,6 +77,36 @@ void main() {
     expect(messages.single.isStreaming, isFalse);
   });
 
+  test('retained timeline cache stays appendable for the next send', () async {
+    final service = createService();
+    await service.init();
+    final conversation = await service.createConversation(title: 'Chat');
+    final first = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: 'first answer',
+    );
+    await service.loadMessages(conversation.id);
+
+    service.retainTimelineWindow(conversation.id, [first.id]);
+    expect(service.getMessages(conversation.id).map((message) => message.id), [
+      first.id,
+    ]);
+
+    final result = await service.beginSendGeneration(
+      conversationId: conversation.id,
+      userContent: 'next question',
+      modelId: 'model',
+      providerId: 'provider',
+    );
+
+    expect(service.getMessages(conversation.id).map((message) => message.id), [
+      first.id,
+      result.userMessage!.id,
+      result.assistantMessage.id,
+    ]);
+  });
+
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {
       final service = createService();

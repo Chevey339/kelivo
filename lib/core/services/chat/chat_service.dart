@@ -301,7 +301,7 @@ class ChatService extends ChangeNotifier {
           .toList(growable: false);
       _messagesCache[conversationId] = messages
           .where((message) => retained.contains(message.id))
-          .toList(growable: false);
+          .toList(growable: true);
       for (final id in removedIds) {
         _toolEventsCache.remove(id);
         _geminiThoughtSigsCache.remove(id);
