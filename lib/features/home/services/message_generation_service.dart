@@ -288,6 +288,7 @@ class MessageGenerationService {
     required String providerKey,
     required String groupId,
     required int version,
+    required bool truncateFuture,
   }) async {
     if (chatService.isTemporaryConversation(conversationId)) {
       final assistantMessage = await createAssistantPlaceholder(
@@ -305,6 +306,7 @@ class MessageGenerationService {
       providerId: providerKey,
       groupId: groupId,
       version: version,
+      truncateFuture: truncateFuture,
     );
     return (assistantMessage: result.assistantMessage, runId: result.run.id);
   }

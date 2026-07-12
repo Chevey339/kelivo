@@ -2008,6 +2008,7 @@ class ChatDatabaseRepository {
         conversation: conversation,
         message: message,
         selectVersion: selectVersion,
+        graftSelectedVersion: false,
         touchUpdatedAt: touchUpdatedAt,
       ),
     );
@@ -2031,12 +2032,14 @@ class ChatDatabaseRepository {
           conversation: conversation,
           message: userMessage,
           selectVersion: false,
+          graftSelectedVersion: false,
           touchUpdatedAt: true,
         );
         final persisted = await _appendGraphMessageToConversation(
           conversation: afterUser,
           message: assistantMessage,
           selectVersion: false,
+          graftSelectedVersion: false,
           touchUpdatedAt: true,
         );
         final run = await GenerationRunCommands(_db).create(
@@ -2059,6 +2062,7 @@ class ChatDatabaseRepository {
     required Conversation conversation,
     required ChatMessage assistantMessage,
     required String runId,
+    required bool truncateFuture,
   }) {
     _validateGenerationBeginMessages(
       conversation: conversation,
@@ -2077,6 +2081,7 @@ class ChatDatabaseRepository {
           conversation: conversation,
           message: assistantMessage,
           selectVersion: true,
+          graftSelectedVersion: !truncateFuture,
           touchUpdatedAt: true,
         );
         final run = await GenerationRunCommands(_db).create(
@@ -2117,6 +2122,7 @@ class ChatDatabaseRepository {
     required Conversation conversation,
     required ChatMessage message,
     required bool selectVersion,
+    required bool graftSelectedVersion,
     required bool touchUpdatedAt,
   }) {
     if (message.conversationId != conversation.id) {
@@ -2222,39 +2228,31 @@ class ChatDatabaseRepository {
         if (target == null) {
           throw StateError('message_graph_revision_group_missing');
         }
-        await _insertGraphRevision(
-          message: message,
-          slotId: target.slotId,
-          parentRevisionId: target.parentRevisionId,
-          requestedRevisionNo: message.version,
-        );
-        final branchId = _deterministicMergeId(
-          'graph_branch',
-          conversation.id,
-          message.id,
-        );
-        await _db
-            .into(_db.conversationBranchRows)
-            .insert(
-              ConversationBranchRowsCompanion.insert(
-                id: branchId,
-                conversationId: conversation.id,
-                parentBranchId: Value(activeBranchId),
-                forkedFromRevisionId: Value(target.parentRevisionId),
-                leafRevisionId: Value(message.id),
-                causalityKind: 'native',
-                createdAt: message.timestamp,
-              ),
-            );
-        await (_db.update(
-          _db.conversationStateRows,
-        )..where((row) => row.conversationId.equals(conversation.id))).write(
-          ConversationStateRowsCompanion(
-            activeBranchId: Value(branchId),
-            contextStartRevisionId: const Value(null),
-            stateRevision: Value(state.stateRevision + 1),
-          ),
-        );
+        final commands = MessageGraphCommands(_db);
+        if (graftSelectedVersion) {
+          await commands.graftRevision(
+            conversationId: conversation.id,
+            targetRevisionId: target.id,
+            text: message.content,
+            mutation: MessageGraphRevisionMutation.regenerateAssistant,
+            expectedStateRevision: active.stateRevision,
+            revisionId: message.id,
+          );
+        } else {
+          await commands.createRevisionBranch(
+            conversationId: conversation.id,
+            targetRevisionId: target.id,
+            text: message.content,
+            mutation: MessageGraphRevisionMutation.regenerateAssistant,
+            expectedStateRevision: active.stateRevision,
+            revisionId: message.id,
+            branchId: _deterministicMergeId(
+              'graph_branch',
+              conversation.id,
+              message.id,
+            ),
+          );
+        }
       } else {
         final slotId = _deterministicMergeId(
           'graph_slot',

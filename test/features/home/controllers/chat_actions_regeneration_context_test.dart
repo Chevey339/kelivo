@@ -20,6 +20,30 @@ ChatMessage _message({
 }
 
 void main() {
+  test('only temporary regeneration physically removes trailing messages', () {
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: false,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: true,
+      ),
+      isTrue,
+    );
+  });
+
   group('ChatActions.buildRegenerationMessages', () {
     test('长会话窗口重试会保留目标消息之前的完整历史前缀', () {
       final messages = <ChatMessage>[

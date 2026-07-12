@@ -1524,6 +1524,7 @@ class ChatService extends ChangeNotifier {
     required String providerId,
     required String groupId,
     required int version,
+    required bool truncateFuture,
   }) async {
     if (!_initialized) await init();
     if (isTemporaryConversation(conversationId)) {
@@ -1546,6 +1547,7 @@ class ChatService extends ChangeNotifier {
       conversation: conversation,
       assistantMessage: assistantMessage,
       runId: const Uuid().v4(),
+      truncateFuture: truncateFuture,
     );
     await _publishGenerationBegin(result);
     return result;

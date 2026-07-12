@@ -63,6 +63,17 @@ void main() {
         runId: 'run-1',
       );
 
+  Future<Conversation> appendFuture(Conversation current) async {
+    final afterUser = await repository.appendGraphMessageToConversation(
+      conversation: current,
+      message: user('user-2'),
+    );
+    return repository.appendGraphMessageToConversation(
+      conversation: afterUser,
+      message: assistant('assistant-tail').copyWith(isStreaming: false),
+    );
+  }
+
   Future<GenerationRun> advanceToStreaming(GenerationRun run) async {
     var current = await repository.transitionGenerationRun(
       id: run.id,
@@ -137,20 +148,22 @@ void main() {
   );
 
   test(
-    'begin regeneration commits alternate revision, branch and run together',
+    'default regeneration grafts the alternate and preserves the future',
     () async {
       final first = await beginFirstSend();
+      final withFuture = await appendFuture(first.conversation);
       final before = await repository.projectActiveMessageGraph(
         conversationId: conversation.id,
       );
       final result = await repository.beginRegeneration(
-        conversation: first.conversation,
+        conversation: withFuture,
         assistantMessage: assistant(
           'assistant-2',
           groupId: 'assistant-1',
           version: 1,
         ),
         runId: 'run-2',
+        truncateFuture: false,
       );
 
       expect(result.userMessage, isNull);
@@ -161,11 +174,53 @@ void main() {
       expect(active?.revisions.map((revision) => revision.id), [
         'user-1',
         'assistant-2',
+        'user-2',
+        'assistant-tail',
       ]);
-      expect(active?.branchId, isNot(equals(before?.branchId)));
-      expect(await repository.getMessageCount(conversation.id), 3);
+      expect(active?.branchId, before?.branchId);
+      expect(await repository.getMessageCount(conversation.id), 5);
     },
   );
+
+  test('truncate regeneration forks without deleting the old future', () async {
+    final first = await beginFirstSend();
+    final withFuture = await appendFuture(first.conversation);
+    final before = await repository.projectActiveMessageGraph(
+      conversationId: conversation.id,
+    );
+
+    final result = await repository.beginRegeneration(
+      conversation: withFuture,
+      assistantMessage: assistant(
+        'assistant-2',
+        groupId: 'assistant-1',
+        version: 1,
+      ),
+      runId: 'run-2',
+      truncateFuture: true,
+    );
+
+    final active = await repository.projectActiveMessageGraph(
+      conversationId: conversation.id,
+    );
+    expect(active?.revisions.map((revision) => revision.id), [
+      'user-1',
+      'assistant-2',
+    ]);
+    expect(active?.branchId, isNot(before?.branchId));
+    final oldBranch = await repository.projectMessageGraphBranch(
+      conversationId: conversation.id,
+      branchId: before!.branchId!,
+    );
+    expect(oldBranch.revisions.map((revision) => revision.id), [
+      'user-1',
+      'assistant-1',
+      'user-2',
+      'assistant-tail',
+    ]);
+    expect(result.run.targetRevisionId, 'assistant-2');
+    expect(await repository.getMessageCount(conversation.id), 5);
+  });
 
   test('invalid begin input is rejected before any database write', () async {
     expect(

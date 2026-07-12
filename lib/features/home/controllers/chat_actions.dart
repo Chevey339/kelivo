@@ -121,6 +121,11 @@ class ChatActionResult {
 /// - Handle stream chunks (reasoning, tools, content)
 /// - Manage streaming state
 class ChatActions {
+  static bool shouldPhysicallyRemoveRegenerationTail({
+    required bool deleteTrailingEnabled,
+    required bool isTemporaryConversation,
+  }) => deleteTrailingEnabled && isTemporaryConversation;
+
   ChatActions({
     required this.chatService,
     required this.chatController,
@@ -979,7 +984,12 @@ class ChatActions {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
-    if (settings.regenerateDeleteTrailingMessages) {
+    if (shouldPhysicallyRemoveRegenerationTail(
+      deleteTrailingEnabled: settings.regenerateDeleteTrailingMessages,
+      isTemporaryConversation: chatService.isTemporaryConversation(
+        conversation.id,
+      ),
+    )) {
       final removeIds = await messageGenerationService.removeTrailingMessages(
         messages: completeMessages,
         lastKeep: versioning.lastKeep,
@@ -1004,6 +1014,7 @@ class ChatActions {
       providerKey: providerKey,
       groupId: targetGroupId,
       version: versioning.nextVersion,
+      truncateFuture: settings.regenerateDeleteTrailingMessages,
     );
     final assistantMessage = begin.assistantMessage;
     _registerGenerationRun(assistantMessage.id, begin.runId);
