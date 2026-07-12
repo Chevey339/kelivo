@@ -231,146 +231,177 @@ void main() {
     isProcessingFiles.dispose();
   });
 
-  testWidgets('程序定位完成后在生成终态前保持底部定位空间', (tester) async {
-    final scrollController = ScrollController();
-    final observerController = ListObserverController(
-      controller: scrollController,
-    );
-    final isProcessingFiles = ValueNotifier<bool>(false);
-    final streamingNotifier = StreamingContentNotifier();
-    final messages = <ChatMessage>[
-      ChatMessage(
-        id: 'new-user-slot',
-        role: 'user',
-        content: 'new question',
-        conversationId: 'conversation-1',
-      ),
-      ChatMessage(
-        id: 'streaming-assistant-slot',
-        role: 'assistant',
-        content: '',
-        conversationId: 'conversation-1',
-        isStreaming: true,
-      ),
-    ];
-    streamingNotifier.getNotifier('streaming-assistant-slot');
-    final coordinator = TimelineCoordinator(
-      loadPage:
-          ({
-            required conversationId,
-            beforeRevisionId,
-            afterRevisionId,
-            fromStart,
-            required limit,
-          }) async => null,
-    );
-    coordinator.programmaticJump('new-user-slot');
-    coordinator.noteContentChanged(isGenerating: true);
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
-          ChangeNotifierProvider.value(value: UserProvider()),
-          ChangeNotifierProvider.value(value: AskUserInteractionService()),
-          ChangeNotifierProvider.value(value: ToolApprovalService()),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ListenableBuilder(
-              listenable: coordinator,
-              builder: (context, child) => MessageListView(
-                scrollController: scrollController,
-                observerController: observerController,
-                messages: messages,
-                byGroup: const {},
-                versionSelections: const {},
-                reasoning: const {},
-                reasoningSegments: const {},
-                contentSplits: const {},
-                toolParts: const {},
-                translations: const {},
-                selecting: false,
-                selectedItems: const {},
-                dividerPadding: EdgeInsets.zero,
-                isProcessingFiles: isProcessingFiles,
-                bottomContentPadding: 16,
-                timelineCoordinator: coordinator,
-                streamingContentNotifier: streamingNotifier,
+  for (final scenario in <({String label, String content})>[
+    (label: '短 user', content: 'new question'),
+    (
+      label: '长 user',
+      content: List<String>.filled(36, 'long user question').join(' '),
+    ),
+  ]) {
+    testWidgets('程序定位先完成 spacer 布局并稳定置顶（${scenario.label}）', (tester) async {
+      final scrollController = ScrollController();
+      final observerController = ListObserverController(
+        controller: scrollController,
+      );
+      final isProcessingFiles = ValueNotifier<bool>(false);
+      final streamingNotifier = StreamingContentNotifier();
+      final messages = <ChatMessage>[
+        for (var index = 0; index < 12; index++)
+          ChatMessage(
+            id: 'history-$index',
+            role: index.isEven ? 'user' : 'assistant',
+            content: 'history message $index',
+            conversationId: 'conversation-1',
+          ),
+        ChatMessage(
+          id: 'new-user-slot',
+          role: 'user',
+          content: scenario.content,
+          conversationId: 'conversation-1',
+        ),
+        ChatMessage(
+          id: 'streaming-assistant-slot',
+          role: 'assistant',
+          content: '',
+          conversationId: 'conversation-1',
+          isStreaming: true,
+        ),
+      ];
+      streamingNotifier.getNotifier('streaming-assistant-slot');
+      final coordinator = TimelineCoordinator(
+        loadPage:
+            ({
+              required conversationId,
+              beforeRevisionId,
+              afterRevisionId,
+              fromStart,
+              required limit,
+            }) async => null,
+      );
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: SettingsProvider()),
+            ChangeNotifierProvider.value(value: AssistantProvider()),
+            ChangeNotifierProvider.value(value: TtsProvider()),
+            ChangeNotifierProvider.value(value: UserProvider()),
+            ChangeNotifierProvider.value(value: AskUserInteractionService()),
+            ChangeNotifierProvider.value(value: ToolApprovalService()),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ListenableBuilder(
+                listenable: coordinator,
+                builder: (context, child) => MessageListView(
+                  scrollController: scrollController,
+                  observerController: observerController,
+                  messages: messages,
+                  byGroup: const {},
+                  versionSelections: const {},
+                  reasoning: const {},
+                  reasoningSegments: const {},
+                  contentSplits: const {},
+                  toolParts: const {},
+                  translations: const {},
+                  selecting: false,
+                  selectedItems: const {},
+                  dividerPadding: EdgeInsets.zero,
+                  isProcessingFiles: isProcessingFiles,
+                  bottomContentPadding: 16,
+                  timelineCoordinator: coordinator,
+                  streamingContentNotifier: streamingNotifier,
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
+      );
 
-    double bottomPadding() {
-      final listView = tester.widget<ListView>(find.byType(ListView));
-      return (listView.padding as EdgeInsets).bottom;
-    }
+      double bottomPadding() {
+        final listView = tester.widget<ListView>(find.byType(ListView));
+        return (listView.padding as EdgeInsets).bottom;
+      }
 
-    final maximumReservedBottom =
-        16 + tester.getSize(find.byType(ListView)).height * 0.75;
-    expect(bottomPadding(), maximumReservedBottom);
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+      coordinator.programmaticJump('new-user-slot');
+      coordinator.noteContentChanged(isGenerating: true);
+      await tester.pump();
 
-    await tester.pump();
-    expect(coordinator.programmaticTargetSlotId, isNull);
-    final shortReplyPadding = bottomPadding();
-    expect(shortReplyPadding, lessThan(maximumReservedBottom));
-    expect(shortReplyPadding, greaterThan(16));
-    final userTop = tester.getTopLeft(find.text('new question')).dy;
-    expect(
-      userTop,
-      lessThan(tester.getSize(find.byType(ListView)).height * 0.35),
-    );
+      final maximumReservedBottom =
+          16 + tester.getSize(find.byType(ListView)).height;
+      expect(bottomPadding(), maximumReservedBottom);
+      expect(coordinator.programmaticTargetSlotId, 'new-user-slot');
 
-    streamingNotifier.updateContent(
-      'streaming-assistant-slot',
-      List.generate(80, (index) => 'reply line $index').join('\n\n'),
-      0,
-    );
-    await tester.pump();
-    expect(bottomPadding(), shortReplyPadding);
-    await tester.pump();
-    expect(bottomPadding(), shortReplyPadding);
-    expect(
-      tester.getTopLeft(find.text('new question')).dy,
-      closeTo(userTop, 1),
-    );
+      await tester.pump();
+      expect(coordinator.programmaticTargetSlotId, 'new-user-slot');
+      await tester.pump();
+      expect(coordinator.programmaticTargetSlotId, isNull);
+      final shortReplyPadding = bottomPadding();
+      expect(shortReplyPadding, lessThan(maximumReservedBottom));
+      if (scenario.label == '短 user') {
+        expect(shortReplyPadding, greaterThan(16));
+      } else {
+        expect(shortReplyPadding, 16);
+      }
+      await tester.pump();
+      final userFinder = find.byKey(const ValueKey('new-user-slot'));
+      final listTop = tester.getTopLeft(find.byType(ListView)).dy;
+      final userTop = tester.getTopLeft(userFinder).dy;
+      expect(
+        userTop,
+        closeTo(listTop, 1),
+        reason:
+            'padding=${bottomPadding()} offset=${scrollController.offset} max=${scrollController.position.maxScrollExtent} '
+            'userBottom=${tester.getBottomRight(userFinder).dy}',
+      );
+      final anchoredOffset = scrollController.offset;
+      for (var frame = 0; frame < 3; frame++) {
+        await tester.pump();
+        expect(scrollController.offset, closeTo(anchoredOffset, 1));
+        expect(tester.getTopLeft(userFinder).dy, closeTo(userTop, 1));
+      }
 
-    coordinator.noteContentChanged(isGenerating: false);
-    await tester.pump();
-    expect(bottomPadding(), lessThanOrEqualTo(shortReplyPadding));
-    expect(
-      tester.getTopLeft(find.text('new question')).dy,
-      closeTo(userTop, 1),
-    );
+      streamingNotifier.updateContent(
+        'streaming-assistant-slot',
+        List.generate(80, (index) => 'reply line $index').join('\n\n'),
+        0,
+      );
+      await tester.pump();
+      expect(bottomPadding(), shortReplyPadding);
+      await tester.pump();
+      expect(bottomPadding(), shortReplyPadding);
+      expect(tester.getTopLeft(userFinder).dy, closeTo(userTop, 1));
 
-    coordinator.followTail();
-    await tester.pump();
-    scrollController.jumpTo(scrollController.position.maxScrollExtent / 2);
-    await tester.pump();
-    final listContext = tester.element(find.byType(ListView));
-    UserScrollNotification(
-      metrics: scrollController.position,
-      context: listContext,
-      direction: ScrollDirection.reverse,
-    ).dispatch(listContext);
-    await tester.pump();
-    expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
+      coordinator.noteContentChanged(isGenerating: false);
+      await tester.pump();
+      expect(bottomPadding(), lessThanOrEqualTo(shortReplyPadding));
+      expect(tester.getTopLeft(userFinder).dy, closeTo(userTop, 1));
 
-    expect(bottomPadding(), 16);
+      coordinator.followTail();
+      await tester.pump();
+      scrollController.jumpTo(scrollController.position.maxScrollExtent / 2);
+      await tester.pump();
+      final listContext = tester.element(find.byType(ListView));
+      UserScrollNotification(
+        metrics: scrollController.position,
+        context: listContext,
+        direction: ScrollDirection.reverse,
+      ).dispatch(listContext);
+      await tester.pump();
+      expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    coordinator.dispose();
-    scrollController.dispose();
-    isProcessingFiles.dispose();
-    streamingNotifier.dispose();
-  });
+      expect(bottomPadding(), 16);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      coordinator.dispose();
+      scrollController.dispose();
+      isProcessingFiles.dispose();
+      streamingNotifier.dispose();
+    });
+  }
 
   testWidgets('流式思考更新缺少起始时间时保留已有计时起点', (tester) async {
     final scrollController = ScrollController();

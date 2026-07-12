@@ -225,7 +225,6 @@ class MessageListView extends StatefulWidget {
 class _MessageListViewState extends State<MessageListView>
     with WidgetsBindingObserver {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
-  static const double _programmaticTailViewportFraction = 0.75;
 
   bool _historyLoadScheduled = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
@@ -236,6 +235,9 @@ class _MessageListViewState extends State<MessageListView>
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
+  String? _preparedProgrammaticTargetSlotId;
+  String? _preparedProgrammaticConversationId;
+  bool _programmaticSpacerReadyForJump = false;
   String? _programmaticAnchorSlotId;
   String? _programmaticAnchorConversationId;
   double _programmaticSpacer = 0;
@@ -264,9 +266,18 @@ class _MessageListViewState extends State<MessageListView>
     _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
     final coordinator = widget.timelineCoordinator;
     final isGenerating = coordinator?.isGenerating == true;
+    final hasPendingTarget = coordinator?.programmaticTargetSlotId != null;
     final conversationChanged =
         _programmaticAnchorConversationId != null &&
         _programmaticAnchorConversationId != coordinator?.conversationId;
+    final preparedConversationChanged =
+        _preparedProgrammaticConversationId != null &&
+        _preparedProgrammaticConversationId != coordinator?.conversationId;
+    if (preparedConversationChanged) {
+      _preparedProgrammaticTargetSlotId = null;
+      _preparedProgrammaticConversationId = null;
+      _programmaticSpacerReadyForJump = false;
+    }
     if (conversationChanged) {
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
@@ -281,11 +292,16 @@ class _MessageListViewState extends State<MessageListView>
       }
     }
     if (coordinator?.viewportMode == TimelineViewportMode.followingTail) {
+      _preparedProgrammaticTargetSlotId = null;
+      _preparedProgrammaticConversationId = null;
+      _programmaticSpacerReadyForJump = false;
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
       _programmaticSpacer = 0;
       _retainTerminalAnchorSpacer = false;
-    } else if (!isGenerating && !_retainTerminalAnchorSpacer) {
+    } else if (!isGenerating &&
+        !hasPendingTarget &&
+        !_retainTerminalAnchorSpacer) {
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
       _programmaticSpacer = 0;
@@ -404,6 +420,12 @@ class _MessageListViewState extends State<MessageListView>
             final timelineCoordinator = widget.timelineCoordinator;
             final targetPending =
                 timelineCoordinator?.programmaticTargetSlotId != null;
+            final preparedTarget =
+                targetPending &&
+                _preparedProgrammaticTargetSlotId ==
+                    timelineCoordinator?.programmaticTargetSlotId &&
+                _preparedProgrammaticConversationId ==
+                    timelineCoordinator?.conversationId;
             final activeGenerationAnchor =
                 (timelineCoordinator?.isGenerating == true ||
                     _retainTerminalAnchorSpacer) &&
@@ -413,7 +435,9 @@ class _MessageListViewState extends State<MessageListView>
                 timelineCoordinator?.viewportMode !=
                     TimelineViewportMode.followingTail;
             final programmaticSpacer = targetPending
-                ? constraints.maxHeight * _programmaticTailViewportFraction
+                ? preparedTarget
+                      ? _programmaticSpacer
+                      : constraints.maxHeight
                 : activeGenerationAnchor
                 ? _programmaticSpacer
                 : 0.0;
@@ -604,20 +628,34 @@ class _MessageListViewState extends State<MessageListView>
       final target = _slotKeys[targetId]?.currentContext?.findRenderObject();
       final viewport = context.findRenderObject();
       if (target is! RenderBox || viewport is! RenderBox) return;
-      final delta =
-          target.localToGlobal(Offset.zero).dy -
-          viewport.localToGlobal(Offset.zero).dy;
+      final conversationId = coordinator?.conversationId;
+      final spacerPrepared =
+          _preparedProgrammaticTargetSlotId == targetId &&
+          _preparedProgrammaticConversationId == conversationId;
+      if (!spacerPrepared) {
+        setState(() {
+          _programmaticSpacer = _calculateProgrammaticSpacer(
+            targetId,
+            viewport,
+          );
+          _preparedProgrammaticTargetSlotId = targetId;
+          _preparedProgrammaticConversationId = conversationId;
+          _programmaticSpacerReadyForJump = false;
+        });
+        return;
+      }
+      if (!_programmaticSpacerReadyForJump) {
+        setState(() => _programmaticSpacerReadyForJump = true);
+        return;
+      }
       final position = widget.scrollController.position;
-      widget.scrollController.jumpTo(
-        (widget.scrollController.offset + delta).clamp(
-          position.minScrollExtent,
-          position.maxScrollExtent,
-        ),
-      );
+      position.ensureVisible(target, alignment: 0, duration: Duration.zero);
       setState(() {
         _programmaticAnchorSlotId = targetId;
-        _programmaticAnchorConversationId = coordinator?.conversationId;
-        _programmaticSpacer = _calculateProgrammaticSpacer(targetId, viewport);
+        _programmaticAnchorConversationId = conversationId;
+        _preparedProgrammaticTargetSlotId = null;
+        _preparedProgrammaticConversationId = null;
+        _programmaticSpacerReadyForJump = false;
       });
       coordinator!.completeProgrammaticJump();
       _captureVisualAnchor();
@@ -632,7 +670,7 @@ class _MessageListViewState extends State<MessageListView>
     final tail = lastSlotId == null
         ? null
         : _slotKeys[lastSlotId]?.currentContext?.findRenderObject();
-    final maximum = viewport.size.height * _programmaticTailViewportFraction;
+    final maximum = viewport.size.height;
     if (anchor is! RenderBox ||
         !anchor.attached ||
         tail is! RenderBox ||
