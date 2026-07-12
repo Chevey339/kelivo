@@ -140,6 +140,40 @@ void main() {
     },
   );
 
+  test('editing a middle user version preserves the active future', () async {
+    final base = conversation();
+    for (final item in [
+      message(id: 'u1', role: 'user'),
+      message(id: 'a1'),
+      message(id: 'u2', role: 'user'),
+      message(id: 'a2'),
+    ]) {
+      await repository.appendGraphMessageToConversation(
+        conversation: base,
+        message: item,
+      );
+    }
+
+    final result = await repository.appendMessageVersion(
+      messageId: 'u2',
+      content: 'u2 edited',
+    );
+    final timeline = await repository.projectMessageGraphTimeline(
+      conversationId: base.id,
+    );
+
+    expect(timeline!.activeRevisions.map((revision) => revision.revisionId), [
+      'u1',
+      'a1',
+      result!.message.id,
+      'a2',
+    ]);
+    expect(await repository.getMessage('u2'), isNotNull);
+    final persisted = await repository.getMessage(result.message.id);
+    expect(persisted?.id, result.message.id);
+    expect(persisted?.content, 'u2 edited');
+  });
+
   test(
     'concurrent selection and append commands preserve unrelated state',
     () async {

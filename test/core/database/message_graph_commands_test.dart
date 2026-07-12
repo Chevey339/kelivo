@@ -180,7 +180,7 @@ void main() {
   )..where((row) => row.revisionId.equals(revisionId))).getSingle()).payload;
 
   test(
-    'edit user creates a complete branch and preserves the old future',
+    'edit user grafts the active child and preserves every later slot',
     () async {
       await insertFixture();
 
@@ -195,15 +195,26 @@ void main() {
         'u1',
         'a1-v1',
         result.revisionId,
+        'a2',
       ]);
       expect(await textOf(result.revisionId), 'U2 edited');
+      expect(result.branchId, 'branch-main');
       expect(result.projection.stateRevision, 1);
       expect(result.projection.contextStartRevisionId, 'u1');
-      final old = await repository.projectMessageGraphBranch(
-        conversationId: 'conversation-1',
-        branchId: 'branch-main',
+      final activeChild = await (database.select(
+        database.messageRevisionRows,
+      )..where((row) => row.id.equals('a2'))).getSingle();
+      expect(activeChild.parentRevisionId, result.revisionId);
+      expect(
+        await database.select(database.conversationBranchRows).get(),
+        hasLength(2),
       );
-      expect(revisionIds(old.revisions), ['u1', 'a1-v1', 'u2', 'a2']);
+      expect(
+        (await database.select(database.messageRevisionRows).get()).map(
+          (row) => row.id,
+        ),
+        contains('u2'),
+      );
     },
   );
 

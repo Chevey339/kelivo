@@ -974,7 +974,7 @@ class ChatDatabaseRepository {
     int? expectedStateRevision,
   }) => _observer.measure(
     ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).createRevisionBranch(
+    () => MessageGraphCommands(_db).graftRevision(
       conversationId: conversationId,
       targetRevisionId: targetRevisionId,
       text: text,
@@ -2658,18 +2658,29 @@ class ChatDatabaseRepository {
       final mutation = original.role == 'user'
           ? MessageGraphRevisionMutation.editUser
           : MessageGraphRevisionMutation.regenerateAssistant;
-      await MessageGraphCommands(_db).createRevisionBranch(
-        conversationId: conversation.id,
-        targetRevisionId: original.id,
-        text: content,
-        mutation: mutation,
-        revisionId: message.id,
-        branchId: _deterministicMergeId(
-          'graph_branch',
-          conversation.id,
-          message.id,
-        ),
-      );
+      final commands = MessageGraphCommands(_db);
+      if (mutation == MessageGraphRevisionMutation.editUser) {
+        await commands.graftRevision(
+          conversationId: conversation.id,
+          targetRevisionId: original.id,
+          text: content,
+          mutation: mutation,
+          revisionId: message.id,
+        );
+      } else {
+        await commands.createRevisionBranch(
+          conversationId: conversation.id,
+          targetRevisionId: original.id,
+          text: content,
+          mutation: mutation,
+          revisionId: message.id,
+          branchId: _deterministicMergeId(
+            'graph_branch',
+            conversation.id,
+            message.id,
+          ),
+        );
+      }
       final order = await _nextMessageOrder(conversation.id);
       await _db
           .into(_db.messageRows)

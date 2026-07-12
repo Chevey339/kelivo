@@ -160,6 +160,142 @@ final class MessageGraphCommands {
     });
   }
 
+  Future<MessageGraphMutationResult> graftRevision({
+    required String conversationId,
+    required String targetRevisionId,
+    required String text,
+    required MessageGraphRevisionMutation mutation,
+    int? expectedStateRevision,
+    String? revisionId,
+  }) {
+    return _db.transaction(() async {
+      final projector = MessageGraphProjector(_db);
+      final current = await projector.projectActivePath(
+        conversationId: conversationId,
+      );
+      if (current == null || current.branchId == null) {
+        throw StateError('message_graph_active_branch_missing');
+      }
+      _requireExpectedState(current, expectedStateRevision);
+      final targetIndex = current.revisions.indexWhere(
+        (revision) => revision.id == targetRevisionId,
+      );
+      if (targetIndex < 0) {
+        throw ArgumentError.value(
+          targetRevisionId,
+          'targetRevisionId',
+          'must identify a revision on the active path',
+        );
+      }
+      final target = current.revisions[targetIndex];
+      final expectedRole = mutation == MessageGraphRevisionMutation.editUser
+          ? 'user'
+          : 'assistant';
+      if (target.role != expectedRole) {
+        throw StateError('message_graph_mutation_role');
+      }
+
+      final maxRevision = _db.messageRevisionRows.revisionNo.max();
+      final maxRow =
+          await (_db.selectOnly(_db.messageRevisionRows)
+                ..addColumns([maxRevision])
+                ..where(
+                  _db.messageRevisionRows.conversationId.equals(
+                        conversationId,
+                      ) &
+                      _db.messageRevisionRows.slotId.equals(target.slotId),
+                ))
+              .getSingle();
+      final timestamp = _now();
+      final createdRevisionId = revisionId ?? _createId();
+      await _db
+          .into(_db.messageRevisionRows)
+          .insert(
+            MessageRevisionRowsCompanion.insert(
+              id: createdRevisionId,
+              conversationId: conversationId,
+              slotId: target.slotId,
+              parentRevisionId: Value(target.parentRevisionId),
+              revisionNo: (maxRow.read(maxRevision) ?? -1) + 1,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              finalizedAt: mutation == MessageGraphRevisionMutation.editUser
+                  ? Value(timestamp)
+                  : const Value.absent(),
+            ),
+          );
+      await _insertTextPart(
+        conversationId: conversationId,
+        revisionId: createdRevisionId,
+        text: text,
+        timestamp: timestamp,
+      );
+
+      if (targetIndex + 1 < current.revisions.length) {
+        final child = current.revisions[targetIndex + 1];
+        final updatedChild =
+            await (_db.update(_db.messageRevisionRows)..where(
+                  (row) =>
+                      row.conversationId.equals(conversationId) &
+                      row.id.equals(child.id) &
+                      row.parentRevisionId.equals(target.id),
+                ))
+                .write(
+                  MessageRevisionRowsCompanion(
+                    parentRevisionId: Value(createdRevisionId),
+                    updatedAt: Value(timestamp),
+                  ),
+                );
+        if (updatedChild != 1) {
+          throw StateError('message_graph_graft_child_conflict');
+        }
+      } else {
+        final updatedBranch =
+            await (_db.update(_db.conversationBranchRows)..where(
+                  (row) =>
+                      row.conversationId.equals(conversationId) &
+                      row.id.equals(current.branchId!) &
+                      row.leafRevisionId.equals(target.id) &
+                      row.deletedAt.isNull(),
+                ))
+                .write(
+                  ConversationBranchRowsCompanion(
+                    leafRevisionId: Value(createdRevisionId),
+                  ),
+                );
+        if (updatedBranch != 1) {
+          throw StateError('message_graph_graft_leaf_conflict');
+        }
+      }
+
+      final boundary = current.contextStartRevisionId == target.id
+          ? createdRevisionId
+          : current.contextStartRevisionId;
+      final updatedState =
+          await (_db.update(_db.conversationStateRows)..where(
+                (row) =>
+                    row.conversationId.equals(conversationId) &
+                    row.activeBranchId.equals(current.branchId!) &
+                    row.stateRevision.equals(current.stateRevision),
+              ))
+              .write(
+                ConversationStateRowsCompanion(
+                  contextStartRevisionId: Value(boundary),
+                  stateRevision: Value(current.stateRevision + 1),
+                ),
+              );
+      if (updatedState != 1) throw StateError('message_graph_state_conflict');
+      final projection = await projector.projectActivePath(
+        conversationId: conversationId,
+      );
+      return MessageGraphMutationResult(
+        revisionId: createdRevisionId,
+        branchId: current.branchId!,
+        projection: projection!,
+      );
+    });
+  }
+
   Future<ActiveMessageGraphProjection> selectRevision({
     required String conversationId,
     required String revisionId,
