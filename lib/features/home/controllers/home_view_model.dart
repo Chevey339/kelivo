@@ -641,7 +641,7 @@ class HomeViewModel extends ChangeNotifier {
     );
     if (plan.isEmpty) return;
 
-    await _chatService.deleteMessages(
+    final deletedMessageIds = await _chatService.deleteMessages(
       conversationId: conversation.id,
       messageIds: plan.deletedMessageIds,
       versionSelectionChanges: {
@@ -650,7 +650,7 @@ class HomeViewModel extends ChangeNotifier {
         ...plan.nextVersionSelections,
       },
     );
-    for (final id in plan.deletedMessageIds) {
+    for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
     _chatController.loadVersionSelections();
@@ -658,7 +658,9 @@ class HomeViewModel extends ChangeNotifier {
       _chatService.getConversation(conversation.id),
     );
 
-    await _chatController.reloadMessages();
+    await _chatController.refreshTimelineAfterMutation(
+      removedRevisionIds: deletedMessageIds,
+    );
     notifyListeners();
   }
 
@@ -679,8 +681,9 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     final conversation = currentConversation;
+    var removedRevisionIds = deletedMessageIds;
     if (conversation != null) {
-      await _chatService.deleteMessages(
+      removedRevisionIds = await _chatService.deleteMessages(
         conversationId: conversation.id,
         messageIds: deletedMessageIds,
         versionSelectionChanges: {gid: newSel},
@@ -689,13 +692,14 @@ class HomeViewModel extends ChangeNotifier {
         _chatService.getConversation(conversation.id),
       );
     }
-    for (final id in deletedMessageIds) {
+    for (final id in removedRevisionIds) {
       _streamController.clearMessageState(id);
     }
     _chatController.loadVersionSelections();
 
-    // Reload messages
-    await _chatController.reloadMessages();
+    await _chatController.refreshTimelineAfterMutation(
+      removedRevisionIds: removedRevisionIds,
+    );
     notifyListeners();
   }
 
@@ -750,7 +754,7 @@ class HomeViewModel extends ChangeNotifier {
       assistantId: assistantId,
     );
 
-    _chatController.setCurrentConversation(conversation);
+    _chatController.setDraftConversation(conversation);
     _streamController.clearAllState();
     notifyListeners();
 
@@ -762,12 +766,12 @@ class HomeViewModel extends ChangeNotifier {
           final role = (pm['role'] == 'assistant') ? 'assistant' : 'user';
           final content = (pm['content'] ?? '').trim();
           if (content.isEmpty) continue;
-          await _chatService.addMessage(
+          final presetMessage = await _chatService.addMessage(
             conversationId: currentConversation!.id,
             role: role,
             content: content,
           );
-          await _chatController.reloadMessages();
+          await _chatController.appendPersistedTailMessage(presetMessage);
           notifyListeners();
         }
       }
@@ -797,7 +801,7 @@ class HomeViewModel extends ChangeNotifier {
       temporary: true,
     );
 
-    _chatController.setCurrentConversation(conversation);
+    _chatController.setDraftConversation(conversation);
     _streamController.clearAllState();
     notifyListeners();
     onScrollToBottom?.call();
@@ -928,12 +932,6 @@ class HomeViewModel extends ChangeNotifier {
   /// Update current conversation reference.
   void updateCurrentConversation(Conversation? conversation) {
     _chatController.updateCurrentConversation(conversation);
-    notifyListeners();
-  }
-
-  /// Reload messages from storage.
-  Future<void> reloadMessages() async {
-    await _chatController.reloadMessages();
     notifyListeners();
   }
 

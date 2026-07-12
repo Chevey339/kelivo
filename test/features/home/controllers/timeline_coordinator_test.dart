@@ -331,7 +331,8 @@ void main() {
     expect(coordinator.showJumpToLatest, isTrue);
   });
 
-  test('loaded streaming slot keeps generation layout state active', () {
+  test('loaded streaming slot keeps generation layout state active', () async {
+    var isStreaming = true;
     final coordinator = TimelineCoordinator(
       loadPage:
           ({
@@ -340,23 +341,25 @@ void main() {
             afterRevisionId,
             fromStart,
             required limit,
-          }) async => null,
+          }) async => LoadedTimelinePage(
+            conversationId: conversationId,
+            stateRevision: isStreaming ? 1 : 2,
+            contextStartRevisionId: null,
+            slots: [
+              slot(0),
+              slot(1, isStreaming: isStreaming),
+            ],
+            hasMoreBefore: false,
+            hasMoreAfter: false,
+            totalSlotCount: 2,
+          ),
     );
 
-    coordinator.seed(
-      LoadedTimelinePage(
-        conversationId: 'conversation',
-        stateRevision: 0,
-        contextStartRevisionId: null,
-        slots: [slot(0), slot(1, isStreaming: true)],
-        hasMoreBefore: false,
-        hasMoreAfter: false,
-        totalSlotCount: 2,
-      ),
-    );
+    await coordinator.open('conversation');
     expect(coordinator.isGenerating, isTrue);
 
-    coordinator.seed(page([0, 1], before: false, after: false));
+    isStreaming = false;
+    await coordinator.open('conversation');
     expect(coordinator.isGenerating, isFalse);
   });
 

@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
-import '../../../core/database/message_graph_projector.dart';
 import 'timeline_coordinator.dart';
 import 'message_render_model.dart';
 
@@ -148,19 +147,17 @@ class ChatController extends ChangeNotifier {
   // Conversation Management
   // ============================================================================
 
-  /// Set the current conversation and load its messages.
-  void setCurrentConversation(Conversation? conversation) {
-    _currentConversation = conversation;
-    if (conversation != null) {
-      _loadVersionSelections();
-      _loadCachedInitialMessageWindow(conversation.id);
-    } else {
-      timelineCoordinator.clear();
-      _messages = [];
-      _loadedStartIndex = 0;
-      _totalMessageCount = 0;
-      _versionSelections = <String, int>{};
+  /// Sets a newly created empty draft without opening a persisted window.
+  void setDraftConversation(Conversation conversation) {
+    if (_chatService.getMessageCount(conversation.id) != 0) {
+      throw StateError('persisted_conversation_requires_async_open');
     }
+    _currentConversation = conversation;
+    timelineCoordinator.clear();
+    _messages = [];
+    _loadedStartIndex = 0;
+    _totalMessageCount = 0;
+    _versionSelections = <String, int>{};
     notifyListeners();
   }
 
@@ -267,15 +264,6 @@ class ChatController extends ChangeNotifier {
     await _preloadVisibleGroupData();
   }
 
-  void _loadCachedInitialMessageWindow(String conversationId) {
-    _totalMessageCount = _chatService.getMessageCount(conversationId);
-    _messages = List.of(_chatService.getRecentMessages(conversationId));
-    _loadedStartIndex = (_totalMessageCount - _messages.length)
-        .clamp(0, _totalMessageCount)
-        .toInt();
-    _seedTimelineFromMessages();
-  }
-
   void refreshLoadedMessageCount() {
     final conversation = _currentConversation;
     if (conversation == null) {
@@ -366,6 +354,19 @@ class ChatController extends ChangeNotifier {
     return _messages.any((message) => message.id == messageId);
   }
 
+  Future<bool> refreshTimelineAfterMutation({
+    Set<String> removedRevisionIds = const <String>{},
+  }) async {
+    if (_currentConversation == null) return false;
+    final refreshed = await timelineCoordinator.refreshAfterMutation(
+      removedRevisionIds: removedRevisionIds,
+    );
+    if (!refreshed) return false;
+    await _preloadVisibleGroupData();
+    invalidateCache();
+    return true;
+  }
+
   int loadedWindowTruncateIndex() {
     final conversationId = _currentConversation?.id;
     final raw = conversationId == null
@@ -433,53 +434,6 @@ class ChatController extends ChangeNotifier {
     );
   }
 
-  void _seedTimelineFromMessages() {
-    final conversation = _currentConversation;
-    if (conversation == null) return;
-    final timelineMessages = collapseVersions(_messages);
-    final timestamp = DateTime.fromMicrosecondsSinceEpoch(0);
-    final counts = <String, int>{};
-    for (final message in _messages) {
-      counts.update(
-        message.groupId ?? message.id,
-        (value) => value + 1,
-        ifAbsent: () => 1,
-      );
-    }
-    timelineCoordinator.seed(
-      LoadedTimelinePage(
-        conversationId: conversation.id,
-        stateRevision: 0,
-        contextStartRevisionId: _chatService.getContextStartRevisionId(
-          conversation.id,
-        ),
-        slots: [
-          for (final (offset, message) in timelineMessages.indexed)
-            LoadedTimelineSlot(
-              identity: ActiveTimelineSlot(
-                slotId: message.groupId ?? message.id,
-                revisionId: message.id,
-                parentRevisionId: offset == 0
-                    ? null
-                    : timelineMessages[offset - 1].id,
-                role: message.role,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-                finalizedAt: message.isStreaming ? null : timestamp,
-                versionCount: counts[message.groupId ?? message.id] ?? 1,
-                logicalIndex: _loadedStartIndex + offset,
-              ),
-              message: message,
-            ),
-        ],
-        hasMoreBefore: _loadedStartIndex > 0,
-        hasMoreAfter:
-            _loadedStartIndex + timelineMessages.length < _totalMessageCount,
-        totalSlotCount: _totalMessageCount,
-      ),
-    );
-  }
-
   Future<void> _preloadVisibleGroupData() async {
     final conversation = _currentConversation;
     if (conversation == null || _messages.isEmpty) return;
@@ -501,7 +455,6 @@ class ChatController extends ChangeNotifier {
   // Message Management
   // ============================================================================
 
-  /// Add a message to the current conversation.
   Future<ChatMessage> addMessage({
     required String role,
     required String content,
@@ -511,21 +464,15 @@ class ChatController extends ChangeNotifier {
     String? groupId,
     int? version,
   }) async {
-    if (_currentConversation == null) {
-      throw StateError('No current conversation');
-    }
-    if (_chatService.getConversation(_currentConversation!.id) == null) {
+    final conversation = _currentConversation;
+    if (conversation == null ||
+        _chatService.getConversation(conversation.id) == null) {
       _clearCurrentConversationState();
       notifyListeners();
       throw StateError('No current conversation');
     }
-
-    if (hasMoreAfter) {
-      await loadEndWindow();
-    }
-
     final message = await _chatService.addMessage(
-      conversationId: _currentConversation!.id,
+      conversationId: conversation.id,
       role: role,
       content: content,
       modelId: modelId,
@@ -534,15 +481,7 @@ class ChatController extends ChangeNotifier {
       groupId: groupId,
       version: version,
     );
-
-    _messages.add(message);
-    _totalMessageCount += 1;
-    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
-    if (overflow > 0) {
-      _messages = _messages.sublist(overflow);
-      _loadedStartIndex += overflow;
-    }
-    notifyListeners();
+    await appendPersistedTailMessage(message);
     return message;
   }
 
@@ -568,37 +507,16 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
-    if (!_chatService.isTemporaryConversation(conversation.id)) {
-      await timelineCoordinator.open(
-        conversation.id,
-        limit: ChatService.defaultLoadedWindowMax,
-      );
-      final user = messages.firstWhere(
-        (message) => message.role == 'user',
-        orElse: () => messages.first,
-      );
-      timelineCoordinator.programmaticJump(user.groupId ?? user.id);
-      return true;
-    }
-
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-
-    for (final message in messages) {
-      final existingIndex = _messages.indexWhere((m) => m.id == message.id);
-      if (existingIndex >= 0) {
-        _messages[existingIndex] = message;
-      } else {
-        _messages.add(message);
-      }
-    }
-
-    final overflow = _messages.length - ChatService.defaultLoadedWindowMax;
-    if (overflow > 0) {
-      _messages = _messages.sublist(overflow);
-      _loadedStartIndex += overflow;
-    }
-    notifyListeners();
-    return false;
+    await timelineCoordinator.open(
+      conversation.id,
+      limit: ChatService.defaultLoadedWindowMax,
+    );
+    final user = messages.firstWhere(
+      (message) => message.role == 'user',
+      orElse: () => messages.first,
+    );
+    timelineCoordinator.programmaticJump(user.groupId ?? user.id);
+    return true;
   }
 
   /// Update a message in the list.
@@ -614,15 +532,14 @@ class ChatController extends ChangeNotifier {
   /// Mirrors an in-memory message snapshot into the timeline window without
   /// publishing a full-window change. Streaming UI has its own narrow notifier.
   bool replaceMessageSnapshot(ChatMessage updatedMessage) {
-    final messageId = updatedMessage.id;
-    final index = _messages.indexWhere(
-      (message) =>
-          message.id == messageId &&
-          message.conversationId == updatedMessage.conversationId,
-    );
-    if (index == -1) return false;
-    _messages[index] = updatedMessage;
-    timelineCoordinator.replaceMessage(updatedMessage, notify: false);
+    if (_currentConversation?.id != updatedMessage.conversationId ||
+        timelineCoordinator.conversationId != updatedMessage.conversationId ||
+        !timelineCoordinator.replaceMessage(updatedMessage, notify: false)) {
+      return false;
+    }
+    _messages = timelineCoordinator.slots
+        .map((slot) => slot.message)
+        .toList(growable: true);
     invalidateCache();
     return true;
   }
@@ -673,72 +590,20 @@ class ChatController extends ChangeNotifier {
       isStreaming: isStreaming,
     );
 
-    // Update in local list
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
+      final updatedMessage = _messages[index].copyWith(
         content: content ?? _messages[index].content,
         totalTokens: totalTokens ?? _messages[index].totalTokens,
         isStreaming: isStreaming ?? _messages[index].isStreaming,
       );
-      timelineCoordinator.replaceMessage(_messages[index]);
+      replaceMessageSnapshot(updatedMessage);
       publishGenerationState(
-        _messages[index].conversationId,
-        isGenerating: _messages[index].isStreaming,
+        updatedMessage.conversationId,
+        isGenerating: updatedMessage.isStreaming,
       );
       notifyListeners();
     }
-  }
-
-  /// Remove messages after a given index.
-  void removeMessagesAfter(int index) {
-    if (index < _messages.length - 1) {
-      _messages = _messages.sublist(0, index + 1);
-      _totalMessageCount = _loadedStartIndex + _messages.length;
-      notifyListeners();
-    }
-  }
-
-  /// Remove specific message IDs from the list.
-  void removeMessageIds(List<String> ids) {
-    _messages.removeWhere((m) => ids.contains(m.id));
-    _totalMessageCount = (_totalMessageCount - ids.length)
-        .clamp(0, 1 << 31)
-        .toInt();
-    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
-    notifyListeners();
-  }
-
-  /// Reload messages from storage.
-  Future<void> reloadMessages() async {
-    if (_currentConversation == null) return;
-    final conversationId = _currentConversation!.id;
-    _totalMessageCount = _chatService.getMessageCount(conversationId);
-    if (_totalMessageCount == 0) {
-      _messages = [];
-      _loadedStartIndex = 0;
-      notifyListeners();
-      return;
-    }
-
-    final visibleCount = _messages.isEmpty
-        ? ChatService.defaultInitialMessageMin
-        : _messages.length.clamp(1, ChatService.defaultLoadedWindowMax).toInt();
-    final start = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
-    final maxStart = (_totalMessageCount - visibleCount)
-        .clamp(0, _totalMessageCount)
-        .toInt();
-    final safeStart = start > maxStart ? maxStart : start;
-    _messages = List.of(
-      await _chatService.loadMessagesRange(
-        conversationId,
-        start: safeStart,
-        limit: visibleCount,
-      ),
-    );
-    _loadedStartIndex = safeStart;
-    await _preloadVisibleGroupData();
-    notifyListeners();
   }
 
   // ============================================================================

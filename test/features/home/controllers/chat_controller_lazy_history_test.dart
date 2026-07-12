@@ -5,6 +5,7 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/database/message_graph_projector.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
+import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 
 class _FakeLazyChatService extends ChatService {
   _FakeLazyChatService(this._messages);
@@ -19,6 +20,10 @@ class _FakeLazyChatService extends ChatService {
   int activeTimelineLoadCalls = 0;
   int messageIndexCalls = 0;
   int contextStartIndex = -1;
+  bool temporary = false;
+
+  @override
+  bool isTemporaryConversation(String? id) => temporary;
 
   @override
   int getContextStartIndex(String conversationId) => contextStartIndex;
@@ -118,9 +123,9 @@ class _FakeLazyChatService extends ChatService {
       activeMessages.add(
         entry.value.firstWhere(
           (message) => selectedVersion == null
-              ? message.version == 0
+              ? identical(message, entry.value.last)
               : message.version == selectedVersion,
-          orElse: () => entry.value.first,
+          orElse: () => entry.value.last,
         ),
       );
     }
@@ -453,7 +458,7 @@ void main() {
 
     test('clears current conversation when the service deletes it', () async {
       chatService.knownConversationIds.add(conversation.id);
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
 
       chatService.deletedConversationIds.add(conversation.id);
       chatService.notifyListeners();
@@ -467,28 +472,31 @@ void main() {
       );
     });
 
-    test('opening a 5000-message conversation keeps only the tail window', () {
-      messages = List<ChatMessage>.generate(5000, _message);
-      conversation = Conversation(
-        id: 'conversation-1',
-        title: 'Very long chat',
-        messageIds: messages.map((message) => message.id).toList(),
-      );
-      chatService = _FakeLazyChatService(messages);
-      controller.dispose();
-      controller = ChatController(chatService: chatService);
+    test(
+      'opening a 5000-message conversation keeps only the tail window',
+      () async {
+        messages = List<ChatMessage>.generate(5000, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long chat',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
 
-      controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
-      expect(chatService.fullLoadCalls, 0);
-      expect(chatService.recentLoadCalls, 1);
-      expect(controller.messages.length, 20);
-      expect(controller.messages.first.id, 'message-4980');
-      expect(controller.messages.last.id, 'message-4999');
-      expect(controller.loadedStartIndex, 4980);
-      expect(controller.totalMessageCount, 5000);
-      expect(controller.hasMoreBefore, isTrue);
-    });
+        expect(chatService.fullLoadCalls, 0);
+        expect(chatService.recentLoadCalls, 0);
+        expect(controller.messages.length, 40);
+        expect(controller.messages.first.id, 'message-4960');
+        expect(controller.messages.last.id, 'message-4999');
+        expect(controller.loadedStartIndex, 4960);
+        expect(controller.totalMessageCount, 5000);
+        expect(controller.hasMoreBefore, isTrue);
+      },
+    );
 
     test(
       'collapsed tail window excludes a version whose group anchor is older',
@@ -511,16 +519,16 @@ void main() {
         controller.dispose();
         controller = ChatController(chatService: chatService);
 
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
-        expect(controller.messages.last.id, 'message-10-v1');
-        expect(controller.loadedStartIndex, 81);
-        expect(controller.messages.length, 20);
+        expect(controller.messages.last.id, 'message-99');
+        expect(controller.loadedStartIndex, 60);
+        expect(controller.messages.length, 40);
         expect(
           controller.collapsedMessages.map((message) => message.id),
           isNot(contains('message-10-v1')),
         );
-        expect(controller.collapsedMessages.first.id, 'message-81');
+        expect(controller.collapsedMessages.first.id, 'message-60');
         expect(controller.collapsedMessages.last.id, 'message-99');
       },
     );
@@ -608,7 +616,7 @@ void main() {
           );
         controller.dispose();
         controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
         await controller.loadStartWindow();
 
         final loaded = await controller.loadMoreAfter(
@@ -659,7 +667,7 @@ void main() {
           );
         controller.dispose();
         controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final loaded = await controller.loadEndWindow();
 
@@ -697,7 +705,7 @@ void main() {
         controller.dispose();
         controller = ChatController(chatService: chatService);
 
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final collapsedIds = controller.collapsedMessages
             .map((message) => message.id)
@@ -735,27 +743,26 @@ void main() {
         controller.dispose();
         controller = ChatController(chatService: chatService);
 
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
-        expect(controller.messages.first.id, 'final-v1');
-        expect(controller.loadedStartIndex, 101);
-        expect(controller.collapsedMessages.map((message) => message.id), [
-          'final-v0',
-        ]);
+        expect(controller.messages.first.id, 'message-61');
+        expect(controller.loadedStartIndex, 61);
+        expect(controller.collapsedMessages.last.id, 'final-v0');
+        expect(controller.collapsedMessages.length, 40);
       },
     );
 
     test(
       'loading older history prepends one page before the visible window',
       () async {
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final loaded = await controller.loadMoreBefore();
 
         expect(loaded, isTrue);
-        expect(chatService.rangeLoadCalls, 1);
-        expect(controller.messages, messages.sublist(60));
-        expect(controller.loadedStartIndex, 60);
+        expect(chatService.rangeLoadCalls, 2);
+        expect(controller.messages, messages.sublist(40));
+        expect(controller.loadedStartIndex, 40);
         expect(controller.hasMoreBefore, isTrue);
       },
     );
@@ -770,22 +777,22 @@ void main() {
       chatService = _FakeLazyChatService(messages);
       controller.dispose();
       controller = ChatController(chatService: chatService);
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
 
       for (var i = 0; i < 30; i++) {
         expect(await controller.loadMoreBefore(), isTrue);
       }
 
       expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
-      expect(controller.messages.first.id, 'message-4380');
-      expect(controller.messages.last.id, 'message-4739');
-      expect(controller.loadedStartIndex, 4380);
+      expect(controller.messages.first.id, 'message-4360');
+      expect(controller.messages.last.id, 'message-4719');
+      expect(controller.loadedStartIndex, 4360);
       expect(controller.hasMoreBefore, isTrue);
       expect(controller.hasMoreAfter, isTrue);
     });
 
     test('loading older history stops at the beginning', () async {
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
 
       await controller.loadMoreBefore(limit: 80);
       final loadedAgain = await controller.loadMoreBefore();
@@ -799,7 +806,7 @@ void main() {
     test(
       'loading until a message is visible supports direct navigation',
       () async {
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final visible = await controller.loadUntilMessageVisible('message-10');
 
@@ -821,12 +828,12 @@ void main() {
       chatService = _FakeLazyChatService(messages);
       controller.dispose();
       controller = ChatController(chatService: chatService);
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
 
       final visible = await controller.loadUntilMessageVisible('message-2500');
 
       expect(visible, isTrue);
-      expect(chatService.rangeLoadCalls, 1);
+      expect(chatService.rangeLoadCalls, 2);
       expect(controller.messages.length, 41);
       expect(controller.messages.first.id, 'message-2480');
       expect(controller.messages.last.id, 'message-2520');
@@ -849,7 +856,7 @@ void main() {
       chatService = _FakeLazyChatService(messages);
       controller.dispose();
       controller = ChatController(chatService: chatService);
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
       await controller.loadUntilMessageVisible('message-2500');
 
       final loaded = await controller.loadMoreAfter();
@@ -875,7 +882,7 @@ void main() {
         chatService = _FakeLazyChatService(messages);
         controller.dispose();
         controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
         await controller.loadUntilMessageVisible('message-2500');
 
         final appended = chatService.appendPersistedMessage(_message(5000));
@@ -902,7 +909,7 @@ void main() {
         chatService = _FakeLazyChatService(messages);
         controller.dispose();
         controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
         await controller.loadEndWindow();
 
         final appended = chatService.appendPersistedMessage(_message(5000));
@@ -918,7 +925,7 @@ void main() {
     );
 
     test('publishes an atomic send pair through the timeline tail', () async {
-      controller.setCurrentConversation(conversation);
+      await controller.setCurrentConversationAndLoad(conversation);
       final user = chatService.appendPersistedMessage(_message(100));
       final assistant = chatService.appendPersistedMessage(_message(101));
 
@@ -928,7 +935,7 @@ void main() {
       ]);
 
       expect(reloaded, isTrue);
-      expect(chatService.rangeLoadCalls, 1);
+      expect(chatService.rangeLoadCalls, 2);
       expect(controller.messages.map((message) => message.id), [
         ...messages.map((message) => message.id),
       ]);
@@ -947,7 +954,7 @@ void main() {
         chatService = _FakeLazyChatService(messages);
         controller.dispose();
         controller = ChatController(chatService: chatService);
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final miniMapMessages = await controller
             .loadAllCollapsedMessagesForCurrentConversation();
@@ -955,8 +962,8 @@ void main() {
         expect(miniMapMessages.length, 5000);
         expect(miniMapMessages.first.id, 'message-0');
         expect(miniMapMessages.last.id, 'message-4999');
-        expect(controller.messages.length, 20);
-        expect(controller.loadedStartIndex, 4980);
+        expect(controller.messages.length, 40);
+        expect(controller.loadedStartIndex, 4960);
         expect(chatService.fullLoadCalls, 0);
         expect(chatService.activeTimelineLoadCalls, 1);
       },
@@ -991,17 +998,93 @@ void main() {
       },
     );
 
-    test('maps persisted truncate index into the loaded tail window', () {
+    test(
+      'mutation refresh removes a deleted slot from every window view',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        controller.timelineCoordinator.captureVisualAnchor(
+          geometries: const [
+            TimelineSlotGeometry(slotId: 'message-80', top: 120, bottom: 180),
+          ],
+          viewportTop: 100,
+          viewportBottom: 600,
+        );
+        messages.removeWhere((message) => message.id == 'message-80');
+
+        expect(
+          await controller.refreshTimelineAfterMutation(
+            removedRevisionIds: const {'message-80'},
+          ),
+          isTrue,
+        );
+        controller.timelineCoordinator.userAnchored();
+        controller.timelineCoordinator.followTail();
+
+        expect(
+          controller.messages.any((message) => message.id == 'message-80'),
+          isFalse,
+        );
+        expect(
+          controller.timelineCoordinator.slots.any(
+            (slot) => slot.identity.revisionId == 'message-80',
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('temporary sends publish through coordinator slots', () async {
+      messages = <ChatMessage>[];
+      conversation = Conversation(
+        id: 'temporary-conversation',
+        title: 'Temporary',
+      );
+      chatService = _FakeLazyChatService(messages)..temporary = true;
+      controller.dispose();
+      controller = ChatController(chatService: chatService);
+      controller.setDraftConversation(conversation);
+      final user = chatService.appendPersistedMessage(
+        ChatMessage(
+          id: 'temporary-user',
+          role: 'user',
+          content: 'secret',
+          conversationId: conversation.id,
+        ),
+      );
+      final assistant = chatService.appendPersistedMessage(
+        ChatMessage(
+          id: 'temporary-assistant',
+          role: 'assistant',
+          content: '',
+          conversationId: conversation.id,
+          isStreaming: true,
+        ),
+      );
+
+      expect(
+        await controller.appendPersistedTailMessages([user, assistant]),
+        isTrue,
+      );
+
+      expect(controller.messages, [user, assistant]);
+      expect(controller.timelineCoordinator.slots.map((slot) => slot.message), [
+        user,
+        assistant,
+      ]);
+      expect(controller.timelineCoordinator.programmaticTargetSlotId, user.id);
+    });
+
+    test('maps persisted truncate index into the loaded tail window', () async {
       final truncatedConversation = conversation.copyWith(truncateIndex: 90);
       chatService.contextStartIndex = 90;
-      controller.setCurrentConversation(truncatedConversation);
+      await controller.setCurrentConversationAndLoad(truncatedConversation);
 
-      expect(controller.loadedWindowTruncateIndex(), 10);
+      expect(controller.loadedWindowTruncateIndex(), 30);
       expect(
         controller
             .conversationForLoadedWindow(truncatedConversation)
             .truncateIndex,
-        10,
+        30,
       );
     });
 
@@ -1010,7 +1093,7 @@ void main() {
       () async {
         final truncatedConversation = conversation.copyWith(truncateIndex: 30);
         chatService.contextStartIndex = 30;
-        controller.setCurrentConversation(truncatedConversation);
+        await controller.setCurrentConversationAndLoad(truncatedConversation);
 
         final contextMessages = await controller
             .allMessagesForCurrentConversationContext();
@@ -1019,8 +1102,8 @@ void main() {
 
         expect(contextMessages, messages);
         expect(contextConversation.truncateIndex, 30);
-        expect(controller.messages, messages.sublist(80));
-        expect(controller.loadedStartIndex, 80);
+        expect(controller.messages, messages.sublist(60));
+        expect(controller.loadedStartIndex, 60);
         expect(chatService.fullLoadCalls, 1);
       },
     );
@@ -1028,7 +1111,7 @@ void main() {
     test(
       'creating a draft conversation clears the loaded history window',
       () async {
-        controller.setCurrentConversation(conversation);
+        await controller.setCurrentConversationAndLoad(conversation);
 
         final draft = await controller.createNewConversation(title: 'Draft');
 

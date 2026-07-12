@@ -191,6 +191,111 @@ void main() {
     );
 
     test(
+      'temporary timeline pages stay bounded without evicting memory history',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        for (var i = 0; i < 45; i++) {
+          await service.addMessage(
+            conversationId: conversation.id,
+            role: i.isEven ? 'user' : 'assistant',
+            content: 'temporary message $i',
+          );
+        }
+
+        final tail = await service.loadTimelinePage(conversation.id, limit: 40);
+        expect(tail, isNotNull);
+        expect(tail!.slots, hasLength(40));
+        expect(tail.slots.first.message.content, 'temporary message 5');
+        expect(tail.hasMoreBefore, isTrue);
+        service.retainTimelineWindow(
+          conversation.id,
+          tail.slots.map((slot) => slot.identity.revisionId),
+        );
+
+        expect(await service.loadMessages(conversation.id), hasLength(45));
+        final before = await service.loadTimelinePage(
+          conversation.id,
+          beforeRevisionId: tail.slots.first.identity.revisionId,
+          limit: 20,
+        );
+        expect(before!.slots, hasLength(5));
+        expect(before.slots.first.message.content, 'temporary message 0');
+      },
+    );
+
+    test('temporary batch deletion reports the removed revisions', () async {
+      final service = createService();
+      await service.init();
+
+      final conversation = await service.createDraftConversation(
+        title: 'Temporary Chat',
+        temporary: true,
+      );
+      final first = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'first',
+      );
+      final second = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'second',
+      );
+
+      final deleted = await service.deleteMessages(
+        conversationId: conversation.id,
+        messageIds: {second.id, 'missing'},
+        versionSelectionChanges: const {},
+      );
+      final page = await service.loadTimelinePage(conversation.id);
+
+      expect(deleted, {second.id});
+      expect(page!.slots.map((slot) => slot.identity.revisionId), [first.id]);
+      expect(await service.loadMessages(conversation.id), [first]);
+    });
+
+    test(
+      'temporary timeline projects the selected revision per slot',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'version zero',
+          groupId: 'answer-slot',
+          version: 0,
+          selectVersion: true,
+        );
+        final selected = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'version two',
+          groupId: 'answer-slot',
+          version: 2,
+          selectVersion: true,
+        );
+
+        final page = await service.loadTimelinePage(conversation.id);
+
+        expect(page!.slots, hasLength(1));
+        expect(page.slots.single.identity.versionCount, 2);
+        expect(page.slots.single.message, selected);
+      },
+    );
+
+    test(
       'temporary conversation is discarded when current conversation changes',
       () async {
         final service = createService();

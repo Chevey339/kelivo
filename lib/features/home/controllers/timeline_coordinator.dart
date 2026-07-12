@@ -292,12 +292,81 @@ class TimelineCoordinator extends ChangeNotifier {
     return true;
   }
 
-  void seed(LoadedTimelinePage page) {
-    _requestEpoch++;
-    _conversationId = page.conversationId;
-    _stateRevision = page.stateRevision;
-    _totalSlotCount = page.totalSlotCount;
-    _replace(page);
+  Future<bool> refreshAfterMutation({
+    Set<String> removedRevisionIds = const <String>{},
+    int? limit,
+  }) async {
+    final conversationId = _conversationId;
+    if (conversationId == null) return false;
+    final epoch = ++_requestEpoch;
+    final refreshLimit = (limit ?? _slots.length)
+        .clamp(1, budget.maxSlots)
+        .toInt();
+    final previousAnchor = _visualAnchor;
+    var anchorIndex = previousAnchor == null
+        ? -1
+        : _slots.indexWhere(
+            (slot) => slot.identity.slotId == previousAnchor.slotId,
+          );
+    if (_viewportMode == TimelineViewportMode.followingTail) {
+      anchorIndex = _slots.length - 1;
+    } else if (anchorIndex < 0 && _slots.isNotEmpty) {
+      anchorIndex = 0;
+    }
+
+    LoadedTimelineSlot? target;
+    for (var distance = 0; distance < _slots.length; distance++) {
+      final candidates = distance == 0
+          ? <int>[anchorIndex]
+          : <int>[anchorIndex - distance, anchorIndex + distance];
+      for (final index in candidates) {
+        if (index < 0 || index >= _slots.length) continue;
+        final candidate = _slots[index];
+        if (removedRevisionIds.contains(candidate.identity.revisionId)) {
+          continue;
+        }
+        target = candidate;
+        break;
+      }
+      if (target != null) break;
+    }
+
+    LoadedTimelinePage? refreshed;
+    final aroundLoader = loadAroundPage;
+    if (target != null && aroundLoader != null) {
+      refreshed = await aroundLoader(
+        conversationId: conversationId,
+        targetRevisionId: target.identity.revisionId,
+        limit: refreshLimit,
+      );
+    } else {
+      refreshed = await loadPage(
+        conversationId: conversationId,
+        fromStart: false,
+        limit: refreshLimit,
+      );
+    }
+    if (!_accepts(epoch, conversationId) || refreshed == null) return false;
+    _stateRevision = refreshed.stateRevision;
+    _totalSlotCount = refreshed.totalSlotCount;
+    if (previousAnchor != null &&
+        removedRevisionIds.any((revisionId) {
+          for (final slot in _slots) {
+            if (slot.identity.slotId == previousAnchor.slotId) {
+              return slot.identity.revisionId == revisionId;
+            }
+          }
+          return false;
+        })) {
+      _visualAnchor = target == null
+          ? null
+          : TimelineViewportAnchor(
+              slotId: target.identity.slotId,
+              localDy: previousAnchor.localDy,
+            );
+    }
+    _replace(refreshed);
+    return true;
   }
 
   Future<bool> loadBefore({int limit = 20}) async {
@@ -419,11 +488,11 @@ class TimelineCoordinator extends ChangeNotifier {
     notifyListeners();
   }
 
-  void replaceMessage(ChatMessage message, {bool notify = true}) {
+  bool replaceMessage(ChatMessage message, {bool notify = true}) {
     final index = _slots.indexWhere(
       (slot) => slot.identity.revisionId == message.id,
     );
-    if (index < 0) return;
+    if (index < 0) return false;
     final updated = _slots.toList(growable: false);
     updated[index] = LoadedTimelineSlot(
       identity: updated[index].identity,
@@ -435,6 +504,7 @@ class TimelineCoordinator extends ChangeNotifier {
       _windowRevision++;
       notifyListeners();
     }
+    return true;
   }
 
   bool _accepts(int epoch, String conversationId) =>

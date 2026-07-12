@@ -272,6 +272,16 @@ class ChatService extends ChangeNotifier {
     int limit = 40,
   }) async {
     if (!_initialized || limit <= 0) return null;
+    if (_temporaryConversationIds.contains(conversationId)) {
+      return _loadTemporaryTimelinePage(
+        conversationId,
+        beforeRevisionId: beforeRevisionId,
+        afterRevisionId: afterRevisionId,
+        aroundRevisionId: aroundRevisionId,
+        fromStart: fromStart,
+        limit: limit,
+      );
+    }
     final page = await _repo.loadActiveTimelinePage(
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
@@ -317,10 +327,122 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  LoadedTimelinePage? _loadTemporaryTimelinePage(
+    String conversationId, {
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    String? aroundRevisionId,
+    required bool fromStart,
+    required int limit,
+  }) {
+    final cursorCount = <String?>[
+      beforeRevisionId,
+      afterRevisionId,
+      aroundRevisionId,
+    ].where((cursor) => cursor != null).length;
+    if (cursorCount > 1 || (fromStart && cursorCount != 0)) {
+      throw ArgumentError('Only one timeline cursor may be supplied.');
+    }
+    final conversation = _draftConversations[conversationId];
+    if (conversation == null) return null;
+    final allMessages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+    final groups = <String, List<ChatMessage>>{};
+    for (final message in allMessages) {
+      groups.putIfAbsent(message.groupId ?? message.id, () => []).add(message);
+    }
+    final activeMessages = <ChatMessage>[];
+    final versionCounts = <String, int>{};
+    for (final entry in groups.entries) {
+      final revisions = entry.value;
+      versionCounts[entry.key] = revisions.length;
+      final selection = conversation.versionSelections[entry.key];
+      ChatMessage? selected;
+      if (selection != null) {
+        for (final revision in revisions) {
+          if (revision.version == selection) {
+            selected = revision;
+            break;
+          }
+        }
+      }
+      activeMessages.add(selected ?? revisions.last);
+    }
+
+    var start = 0;
+    var end = activeMessages.length;
+    if (fromStart) {
+      end = limit.clamp(0, activeMessages.length).toInt();
+    } else if (aroundRevisionId != null) {
+      final targetIndex = activeMessages.indexWhere(
+        (message) => message.id == aroundRevisionId,
+      );
+      if (targetIndex < 0) return null;
+      start = (targetIndex - (limit ~/ 2))
+          .clamp(0, activeMessages.length)
+          .toInt();
+      end = (start + limit).clamp(start, activeMessages.length).toInt();
+      start = (end - limit).clamp(0, end).toInt();
+    } else if (beforeRevisionId != null) {
+      end = activeMessages.indexWhere(
+        (message) => message.id == beforeRevisionId,
+      );
+      if (end < 0) return null;
+      start = (end - limit).clamp(0, end).toInt();
+    } else if (afterRevisionId != null) {
+      final cursorIndex = activeMessages.indexWhere(
+        (message) => message.id == afterRevisionId,
+      );
+      if (cursorIndex < 0) return null;
+      start = cursorIndex + 1;
+      end = (start + limit).clamp(start, activeMessages.length).toInt();
+    } else {
+      start = (activeMessages.length - limit)
+          .clamp(0, activeMessages.length)
+          .toInt();
+    }
+
+    String? parentRevisionId = start == 0 ? null : activeMessages[start - 1].id;
+    final slots = <LoadedTimelineSlot>[];
+    for (var index = start; index < end; index++) {
+      final message = activeMessages[index];
+      final groupId = message.groupId ?? message.id;
+      slots.add(
+        LoadedTimelineSlot(
+          identity: ActiveTimelineSlot(
+            slotId: groupId,
+            revisionId: message.id,
+            parentRevisionId: parentRevisionId,
+            role: message.role,
+            createdAt: message.timestamp,
+            updatedAt: message.timestamp,
+            finalizedAt: message.isStreaming ? null : message.timestamp,
+            versionCount: versionCounts[groupId] ?? 1,
+            logicalIndex: index,
+          ),
+          message: message,
+        ),
+      );
+      parentRevisionId = message.id;
+    }
+    return LoadedTimelinePage(
+      conversationId: conversationId,
+      stateRevision: conversation.updatedAt.microsecondsSinceEpoch,
+      contextStartRevisionId: null,
+      slots: slots,
+      hasMoreBefore: start > 0,
+      hasMoreAfter: end < activeMessages.length,
+      totalSlotCount: activeMessages.length,
+    );
+  }
+
   void retainTimelineWindow(
     String conversationId,
     Iterable<String> revisionIds,
   ) {
+    // Temporary chats have no database shadow from which evicted rows can be
+    // reloaded. Their service-owned data stays complete while the coordinator
+    // still exposes only its bounded visible window.
+    if (_temporaryConversationIds.contains(conversationId)) return;
     final retained = revisionIds.toSet();
     final messages = _messagesCache[conversationId];
     if (messages != null) {
@@ -1992,20 +2114,49 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  Future<void> deleteMessages({
+  Future<Set<String>> deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
     required Map<String, int?> versionSelectionChanges,
   }) async {
-    if (!_initialized || messageIds.isEmpty) return;
+    if (!_initialized || messageIds.isEmpty) return const <String>{};
+    if (_temporaryConversationIds.contains(conversationId)) {
+      final conversation = _draftConversations[conversationId];
+      final messages = _messagesCache[conversationId];
+      if (conversation == null || messages == null) return const <String>{};
+      final deletedIds = messages
+          .where((message) => messageIds.contains(message.id))
+          .map((message) => message.id)
+          .toSet();
+      if (deletedIds.isEmpty) return const <String>{};
+      messages.removeWhere((message) => deletedIds.contains(message.id));
+      conversation.messageIds.removeWhere(deletedIds.contains);
+      for (final entry in versionSelectionChanges.entries) {
+        final version = entry.value;
+        if (version == null) {
+          conversation.versionSelections.remove(entry.key);
+        } else {
+          conversation.versionSelections[entry.key] = version;
+        }
+      }
+      conversation.updatedAt = DateTime.now();
+      for (final id in deletedIds) {
+        _temporaryToolEvents.remove(id);
+        _temporaryGeminiThoughtSigs.remove(id);
+      }
+      notifyListeners();
+      return Set<String>.unmodifiable(deletedIds);
+    }
     final result = await _repo.deleteGraphMessages(
       conversationId: conversationId,
       revisionIds: messageIds,
     );
-    if (result == null) return;
+    if (result == null) return const <String>{};
 
     _conversationsCache[conversationId] = result.conversation;
+    final deletedIds = <String>{};
     for (final message in result.messages) {
+      deletedIds.add(message.id);
       _toolEventsCache.remove(message.id);
       _geminiThoughtSigsCache.remove(message.id);
     }
@@ -2020,6 +2171,7 @@ class ChatService extends ChangeNotifier {
     await loadMessageGraphTimeline(conversationId, force: true);
     await _cleanupOrphanUploads();
     notifyListeners();
+    return Set<String>.unmodifiable(deletedIds);
   }
 
   void setCurrentConversation(String? id) {

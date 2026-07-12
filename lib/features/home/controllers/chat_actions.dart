@@ -986,7 +986,9 @@ class ChatActions {
         targetGroupId: versioning.targetGroupId,
       );
       if (removeIds.isNotEmpty) {
-        await chatController.reloadMessages();
+        await chatController.refreshTimelineAfterMutation(
+          removedRevisionIds: removeIds.toSet(),
+        );
         viewModel.restoreMessageUiState();
         onMessagesChanged?.call();
       }

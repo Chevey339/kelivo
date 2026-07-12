@@ -541,6 +541,7 @@ class MessageGenerationService {
       targetGroupId: targetGroupId,
     );
 
+    var deletedIds = removeIds;
     if (removeIds.isNotEmpty && messages.isNotEmpty) {
       final removeIdSet = removeIds.toSet();
       final conversationId = messages.first.conversationId;
@@ -550,19 +551,19 @@ class MessageGenerationService {
           selectionChanges[message.groupId ?? message.id] = null;
         }
       }
-      await chatService.deleteMessages(
+      deletedIds = (await chatService.deleteMessages(
         conversationId: conversationId,
         messageIds: removeIdSet,
         versionSelectionChanges: selectionChanges,
-      );
+      )).toList(growable: false);
     }
-    for (final id in removeIds) {
+    for (final id in deletedIds) {
       streamController.reasoning.remove(id);
       streamController.toolParts.remove(id);
       streamController.reasoningSegments.remove(id);
     }
 
-    return removeIds;
+    return deletedIds;
   }
 
   bool _shouldIncludeAudioForProvider(
