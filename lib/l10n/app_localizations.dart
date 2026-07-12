@@ -652,6 +652,12 @@ abstract class AppLocalizations {
   /// **'Overview'**
   String get statsPageSummaryTitle;
 
+  /// No description provided for @statsPageUsageScopesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Branch / All Generation Usage'**
+  String get statsPageUsageScopesTitle;
+
   /// No description provided for @statsPageTotalConversations.
   ///
   /// In en, this message translates to:

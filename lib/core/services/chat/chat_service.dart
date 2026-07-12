@@ -631,6 +631,23 @@ class ChatService extends ChangeNotifier {
     );
   }
 
+  Future<ChatStatsAggregate> loadStatsAggregate({
+    required DateTime? rangeStart,
+    required DateTime? rangeEndExclusive,
+    required DateTime heatmapStart,
+    required DateTime trendStart,
+    required DateTime trendEndExclusive,
+  }) async {
+    if (!_initialized) await init();
+    return _repo.queryStatsAggregate(
+      rangeStart: rangeStart,
+      rangeEndExclusive: rangeEndExclusive,
+      heatmapStart: heatmapStart,
+      trendStart: trendStart,
+      trendEndExclusive: trendEndExclusive,
+    );
+  }
+
   List<ChatMessage> getMessages(String conversationId) {
     if (!_initialized) return const [];
     return _messagesCache[conversationId] ?? const [];

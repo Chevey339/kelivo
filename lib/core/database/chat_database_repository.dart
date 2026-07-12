@@ -1988,6 +1988,205 @@ class ChatDatabaseRepository {
         .toList(growable: false);
   }
 
+  Future<ChatStatsAggregate> queryStatsAggregate({
+    required DateTime? rangeStart,
+    required DateTime? rangeEndExclusive,
+    required DateTime heatmapStart,
+    required DateTime trendStart,
+    required DateTime trendEndExclusive,
+  }) async {
+    const activeCte = '''
+      WITH RECURSIVE active_revisions(conversation_id, revision_id, parent_revision_id) AS (
+        SELECT s.conversation_id, b.leaf_revision_id, r.parent_revision_id
+        FROM conversation_state_rows s
+        JOIN conversation_branch_rows b
+          ON b.conversation_id = s.conversation_id AND b.id = s.active_branch_id
+        JOIN message_revision_rows r
+          ON r.conversation_id = b.conversation_id AND r.id = b.leaf_revision_id
+        UNION
+        SELECT p.conversation_id, p.id, p.parent_revision_id
+        FROM message_revision_rows p
+        JOIN active_revisions child
+          ON child.conversation_id = p.conversation_id
+         AND child.parent_revision_id = p.id
+      )
+    ''';
+    final start = rangeStart?.microsecondsSinceEpoch;
+    final end = rangeEndExclusive?.microsecondsSinceEpoch;
+    final rangeClause = <String>[
+      if (start != null) 'm.timestamp >= ?',
+      if (end != null) 'm.timestamp < ?',
+    ].join(' AND ');
+    final rangeWhere = rangeClause.isEmpty ? '' : 'AND $rangeClause';
+    final rangeVariables = <Variable>[
+      if (start != null) Variable<int>(start),
+      if (end != null) Variable<int>(end),
+    ];
+    final conversationRangeClause = <String>[
+      if (start != null) 'c.created_at >= ?',
+      if (end != null) 'c.created_at < ?',
+    ].join(' AND ');
+
+    final summary = await _db
+        .customSelect(
+          '''
+      $activeCte,
+      active_messages AS (
+        SELECT m.* FROM active_revisions a
+        JOIN message_rows m ON m.id = a.revision_id
+        WHERE 1 = 1 $rangeWhere
+      )
+      SELECT
+        (SELECT COUNT(*) FROM conversation_rows c
+          ${conversationRangeClause.isEmpty ? '' : 'WHERE $conversationRangeClause'}) AS conversations,
+        COUNT(*) AS active_messages,
+        COALESCE(SUM(prompt_tokens), 0) AS active_input,
+        COALESCE(SUM(completion_tokens), 0) AS active_output,
+        COALESCE(SUM(cached_tokens), 0) AS active_cached
+      FROM active_messages;
+    ''',
+          variables: [...rangeVariables, ...rangeVariables],
+        )
+        .getSingle();
+
+    final all = await _db.customSelect('''
+      SELECT COUNT(*) AS messages,
+        COALESCE(SUM(prompt_tokens), 0) AS input_tokens,
+        COALESCE(SUM(completion_tokens), 0) AS output_tokens,
+        COALESCE(SUM(cached_tokens), 0) AS cached_tokens
+      FROM message_rows m WHERE 1 = 1 $rangeWhere;
+    ''', variables: rangeVariables).getSingle();
+
+    final heatmapRows = await _db
+        .customSelect(
+          '''
+      $activeCte
+      SELECT strftime('%Y-%m-%d', m.timestamp / 1000000.0,
+          'unixepoch', 'localtime') AS day,
+        COUNT(*) AS message_count
+      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      WHERE m.timestamp >= ?
+      GROUP BY day ORDER BY day;
+    ''',
+          variables: [Variable<int>(heatmapStart.microsecondsSinceEpoch)],
+        )
+        .get();
+
+    final trendRows = await _db
+        .customSelect(
+          '''
+      $activeCte
+      SELECT strftime('%Y-%m-%d', m.timestamp / 1000000.0,
+          'unixepoch', 'localtime') AS day,
+        COALESCE(NULLIF(TRIM(m.provider_id), ''), '_unknown') AS provider_id,
+        COUNT(*) AS activity_count,
+        COALESCE(SUM(m.prompt_tokens), 0) AS input_tokens,
+        COALESCE(SUM(m.completion_tokens), 0) AS output_tokens,
+        COALESCE(SUM(m.cached_tokens), 0) AS cached_tokens,
+        COALESCE(SUM(CASE WHEN COALESCE(m.prompt_tokens, 0) = 0
+          AND COALESCE(m.completion_tokens, 0) = 0
+          THEN COALESCE(m.total_tokens, 0) ELSE 0 END), 0) AS uncategorized_tokens
+      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      WHERE m.timestamp >= ? AND m.timestamp < ?
+      GROUP BY day, provider_id ORDER BY day, provider_id;
+    ''',
+          variables: [
+            Variable<int>(trendStart.microsecondsSinceEpoch),
+            Variable<int>(trendEndExclusive.microsecondsSinceEpoch),
+          ],
+        )
+        .get();
+
+    final modelRows = await _db.customSelect('''
+      $activeCte
+      SELECT m.model_id AS id, MIN(m.provider_id) AS provider_id,
+        COUNT(*) AS item_count
+      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      WHERE NULLIF(TRIM(m.model_id), '') IS NOT NULL $rangeWhere
+      GROUP BY m.model_id ORDER BY item_count DESC, id;
+    ''', variables: rangeVariables).get();
+    final topicRows = await _db.customSelect('''
+      $activeCte
+      SELECT c.id AS id, c.title AS label, COUNT(*) AS item_count
+      FROM active_revisions a
+      JOIN message_rows m ON m.id = a.revision_id
+      JOIN conversation_rows c ON c.id = a.conversation_id
+      WHERE 1 = 1 $rangeWhere
+      GROUP BY c.id, c.title ORDER BY item_count DESC, c.id;
+    ''', variables: rangeVariables).get();
+    final conversationRange = <String>[
+      if (start != null) 'created_at >= ?',
+      if (end != null) 'created_at < ?',
+    ].join(' AND ');
+    final assistantRows = await _db.customSelect('''
+      SELECT COALESCE(NULLIF(TRIM(assistant_id), ''), '_default') AS id,
+        COUNT(*) AS item_count
+      FROM conversation_rows
+      ${conversationRange.isEmpty ? '' : 'WHERE $conversationRange'}
+      GROUP BY id ORDER BY item_count DESC, id;
+    ''', variables: rangeVariables).get();
+
+    return ChatStatsAggregate(
+      conversations: summary.read<int>('conversations'),
+      active: ChatStatsTotals(
+        messages: summary.read<int>('active_messages'),
+        inputTokens: summary.read<int>('active_input'),
+        outputTokens: summary.read<int>('active_output'),
+        cachedTokens: summary.read<int>('active_cached'),
+      ),
+      allRevisions: ChatStatsTotals(
+        messages: all.read<int>('messages'),
+        inputTokens: all.read<int>('input_tokens'),
+        outputTokens: all.read<int>('output_tokens'),
+        cachedTokens: all.read<int>('cached_tokens'),
+      ),
+      heatmap: [
+        for (final row in heatmapRows)
+          ChatStatsDayCount(
+            day: DateTime.parse(row.read<String>('day')),
+            count: row.read<int>('message_count'),
+          ),
+      ],
+      trend: [
+        for (final row in trendRows)
+          ChatStatsTrendBucket(
+            day: DateTime.parse(row.read<String>('day')),
+            providerId: row.read<String>('provider_id'),
+            activityCount: row.read<int>('activity_count'),
+            inputTokens: row.read<int>('input_tokens'),
+            outputTokens: row.read<int>('output_tokens'),
+            cachedTokens: row.read<int>('cached_tokens'),
+            uncategorizedTokens: row.read<int>('uncategorized_tokens'),
+          ),
+      ],
+      models: [
+        for (final row in modelRows)
+          ChatStatsRank(
+            id: row.read<String>('id'),
+            label: row.read<String>('id'),
+            count: row.read<int>('item_count'),
+            providerId: row.readNullable<String>('provider_id'),
+          ),
+      ],
+      assistants: [
+        for (final row in assistantRows)
+          ChatStatsRank(
+            id: row.read<String>('id'),
+            label: row.read<String>('id'),
+            count: row.read<int>('item_count'),
+          ),
+      ],
+      topics: [
+        for (final row in topicRows)
+          ChatStatsRank(
+            id: row.read<String>('id'),
+            label: row.read<String>('label'),
+            count: row.read<int>('item_count'),
+          ),
+      ],
+    );
+  }
+
   bool _requiresCjkFallback(String token) {
     return RegExp(
       r'[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]',
@@ -4239,6 +4438,79 @@ class ConversationSearchMatch {
   final String? groupId;
   final int? version;
   final int? maxVersion;
+}
+
+final class ChatStatsTotals {
+  const ChatStatsTotals({
+    required this.messages,
+    required this.inputTokens,
+    required this.outputTokens,
+    required this.cachedTokens,
+  });
+
+  final int messages;
+  final int inputTokens;
+  final int outputTokens;
+  final int cachedTokens;
+}
+
+final class ChatStatsDayCount {
+  const ChatStatsDayCount({required this.day, required this.count});
+  final DateTime day;
+  final int count;
+}
+
+final class ChatStatsTrendBucket {
+  const ChatStatsTrendBucket({
+    required this.day,
+    required this.providerId,
+    required this.activityCount,
+    required this.inputTokens,
+    required this.outputTokens,
+    required this.cachedTokens,
+    required this.uncategorizedTokens,
+  });
+  final DateTime day;
+  final String providerId;
+  final int activityCount;
+  final int inputTokens;
+  final int outputTokens;
+  final int cachedTokens;
+  final int uncategorizedTokens;
+}
+
+final class ChatStatsRank {
+  const ChatStatsRank({
+    required this.id,
+    required this.label,
+    required this.count,
+    this.providerId,
+  });
+  final String id;
+  final String label;
+  final int count;
+  final String? providerId;
+}
+
+final class ChatStatsAggregate {
+  const ChatStatsAggregate({
+    required this.conversations,
+    required this.active,
+    required this.allRevisions,
+    required this.heatmap,
+    required this.trend,
+    required this.models,
+    required this.assistants,
+    required this.topics,
+  });
+  final int conversations;
+  final ChatStatsTotals active;
+  final ChatStatsTotals allRevisions;
+  final List<ChatStatsDayCount> heatmap;
+  final List<ChatStatsTrendBucket> trend;
+  final List<ChatStatsRank> models;
+  final List<ChatStatsRank> assistants;
+  final List<ChatStatsRank> topics;
 }
 
 class ChatStorageMetaKeys {

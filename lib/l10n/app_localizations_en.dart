@@ -311,6 +311,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statsPageSummaryTitle => 'Overview';
 
   @override
+  String get statsPageUsageScopesTitle =>
+      'Current Branch / All Generation Usage';
+
+  @override
   String get statsPageTotalConversations => 'Total Conversations';
 
   @override

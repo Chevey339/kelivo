@@ -1,9 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
-import '../../../core/models/conversation.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -33,8 +35,9 @@ class StatsPage extends StatefulWidget {
 
 class _StatsPageState extends State<StatsPage> {
   late StatsDateRange _range;
-  String? _loadedMessageSignature;
-  bool _loadingMessages = false;
+  StatsSnapshot? _databaseSnapshot;
+  String? _statsSignature;
+  bool _loadingStats = false;
 
   @override
   void initState() {
@@ -70,7 +73,7 @@ class _StatsPageState extends State<StatsPage> {
         ),
         const SizedBox(height: 12),
         StatsSectionCard(
-          title: l10n.statsPageSummaryTitle,
+          title: l10n.statsPageUsageScopesTitle,
           child: StatsMetricGrid(summary: snapshot.summary),
         ),
         const SizedBox(height: 12),
@@ -165,67 +168,104 @@ class _StatsPageState extends State<StatsPage> {
     final settings = context.watch<SettingsProvider>();
     final assistantProvider = context.watch<AssistantProvider>();
     final conversations = chatService.getAllCompleteConversations();
-    _loadStatsMessages(chatService, conversations);
-    final messagesByConversation = {
-      for (final conversation in conversations)
-        conversation.id: chatService.getMessages(conversation.id),
-    };
     final assistantNames = {
       for (final assistant in assistantProvider.assistants)
         assistant.id: assistant.name,
       '_default': l10n.statsPageUnknownAssistant,
     };
-    final existingAssistantIds = {
-      for (final assistant in assistantProvider.assistants) assistant.id,
-      '_default',
-    };
     final providerNames = {
       for (final entry in settings.providerConfigs.entries)
         entry.key: entry.value.name,
     };
-    return StatsAggregationService.buildSnapshot(
-      now: now,
-      range: _range,
-      conversations: conversations,
-      messagesByConversation: messagesByConversation,
-      launchCount: settings.appLaunchCount,
-      assistantNames: assistantNames,
-      existingAssistantIds: existingAssistantIds,
-      providerNames: providerNames,
-      unknownProviderLabel: l10n.statsPageUnknownProvider,
-      unknownTopicLabel: l10n.statsPageUnknownTopic,
-    );
-  }
-
-  void _loadStatsMessages(
-    ChatService chatService,
-    List<Conversation> conversations,
-  ) {
-    final signature = conversations
+    final conversationSignature = conversations
         .map(
           (conversation) =>
               '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
               '${chatService.getMessageCount(conversation.id)}',
         )
         .join('|');
-    if (_loadingMessages || _loadedMessageSignature == signature) return;
-    _loadingMessages = true;
-    Future.wait<void>([
-      for (final conversation in conversations)
-        chatService.loadMessages(conversation.id).then((_) {}),
-    ]).then(
-      (_) {
-        if (!mounted) return;
-        setState(() {
-          _loadedMessageSignature = signature;
-          _loadingMessages = false;
-        });
-      },
-      onError: (Object error, StackTrace stackTrace) {
-        _loadingMessages = false;
-        Error.throwWithStackTrace(error, stackTrace);
-      },
-    );
+    final signature =
+        '$conversationSignature|${_range.preset.name}:'
+        '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
+        '${providerNames.length}:${assistantNames.length}';
+    if (!_loadingStats && _statsSignature != signature) {
+      _loadingStats = true;
+      final rangeStart = _range.start;
+      final rangeEndExclusive = _range.end == null
+          ? null
+          : StatsDateRange.addCalendarDays(_range.end!, 1);
+      final today = StatsDateRange.normalizeDate(now);
+      final trendStart = _range.isAllTime
+          ? StatsDateRange.addCalendarDays(today, -29)
+          : (_range.start ?? StatsDateRange.addCalendarDays(today, -29));
+      final trendEnd = StatsDateRange.addCalendarDays(
+        _range.isAllTime ? today : (_range.end ?? today),
+        1,
+      );
+      unawaited(
+        chatService
+            .loadStatsAggregate(
+              rangeStart: rangeStart,
+              rangeEndExclusive: rangeEndExclusive,
+              heatmapStart: StatsDateRange.addCalendarDays(today, -364),
+              trendStart: trendStart,
+              trendEndExclusive: trendEnd,
+            )
+            .then(
+              (aggregate) {
+                if (!mounted) return;
+                setState(() {
+                  _databaseSnapshot =
+                      StatsAggregationService.buildDatabaseSnapshot(
+                        now: now,
+                        range: _range,
+                        aggregate: aggregate,
+                        launchCount: settings.appLaunchCount,
+                        assistantNames: assistantNames,
+                        providerNames: providerNames,
+                        unknownProviderLabel: l10n.statsPageUnknownProvider,
+                        unknownTopicLabel: l10n.statsPageUnknownTopic,
+                      );
+                  _statsSignature = signature;
+                  _loadingStats = false;
+                });
+              },
+              onError: (Object _, StackTrace __) {
+                if (mounted) setState(() => _loadingStats = false);
+              },
+            ),
+      );
+    }
+    return _databaseSnapshot ??
+        StatsAggregationService.buildDatabaseSnapshot(
+          now: now,
+          range: _range,
+          aggregate: const ChatStatsAggregate(
+            conversations: 0,
+            active: ChatStatsTotals(
+              messages: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              cachedTokens: 0,
+            ),
+            allRevisions: ChatStatsTotals(
+              messages: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              cachedTokens: 0,
+            ),
+            heatmap: [],
+            trend: [],
+            models: [],
+            assistants: [],
+            topics: [],
+          ),
+          launchCount: settings.appLaunchCount,
+          assistantNames: assistantNames,
+          providerNames: providerNames,
+          unknownProviderLabel: l10n.statsPageUnknownProvider,
+          unknownTopicLabel: l10n.statsPageUnknownTopic,
+        );
   }
 
   void _setPreset(StatsDateRangePreset preset) {

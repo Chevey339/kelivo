@@ -171,6 +171,7 @@
   "statsPageHeatmapLess": "Less",
   "statsPageHeatmapMore": "More",
   "statsPageSummaryTitle": "Overview",
+  "statsPageUsageScopesTitle": "Current Branch / All Generation Usage",
   "statsPageTotalConversations": "Total Conversations",
   "statsPageTotalMessages": "Total Messages",
   "statsPageInputTokens": "Input Tokens",

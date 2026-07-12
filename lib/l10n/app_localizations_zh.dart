@@ -307,6 +307,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statsPageSummaryTitle => '总览';
 
   @override
+  String get statsPageUsageScopesTitle => '当前分支 / 全部生成用量';
+
+  @override
   String get statsPageTotalConversations => '总对话数';
 
   @override
@@ -5815,6 +5818,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get statsPageSummaryTitle => '总览';
 
   @override
+  String get statsPageUsageScopesTitle => '当前分支 / 全部生成用量';
+
+  @override
   String get statsPageTotalConversations => '总对话数';
 
   @override
@@ -11321,6 +11327,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get statsPageSummaryTitle => '總覽';
+
+  @override
+  String get statsPageUsageScopesTitle => '目前分支 / 全部生成用量';
 
   @override
   String get statsPageTotalConversations => '總對話數';

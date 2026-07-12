@@ -1,8 +1,93 @@
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/database/chat_database_repository.dart';
 import '../models/stats_models.dart';
 
 class StatsAggregationService {
+  static StatsSnapshot buildDatabaseSnapshot({
+    required DateTime now,
+    required StatsDateRange range,
+    required ChatStatsAggregate aggregate,
+    required int launchCount,
+    required String unknownProviderLabel,
+    required String unknownTopicLabel,
+    Map<String, String> assistantNames = const {},
+    Map<String, String> providerNames = const {},
+  }) {
+    final heatmapCounts = {
+      for (final row in aggregate.heatmap) row.day: row.count,
+    };
+    final trendRange = _trendRange(now, range);
+    final trendBuckets = <DateTime, Map<String, StatsTokenBucket>>{
+      for (
+        var day = trendRange.start;
+        !day.isAfter(trendRange.end);
+        day = StatsDateRange.addCalendarDays(day, 1)
+      )
+        day: <String, StatsTokenBucket>{},
+    };
+    for (final row in aggregate.trend) {
+      final providerLabel = row.providerId == '_unknown'
+          ? unknownProviderLabel
+          : (providerNames[row.providerId] ?? row.providerId);
+      trendBuckets[row.day]![providerLabel] = StatsTokenBucket(
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        cachedTokens: row.cachedTokens,
+        uncategorizedTokens: row.uncategorizedTokens,
+        activityCount: row.activityCount,
+      );
+    }
+    return StatsSnapshot(
+      range: range,
+      summary: StatsSummary(
+        totalConversations: aggregate.conversations,
+        totalMessages: aggregate.active.messages,
+        inputTokens: aggregate.active.inputTokens,
+        outputTokens: aggregate.active.outputTokens,
+        cachedTokens: aggregate.active.cachedTokens,
+        launchCount: launchCount,
+        allRevisionMessages: aggregate.allRevisions.messages,
+        allRevisionInputTokens: aggregate.allRevisions.inputTokens,
+        allRevisionOutputTokens: aggregate.allRevisions.outputTokens,
+        allRevisionCachedTokens: aggregate.allRevisions.cachedTokens,
+      ),
+      heatmap: _buildHeatmap(now, heatmapCounts),
+      trend: [
+        for (final entry in trendBuckets.entries)
+          StatsTrendDay(
+            date: entry.key,
+            providerTokens: Map.unmodifiable(entry.value),
+          ),
+      ],
+      modelRank: [
+        for (final row in aggregate.models)
+          StatsRankItem(
+            id: row.id,
+            label: row.label,
+            value: row.count,
+            providerId: row.providerId,
+          ),
+      ],
+      assistantRank: [
+        for (final row in aggregate.assistants)
+          StatsRankItem(
+            id: row.id,
+            label: assistantNames[row.id] ?? row.label,
+            value: row.count,
+          ),
+      ],
+      topicRank: [
+        for (final row in aggregate.topics)
+          StatsRankItem(
+            id: row.id,
+            label: row.label.trim().isEmpty ? unknownTopicLabel : row.label,
+            value: row.count,
+          ),
+      ],
+    );
+  }
+
   static StatsSnapshot buildSnapshot({
     required DateTime now,
     required StatsDateRange range,

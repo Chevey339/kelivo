@@ -91,6 +91,7 @@
   "statsPageHeatmapLess": "少",
   "statsPageHeatmapMore": "多",
   "statsPageSummaryTitle": "总览",
+  "statsPageUsageScopesTitle": "当前分支 / 全部生成用量",
   "statsPageTotalConversations": "总对话数",
   "statsPageTotalMessages": "总消息数",
   "statsPageInputTokens": "输入 Tokens",
