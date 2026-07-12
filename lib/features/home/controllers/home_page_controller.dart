@@ -330,7 +330,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeServices() {
-    _ocrService = OcrService();
+    _ocrService = OcrService(chatService: _chatService);
     _translationService = TranslationService(
       chatService: _chatService,
       getContext: () => _scaffoldKey.currentContext ?? _context,
@@ -571,7 +571,10 @@ class HomePageController extends ChangeNotifier {
   Future<void> initChat() async {
     final prefs = _context.read<SettingsProvider>();
     final assistantProvider = _context.read<AssistantProvider>();
+    final ctx = _context;
     await _chatService.init();
+    if (!ctx.mounted) return;
+    await assistantProvider.ensureDefaults(ctx);
     if (prefs.newChatOnLaunch) {
       await _createNewConversation();
     } else {

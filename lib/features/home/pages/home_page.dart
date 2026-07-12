@@ -579,7 +579,8 @@ class _HomePageState extends State<HomePage>
     final width = MediaQuery.sizeOf(context).width;
     final cs = Theme.of(context).colorScheme;
     final settings = context.watch<SettingsProvider>();
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final ap = context.watch<AssistantProvider>();
+    final assistant = ap.currentAssistant;
 
     final modelInfo = getModelDisplayInfo(settings, assistant: assistant);
 

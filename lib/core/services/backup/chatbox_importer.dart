@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -36,7 +37,6 @@ class ChatboxImporter {
   // Persisted keys used by SettingsProvider/AssistantProvider/TagProvider
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
-  static const String _assistantsKey = 'assistants_v1';
   static const String _tagsKey = 'assistant_tags_v1';
   static const String _assignKey =
       'assistant_tag_map_v1'; // assistantId -> tagId
@@ -281,20 +281,12 @@ class ChatboxImporter {
     final importedAssistantIds = <String>[];
 
     // For merge mode, we need to know what already exists.
-    final prefs = await SharedPreferences.getInstance();
-    final existingAssistantsById = <String, Map<String, dynamic>>{};
+    final existingAssistantsById = <String, Assistant>{};
     if (mode == RestoreMode.merge) {
       try {
-        final raw = prefs.getString(_assistantsKey);
-        if (raw != null && raw.isNotEmpty) {
-          final arr = jsonDecode(raw) as List<dynamic>;
-          for (final e in arr) {
-            if (e is Map && e['id'] != null) {
-              existingAssistantsById[e['id'].toString()] = e.map(
-                (k, v) => MapEntry(k.toString(), v),
-              );
-            }
-          }
+        final list = await chatService.getAllAssistants();
+        for (final a in list) {
+          existingAssistantsById[a.id] = a;
         }
       } catch (_) {}
     }
@@ -399,30 +391,22 @@ class ChatboxImporter {
       } else {
         // Merge: keep local assistant unless incoming contains non-empty system prompt / model fields.
         final local = existingAssistantsById[id]!;
-        final incPrompt =
-            (assistantJson['systemPrompt'] as String?)?.trim() ?? '';
-        if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        if (assistantJson['chatModelProvider'] != null) {
-          local['chatModelProvider'] = assistantJson['chatModelProvider'];
-        }
-        if (assistantJson['chatModelId'] != null) {
-          local['chatModelId'] = assistantJson['chatModelId'];
-        }
-        if (assistantJson['temperature'] != null) {
-          local['temperature'] = assistantJson['temperature'];
-        }
-        if (assistantJson['topP'] != null) {
-          local['topP'] = assistantJson['topP'];
-        }
-        if (assistantJson['maxTokens'] != null) {
-          local['maxTokens'] = assistantJson['maxTokens'];
-        }
-        if (assistantJson['thinkingBudget'] != null) {
-          local['thinkingBudget'] = assistantJson['thinkingBudget'];
-        }
-        // Do not overwrite local avatar/background in merge mode.
-        existingAssistantsById[id] = local;
-        importedAssistantIds.add(id); // still tag it as chatbox source
+        final incomingMap = assistantJson;
+        final toMerge = local.copyWith(
+          systemPrompt:
+              ((incomingMap['systemPrompt'] as String?)?.trim() ?? '')
+                  .isNotEmpty
+              ? incomingMap['systemPrompt'] as String
+              : null,
+          chatModelProvider: incomingMap['chatModelProvider'] as String?,
+          chatModelId: incomingMap['chatModelId'] as String?,
+          temperature: (incomingMap['temperature'] as num?)?.toDouble(),
+          topP: (incomingMap['topP'] as num?)?.toDouble(),
+          maxTokens: (incomingMap['maxTokens'] as num?)?.toInt(),
+          thinkingBudget: (incomingMap['thinkingBudget'] as num?)?.toInt(),
+        );
+        existingAssistantsById[id] = toMerge;
+        importedAssistantIds.add(id);
       }
 
       // Conversations (topics)
@@ -617,21 +601,18 @@ class ChatboxImporter {
       }
     }
 
+    final incoming = importedAssistants
+        .map((j) => Assistant.fromJson(j))
+        .toList();
     if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_assistantsKey, jsonEncode(importedAssistants));
+      await chatService.putAssistants(incoming);
     } else {
-      // merge: preserve existing and add/update imported ones
-      final mergedById = <String, Map<String, dynamic>>{}
-        ..addAll(existingAssistantsById);
-      for (final a in importedAssistants) {
-        final id = (a['id'] ?? '').toString();
-        if (id.isEmpty) continue;
-        mergedById[id] = a;
+      final merged = existingAssistantsById.values.toList();
+      final existingIds = merged.map((a) => a.id).toSet();
+      for (final a in incoming) {
+        if (!existingIds.contains(a.id)) merged.add(a);
       }
-      await prefs.setString(
-        _assistantsKey,
-        jsonEncode(mergedById.values.toList()),
-      );
+      await chatService.putAssistants(merged);
     }
 
     return _AssistantsConversationsResult(

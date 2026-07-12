@@ -6,10 +6,11 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
+import '../database/chat_database_repository.dart';
+import '../services/chat/chat_service.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
-import '../services/chat/chat_service.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
@@ -19,9 +20,15 @@ class AssistantProvider extends ChangeNotifier {
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
 
+  ChatDatabaseRepository? get _repo {
+    if (chatService == null || !chatService!.initialized) return null;
+    return chatService!.repo;
+  }
+
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
   final ChatService? chatService;
+  bool _loaded = false;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => _currentAssistantId;
@@ -32,13 +39,21 @@ class AssistantProvider extends ChangeNotifier {
     return null;
   }
 
+  bool get isLoaded => _loaded;
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
-  AssistantProvider({this.chatService}) {
-    _load();
+  AssistantProvider({this.chatService});
+
+  Future<void> ensureLoaded() async {
+    if (_loaded) return;
+    final repo = _repo;
+    if (repo == null) return;
+    await _doLoad(repo);
   }
 
-  Future<void> _load() async {
+  @visibleForTesting
+  Future<void> loadFromPrefs() async {
+    if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
@@ -47,57 +62,97 @@ class AssistantProvider extends ChangeNotifier {
         raw,
         legacySearchEnabled: legacySearchEnabled,
       );
-      bool migratedSearchEnabled = false;
       _assistants
         ..clear()
         ..addAll(migrated.assistants);
-      migratedSearchEnabled = migrated.didApplyLegacySearch;
-      // Fix any sandboxed local paths (avatars/backgrounds) imported from other platforms
-      bool changed = migratedSearchEnabled;
-      for (int i = 0; i < _assistants.length; i++) {
-        final a = _assistants[i];
-        String? av = a.avatar;
-        String? bg = a.background;
-        if (av != null &&
-            av.isNotEmpty &&
-            (av.startsWith('/') || av.contains(':')) &&
-            !av.startsWith('http')) {
-          final fixed = SandboxPathResolver.fix(av);
-          if (fixed != av) {
-            av = fixed;
-            changed = true;
-          }
-        }
-        if (bg != null &&
-            bg.isNotEmpty &&
-            (bg.startsWith('/') || bg.contains(':')) &&
-            !bg.startsWith('http')) {
-          final fixedBg = SandboxPathResolver.fix(bg);
-          if (fixedBg != bg) {
-            bg = fixedBg;
-            changed = true;
-          }
-        }
-        if (changed) {
-          _assistants[i] = a.copyWith(avatar: av, background: bg);
-        }
-      }
-      if (changed) {
-        try {
-          await _persist();
-        } catch (_) {}
-      }
     }
-    // Do not create defaults here because localization is not available.
-    // Defaults will be ensured later via ensureDefaults(context).
-    // Restore current assistant if present
+    if (_assistants.isEmpty) return;
+    _loaded = true;
     final savedId = prefs.getString(_currentAssistantKey);
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
-    } else {
-      _currentAssistantId = null;
     }
     notifyListeners();
+  }
+
+  Future<void> _doLoad(ChatDatabaseRepository repo) async {
+    final prefs = await SharedPreferences.getInstance();
+    final rows = await repo.getAllAssistants();
+    if (rows.isNotEmpty) {
+      _assistants
+        ..clear()
+        ..addAll(rows);
+    } else {
+      await _migrateFromPrefs(prefs, repo);
+    }
+
+    if (_assistants.isEmpty) return;
+
+    _loaded = true;
+    final savedId = prefs.getString(_currentAssistantKey);
+    if (savedId != null && _assistants.any((a) => a.id == savedId)) {
+      _currentAssistantId = savedId;
+    }
+    notifyListeners();
+  }
+
+  Future<void> _migrateFromPrefs(
+    SharedPreferences prefs,
+    ChatDatabaseRepository? repo,
+  ) async {
+    final raw = prefs.getString(_assistantsKey);
+    if (raw == null || raw.isEmpty) return;
+
+    final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
+    final migrated = _decodeAssistantsWithLegacySearch(
+      raw,
+      legacySearchEnabled: legacySearchEnabled,
+    );
+    bool changed = migrated.didApplyLegacySearch;
+    _assistants
+      ..clear()
+      ..addAll(migrated.assistants);
+
+    for (int i = 0; i < _assistants.length; i++) {
+      final a = _assistants[i];
+      String? av = a.avatar;
+      String? bg = a.background;
+      bool dirty = false;
+      if (av != null &&
+          av.isNotEmpty &&
+          (av.startsWith('/') || av.contains(':')) &&
+          !av.startsWith('http')) {
+        final fixed = SandboxPathResolver.fix(av);
+        if (fixed != av) {
+          av = fixed;
+          dirty = true;
+        }
+      }
+      if (bg != null &&
+          bg.isNotEmpty &&
+          (bg.startsWith('/') || bg.contains(':')) &&
+          !bg.startsWith('http')) {
+        final fixedBg = SandboxPathResolver.fix(bg);
+        if (fixedBg != bg) {
+          bg = fixedBg;
+          dirty = true;
+        }
+      }
+      if (dirty) {
+        _assistants[i] = a.copyWith(avatar: av, background: bg);
+        changed = true;
+      }
+    }
+
+    if (repo != null) {
+      try {
+        await repo.putAssistants(_assistants);
+        await prefs.remove(_assistantsKey);
+        await prefs.remove(_legacySearchEnabledKey);
+      } catch (_) {}
+    } else if (changed) {
+      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+    }
   }
 
   _AssistantDecodeResult _decodeAssistantsWithLegacySearch(
@@ -143,6 +198,7 @@ class AssistantProvider extends ChangeNotifier {
 
   // Ensure localized default assistants exist; call this after localization is ready.
   Future<void> ensureDefaults(dynamic context) async {
+    await ensureLoaded();
     if (_assistants.isNotEmpty) return;
     final l10n = AppLocalizations.of(context)!;
     // 1) 默认助手
@@ -291,8 +347,39 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
+    final repo = _repo;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+    if (repo != null) {
+      await repo.putAssistants(_assistants);
+      await prefs.remove(_assistantsKey);
+      await prefs.remove(_legacySearchEnabledKey);
+    } else {
+      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+    }
+  }
+
+  Future<void> _persistSingle(Assistant a, {int? sortOrder}) async {
+    final repo = _repo;
+    if (repo != null) {
+      await repo.putAssistant(a, sortOrder: sortOrder);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_assistantsKey);
+      await prefs.remove(_legacySearchEnabledKey);
+    } else {
+      await _persist();
+    }
+  }
+
+  Future<void> _deleteSingle(String id) async {
+    final repo = _repo;
+    if (repo != null) {
+      await repo.deleteAssistant(id);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_assistantsKey);
+      await prefs.remove(_legacySearchEnabledKey);
+    } else {
+      await _persist();
+    }
   }
 
   Future<void> setCurrentAssistant(String id) async {
@@ -335,7 +422,7 @@ class AssistantProvider extends ChangeNotifier {
       topP: null,
     );
     _assistants.add(a);
-    await _persist();
+    await _persistSingle(a, sortOrder: _assistants.length - 1);
     notifyListeners();
     return a.id;
   }
@@ -393,7 +480,7 @@ class AssistantProvider extends ChangeNotifier {
     );
 
     _assistants.insert(idx + 1, copy);
-    await _persist();
+    await _persistSingle(copy, sortOrder: idx + 1);
     notifyListeners();
     return copy.id;
   }
@@ -471,7 +558,7 @@ class AssistantProvider extends ChangeNotifier {
     }
 
     _assistants[idx] = next;
-    await _persist();
+    await _persistSingle(next, sortOrder: idx);
     notifyListeners();
   }
 
@@ -493,9 +580,10 @@ class AssistantProvider extends ChangeNotifier {
     if (newIndex < 0 || newIndex >= list.length) return;
     final item = list.removeAt(oldIndex);
     list.insert(newIndex, item);
-    _assistants[idx] = _assistants[idx].copyWith(regexRules: list);
+    final updated = _assistants[idx].copyWith(regexRules: list);
+    _assistants[idx] = updated;
     notifyListeners();
-    await _persist();
+    await _persistSingle(updated, sortOrder: idx);
   }
 
   Future<bool> deleteAssistant(String id) async {
@@ -513,7 +601,7 @@ class AssistantProvider extends ChangeNotifier {
           ? _assistants.first.id
           : null;
     }
-    await _persist();
+    await _deleteSingle(id);
     final prefs = await SharedPreferences.getInstance();
     if (_currentAssistantId != null) {
       await prefs.setString(_currentAssistantKey, _currentAssistantId!);

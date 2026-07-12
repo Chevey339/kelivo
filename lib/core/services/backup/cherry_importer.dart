@@ -4,6 +4,7 @@ import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/api_keys.dart';
+import '../../models/assistant.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -33,7 +34,6 @@ class CherryImporter {
   // Persisted keys used by SettingsProvider/AssistantProvider
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
-  static const String _assistantsKey = 'assistants_v1';
 
   static Future<CherryImportResult> importFromCherryStudio({
     required File file,
@@ -194,9 +194,6 @@ class CherryImporter {
       mode,
     );
 
-    // 6) Import assistants (persist to SharedPreferences, restart recommended)
-    final importedAssistants = await _importAssistants(cherryAssistants, mode);
-
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
     if (!chatService.initialized) {
       await chatService.init();
@@ -204,6 +201,13 @@ class CherryImporter {
     if (mode == RestoreMode.overwrite) {
       await chatService.clearAllData();
     }
+
+    // 6) Import assistants into DB
+    final importedAssistants = await _importAssistants(
+      cherryAssistants,
+      mode,
+      chatService,
+    );
 
     // 7) Prepare files (only if referenced by messages)
     final filesById = <String, Map<String, dynamic>>{
@@ -524,8 +528,8 @@ class CherryImporter {
   static Future<int> _importAssistants(
     List<dynamic> cherryAssistants,
     RestoreMode mode,
+    ChatService chatService,
   ) async {
-    // Map to our Assistant JSON list (as stored by Assistant.encodeList)
     final out = <Map<String, dynamic>>[];
     for (final a in cherryAssistants) {
       if (a is! Map) continue;
@@ -576,44 +580,31 @@ class CherryImporter {
       out.add(json);
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final incoming = out.map((j) => Assistant.fromJson(j)).toList();
+    if (incoming.isEmpty) return 0;
+
     if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_assistantsKey, jsonEncode(out));
-      return out.length;
+      await chatService.putAssistants(incoming);
+      return incoming.length;
     }
 
-    // merge: merge by id; update systemPrompt if provided, keep other local values
-    List<dynamic> existing = const <dynamic>[];
-    try {
-      final raw = prefs.getString(_assistantsKey);
-      if (raw != null && raw.isNotEmpty) {
-        existing = jsonDecode(raw) as List<dynamic>;
-      }
-    } catch (_) {}
-    final byId = <String, Map<String, dynamic>>{
-      for (final e in existing)
-        if (e is Map && e['id'] != null)
-          e['id'].toString(): e.map((k, v) => MapEntry(k.toString(), v)),
-    };
-    for (final a in out) {
-      final id = a['id'] as String;
-      if (!byId.containsKey(id)) {
-        byId[id] = a;
+    // merge by ID; update systemPrompt + model fields from incoming
+    final existing = await chatService.getAllAssistants();
+    final byId = <String, Assistant>{for (final a in existing) a.id: a};
+    for (final a in incoming) {
+      final local = byId[a.id];
+      if (local == null) {
+        byId[a.id] = a;
       } else {
-        final local = byId[id]!;
-        // Update prompt if incoming has non-empty
-        final incPrompt = (a['systemPrompt'] as String?)?.trim() ?? '';
-        if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        // Update model fields if provided
-        if (a['chatModelProvider'] != null) {
-          local['chatModelProvider'] = a['chatModelProvider'];
-        }
-        if (a['chatModelId'] != null) local['chatModelId'] = a['chatModelId'];
+        byId[a.id] = local.copyWith(
+          systemPrompt: a.systemPrompt.isNotEmpty ? a.systemPrompt : null,
+          chatModelProvider: a.chatModelProvider,
+          chatModelId: a.chatModelId,
+        );
       }
     }
-    final merged = byId.values.toList();
-    await prefs.setString(_assistantsKey, jsonEncode(merged));
-    return out.length;
+    await chatService.putAssistants(byId.values.toList());
+    return incoming.length;
   }
 
   /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into

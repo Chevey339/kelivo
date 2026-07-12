@@ -50,7 +50,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
     RouteObserver<ModalRoute<dynamic>>();
 bool _didCheckUpdates = false; // one-time update check flag
-bool _didEnsureAssistants = false; // ensure defaults after l10n ready
 
 Future<void> main() async {
   await runZoned(
@@ -385,27 +384,21 @@ class MyApp extends StatelessWidget {
                           systemNavigationBarDividerColor: Colors.transparent,
                           systemNavigationBarContrastEnforced: false,
                         );
-                  // Ensure localized defaults (assistants and chat default title) after first frame
-                  if (!_didEnsureAssistants) {
-                    _didEnsureAssistants = true;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      try {
-                        ctx.read<AssistantProvider>().ensureDefaults(ctx);
-                      } catch (_) {}
-                      try {
-                        ctx.read<ChatService>().setDefaultConversationTitle(
-                          AppLocalizations.of(
-                            ctx,
-                          )!.chatServiceDefaultConversationTitle,
-                        );
-                      } catch (_) {}
-                      try {
-                        ctx.read<UserProvider>().setDefaultNameIfUnset(
-                          AppLocalizations.of(ctx)!.userProviderDefaultUserName,
-                        );
-                      } catch (_) {}
-                    });
-                  }
+                  // Ensure localized defaults after first frame
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    try {
+                      ctx.read<ChatService>().setDefaultConversationTitle(
+                        AppLocalizations.of(
+                          ctx,
+                        )!.chatServiceDefaultConversationTitle,
+                      );
+                    } catch (_) {}
+                    try {
+                      ctx.read<UserProvider>().setDefaultNameIfUnset(
+                        AppLocalizations.of(ctx)!.userProviderDefaultUserName,
+                      );
+                    } catch (_) {}
+                  });
 
                   // Desktop tray + close behaviour (minimize to tray) sync
                   final l10n = AppLocalizations.of(ctx);

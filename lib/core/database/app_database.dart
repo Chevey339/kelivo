@@ -66,6 +66,66 @@ class MessageRows extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+class AssistantRows extends Table {
+  //--- Identifier & Display ---
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  TextColumn get avatar => text().nullable()();
+  BoolColumn get useAssistantAvatar =>
+      boolean().withDefault(const Constant(false))();
+  BoolColumn get useAssistantName =>
+      boolean().withDefault(const Constant(false))();
+  TextColumn get background => text().nullable()();
+
+  // --- Model Selection ---
+  TextColumn get chatModelProvider => text().nullable()();
+  TextColumn get chatModelId => text().nullable()();
+
+  // --- Request Params ---
+  RealColumn get temperature => real().nullable()();
+  RealColumn get topP => real().nullable()();
+  IntColumn get contextMessageSize =>
+      integer().withDefault(const Constant(64))();
+  BoolColumn get limitContextMessages =>
+      boolean().withDefault(const Constant(true))();
+  BoolColumn get streamOutput => boolean().withDefault(const Constant(true))();
+  IntColumn get thinkingBudget => integer().nullable()();
+  IntColumn get maxTokens => integer().nullable()();
+  TextColumn get customHeadersJson =>
+      text().withDefault(const Constant('[]'))();
+  TextColumn get customBodyJson => text().withDefault(const Constant('[]'))();
+
+  // --- Messages ---
+  TextColumn get systemPrompt => text().withDefault(const Constant(''))();
+  TextColumn get messageTemplate =>
+      text().withDefault(const Constant('{{ message }}'))();
+  TextColumn get presetMessagesJson =>
+      text().withDefault(const Constant('[]'))();
+
+  // --- Extended Functionality ---
+  BoolColumn get searchEnabled =>
+      boolean().withDefault(const Constant(false))();
+  TextColumn get mcpServerIdsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get localToolIdsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get regexRulesJson => text().withDefault(const Constant('[]'))();
+
+  // --- Memory ---
+  BoolColumn get enableMemory => boolean().withDefault(const Constant(false))();
+  BoolColumn get enableRecentChatsReference =>
+      boolean().withDefault(const Constant(false))();
+  IntColumn get recentChatsSummaryMessageCount =>
+      integer().withDefault(const Constant(5))();
+  TextColumn get memoryRecordPrompt => text().withDefault(const Constant(''))();
+
+  // --- Sort & Timestamp ---
+  IntColumn get sortOrder => integer()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 class ConversationMcpServerRows extends Table {
   TextColumn get conversationId =>
       text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
@@ -94,6 +154,16 @@ class GeminiThoughtSignatureRows extends Table {
   Set<Column<Object>> get primaryKey => {messageId};
 }
 
+class CacheRows extends Table {
+  TextColumn get type => text()(); // e.g., 'ocr'
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {type, key};
+}
+
 class ChatStorageMetaRows extends Table {
   TextColumn get key => text()();
   TextColumn get value => text()();
@@ -106,9 +176,11 @@ class ChatStorageMetaRows extends Table {
   tables: [
     ConversationRows,
     MessageRows,
+    AssistantRows,
     ConversationMcpServerRows,
     ToolEventRows,
     GeminiThoughtSignatureRows,
+    CacheRows,
     ChatStorageMetaRows,
   ],
 )
@@ -146,13 +218,19 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA busy_timeout = 5000;');
+    },
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.createTable(assistantRows);
+        await migrator.createTable(cacheRows);
+      }
     },
   );
 }

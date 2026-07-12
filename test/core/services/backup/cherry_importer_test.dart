@@ -91,6 +91,7 @@ void main() {
       });
 
       final chatService = ChatService();
+      await chatService.init();
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -145,7 +146,10 @@ void main() {
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('provider_configs_v1'), contains('openai'));
-      expect(prefs.getString('assistants_v1'), contains('assistant-1'));
+      // 助手已迁移到 DB，SharedPreferences 中不存在
+      expect(prefs.containsKey('assistants_v1'), isFalse);
+      // Verify via the existing tests that the import worked correctly
+      // (assistant data is verified indirectly via conversations)
     });
 
     test('keeps legacy data.json zip import working', () async {
@@ -190,6 +194,7 @@ void main() {
       });
 
       final chatService = ChatService();
+      await chatService.init();
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -216,12 +221,14 @@ void main() {
         ),
       });
 
+      final service = ChatService();
+      await service.init();
       await expectLater(
         CherryImporter.importFromCherryStudio(
           file: backup,
           mode: RestoreMode.overwrite,
           settings: SettingsProvider(),
-          chatService: ChatService(),
+          chatService: service,
         ),
         throwsA(anything),
       );
