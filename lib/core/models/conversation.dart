@@ -116,11 +116,10 @@ class Conversation {
       title: json['title'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
-      messageIds:
-          (json['messageIds'] as List?)?.cast<String>() ?? const <String>[],
+      messageIds: (json['messageIds'] as List?)?.cast<String>() ?? <String>[],
       isPinned: json['isPinned'] as bool? ?? false,
       mcpServerIds:
-          (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
+          (json['mcpServerIds'] as List?)?.cast<String>() ?? <String>[],
       assistantId: json['assistantId'] as String?,
       truncateIndex: json['truncateIndex'] as int? ?? -1,
       versionSelections:
@@ -132,8 +131,7 @@ class Conversation {
       lastSummarizedMessageCount:
           json['lastSummarizedMessageCount'] as int? ?? 0,
       chatSuggestions:
-          (json['chatSuggestions'] as List?)?.cast<String>() ??
-          const <String>[],
+          (json['chatSuggestions'] as List?)?.cast<String>() ?? <String>[],
     );
   }
 }

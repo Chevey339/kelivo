@@ -871,9 +871,9 @@ class ChatDatabaseRepository {
       title: row.title,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
-      messageIds: messageRows.map((m) => m.id).toList(growable: false),
+      messageIds: messageRows.map((m) => m.id).toList(),
       isPinned: row.isPinned,
-      mcpServerIds: mcpRows.map((m) => m.serverId).toList(growable: false),
+      mcpServerIds: mcpRows.map((m) => m.serverId).toList(),
       assistantId: row.assistantId,
       truncateIndex: row.truncateIndex,
       versionSelections: _decodeStringIntMap(row.versionSelectionsJson),
@@ -907,14 +907,10 @@ class ChatDatabaseRepository {
       createdAt: _dateTimeFromSqlite(row['created_at']),
       updatedAt: _dateTimeFromSqlite(row['updated_at']),
       messageIds:
-          messageRows?.map((m) => m['id'] as String).toList(growable: false) ??
-          const <String>[],
+          messageRows?.map((m) => m['id'] as String).toList() ?? <String>[],
       isPinned: row['is_pinned'] == 1,
       mcpServerIds:
-          mcpRows
-              ?.map((m) => m['server_id'] as String)
-              .toList(growable: false) ??
-          const <String>[],
+          mcpRows?.map((m) => m['server_id'] as String).toList() ?? <String>[],
       assistantId: row['assistant_id'] as String?,
       truncateIndex: row['truncate_index'] as int? ?? -1,
       versionSelections: _decodeStringIntMap(
