@@ -1814,6 +1814,7 @@ class ChatDatabaseRepository {
     required List<String> tokens,
     int limit = 200,
     int candidateMultiplier = 8,
+    bool includeAllRevisions = false,
   }) {
     return _observer.measure(
       ChatDatabaseOperation.querySearch,
@@ -1821,6 +1822,7 @@ class ChatDatabaseRepository {
         tokens: tokens,
         limit: limit,
         candidateMultiplier: candidateMultiplier,
+        includeAllRevisions: includeAllRevisions,
       ),
       resultCount: (rows) => rows.length,
     );
@@ -1830,6 +1832,7 @@ class ChatDatabaseRepository {
     required List<String> tokens,
     required int limit,
     required int candidateMultiplier,
+    required bool includeAllRevisions,
   }) async {
     final cleanTokens = tokens
         .map((token) => token.trim().toLowerCase())
@@ -1838,6 +1841,8 @@ class ChatDatabaseRepository {
     if (cleanTokens.isEmpty || limit <= 0) {
       return const <ConversationSearchMatch>[];
     }
+    await _ensureMessageSearchFts();
+    final useSubstringFallback = cleanTokens.any(_requiresCjkFallback);
 
     String escapeLike(String value) => value
         .replaceAll(r'\', r'\\')
@@ -1863,8 +1868,31 @@ class ChatDatabaseRepository {
         )
         ''');
       existsArgs.add(pattern);
-      messageAnyClauses.add('LOWER(m.content) LIKE ? ESCAPE \'\\\'');
-      messageArgs.add(pattern);
+      if (useSubstringFallback) {
+        messageAnyClauses.add('LOWER(m.content) LIKE ? ESCAPE \'\\\'');
+        messageArgs.add(pattern);
+      }
+    }
+    final ftsQuery = cleanTokens
+        .map((token) => '"${token.replaceAll('"', '""')}"')
+        .join(' AND ');
+    if (!useSubstringFallback) {
+      messageAnyClauses.add(
+        'm.id IN (SELECT revision_id FROM message_search_fts '
+        'WHERE body MATCH ?)',
+      );
+      messageArgs.add(ftsQuery);
+      existsClauses
+        ..clear()
+        ..add('''
+        EXISTS (
+          SELECT 1 FROM message_search_fts fx
+          WHERE fx.conversation_id = c.id AND fx.body MATCH ?
+        )
+        ''');
+      existsArgs
+        ..clear()
+        ..add(ftsQuery);
     }
 
     final candidateLimit = (limit * candidateMultiplier)
@@ -1921,6 +1949,7 @@ class ChatDatabaseRepository {
         ON m.conversation_id = c.id
         AND m.role IN ('user', 'assistant')
         AND (${messageAnyClauses.join(' OR ')})
+        ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM active_revisions visible WHERE visible.conversation_id = m.conversation_id AND visible.revision_id = m.id)'}
       WHERE (${titleClauses.join(' AND ')}) OR (${existsClauses.join(' AND ')})
       ORDER BY c.updated_at DESC, m.message_order ASC
       LIMIT ?
@@ -1957,6 +1986,58 @@ class ChatDatabaseRepository {
           );
         })
         .toList(growable: false);
+  }
+
+  bool _requiresCjkFallback(String token) {
+    return RegExp(
+      r'[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]',
+    ).hasMatch(token);
+  }
+
+  Future<void> _ensureMessageSearchFts() async {
+    await _db.customStatement('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS message_search_fts USING fts5(
+        revision_id UNINDEXED,
+        conversation_id UNINDEXED,
+        body,
+        tokenize = 'unicode61 remove_diacritics 2'
+      );
+    ''');
+    await _db.customStatement('''
+      CREATE TRIGGER IF NOT EXISTS message_search_fts_insert
+      AFTER INSERT ON message_rows BEGIN
+        INSERT INTO message_search_fts(revision_id, conversation_id, body)
+        VALUES (new.id, new.conversation_id, new.content);
+      END;
+    ''');
+    await _db.customStatement('''
+      CREATE TRIGGER IF NOT EXISTS message_search_fts_delete
+      AFTER DELETE ON message_rows BEGIN
+        DELETE FROM message_search_fts WHERE revision_id = old.id;
+      END;
+    ''');
+    await _db.customStatement('''
+      CREATE TRIGGER IF NOT EXISTS message_search_fts_update
+      AFTER UPDATE OF content, conversation_id ON message_rows BEGIN
+        DELETE FROM message_search_fts WHERE revision_id = old.id;
+        INSERT INTO message_search_fts(revision_id, conversation_id, body)
+        VALUES (new.id, new.conversation_id, new.content);
+      END;
+    ''');
+    final counts = await _db.customSelect('''
+      SELECT
+        (SELECT COUNT(*) FROM message_rows) AS source_count,
+        (SELECT COUNT(*) FROM message_search_fts) AS fts_count;
+    ''').getSingle();
+    if (counts.read<int>('source_count') != counts.read<int>('fts_count')) {
+      await _db.transaction(() async {
+        await _db.customStatement('DELETE FROM message_search_fts;');
+        await _db.customStatement('''
+          INSERT INTO message_search_fts(revision_id, conversation_id, body)
+          SELECT id, conversation_id, content FROM message_rows;
+        ''');
+      });
+    }
   }
 
   Future<void> putConversation(Conversation conversation) async {

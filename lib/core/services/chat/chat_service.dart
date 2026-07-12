@@ -621,9 +621,14 @@ class ChatService extends ChangeNotifier {
   Future<List<ConversationSearchMatch>> searchConversationMatches({
     required List<String> tokens,
     int limit = 200,
+    bool includeAllRevisions = false,
   }) async {
     if (!_initialized) return const <ConversationSearchMatch>[];
-    return _repo.searchConversationMatches(tokens: tokens, limit: limit);
+    return _repo.searchConversationMatches(
+      tokens: tokens,
+      limit: limit,
+      includeAllRevisions: includeAllRevisions,
+    );
   }
 
   List<ChatMessage> getMessages(String conversationId) {
