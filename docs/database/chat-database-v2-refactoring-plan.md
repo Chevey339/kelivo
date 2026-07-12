@@ -808,7 +808,7 @@ flowchart LR
 - `GEN-02`：原子 begin send/regeneration。
 - `GEN-03`：解耦网络 buffer、UI frame publisher、DB checkpoint queue。
 - `GEN-04`：原子 complete/fail/cancel/interrupted 收尾。
-- `GEN-05`：tool/reasoning/provider artifacts 按有序 parts 持久化。
+- `GEN-05`：tool/reasoning/provider artifacts 按有序 parts 持久化；在此项完成前，`message_rows` 与 `message_part_rows` 的正文双写只是过渡态，repository 是唯一允许的写入口；完成时必须让 parts 成为唯一正文权威，并移除或拒绝任何绕过 repository 直接改写 `message_rows` 正文的路径。
 - `GEN-06`：启动恢复所有非终态 run；删除 active ID JSON。
 - `GEN-07`：验证 chunk/onDone/cancel/切会话/kill 竞态和迟到事件。
 
@@ -848,10 +848,10 @@ flowchart LR
 - `OPS-03`：旧 JSON 只读 adapter + 显式 portable NDJSON v2。
 - `OPS-04`：FTS5/短中文 fallback 和 branch-aware 导航。
 - `OPS-05`：统计 SQL 聚合与 current branch/all revisions 口径。
-- `OPS-06`：assets 引用表、缩略图元数据和延迟 GC。
+- `OPS-06`：assets 引用表、缩略图元数据，以及 assets/branch/revision 延迟 GC；消除 `deleteRevision` 当前为每个未删除 branch 重做完整路径投影的 `O(活跃 branch 数 × 路径长度)` 检测，以集合化 reachability、索引或可批处理的 GC ledger 控制重度会话删除成本，并保留高 branch-count 压测证据。
 - `OPS-07`：秘密迁入平台安全存储，普通备份排除秘密。
 - `OPS-08`：灰度、迁移指标、恢复支持和 v2-compatible rollback build。
-- `OPS-09`：满足保留条件后移除 Hive adapter、文件和 v1 写路径。
+- `OPS-09`：满足保留条件后移除 Hive adapter、文件和 v1 写路径；显式退役或先标注 `@Deprecated('legacy/test only')` 的 repository compaction/legacy API，包括 `updateMessageOrder`、`updateConversationMessages`、`deleteMessages`、`appendMessageToConversation`，不得让新业务重新接回全会话 compact 路径。
 
 退出条件：
 
