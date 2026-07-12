@@ -826,7 +826,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openSelectionMiniMap() async {
-    final collapsed = _controller.allCollapsedMessagesForCurrentConversation();
+    final collapsed = await _controller
+        .loadAllCollapsedMessagesForCurrentConversation();
+    if (!mounted) return;
     if (collapsed.isEmpty) return;
 
     if (PlatformUtils.isDesktop &&
@@ -1368,7 +1370,9 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _openMiniMap() async {
-    final collapsed = _controller.allCollapsedMessagesForCurrentConversation();
+    final collapsed = await _controller
+        .loadAllCollapsedMessagesForCurrentConversation();
+    if (!mounted) return;
     if (collapsed.isEmpty) return;
 
     String? selectedId;

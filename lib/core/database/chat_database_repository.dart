@@ -866,6 +866,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     String? beforeRevisionId,
     String? afterRevisionId,
+    String? aroundRevisionId,
     bool fromStart = false,
     int limit = 40,
   }) => _observer.measure(
@@ -874,6 +875,7 @@ class ChatDatabaseRepository {
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
+      aroundRevisionId: aroundRevisionId,
       fromStart: fromStart,
       limit: limit,
     ),

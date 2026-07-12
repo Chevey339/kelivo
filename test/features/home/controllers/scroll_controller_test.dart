@@ -145,8 +145,9 @@ void main() {
         indexOfId: (id) => messages.indexWhere((message) => message.id == id),
       );
       await tester.pumpAndSettle();
-      await navigation;
+      final moved = await navigation;
 
+      expect(moved, isTrue);
       expect(chatScrollController.lastJumpUserMessageId, 'message-15');
 
       chatScrollController.dispose();
@@ -184,8 +185,9 @@ void main() {
         indexOfId: (id) => messages.indexWhere((message) => message.id == id),
       );
       await tester.pumpAndSettle();
-      await navigation;
+      final moved = await navigation;
 
+      expect(moved, isTrue);
       expect(chatScrollController.lastJumpUserMessageId, 'message-15');
 
       chatScrollController.dispose();

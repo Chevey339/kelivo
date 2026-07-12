@@ -216,12 +216,17 @@ final class MessageGraphProjector {
     required String conversationId,
     String? beforeRevisionId,
     String? afterRevisionId,
+    String? aroundRevisionId,
     bool fromStart = false,
     int limit = 40,
   }) async {
     if (limit <= 0) throw ArgumentError.value(limit, 'limit');
-    if ((beforeRevisionId != null && afterRevisionId != null) ||
-        (fromStart && (beforeRevisionId != null || afterRevisionId != null))) {
+    final cursorCount = [
+      beforeRevisionId,
+      afterRevisionId,
+      aroundRevisionId,
+    ].where((cursor) => cursor != null).length;
+    if (cursorCount > 1 || (fromStart && cursorCount != 0)) {
       throw ArgumentError('Only one timeline cursor may be supplied.');
     }
     final state =
@@ -273,7 +278,7 @@ final class MessageGraphProjector {
       );
     }
 
-    final cursor = beforeRevisionId ?? afterRevisionId;
+    final cursor = beforeRevisionId ?? afterRevisionId ?? aroundRevisionId;
     if (cursor != null &&
         !await _activePathContains(
           conversationId: conversationId,
@@ -285,18 +290,36 @@ final class MessageGraphProjector {
       );
     }
 
+    final aroundLeading = limit ~/ 2;
+    final aroundTrailing = limit - aroundLeading - 1;
+    final aroundCursorCte = aroundRevisionId == null
+        ? ''
+        : ', cursor_depth AS ('
+              'SELECT depth FROM active_path WHERE id = ?'
+              ')';
     final cursorPredicate = beforeRevisionId != null
         ? 'WHERE depth > (SELECT depth FROM active_path WHERE id = ?)'
         : afterRevisionId != null
         ? 'WHERE depth < (SELECT depth FROM active_path WHERE id = ?)'
+        : aroundRevisionId != null
+        ? 'WHERE path.depth BETWEEN '
+              'MAX(0, (SELECT depth FROM cursor_depth) - ?) '
+              'AND (SELECT depth FROM cursor_depth) + ?'
         : '';
-    final order = afterRevisionId != null || fromStart ? 'DESC' : 'ASC';
+    final order =
+        afterRevisionId != null || aroundRevisionId != null || fromStart
+        ? 'DESC'
+        : 'ASC';
     final variables = <Variable<Object>>[
       Variable.withString(leafRevisionId),
       Variable.withString(conversationId),
       Variable.withString(conversationId),
       if (cursor != null) Variable.withString(cursor),
-      Variable.withInt(limit + 1),
+      if (aroundRevisionId != null) ...[
+        Variable.withInt(aroundTrailing),
+        Variable.withInt(aroundLeading),
+      ],
+      Variable.withInt(aroundRevisionId == null ? limit + 1 : limit),
     ];
     final rows = await _db
         .customSelect(
@@ -316,6 +339,7 @@ WITH RECURSIVE active_path(
   WHERE parent.conversation_id = ?
     AND parent.deleted_at IS NULL
 )
+$aroundCursorCte
 SELECT path.id, path.slot_id, path.parent_revision_id,
        path.created_at, path.updated_at, path.finalized_at,
        slot.role, path.depth,
@@ -332,7 +356,8 @@ LIMIT ?;
         .get();
     final hasExtra = rows.length > limit;
     final selectedRows = rows.take(limit).toList(growable: true);
-    final orderedRows = afterRevisionId == null && !fromStart
+    final orderedRows =
+        afterRevisionId == null && aroundRevisionId == null && !fromStart
         ? selectedRows.reversed.toList(growable: false)
         : selectedRows;
     final slotIds = orderedRows
@@ -385,14 +410,18 @@ LIMIT ?;
       stateRevision: state.stateRevision,
       contextStartRevisionId: state.contextStartRevisionId,
       slots: slots,
-      hasMoreBefore: fromStart
+      hasMoreBefore: aroundRevisionId != null
+          ? slots.isNotEmpty && slots.first.logicalIndex > 0
+          : fromStart
           ? false
           : beforeRevisionId != null
           ? hasExtra
           : afterRevisionId != null
           ? true
           : hasExtra,
-      hasMoreAfter: fromStart
+      hasMoreAfter: aroundRevisionId != null
+          ? slots.isNotEmpty && slots.last.logicalIndex < totalSlotCount - 1
+          : fromStart
           ? hasExtra
           : afterRevisionId != null
           ? hasExtra

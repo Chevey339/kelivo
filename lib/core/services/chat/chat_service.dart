@@ -236,10 +236,38 @@ class ChatService extends ChangeNotifier {
     return timeline;
   }
 
+  Future<List<ChatMessage>> loadActiveTimelineMessages(
+    String conversationId,
+  ) async {
+    if (!_initialized) return const <ChatMessage>[];
+    if (_temporaryConversationIds.contains(conversationId)) {
+      return List<ChatMessage>.of(
+        _messagesCache[conversationId] ?? const <ChatMessage>[],
+      );
+    }
+    final timeline = await loadMessageGraphTimeline(
+      conversationId,
+      force: true,
+    );
+    if (timeline == null || timeline.activeRevisions.isEmpty) {
+      return const <ChatMessage>[];
+    }
+    final revisionIds = timeline.activeRevisions
+        .map((revision) => revision.revisionId)
+        .toList(growable: false);
+    final messages = await _repo.getMessagesByIds(revisionIds);
+    final byId = {for (final message in messages) message.id: message};
+    return List<ChatMessage>.unmodifiable([
+      for (final revisionId in revisionIds)
+        if (byId[revisionId] != null) byId[revisionId]!,
+    ]);
+  }
+
   Future<LoadedTimelinePage?> loadTimelinePage(
     String conversationId, {
     String? beforeRevisionId,
     String? afterRevisionId,
+    String? aroundRevisionId,
     bool fromStart = false,
     int limit = 40,
   }) async {
@@ -248,6 +276,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
+      aroundRevisionId: aroundRevisionId,
       fromStart: fromStart,
       limit: limit,
     );

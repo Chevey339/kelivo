@@ -202,6 +202,44 @@ void main() {
     },
   );
 
+  test(
+    'openAround replaces the window around a stable revision cursor',
+    () async {
+      String? requestedRevisionId;
+      final coordinator = TimelineCoordinator(
+        loadPage:
+            ({
+              required conversationId,
+              beforeRevisionId,
+              afterRevisionId,
+              fromStart,
+              required limit,
+            }) async => page([4, 5], before: true, after: false),
+        loadAroundPage:
+            ({
+              required conversationId,
+              required targetRevisionId,
+              required limit,
+            }) async {
+              requestedRevisionId = targetRevisionId;
+              return page([1, 2, 3], before: true, after: true);
+            },
+      );
+      await coordinator.open('conversation');
+
+      expect(await coordinator.openAround('revision-2', limit: 3), isTrue);
+
+      expect(requestedRevisionId, 'revision-2');
+      expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
+        'revision-1',
+        'revision-2',
+        'revision-3',
+      ]);
+      expect(coordinator.viewportMode, TimelineViewportMode.programmaticJump);
+      expect(coordinator.programmaticTargetSlotId, 'slot-2');
+    },
+  );
+
   test('slot ID and localDy resolve layout drift within one logical pixel', () {
     final coordinator = TimelineCoordinator(
       loadPage:

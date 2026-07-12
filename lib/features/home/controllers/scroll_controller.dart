@@ -440,13 +440,13 @@ class ChatScrollController {
   /// Jump to the previous user message (question) above the current viewport.
   ///
   /// Uses ListObserverController for precise index-based navigation.
-  Future<void> jumpToPreviousQuestion({
+  Future<bool> jumpToPreviousQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
   }) async {
     try {
-      if (!_scrollController.hasClients) return;
-      if (messages.isEmpty) return;
+      if (!_scrollController.hasClients) return false;
+      if (messages.isEmpty) return false;
 
       revealNavButtons();
       onUserAnchored?.call();
@@ -476,9 +476,8 @@ class ChatScrollController {
         }
       }
       if (target < 0) {
-        _scrollController.jumpTo(0.0);
         _lastJumpUserMessageId = null;
-        return;
+        return false;
       }
 
       await _observerController.animateTo(
@@ -488,19 +487,22 @@ class ChatScrollController {
         curve: Curves.easeOutCubic,
       );
       _lastJumpUserMessageId = messages[target].id;
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Jump to the next user message (question) below the current viewport.
   ///
   /// Uses ListObserverController for precise index-based navigation.
-  Future<void> jumpToNextQuestion({
+  Future<bool> jumpToNextQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
   }) async {
     try {
-      if (!_scrollController.hasClients) return;
-      if (messages.isEmpty) return;
+      if (!_scrollController.hasClients) return false;
+      if (messages.isEmpty) return false;
 
       revealNavButtons();
       onUserAnchored?.call();
@@ -528,9 +530,8 @@ class ChatScrollController {
         }
       }
       if (target < 0) {
-        forceScrollToBottom();
         _lastJumpUserMessageId = null;
-        return;
+        return false;
       }
 
       await _observerController.animateTo(
@@ -540,7 +541,10 @@ class ChatScrollController {
         curve: Curves.easeOutCubic,
       );
       _lastJumpUserMessageId = messages[target].id;
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Scroll to a specific message by index (from mini map or search).

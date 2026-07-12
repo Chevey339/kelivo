@@ -305,6 +305,19 @@ void main() {
       expect(after.hasMoreBefore, isTrue);
       expect(after.hasMoreAfter, isFalse);
 
+      final around = await repository.loadActiveTimelinePage(
+        conversationId: 'conversation-1',
+        aroundRevisionId: 'a1-v1',
+        limit: 3,
+      );
+      expect(around!.slots.map((slot) => slot.revisionId), [
+        'u1',
+        'a1-v1',
+        'u2',
+      ]);
+      expect(around.hasMoreBefore, isFalse);
+      expect(around.hasMoreAfter, isTrue);
+
       await expectLater(
         repository.loadActiveTimelinePage(
           conversationId: 'conversation-1',

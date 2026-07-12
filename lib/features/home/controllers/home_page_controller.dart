@@ -1787,15 +1787,18 @@ class HomePageController extends ChangeNotifier {
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() =>
       _chatController.allCollapsedMessagesForCurrentConversation();
 
+  Future<List<ChatMessage>> loadAllCollapsedMessagesForCurrentConversation() =>
+      _chatController.loadAllCollapsedMessagesForCurrentConversation();
+
   Future<void> scrollToMessageId(String targetId) async {
     if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
       final loaded = await _viewModel.loadUntilMessageVisible(targetId);
-      if (loaded) {
-        _scrollCtrl.clearObserverCache();
-      }
+      if (!loaded) return;
+      _scrollCtrl.clearObserverCache();
       try {
         await WidgetsBinding.instance.endOfFrame;
       } catch (_) {}
+      return;
     }
     final index = _chatController.indexOfCollapsedMessageId(targetId);
     if (index < 0) return;
@@ -1803,17 +1806,46 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> jumpToPreviousQuestion() async {
-    await _scrollCtrl.jumpToPreviousQuestion(
+    final moved = await _scrollCtrl.jumpToPreviousQuestion(
       messages: _chatController.collapsedMessages,
       indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
     );
+    if (!moved) await _jumpToAdjacentQuestionOutsideWindow(previous: true);
   }
 
   Future<void> jumpToNextQuestion() async {
-    await _scrollCtrl.jumpToNextQuestion(
+    final moved = await _scrollCtrl.jumpToNextQuestion(
       messages: _chatController.collapsedMessages,
       indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
     );
+    if (!moved) await _jumpToAdjacentQuestionOutsideWindow(previous: false);
+  }
+
+  Future<void> _jumpToAdjacentQuestionOutsideWindow({
+    required bool previous,
+  }) async {
+    final window = _chatController.collapsedMessages;
+    if (window.isEmpty) return;
+    final all = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
+    final boundaryId = previous ? window.first.id : window.last.id;
+    final boundary = all.indexWhere((message) => message.id == boundaryId);
+    if (boundary < 0) return;
+    final step = previous ? -1 : 1;
+    for (
+      var index = boundary + step;
+      index >= 0 && index < all.length;
+      index += step
+    ) {
+      if (all[index].role != 'user') continue;
+      await scrollToMessageId(all[index].id);
+      return;
+    }
+    if (previous) {
+      await scrollToTop();
+    } else {
+      await forceScrollToBottom();
+    }
   }
 
   Future<void> scrollToTop({bool animate = true}) async {

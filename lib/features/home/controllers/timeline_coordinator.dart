@@ -17,6 +17,13 @@ typedef TimelinePageLoader =
 typedef TimelineWindowRetainer =
     void Function(String conversationId, Iterable<String> revisionIds);
 
+typedef TimelineAroundPageLoader =
+    Future<LoadedTimelinePage?> Function({
+      required String conversationId,
+      required String targetRevisionId,
+      required int limit,
+    });
+
 final class TimelineWindowBudget {
   const TimelineWindowBudget({
     this.maxSlots = 360,
@@ -59,11 +66,13 @@ enum TimelineViewportMode {
 class TimelineCoordinator extends ChangeNotifier {
   TimelineCoordinator({
     required this.loadPage,
+    this.loadAroundPage,
     this.retainWindow,
     this.budget = const TimelineWindowBudget(),
   });
 
   final TimelinePageLoader loadPage;
+  final TimelineAroundPageLoader? loadAroundPage;
   final TimelineWindowRetainer? retainWindow;
   final TimelineWindowBudget budget;
 
@@ -254,6 +263,33 @@ class TimelineCoordinator extends ChangeNotifier {
     _stateRevision = page.stateRevision;
     _totalSlotCount = page.totalSlotCount;
     _replace(page);
+  }
+
+  Future<bool> openAround(String targetRevisionId, {int limit = 40}) async {
+    final conversationId = _conversationId;
+    final loader = loadAroundPage;
+    if (conversationId == null || loader == null || limit <= 0) return false;
+    final epoch = ++_requestEpoch;
+    final page = await loader(
+      conversationId: conversationId,
+      targetRevisionId: targetRevisionId,
+      limit: limit,
+    );
+    if (!_accepts(epoch, conversationId) || page == null) return false;
+    LoadedTimelineSlot? target;
+    for (final slot in page.slots) {
+      if (slot.identity.revisionId == targetRevisionId) {
+        target = slot;
+        break;
+      }
+    }
+    if (target == null) return false;
+    _stateRevision = page.stateRevision;
+    _totalSlotCount = page.totalSlotCount;
+    _visualAnchor = null;
+    _replace(page);
+    programmaticJump(target.identity.slotId);
+    return true;
   }
 
   void seed(LoadedTimelinePage page) {

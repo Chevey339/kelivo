@@ -16,6 +16,8 @@ class _FakeLazyChatService extends ChatService {
   int fullLoadCalls = 0;
   int recentLoadCalls = 0;
   int rangeLoadCalls = 0;
+  int activeTimelineLoadCalls = 0;
+  int messageIndexCalls = 0;
   int contextStartIndex = -1;
 
   @override
@@ -34,10 +36,19 @@ class _FakeLazyChatService extends ChatService {
   }
 
   @override
+  Future<List<ChatMessage>> loadActiveTimelineMessages(
+    String conversationId,
+  ) async {
+    activeTimelineLoadCalls++;
+    return List<ChatMessage>.of(_messages);
+  }
+
+  @override
   int getMessageCount(String conversationId) => _messages.length;
 
   @override
   int getMessageIndex(String conversationId, String messageId) {
+    messageIndexCalls++;
     return _messages.indexWhere((message) => message.id == messageId);
   }
 
@@ -92,6 +103,7 @@ class _FakeLazyChatService extends ChatService {
     String conversationId, {
     String? beforeRevisionId,
     String? afterRevisionId,
+    String? aroundRevisionId,
     bool fromStart = false,
     int limit = 40,
   }) async {
@@ -118,6 +130,15 @@ class _FakeLazyChatService extends ChatService {
     if (fromStart) {
       start = 0;
       end = effectiveLimit.clamp(0, activeMessages.length);
+    } else if (aroundRevisionId != null) {
+      final target = activeMessages.indexWhere(
+        (message) => message.id == aroundRevisionId,
+      );
+      if (target < 0) return null;
+      final before = limit ~/ 2;
+      start = (target - before).clamp(0, activeMessages.length - 1);
+      end = (start + limit).clamp(start, activeMessages.length);
+      start = (end - limit).clamp(0, end);
     } else if (beforeRevisionId != null) {
       end = activeMessages.indexWhere(
         (message) => message.id == beforeRevisionId,
@@ -789,9 +810,9 @@ void main() {
 
       expect(visible, isTrue);
       expect(chatService.rangeLoadCalls, 1);
-      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
+      expect(controller.messages.length, 41);
       expect(controller.messages.first.id, 'message-2480');
-      expect(controller.messages.last.id, 'message-2839');
+      expect(controller.messages.last.id, 'message-2520');
       expect(
         controller.messages.any((message) => message.id == 'message-2500'),
         isTrue,
@@ -817,10 +838,10 @@ void main() {
       final loaded = await controller.loadMoreAfter();
 
       expect(loaded, isTrue);
-      expect(controller.messages.length, ChatService.defaultLoadedWindowMax);
-      expect(controller.messages.first.id, 'message-2500');
-      expect(controller.messages.last.id, 'message-2859');
-      expect(controller.loadedStartIndex, 2500);
+      expect(controller.messages.length, 61);
+      expect(controller.messages.first.id, 'message-2480');
+      expect(controller.messages.last.id, 'message-2540');
+      expect(controller.loadedStartIndex, 2480);
       expect(controller.hasMoreBefore, isTrue);
       expect(controller.hasMoreAfter, isTrue);
     });
@@ -911,8 +932,8 @@ void main() {
         controller = ChatController(chatService: chatService);
         controller.setCurrentConversation(conversation);
 
-        final miniMapMessages = controller
-            .allCollapsedMessagesForCurrentConversation();
+        final miniMapMessages = await controller
+            .loadAllCollapsedMessagesForCurrentConversation();
 
         expect(miniMapMessages.length, 5000);
         expect(miniMapMessages.first.id, 'message-0');
@@ -920,6 +941,36 @@ void main() {
         expect(controller.messages.length, 20);
         expect(controller.loadedStartIndex, 4980);
         expect(chatService.fullLoadCalls, 0);
+        expect(chatService.activeTimelineLoadCalls, 1);
+      },
+    );
+
+    test(
+      'cross-window target opens by revision cursor instead of offset',
+      () async {
+        messages = List<ChatMessage>.generate(500, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Cursor navigation',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        expect(await controller.loadUntilMessageVisible('message-10'), isTrue);
+
+        expect(chatService.messageIndexCalls, 0);
+        expect(
+          controller.messages.any((message) => message.id == 'message-10'),
+          isTrue,
+        );
+        expect(controller.messages.last.id, isNot('message-499'));
+        expect(
+          controller.timelineCoordinator.programmaticTargetSlotId,
+          'message-10',
+        );
       },
     );
 
