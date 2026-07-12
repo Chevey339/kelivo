@@ -218,15 +218,19 @@ class TimelineCoordinator extends ChangeNotifier {
 
   Future<void> open(String conversationId, {int limit = 40}) async {
     final epoch = ++_requestEpoch;
+    final preserveVisibleWindow =
+        _conversationId == conversationId && _slots.isNotEmpty;
     _conversationId = conversationId;
-    _slots = const [];
-    _hasMoreBefore = false;
-    _hasMoreAfter = false;
-    _decodedBytes = 0;
-    _isGenerating = false;
-    _visualAnchor = null;
-    _windowRevision++;
-    notifyListeners();
+    if (!preserveVisibleWindow) {
+      _slots = const [];
+      _hasMoreBefore = false;
+      _hasMoreAfter = false;
+      _decodedBytes = 0;
+      _isGenerating = false;
+      _visualAnchor = null;
+      _windowRevision++;
+      notifyListeners();
+    }
     final page = await loadPage(
       conversationId: conversationId,
       fromStart: false,

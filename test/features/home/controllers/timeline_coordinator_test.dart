@@ -160,6 +160,47 @@ void main() {
     expect(coordinator.slots.single.identity.revisionId, 'revision-5');
   });
 
+  test(
+    'same-conversation open keeps the visible window while refreshing',
+    () async {
+      final refresh = Completer<LoadedTimelinePage?>();
+      var calls = 0;
+      final coordinator = TimelineCoordinator(
+        loadPage:
+            ({
+              required conversationId,
+              beforeRevisionId,
+              afterRevisionId,
+              fromStart,
+              required limit,
+            }) async {
+              calls++;
+              if (calls == 1) {
+                return page([2, 3], before: true, after: false);
+              }
+              return refresh.future;
+            },
+      );
+      await coordinator.open('conversation');
+      final visibleSlots = coordinator.slots.toList();
+      final visibleRevision = coordinator.windowRevision;
+
+      final refreshing = coordinator.open('conversation');
+      await Future<void>.delayed(Duration.zero);
+
+      expect(coordinator.slots, visibleSlots);
+      expect(coordinator.windowRevision, visibleRevision);
+
+      refresh.complete(page([3, 4], before: true, after: false));
+      await refreshing;
+      expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
+        'revision-3',
+        'revision-4',
+      ]);
+      expect(coordinator.windowRevision, visibleRevision + 1);
+    },
+  );
+
   test('slot ID and localDy resolve layout drift within one logical pixel', () {
     final coordinator = TimelineCoordinator(
       loadPage:
