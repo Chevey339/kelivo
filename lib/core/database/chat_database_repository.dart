@@ -9,6 +9,8 @@ import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import 'app_database.dart';
 import 'chat_database_observer.dart';
+import 'generation_run.dart';
+import 'generation_run_commands.dart';
 import 'message_graph_projector.dart';
 import 'message_graph_commands.dart';
 import 'legacy_message_graph_adapter.dart';
@@ -76,6 +78,37 @@ class ChatDatabaseRepository {
     final db = AppDatabase.open(file: file);
     return ChatDatabaseRepository(db, databaseFile: file, observer: observer);
   }
+
+  Future<GenerationRun> createGenerationRun({
+    required String id,
+    required String conversationId,
+    required String targetRevisionId,
+    required DateTime createdAt,
+  }) => GenerationRunCommands(_db).create(
+    id: id,
+    conversationId: conversationId,
+    targetRevisionId: targetRevisionId,
+    createdAt: createdAt,
+  );
+
+  Future<GenerationRun?> getGenerationRun(String id) =>
+      GenerationRunCommands(_db).get(id);
+
+  Future<GenerationRun> transitionGenerationRun({
+    required String id,
+    required GenerationRunState expectedState,
+    required int expectedStateRevision,
+    required GenerationRunState nextState,
+    required DateTime updatedAt,
+    String? errorCode,
+  }) => GenerationRunCommands(_db).transition(
+    id: id,
+    expectedState: expectedState,
+    expectedStateRevision: expectedStateRevision,
+    nextState: nextState,
+    updatedAt: updatedAt,
+    errorCode: errorCode,
+  );
 
   static Future<bool> migrateInstalledDatabase(File file) async {
     final database = sqlite.sqlite3.open(
@@ -432,6 +465,8 @@ class ChatDatabaseRepository {
         database.userVersion >= AppDatabase.messagePartsSchemaVersion;
     final includesMigrationLedger =
         database.userVersion >= AppDatabase.legacyGraphAdapterSchemaVersion;
+    final includesGenerationRuns =
+        database.userVersion >= AppDatabase.generationRunSchemaVersion;
     if (includesMessageGraph) {
       requiredTables.addAll(const {
         'message_slot_rows',
@@ -447,6 +482,7 @@ class ChatDatabaseRepository {
         'migration_issue_rows',
       });
     }
+    if (includesGenerationRuns) requiredTables.add('generation_run_rows');
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -462,6 +498,7 @@ class ChatDatabaseRepository {
       includesMessageGraph: includesMessageGraph,
       includesMessageParts: includesMessageParts,
       includesMigrationLedger: includesMigrationLedger,
+      includesGenerationRuns: includesGenerationRuns,
     );
   }
 
@@ -470,6 +507,7 @@ class ChatDatabaseRepository {
     required bool includesMessageGraph,
     required bool includesMessageParts,
     required bool includesMigrationLedger,
+    required bool includesGenerationRuns,
   }) {
     final expectedColumns = <String, List<String>>{
       'conversation_rows': [
@@ -582,6 +620,20 @@ class ChatDatabaseRepository {
         ],
       });
     }
+    if (includesGenerationRuns) {
+      expectedColumns['generation_run_rows'] = const [
+        'id',
+        'conversation_id',
+        'target_revision_id',
+        'state',
+        'state_revision',
+        'checkpoint_seq',
+        'error_code',
+        'created_at',
+        'updated_at',
+        'terminal_at',
+      ];
+    }
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -637,6 +689,13 @@ class ChatDatabaseRepository {
     if (includesMigrationLedger) {
       expectedForeignKeys['migration_issue_rows'] = const {
         'migration_run_id->migration_run_rows.id:CASCADE',
+      };
+    }
+    if (includesGenerationRuns) {
+      expectedForeignKeys['generation_run_rows'] = const {
+        'conversation_id->conversation_rows.id:CASCADE',
+        'conversation_id->message_revision_rows.conversation_id:NO ACTION',
+        'target_revision_id->message_revision_rows.id:NO ACTION',
       };
     }
     for (final entry in expectedForeignKeys.entries) {

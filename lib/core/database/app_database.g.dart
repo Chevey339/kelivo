@@ -6219,6 +6219,651 @@ class MigrationIssueRowsCompanion extends UpdateCompanion<MigrationIssueRow> {
   }
 }
 
+class $GenerationRunRowsTable extends GenerationRunRows
+    with TableInfo<$GenerationRunRowsTable, GenerationRunRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $GenerationRunRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _conversationIdMeta = const VerificationMeta(
+    'conversationId',
+  );
+  @override
+  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
+    'conversation_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES conversation_rows (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _targetRevisionIdMeta = const VerificationMeta(
+    'targetRevisionId',
+  );
+  @override
+  late final GeneratedColumn<String> targetRevisionId = GeneratedColumn<String>(
+    'target_revision_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateMeta = const VerificationMeta('state');
+  @override
+  late final GeneratedColumn<String> state = GeneratedColumn<String>(
+    'state',
+    aliasedName,
+    false,
+    check: () => state.isIn(const [
+      'preparing',
+      'requesting',
+      'streaming',
+      'waiting_tool',
+      'completed',
+      'failed',
+      'cancelled',
+      'interrupted',
+    ]),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _stateRevisionMeta = const VerificationMeta(
+    'stateRevision',
+  );
+  @override
+  late final GeneratedColumn<int> stateRevision = GeneratedColumn<int>(
+    'state_revision',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(stateRevision).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _checkpointSeqMeta = const VerificationMeta(
+    'checkpointSeq',
+  );
+  @override
+  late final GeneratedColumn<int> checkpointSeq = GeneratedColumn<int>(
+    'checkpoint_seq',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(checkpointSeq).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _errorCodeMeta = const VerificationMeta(
+    'errorCode',
+  );
+  @override
+  late final GeneratedColumn<String> errorCode = GeneratedColumn<String>(
+    'error_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> createdAt =
+      GeneratedColumn<int>(
+        'created_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationRunRowsTable.$convertercreatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($GenerationRunRowsTable.$converterupdatedAt);
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime?, int> terminalAt =
+      GeneratedColumn<int>(
+        'terminal_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      ).withConverter<DateTime?>($GenerationRunRowsTable.$converterterminalAtn);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    conversationId,
+    targetRevisionId,
+    state,
+    stateRevision,
+    checkpointSeq,
+    errorCode,
+    createdAt,
+    updatedAt,
+    terminalAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'generation_run_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<GenerationRunRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('conversation_id')) {
+      context.handle(
+        _conversationIdMeta,
+        conversationId.isAcceptableOrUnknown(
+          data['conversation_id']!,
+          _conversationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_conversationIdMeta);
+    }
+    if (data.containsKey('target_revision_id')) {
+      context.handle(
+        _targetRevisionIdMeta,
+        targetRevisionId.isAcceptableOrUnknown(
+          data['target_revision_id']!,
+          _targetRevisionIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_targetRevisionIdMeta);
+    }
+    if (data.containsKey('state')) {
+      context.handle(
+        _stateMeta,
+        state.isAcceptableOrUnknown(data['state']!, _stateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_stateMeta);
+    }
+    if (data.containsKey('state_revision')) {
+      context.handle(
+        _stateRevisionMeta,
+        stateRevision.isAcceptableOrUnknown(
+          data['state_revision']!,
+          _stateRevisionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('checkpoint_seq')) {
+      context.handle(
+        _checkpointSeqMeta,
+        checkpointSeq.isAcceptableOrUnknown(
+          data['checkpoint_seq']!,
+          _checkpointSeqMeta,
+        ),
+      );
+    }
+    if (data.containsKey('error_code')) {
+      context.handle(
+        _errorCodeMeta,
+        errorCode.isAcceptableOrUnknown(data['error_code']!, _errorCodeMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  GenerationRunRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return GenerationRunRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      conversationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}conversation_id'],
+      )!,
+      targetRevisionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_revision_id'],
+      )!,
+      state: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}state'],
+      )!,
+      stateRevision: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}state_revision'],
+      )!,
+      checkpointSeq: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}checkpoint_seq'],
+      )!,
+      errorCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}error_code'],
+      ),
+      createdAt: $GenerationRunRowsTable.$convertercreatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}created_at'],
+        )!,
+      ),
+      updatedAt: $GenerationRunRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+      terminalAt: $GenerationRunRowsTable.$converterterminalAtn.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}terminal_at'],
+        ),
+      ),
+    );
+  }
+
+  @override
+  $GenerationRunRowsTable createAlias(String alias) {
+    return $GenerationRunRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $convertercreatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime, int> $converterterminalAt =
+      const MicrosecondDateTimeConverter();
+  static TypeConverter<DateTime?, int?> $converterterminalAtn =
+      NullAwareTypeConverter.wrap($converterterminalAt);
+}
+
+class GenerationRunRow extends DataClass
+    implements Insertable<GenerationRunRow> {
+  final String id;
+  final String conversationId;
+  final String targetRevisionId;
+  final String state;
+  final int stateRevision;
+  final int checkpointSeq;
+  final String? errorCode;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? terminalAt;
+  const GenerationRunRow({
+    required this.id,
+    required this.conversationId,
+    required this.targetRevisionId,
+    required this.state,
+    required this.stateRevision,
+    required this.checkpointSeq,
+    this.errorCode,
+    required this.createdAt,
+    required this.updatedAt,
+    this.terminalAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['conversation_id'] = Variable<String>(conversationId);
+    map['target_revision_id'] = Variable<String>(targetRevisionId);
+    map['state'] = Variable<String>(state);
+    map['state_revision'] = Variable<int>(stateRevision);
+    map['checkpoint_seq'] = Variable<int>(checkpointSeq);
+    if (!nullToAbsent || errorCode != null) {
+      map['error_code'] = Variable<String>(errorCode);
+    }
+    {
+      map['created_at'] = Variable<int>(
+        $GenerationRunRowsTable.$convertercreatedAt.toSql(createdAt),
+      );
+    }
+    {
+      map['updated_at'] = Variable<int>(
+        $GenerationRunRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    if (!nullToAbsent || terminalAt != null) {
+      map['terminal_at'] = Variable<int>(
+        $GenerationRunRowsTable.$converterterminalAtn.toSql(terminalAt),
+      );
+    }
+    return map;
+  }
+
+  GenerationRunRowsCompanion toCompanion(bool nullToAbsent) {
+    return GenerationRunRowsCompanion(
+      id: Value(id),
+      conversationId: Value(conversationId),
+      targetRevisionId: Value(targetRevisionId),
+      state: Value(state),
+      stateRevision: Value(stateRevision),
+      checkpointSeq: Value(checkpointSeq),
+      errorCode: errorCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(errorCode),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+      terminalAt: terminalAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(terminalAt),
+    );
+  }
+
+  factory GenerationRunRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return GenerationRunRow(
+      id: serializer.fromJson<String>(json['id']),
+      conversationId: serializer.fromJson<String>(json['conversationId']),
+      targetRevisionId: serializer.fromJson<String>(json['targetRevisionId']),
+      state: serializer.fromJson<String>(json['state']),
+      stateRevision: serializer.fromJson<int>(json['stateRevision']),
+      checkpointSeq: serializer.fromJson<int>(json['checkpointSeq']),
+      errorCode: serializer.fromJson<String?>(json['errorCode']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+      terminalAt: serializer.fromJson<DateTime?>(json['terminalAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'conversationId': serializer.toJson<String>(conversationId),
+      'targetRevisionId': serializer.toJson<String>(targetRevisionId),
+      'state': serializer.toJson<String>(state),
+      'stateRevision': serializer.toJson<int>(stateRevision),
+      'checkpointSeq': serializer.toJson<int>(checkpointSeq),
+      'errorCode': serializer.toJson<String?>(errorCode),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+      'terminalAt': serializer.toJson<DateTime?>(terminalAt),
+    };
+  }
+
+  GenerationRunRow copyWith({
+    String? id,
+    String? conversationId,
+    String? targetRevisionId,
+    String? state,
+    int? stateRevision,
+    int? checkpointSeq,
+    Value<String?> errorCode = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Value<DateTime?> terminalAt = const Value.absent(),
+  }) => GenerationRunRow(
+    id: id ?? this.id,
+    conversationId: conversationId ?? this.conversationId,
+    targetRevisionId: targetRevisionId ?? this.targetRevisionId,
+    state: state ?? this.state,
+    stateRevision: stateRevision ?? this.stateRevision,
+    checkpointSeq: checkpointSeq ?? this.checkpointSeq,
+    errorCode: errorCode.present ? errorCode.value : this.errorCode,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    terminalAt: terminalAt.present ? terminalAt.value : this.terminalAt,
+  );
+  GenerationRunRow copyWithCompanion(GenerationRunRowsCompanion data) {
+    return GenerationRunRow(
+      id: data.id.present ? data.id.value : this.id,
+      conversationId: data.conversationId.present
+          ? data.conversationId.value
+          : this.conversationId,
+      targetRevisionId: data.targetRevisionId.present
+          ? data.targetRevisionId.value
+          : this.targetRevisionId,
+      state: data.state.present ? data.state.value : this.state,
+      stateRevision: data.stateRevision.present
+          ? data.stateRevision.value
+          : this.stateRevision,
+      checkpointSeq: data.checkpointSeq.present
+          ? data.checkpointSeq.value
+          : this.checkpointSeq,
+      errorCode: data.errorCode.present ? data.errorCode.value : this.errorCode,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+      terminalAt: data.terminalAt.present
+          ? data.terminalAt.value
+          : this.terminalAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationRunRow(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('targetRevisionId: $targetRevisionId, ')
+          ..write('state: $state, ')
+          ..write('stateRevision: $stateRevision, ')
+          ..write('checkpointSeq: $checkpointSeq, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('terminalAt: $terminalAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    conversationId,
+    targetRevisionId,
+    state,
+    stateRevision,
+    checkpointSeq,
+    errorCode,
+    createdAt,
+    updatedAt,
+    terminalAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is GenerationRunRow &&
+          other.id == this.id &&
+          other.conversationId == this.conversationId &&
+          other.targetRevisionId == this.targetRevisionId &&
+          other.state == this.state &&
+          other.stateRevision == this.stateRevision &&
+          other.checkpointSeq == this.checkpointSeq &&
+          other.errorCode == this.errorCode &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt &&
+          other.terminalAt == this.terminalAt);
+}
+
+class GenerationRunRowsCompanion extends UpdateCompanion<GenerationRunRow> {
+  final Value<String> id;
+  final Value<String> conversationId;
+  final Value<String> targetRevisionId;
+  final Value<String> state;
+  final Value<int> stateRevision;
+  final Value<int> checkpointSeq;
+  final Value<String?> errorCode;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<DateTime?> terminalAt;
+  final Value<int> rowid;
+  const GenerationRunRowsCompanion({
+    this.id = const Value.absent(),
+    this.conversationId = const Value.absent(),
+    this.targetRevisionId = const Value.absent(),
+    this.state = const Value.absent(),
+    this.stateRevision = const Value.absent(),
+    this.checkpointSeq = const Value.absent(),
+    this.errorCode = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.terminalAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  GenerationRunRowsCompanion.insert({
+    required String id,
+    required String conversationId,
+    required String targetRevisionId,
+    required String state,
+    this.stateRevision = const Value.absent(),
+    this.checkpointSeq = const Value.absent(),
+    this.errorCode = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.terminalAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       conversationId = Value(conversationId),
+       targetRevisionId = Value(targetRevisionId),
+       state = Value(state),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<GenerationRunRow> custom({
+    Expression<String>? id,
+    Expression<String>? conversationId,
+    Expression<String>? targetRevisionId,
+    Expression<String>? state,
+    Expression<int>? stateRevision,
+    Expression<int>? checkpointSeq,
+    Expression<String>? errorCode,
+    Expression<int>? createdAt,
+    Expression<int>? updatedAt,
+    Expression<int>? terminalAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (conversationId != null) 'conversation_id': conversationId,
+      if (targetRevisionId != null) 'target_revision_id': targetRevisionId,
+      if (state != null) 'state': state,
+      if (stateRevision != null) 'state_revision': stateRevision,
+      if (checkpointSeq != null) 'checkpoint_seq': checkpointSeq,
+      if (errorCode != null) 'error_code': errorCode,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (terminalAt != null) 'terminal_at': terminalAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  GenerationRunRowsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? conversationId,
+    Value<String>? targetRevisionId,
+    Value<String>? state,
+    Value<int>? stateRevision,
+    Value<int>? checkpointSeq,
+    Value<String?>? errorCode,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<DateTime?>? terminalAt,
+    Value<int>? rowid,
+  }) {
+    return GenerationRunRowsCompanion(
+      id: id ?? this.id,
+      conversationId: conversationId ?? this.conversationId,
+      targetRevisionId: targetRevisionId ?? this.targetRevisionId,
+      state: state ?? this.state,
+      stateRevision: stateRevision ?? this.stateRevision,
+      checkpointSeq: checkpointSeq ?? this.checkpointSeq,
+      errorCode: errorCode ?? this.errorCode,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      terminalAt: terminalAt ?? this.terminalAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (conversationId.present) {
+      map['conversation_id'] = Variable<String>(conversationId.value);
+    }
+    if (targetRevisionId.present) {
+      map['target_revision_id'] = Variable<String>(targetRevisionId.value);
+    }
+    if (state.present) {
+      map['state'] = Variable<String>(state.value);
+    }
+    if (stateRevision.present) {
+      map['state_revision'] = Variable<int>(stateRevision.value);
+    }
+    if (checkpointSeq.present) {
+      map['checkpoint_seq'] = Variable<int>(checkpointSeq.value);
+    }
+    if (errorCode.present) {
+      map['error_code'] = Variable<String>(errorCode.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<int>(
+        $GenerationRunRowsTable.$convertercreatedAt.toSql(createdAt.value),
+      );
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $GenerationRunRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (terminalAt.present) {
+      map['terminal_at'] = Variable<int>(
+        $GenerationRunRowsTable.$converterterminalAtn.toSql(terminalAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('GenerationRunRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('conversationId: $conversationId, ')
+          ..write('targetRevisionId: $targetRevisionId, ')
+          ..write('state: $state, ')
+          ..write('stateRevision: $stateRevision, ')
+          ..write('checkpointSeq: $checkpointSeq, ')
+          ..write('errorCode: $errorCode, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('terminalAt: $terminalAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -6250,6 +6895,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $MigrationIssueRowsTable migrationIssueRows =
       $MigrationIssueRowsTable(this);
+  late final $GenerationRunRowsTable generationRunRows =
+      $GenerationRunRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -6298,6 +6945,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_migration_issues_run_kind',
     'CREATE INDEX idx_migration_issues_run_kind ON migration_issue_rows (migration_run_id, kind, id)',
   );
+  late final Index idxGenerationRunsActiveTarget = Index(
+    'idx_generation_runs_active_target',
+    'CREATE UNIQUE INDEX idx_generation_runs_active_target ON generation_run_rows (conversation_id, target_revision_id) WHERE state IN (\'preparing\', \'requesting\', \'streaming\', \'waiting_tool\')',
+  );
+  late final Index idxGenerationRunsStateUpdated = Index(
+    'idx_generation_runs_state_updated',
+    'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -6316,6 +6971,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     messagePartRows,
     migrationRunRows,
     migrationIssueRows,
+    generationRunRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -6328,6 +6984,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxConversationBranchesParent,
     idxMessagePartsRevisionOrdinal,
     idxMigrationIssuesRunKind,
+    idxGenerationRunsActiveTarget,
+    idxGenerationRunsStateUpdated,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -6399,6 +7057,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('migration_issue_rows', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'conversation_rows',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('generation_run_rows', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -6579,6 +7244,28 @@ final class $$ConversationRowsTableReferences
 
     final cache = $_typedResult.readTableOrNull(
       _conversationStateRowsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$GenerationRunRowsTable, List<GenerationRunRow>>
+  _generationRunRowsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.generationRunRows,
+        aliasName:
+            'conversation_rows__id__generation_run_rows__conversation_id',
+      );
+
+  $$GenerationRunRowsTableProcessedTableManager get generationRunRowsRefs {
+    final manager = $$GenerationRunRowsTableTableManager(
+      $_db,
+      $_db.generationRunRows,
+    ).filter((f) => f.conversationId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _generationRunRowsRefsTable($_db),
     );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
@@ -6803,6 +7490,31 @@ class $$ConversationRowsTableFilterComposer
                     $removeJoinBuilderFromRootComposer,
               ),
         );
+    return f(composer);
+  }
+
+  Expression<bool> generationRunRowsRefs(
+    Expression<bool> Function($$GenerationRunRowsTableFilterComposer f) f,
+  ) {
+    final $$GenerationRunRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.generationRunRows,
+      getReferencedColumn: (t) => t.conversationId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$GenerationRunRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.generationRunRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
     return f(composer);
   }
 }
@@ -7078,6 +7790,32 @@ class $$ConversationRowsTableAnnotationComposer
         );
     return f(composer);
   }
+
+  Expression<T> generationRunRowsRefs<T extends Object>(
+    Expression<T> Function($$GenerationRunRowsTableAnnotationComposer a) f,
+  ) {
+    final $$GenerationRunRowsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.generationRunRows,
+          getReferencedColumn: (t) => t.conversationId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$GenerationRunRowsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.generationRunRows,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$ConversationRowsTableTableManager
@@ -7100,6 +7838,7 @@ class $$ConversationRowsTableTableManager
             bool messageRevisionRowsRefs,
             bool conversationBranchRowsRefs,
             bool conversationStateRowsRefs,
+            bool generationRunRowsRefs,
           })
         > {
   $$ConversationRowsTableTableManager(
@@ -7187,6 +7926,7 @@ class $$ConversationRowsTableTableManager
                 messageRevisionRowsRefs = false,
                 conversationBranchRowsRefs = false,
                 conversationStateRowsRefs = false,
+                generationRunRowsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -7198,6 +7938,7 @@ class $$ConversationRowsTableTableManager
                     if (messageRevisionRowsRefs) db.messageRevisionRows,
                     if (conversationBranchRowsRefs) db.conversationBranchRows,
                     if (conversationStateRowsRefs) db.conversationStateRows,
+                    if (generationRunRowsRefs) db.generationRunRows,
                   ],
                   addJoins: null,
                   getPrefetchedDataCallback: (items) async {
@@ -7328,6 +8069,27 @@ class $$ConversationRowsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (generationRunRowsRefs)
+                        await $_getPrefetchedData<
+                          ConversationRow,
+                          $ConversationRowsTable,
+                          GenerationRunRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ConversationRowsTableReferences
+                              ._generationRunRowsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ConversationRowsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).generationRunRowsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.conversationId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7355,6 +8117,7 @@ typedef $$ConversationRowsTableProcessedTableManager =
         bool messageRevisionRowsRefs,
         bool conversationBranchRowsRefs,
         bool conversationStateRowsRefs,
+        bool generationRunRowsRefs,
       })
     >;
 typedef $$MessageRowsTableCreateCompanionBuilder =
@@ -11704,6 +12467,448 @@ typedef $$MigrationIssueRowsTableProcessedTableManager =
       MigrationIssueRow,
       PrefetchHooks Function({bool migrationRunId})
     >;
+typedef $$GenerationRunRowsTableCreateCompanionBuilder =
+    GenerationRunRowsCompanion Function({
+      required String id,
+      required String conversationId,
+      required String targetRevisionId,
+      required String state,
+      Value<int> stateRevision,
+      Value<int> checkpointSeq,
+      Value<String?> errorCode,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<DateTime?> terminalAt,
+      Value<int> rowid,
+    });
+typedef $$GenerationRunRowsTableUpdateCompanionBuilder =
+    GenerationRunRowsCompanion Function({
+      Value<String> id,
+      Value<String> conversationId,
+      Value<String> targetRevisionId,
+      Value<String> state,
+      Value<int> stateRevision,
+      Value<int> checkpointSeq,
+      Value<String?> errorCode,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<DateTime?> terminalAt,
+      Value<int> rowid,
+    });
+
+final class $$GenerationRunRowsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $GenerationRunRowsTable,
+          GenerationRunRow
+        > {
+  $$GenerationRunRowsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $ConversationRowsTable _conversationIdTable(_$AppDatabase db) =>
+      db.conversationRows.createAlias(
+        'generation_run_rows__conversation_id__conversation_rows__id',
+      );
+
+  $$ConversationRowsTableProcessedTableManager get conversationId {
+    final $_column = $_itemColumn<String>('conversation_id')!;
+
+    final manager = $$ConversationRowsTableTableManager(
+      $_db,
+      $_db.conversationRows,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_conversationIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$GenerationRunRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $GenerationRunRowsTable> {
+  $$GenerationRunRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get targetRevisionId => $composableBuilder(
+    column: $table.targetRevisionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get checkpointSeq => $composableBuilder(
+    column: $table.checkpointSeq,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get createdAt =>
+      $composableBuilder(
+        column: $table.createdAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnWithTypeConverterFilters<DateTime?, DateTime, int> get terminalAt =>
+      $composableBuilder(
+        column: $table.terminalAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  $$ConversationRowsTableFilterComposer get conversationId {
+    final $$ConversationRowsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableFilterComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenerationRunRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $GenerationRunRowsTable> {
+  $$GenerationRunRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get targetRevisionId => $composableBuilder(
+    column: $table.targetRevisionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get state => $composableBuilder(
+    column: $table.state,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get checkpointSeq => $composableBuilder(
+    column: $table.checkpointSeq,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get errorCode => $composableBuilder(
+    column: $table.errorCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get terminalAt => $composableBuilder(
+    column: $table.terminalAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$ConversationRowsTableOrderingComposer get conversationId {
+    final $$ConversationRowsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableOrderingComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenerationRunRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $GenerationRunRowsTable> {
+  $$GenerationRunRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get targetRevisionId => $composableBuilder(
+    column: $table.targetRevisionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get state =>
+      $composableBuilder(column: $table.state, builder: (column) => column);
+
+  GeneratedColumn<int> get stateRevision => $composableBuilder(
+    column: $table.stateRevision,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get checkpointSeq => $composableBuilder(
+    column: $table.checkpointSeq,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get errorCode =>
+      $composableBuilder(column: $table.errorCode, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime?, int> get terminalAt =>
+      $composableBuilder(
+        column: $table.terminalAt,
+        builder: (column) => column,
+      );
+
+  $$ConversationRowsTableAnnotationComposer get conversationId {
+    final $$ConversationRowsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.conversationId,
+      referencedTable: $db.conversationRows,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ConversationRowsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.conversationRows,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$GenerationRunRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $GenerationRunRowsTable,
+          GenerationRunRow,
+          $$GenerationRunRowsTableFilterComposer,
+          $$GenerationRunRowsTableOrderingComposer,
+          $$GenerationRunRowsTableAnnotationComposer,
+          $$GenerationRunRowsTableCreateCompanionBuilder,
+          $$GenerationRunRowsTableUpdateCompanionBuilder,
+          (GenerationRunRow, $$GenerationRunRowsTableReferences),
+          GenerationRunRow,
+          PrefetchHooks Function({bool conversationId})
+        > {
+  $$GenerationRunRowsTableTableManager(
+    _$AppDatabase db,
+    $GenerationRunRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$GenerationRunRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$GenerationRunRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$GenerationRunRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> conversationId = const Value.absent(),
+                Value<String> targetRevisionId = const Value.absent(),
+                Value<String> state = const Value.absent(),
+                Value<int> stateRevision = const Value.absent(),
+                Value<int> checkpointSeq = const Value.absent(),
+                Value<String?> errorCode = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<DateTime?> terminalAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationRunRowsCompanion(
+                id: id,
+                conversationId: conversationId,
+                targetRevisionId: targetRevisionId,
+                state: state,
+                stateRevision: stateRevision,
+                checkpointSeq: checkpointSeq,
+                errorCode: errorCode,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                terminalAt: terminalAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String conversationId,
+                required String targetRevisionId,
+                required String state,
+                Value<int> stateRevision = const Value.absent(),
+                Value<int> checkpointSeq = const Value.absent(),
+                Value<String?> errorCode = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<DateTime?> terminalAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => GenerationRunRowsCompanion.insert(
+                id: id,
+                conversationId: conversationId,
+                targetRevisionId: targetRevisionId,
+                state: state,
+                stateRevision: stateRevision,
+                checkpointSeq: checkpointSeq,
+                errorCode: errorCode,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                terminalAt: terminalAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$GenerationRunRowsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({conversationId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (conversationId) {
+                      state =
+                          state.withJoin(
+                                currentTable: table,
+                                currentColumn: table.conversationId,
+                                referencedTable:
+                                    $$GenerationRunRowsTableReferences
+                                        ._conversationIdTable(db),
+                                referencedColumn:
+                                    $$GenerationRunRowsTableReferences
+                                        ._conversationIdTable(db)
+                                        .id,
+                              )
+                              as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$GenerationRunRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $GenerationRunRowsTable,
+      GenerationRunRow,
+      $$GenerationRunRowsTableFilterComposer,
+      $$GenerationRunRowsTableOrderingComposer,
+      $$GenerationRunRowsTableAnnotationComposer,
+      $$GenerationRunRowsTableCreateCompanionBuilder,
+      $$GenerationRunRowsTableUpdateCompanionBuilder,
+      (GenerationRunRow, $$GenerationRunRowsTableReferences),
+      GenerationRunRow,
+      PrefetchHooks Function({bool conversationId})
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -11744,4 +12949,6 @@ class $AppDatabaseManager {
       $$MigrationRunRowsTableTableManager(_db, _db.migrationRunRows);
   $$MigrationIssueRowsTableTableManager get migrationIssueRows =>
       $$MigrationIssueRowsTableTableManager(_db, _db.migrationIssueRows);
+  $$GenerationRunRowsTableTableManager get generationRunRows =>
+      $$GenerationRunRowsTableTableManager(_db, _db.generationRunRows);
 }

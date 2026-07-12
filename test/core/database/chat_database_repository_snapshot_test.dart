@@ -244,6 +244,32 @@ void main() {
         ),
       );
     });
+
+    test('rejects a v7 database missing generation run state', () async {
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('PRAGMA foreign_keys = OFF;');
+        raw.execute('DROP TABLE generation_run_rows;');
+      } finally {
+        raw.close();
+      }
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(
+          sourceFile,
+          validateContents: true,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'required_tables',
+          ),
+        ),
+      );
+    });
   });
 }
 

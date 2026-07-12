@@ -27,7 +27,7 @@ void main() {
       const versions = GeneratedHelper.versions;
       expect(
         versions,
-        orderedEquals([1, 2, 3, 4, 5, AppDatabase.currentSchemaVersion]),
+        orderedEquals([1, 2, 3, 4, 5, 6, AppDatabase.currentSchemaVersion]),
       );
 
       for (final (index, fromVersion) in versions.indexed) {
@@ -276,6 +276,24 @@ void main() {
         expect(await database.select(database.migrationRunRows).get(), isEmpty);
         expect(
           await database.select(database.migrationIssueRows).get(),
+          isEmpty,
+        );
+      } finally {
+        await database.close();
+        schema.close();
+      }
+    });
+
+    test('v6 to v7 adds empty generation run state', () async {
+      final schema = await verifier.schemaAt(6);
+      final database = AppDatabase(schema.newConnection());
+      try {
+        await verifier.migrateAndValidate(
+          database,
+          AppDatabase.currentSchemaVersion,
+        );
+        expect(
+          await database.select(database.generationRunRows).get(),
           isEmpty,
         );
       } finally {

@@ -425,6 +425,68 @@ class MigrationIssueRows extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+@TableIndex.sql(
+  'CREATE UNIQUE INDEX idx_generation_runs_active_target '
+  'ON generation_run_rows (conversation_id, target_revision_id) '
+  "WHERE state IN ('preparing', 'requesting', 'streaming', 'waiting_tool')",
+)
+@TableIndex(
+  name: 'idx_generation_runs_state_updated',
+  columns: {#state, #updatedAt, #id},
+)
+class GenerationRunRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get conversationId =>
+      text().references(ConversationRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get targetRevisionId => text()();
+  TextColumn get state => text().check(
+    // ignore: recursive_getters
+    state.isIn(const [
+      'preparing',
+      'requesting',
+      'streaming',
+      'waiting_tool',
+      'completed',
+      'failed',
+      'cancelled',
+      'interrupted',
+    ]),
+  )();
+  IntColumn get stateRevision => integer()
+      // ignore: recursive_getters
+      .check(stateRevision.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+  IntColumn get checkpointSeq => integer()
+      // ignore: recursive_getters
+      .check(checkpointSeq.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+  TextColumn get errorCode => text().nullable()();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get terminalAt =>
+      integer().map(const MicrosecondDateTimeConverter()).nullable()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+
+  @override
+  List<String> get customConstraints => [
+    'FOREIGN KEY (conversation_id, target_revision_id) '
+        'REFERENCES message_revision_rows (conversation_id, id) '
+        'DEFERRABLE INITIALLY DEFERRED',
+    'CHECK (updated_at >= created_at)',
+    'CHECK (terminal_at IS NULL OR terminal_at >= created_at)',
+    "CHECK ((state IN ('preparing', 'requesting', 'streaming', "
+        "'waiting_tool') AND terminal_at IS NULL) OR "
+        "(state IN ('completed', 'failed', 'cancelled', 'interrupted') "
+        'AND terminal_at IS NOT NULL))',
+    "CHECK (error_code IS NULL OR (length(error_code) BETWEEN 1 AND 128 "
+        "AND state IN ('failed', 'cancelled', 'interrupted')))",
+  ];
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -440,6 +502,7 @@ class MigrationIssueRows extends Table {
     MessagePartRows,
     MigrationRunRows,
     MigrationIssueRows,
+    GenerationRunRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -454,7 +517,8 @@ class AppDatabase extends _$AppDatabase {
   static const messageGraphSchemaVersion = 4;
   static const messagePartsSchemaVersion = 5;
   static const legacyGraphAdapterSchemaVersion = 6;
-  static const currentSchemaVersion = legacyGraphAdapterSchemaVersion;
+  static const generationRunSchemaVersion = 7;
+  static const currentSchemaVersion = generationRunSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -640,6 +704,13 @@ FROM probe;
           await migrator.createTable(migrationRunRows);
           await migrator.createTable(migrationIssueRows);
           await migrator.createIndex(idxMigrationIssuesRunKind);
+        });
+      },
+      from6To7: (migrator, schema) async {
+        await transaction(() async {
+          await migrator.createTable(generationRunRows);
+          await migrator.createIndex(idxGenerationRunsActiveTarget);
+          await migrator.createIndex(idxGenerationRunsStateUpdated);
         });
       },
     ),
