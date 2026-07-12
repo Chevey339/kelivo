@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:Kelivo/core/database/message_graph_projector.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -18,6 +20,7 @@ void main() {
         updatedAt: timestamp,
         finalizedAt: timestamp,
         versionCount: index == 2 ? 500 : 1,
+        logicalIndex: index,
       ),
       message: ChatMessage(
         id: id,
@@ -39,6 +42,7 @@ void main() {
     slots: indices.map(slot).toList(),
     hasMoreBefore: before,
     hasMoreAfter: after,
+    totalSlotCount: 6,
   );
 
   test(
@@ -51,6 +55,7 @@ void main() {
               required conversationId,
               beforeRevisionId,
               afterRevisionId,
+              fromStart,
               required limit,
             }) async {
               calls.add((before: beforeRevisionId, after: afterRevisionId));
@@ -88,4 +93,69 @@ void main() {
       ]);
     },
   );
+
+  test('row and decoded-byte budgets evict the opposite edge', () async {
+    final retained = <String>[];
+    final coordinator = TimelineCoordinator(
+      budget: const TimelineWindowBudget(maxSlots: 3, maxDecodedBytes: 600),
+      retainWindow: (_, ids) {
+        retained
+          ..clear()
+          ..addAll(ids);
+      },
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async => page([0, 1, 2, 3], before: true, after: false),
+    );
+
+    await coordinator.open('conversation');
+
+    expect(coordinator.slots, hasLength(3));
+    expect(coordinator.slots.map((slot) => slot.identity.revisionId), [
+      'revision-1',
+      'revision-2',
+      'revision-3',
+    ]);
+    expect(coordinator.decodedBytes, lessThanOrEqualTo(600));
+    expect(retained, ['revision-1', 'revision-2', 'revision-3']);
+    expect(coordinator.hasMoreBefore, isTrue);
+  });
+
+  test('late page from a previous conversation is discarded', () async {
+    final first = Completer<LoadedTimelinePage?>();
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async {
+            if (conversationId == 'first') return first.future;
+            return LoadedTimelinePage(
+              conversationId: 'second',
+              stateRevision: 0,
+              contextStartRevisionId: null,
+              slots: [slot(5)],
+              hasMoreBefore: false,
+              hasMoreAfter: false,
+              totalSlotCount: 1,
+            );
+          },
+    );
+
+    final staleOpen = coordinator.open('first');
+    await coordinator.open('second');
+    first.complete(page([0, 1], before: false, after: false));
+    await staleOpen;
+
+    expect(coordinator.conversationId, 'second');
+    expect(coordinator.slots.single.identity.revisionId, 'revision-5');
+  });
 }

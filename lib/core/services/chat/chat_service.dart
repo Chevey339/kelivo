@@ -30,6 +30,7 @@ final class LoadedTimelinePage {
     required List<LoadedTimelineSlot> slots,
     required this.hasMoreBefore,
     required this.hasMoreAfter,
+    required this.totalSlotCount,
   }) : slots = List.unmodifiable(slots);
 
   final String conversationId;
@@ -38,6 +39,7 @@ final class LoadedTimelinePage {
   final List<LoadedTimelineSlot> slots;
   final bool hasMoreBefore;
   final bool hasMoreAfter;
+  final int totalSlotCount;
 
   String? get beforeRevisionId => hasMoreBefore && slots.isNotEmpty
       ? slots.first.identity.revisionId
@@ -52,6 +54,7 @@ class ChatService extends ChangeNotifier {
 
   static const int defaultInitialMessageMin = 2;
   static const int defaultInitialMessageMax = 240;
+  static const int defaultTimelineInitialSlots = 40;
   static const int defaultInitialTextBudget = 20000;
   static const int defaultHistoryPageSize = 20;
   static const int defaultLoadedWindowMax = 360;
@@ -237,6 +240,7 @@ class ChatService extends ChangeNotifier {
     String conversationId, {
     String? beforeRevisionId,
     String? afterRevisionId,
+    bool fromStart = false,
     int limit = 40,
   }) async {
     if (!_initialized || limit <= 0) return null;
@@ -244,6 +248,7 @@ class ChatService extends ChangeNotifier {
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
+      fromStart: fromStart,
       limit: limit,
     );
     if (page == null) return null;
@@ -260,6 +265,16 @@ class ChatService extends ChangeNotifier {
     if (loadedSlots.length != page.slots.length) {
       throw StateError('timeline_selected_revision_shadow_missing');
     }
+    final selections = _graphVersionSelections.putIfAbsent(
+      conversationId,
+      () => <String, int>{},
+    );
+    for (final slot in loadedSlots) {
+      if (slot.identity.versionCount > 1) {
+        selections[slot.message.groupId ?? slot.message.id] =
+            slot.message.version;
+      }
+    }
     _cacheLoadedMessages(conversationId, messages);
     await _cacheMessageArtifacts(messages);
     return LoadedTimelinePage(
@@ -269,7 +284,29 @@ class ChatService extends ChangeNotifier {
       slots: loadedSlots,
       hasMoreBefore: page.hasMoreBefore,
       hasMoreAfter: page.hasMoreAfter,
+      totalSlotCount: page.totalSlotCount,
     );
+  }
+
+  void retainTimelineWindow(
+    String conversationId,
+    Iterable<String> revisionIds,
+  ) {
+    final retained = revisionIds.toSet();
+    final messages = _messagesCache[conversationId];
+    if (messages != null) {
+      final removedIds = messages
+          .where((message) => !retained.contains(message.id))
+          .map((message) => message.id)
+          .toList(growable: false);
+      _messagesCache[conversationId] = messages
+          .where((message) => retained.contains(message.id))
+          .toList(growable: false);
+      for (final id in removedIds) {
+        _toolEventsCache.remove(id);
+        _geminiThoughtSigsCache.remove(id);
+      }
+    }
   }
 
   int getContextStartIndex(String conversationId) =>

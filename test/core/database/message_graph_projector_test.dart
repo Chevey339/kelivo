@@ -277,6 +277,15 @@ void main() {
       expect(tail.beforeRevisionId, 'u2');
       expect(tail.afterRevisionId, isNull);
 
+      final head = await repository.loadActiveTimelinePage(
+        conversationId: 'conversation-1',
+        fromStart: true,
+        limit: 2,
+      );
+      expect(head!.slots.map((slot) => slot.revisionId), ['u1', 'a1-v1']);
+      expect(head.hasMoreBefore, isFalse);
+      expect(head.hasMoreAfter, isTrue);
+
       final before = await repository.loadActiveTimelinePage(
         conversationId: 'conversation-1',
         beforeRevisionId: tail.beforeRevisionId,

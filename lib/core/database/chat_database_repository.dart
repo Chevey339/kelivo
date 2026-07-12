@@ -866,6 +866,7 @@ class ChatDatabaseRepository {
     required String conversationId,
     String? beforeRevisionId,
     String? afterRevisionId,
+    bool fromStart = false,
     int limit = 40,
   }) => _observer.measure(
     ChatDatabaseOperation.queryMessageRange,
@@ -873,6 +874,7 @@ class ChatDatabaseRepository {
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
+      fromStart: fromStart,
       limit: limit,
     ),
     resultCount: (page) => page?.slots.length ?? 0,

@@ -152,6 +152,7 @@ final class ActiveTimelineSlot {
     required this.updatedAt,
     required this.finalizedAt,
     required this.versionCount,
+    required this.logicalIndex,
   });
 
   final String slotId;
@@ -162,6 +163,7 @@ final class ActiveTimelineSlot {
   final DateTime updatedAt;
   final DateTime? finalizedAt;
   final int versionCount;
+  final int logicalIndex;
 }
 
 final class ActiveTimelinePage {
@@ -173,6 +175,7 @@ final class ActiveTimelinePage {
     required List<ActiveTimelineSlot> slots,
     required this.hasMoreBefore,
     required this.hasMoreAfter,
+    required this.totalSlotCount,
   }) : slots = UnmodifiableListView(slots);
 
   final String conversationId;
@@ -182,6 +185,7 @@ final class ActiveTimelinePage {
   final List<ActiveTimelineSlot> slots;
   final bool hasMoreBefore;
   final bool hasMoreAfter;
+  final int totalSlotCount;
 
   String? get beforeRevisionId =>
       hasMoreBefore && slots.isNotEmpty ? slots.first.revisionId : null;
@@ -212,10 +216,12 @@ final class MessageGraphProjector {
     required String conversationId,
     String? beforeRevisionId,
     String? afterRevisionId,
+    bool fromStart = false,
     int limit = 40,
   }) async {
     if (limit <= 0) throw ArgumentError.value(limit, 'limit');
-    if (beforeRevisionId != null && afterRevisionId != null) {
+    if ((beforeRevisionId != null && afterRevisionId != null) ||
+        (fromStart && (beforeRevisionId != null || afterRevisionId != null))) {
       throw ArgumentError('Only one timeline cursor may be supplied.');
     }
     final state =
@@ -239,6 +245,7 @@ final class MessageGraphProjector {
         slots: const [],
         hasMoreBefore: false,
         hasMoreAfter: false,
+        totalSlotCount: 0,
       );
     }
     final branch =
@@ -262,6 +269,7 @@ final class MessageGraphProjector {
         slots: const [],
         hasMoreBefore: false,
         hasMoreAfter: false,
+        totalSlotCount: 0,
       );
     }
 
@@ -282,7 +290,7 @@ final class MessageGraphProjector {
         : afterRevisionId != null
         ? 'WHERE depth < (SELECT depth FROM active_path WHERE id = ?)'
         : '';
-    final order = afterRevisionId != null ? 'DESC' : 'ASC';
+    final order = afterRevisionId != null || fromStart ? 'DESC' : 'ASC';
     final variables = <Variable<Object>>[
       Variable.withString(leafRevisionId),
       Variable.withString(conversationId),
@@ -310,7 +318,8 @@ WITH RECURSIVE active_path(
 )
 SELECT path.id, path.slot_id, path.parent_revision_id,
        path.created_at, path.updated_at, path.finalized_at,
-       slot.role, path.depth
+       slot.role, path.depth,
+       (SELECT COUNT(*) FROM active_path) AS total_slot_count
 FROM active_path AS path
 JOIN message_slot_rows AS slot ON slot.id = path.slot_id
 $cursorPredicate
@@ -323,7 +332,7 @@ LIMIT ?;
         .get();
     final hasExtra = rows.length > limit;
     final selectedRows = rows.take(limit).toList(growable: true);
-    final orderedRows = afterRevisionId == null
+    final orderedRows = afterRevisionId == null && !fromStart
         ? selectedRows.reversed.toList(growable: false)
         : selectedRows;
     final slotIds = orderedRows
@@ -360,23 +369,65 @@ LIMIT ?;
           updatedAt: _readDateTime(row, 'updated_at'),
           finalizedAt: _readNullableDateTime(row, 'finalized_at'),
           versionCount: versionCounts[row.read<String>('slot_id')] ?? 1,
+          logicalIndex:
+              row.read<int>('total_slot_count') - 1 - row.read<int>('depth'),
         ),
     ];
+    final totalSlotCount = rows.isEmpty
+        ? await _activePathLength(
+            conversationId: conversationId,
+            leafRevisionId: leafRevisionId,
+          )
+        : rows.first.read<int>('total_slot_count');
     return ActiveTimelinePage(
       conversationId: conversationId,
       branchId: branchId,
       stateRevision: state.stateRevision,
       contextStartRevisionId: state.contextStartRevisionId,
       slots: slots,
-      hasMoreBefore: beforeRevisionId != null
+      hasMoreBefore: fromStart
+          ? false
+          : beforeRevisionId != null
           ? hasExtra
           : afterRevisionId != null
           ? true
           : hasExtra,
-      hasMoreAfter: afterRevisionId != null
+      hasMoreAfter: fromStart
+          ? hasExtra
+          : afterRevisionId != null
           ? hasExtra
           : beforeRevisionId != null,
+      totalSlotCount: totalSlotCount,
     );
+  }
+
+  Future<int> _activePathLength({
+    required String conversationId,
+    required String leafRevisionId,
+  }) async {
+    final row = await _db
+        .customSelect(
+          '''
+WITH RECURSIVE active_path(id, parent_revision_id) AS (
+  SELECT id, parent_revision_id FROM message_revision_rows
+  WHERE id = ? AND conversation_id = ? AND deleted_at IS NULL
+  UNION ALL
+  SELECT parent.id, parent.parent_revision_id
+  FROM message_revision_rows AS parent
+  JOIN active_path AS child ON child.parent_revision_id = parent.id
+  WHERE parent.conversation_id = ? AND parent.deleted_at IS NULL
+)
+SELECT COUNT(*) AS slot_count FROM active_path;
+''',
+          variables: [
+            Variable.withString(leafRevisionId),
+            Variable.withString(conversationId),
+            Variable.withString(conversationId),
+          ],
+          readsFrom: {_db.messageRevisionRows},
+        )
+        .getSingle();
+    return row.read<int>('slot_count');
   }
 
   Future<bool> _activePathContains({

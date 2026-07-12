@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/database/message_graph_projector.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 
 class _FakeLazyChatService extends ChatService {
@@ -85,6 +86,101 @@ class _FakeLazyChatService extends ChatService {
     required int start,
     required int limit,
   }) async => getMessagesRange(conversationId, start: start, limit: limit);
+
+  @override
+  Future<LoadedTimelinePage?> loadTimelinePage(
+    String conversationId, {
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    bool fromStart = false,
+    int limit = 40,
+  }) async {
+    rangeLoadCalls++;
+    final grouped = <String, List<ChatMessage>>{};
+    for (final message in _messages) {
+      grouped.putIfAbsent(message.groupId ?? message.id, () => []).add(message);
+    }
+    final activeMessages = <ChatMessage>[];
+    for (final entry in grouped.entries) {
+      final selectedVersion = versionSelections[entry.key];
+      activeMessages.add(
+        entry.value.firstWhere(
+          (message) => selectedVersion == null
+              ? message.version == 0
+              : message.version == selectedVersion,
+          orElse: () => entry.value.first,
+        ),
+      );
+    }
+    final effectiveLimit = limit;
+    var start = 0;
+    var end = activeMessages.length;
+    if (fromStart) {
+      start = 0;
+      end = effectiveLimit.clamp(0, activeMessages.length);
+    } else if (beforeRevisionId != null) {
+      end = activeMessages.indexWhere(
+        (message) => message.id == beforeRevisionId,
+      );
+      if (end < 0) return null;
+      start = (end - effectiveLimit).clamp(0, end);
+    } else if (afterRevisionId != null) {
+      final cursor = activeMessages.indexWhere(
+        (message) => message.id == afterRevisionId,
+      );
+      if (cursor < 0) return null;
+      start = cursor + 1;
+      end = (start + effectiveLimit).clamp(start, activeMessages.length);
+    } else {
+      start = (activeMessages.length - effectiveLimit).clamp(
+        0,
+        activeMessages.length,
+      );
+    }
+    final selected = activeMessages.sublist(start, end);
+    final counts = <String, int>{};
+    for (final message in _messages) {
+      counts.update(
+        message.groupId ?? message.id,
+        (value) => value + 1,
+        ifAbsent: () => 1,
+      );
+    }
+    final timestamp = DateTime(2026, 7, 11);
+    return LoadedTimelinePage(
+      conversationId: conversationId,
+      stateRevision: 0,
+      contextStartRevisionId: null,
+      slots: [
+        for (final (offset, message) in selected.indexed)
+          LoadedTimelineSlot(
+            identity: ActiveTimelineSlot(
+              slotId: message.groupId ?? message.id,
+              revisionId: message.id,
+              parentRevisionId: start + offset == 0
+                  ? null
+                  : activeMessages[start + offset - 1].id,
+              role: message.role,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+              finalizedAt: timestamp,
+              versionCount: counts[message.groupId ?? message.id] ?? 1,
+              logicalIndex: start + offset,
+            ),
+            message: message,
+          ),
+      ],
+      hasMoreBefore: start > 0,
+      hasMoreAfter: end < activeMessages.length,
+      totalSlotCount: activeMessages.length,
+    );
+  }
+
+  @override
+  void retainTimelineWindow(
+    String conversationId,
+    Iterable<String> revisionIds,
+  ) {}
 
   @override
   Map<String, int> getVersionSelections(String conversationId) =>
@@ -211,9 +307,9 @@ void main() {
       await controller.setCurrentConversationAndLoad(conversation);
 
       expect(chatService.fullLoadCalls, 0);
-      expect(chatService.recentLoadCalls, 1);
-      expect(controller.messages, messages.sublist(80));
-      expect(controller.loadedStartIndex, 80);
+      expect(chatService.recentLoadCalls, 0);
+      expect(controller.messages, messages.sublist(60));
+      expect(controller.loadedStartIndex, 60);
       expect(controller.totalMessageCount, 100);
       expect(controller.hasMoreBefore, isTrue);
     });
@@ -339,7 +435,7 @@ void main() {
     );
 
     test(
-      'loading newer history falls back when the tail has no visible anchors',
+      'alternate revisions do not create a newer logical timeline page',
       () async {
         final anchors = List<ChatMessage>.generate(
           ChatService.defaultLoadedWindowMax,
@@ -382,7 +478,7 @@ void main() {
           limit: ChatService.defaultLoadedWindowMax,
         );
 
-        expect(loaded, isTrue);
+        expect(loaded, isFalse);
         expect(chatService.fullLoadCalls, 0);
         expect(controller.collapsedMessages, isNotEmpty);
         expect(controller.collapsedMessages.last.id, 'anchor-359-v1');
