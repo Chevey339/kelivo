@@ -313,9 +313,10 @@ class TimelineCoordinator extends ChangeNotifier {
     _beginLoading();
     notifyListeners();
     try {
+      final cursorRevisionId = _slots.first.identity.revisionId;
       final page = await loadPage(
         conversationId: conversationId,
-        beforeRevisionId: _slots.first.identity.revisionId,
+        beforeRevisionId: cursorRevisionId,
         fromStart: false,
         limit: limit,
       );
@@ -325,6 +326,7 @@ class TimelineCoordinator extends ChangeNotifier {
           conversationId: conversationId,
           epoch: epoch,
           limit: limit,
+          fallbackRevisionId: cursorRevisionId,
         );
       }
       if (page.slots.isEmpty) {
@@ -361,9 +363,10 @@ class TimelineCoordinator extends ChangeNotifier {
     _beginLoading();
     notifyListeners();
     try {
+      final cursorRevisionId = _slots.last.identity.revisionId;
       final page = await loadPage(
         conversationId: conversationId,
-        afterRevisionId: _slots.last.identity.revisionId,
+        afterRevisionId: cursorRevisionId,
         fromStart: false,
         limit: limit,
       );
@@ -373,6 +376,7 @@ class TimelineCoordinator extends ChangeNotifier {
           conversationId: conversationId,
           epoch: epoch,
           limit: limit,
+          fallbackRevisionId: cursorRevisionId,
         );
       }
       if (page.slots.isEmpty) {
@@ -440,13 +444,44 @@ class TimelineCoordinator extends ChangeNotifier {
     required String conversationId,
     required int epoch,
     required int limit,
+    required String fallbackRevisionId,
   }) async {
     final refreshLimit = limit > _slots.length ? limit : _slots.length;
-    final refreshed = await loadPage(
-      conversationId: conversationId,
-      fromStart: false,
-      limit: refreshLimit,
-    );
+    final anchorSlotId = _visualAnchor?.slotId;
+    String? anchorRevisionId;
+    if (anchorSlotId != null) {
+      for (final slot in _slots) {
+        if (slot.identity.slotId == anchorSlotId) {
+          anchorRevisionId = slot.identity.revisionId;
+          break;
+        }
+      }
+    }
+    final aroundLoader = loadAroundPage;
+    LoadedTimelinePage? refreshed;
+    if (aroundLoader != null) {
+      final targetRevisionId = anchorRevisionId ?? fallbackRevisionId;
+      try {
+        refreshed = await aroundLoader(
+          conversationId: conversationId,
+          targetRevisionId: targetRevisionId,
+          limit: refreshLimit,
+        );
+      } catch (_) {
+        if (targetRevisionId == fallbackRevisionId) rethrow;
+        refreshed = await aroundLoader(
+          conversationId: conversationId,
+          targetRevisionId: fallbackRevisionId,
+          limit: refreshLimit,
+        );
+      }
+    } else {
+      refreshed = await loadPage(
+        conversationId: conversationId,
+        fromStart: false,
+        limit: refreshLimit,
+      );
+    }
     if (!_accepts(epoch, conversationId) || refreshed == null) return false;
     _stateRevision = refreshed.stateRevision;
     _totalSlotCount = refreshed.totalSlotCount;

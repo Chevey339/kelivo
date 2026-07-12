@@ -386,7 +386,8 @@ void main() {
   });
 
   test('paging rebuilds the window when the graph revision changes', () async {
-    var calls = 0;
+    var pageCalls = 0;
+    final aroundTargets = <String>[];
     final coordinator = TimelineCoordinator(
       loadPage:
           ({
@@ -396,14 +397,22 @@ void main() {
             fromStart,
             required limit,
           }) async {
-            calls++;
-            return switch (calls) {
+            pageCalls++;
+            return switch (pageCalls) {
               1 => page([2, 3], before: true, after: false),
               2 => page([0, 1], before: false, after: true, stateRevision: 1),
-              3 => page([3, 4], before: true, after: false, stateRevision: 1),
-              4 => page([1, 2], before: false, after: true, stateRevision: 1),
+              3 => page([1, 2], before: false, after: true, stateRevision: 1),
               _ => throw StateError('unexpected page request'),
             };
+          },
+      loadAroundPage:
+          ({
+            required conversationId,
+            required targetRevisionId,
+            required limit,
+          }) async {
+            aroundTargets.add(targetRevisionId);
+            return page([3, 4], before: true, after: false, stateRevision: 1);
           },
     );
     await coordinator.open('conversation');
@@ -416,15 +425,25 @@ void main() {
     );
 
     expect(await coordinator.loadBefore(), isTrue);
-    expect(calls, 3);
+    expect(pageCalls, 2);
+    expect(aroundTargets, ['revision-3']);
     expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
       'revision-3',
       'revision-4',
     ]);
     expect(coordinator.visualAnchor?.slotId, 'slot-3');
+    expect(
+      coordinator.resolveVisualAnchorCorrection(
+        geometries: const [
+          TimelineSlotGeometry(slotId: 'slot-3', top: 120, bottom: 180),
+        ],
+        viewportTop: 100,
+      ),
+      0,
+    );
 
     expect(await coordinator.loadBefore(), isTrue);
-    expect(calls, 4);
+    expect(pageCalls, 3);
     expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
       'revision-1',
       'revision-2',
