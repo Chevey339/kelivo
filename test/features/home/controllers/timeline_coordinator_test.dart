@@ -36,9 +36,10 @@ void main() {
     List<int> indices, {
     required bool before,
     required bool after,
+    int stateRevision = 0,
   }) => LoadedTimelinePage(
     conversationId: 'conversation',
-    stateRevision: 0,
+    stateRevision: stateRevision,
     contextStartRevisionId: null,
     slots: indices.map(slot).toList(),
     hasMoreBefore: before,
@@ -344,5 +345,53 @@ void main() {
     completer.complete(page([0, 1], before: false, after: true));
     await loading;
     expect(coordinator.viewportMode, TimelineViewportMode.userAnchored);
+  });
+
+  test('paging rebuilds the window when the graph revision changes', () async {
+    var calls = 0;
+    final coordinator = TimelineCoordinator(
+      loadPage:
+          ({
+            required conversationId,
+            beforeRevisionId,
+            afterRevisionId,
+            fromStart,
+            required limit,
+          }) async {
+            calls++;
+            return switch (calls) {
+              1 => page([2, 3], before: true, after: false),
+              2 => page([0, 1], before: false, after: true, stateRevision: 1),
+              3 => page([3, 4], before: true, after: false, stateRevision: 1),
+              4 => page([1, 2], before: false, after: true, stateRevision: 1),
+              _ => throw StateError('unexpected page request'),
+            };
+          },
+    );
+    await coordinator.open('conversation');
+    coordinator.captureVisualAnchor(
+      geometries: const [
+        TimelineSlotGeometry(slotId: 'slot-3', top: 120, bottom: 180),
+      ],
+      viewportTop: 100,
+      viewportBottom: 500,
+    );
+
+    expect(await coordinator.loadBefore(), isTrue);
+    expect(calls, 3);
+    expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
+      'revision-3',
+      'revision-4',
+    ]);
+    expect(coordinator.visualAnchor?.slotId, 'slot-3');
+
+    expect(await coordinator.loadBefore(), isTrue);
+    expect(calls, 4);
+    expect(coordinator.slots.map((entry) => entry.identity.revisionId), [
+      'revision-1',
+      'revision-2',
+      'revision-3',
+      'revision-4',
+    ]);
   });
 }

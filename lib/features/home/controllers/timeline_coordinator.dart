@@ -284,7 +284,13 @@ class TimelineCoordinator extends ChangeNotifier {
         limit: limit,
       );
       if (!_accepts(epoch, conversationId) || page == null) return false;
-      if (page.stateRevision != _stateRevision) return false;
+      if (page.stateRevision != _stateRevision) {
+        return _rebuildAfterStateRevisionChange(
+          conversationId: conversationId,
+          epoch: epoch,
+          limit: limit,
+        );
+      }
       if (page.slots.isEmpty) {
         _hasMoreBefore = false;
         _windowRevision++;
@@ -326,7 +332,13 @@ class TimelineCoordinator extends ChangeNotifier {
         limit: limit,
       );
       if (!_accepts(epoch, conversationId) || page == null) return false;
-      if (page.stateRevision != _stateRevision) return false;
+      if (page.stateRevision != _stateRevision) {
+        return _rebuildAfterStateRevisionChange(
+          conversationId: conversationId,
+          epoch: epoch,
+          limit: limit,
+        );
+      }
       if (page.slots.isEmpty) {
         _hasMoreAfter = false;
         _windowRevision++;
@@ -387,6 +399,24 @@ class TimelineCoordinator extends ChangeNotifier {
 
   bool _accepts(int epoch, String conversationId) =>
       epoch == _requestEpoch && _conversationId == conversationId;
+
+  Future<bool> _rebuildAfterStateRevisionChange({
+    required String conversationId,
+    required int epoch,
+    required int limit,
+  }) async {
+    final refreshLimit = limit > _slots.length ? limit : _slots.length;
+    final refreshed = await loadPage(
+      conversationId: conversationId,
+      fromStart: false,
+      limit: refreshLimit,
+    );
+    if (!_accepts(epoch, conversationId) || refreshed == null) return false;
+    _stateRevision = refreshed.stateRevision;
+    _totalSlotCount = refreshed.totalSlotCount;
+    _replace(refreshed);
+    return true;
+  }
 
   void _replace(LoadedTimelinePage page) {
     _slots = _merge(const [], page.slots);
