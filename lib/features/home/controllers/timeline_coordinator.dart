@@ -74,6 +74,7 @@ class TimelineCoordinator extends ChangeNotifier {
   bool _loadingBefore = false;
   bool _loadingAfter = false;
   int _requestEpoch = 0;
+  int _windowRevision = 0;
   int _stateRevision = 0;
   int _totalSlotCount = 0;
   int _decodedBytes = 0;
@@ -92,6 +93,7 @@ class TimelineCoordinator extends ChangeNotifier {
   bool get loadingBefore => _loadingBefore;
   bool get loadingAfter => _loadingAfter;
   int get totalSlotCount => _totalSlotCount;
+  int get windowRevision => _windowRevision;
   int get decodedBytes => _decodedBytes;
   TimelineViewportAnchor? get visualAnchor => _visualAnchor;
   TimelineViewportMode get viewportMode => _viewportMode;
@@ -104,6 +106,11 @@ class TimelineCoordinator extends ChangeNotifier {
       _viewportMode == TimelineViewportMode.userAnchored && _hasUnreadContent;
 
   void followTail() {
+    if (_viewportMode == TimelineViewportMode.followingTail &&
+        _programmaticTargetSlotId == null &&
+        !_hasUnreadContent) {
+      return;
+    }
     _viewportMode = TimelineViewportMode.followingTail;
     _programmaticTargetSlotId = null;
     _hasUnreadContent = false;
@@ -111,12 +118,24 @@ class TimelineCoordinator extends ChangeNotifier {
   }
 
   void userAnchored({bool preserveProgrammaticTarget = false}) {
+    final nextTarget = preserveProgrammaticTarget
+        ? _programmaticTargetSlotId
+        : null;
+    if (_viewportMode == TimelineViewportMode.userAnchored &&
+        _programmaticTargetSlotId == nextTarget) {
+      return;
+    }
     _viewportMode = TimelineViewportMode.userAnchored;
-    if (!preserveProgrammaticTarget) _programmaticTargetSlotId = null;
+    _programmaticTargetSlotId = nextTarget;
     notifyListeners();
   }
 
   void programmaticJump(String slotId) {
+    if (_viewportMode == TimelineViewportMode.programmaticJump &&
+        _programmaticTargetSlotId == slotId &&
+        !_hasUnreadContent) {
+      return;
+    }
     _viewportMode = TimelineViewportMode.programmaticJump;
     _programmaticTargetSlotId = slotId;
     _hasUnreadContent = false;
@@ -129,11 +148,15 @@ class TimelineCoordinator extends ChangeNotifier {
   }
 
   void noteContentChanged({required bool isGenerating}) {
-    _isGenerating = isGenerating;
-    if (_viewportMode == TimelineViewportMode.userAnchored &&
-        _programmaticTargetSlotId == null) {
-      _hasUnreadContent = true;
+    final shouldMarkUnread =
+        _viewportMode == TimelineViewportMode.userAnchored &&
+        _programmaticTargetSlotId == null;
+    if (_isGenerating == isGenerating &&
+        (!shouldMarkUnread || _hasUnreadContent)) {
+      return;
     }
+    _isGenerating = isGenerating;
+    if (shouldMarkUnread) _hasUnreadContent = true;
     notifyListeners();
   }
 
@@ -202,6 +225,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _decodedBytes = 0;
     _isGenerating = false;
     _visualAnchor = null;
+    _windowRevision++;
     notifyListeners();
     final page = await loadPage(
       conversationId: conversationId,
@@ -259,12 +283,14 @@ class TimelineCoordinator extends ChangeNotifier {
       if (page.stateRevision != _stateRevision) return false;
       if (page.slots.isEmpty) {
         _hasMoreBefore = false;
+        _windowRevision++;
         return false;
       }
       _slots = _merge(page.slots, _slots);
       _hasMoreBefore = page.hasMoreBefore;
       _totalSlotCount = page.totalSlotCount;
       _enforceBudget(trimFromStart: false);
+      _windowRevision++;
       _publishRetainedWindow();
       return true;
     } finally {
@@ -299,12 +325,14 @@ class TimelineCoordinator extends ChangeNotifier {
       if (page.stateRevision != _stateRevision) return false;
       if (page.slots.isEmpty) {
         _hasMoreAfter = false;
+        _windowRevision++;
         return false;
       }
       _slots = _merge(_slots, page.slots);
       _hasMoreAfter = page.hasMoreAfter;
       _totalSlotCount = page.totalSlotCount;
       _enforceBudget(trimFromStart: true);
+      _windowRevision++;
       _publishRetainedWindow();
       return true;
     } finally {
@@ -331,6 +359,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _programmaticTargetSlotId = null;
     _hasUnreadContent = false;
     _isGenerating = false;
+    _windowRevision++;
     notifyListeners();
   }
 
@@ -346,7 +375,10 @@ class TimelineCoordinator extends ChangeNotifier {
     );
     _slots = List.unmodifiable(updated);
     _decodedBytes = _slots.fold<int>(0, (sum, slot) => sum + _slotBytes(slot));
-    if (notify) notifyListeners();
+    if (notify) {
+      _windowRevision++;
+      notifyListeners();
+    }
   }
 
   bool _accepts(int epoch, String conversationId) =>
@@ -358,6 +390,7 @@ class TimelineCoordinator extends ChangeNotifier {
     _hasMoreAfter = page.hasMoreAfter;
     _enforceBudget(trimFromStart: true);
     _isGenerating = _slots.any((slot) => slot.message.isStreaming);
+    _windowRevision++;
     _publishRetainedWindow();
     notifyListeners();
   }

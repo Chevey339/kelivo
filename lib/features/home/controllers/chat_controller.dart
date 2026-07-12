@@ -64,6 +64,7 @@ class ChatController extends ChangeNotifier {
   /// Total persisted message count for the current conversation.
   int _totalMessageCount = 0;
   int get totalMessageCount => _totalMessageCount;
+  int _lastTimelineWindowRevision = -1;
 
   bool get hasMoreBefore =>
       timelineCoordinator.conversationId == _currentConversation?.id
@@ -119,6 +120,9 @@ class ChatController extends ChangeNotifier {
 
   void _syncTimelineWindow() {
     if (timelineCoordinator.conversationId != _currentConversation?.id) return;
+    final revision = timelineCoordinator.windowRevision;
+    if (_lastTimelineWindowRevision == revision) return;
+    _lastTimelineWindowRevision = revision;
     _messages = timelineCoordinator.slots
         .map((slot) => slot.message)
         .toList(growable: true);

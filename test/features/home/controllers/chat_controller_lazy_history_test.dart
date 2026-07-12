@@ -365,6 +365,31 @@ void main() {
       },
     );
 
+    test(
+      'viewport intent changes do not republish the message window',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        final originalMessages = controller.messages;
+        var controllerNotifications = 0;
+        var coordinatorNotifications = 0;
+        controller.addListener(() => controllerNotifications++);
+        controller.timelineCoordinator.addListener(
+          () => coordinatorNotifications++,
+        );
+
+        for (var index = 0; index < 120; index++) {
+          controller.timelineCoordinator.userAnchored();
+        }
+        for (var index = 0; index < 120; index++) {
+          controller.timelineCoordinator.followTail();
+        }
+
+        expect(controllerNotifications, 0);
+        expect(coordinatorNotifications, 2);
+        expect(identical(controller.messages, originalMessages), isTrue);
+      },
+    );
+
     test('clears current conversation when the service deletes it', () async {
       chatService.knownConversationIds.add(conversation.id);
       controller.setCurrentConversation(conversation);
