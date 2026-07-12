@@ -15,6 +15,7 @@ import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
@@ -333,13 +334,26 @@ void main() {
       0,
     );
     await tester.pump();
+    expect(bottomPadding(), shortReplyPadding);
     await tester.pump();
-    expect(bottomPadding(), lessThan(shortReplyPadding));
-    expect(bottomPadding(), 16);
+    expect(bottomPadding(), shortReplyPadding);
     expect(
       tester.getTopLeft(find.text('new question')).dy,
       closeTo(userTop, 1),
     );
+
+    coordinator.followTail();
+    await tester.pump();
+    scrollController.jumpTo(scrollController.position.maxScrollExtent / 2);
+    await tester.pump();
+    final listContext = tester.element(find.byType(ListView));
+    UserScrollNotification(
+      metrics: scrollController.position,
+      context: listContext,
+      direction: ScrollDirection.reverse,
+    ).dispatch(listContext);
+    await tester.pump();
+    expect(coordinator.viewportMode, TimelineViewportMode.followingTail);
 
     coordinator.noteContentChanged(isGenerating: false);
     await tester.pump();

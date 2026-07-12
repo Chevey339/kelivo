@@ -234,7 +234,6 @@ class _MessageListViewState extends State<MessageListView>
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
-  bool _programmaticSpacerUpdateScheduled = false;
   String? _programmaticAnchorSlotId;
   String? _programmaticAnchorConversationId;
   double _programmaticSpacer = 0;
@@ -368,7 +367,9 @@ class _MessageListViewState extends State<MessageListView>
                 timelineCoordinator?.isGenerating == true &&
                 _programmaticAnchorSlotId != null &&
                 _programmaticAnchorConversationId ==
-                    timelineCoordinator?.conversationId;
+                    timelineCoordinator?.conversationId &&
+                timelineCoordinator?.viewportMode !=
+                    TimelineViewportMode.followingTail;
             final programmaticSpacer = targetPending
                 ? constraints.maxHeight * _programmaticTailViewportFraction
                 : activeGenerationAnchor
@@ -404,18 +405,9 @@ class _MessageListViewState extends State<MessageListView>
               child: list,
             );
 
-            final sizeAwareList =
-                NotificationListener<SizeChangedLayoutNotification>(
-                  onNotification: (notification) {
-                    _scheduleProgrammaticSpacerUpdate();
-                    return false;
-                  },
-                  child: observedList,
-                );
-
             final historyList = NotificationListener<ScrollNotification>(
               onNotification: _handleScrollNotification,
-              child: sizeAwareList,
+              child: observedList,
             );
 
             final userScrollAwareList = Listener(
@@ -500,7 +492,7 @@ class _MessageListViewState extends State<MessageListView>
     if (notification is UserScrollNotification) {
       final shouldDefer = notification.direction != ScrollDirection.idle;
       if (shouldDefer) {
-        _handleUserScrollActivity(notification.metrics);
+        _setDeferStreamingMessageUpdates(true);
       } else {
         _scheduleStreamingUpdateResume();
       }
@@ -611,34 +603,29 @@ class _MessageListViewState extends State<MessageListView>
     return (maximum - occupied - fixedBottom).clamp(0.0, maximum).toDouble();
   }
 
-  void _scheduleProgrammaticSpacerUpdate() {
-    if (_programmaticSpacerUpdateScheduled) return;
-    _programmaticSpacerUpdateScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _programmaticSpacerUpdateScheduled = false;
-      if (!mounted || widget.timelineCoordinator?.isGenerating != true) return;
-      final anchorSlotId = _programmaticAnchorSlotId;
-      final viewport = context.findRenderObject();
-      if (anchorSlotId == null ||
-          viewport is! RenderBox ||
-          !viewport.attached) {
-        return;
-      }
-      final next = _calculateProgrammaticSpacer(anchorSlotId, viewport);
-      if ((next - _programmaticSpacer).abs() <= 0.5) return;
-      setState(() => _programmaticSpacer = next);
-    });
-  }
-
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
     if (metrics != null) {
-      return metrics.maxScrollExtent - metrics.pixels <=
-          _streamingUpdateDeferBottomTolerance;
+      final gap = _contentMaxScrollExtent(metrics) - metrics.pixels;
+      return gap >= -0.5 && gap <= _streamingUpdateDeferBottomTolerance;
     }
     if (!widget.scrollController.hasClients) return true;
     final position = widget.scrollController.position;
-    return position.maxScrollExtent - position.pixels <=
-        _streamingUpdateDeferBottomTolerance;
+    final gap = _contentMaxScrollExtent(position) - position.pixels;
+    return gap >= -0.5 && gap <= _streamingUpdateDeferBottomTolerance;
+  }
+
+  double _contentMaxScrollExtent(ScrollMetrics metrics) {
+    final coordinator = widget.timelineCoordinator;
+    final anchoredGeneration =
+        coordinator?.isGenerating == true &&
+        coordinator?.viewportMode == TimelineViewportMode.userAnchored &&
+        _programmaticAnchorSlotId != null &&
+        _programmaticAnchorConversationId == coordinator?.conversationId;
+    if (!anchoredGeneration) return metrics.maxScrollExtent;
+    return (metrics.maxScrollExtent - _programmaticSpacer).clamp(
+      metrics.minScrollExtent,
+      metrics.maxScrollExtent,
+    );
   }
 
   void _setDeferStreamingMessageUpdates(bool value) {
@@ -775,7 +762,7 @@ class _MessageListViewState extends State<MessageListView>
         widget.streamingContentNotifier != null &&
         widget.streamingContentNotifier!.hasNotifier(message.id);
 
-    Widget messageColumn = Column(
+    final messageColumn = Column(
       key: _slotKeys.putIfAbsent(
         _slotId(message),
         () => GlobalKey(debugLabel: 'timeline-slot:${_slotId(message)}'),
@@ -875,10 +862,6 @@ class _MessageListViewState extends State<MessageListView>
           ),
       ],
     );
-    if (isStreaming) {
-      messageColumn = SizeChangedLayoutNotifier(child: messageColumn);
-    }
-
     final isSpotlight =
         widget.spotlightMessageId != null &&
         message.id == widget.spotlightMessageId;
