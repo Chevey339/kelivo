@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
+import '../../../core/database/generation_run.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
@@ -25,10 +27,24 @@ import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 class _StreamingCheckpoint {
-  const _StreamingCheckpoint({required this.message, required this.toolEvents});
+  const _StreamingCheckpoint({
+    required this.message,
+    required this.toolEvents,
+    this.generationRunId,
+    this.checkpointSeq,
+  });
 
   final ChatMessage message;
   final List<Map<String, dynamic>> toolEvents;
+  final String? generationRunId;
+  final int? checkpointSeq;
+}
+
+class _GenerationCheckpointCursor {
+  _GenerationCheckpointCursor({required this.runId, required this.nextSeq});
+
+  final String runId;
+  int nextSeq;
 }
 
 /// Result of a send/regenerate action.
@@ -219,6 +235,8 @@ class ChatActions {
       <String, LatestWinsCheckpointWriter<_StreamingCheckpoint>>{};
   final Map<String, List<Map<String, dynamic>>> _streamingToolEvents =
       <String, List<Map<String, dynamic>>>{};
+  final Map<String, _GenerationCheckpointCursor> _generationCheckpointCursors =
+      <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
       ActiveStreamingMessageStore();
 
@@ -285,26 +303,44 @@ class ChatActions {
     if (writer == null || state.finishHandled) return;
     final message = _streamingMessageSnapshot(state);
     _activeAssistantMessages.put(message);
-    writer.add(
-      _StreamingCheckpoint(
-        message: message,
-        toolEvents: _copyToolEvents(state.messageId),
-      ),
+    writer.add(_createStreamingCheckpoint(message));
+  }
+
+  _StreamingCheckpoint _createStreamingCheckpoint(ChatMessage message) {
+    final cursor = _generationCheckpointCursors[message.id];
+    final checkpointSeq = cursor?.nextSeq;
+    if (cursor != null) cursor.nextSeq += 1;
+    return _StreamingCheckpoint(
+      message: message,
+      toolEvents: _copyToolEvents(message.id),
+      generationRunId: cursor?.runId,
+      checkpointSeq: checkpointSeq,
     );
   }
 
   Future<void> _finalizeStreamingCheckpoint(ChatMessage message) async {
     final writer = _checkpointWriters.remove(message.id);
-    final events = _copyToolEvents(message.id);
+    final checkpoint = _createStreamingCheckpoint(message);
     try {
       if (writer == null) {
-        await chatService.updateStreamingCheckpointSilent(message, events);
+        await chatService.updateStreamingCheckpointSilent(
+          message,
+          checkpoint.toolEvents,
+          generationRunId: checkpoint.generationRunId,
+          checkpointSeq: checkpoint.checkpointSeq,
+        );
       } else {
         await writer.finalize(
-          () => chatService.updateStreamingCheckpointSilent(message, events),
+          () => chatService.updateStreamingCheckpointSilent(
+            message,
+            checkpoint.toolEvents,
+            generationRunId: checkpoint.generationRunId,
+            checkpointSeq: checkpoint.checkpointSeq,
+          ),
         );
       }
     } finally {
+      _generationCheckpointCursors.remove(message.id);
       _streamingToolEvents.remove(message.id);
       _activeAssistantMessages.removeIfMatches(message);
     }
@@ -418,50 +454,68 @@ class ChatActions {
     required Future<void> Function(Object error, StackTrace stackTrace) onError,
     required Future<void> Function() onDone,
   }) {
+    final events =
+        Queue<({T? data, Object? error, StackTrace? stackTrace, bool done})>();
     late final StreamSubscription<T> subscription;
-    var terminalStarted = false;
+    var draining = false;
+    var terminalQueued = false;
 
-    Future<void> handleError(Object error, StackTrace stackTrace) async {
-      if (terminalStarted) return;
-      terminalStarted = true;
+    Future<void> drain() async {
+      if (draining) return;
+      draining = true;
       try {
+        while (events.isNotEmpty) {
+          final event = events.removeFirst();
+          final error = event.error;
+          if (error != null) {
+            await onError(error, event.stackTrace ?? StackTrace.current);
+            await subscription.cancel();
+            events.clear();
+            return;
+          }
+          if (event.done) {
+            await onDone();
+            return;
+          }
+          await onData(event.data as T);
+        }
+      } catch (error, stackTrace) {
+        terminalQueued = true;
+        events.clear();
         await onError(error, stackTrace);
-      } finally {
         await subscription.cancel();
+      } finally {
+        draining = false;
+        if (events.isNotEmpty) unawaited(drain());
       }
     }
 
-    Future<void> handleDone() async {
-      if (terminalStarted) return;
-      terminalStarted = true;
-      try {
-        await onDone();
-      } catch (error, stackTrace) {
-        terminalStarted = false;
-        await handleError(error, stackTrace);
-      }
+    void enqueue(
+      ({T? data, Object? error, StackTrace? stackTrace, bool done}) event,
+    ) {
+      events.add(event);
+      unawaited(drain());
     }
 
     subscription = stream.listen(
       (chunk) {
-        if (terminalStarted) return;
-        subscription.pause();
-        Future<void>.sync(() => onData(chunk)).then(
-          (_) {
-            if (!terminalStarted) {
-              subscription.resume();
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            unawaited(handleError(error, stackTrace));
-          },
-        );
+        if (terminalQueued) return;
+        enqueue((data: chunk, error: null, stackTrace: null, done: false));
       },
       onError: (Object error, StackTrace stackTrace) {
-        unawaited(handleError(error, stackTrace));
+        if (terminalQueued) return;
+        terminalQueued = true;
+        enqueue((
+          data: null,
+          error: error,
+          stackTrace: stackTrace,
+          done: false,
+        ));
       },
       onDone: () {
-        unawaited(handleDone());
+        if (terminalQueued) return;
+        terminalQueued = true;
+        enqueue((data: null, error: null, stackTrace: null, done: true));
       },
       cancelOnError: true,
     );
@@ -1160,6 +1214,8 @@ class ChatActions {
           write: (checkpoint) => chatService.updateStreamingCheckpointSilent(
             checkpoint.message,
             checkpoint.toolEvents,
+            generationRunId: checkpoint.generationRunId,
+            checkpointSeq: checkpoint.checkpointSeq,
           ),
           onError: (error, stackTrace) {
             debugPrint('[StreamingCheckpoint] write failed: $error');
@@ -1172,6 +1228,21 @@ class ChatActions {
       if (!_activeAssistantMessages.isActive(ctx.assistantMessage)) {
         await _cancelIosBackgroundGeneration();
         return;
+      }
+      final runId = ctx.generationRunId;
+      if (runId != null) {
+        final run = await chatService.transitionGenerationRun(
+          id: runId,
+          expectedState: GenerationRunState.preparing,
+          expectedStateRevision: 0,
+          nextState: GenerationRunState.requesting,
+        );
+        state.generationStateRevision = run.stateRevision;
+        _generationCheckpointCursors[state.messageId] =
+            _GenerationCheckpointCursor(
+              runId: run.id,
+              nextSeq: run.checkpointSeq + 1,
+            );
       }
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
@@ -1215,6 +1286,7 @@ class ChatActions {
     ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
+    await _markGenerationStreaming(state);
     final chunkContent = chunk.content.isNotEmpty
         ? streamController.captureGeminiThoughtSignature(
             chunk.content,
@@ -1244,6 +1316,27 @@ class ChatActions {
       await _handleContentChunk(chunk, state, chunkContent);
       _scheduleStreamingCheckpoint(state);
     }
+  }
+
+  Future<void> _markGenerationStreaming(
+    stream_ctrl.StreamingState state,
+  ) async {
+    final runId = state.ctx.generationRunId;
+    final expectedRevision = state.generationStateRevision;
+    if (runId == null ||
+        expectedRevision == null ||
+        state.generationStreamingStarted) {
+      return;
+    }
+    final run = await chatService.transitionGenerationRun(
+      id: runId,
+      expectedState: GenerationRunState.requesting,
+      expectedStateRevision: expectedRevision,
+      nextState: GenerationRunState.streaming,
+    );
+    state
+      ..generationStateRevision = run.stateRevision
+      ..generationStreamingStarted = true;
   }
 
   /// Handle reasoning chunk from stream.
@@ -1752,12 +1845,7 @@ class ChatActions {
         _copyToolEvents(streaming.id),
       );
     } else {
-      writer.add(
-        _StreamingCheckpoint(
-          message: snapshot,
-          toolEvents: _copyToolEvents(streaming.id),
-        ),
-      );
+      writer.add(_createStreamingCheckpoint(snapshot));
       await writer.barrier();
     }
     // Ensure any inline data URLs get converted even if the user navigates away mid-stream

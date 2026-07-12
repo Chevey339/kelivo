@@ -161,4 +161,47 @@ void main() {
     );
     expect(await database.select(database.conversationRows).get(), isEmpty);
   });
+
+  test(
+    'message snapshot and run checkpoint sequence commit together',
+    () async {
+      final begin = await beginFirstSend();
+      var run = begin.run;
+      run = await repository.transitionGenerationRun(
+        id: run.id,
+        expectedState: run.state,
+        expectedStateRevision: run.stateRevision,
+        nextState: GenerationRunState.requesting,
+        updatedAt: timestamp.add(const Duration(microseconds: 2)),
+      );
+      run = await repository.transitionGenerationRun(
+        id: run.id,
+        expectedState: run.state,
+        expectedStateRevision: run.stateRevision,
+        nextState: GenerationRunState.streaming,
+        updatedAt: timestamp.add(const Duration(microseconds: 3)),
+      );
+
+      final checkpoint = begin.assistantMessage.copyWith(content: 'partial');
+      await repository.updateStreamingCheckpoint(
+        checkpoint,
+        const [],
+        generationRunId: run.id,
+        checkpointSeq: 1,
+      );
+      expect((await repository.getMessage(checkpoint.id))?.content, 'partial');
+      expect((await repository.getGenerationRun(run.id))?.checkpointSeq, 1);
+
+      await expectLater(
+        repository.updateStreamingCheckpoint(
+          checkpoint.copyWith(content: 'stale'),
+          const [],
+          generationRunId: run.id,
+          checkpointSeq: 1,
+        ),
+        throwsA(isA<GenerationRunCheckpointConflict>()),
+      );
+      expect((await repository.getMessage(checkpoint.id))?.content, 'partial');
+    },
+  );
 }

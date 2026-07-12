@@ -165,6 +165,42 @@ void main() {
     expect((await createRun(id: 'run-2')).state, GenerationRunState.preparing);
   });
 
+  test('checkpoint sequence advances monotonically on an active run', () async {
+    var run = await createRun();
+    run = await repository.transitionGenerationRun(
+      id: run.id,
+      expectedState: run.state,
+      expectedStateRevision: run.stateRevision,
+      nextState: GenerationRunState.requesting,
+      updatedAt: createdAt.add(const Duration(microseconds: 1)),
+    );
+    run = await repository.transitionGenerationRun(
+      id: run.id,
+      expectedState: run.state,
+      expectedStateRevision: run.stateRevision,
+      nextState: GenerationRunState.streaming,
+      updatedAt: createdAt.add(const Duration(microseconds: 2)),
+    );
+
+    run = await repository.checkpointGenerationRun(
+      id: run.id,
+      targetRevisionId: run.targetRevisionId,
+      checkpointSeq: 3,
+      updatedAt: createdAt.add(const Duration(microseconds: 3)),
+    );
+    expect(run.checkpointSeq, 3);
+    await expectLater(
+      repository.checkpointGenerationRun(
+        id: run.id,
+        targetRevisionId: run.targetRevisionId,
+        checkpointSeq: 2,
+        updatedAt: createdAt.add(const Duration(microseconds: 4)),
+      ),
+      throwsA(isA<GenerationRunCheckpointConflict>()),
+    );
+    expect((await repository.getGenerationRun(run.id))?.checkpointSeq, 3);
+  });
+
   test('database constraints reject terminal and FK inconsistencies', () async {
     await expectLater(
       database

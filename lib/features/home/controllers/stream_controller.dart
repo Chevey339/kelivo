@@ -1369,6 +1369,8 @@ class StreamingState {
   bool finishHandled = false;
   bool titleQueued = false;
   DateTime? streamStartedAt;
+  int? generationStateRevision;
+  bool generationStreamingStarted = false;
   bool hadThinkingBlock = false;
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];

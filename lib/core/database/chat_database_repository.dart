@@ -117,6 +117,18 @@ class ChatDatabaseRepository {
     errorCode: errorCode,
   );
 
+  Future<GenerationRun> checkpointGenerationRun({
+    required String id,
+    required String targetRevisionId,
+    required int checkpointSeq,
+    required DateTime updatedAt,
+  }) => GenerationRunCommands(_db).checkpoint(
+    id: id,
+    targetRevisionId: targetRevisionId,
+    checkpointSeq: checkpointSeq,
+    updatedAt: updatedAt,
+  );
+
   static Future<bool> migrateInstalledDatabase(File file) async {
     final database = sqlite.sqlite3.open(
       file.absolute.path,
@@ -3152,20 +3164,32 @@ class ChatDatabaseRepository {
 
   Future<void> updateStreamingCheckpoint(
     ChatMessage message,
-    List<Map<String, dynamic>> toolEvents,
-  ) {
+    List<Map<String, dynamic>> toolEvents, {
+    String? generationRunId,
+    int? checkpointSeq,
+  }) {
+    if ((generationRunId == null) != (checkpointSeq == null)) {
+      throw ArgumentError('generationRunId and checkpointSeq must pair');
+    }
     return _observer.measure(
       message.isStreaming
           ? ChatDatabaseOperation.commandStreamingCheckpoint
           : ChatDatabaseOperation.commandFinalCheckpoint,
-      () => _updateStreamingCheckpoint(message, toolEvents),
+      () => _updateStreamingCheckpoint(
+        message,
+        toolEvents,
+        generationRunId: generationRunId,
+        checkpointSeq: checkpointSeq,
+      ),
     );
   }
 
   Future<void> _updateStreamingCheckpoint(
     ChatMessage message,
-    List<Map<String, dynamic>> toolEvents,
-  ) async {
+    List<Map<String, dynamic>> toolEvents, {
+    String? generationRunId,
+    int? checkpointSeq,
+  }) async {
     await _db.transaction(() async {
       await (_db.update(
         _db.messageRows,
@@ -3179,6 +3203,14 @@ class ChatDatabaseRepository {
               eventsJson: jsonEncode(toolEvents),
             ),
           );
+      if (generationRunId != null && checkpointSeq != null) {
+        await GenerationRunCommands(_db).checkpoint(
+          id: generationRunId,
+          targetRevisionId: message.id,
+          checkpointSeq: checkpointSeq,
+          updatedAt: DateTime.now().toUtc(),
+        );
+      }
       if (!message.isStreaming) {
         await untrackActiveStreamingId(message.id);
       }

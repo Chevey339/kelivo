@@ -82,6 +82,39 @@ final class GenerationRunCommands {
     });
   }
 
+  Future<GenerationRun> checkpoint({
+    required String id,
+    required String targetRevisionId,
+    required int checkpointSeq,
+    required DateTime updatedAt,
+  }) {
+    if (checkpointSeq <= 0) {
+      throw ArgumentError.value(checkpointSeq, 'checkpointSeq');
+    }
+    return _db.transaction(() async {
+      final updated =
+          await (_db.update(_db.generationRunRows)..where(
+                (run) =>
+                    run.id.equals(id) &
+                    run.targetRevisionId.equals(targetRevisionId) &
+                    run.state.isIn(const [
+                      'requesting',
+                      'streaming',
+                      'waiting_tool',
+                    ]) &
+                    run.checkpointSeq.isSmallerThanValue(checkpointSeq),
+              ))
+              .write(
+                GenerationRunRowsCompanion(
+                  checkpointSeq: Value(checkpointSeq),
+                  updatedAt: Value(updatedAt),
+                ),
+              );
+      if (updated != 1) throw GenerationRunCheckpointConflict();
+      return _readRequired(id);
+    });
+  }
+
   Future<GenerationRun> _readRequired(String id) async {
     final row = await (_db.select(
       _db.generationRunRows,

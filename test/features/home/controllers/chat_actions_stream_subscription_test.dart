@@ -150,5 +150,43 @@ void main() {
 
       expect(started, const [1, 2]);
     });
+
+    test('异步 handler 未完成时网络订阅保持读取并在本地排队', () async {
+      final controller = async.StreamController<int>(sync: true);
+      final firstStarted = async.Completer<void>();
+      final allowFirstToFinish = async.Completer<void>();
+      final done = async.Completer<void>();
+      final seen = <int>[];
+
+      final subscription = ChatActions.listenSequentiallyToStream<int>(
+        stream: controller.stream,
+        onData: (value) async {
+          seen.add(value);
+          if (value == 1) {
+            firstStarted.complete();
+            await allowFirstToFinish.future;
+          }
+        },
+        onError: (error, stackTrace) async {
+          fail('unexpected stream error: $error');
+        },
+        onDone: () async => done.complete(),
+      );
+      addTearDown(subscription.cancel);
+
+      controller.add(1);
+      await firstStarted.future.timeout(const Duration(seconds: 1));
+      expect(controller.isPaused, isFalse);
+      controller
+        ..add(2)
+        ..add(3);
+      expect(controller.isPaused, isFalse);
+      expect(seen, const [1]);
+
+      allowFirstToFinish.complete();
+      await controller.close();
+      await done.future.timeout(const Duration(seconds: 1));
+      expect(seen, const [1, 2, 3]);
+    });
   });
 }

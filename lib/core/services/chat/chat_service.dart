@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
+import '../../database/generation_run.dart';
 import '../../database/message_graph_projector.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
@@ -1464,8 +1465,10 @@ class ChatService extends ChangeNotifier {
   /// Persists one complete streaming snapshot without a read-before-write.
   Future<void> updateStreamingCheckpointSilent(
     ChatMessage message,
-    List<Map<String, dynamic>> toolEvents,
-  ) async {
+    List<Map<String, dynamic>> toolEvents, {
+    String? generationRunId,
+    int? checkpointSeq,
+  }) async {
     if (!_initialized) return;
 
     if (isTemporaryConversation(message.conversationId)) {
@@ -1476,10 +1479,30 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    await _repo.updateStreamingCheckpoint(message, toolEvents);
+    await _repo.updateStreamingCheckpoint(
+      message,
+      toolEvents,
+      generationRunId: generationRunId,
+      checkpointSeq: checkpointSeq,
+    );
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
   }
+
+  Future<GenerationRun> transitionGenerationRun({
+    required String id,
+    required GenerationRunState expectedState,
+    required int expectedStateRevision,
+    required GenerationRunState nextState,
+    String? errorCode,
+  }) => _repo.transitionGenerationRun(
+    id: id,
+    expectedState: expectedState,
+    expectedStateRevision: expectedStateRevision,
+    nextState: nextState,
+    updatedAt: DateTime.now().toUtc(),
+    errorCode: errorCode,
+  );
 
   // Tool events persistence (per assistant message)
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {

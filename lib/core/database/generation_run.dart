@@ -55,3 +55,8 @@ final class GenerationRunTransitionConflict extends StateError {
   GenerationRunTransitionConflict()
     : super('generation_run_transition_conflict');
 }
+
+final class GenerationRunCheckpointConflict extends StateError {
+  GenerationRunCheckpointConflict()
+    : super('generation_run_checkpoint_conflict');
+}
