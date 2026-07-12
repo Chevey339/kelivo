@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.5.0] - 2026-07-13
+
+> ⚠️ **Before Upgrading**
+>
+> This release migrates assistant storage from SharedPreferences to SQLite.
+> **Please back up your chat history via Settings before upgrading** to guard
+> against any edge-case data anomalies.
+>
+> It also fixes a critical issue where old conversations could not be resumed
+> after restart due to immutable `messageIds` lists. If you encountered this,
+> the upgrade will restore normal functionality.
+
+### Added
+- Server tool events — OpenAI server-executed tool calls rendered as native tool cards
+
+### Changed
+- Assistant storage migrated from SharedPreferences to SQLite, improving reliability and extensibility
+
+### Fixed
+- Old conversations could not send messages after restart due to immutable `messageIds` (#22)
+- Past OCR results were lost after app restart (now persisted to SQLite via `CacheRows` table)
+- `fetch_markdown` tool output did not strip `<script>` and `<style>` tags (#17)
+
 ## [1.4.1] - 2026-07-12
 
 ### Added

@@ -17,8 +17,8 @@ Currently known to be used by the author and at least 2 other stable users with 
 
 ## New Features
 
-1. **SQLite storage** — Replaced Hive with SQLite for improved reliability.
-   - *In practice*: Data loss incidents are expected to drop by roughly 70%.
+1. **SQLite storage** — Replaced Hive with SQLite for improved reliability. Assistant storage (SharedPreferences) has also been migrated to SQLite, expanding database coverage.
+   - *In practice*: Data loss incidents are expected to drop by roughly 90%.
    - *Note*: Existing `.zip` backups remain fully compatible, as they are not raw Hive binaries.
 
 2. **Incremental backup** — Uploads only conversations, messages and related attachments since a selected date.
@@ -37,6 +37,8 @@ Currently known to be used by the author and at least 2 other stable users with 
 6. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
 7. **Additional fixes across the repo**
+   - OCR result caching now persists across restarts (SQLite-backed)
+   - `fetch_markdown` tool output now strips `<script>` and `<style>` tags to reduce excessive token consumption
    - Qwen/Doubao model capability detection
    - Accurate Gemini cached-token reporting
    - Optimized title generation logic (auto-retry on first failure)
