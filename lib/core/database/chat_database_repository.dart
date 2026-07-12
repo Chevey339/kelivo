@@ -2275,7 +2275,6 @@ class ChatDatabaseRepository {
           ),
         );
       }
-      if (message.isStreaming) await trackActiveStreamingId(message.id);
       return persisted;
     });
   }
@@ -2435,9 +2434,6 @@ class ChatDatabaseRepository {
       await _db
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
-      if (message.isStreaming) {
-        await trackActiveStreamingId(message.id);
-      }
     });
     return persisted;
   }
@@ -2576,9 +2572,6 @@ class ChatDatabaseRepository {
         await _db
             .into(_db.messageRows)
             .insert(_messageCompanion(message, index), mode: InsertMode.insert);
-        if (message.isStreaming) {
-          await trackActiveStreamingId(message.id);
-        }
       }
     });
   }
@@ -3266,9 +3259,6 @@ class ChatDatabaseRepository {
     await _db.transaction(() async {
       await _updateMessageShadow(message);
       await _updateGraphRevisionPayload(message);
-      if (untrackStreaming) {
-        await untrackActiveStreamingId(message.id);
-      }
     });
   }
 
@@ -3318,9 +3308,6 @@ class ChatDatabaseRepository {
           checkpointSeq: checkpointSeq,
           updatedAt: DateTime.now().toUtc(),
         );
-      }
-      if (!message.isStreaming) {
-        await untrackActiveStreamingId(message.id);
       }
     });
   }
@@ -3743,30 +3730,17 @@ class ChatDatabaseRepository {
   }
 
   Future<List<String>> getActiveStreamingIds() async {
-    final row =
-        await (_db.select(_db.chatStorageMetaRows)..where(
-              (t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds),
+    final rows =
+        await (_db.select(_db.generationRunRows)..where(
+              (row) => row.state.isIn(const [
+                'preparing',
+                'requesting',
+                'streaming',
+                'waiting_tool',
+              ]),
             ))
-            .getSingleOrNull();
-    if (row == null) return const <String>[];
-    final decoded = jsonDecode(row.value);
-    if (decoded is! List) return const <String>[];
-    return decoded.map((e) => e.toString()).toList(growable: false);
-  }
-
-  Future<void> setActiveStreamingIds(List<String> ids) async {
-    if (ids.isEmpty) {
-      await clearActiveStreamingIds();
-      return;
-    }
-    await _db
-        .into(_db.chatStorageMetaRows)
-        .insertOnConflictUpdate(
-          ChatStorageMetaRowsCompanion.insert(
-            key: ChatStorageMetaKeys.activeStreamingIds,
-            value: jsonEncode(ids),
-          ),
-        );
+            .get();
+    return rows.map((row) => row.targetRevisionId).toList(growable: false);
   }
 
   Future<void> clearActiveStreamingIds() async {
@@ -3775,33 +3749,56 @@ class ChatDatabaseRepository {
     )..where((t) => t.key.equals(ChatStorageMetaKeys.activeStreamingIds))).go();
   }
 
-  /// Clears every persisted streaming projection after a cold application start.
-  Future<void> resetStaleStreamingState() async {
-    await _db.transaction(() async {
+  /// Atomically terminalizes every generation abandoned by a prior process.
+  Future<int> resetStaleStreamingState() async {
+    return _db.transaction(() async {
+      final activeStates = const [
+        'preparing',
+        'requesting',
+        'streaming',
+        'waiting_tool',
+      ];
+      final runs = await (_db.select(
+        _db.generationRunRows,
+      )..where((row) => row.state.isIn(activeStates))).get();
+      final now = DateTime.now().toUtc();
+      final targetIds = runs.map((run) => run.targetRevisionId).toSet();
+      if (runs.isNotEmpty) {
+        await (_db.update(
+          _db.generationRunRows,
+        )..where((row) => row.state.isIn(activeStates))).write(
+          GenerationRunRowsCompanion(
+            state: const Value('interrupted'),
+            stateRevision: const Value.absent(),
+            errorCode: const Value('app_restart'),
+            updatedAt: Value(now),
+            terminalAt: Value(now),
+          ),
+        );
+        await _db.customUpdate(
+          'UPDATE generation_run_rows '
+          'SET state_revision = state_revision + 1 '
+          "WHERE state = 'interrupted' AND terminal_at = ?;",
+          variables: [Variable.withInt(now.microsecondsSinceEpoch)],
+          updates: {_db.generationRunRows},
+        );
+      }
       await (_db.update(_db.messageRows)
             ..where((row) => row.isStreaming.equals(true)))
           .write(const MessageRowsCompanion(isStreaming: Value(false)));
+      if (targetIds.isNotEmpty) {
+        await (_db.update(_db.messageRevisionRows)..where(
+              (row) => row.id.isIn(targetIds) & row.finalizedAt.isNull(),
+            ))
+            .write(
+              MessageRevisionRowsCompanion(
+                updatedAt: Value(now),
+                finalizedAt: Value(now),
+              ),
+            );
+      }
       await clearActiveStreamingIds();
-    });
-  }
-
-  Future<void> untrackActiveStreamingId(String messageId) async {
-    await _db.transaction(() async {
-      final ids = await getActiveStreamingIds();
-      if (!ids.contains(messageId)) return;
-      final updated = ids
-          .where((id) => id != messageId)
-          .toList(growable: false);
-      await setActiveStreamingIds(updated);
-    });
-  }
-
-  Future<void> trackActiveStreamingId(String messageId) async {
-    await _db.transaction(() async {
-      final ids = (await getActiveStreamingIds()).toList();
-      if (ids.contains(messageId)) return;
-      ids.add(messageId);
-      await setActiveStreamingIds(ids);
+      return runs.length;
     });
   }
 

@@ -125,7 +125,6 @@ class HiveToSqliteMigrationService {
   static const _conversationBoxName = 'conversations';
   static const _messagesBoxName = 'messages';
   static const _toolEventsBoxName = 'tool_events_v1';
-  static const _activeStreamingKey = '_active_streaming_ids';
   static const _messageBatchSize = 128;
   static const _settingsBackupName = 'settings.json';
   static const _chatsBackupName = 'chats.json';
@@ -494,12 +493,6 @@ class HiveToSqliteMigrationService {
         conversations: conversations.length,
         messages: migratedMessages,
       );
-      if (toolEventsBox != null) {
-        final active = await toolEventsBox.get(_activeStreamingKey);
-        if (active is List && active.isNotEmpty) {
-          await repo.setActiveStreamingIds(active.map((e) => '$e').toList());
-        }
-      }
       _emit(
         HiveToSqliteMigrationStage.migrating,
         0.98,

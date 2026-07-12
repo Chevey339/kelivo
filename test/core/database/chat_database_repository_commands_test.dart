@@ -53,7 +53,7 @@ void main() {
   }
 
   test(
-    'append atomically persists conversation, message, selection and run receipt',
+    'legacy append persists conversation and selection without active JSON',
     () async {
       final persisted = await repository.appendMessageToConversation(
         conversation: conversation(),
@@ -71,7 +71,7 @@ void main() {
       expect((await repository.getConversation('conversation-1'))?.messageIds, [
         'message-1',
       ]);
-      expect(await repository.getActiveStreamingIds(), const ['message-1']);
+      expect(await repository.getActiveStreamingIds(), isEmpty);
     },
   );
 

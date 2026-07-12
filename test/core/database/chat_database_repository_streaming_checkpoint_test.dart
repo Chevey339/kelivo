@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -168,28 +169,77 @@ void main() {
     });
 
     test('cold start 一次事务清理未登记 flag 和孤儿 tracking metadata', () async {
-      await repository.setActiveStreamingIds(const [
-        'different-message',
-        'missing-message',
-      ]);
+      final createdAt = DateTime.now().toUtc();
+      await repository.createGenerationRun(
+        id: 'abandoned-run',
+        conversationId: 'conversation',
+        targetRevisionId: 'streaming',
+        createdAt: createdAt,
+      );
+      await repository.transitionGenerationRun(
+        id: 'abandoned-run',
+        expectedState: GenerationRunState.preparing,
+        expectedStateRevision: 0,
+        nextState: GenerationRunState.requesting,
+        updatedAt: createdAt.add(const Duration(milliseconds: 1)),
+      );
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          content: 'preserved partial',
+          conversationId: 'conversation',
+          isStreaming: true,
+        ),
+        const [],
+        generationRunId: 'abandoned-run',
+        checkpointSeq: 1,
+      );
 
-      await repository.resetStaleStreamingState();
+      expect(await repository.resetStaleStreamingState(), 1);
 
       final message = await repository.getMessage('streaming');
       expect(message?.isStreaming, isFalse);
+      expect(message?.content, 'preserved partial');
+      final run = await repository.getGenerationRun('abandoned-run');
+      expect(run?.state, GenerationRunState.interrupted);
+      expect(run?.stateRevision, 2);
+      expect(run?.checkpointSeq, 1);
+      expect(run?.errorCode, 'app_restart');
       expect(await repository.getActiveStreamingIds(), isEmpty);
     });
 
-    test('并发 generation 的 tracking 更新不会互相覆盖', () async {
-      await Future.wait([
-        repository.trackActiveStreamingId('first-stream'),
-        repository.trackActiveStreamingId('second-stream'),
-      ]);
+    test('active generation projection comes only from run rows', () async {
+      final createdAt = DateTime.now().toUtc();
+      await repository.createGenerationRun(
+        id: 'first-run',
+        conversationId: 'conversation',
+        targetRevisionId: 'first',
+        createdAt: createdAt,
+      );
+      await repository.createGenerationRun(
+        id: 'streaming-run',
+        conversationId: 'conversation',
+        targetRevisionId: 'streaming',
+        createdAt: createdAt,
+      );
 
       expect(
         await repository.getActiveStreamingIds(),
-        containsAll(['first-stream', 'second-stream']),
+        containsAll(['first', 'streaming']),
       );
+      final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+      try {
+        expect(
+          raw.select(
+            "SELECT value FROM chat_storage_meta_rows "
+            "WHERE key = 'active_streaming_ids';",
+          ),
+          isEmpty,
+        );
+      } finally {
+        raw.close();
+      }
     });
   });
 }

@@ -32,7 +32,6 @@ void main() {
       'preserves migration receipt and clears runtime streaming state',
       () async {
         await repository.markMigrationComplete();
-        await repository.setActiveStreamingIds(const ['streaming-message']);
 
         await repository.clearAllData();
 
@@ -42,7 +41,6 @@ void main() {
     );
 
     test('replaces all backup data in one transaction', () async {
-      await repository.setActiveStreamingIds(const ['streaming-message']);
       await repository.putMigrationBatch(
         conversations: [
           Conversation(
@@ -112,7 +110,6 @@ void main() {
     test(
       'rolls back deletion when replacement data cannot be written',
       () async {
-        await repository.setActiveStreamingIds(const ['existing-message']);
         await repository.putMigrationBatch(
           conversations: [
             Conversation(
@@ -165,9 +162,7 @@ void main() {
           isNull,
         );
         expect(await repository.getMessageCount('existing-conversation'), 1);
-        expect(await repository.getActiveStreamingIds(), const [
-          'existing-message',
-        ]);
+        expect(await repository.getActiveStreamingIds(), isEmpty);
       },
     );
   });
