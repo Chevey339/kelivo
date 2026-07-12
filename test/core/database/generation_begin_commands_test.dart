@@ -63,6 +63,24 @@ void main() {
         runId: 'run-1',
       );
 
+  Future<GenerationRun> advanceToStreaming(GenerationRun run) async {
+    var current = await repository.transitionGenerationRun(
+      id: run.id,
+      expectedState: run.state,
+      expectedStateRevision: run.stateRevision,
+      nextState: GenerationRunState.requesting,
+      updatedAt: timestamp.add(const Duration(microseconds: 2)),
+    );
+    current = await repository.transitionGenerationRun(
+      id: current.id,
+      expectedState: current.state,
+      expectedStateRevision: current.stateRevision,
+      nextState: GenerationRunState.streaming,
+      updatedAt: timestamp.add(const Duration(microseconds: 3)),
+    );
+    return current;
+  }
+
   test(
     'begin send commits user, assistant, graph, branch and run together',
     () async {
@@ -166,21 +184,7 @@ void main() {
     'message snapshot and run checkpoint sequence commit together',
     () async {
       final begin = await beginFirstSend();
-      var run = begin.run;
-      run = await repository.transitionGenerationRun(
-        id: run.id,
-        expectedState: run.state,
-        expectedStateRevision: run.stateRevision,
-        nextState: GenerationRunState.requesting,
-        updatedAt: timestamp.add(const Duration(microseconds: 2)),
-      );
-      run = await repository.transitionGenerationRun(
-        id: run.id,
-        expectedState: run.state,
-        expectedStateRevision: run.stateRevision,
-        nextState: GenerationRunState.streaming,
-        updatedAt: timestamp.add(const Duration(microseconds: 3)),
-      );
+      final run = await advanceToStreaming(begin.run);
 
       final checkpoint = begin.assistantMessage.copyWith(content: 'partial');
       await repository.updateStreamingCheckpoint(
@@ -202,6 +206,102 @@ void main() {
         throwsA(isA<GenerationRunCheckpointConflict>()),
       );
       expect((await repository.getMessage(checkpoint.id))?.content, 'partial');
+    },
+  );
+
+  test(
+    'final snapshot, receipt cleanup and terminal run commit together',
+    () async {
+      final begin = await beginFirstSend();
+      final run = await advanceToStreaming(begin.run);
+      final finalMessage = begin.assistantMessage.copyWith(
+        content: 'final',
+        isStreaming: false,
+        totalTokens: 9,
+      );
+
+      final completed = await repository.finalizeGenerationRun(
+        message: finalMessage,
+        toolEvents: const [
+          {'id': 'tool-1', 'name': 'search'},
+        ],
+        generationRunId: run.id,
+        expectedState: run.state,
+        expectedStateRevision: run.stateRevision,
+        terminalState: GenerationRunState.completed,
+        checkpointSeq: 1,
+      );
+
+      expect(completed.state, GenerationRunState.completed);
+      expect(completed.checkpointSeq, 1);
+      expect(completed.terminalAt, isNotNull);
+      expect((await repository.getMessage(finalMessage.id))?.content, 'final');
+      expect(await repository.getActiveStreamingIds(), isEmpty);
+      await expectLater(
+        repository.updateStreamingCheckpoint(
+          finalMessage.copyWith(content: 'late', isStreaming: true),
+          const [],
+          generationRunId: run.id,
+          checkpointSeq: 2,
+        ),
+        throwsA(isA<GenerationRunCheckpointConflict>()),
+      );
+      expect((await repository.getMessage(finalMessage.id))?.content, 'final');
+    },
+  );
+
+  test(
+    'terminal CAS failure rolls back final message and receipt cleanup',
+    () async {
+      final begin = await beginFirstSend();
+      final run = await advanceToStreaming(begin.run);
+
+      await expectLater(
+        repository.finalizeGenerationRun(
+          message: begin.assistantMessage.copyWith(
+            content: 'must roll back',
+            isStreaming: false,
+          ),
+          toolEvents: const [],
+          generationRunId: run.id,
+          expectedState: run.state,
+          expectedStateRevision: run.stateRevision + 1,
+          terminalState: GenerationRunState.failed,
+          checkpointSeq: 1,
+          errorCode: 'generation_failed',
+        ),
+        throwsA(isA<GenerationRunTransitionConflict>()),
+      );
+
+      final message = await repository.getMessage(begin.assistantMessage.id);
+      expect(message?.content, isEmpty);
+      expect(message?.isStreaming, isTrue);
+      expect((await repository.getGenerationRun(run.id))?.state, run.state);
+      expect(await repository.getActiveStreamingIds(), [
+        begin.assistantMessage.id,
+      ]);
+    },
+  );
+
+  test(
+    'preparation failure terminates without inventing a checkpoint',
+    () async {
+      final begin = await beginFirstSend();
+
+      final failed = await repository.finalizeGenerationRun(
+        message: begin.assistantMessage.copyWith(isStreaming: false),
+        toolEvents: const [],
+        generationRunId: begin.run.id,
+        expectedState: GenerationRunState.preparing,
+        expectedStateRevision: 0,
+        terminalState: GenerationRunState.failed,
+        errorCode: 'preparation_failed',
+      );
+
+      expect(failed.state, GenerationRunState.failed);
+      expect(failed.checkpointSeq, 0);
+      expect(failed.errorCode, 'preparation_failed');
+      expect(await repository.getActiveStreamingIds(), isEmpty);
     },
   );
 }

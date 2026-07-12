@@ -41,9 +41,16 @@ class _StreamingCheckpoint {
 }
 
 class _GenerationCheckpointCursor {
-  _GenerationCheckpointCursor({required this.runId, required this.nextSeq});
+  _GenerationCheckpointCursor({
+    required this.runId,
+    required this.state,
+    required this.stateRevision,
+    required this.nextSeq,
+  });
 
   final String runId;
+  GenerationRunState state;
+  int stateRevision;
   int nextSeq;
 }
 
@@ -318,32 +325,58 @@ class ChatActions {
     );
   }
 
-  Future<void> _finalizeStreamingCheckpoint(ChatMessage message) async {
+  void _registerGenerationRun(String messageId, String? runId) {
+    if (runId == null) return;
+    _generationCheckpointCursors[messageId] = _GenerationCheckpointCursor(
+      runId: runId,
+      state: GenerationRunState.preparing,
+      stateRevision: 0,
+      nextSeq: 1,
+    );
+  }
+
+  Future<void> _finalizeStreamingCheckpoint(
+    ChatMessage message, {
+    required GenerationRunState terminalState,
+    String? errorCode,
+  }) async {
     final writer = _checkpointWriters.remove(message.id);
-    final checkpoint = _createStreamingCheckpoint(message);
+    final cursor = _generationCheckpointCursors[message.id];
+    final checkpointSeq =
+        cursor == null || cursor.state == GenerationRunState.preparing
+        ? null
+        : cursor.nextSeq++;
+    final toolEvents = _copyToolEvents(message.id);
+    Future<void> writeFinal() async {
+      await chatService.finalizeGenerationRunSilent(
+        message: message,
+        toolEvents: toolEvents,
+        generationRunId: cursor?.runId,
+        expectedState: cursor?.state,
+        expectedStateRevision: cursor?.stateRevision,
+        terminalState: terminalState,
+        checkpointSeq: checkpointSeq,
+        errorCode: errorCode,
+      );
+    }
+
+    var committed = false;
     try {
       if (writer == null) {
-        await chatService.updateStreamingCheckpointSilent(
-          message,
-          checkpoint.toolEvents,
-          generationRunId: checkpoint.generationRunId,
-          checkpointSeq: checkpoint.checkpointSeq,
-        );
+        await writeFinal();
       } else {
-        await writer.finalize(
-          () => chatService.updateStreamingCheckpointSilent(
-            message,
-            checkpoint.toolEvents,
-            generationRunId: checkpoint.generationRunId,
-            checkpointSeq: checkpoint.checkpointSeq,
-          ),
-        );
+        await writer.finalize(writeFinal);
       }
+      committed = true;
     } finally {
-      _generationCheckpointCursors.remove(message.id);
-      _streamingToolEvents.remove(message.id);
-      _activeAssistantMessages.removeIfMatches(message);
+      if (committed) _clearGenerationRuntimeState(message);
     }
+  }
+
+  void _clearGenerationRuntimeState(ChatMessage message) {
+    _generationCheckpointCursors.remove(message.id);
+    _streamingToolEvents.remove(message.id);
+    _activeAssistantMessages.removeIfMatches(message);
   }
 
   Future<void> _finishPreparingMessage(
@@ -358,8 +391,13 @@ class ChatActions {
     streamController.cleanupTimers(message.id);
     streamController.removeStreamingNotifier(message.id);
     try {
-      await _finalizeStreamingCheckpoint(message);
+      await _finalizeStreamingCheckpoint(
+        message,
+        terminalState: GenerationRunState.failed,
+        errorCode: 'preparation_failed',
+      );
     } finally {
+      _clearGenerationRuntimeState(message);
       final index = _messages.indexWhere((item) => item.id == message.id);
       if (index >= 0) {
         _messages[index] = message;
@@ -714,6 +752,7 @@ class ChatActions {
       userMessage = begin.userMessage;
       assistantMessage = begin.assistantMessage;
       generationRunId = begin.runId;
+      _registerGenerationRun(assistantMessage.id, generationRunId);
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
@@ -911,6 +950,7 @@ class ChatActions {
       version: versioning.nextVersion,
     );
     final assistantMessage = begin.assistantMessage;
+    _registerGenerationRun(assistantMessage.id, begin.runId);
     _activeAssistantMessages.put(assistantMessage);
 
     // Pre-create streaming notifier BEFORE adding message to list
@@ -1161,8 +1201,12 @@ class ChatActions {
         latestStreaming,
       ).copyWith(isStreaming: false);
       try {
-        await _finalizeStreamingCheckpoint(finalizedMessage);
+        await _finalizeStreamingCheckpoint(
+          finalizedMessage,
+          terminalState: GenerationRunState.cancelled,
+        );
       } finally {
+        _clearGenerationRuntimeState(finalizedMessage);
         if (idx != -1) {
           _messages[idx] = finalizedMessage;
           onMessagesChanged?.call();
@@ -1231,18 +1275,21 @@ class ChatActions {
       }
       final runId = ctx.generationRunId;
       if (runId != null) {
+        final cursor = _generationCheckpointCursors[state.messageId];
+        if (cursor == null) {
+          throw StateError('generation_run_cursor_missing');
+        }
         final run = await chatService.transitionGenerationRun(
           id: runId,
-          expectedState: GenerationRunState.preparing,
-          expectedStateRevision: 0,
+          expectedState: cursor.state,
+          expectedStateRevision: cursor.stateRevision,
           nextState: GenerationRunState.requesting,
         );
         state.generationStateRevision = run.stateRevision;
-        _generationCheckpointCursors[state.messageId] =
-            _GenerationCheckpointCursor(
-              runId: run.id,
-              nextSeq: run.checkpointSeq + 1,
-            );
+        cursor
+          ..state = run.state
+          ..stateRevision = run.stateRevision
+          ..nextSeq = run.checkpointSeq + 1;
       }
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
@@ -1337,6 +1384,12 @@ class ChatActions {
     state
       ..generationStateRevision = run.stateRevision
       ..generationStreamingStarted = true;
+    final cursor = _generationCheckpointCursors[state.messageId];
+    if (cursor != null) {
+      cursor
+        ..state = run.state
+        ..stateRevision = run.stateRevision;
+    }
   }
 
   /// Handle reasoning chunk from stream.
@@ -1685,31 +1738,34 @@ class ChatActions {
       cachedTokens: finalCachedTokens,
       durationMs: finalDurationMs,
     );
-    await _finalizeStreamingCheckpoint(finalizedMessage);
+    try {
+      await _finalizeStreamingCheckpoint(
+        finalizedMessage,
+        terminalState: GenerationRunState.completed,
+      );
 
-    final index = _messages.indexWhere((m) => m.id == messageId);
-    if (index != -1) {
-      _messages[index] = finalizedMessage;
-      onMessagesChanged?.call();
+      final index = _messages.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        _messages[index] = finalizedMessage;
+        onMessagesChanged?.call();
+      }
+      onAssistantMessageFinished?.call(finalizedMessage);
+
+      if (shouldGenerateTitle) {
+        onMaybeGenerateTitle?.call(conversationId);
+      }
+
+      // Trigger summary generation check (actual logic in HomeViewModel)
+      onMaybeGenerateSummary?.call(conversationId);
+
+      // Trigger follow-up suggestions after the final assistant reply is stored.
+      onMaybeGenerateSuggestions?.call(conversationId);
+      await _finishIosBackgroundGeneration(success: true);
+    } finally {
+      // UI lifecycle cleanup is independent from terminal persistence success.
+      streamController.removeStreamingNotifier(messageId);
+      _setConversationLoading(conversationId, false);
     }
-
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
-
-    _setConversationLoading(conversationId, false);
-    onAssistantMessageFinished?.call(finalizedMessage);
-
-    if (shouldGenerateTitle) {
-      onMaybeGenerateTitle?.call(conversationId);
-    }
-
-    // Trigger summary generation check (actual logic in HomeViewModel)
-    onMaybeGenerateSummary?.call(conversationId);
-
-    // Trigger follow-up suggestions after the final assistant reply is stored.
-    onMaybeGenerateSuggestions?.call(conversationId);
-
-    await _finishIosBackgroundGeneration(success: true);
   }
 
   /// Handle stream error.
@@ -1729,39 +1785,40 @@ class ChatActions {
 
     streamController.cleanupTimers(messageId);
     streamController.finishReasoningIfNeeded(messageId);
-    final rawContent = state.fullContentRaw.isNotEmpty
-        ? state.fullContentRaw
-        : errorText;
-    final processed = _transformAssistantContent(state, rawContent);
-    // Let UI provide the localized error message
-    final displayContent = processed.isNotEmpty ? processed : errorText;
+    final displayContent = state.fullContentRaw.isEmpty
+        ? ''
+        : _transformAssistantContent(state, state.fullContentRaw);
     final currentIndex = _messages.indexWhere((m) => m.id == messageId);
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
       content: displayContent,
       totalTokens: state.totalTokens,
       isStreaming: false,
     );
-    await _finalizeStreamingCheckpoint(errorMessage);
-
-    final index = currentIndex;
-    if (index != -1) {
-      _messages[index] = _messages[index].copyWith(
-        content: displayContent,
-        isStreaming: false,
-        totalTokens: state.totalTokens,
+    try {
+      await _finalizeStreamingCheckpoint(
+        errorMessage,
+        terminalState: GenerationRunState.failed,
+        errorCode: 'generation_failed',
       );
-      onMessagesChanged?.call();
+
+      final index = currentIndex;
+      if (index != -1) {
+        _messages[index] = _messages[index].copyWith(
+          content: displayContent,
+          isStreaming: false,
+          totalTokens: state.totalTokens,
+        );
+        onMessagesChanged?.call();
+      }
+    } finally {
+      _clearGenerationRuntimeState(errorMessage);
+      streamController.removeStreamingNotifier(messageId);
+      _setConversationLoading(conversationId, false);
+      await _conversationStreams.remove(conversationId)?.cancel();
+      onStreamError?.call(errorText);
+      onStreamFinished?.call();
+      await _finishIosBackgroundGeneration(success: false, detail: errorText);
     }
-
-    // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
-    streamController.removeStreamingNotifier(messageId);
-
-    _setConversationLoading(conversationId, false);
-
-    await _conversationStreams.remove(conversationId)?.cancel();
-    onStreamError?.call(errorText);
-    onStreamFinished?.call();
-    await _finishIosBackgroundGeneration(success: false, detail: errorText);
   }
 
   /// Handle stream done callback.

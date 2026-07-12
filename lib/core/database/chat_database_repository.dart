@@ -129,6 +129,40 @@ class ChatDatabaseRepository {
     updatedAt: updatedAt,
   );
 
+  Future<GenerationRun> finalizeGenerationRun({
+    required ChatMessage message,
+    required List<Map<String, dynamic>> toolEvents,
+    required String generationRunId,
+    required GenerationRunState expectedState,
+    required int expectedStateRevision,
+    required GenerationRunState terminalState,
+    int? checkpointSeq,
+    String? errorCode,
+  }) {
+    if (!terminalState.isTerminal) {
+      throw ArgumentError.value(terminalState, 'terminalState');
+    }
+    return _observer.measure(
+      ChatDatabaseOperation.commandFinalCheckpoint,
+      () => _db.transaction(() async {
+        await _updateStreamingCheckpoint(
+          message,
+          toolEvents,
+          generationRunId: checkpointSeq == null ? null : generationRunId,
+          checkpointSeq: checkpointSeq,
+        );
+        return GenerationRunCommands(_db).transition(
+          id: generationRunId,
+          expectedState: expectedState,
+          expectedStateRevision: expectedStateRevision,
+          nextState: terminalState,
+          updatedAt: DateTime.now().toUtc(),
+          errorCode: errorCode,
+        );
+      }),
+    );
+  }
+
   static Future<bool> migrateInstalledDatabase(File file) async {
     final database = sqlite.sqlite3.open(
       file.absolute.path,

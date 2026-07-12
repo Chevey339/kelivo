@@ -1504,6 +1504,40 @@ class ChatService extends ChangeNotifier {
     errorCode: errorCode,
   );
 
+  Future<GenerationRun?> finalizeGenerationRunSilent({
+    required ChatMessage message,
+    required List<Map<String, dynamic>> toolEvents,
+    required String? generationRunId,
+    required GenerationRunState? expectedState,
+    required int? expectedStateRevision,
+    required GenerationRunState terminalState,
+    int? checkpointSeq,
+    String? errorCode,
+  }) async {
+    if (!_initialized) return null;
+    if (isTemporaryConversation(message.conversationId) ||
+        generationRunId == null) {
+      await updateStreamingCheckpointSilent(message, toolEvents);
+      return null;
+    }
+    if (expectedState == null || expectedStateRevision == null) {
+      throw StateError('generation_run_cursor_missing');
+    }
+    final run = await _repo.finalizeGenerationRun(
+      message: message,
+      toolEvents: toolEvents,
+      generationRunId: generationRunId,
+      expectedState: expectedState,
+      expectedStateRevision: expectedStateRevision,
+      terminalState: terminalState,
+      checkpointSeq: checkpointSeq,
+      errorCode: errorCode,
+    );
+    _replaceCachedMessage(message);
+    _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    return run;
+  }
+
   // Tool events persistence (per assistant message)
   List<Map<String, dynamic>> getToolEvents(String assistantMessageId) {
     if (!_initialized) return const <Map<String, dynamic>>[];
