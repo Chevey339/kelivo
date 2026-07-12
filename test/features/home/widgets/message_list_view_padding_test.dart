@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as stream_ctrl;
 import 'package:Kelivo/features/home/controllers/streaming_content_notifier.dart';
@@ -235,6 +236,23 @@ void main() {
       controller: scrollController,
     );
     final isProcessingFiles = ValueNotifier<bool>(false);
+    final streamingNotifier = StreamingContentNotifier();
+    final messages = <ChatMessage>[
+      ChatMessage(
+        id: 'new-user-slot',
+        role: 'user',
+        content: 'new question',
+        conversationId: 'conversation-1',
+      ),
+      ChatMessage(
+        id: 'streaming-assistant-slot',
+        role: 'assistant',
+        content: '',
+        conversationId: 'conversation-1',
+        isStreaming: true,
+      ),
+    ];
+    streamingNotifier.getNotifier('streaming-assistant-slot');
     final coordinator = TimelineCoordinator(
       loadPage:
           ({
@@ -249,27 +267,40 @@ void main() {
     coordinator.noteContentChanged(isGenerating: true);
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: ListenableBuilder(
-            listenable: coordinator,
-            builder: (context, child) => MessageListView(
-              scrollController: scrollController,
-              observerController: observerController,
-              messages: const [],
-              byGroup: const {},
-              versionSelections: const {},
-              reasoning: const {},
-              reasoningSegments: const {},
-              contentSplits: const {},
-              toolParts: const {},
-              translations: const {},
-              selecting: false,
-              selectedItems: const {},
-              dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
-              bottomContentPadding: 16,
-              timelineCoordinator: coordinator,
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider.value(value: SettingsProvider()),
+          ChangeNotifierProvider.value(value: AssistantProvider()),
+          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(value: UserProvider()),
+          ChangeNotifierProvider.value(value: AskUserInteractionService()),
+          ChangeNotifierProvider.value(value: ToolApprovalService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ListenableBuilder(
+              listenable: coordinator,
+              builder: (context, child) => MessageListView(
+                scrollController: scrollController,
+                observerController: observerController,
+                messages: messages,
+                byGroup: const {},
+                versionSelections: const {},
+                reasoning: const {},
+                reasoningSegments: const {},
+                contentSplits: const {},
+                toolParts: const {},
+                translations: const {},
+                selecting: false,
+                selectedItems: const {},
+                dividerPadding: EdgeInsets.zero,
+                isProcessingFiles: isProcessingFiles,
+                bottomContentPadding: 16,
+                timelineCoordinator: coordinator,
+                streamingContentNotifier: streamingNotifier,
+              ),
             ),
           ),
         ),
@@ -281,22 +312,44 @@ void main() {
       return (listView.padding as EdgeInsets).bottom;
     }
 
-    final reservedBottom =
-        16 + tester.getSize(find.byType(ListView)).height * 0.85;
-    expect(bottomPadding(), reservedBottom);
+    final maximumReservedBottom =
+        16 + tester.getSize(find.byType(ListView)).height * 0.75;
+    expect(bottomPadding(), maximumReservedBottom);
 
-    coordinator.completeProgrammaticJump();
     await tester.pump();
     expect(coordinator.programmaticTargetSlotId, isNull);
-    expect(bottomPadding(), reservedBottom);
+    final shortReplyPadding = bottomPadding();
+    expect(shortReplyPadding, lessThan(maximumReservedBottom));
+    expect(shortReplyPadding, greaterThan(16));
+    final userTop = tester.getTopLeft(find.text('new question')).dy;
+    expect(
+      userTop,
+      lessThan(tester.getSize(find.byType(ListView)).height * 0.35),
+    );
+
+    streamingNotifier.updateContent(
+      'streaming-assistant-slot',
+      List.generate(80, (index) => 'reply line $index').join('\n\n'),
+      0,
+    );
+    await tester.pump();
+    await tester.pump();
+    expect(bottomPadding(), lessThan(shortReplyPadding));
+    expect(bottomPadding(), 16);
+    expect(
+      tester.getTopLeft(find.text('new question')).dy,
+      closeTo(userTop, 1),
+    );
 
     coordinator.noteContentChanged(isGenerating: false);
     await tester.pump();
     expect(bottomPadding(), 16);
 
+    await tester.pumpWidget(const SizedBox.shrink());
     coordinator.dispose();
     scrollController.dispose();
     isProcessingFiles.dispose();
+    streamingNotifier.dispose();
   });
 
   testWidgets('流式思考更新缺少起始时间时保留已有计时起点', (tester) async {

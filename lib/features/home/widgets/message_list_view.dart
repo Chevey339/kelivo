@@ -223,6 +223,7 @@ class MessageListView extends StatefulWidget {
 class _MessageListViewState extends State<MessageListView>
     with WidgetsBindingObserver {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
+  static const double _programmaticTailViewportFraction = 0.75;
 
   bool _historyLoadScheduled = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
@@ -233,6 +234,10 @@ class _MessageListViewState extends State<MessageListView>
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
+  bool _programmaticSpacerUpdateScheduled = false;
+  String? _programmaticAnchorSlotId;
+  String? _programmaticAnchorConversationId;
+  double _programmaticSpacer = 0;
   late List<MessageRenderModel> _effectiveRenderModels;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
@@ -253,6 +258,11 @@ class _MessageListViewState extends State<MessageListView>
     _refreshRenderModels();
     final active = _effectiveRenderModels.map((model) => model.slotId).toSet();
     _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
+    if (widget.timelineCoordinator?.isGenerating != true) {
+      _programmaticAnchorSlotId = null;
+      _programmaticAnchorConversationId = null;
+      _programmaticSpacer = 0;
+    }
   }
 
   void _refreshRenderModels() {
@@ -352,11 +362,18 @@ class _MessageListViewState extends State<MessageListView>
           builder: (context, isProcessing, child) {
             _scheduleProgrammaticJump();
             final timelineCoordinator = widget.timelineCoordinator;
-            final programmaticSpacer =
-                timelineCoordinator?.programmaticTargetSlotId == null &&
-                    timelineCoordinator?.isGenerating != true
-                ? 0.0
-                : constraints.maxHeight * 0.85;
+            final targetPending =
+                timelineCoordinator?.programmaticTargetSlotId != null;
+            final activeGenerationAnchor =
+                timelineCoordinator?.isGenerating == true &&
+                _programmaticAnchorSlotId != null &&
+                _programmaticAnchorConversationId ==
+                    timelineCoordinator?.conversationId;
+            final programmaticSpacer = targetPending
+                ? constraints.maxHeight * _programmaticTailViewportFraction
+                : activeGenerationAnchor
+                ? _programmaticSpacer
+                : 0.0;
             final list = ListView.builder(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
@@ -387,9 +404,18 @@ class _MessageListViewState extends State<MessageListView>
               child: list,
             );
 
+            final sizeAwareList =
+                NotificationListener<SizeChangedLayoutNotification>(
+                  onNotification: (notification) {
+                    _scheduleProgrammaticSpacerUpdate();
+                    return false;
+                  },
+                  child: observedList,
+                );
+
             final historyList = NotificationListener<ScrollNotification>(
               onNotification: _handleScrollNotification,
-              child: observedList,
+              child: sizeAwareList,
             );
 
             final userScrollAwareList = Listener(
@@ -551,8 +577,56 @@ class _MessageListViewState extends State<MessageListView>
           position.maxScrollExtent,
         ),
       );
+      setState(() {
+        _programmaticAnchorSlotId = targetId;
+        _programmaticAnchorConversationId = coordinator?.conversationId;
+        _programmaticSpacer = _calculateProgrammaticSpacer(targetId, viewport);
+      });
       coordinator!.completeProgrammaticJump();
       _captureVisualAnchor();
+    });
+  }
+
+  double _calculateProgrammaticSpacer(String anchorSlotId, RenderBox viewport) {
+    final anchor = _slotKeys[anchorSlotId]?.currentContext?.findRenderObject();
+    final lastSlotId = _effectiveRenderModels.isEmpty
+        ? null
+        : _effectiveRenderModels.last.slotId;
+    final tail = lastSlotId == null
+        ? null
+        : _slotKeys[lastSlotId]?.currentContext?.findRenderObject();
+    final maximum = viewport.size.height * _programmaticTailViewportFraction;
+    if (anchor is! RenderBox ||
+        !anchor.attached ||
+        tail is! RenderBox ||
+        !tail.attached) {
+      return maximum;
+    }
+    final anchorTop = anchor.localToGlobal(Offset.zero).dy;
+    final tailBottom = tail.localToGlobal(Offset(0, tail.size.height)).dy;
+    final fixedBottom =
+        widget.bottomContentPadding +
+        (widget.isPinnedIndicatorActive ? 12.0 : 0.0);
+    final occupied = (tailBottom - anchorTop).clamp(0.0, double.infinity);
+    return (maximum - occupied - fixedBottom).clamp(0.0, maximum).toDouble();
+  }
+
+  void _scheduleProgrammaticSpacerUpdate() {
+    if (_programmaticSpacerUpdateScheduled) return;
+    _programmaticSpacerUpdateScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _programmaticSpacerUpdateScheduled = false;
+      if (!mounted || widget.timelineCoordinator?.isGenerating != true) return;
+      final anchorSlotId = _programmaticAnchorSlotId;
+      final viewport = context.findRenderObject();
+      if (anchorSlotId == null ||
+          viewport is! RenderBox ||
+          !viewport.attached) {
+        return;
+      }
+      final next = _calculateProgrammaticSpacer(anchorSlotId, viewport);
+      if ((next - _programmaticSpacer).abs() <= 0.5) return;
+      setState(() => _programmaticSpacer = next);
     });
   }
 
@@ -701,7 +775,7 @@ class _MessageListViewState extends State<MessageListView>
         widget.streamingContentNotifier != null &&
         widget.streamingContentNotifier!.hasNotifier(message.id);
 
-    final messageColumn = Column(
+    Widget messageColumn = Column(
       key: _slotKeys.putIfAbsent(
         _slotId(message),
         () => GlobalKey(debugLabel: 'timeline-slot:${_slotId(message)}'),
@@ -801,6 +875,9 @@ class _MessageListViewState extends State<MessageListView>
           ),
       ],
     );
+    if (isStreaming) {
+      messageColumn = SizeChangedLayoutNotifier(child: messageColumn);
+    }
 
     final isSpotlight =
         widget.spotlightMessageId != null &&
