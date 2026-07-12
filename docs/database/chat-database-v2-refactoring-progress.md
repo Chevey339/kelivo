@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
 > - 最后更新：2026-07-12（第三轮复审：四个用户症状逐一定位，新登记 §10.3 MSG-R1～R3 / TL-R14～R15；PD-01/PD-02/§7.2 修订为默认 graft 语义）
-> - 当前结论：Phase 0/1/3 保持关闭。MSG-R3、MSG-R1、MSG-R2 已完成自动化实现：版本切换器使用 DB 权威计数；编辑/切换/默认重生成走 graft 并保留后续；开启删除尾随的持久会话重生成只 fork、不物理删除，旧 branch 可恢复。generation/context 18/18 与 analyze 通过。Phase 2 语义实现已收敛但仍待第三轮真机矩阵；无限跳动与发送弹距继续进入 TL-R14/R15，Phase 5 暂不启动
+> - 当前结论：Phase 0/1/3 保持关闭。MSG-R3、MSG-R1、MSG-R2 与 TL-R14 已完成自动化实现：版本切换器使用 DB 权威计数；编辑/切换/默认重生成走 graft 并保留后续；生成期到底由 layout pin 独占，拖拽意图只在手势结束结算一次。Phase 2 语义实现已收敛但仍待第三轮真机矩阵；Phase 4 仅余 TL-R15，Phase 5 暂不启动
 
 ## 1. 文档使用规则
 
@@ -40,7 +40,7 @@
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
 | Phase 2：Message Graph | 6 / 7 | `进行中` | PD-01 修订后的 MSG-R1/R2 graft/fork 命令与设置分流已实现并自动化通过，schema 不变；MSG-04 与 Phase 2 只待第三轮真机产品矩阵确认后恢复完成 |
 | Phase 3：Generation State Machine | 7 / 7 | `已完成` | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 与竞态/长响应矩阵全部闭环 |
-| Phase 4：Timeline 与 Renderer | 6 / 8 | `进行中` | TL-R1～R6 已获第一轮真机确认；§10.2 TL-R7～R13 实现与自动化闭环；§10.3 MSG-R3 已完成，TL-R14/R15 尚待执行，闭环并经真机四症状矩阵前不关闭 |
+| Phase 4：Timeline 与 Renderer | 7 / 8 | `进行中` | TL-R1～R6 已获第一轮真机确认；§10.2 TL-R7～R13 实现与自动化闭环；§10.3 TL-R14 已完成，TL-R15 尚待执行，闭环并经真机四症状矩阵前不关闭 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
 
 ## 3. 已完成的审计工作
@@ -415,6 +415,8 @@ dart run tool/run_restore_process_harness.dart \
 
 实现收敛（2026-07-12，MSG-R2）：`beginRegeneration` 增加显式 `truncateFuture` 领域输入并贯穿 action/service/repository。false 时 generation run、message shadow、新 assistant revision、on-path child re-parent 与 state revision 在同一外层事务完成，active branch/future 不变；true 时创建截止新 assistant 的新 branch，旧 branch 与旧 future message rows 完整保留且 message count 不减少。ChatActions 的 `regenerateDeleteTrailingMessages` 不再触发持久会话 `removeTrailingMessages`，避免“先物理删再 fork”；仅不落盘、无可恢复 branch 的临时会话保留内存截断边界。红色回归先因缺少分流参数失败，绿化后默认得到 `U1/A1(v2)/U2/A2`，开启设置得到 `U1/A1(v2)` 且旧 branch 仍为 `U1/A1(v1)/U2/A2`；generation/context 18/18 与 analyze 通过。
 
+实现收敛（2026-07-12，TL-R14）：`ChatScrollController` 接入会话生成态，生成期显式“到底”只执行一次 `jumpTo`，随后由 layout-time tail pin 独占像素；非生成期驱动动画存活时显式挂起 layout pin，消除两个执行器同帧争抢。MessageList 将一次 pointer drag 收口为手势事务：move/scroll update 仅记录最新 metrics 与视觉锚点，pointer up/ScrollEnd 仅一次结算 `followTail` 或 `userAnchored`，不再在同手势中反复翻转模式/销毁 spacer。红色回归分别证明旧生成期到底仍启动动画、两次 move 发布 5 次意图；绿化后生成增长位置单调贴 max，手势结束前 0 次、结束后恰 1 次意图。controller/widget 聚焦 18/18 与 analyze 通过。
+
 ## 11. Phase 5：Data Operations 与退役
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
@@ -565,6 +567,7 @@ PD-01/PD-02 已于 2026-07-12 修订，方案与 ADR-0001 均已同步；MSG-R3/
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
 | 2026-07-12 | 完成 MSG-R2：`truncateFuture` 从 ChatActions 显式贯穿 generation service/ChatService/repository；默认 false 的 generation begin 在同一事务 graft 新 assistant 并保留全部后续，true 只创建截断 branch且旧 branch/旧 message rows 完整保留。持久会话不再先调用 `removeTrailingMessages`，临时不落盘会话保留内存截断边界。回归覆盖默认 future/branch 不变、开启设置 active path 截断但旧 branch 可恢复且 message count 不减，以及持久会话永不物理删除的决策；generation/context 18/18 与 analyze 通过。MSG-04 实现收敛，待真机确认 | MSG-R2、MSG-04、PD-01/02、GEN-02 | 本里程碑提交 | Codex |
+| 2026-07-12 | 完成 TL-R14：生成期显式“到底”改为一次 jump，后续只由 layout pin 跟随；普通驱动动画期间 layout pin 挂起。pointer drag 改为手势结束时一次性结算视口意图，move/update 不再发布互斥模式。回归覆盖流式到底随内容增长单调贴 max，以及慢拖多次 move 在结束前 0 次、结束后恰 1 次意图；controller/widget 18/18 与 analyze 通过 | TL-R14、TL-02、TL-04 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 MSG-R1：新增单事务 graft command，创建同 slot sibling 后把 active path 直接 child 改挂到新 revision（leaf 时移动原 branch leaf），映射 boundary 并 CAS 推进 state revision；branch ID/数量与全部后续 slot 不变，旧 revision 保留。稳定 graph edit API 与 Home `appendMessageVersion(user)` 均接入；native same-slot `selectRevision` 也改为 graft-select，切回旧版本不再截断后续，legacy ambiguous 保持安全 branch。两轮红色回归复现编辑/切换的旧截断，绿化后 domain/repository 均保持完整未来。ADR-0001 同步修订，analyze 通过 | MSG-R1、MSG-04、PD-01/02、MSG-01 | 本里程碑提交 + follow-up | Codex |
 | 2026-07-12 | 完成 MSG-R3：render model 的版本总数与选中索引改用 coordinator slot 的 DB 权威 `versionCount`/active revision，不再依赖会被窗口 retain 驱逐的 sibling cache；MessageList 的切换器、导航边界与删除全部入口统一读取权威 count，缺失 sibling 继续在用户点击时通过现有异步 group loader 懒加载。红色回归覆盖只剩 active v1、权威 count=2，绿化后立即投影 `<2/2>`；render/controller/widget 64/64 与 analyze 通过。第三轮方案/进度修订一并纳入本里程碑，Phase 2/4 保持进行中 | MSG-R3、PD-01/02、MSG-04、TL-R14/R15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 第三轮复审：逐一定位四个用户症状。"仅保存"删下方消息与"重新生成设置失效"根因为 PD-01 纯 fork 语义与既有产品合同冲突——`appendMessageVersion`/`beginRegeneration` 无条件 `createRevisionBranch`/fork 激活新 branch，active path（leaf 祖先链）随即截止于变更 slot，下方消息全部离开时间线（MSG-R1/R2）；切换器不显示根因为 render model 版本数依赖被 `retainTimelineWindow` 驱逐的 `_messagesCache` 而非窗口自带 DB 权威 `versionCount`，且发送/重生成路径不回填 siblings（MSG-R3）；无限跳动根因为流式期间 `animateTo(旧 max)` 与 layout `correctPixels(新 max)` 逐帧对抗，及单次拖拽内 pointer-move `userAnchored` 与贴底判定 `followTail` 交替翻转并销毁生成期 spacer（TL-R14）；发送弹距根因为 jump 管线跨 3 帧使用陈旧 `bottomContentPadding`/键盘 inset/occupied，且目标未布局时静默停摆（TL-R15）。修订 PD-01/PD-02/§7.2/§8.3 为"默认 graft 保留后代、仅删除尾随 fork"（schema 不变），§7.4 补充"同帧唯一执行器"“手势内不翻转意图”“jump 同帧输入"三条合同；MSG-04 重开，§10.3 冻结返工顺序与验收 | MSG-R1～R3、TL-R14/R15、MSG-04、PD-01/02 | 本复审提交 | 用户 / Fable |

@@ -87,6 +87,7 @@ class ChatScrollController {
     this.onUserAnchored,
     this.onFollowingTail,
     this.shouldFollowTail,
+    this.isGenerating,
   }) {
     final scrollController = _scrollController;
     _scrollController.addListener(_onScrollControllerChanged);
@@ -99,6 +100,7 @@ class ChatScrollController {
           _getAutoScrollEnabled() &&
           _autoStickToBottom &&
           !_isUserScrolling &&
+          !_explicitBottomAnimationInProgress &&
           (shouldFollowTail?.call() ?? true);
     }
   }
@@ -110,6 +112,7 @@ class ChatScrollController {
   final VoidCallback? onUserAnchored;
   final VoidCallback? onFollowingTail;
   final bool Function()? shouldFollowTail;
+  final bool Function()? isGenerating;
 
   /// Observer controller for precise index-based scroll navigation.
   late final ListObserverController _observerController;
@@ -143,6 +146,12 @@ class ChatScrollController {
 
   /// Scheduling state for batched auto-scroll (used by explicit scroll-to-bottom).
   bool _autoScrollScheduled = false;
+
+  /// A driven scroll and the layout-time tail pin must never own pixels in the
+  /// same frame.
+  bool _explicitBottomAnimationInProgress = false;
+  bool get explicitBottomAnimationInProgress =>
+      _explicitBottomAnimationInProgress;
 
   /// Anchor for chained "jump to previous question" navigation.
   String? _lastJumpUserMessageId;
@@ -290,7 +299,8 @@ class ChatScrollController {
   void scrollToBottom({bool animate = true}) {
     _autoStickToBottom = true;
     onFollowingTail?.call();
-    _scheduleExplicitScrollToBottom(animate: animate);
+    final generating = isGenerating?.call() ?? false;
+    _scheduleExplicitScrollToBottom(animate: animate && !generating);
   }
 
   /// Force scroll to bottom (used when user explicitly clicks the button).
@@ -299,7 +309,6 @@ class ChatScrollController {
     _userScrollTimer?.cancel();
     _lastJumpUserMessageId = null;
     revealNavButtons();
-    onFollowingTail?.call();
     scrollToBottom();
   }
 
@@ -385,11 +394,16 @@ class ChatScrollController {
             : distance < 2000
             ? 350
             : 450;
-        await pos.animateTo(
-          max,
-          duration: Duration(milliseconds: durationMs),
-          curve: Curves.easeOutCubic,
-        );
+        _explicitBottomAnimationInProgress = true;
+        try {
+          await pos.animateTo(
+            max,
+            duration: Duration(milliseconds: durationMs),
+            curve: Curves.easeOutCubic,
+          );
+        } finally {
+          _explicitBottomAnimationInProgress = false;
+        }
       } else {
         pos.jumpTo(max);
       }

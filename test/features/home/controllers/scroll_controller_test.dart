@@ -5,6 +5,52 @@ import 'package:scrollview_observer/scrollview_observer.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
+    testWidgets('streaming bottom command jumps once and layout owns follow', (
+      tester,
+    ) async {
+      var itemCount = 30;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      scrollController.jumpTo(0);
+
+      chatScrollController.forceScrollToBottom();
+      await tester.pump();
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+      expect(chatScrollController.explicitBottomAnimationInProgress, isFalse);
+
+      final oldOffset = scrollController.offset;
+      itemCount++;
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      expect(scrollController.offset, greaterThanOrEqualTo(oldOffset));
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('programmatic animation does not publish user scroll intent', (
       tester,
     ) async {

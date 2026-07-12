@@ -651,6 +651,7 @@ void main() {
   });
 
   testWidgets('贴近底部时用户滚动不暂停应用流式内容更新', (tester) async {
+    var userIntentCalls = 0;
     final scrollController = ScrollController();
     final observerController = ListObserverController(
       controller: scrollController,
@@ -705,6 +706,7 @@ void main() {
               isProcessingFiles: isProcessingFiles,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
+              onUserScrollIntent: () => userIntentCalls++,
             ),
           ),
         ),
@@ -719,6 +721,10 @@ void main() {
     );
     await gesture.moveBy(const Offset(0, 8));
     await tester.pump();
+    await gesture.moveBy(const Offset(0, -4));
+    await tester.pump();
+
+    expect(userIntentCalls, 0);
 
     streamingNotifier.updateContent(
       'bottom-streaming-message',
@@ -727,9 +733,12 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('updated while still near bottom'), findsOneWidget);
+    expect(find.text('updated while still near bottom'), findsNothing);
 
     await gesture.up();
+    await tester.pump(const Duration(milliseconds: 220));
+    expect(userIntentCalls, 1);
+    expect(find.text('updated while still near bottom'), findsOneWidget);
 
     scrollController.dispose();
     isProcessingFiles.dispose();

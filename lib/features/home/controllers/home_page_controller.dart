@@ -445,6 +445,7 @@ class HomePageController extends ChangeNotifier {
       onFollowingTail: _chatController.timelineCoordinator.followTail,
       shouldFollowTail: () =>
           _chatController.timelineCoordinator.shouldFollowTail,
+      isGenerating: () => _chatController.timelineCoordinator.isGenerating,
     );
   }
 

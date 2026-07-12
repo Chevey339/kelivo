@@ -227,6 +227,8 @@ class _MessageListViewState extends State<MessageListView>
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
 
   bool _historyLoadScheduled = false;
+  bool _pointerDragInProgress = false;
+  ScrollMetrics? _latestPointerDragMetrics;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
     false,
   );
@@ -482,14 +484,17 @@ class _MessageListViewState extends State<MessageListView>
                 if (event.buttons == kSecondaryMouseButton) {
                   _captureVisualAnchor();
                   widget.timelineCoordinator?.userAnchored();
+                } else if (event.buttons != 0) {
+                  _pointerDragInProgress = true;
+                  _latestPointerDragMetrics = null;
                 }
               },
               onPointerMove: (event) {
                 if (event.buttons == 0) return;
-                widget.onUserScrollIntent?.call();
                 _captureVisualAnchor();
-                widget.timelineCoordinator?.userAnchored();
               },
+              onPointerUp: (_) => _settlePointerDrag(),
+              onPointerCancel: (_) => _settlePointerDrag(),
               onPointerSignal: (event) {
                 if (event is PointerScrollEvent) {
                   _schedulePointerScrollActivityCheck();
@@ -541,21 +546,21 @@ class _MessageListViewState extends State<MessageListView>
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification is ScrollUpdateNotification) {
       if (notification.dragDetails != null) {
-        _handleUserScrollActivity(notification.metrics);
+        _recordPointerDrag(notification.metrics);
       }
       if (_deferStreamingMessageUpdates.value) {
         _scheduleStreamingUpdateResume();
       }
     } else if (notification is OverscrollNotification) {
       if (notification.dragDetails != null) {
-        _handleUserScrollActivity(notification.metrics);
+        _recordPointerDrag(notification.metrics);
       }
       if (_deferStreamingMessageUpdates.value) {
         _scheduleStreamingUpdateResume();
       }
     } else if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
-      _handleUserScrollActivity(notification.metrics);
+      _recordPointerDrag(notification.metrics);
     }
     if (notification is UserScrollNotification) {
       final shouldDefer = notification.direction != ScrollDirection.idle;
@@ -566,6 +571,7 @@ class _MessageListViewState extends State<MessageListView>
       }
     }
     if (notification is ScrollEndNotification) {
+      _settlePointerDrag(notification.metrics);
       _scheduleStreamingUpdateResume();
     }
     if (_historyLoadScheduled) return false;
@@ -588,6 +594,19 @@ class _MessageListViewState extends State<MessageListView>
       _scheduleHistoryLoad(load: widget.onLoadMoreAfter!);
     }
     return false;
+  }
+
+  void _recordPointerDrag(ScrollMetrics metrics) {
+    _pointerDragInProgress = true;
+    _latestPointerDragMetrics = metrics;
+  }
+
+  void _settlePointerDrag([ScrollMetrics? metrics]) {
+    if (!_pointerDragInProgress) return;
+    _pointerDragInProgress = false;
+    final settledMetrics = metrics ?? _latestPointerDragMetrics;
+    _latestPointerDragMetrics = null;
+    _handleUserScrollActivity(settledMetrics);
   }
 
   void _schedulePointerScrollActivityCheck() {
