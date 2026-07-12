@@ -592,6 +592,9 @@ class ChatActions {
     } catch (e) {
       // Ensure file processing indicator is cleared on error
       onFileProcessingFinished?.call();
+      _setConversationLoading(conversation.id, false);
+      streamController.markStreamingEnded(assistantMessage.id);
+      streamController.cleanupTimers(assistantMessage.id);
       return ChatActionResult.error(e.toString());
     }
   }
