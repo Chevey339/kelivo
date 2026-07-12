@@ -14,7 +14,7 @@ machine-readable `OPS08_RELEASE_CAPABILITY_RESULT` line.
 | Platform | Result | Evidence |
 | --- | --- | --- |
 | Android | pending | Run on a physical device or emulator; do not infer from macOS |
-| iOS | pending | Run on an iPhone or simulator; do not infer from macOS |
+| iOS | PASS | iOS 26.5 simulator; secure-store round trip `true`; schema `8`; rollback-compatible `true`; storage contract `2` |
 | macOS | PASS | macOS 26.5.2; secure-store round trip `true`; schema `8`; rollback-compatible `true`; storage contract `2` |
 | Windows | pending | Run on the native Windows runner; do not infer from macOS |
 | Linux | pending | Run with the desktop secret service available; do not infer from macOS |
@@ -23,6 +23,12 @@ Recorded macOS line:
 
 ```text
 OPS08_RELEASE_CAPABILITY_RESULT:{"platform":"macOS","operatingSystem":"macos","operatingSystemVersion":"Version 26.5.2 (Build 25F84)","secureStorageWriteReadOverwriteDelete":true,"databaseSchemaVersion":8,"rollbackCompatible":true,"storageContractVersion":2}
+```
+
+Recorded iOS simulator line:
+
+```text
+OPS08_RELEASE_CAPABILITY_RESULT:{"platform":"iOS","operatingSystem":"ios","operatingSystemVersion":"Version 26.5 (Build 23F77)","secureStorageWriteReadOverwriteDelete":true,"databaseSchemaVersion":8,"rollbackCompatible":true,"storageContractVersion":2}
 ```
 
 The first macOS run correctly failed with Keychain error `-34018` because an
