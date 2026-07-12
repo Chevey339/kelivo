@@ -646,26 +646,20 @@ class ChatActions {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
-    // Create user message
-    final userMessage = await messageGenerationService.createUserMessage(
-      conversationId: conversation.id,
-      input: input,
-      assistant: assistant,
-    );
-    if (await chatController.appendPersistedTailMessage(userMessage)) {
-      viewModel.restoreMessageUiState();
-    }
-    onMessagesChanged?.call();
-
-    // Create assistant message placeholder
+    late final ChatMessage userMessage;
     late final ChatMessage assistantMessage;
+    String? generationRunId;
     try {
-      assistantMessage = await messageGenerationService
-          .createAssistantPlaceholder(
-            conversationId: conversation.id,
-            modelId: modelId,
-            providerKey: providerKey,
-          );
+      final begin = await messageGenerationService.beginSendGeneration(
+        conversationId: conversation.id,
+        input: input,
+        assistant: assistant,
+        modelId: modelId,
+        providerKey: providerKey,
+      );
+      userMessage = begin.userMessage;
+      assistantMessage = begin.assistantMessage;
+      generationRunId = begin.runId;
     } catch (e) {
       return ChatActionResult.error(e.toString());
     }
@@ -676,7 +670,10 @@ class ChatActions {
     // so that MessageListView can detect it's streaming on first render
     streamController.markStreamingStarted(assistantMessage.id);
 
-    if (await chatController.appendPersistedTailMessage(assistantMessage)) {
+    if (await chatController.appendPersistedTailMessages([
+      userMessage,
+      assistantMessage,
+    ])) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
@@ -739,6 +736,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: true,
+        generationRunId: generationRunId,
       );
 
       if (!_activeAssistantMessages.isActive(assistantMessage)) {
@@ -847,15 +845,18 @@ class ChatActions {
       }
     }
 
-    // Create assistant message placeholder (new version)
-    final assistantMessage = await messageGenerationService
-        .createAssistantPlaceholder(
-          conversationId: conversation.id,
-          modelId: modelId,
-          providerKey: providerKey,
-          groupId: versioning.targetGroupId,
-          version: versioning.nextVersion,
-        );
+    final targetGroupId = versioning.targetGroupId;
+    if (targetGroupId == null) {
+      return ChatActionResult.error('invalid_versioning');
+    }
+    final begin = await messageGenerationService.beginRegeneration(
+      conversationId: conversation.id,
+      modelId: modelId,
+      providerKey: providerKey,
+      groupId: targetGroupId,
+      version: versioning.nextVersion,
+    );
+    final assistantMessage = begin.assistantMessage;
     _activeAssistantMessages.put(assistantMessage);
 
     // Pre-create streaming notifier BEFORE adding message to list
@@ -933,6 +934,7 @@ class ChatActions {
         supportsReasoning: supportsReasoning,
         enableReasoning: enableReasoning,
         generateTitleOnFinish: false,
+        generationRunId: begin.runId,
       );
 
       if (!_activeAssistantMessages.isActive(assistantMessage)) {

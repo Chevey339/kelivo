@@ -563,8 +563,18 @@ class ChatController extends ChangeNotifier {
   /// [_messages] as a real contiguous persisted range instead of mixing a tail
   /// message into an older loaded window.
   Future<bool> appendPersistedTailMessage(ChatMessage message) async {
+    return appendPersistedTailMessages([message]);
+  }
+
+  /// Publishes one atomic persistence result to the loaded tail as one UI
+  /// mutation. A send begins with a user/assistant pair, so refreshing the
+  /// persisted count between those two messages would briefly create a false
+  /// gap and trigger an unnecessary window reload.
+  Future<bool> appendPersistedTailMessages(List<ChatMessage> messages) async {
+    if (messages.isEmpty) return false;
     final conversation = _currentConversation;
-    if (conversation == null || message.conversationId != conversation.id) {
+    if (conversation == null ||
+        messages.any((message) => message.conversationId != conversation.id)) {
       return false;
     }
 
@@ -573,6 +583,7 @@ class ChatController extends ChangeNotifier {
     _totalMessageCount = _chatService.getMessageCount(conversation.id);
 
     if (!wasAtTail) {
+      final message = messages.last;
       final groupId = message.groupId ?? message.id;
       final firstIndices = await _chatService.loadFirstMessageIndicesForGroups(
         conversation.id,
@@ -592,11 +603,13 @@ class ChatController extends ChangeNotifier {
       return loadEndWindow();
     }
 
-    final existingIndex = _messages.indexWhere((m) => m.id == message.id);
-    if (existingIndex >= 0) {
-      _messages[existingIndex] = message;
-    } else {
-      _messages.add(message);
+    for (final message in messages) {
+      final existingIndex = _messages.indexWhere((m) => m.id == message.id);
+      if (existingIndex >= 0) {
+        _messages[existingIndex] = message;
+      } else {
+        _messages.add(message);
+      }
     }
 
     final overflow = _messages.length - ChatService.defaultLoadedWindowMax;

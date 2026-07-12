@@ -4,6 +4,7 @@ import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
+import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
 import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
@@ -1216,6 +1217,102 @@ class ChatService extends ChangeNotifier {
 
     notifyListeners();
     return message;
+  }
+
+  Future<GenerationBeginResult> beginSendGeneration({
+    required String conversationId,
+    required String userContent,
+    required String modelId,
+    required String providerId,
+  }) async {
+    if (!_initialized) await init();
+    if (isTemporaryConversation(conversationId)) {
+      throw StateError('temporary_generation_is_not_persisted');
+    }
+    final conversation =
+        _conversationsCache[conversationId] ??
+        _draftConversations[conversationId] ??
+        Conversation(id: conversationId, title: _defaultConversationTitle);
+    if (_conversationsCache.containsKey(conversationId)) {
+      await _loadMessageOrder(conversationId);
+    }
+    final userMessage = ChatMessage(
+      role: 'user',
+      content: userContent,
+      conversationId: conversationId,
+    );
+    final assistantMessage = ChatMessage(
+      role: 'assistant',
+      content: '',
+      conversationId: conversationId,
+      modelId: modelId,
+      providerId: providerId,
+      isStreaming: true,
+    );
+    final result = await _repo.beginSendGeneration(
+      conversation: conversation,
+      userMessage: userMessage,
+      assistantMessage: assistantMessage,
+      runId: const Uuid().v4(),
+    );
+    await _publishGenerationBegin(result);
+    return result;
+  }
+
+  Future<GenerationBeginResult> beginRegeneration({
+    required String conversationId,
+    required String modelId,
+    required String providerId,
+    required String groupId,
+    required int version,
+  }) async {
+    if (!_initialized) await init();
+    if (isTemporaryConversation(conversationId)) {
+      throw StateError('temporary_generation_is_not_persisted');
+    }
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null) throw StateError('conversation_missing');
+    await _loadMessageOrder(conversationId);
+    final assistantMessage = ChatMessage(
+      role: 'assistant',
+      content: '',
+      conversationId: conversationId,
+      modelId: modelId,
+      providerId: providerId,
+      isStreaming: true,
+      groupId: groupId,
+      version: version,
+    );
+    final result = await _repo.beginRegeneration(
+      conversation: conversation,
+      assistantMessage: assistantMessage,
+      runId: const Uuid().v4(),
+    );
+    await _publishGenerationBegin(result);
+    return result;
+  }
+
+  Future<void> _publishGenerationBegin(GenerationBeginResult result) async {
+    final conversationId = result.conversation.id;
+    _draftConversations.remove(conversationId);
+    _conversationsCache[conversationId] = result.conversation;
+    final messages = [
+      if (result.userMessage case final userMessage?) userMessage,
+      result.assistantMessage,
+    ];
+    final order = _messageOrderIds.putIfAbsent(
+      conversationId,
+      () => <String>[],
+    );
+    for (final message in messages) {
+      if (!order.contains(message.id)) order.add(message.id);
+    }
+    _messageCounts[conversationId] = order.length;
+    if (_messagesCache.containsKey(conversationId)) {
+      _messagesCache[conversationId]!.addAll(messages);
+    }
+    await loadMessageGraphTimeline(conversationId, force: true);
+    notifyListeners();
   }
 
   ChatMessage? _cachedTemporaryMessage(String messageId) {

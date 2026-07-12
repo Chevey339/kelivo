@@ -684,6 +684,26 @@ void main() {
       },
     );
 
+    test('publishes an atomic send pair without a false tail reload', () async {
+      controller.setCurrentConversation(conversation);
+      final user = chatService.appendPersistedMessage(_message(100));
+      final assistant = chatService.appendPersistedMessage(_message(101));
+
+      final reloaded = await controller.appendPersistedTailMessages([
+        user,
+        assistant,
+      ]);
+
+      expect(reloaded, isFalse);
+      expect(chatService.rangeLoadCalls, 0);
+      expect(controller.messages.map((message) => message.id), [
+        ...messages.sublist(80, 100).map((message) => message.id),
+        'message-100',
+        'message-101',
+      ]);
+      expect(controller.totalMessageCount, 102);
+    });
+
     test(
       'mini map source includes all messages without expanding chat window',
       () async {

@@ -238,6 +238,77 @@ class MessageGenerationService {
     );
   }
 
+  Future<
+    ({ChatMessage userMessage, ChatMessage assistantMessage, String? runId})
+  >
+  beginSendGeneration({
+    required String conversationId,
+    required ChatInputData input,
+    required Assistant? assistant,
+    required String modelId,
+    required String providerKey,
+  }) async {
+    final userContent = buildPersistedUserMessageContent(
+      input,
+      assistant: assistant,
+    );
+    if (chatService.isTemporaryConversation(conversationId)) {
+      final userMessage = await chatService.addMessage(
+        conversationId: conversationId,
+        role: 'user',
+        content: userContent,
+      );
+      final assistantMessage = await createAssistantPlaceholder(
+        conversationId: conversationId,
+        modelId: modelId,
+        providerKey: providerKey,
+      );
+      return (
+        userMessage: userMessage,
+        assistantMessage: assistantMessage,
+        runId: null,
+      );
+    }
+    final result = await chatService.beginSendGeneration(
+      conversationId: conversationId,
+      userContent: userContent,
+      modelId: modelId,
+      providerId: providerKey,
+    );
+    return (
+      userMessage: result.userMessage!,
+      assistantMessage: result.assistantMessage,
+      runId: result.run.id,
+    );
+  }
+
+  Future<({ChatMessage assistantMessage, String? runId})> beginRegeneration({
+    required String conversationId,
+    required String modelId,
+    required String providerKey,
+    required String groupId,
+    required int version,
+  }) async {
+    if (chatService.isTemporaryConversation(conversationId)) {
+      final assistantMessage = await createAssistantPlaceholder(
+        conversationId: conversationId,
+        modelId: modelId,
+        providerKey: providerKey,
+        groupId: groupId,
+        version: version,
+      );
+      return (assistantMessage: assistantMessage, runId: null);
+    }
+    final result = await chatService.beginRegeneration(
+      conversationId: conversationId,
+      modelId: modelId,
+      providerId: providerKey,
+      groupId: groupId,
+      version: version,
+    );
+    return (assistantMessage: result.assistantMessage, runId: result.run.id);
+  }
+
   /// Build the persisted content string for a user message.
   static String buildPersistedUserMessageContent(
     ChatInputData input, {
@@ -308,6 +379,7 @@ class MessageGenerationService {
     required bool supportsReasoning,
     required bool enableReasoning,
     required bool generateTitleOnFinish,
+    String? generationRunId,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -336,6 +408,7 @@ class MessageGenerationService {
       streamOutput: assistant?.streamOutput ?? true,
       ocrActive: ocrActive,
       generateTitleOnFinish: generateTitleOnFinish,
+      generationRunId: generationRunId,
     );
   }
 

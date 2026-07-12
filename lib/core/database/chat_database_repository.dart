@@ -33,6 +33,13 @@ typedef DeletedMessagesResult = ({
   List<ChatMessage> messages,
 });
 
+typedef GenerationBeginResult = ({
+  Conversation conversation,
+  ChatMessage? userMessage,
+  ChatMessage assistantMessage,
+  GenerationRun run,
+});
+
 class BackupMergeReport {
   const BackupMergeReport({
     required this.importedConversations,
@@ -1906,6 +1913,106 @@ class ChatDatabaseRepository {
         touchUpdatedAt: touchUpdatedAt,
       ),
     );
+  }
+
+  Future<GenerationBeginResult> beginSendGeneration({
+    required Conversation conversation,
+    required ChatMessage userMessage,
+    required ChatMessage assistantMessage,
+    required String runId,
+  }) {
+    _validateGenerationBeginMessages(
+      conversation: conversation,
+      userMessage: userMessage,
+      assistantMessage: assistantMessage,
+    );
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendMessage,
+      () => _db.transaction(() async {
+        final afterUser = await _appendGraphMessageToConversation(
+          conversation: conversation,
+          message: userMessage,
+          selectVersion: false,
+          touchUpdatedAt: true,
+        );
+        final persisted = await _appendGraphMessageToConversation(
+          conversation: afterUser,
+          message: assistantMessage,
+          selectVersion: false,
+          touchUpdatedAt: true,
+        );
+        final run = await GenerationRunCommands(_db).create(
+          id: runId,
+          conversationId: conversation.id,
+          targetRevisionId: assistantMessage.id,
+          createdAt: assistantMessage.timestamp,
+        );
+        return (
+          conversation: persisted,
+          userMessage: userMessage,
+          assistantMessage: assistantMessage,
+          run: run,
+        );
+      }),
+    );
+  }
+
+  Future<GenerationBeginResult> beginRegeneration({
+    required Conversation conversation,
+    required ChatMessage assistantMessage,
+    required String runId,
+  }) {
+    _validateGenerationBeginMessages(
+      conversation: conversation,
+      assistantMessage: assistantMessage,
+    );
+    if (assistantMessage.groupId == null) {
+      throw ArgumentError.value(
+        assistantMessage.groupId,
+        'assistantMessage.groupId',
+      );
+    }
+    return _observer.measure(
+      ChatDatabaseOperation.commandAppendMessage,
+      () => _db.transaction(() async {
+        final persisted = await _appendGraphMessageToConversation(
+          conversation: conversation,
+          message: assistantMessage,
+          selectVersion: true,
+          touchUpdatedAt: true,
+        );
+        final run = await GenerationRunCommands(_db).create(
+          id: runId,
+          conversationId: conversation.id,
+          targetRevisionId: assistantMessage.id,
+          createdAt: assistantMessage.timestamp,
+        );
+        return (
+          conversation: persisted,
+          userMessage: null,
+          assistantMessage: assistantMessage,
+          run: run,
+        );
+      }),
+    );
+  }
+
+  static void _validateGenerationBeginMessages({
+    required Conversation conversation,
+    ChatMessage? userMessage,
+    required ChatMessage assistantMessage,
+  }) {
+    if (userMessage != null &&
+        (userMessage.conversationId != conversation.id ||
+            userMessage.role != 'user' ||
+            userMessage.isStreaming)) {
+      throw ArgumentError.value(userMessage, 'userMessage');
+    }
+    if (assistantMessage.conversationId != conversation.id ||
+        assistantMessage.role != 'assistant' ||
+        !assistantMessage.isStreaming) {
+      throw ArgumentError.value(assistantMessage, 'assistantMessage');
+    }
   }
 
   Future<Conversation> _appendGraphMessageToConversation({
