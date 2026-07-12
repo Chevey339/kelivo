@@ -1472,6 +1472,41 @@ void main() {
       expect(sync.lastMergeReport?.importedConversations, 1);
     });
 
+    test(
+      'merge settings rolls back every key when a later write fails',
+      () async {
+        SharedPreferences.setMockInitialValues({'local_setting': 'keep'});
+        SharedPreferencesStorePlatform.instance =
+            _FailingNthSetPreferencesStore({
+              'flutter.local_setting': 'keep',
+            }, failOnCall: 2);
+        final settingsFile = File('${root.path}/atomic_merge_settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({'incoming_a': 'first', 'incoming_b': 'second'}),
+        );
+        final zipFile = File('${root.path}/atomic_merge_settings.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+
+        await expectLater(
+          DataSync(chatService: ChatService()).restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+            mode: RestoreMode.merge,
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.reload();
+        expect(prefs.getString('local_setting'), 'keep');
+        expect(prefs.getString('incoming_a'), isNull);
+        expect(prefs.getString('incoming_b'), isNull);
+      },
+    );
+
     test('restores managed font files in overwrite and merge modes', () async {
       final sourceDir = Directory('${root.path}/source_fonts');
       await sourceDir.create(recursive: true);

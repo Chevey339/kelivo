@@ -1749,9 +1749,7 @@ class DataSync {
                   );
             }
             BackupSettingsValidator.validate(pendingSettings);
-            for (final entry in pendingSettings.entries) {
-              await prefs.restoreSingle(entry.key, entry.value);
-            }
+            await prefs.restoreAtomically(pendingSettings);
           }
         } catch (_) {
           rethrow;
@@ -2499,6 +2497,66 @@ class SharedPreferencesAsync {
     if (BackupSettingsValidator.isLocalOnly(key)) return;
     final prefs = await SharedPreferences.getInstance();
     await _restoreValue(prefs, key, value);
+  }
+
+  /// Applies a settings batch with in-process compensation. This is used by
+  /// merge restore, where a partial key set would otherwise be observable.
+  Future<void> restoreAtomically(Map<String, dynamic> data) async {
+    final prefs = await SharedPreferences.getInstance();
+    final previous = <String, Object?>{};
+    final absent = <String>{};
+    final written = <String>[];
+    for (final key in data.keys) {
+      if (BackupSettingsValidator.isLocalOnly(key)) continue;
+      final value = prefs.get(key);
+      if (value == null) {
+        absent.add(key);
+      } else {
+        previous[key] = value;
+      }
+    }
+    try {
+      for (final entry in data.entries) {
+        if (BackupSettingsValidator.isLocalOnly(entry.key)) continue;
+        await _restoreValue(prefs, entry.key, entry.value);
+        written.add(entry.key);
+      }
+    } catch (error, stackTrace) {
+      Object? rollbackError;
+      for (final key in written.reversed) {
+        try {
+          final restored = absent.contains(key)
+              ? await prefs.remove(key)
+              : await _restorePreviousValue(prefs, key, previous[key]!);
+          if (!restored) rollbackError ??= StateError(key);
+        } catch (failure) {
+          rollbackError ??= failure;
+        }
+      }
+      if (rollbackError != null) {
+        Error.throwWithStackTrace(
+          StateError('settings_merge_rollback:$rollbackError'),
+          stackTrace,
+        );
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<bool> _restorePreviousValue(
+    SharedPreferences prefs,
+    String key,
+    Object value,
+  ) async {
+    if (value is bool) return prefs.setBool(key, value);
+    if (value is int) return prefs.setInt(key, value);
+    if (value is double) return prefs.setDouble(key, value);
+    if (value is String) return prefs.setString(key, value);
+    if (value is List<String>) return prefs.setStringList(key, value);
+    if (value is List && value.every((item) => item is String)) {
+      return prefs.setStringList(key, value.cast<String>());
+    }
+    throw FormatException(key);
   }
 
   Future<void> _restoreValue(
