@@ -495,6 +495,24 @@ class ChatController extends ChangeNotifier {
     return appendPersistedTailMessages([message]);
   }
 
+  /// Opens the logical window around an already-persisted revision mutation.
+  ///
+  /// Editing or selecting a version can target a slot far outside the tail
+  /// window, so it must not reuse the append-to-tail navigation path.
+  Future<bool> openAroundPersistedMessage(ChatMessage message) async {
+    final conversation = _currentConversation;
+    if (conversation == null || message.conversationId != conversation.id) {
+      return false;
+    }
+    final opened = await timelineCoordinator.openAround(
+      message.id,
+      limit: ChatService.defaultLoadedWindowMax,
+    );
+    if (!opened) return false;
+    timelineCoordinator.programmaticJump(message.groupId ?? message.id);
+    return true;
+  }
+
   /// Publishes one atomic persistence result to the loaded tail as one UI
   /// mutation. A send begins with a user/assistant pair, so refreshing the
   /// persisted count between those two messages would briefly create a false

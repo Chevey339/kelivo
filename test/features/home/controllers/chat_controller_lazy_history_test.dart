@@ -999,6 +999,45 @@ void main() {
     );
 
     test(
+      'edited middle revision opens around its stable cursor instead of tail',
+      () async {
+        messages = List<ChatMessage>.generate(500, _message);
+        final edited = ChatMessage(
+          id: 'message-10-v2',
+          role: messages[10].role,
+          content: 'edited middle message',
+          conversationId: 'conversation-1',
+          groupId: 'message-10',
+          version: 1,
+        );
+        messages.add(edited);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Cursor navigation',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const {'message-10': 1};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        final opened = await controller.openAroundPersistedMessage(edited);
+
+        expect(opened, isTrue);
+        expect(
+          controller.messages.any((message) => message.id == edited.id),
+          isTrue,
+        );
+        expect(controller.messages.last.id, isNot('message-499'));
+        expect(
+          controller.timelineCoordinator.programmaticTargetSlotId,
+          'message-10',
+        );
+      },
+    );
+
+    test(
       'mutation refresh removes a deleted slot from every window view',
       () async {
         await controller.setCurrentConversationAndLoad(conversation);

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
@@ -59,6 +60,8 @@ class ChatService extends ChangeNotifier {
   static const int defaultInitialTextBudget = 20000;
   static const int defaultHistoryPageSize = 20;
   static const int defaultLoadedWindowMax = 360;
+  static const int _assetReferenceBackfillVersion = 2;
+  static const Duration _assetGcDelay = Duration(days: 7);
 
   late ChatDatabaseRepository _repo;
   late File _databaseFile;
@@ -123,6 +126,8 @@ class ChatService extends ChangeNotifier {
       // Versioned and transactional: normal launches return before scanning rows.
       await _migrateSandboxPaths();
       await _repo.backfillMissingMessageGraphs();
+      await _backfillAssetReferences(appDataDir);
+      await runAssetMaintenance();
       await _loadConversationsCache();
 
       // Reset any stale isStreaming flags left over from a previous app crash or
@@ -962,8 +967,8 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Set<String> _extractAttachmentPaths(String content) {
-    final out = <String>{};
+  List<({String path, String kind})> _extractLocalAttachments(String content) {
+    final out = <String, ({String path, String kind})>{};
     final imgRe = RegExp(r"\[image:(.+?)\]");
     for (final m in imgRe.allMatches(content)) {
       final pth = m.group(1)?.trim();
@@ -971,7 +976,8 @@ class ChatService extends ChangeNotifier {
           pth.isNotEmpty &&
           !pth.startsWith('http') &&
           !pth.startsWith('data:')) {
-        out.add(SandboxPathResolver.fix(pth));
+        final fixed = SandboxPathResolver.fix(pth);
+        out['image:$fixed'] = (path: fixed, kind: 'image');
       }
     }
     final fileRe = RegExp(r"\[file:(.+?)\|(.+?)\|(.+?)\]");
@@ -981,10 +987,95 @@ class ChatService extends ChangeNotifier {
           pth.isNotEmpty &&
           !pth.startsWith('http') &&
           !pth.startsWith('data:')) {
-        out.add(SandboxPathResolver.fix(pth));
+        final fixed = SandboxPathResolver.fix(pth);
+        out['file:$fixed'] = (path: fixed, kind: 'file');
       }
     }
-    return out;
+    return List.unmodifiable(out.values);
+  }
+
+  bool _messageCanOwnAssets(ChatMessage message) =>
+      message.content.contains('[image:') || message.content.contains('[file:');
+
+  Future<void> _backfillAssetReferences(Directory appDataDir) async {
+    final targetRoot = p.normalize(appDataDir.absolute.path);
+    final includeLegacyCandidates = await _repo.needsAssetReferenceBackfill(
+      version: _assetReferenceBackfillVersion,
+      targetRoot: targetRoot,
+    );
+    if (!includeLegacyCandidates &&
+        !await _repo.hasPendingAssetReferenceSync()) {
+      return;
+    }
+    var cursor = '';
+    while (true) {
+      final messages = await _repo.getMessagesForAssetReferenceBackfill(
+        afterMessageId: cursor,
+        includeLegacyCandidates: includeLegacyCandidates,
+      );
+      if (messages.isEmpty) break;
+      for (final message in messages) {
+        await _synchronizeMessageAssets(message);
+        cursor = message.id;
+      }
+    }
+    if (includeLegacyCandidates) {
+      await _repo.markAssetReferenceBackfillComplete(
+        version: _assetReferenceBackfillVersion,
+        targetRoot: targetRoot,
+      );
+    }
+  }
+
+  Future<void> _backfillAssetReferencesForCurrentRoot() async {
+    await _backfillAssetReferences(await AppDirectories.getAppDataDirectory());
+  }
+
+  Future<void> _synchronizeMessageAssets(ChatMessage message) async {
+    if (isTemporaryConversation(message.conversationId)) return;
+    final appDataDir = await AppDirectories.getAppDataDirectory();
+    final allowedRoots = [
+      p.normalize(p.join(appDataDir.absolute.path, 'upload')),
+      p.normalize(p.join(appDataDir.absolute.path, 'images')),
+    ];
+    final registrations = <MessageAssetRegistration>[];
+    for (final attachment in _extractLocalAttachments(message.content)) {
+      final normalizedPath = p.normalize(File(attachment.path).absolute.path);
+      if (!allowedRoots.any((root) => p.isWithin(root, normalizedPath))) {
+        continue;
+      }
+      final file = File(normalizedPath);
+      if (await FileSystemEntity.type(file.path, followLinks: false) !=
+          FileSystemEntityType.file) {
+        continue;
+      }
+      final contentHash = (await sha256.bind(file.openRead()).first).toString();
+      registrations.add(
+        MessageAssetRegistration(
+          assetId: 'asset_$contentHash',
+          contentHash: contentHash,
+          path: normalizedPath,
+          byteSize: await file.length(),
+          kind: attachment.kind,
+        ),
+      );
+    }
+    await _repo.replaceMessageAssetReferences(
+      conversationId: message.conversationId,
+      revisionId: message.id,
+      assets: registrations,
+    );
+  }
+
+  Future<void> _synchronizeMessageAssetsBestEffort(ChatMessage message) async {
+    try {
+      await _synchronizeMessageAssets(message);
+    } catch (error) {
+      // Message persistence is authoritative. The message transaction queues
+      // relevant revisions first, so a failed asset-index update is retried by
+      // the bounded startup backfill instead of failing the send.
+      debugPrint('Message asset synchronization failed: $error');
+    }
   }
 
   Future<void> _migrateSandboxPaths() async {
@@ -1025,51 +1116,54 @@ class ChatService extends ChangeNotifier {
     await _repo.resetStaleStreamingState();
   }
 
-  Future<void> _cleanupOrphanUploads() async {
+  Future<void> runAssetMaintenance({DateTime? now}) async {
+    final effectiveNow = (now ?? DateTime.now()).toUtc();
     try {
-      final uploadDir = await AppDirectories.getUploadDirectory();
-      if (!await uploadDir.exists()) return;
-
-      // Build the set of all referenced paths across all messages
-      String canon(String pth) {
-        // Normalize separators and resolve redundant segments to enable
-        // reliable equality checks across platforms (esp. Windows).
-        final normalized = p.normalize(pth);
-        // On Windows, paths are case-insensitive; compare in lowercase.
-        return Platform.isWindows ? normalized.toLowerCase() : normalized;
-      }
-
-      final referenced = <String>{};
-      for (final conversation in _conversationsCache.values) {
-        final total = getMessageCount(conversation.id);
-        for (var start = 0; start < total; start += defaultLoadedWindowMax) {
-          final messages = await loadMessagesRange(
-            conversation.id,
-            start: start,
-            limit: defaultLoadedWindowMax,
+      await _repo.scheduleUnreferencedAssetGc(
+        notBefore: effectiveNow.add(_assetGcDelay),
+      );
+      final candidates = await _repo.claimAssetGc(now: effectiveNow);
+      final appDataDir = await AppDirectories.getAppDataDirectory();
+      final allowedRoots = [
+        p.normalize(p.join(appDataDir.absolute.path, 'upload')),
+        p.normalize(p.join(appDataDir.absolute.path, 'images')),
+      ];
+      for (final candidate in candidates) {
+        final paths = [
+          candidate.path,
+          candidate.thumbnailPath,
+        ].whereType<String>();
+        final regularFiles = <File>[];
+        var safe = true;
+        for (final candidatePath in paths) {
+          final normalized = p.normalize(File(candidatePath).absolute.path);
+          if (!allowedRoots.any((root) => p.isWithin(root, normalized))) {
+            safe = false;
+            break;
+          }
+          final type = await FileSystemEntity.type(
+            normalized,
+            followLinks: false,
           );
-          for (final m in messages) {
-            for (final pth in _extractAttachmentPaths(m.content)) {
-              referenced.add(canon(pth));
-            }
+          if (type == FileSystemEntityType.file) {
+            regularFiles.add(File(normalized));
+          } else if (type != FileSystemEntityType.notFound) {
+            safe = false;
+            break;
           }
         }
-      }
-
-      // Walk upload directory recursively to consider all files
-      final entries = uploadDir.listSync(recursive: true, followLinks: false);
-      for (final ent in entries) {
-        if (ent is File) {
-          final filePath = canon(ent.path);
-          if (!referenced.contains(filePath)) {
-            try {
-              await ent.delete();
-            } catch (_) {}
-          }
+        if (!safe) continue;
+        for (final file in regularFiles) {
+          await file.delete();
         }
+        await _repo.completeAssetGc(assetId: candidate.assetId);
       }
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Asset maintenance failed: $error');
+    }
   }
+
+  Future<void> _cleanupOrphanUploads() => runAssetMaintenance();
 
   Future<void> restoreConversation(
     Conversation conversation,
@@ -1103,6 +1197,7 @@ class ChatService extends ChangeNotifier {
       geminiSignaturesByMessageId: const {},
     );
     await _repo.backfillMissingMessageGraphs();
+    await _backfillAssetReferencesForCurrentRoot();
     await _refreshConversation(restored.id);
 
     // Update caches
@@ -1170,6 +1265,7 @@ class ChatService extends ChangeNotifier {
     final report = await _repo.mergeBackupSnapshot(snapshotFile);
     _messagesCache.clear();
     await _repo.backfillMissingMessageGraphs();
+    await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
     return report;
@@ -1195,6 +1291,7 @@ class ChatService extends ChangeNotifier {
     );
     _messagesCache.clear();
     await _repo.backfillMissingMessageGraphs();
+    await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
     return report;
@@ -1215,6 +1312,7 @@ class ChatService extends ChangeNotifier {
     _graphContextStartIndices.clear();
     _currentConversationId = null;
     await _repo.backfillMissingMessageGraphs();
+    await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
   }
@@ -1235,6 +1333,9 @@ class ChatService extends ChangeNotifier {
       message: message,
       touchUpdatedAt: false,
     );
+    if (_messageCanOwnAssets(message)) {
+      await _synchronizeMessageAssetsBestEffort(message);
+    }
     _conversationsCache[conversationId] = persisted;
     order.add(message.id);
     _messageCounts[conversationId] = order.length;
@@ -1505,6 +1606,9 @@ class ChatService extends ChangeNotifier {
         message: message,
         selectVersion: selectVersion,
       );
+      if (_messageCanOwnAssets(message)) {
+        await _synchronizeMessageAssetsBestEffort(message);
+      }
       _draftConversations.remove(conversationId);
       _conversationsCache[conversationId] = persisted;
       conversation = persisted;
@@ -1609,6 +1713,10 @@ class ChatService extends ChangeNotifier {
       if (result.userMessage case final userMessage?) userMessage,
       result.assistantMessage,
     ];
+    if (result.userMessage case final userMessage?
+        when _messageCanOwnAssets(userMessage)) {
+      await _synchronizeMessageAssetsBestEffort(userMessage);
+    }
     final order = _messageOrderIds.putIfAbsent(
       conversationId,
       () => <String>[],
@@ -1690,10 +1798,17 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
+    if (content != null) {
+      await _repo.markMessageAssetReferencesDirty(updatedMessage.id);
+    }
+
     await _repo.updateMessageAndStreamingState(
       updatedMessage,
       untrackStreaming: isStreaming == false,
     );
+    if (content != null) {
+      await _synchronizeMessageAssetsBestEffort(updatedMessage);
+    }
 
     // Update cache
     final conversationId = message.conversationId;
@@ -1842,6 +1957,9 @@ class ChatService extends ChangeNotifier {
       errorCode: errorCode,
       geminiThoughtSignature: _geminiThoughtSigsCache[message.id],
     );
+    if (_messageCanOwnAssets(message)) {
+      await _synchronizeMessageAssetsBestEffort(message);
+    }
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
     return run;
@@ -2020,6 +2138,9 @@ class ChatService extends ChangeNotifier {
     );
     if (result == null) return null;
     final newMsg = result.message;
+    if (_messageCanOwnAssets(newMsg)) {
+      await _synchronizeMessageAssetsBestEffort(newMsg);
+    }
     final cid = newMsg.conversationId;
     _conversationsCache[cid] = result.conversation;
     final order = _messageOrderIds.putIfAbsent(cid, () => <String>[]);

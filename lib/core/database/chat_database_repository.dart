@@ -77,6 +77,8 @@ class ChatDatabaseRepository {
   final AppDatabase _db;
   final File? _databaseFile;
   final ChatDatabaseObserver _observer;
+  bool _messageSearchFtsReady = false;
+  bool _assetGcSchemaReady = false;
 
   static ChatDatabaseRepository open({
     File? file,
@@ -1522,6 +1524,98 @@ class ChatDatabaseRepository {
     });
   }
 
+  Future<bool> needsAssetReferenceBackfill({
+    required int version,
+    required String targetRoot,
+  }) async {
+    final row =
+        await (_db.select(_db.chatStorageMetaRows)..where(
+              (table) => table.key.equals(
+                ChatStorageMetaKeys.assetReferenceBackfillVersion,
+              ),
+            ))
+            .getSingleOrNull();
+    if (row == null) return true;
+    try {
+      final value = jsonDecode(row.value);
+      return value is! Map<String, dynamic> ||
+          value['version'] != version ||
+          value['targetRoot'] != targetRoot;
+    } on FormatException {
+      return true;
+    }
+  }
+
+  Future<void> markAssetReferenceBackfillComplete({
+    required int version,
+    required String targetRoot,
+  }) async {
+    await _db
+        .into(_db.chatStorageMetaRows)
+        .insertOnConflictUpdate(
+          ChatStorageMetaRowsCompanion.insert(
+            key: ChatStorageMetaKeys.assetReferenceBackfillVersion,
+            value: jsonEncode({'version': version, 'targetRoot': targetRoot}),
+          ),
+        );
+  }
+
+  Future<List<ChatMessage>> getMessagesForAssetReferenceBackfill({
+    required String afterMessageId,
+    required bool includeLegacyCandidates,
+    int limit = 360,
+  }) async {
+    if (limit <= 0) return const <ChatMessage>[];
+    await _ensureAssetGcSchema();
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT m.* FROM message_rows m
+          WHERE m.id > ? AND (
+            EXISTS (
+              SELECT 1 FROM asset_reference_dirty_rows d
+              WHERE d.revision_id = m.id
+            ) OR (? AND (
+              m.role = 'user' OR
+              m.content LIKE '%[image:%' OR
+              m.content LIKE '%[file:%' OR
+              EXISTS (
+                SELECT 1 FROM message_asset_rows a WHERE a.revision_id = m.id
+              )
+            ))
+          )
+          ORDER BY m.id LIMIT ?;
+        ''',
+          variables: [
+            Variable<String>(afterMessageId),
+            Variable<bool>(includeLegacyCandidates),
+            Variable<int>(limit),
+          ],
+          readsFrom: {_db.messageRows},
+        )
+        .get();
+    return _messagesFromRowsWithParts(
+      rows.map((row) => _db.messageRows.map(row.data)).toList(growable: false),
+    );
+  }
+
+  Future<bool> hasPendingAssetReferenceSync() async {
+    await _ensureAssetGcSchema();
+    return await _db
+            .customSelect('SELECT 1 FROM asset_reference_dirty_rows LIMIT 1;')
+            .getSingleOrNull() !=
+        null;
+  }
+
+  Future<void> markMessageAssetReferencesDirty(String revisionId) async {
+    await _ensureAssetGcSchema();
+    await _db.customStatement(
+      'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+      'VALUES (?);',
+      [revisionId],
+    );
+  }
+
   Future<void> checkpoint() async {
     final stopwatch = Stopwatch()..start();
     int? walBytesBefore;
@@ -1900,8 +1994,8 @@ class ChatDatabaseRepository {
         .join(' AND ');
     if (!useSubstringFallback) {
       messageAnyClauses.add(
-        'm.id IN (SELECT revision_id FROM message_search_fts '
-        'WHERE body MATCH ?)',
+        'm.id IN (SELECT id FROM message_search_fts '
+        'WHERE content MATCH ?)',
       );
       messageArgs.add(ftsQuery);
       existsClauses
@@ -1909,7 +2003,7 @@ class ChatDatabaseRepository {
         ..add('''
         EXISTS (
           SELECT 1 FROM message_search_fts fx
-          WHERE fx.conversation_id = c.id AND fx.body MATCH ?
+          WHERE fx.conversation_id = c.id AND fx.content MATCH ?
         )
         ''');
       existsArgs
@@ -2276,6 +2370,65 @@ class ChatDatabaseRepository {
     });
   }
 
+  Future<void> replaceMessageAssetReferences({
+    required String conversationId,
+    required String revisionId,
+    required List<MessageAssetRegistration> assets,
+  }) async {
+    await _ensureAssetGcSchema();
+    await _db.transaction(() async {
+      await _db.customStatement(
+        'DELETE FROM message_asset_rows WHERE revision_id = ?;',
+        [revisionId],
+      );
+      final now = DateTime.now().microsecondsSinceEpoch;
+      for (final asset in assets) {
+        await _db.customStatement(
+          '''
+          INSERT INTO asset_rows(
+            id, content_hash, path, byte_size, width, height, thumbnail_path,
+            created_at, last_referenced_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            path = excluded.path,
+            byte_size = excluded.byte_size,
+            width = excluded.width,
+            height = excluded.height,
+            thumbnail_path = excluded.thumbnail_path,
+            last_referenced_at = excluded.last_referenced_at;
+        ''',
+          [
+            asset.assetId,
+            asset.contentHash,
+            asset.path,
+            asset.byteSize,
+            asset.width,
+            asset.height,
+            asset.thumbnailPath,
+            now,
+            now,
+          ],
+        );
+        await _db.customStatement(
+          '''
+          INSERT OR IGNORE INTO message_asset_rows(
+            conversation_id, revision_id, asset_id, kind
+          ) VALUES (?, ?, ?, ?);
+        ''',
+          [conversationId, revisionId, asset.assetId, asset.kind],
+        );
+        await _db.customStatement(
+          'DELETE FROM asset_gc_rows WHERE asset_id = ?;',
+          [asset.assetId],
+        );
+      }
+      await _db.customStatement(
+        'DELETE FROM asset_reference_dirty_rows WHERE revision_id = ?;',
+        [revisionId],
+      );
+    });
+  }
+
   Future<void> unlinkMessageAsset({
     required String revisionId,
     required String assetId,
@@ -2458,6 +2611,7 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _ensureAssetGcSchema() async {
+    if (_assetGcSchemaReady) return;
     await _db.customStatement('''
       CREATE TABLE IF NOT EXISTS asset_rows(
         id TEXT PRIMARY KEY NOT NULL,
@@ -2502,6 +2656,13 @@ class ChatDatabaseRepository {
         completed_at INTEGER NOT NULL
       );
     ''');
+    await _db.customStatement('''
+      CREATE TABLE IF NOT EXISTS asset_reference_dirty_rows(
+        revision_id TEXT PRIMARY KEY NOT NULL
+          REFERENCES message_revision_rows(id) ON DELETE CASCADE
+      );
+    ''');
+    _assetGcSchemaReady = true;
   }
 
   bool _requiresCjkFallback(String token) {
@@ -2511,49 +2672,77 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _ensureMessageSearchFts() async {
+    if (_messageSearchFtsReady) return;
+    final existing = await _db
+        .customSelect(
+          "SELECT sql FROM sqlite_master "
+          "WHERE type = 'table' AND name = 'message_search_fts';",
+        )
+        .getSingleOrNull();
+    final existingSql = existing?.readNullable<String>('sql') ?? '';
+    final externalContent =
+        existingSql.contains("content='message_rows'") &&
+        existingSql.contains("content_rowid='rowid'");
+    if (existing != null && !externalContent) {
+      await _db.transaction(() async {
+        await _db.customStatement(
+          'DROP TRIGGER IF EXISTS message_search_fts_insert;',
+        );
+        await _db.customStatement(
+          'DROP TRIGGER IF EXISTS message_search_fts_delete;',
+        );
+        await _db.customStatement(
+          'DROP TRIGGER IF EXISTS message_search_fts_update;',
+        );
+        await _db.customStatement('DROP TABLE message_search_fts;');
+      });
+    }
+    final needsRebuild = existing == null || !externalContent;
     await _db.customStatement('''
       CREATE VIRTUAL TABLE IF NOT EXISTS message_search_fts USING fts5(
-        revision_id UNINDEXED,
+        id UNINDEXED,
         conversation_id UNINDEXED,
-        body,
+        content,
+        content='message_rows',
+        content_rowid='rowid',
         tokenize = 'unicode61 remove_diacritics 2'
       );
     ''');
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_insert
       AFTER INSERT ON message_rows BEGIN
-        INSERT INTO message_search_fts(revision_id, conversation_id, body)
-        VALUES (new.id, new.conversation_id, new.content);
+        INSERT INTO message_search_fts(rowid, id, conversation_id, content)
+        VALUES (new.rowid, new.id, new.conversation_id, new.content);
       END;
     ''');
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_delete
       AFTER DELETE ON message_rows BEGIN
-        DELETE FROM message_search_fts WHERE revision_id = old.id;
+        INSERT INTO message_search_fts(
+          message_search_fts, rowid, id, conversation_id, content
+        ) VALUES (
+          'delete', old.rowid, old.id, old.conversation_id, old.content
+        );
       END;
     ''');
     await _db.customStatement('''
       CREATE TRIGGER IF NOT EXISTS message_search_fts_update
       AFTER UPDATE OF content, conversation_id ON message_rows BEGIN
-        DELETE FROM message_search_fts WHERE revision_id = old.id;
-        INSERT INTO message_search_fts(revision_id, conversation_id, body)
-        VALUES (new.id, new.conversation_id, new.content);
+        INSERT INTO message_search_fts(
+          message_search_fts, rowid, id, conversation_id, content
+        ) VALUES (
+          'delete', old.rowid, old.id, old.conversation_id, old.content
+        );
+        INSERT INTO message_search_fts(rowid, id, conversation_id, content)
+        VALUES (new.rowid, new.id, new.conversation_id, new.content);
       END;
     ''');
-    final counts = await _db.customSelect('''
-      SELECT
-        (SELECT COUNT(*) FROM message_rows) AS source_count,
-        (SELECT COUNT(*) FROM message_search_fts) AS fts_count;
-    ''').getSingle();
-    if (counts.read<int>('source_count') != counts.read<int>('fts_count')) {
-      await _db.transaction(() async {
-        await _db.customStatement('DELETE FROM message_search_fts;');
-        await _db.customStatement('''
-          INSERT INTO message_search_fts(revision_id, conversation_id, body)
-          SELECT id, conversation_id, content FROM message_rows;
-        ''');
-      });
+    if (needsRebuild) {
+      await _db.customStatement(
+        "INSERT INTO message_search_fts(message_search_fts) VALUES('rebuild');",
+      );
     }
+    _messageSearchFtsReady = true;
   }
 
   Future<void> putConversation(Conversation conversation) async {
@@ -2940,6 +3129,10 @@ class ChatDatabaseRepository {
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
   }) async {
+    if (message.content.contains('[image:') ||
+        message.content.contains('[file:')) {
+      await markMessageAssetReferencesDirty(message.id);
+    }
     final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
     await (_db.delete(
       _db.messagePartRows,
@@ -4031,61 +4224,71 @@ class ChatDatabaseRepository {
     if (revisionIds.isEmpty) return Future.value(null);
     return _observer.measure(
       ChatDatabaseOperation.commandDeleteMessages,
-      () => _db.transaction(() async {
-        final conversationRow = await (_db.select(
-          _db.conversationRows,
-        )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
-        if (conversationRow == null) return null;
-        final beforeRows = await (_db.select(
-          _db.messageRows,
-        )..where((row) => row.conversationId.equals(conversationId))).get();
-        final commands = MessageGraphCommands(_db);
-        for (final revisionId in revisionIds) {
-          final revision =
+      () async {
+        await _ensureAssetGcSchema();
+        return _db.transaction(() async {
+          final conversationRow = await (_db.select(
+            _db.conversationRows,
+          )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
+          if (conversationRow == null) return null;
+          final beforeRows = await (_db.select(
+            _db.messageRows,
+          )..where((row) => row.conversationId.equals(conversationId))).get();
+          final commands = MessageGraphCommands(_db);
+          for (final revisionId in revisionIds) {
+            final revision =
+                await (_db.select(_db.messageRevisionRows)..where(
+                      (row) =>
+                          row.conversationId.equals(conversationId) &
+                          row.id.equals(revisionId) &
+                          row.deletedAt.isNull(),
+                    ))
+                    .getSingleOrNull();
+            if (revision == null) continue;
+            await commands.deleteRevision(
+              conversationId: conversationId,
+              revisionId: revisionId,
+              confirmCascade: true,
+            );
+          }
+          final deletedRevisionRows =
               await (_db.select(_db.messageRevisionRows)..where(
                     (row) =>
                         row.conversationId.equals(conversationId) &
-                        row.id.equals(revisionId) &
-                        row.deletedAt.isNull(),
+                        row.deletedAt.isNotNull(),
                   ))
-                  .getSingleOrNull();
-          if (revision == null) continue;
-          await commands.deleteRevision(
-            conversationId: conversationId,
-            revisionId: revisionId,
-            confirmCascade: true,
+                  .get();
+          final deletedIds = deletedRevisionRows.map((row) => row.id).toSet();
+          if (deletedIds.isNotEmpty) {
+            await _db.customStatement(
+              'DELETE FROM message_asset_rows WHERE revision_id IN '
+              '(${List.filled(deletedIds.length, '?').join(',')});',
+              deletedIds.toList(growable: false),
+            );
+          }
+          final deletedMessages = beforeRows
+              .where((row) => deletedIds.contains(row.id))
+              .map(_messageFromRow)
+              .toList(growable: false);
+          if (deletedIds.isNotEmpty) {
+            await (_db.delete(
+              _db.messageRows,
+            )..where((row) => row.id.isIn(deletedIds))).go();
+          }
+          final current = await _conversationFromRow(
+            conversationRow,
+            includeMessageIds: false,
           );
-        }
-        final deletedRevisionRows =
-            await (_db.select(_db.messageRevisionRows)..where(
-                  (row) =>
-                      row.conversationId.equals(conversationId) &
-                      row.deletedAt.isNotNull(),
-                ))
-                .get();
-        final deletedIds = deletedRevisionRows.map((row) => row.id).toSet();
-        final deletedMessages = beforeRows
-            .where((row) => deletedIds.contains(row.id))
-            .map(_messageFromRow)
-            .toList(growable: false);
-        if (deletedIds.isNotEmpty) {
-          await (_db.delete(
-            _db.messageRows,
-          )..where((row) => row.id.isIn(deletedIds))).go();
-        }
-        final current = await _conversationFromRow(
-          conversationRow,
-          includeMessageIds: false,
-        );
-        final conversation = current.copyWith(
-          chatSuggestions: const [],
-          updatedAt: DateTime.now(),
-        );
-        await (_db.update(_db.conversationRows)
-              ..where((row) => row.id.equals(conversationId)))
-            .write(_conversationCompanion(conversation));
-        return (conversation: conversation, messages: deletedMessages);
-      }),
+          final conversation = current.copyWith(
+            chatSuggestions: const [],
+            updatedAt: DateTime.now(),
+          );
+          await (_db.update(_db.conversationRows)
+                ..where((row) => row.id.equals(conversationId)))
+              .write(_conversationCompanion(conversation));
+          return (conversation: conversation, messages: deletedMessages);
+        });
+      },
     );
   }
 
@@ -4849,6 +5052,28 @@ final class AssetGcCandidate {
   final int byteSize;
 }
 
+final class MessageAssetRegistration {
+  const MessageAssetRegistration({
+    required this.assetId,
+    required this.contentHash,
+    required this.path,
+    required this.byteSize,
+    required this.kind,
+    this.width,
+    this.height,
+    this.thumbnailPath,
+  });
+
+  final String assetId;
+  final String contentHash;
+  final String path;
+  final int byteSize;
+  final String kind;
+  final int? width;
+  final int? height;
+  final String? thumbnailPath;
+}
+
 final class GraphGcResult {
   const GraphGcResult({required this.branches, required this.revisions});
   final int branches;
@@ -4862,4 +5087,6 @@ class ChatStorageMetaKeys {
   static const hiveMigrationComplete = 'hive_migration_complete_v1';
   static const databaseIdentity = 'database_identity_v1';
   static const sandboxPathVersion = 'sandbox_path_migration_version';
+  static const assetReferenceBackfillVersion =
+      'asset_reference_backfill_version';
 }

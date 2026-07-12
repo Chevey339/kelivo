@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-12（第三轮复审：四个用户症状逐一定位，新登记 §10.3 MSG-R1～R3 / TL-R14～R15；PD-01/PD-02/§7.2 修订为默认 graft 语义）
-> - 当前结论：Phase 0/1/3 保持关闭。§10.3 MSG-R1～R3、TL-R14/R15 已全部完成自动化实现；Phase 2/4 的第三轮真机矩阵按用户决定暂缓。Phase 5 的 OPS-01～09 可执行实现已走完；OPS-08 发布矩阵 2/5，OPS-09 仍受 30 天与显式授权门禁约束
+> - 最后更新：2026-07-12（完成 §11.1 OBS-1～OBS-4 修复；OBS-5 按已冻结的平台能力边界接受现状）
+> - 当前结论：Phase 0/1/3 保持关闭。§10.3 MSG-R1～R3、TL-R14/R15 已全部完成自动化实现并通过复审；Phase 2/4 的第三轮真机矩阵按用户决定暂缓。Phase 5 的 OPS-01～09 可执行实现已走完并通过复审；OPS-08 发布矩阵 2/5，OPS-09 仍受 30 天与显式授权门禁约束
 
 ## 1. 文档使用规则
 
@@ -428,12 +428,24 @@ dart run tool/run_restore_process_harness.dart \
 | OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `已完成` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | 既有提交 + 本里程碑提交（2026-07-12） | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 分块压缩与流式 hash、ZIP 自校验、round trip、秘密排除均已实现；writer 现发布 ZIP64 entry/central/end records，不再受 ZIP32 的 4 GiB/65,535 条目格式上限，restore 仍以 8 GiB/entry、16 GiB total、100,000 entries 显式拒绝资源滥用。五平台 SQLite snapshot 能力沿用 DB2-07 的 5/5 设备 runner；backup/restore 聚焦 47/47 与 analyze 通过 |
 | OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `已完成` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交（2026-07-12） | overwrite 已由 P0-02 完成 selected-only staging、business lease、strict topology、append-only receipt、bounded previous、WAL normalization、operation-ahead forward/rollback、cold ack/archive 与启动恢复；240 real-process phases/58 SIGKILL 及逻辑 failpoint 均只开放完整 before/target。SQLite merge 以 ATTACH + 单事务导入，hash 相同去重、冲突整会话确定性 remap/report、重复执行幂等，非法 source 全回滚；settings merge 现先完整验证并以 touched-key snapshot 补偿批次应用，后续 key 写失败不再留下前缀，assets merge 为 only-if-absent 幂等补齐。merge/backup/startup 聚焦 110/110 与 analyze 通过；raw syscall/硬件断电和资源耗尽仍属于发布环境故障注入，不重复扩大应用实现门槛 |
 | OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `已完成` | 新完整备份不写 `chats.json`；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | 既有提交 + 本里程碑提交（2026-07-12） | 完整备份保持 SQLite，不写 `chats.json`；旧 `chats.json`、Cherry `data.json` ZIP、无 manifest settings-only 与迁移页 JSON 灾备仍为只读兼容入口。新增 `kelivo-portable-chat` NDJSON v2：默认 active branch + 非 streaming 终态，显式 `allRevisions` 导出全部 revision shadow；100 条分页写出，每行独立 JSON，footer 绑定 conversation/message count 与前文 SHA-256。导入逐行解析到临时 SQLite，完整 footer/hash 校验和 graph backfill 后才复用事务 merge/remap 发布，篡改/截断不触碰 live。portable/legacy 聚焦 5/5 与 analyze 通过 |
-| OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `已完成` | D2 正确率和 p95 达标，五平台一致性已验证 | 本里程碑提交（2026-07-12） | `message_search_fts` 是可重建派生 FTS5 索引，insert/delete/content-update triggers 保持同步，首次 count drift 时事务重建；普通词用 quoted FTS `AND` query，含 CJK/Japanese/Korean token 确定性走 escaped substring fallback，解决 DB2-07 五平台 `中文` 零命中。默认 SQL join 直接约束 active ancestry，显式 `includeAllRevisions` 才扩大范围；结果携带 conversation + stable revision(messageId) + slot(groupId)，现有搜索点击统一进入 coordinator `openAround`。英文/CJK/更新同步、观测与 timeline 聚焦 15/15、analyze 通过；五平台 FTS5 可用性沿用 DB2-07 5/5 runner |
+| OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `已完成` | D2 正确率和 p95 达标，五平台一致性已验证 | 本里程碑提交 + §11.1 修复提交（2026-07-12） | `message_search_fts` 是以 `message_rows` 为 external content 的可重建派生 FTS5 索引，正文不再双份落盘；triggers 保持同步，旧 internal-content 表在首次初始化时自动迁移并重建，repository 实例内后续搜索不再重复执行 DDL/双 COUNT。普通词使用 FTS，CJK/Japanese/Korean token 确定性走 substring fallback；默认约束 active ancestry，显式开关才扩大范围。external-content schema、英文/CJK/更新同步与 timeline 聚焦回归通过；五平台能力沿用 DB2-07 5/5 runner |
 | OPS-05 | SQL stats 与口径 | PD-07、MSG-03 | `已完成` | current branch/total usage 定义和查询均明确 | 本里程碑提交（2026-07-12） | StatsPage 不再为每个会话 `loadMessages` 并常驻全库对象图。repository 用 active ancestry CTE + SQL GROUP BY 直接返回范围 summary、365 天 heatmap、day/provider trend、model/assistant/topic ranks；另以 message_rows 全 revisions 单独聚合全部生成 message/input/output/cached。页面仅保留天/分组级聚合，用“当前分支 / 全部生成用量”双值明确展示两套口径，日期范围在 DB 裁剪。回归以同 slot v1/v2 证明 active 只计选中 v2、all revisions 计 v1+v2；stats repository/service/page 21/21 与 analyze 通过 |
-| OPS-06 | Assets/branch/revision FK、尺寸、缩略图、延迟 GC | MSG-02、TL-06 | `已完成` | 删除消息不扫全库；高 branch-count 会话不逐 branch 重跑完整路径投影；资源 hash/reference 可验证 | 本里程碑提交（2026-07-12） | `deleteRevision` 的 branch 影响检测改为单个集合化 recursive CTE：一次构造 descendants、所有 live branch ancestry 与 parent-branch closure，不再循环调用 projector；200 个派生 branch 删除回归一次得到 201 affected。新增 assets/reference/GC maintenance schema：content hash/path/bytes/宽高/thumbnail 元数据，revision composite FK，link 会取消待清理；unreferenced 只进入 delayed ledger，空闲任务 claim 后删除文件并二次确认无引用才删除 DB 元数据。soft-deleted branch/revision 以 cutoff+limit 小批、branch-first/revision leaf-first 回收并写 audit，不在用户删除事务扫描文件系统。graph/assets 10/10 与 analyze 通过 |
+| OPS-06 | Assets/branch/revision FK、尺寸、缩略图、延迟 GC | MSG-02、TL-06 | `已完成` | 删除消息不扫全库；高 branch-count 会话不逐 branch 重跑完整路径投影；资源 hash/reference 可验证 | 本里程碑提交 + §11.1 修复提交（2026-07-12） | branch 检测保持单个集合化 recursive CTE。asset 管线已接入生产：持久消息新增、发送、编辑/版本保存和生成终态按正文 marker 计算 SHA-256/bytes 并替换 revision 引用；首次迁移、portable import、snapshot restore/merge 以 version+root receipt 分页回填旧消息，日常写入则在消息事务登记待同步 revision、成功后原子出队，正常冷启动不重扫全库。删除只移除引用并登记 7 天延迟 GC；maintenance 仅允许 AppData `upload`/`images` 内普通文件，先验证全部路径再删除并二次确认无引用。索引失败不回滚聊天写入，队列留待下次启动修复。真实文件延迟删除与旧写入回填回归通过 |
 | OPS-07 | 平台安全存储与秘密备份策略 | P0-08、PD-11 | `已完成` | 普通备份移除应用已知认证凭据；五平台 secure storage 通过 | `6c3618b8` + 本里程碑提交（2026-07-12） | 引入 `flutter_secure_storage` 的 Android Keystore/iOS+macOS Keychain/Linux Secret Service/Windows credential protection/WebCrypto 平台实现。Provider/search/TTS/WebDAV/S3 配置以“SharedPreferences 非秘密 shape + secure credential leaf overlay”拆分，global proxy password 完全移出 prefs；首次读取旧明文时先写 secure storage，再持久化 sanitizer 结果/删除 scalar，运行时按 path overlay 水合。provider migration 临时 backup 也只写 sanitized 内容并立即删除。普通备份继续只读取已脱敏 prefs；自由文本按 PD-11 明确不做秘密猜测。credential/settings/backup 聚焦 13/13 与 analyze 通过；无插件测试 runner 仅 memory fallback、绝不退回明文持久化，五平台实际 smoke 纳入 OPS-08 发布矩阵 |
 | OPS-08 | 灰度、支持、v2-compatible rollback | OPS-01～07 | `进行中`（实现完成，发布矩阵 2/5） | 迁移/恢复/性能指标达标且回滚演练通过 | 本里程碑提交（2026-07-12） | 新增 secret-free append-only rollout ledger：记录 source/run hash、schema、迁移会话/消息数、warning/recovered/rejected 数与去重冷启动次数，损坏/断链 fail closed；`KELIVO_DATABASE_V2_ROLLOUT_BASIS_POINTS` 以 installation ID 稳定分 cohort。rollback contract 冻结 storage v2、schema 8..8、禁止 down migration/Hive writer。统一 release runner 真机执行 secure-store write/read/overwrite/delete + rollback contract；macOS 26.5.2 与 iOS 26.5 simulator PASS，并据 macOS 首轮 `-34018` 修复 unsigned build为 login Keychain stdin fallback。Android/Windows/Linux 尚未执行，故不关闭 OPS-08；详见 [OPS-08 发布能力证据](./baselines/ops-08-release-capabilities-2026-07-12.md) |
 | OPS-09 | 移除 Hive/v1 写路径、旧文件和 legacy repository API | PD-10、OPS-08 | `进行中`（门禁实现完成，物理退役未授权） | 保留期、成功启动、清理授权和支持方案全部满足；新业务无法调用全会话 compact | 本里程碑提交（2026-07-12） | legacy compact/linear API `updateMessageOrder`、`updateConversationMessages`、`appendMessageToConversation`、`deleteMessages` 及同族 `putMessage`/`deleteMessage`/`createConversationWithMessages` 全部标注 `@Deprecated('legacy/test only')`；`lib/` 生产调用图为零，正式删除走 graph commands。新增 PD-10 retirement service：只识别冻结的 3 个 Hive 文件名，先导出不含正文/路径/秘密的 hash/size + rollout/restore-run 诊断；严格要求 ledger ≥3 冷启动且 ≥30 天、诊断 hash、固定显式确认。删除前先发布 durable `deleting` receipt，逐文件复验 hash 后删除并发布 `completed` receipt，中断可续；不碰无关文件、restore `.previous` 或 adapter。测试 runner 全局安装 secure-storage memory platform，避免无原生宿主 MethodChannel 永久等待；全量 analyze 无问题、1309/1309 tests PASS。当前迁移龄期、OPS-08 其余平台和用户授权均未满足，因此未删除任何真实数据，也不能移除仍服务未迁移用户的 Hive dependency/adapter |
+
+### 11.1 Phase 5 复审观察（2026-07-12，独立代码审查）
+
+复审结论：§10.3 返工与 OPS-01～09 的实现均通过逐 commit 代码审查；本机独立复跑 `flutter analyze` 无问题、全量 `flutter test` 1309/1309 通过。以下观察均不阻塞当前状态；OBS-1～OBS-4 已在复审后修复，OBS-5 按冻结边界接受：
+
+| ID | 观察 | 严重度 | 说明与建议 |
+| --- | --- | --- | --- |
+| OBS-1 | OPS-06 asset/GC 管线是"仅基础设施"，生产附件未进入 reference/GC 台账 | 中 | `已解决`：生产持久化路径已接线；旧数据、导入与恢复使用 version+root receipt 分页回填，日常失败只重放持久化 revision 小队列；删除后的真实文件只进入 7 天延迟台账，且仅清理受控目录普通文件。MIME、图片尺寸与缩略图派生仍留在迁移台账，不冒充已完成 |
+| OBS-2 | "仅保存"编辑中部消息后固定打开尾窗，目标不在窗口时落到会话底部 | 中 | `已解决（待真机体验确认）`：两条编辑保存路径都以新 revision 稳定 ID 调用 `openAround` 再 programmatic jump；回归覆盖被编辑消息位于尾窗外。第三轮真机矩阵继续验证实际落点 |
+| OBS-3 | TL-R15 jump 收敛循环无迭代上限 | 低 | `已解决`：同一 jump 最多重测 spacer 5 次，仍波动时使用当前已布局的最新值完成定位；新 target、会话切换、完成/取消均重置计数。回归用每帧改变 padding 的输入证明有界退出 |
+| OBS-4 | FTS 每次搜索重复 DDL/双 COUNT，且索引冗余存储 message body | 低 | `已解决`：改为 `content='message_rows', content_rowid='rowid'` external-content FTS；旧表自动迁移重建，triggers 使用 rowid delete/update 协议，repository 实例内初始化标记消除后续固定开销 |
+| OBS-5 | OPS-02 settings merge 的 `restoreAtomically` 是进程内补偿，kill 中间仍可能留下部分键 | 低 | `接受现状`：继续明确为 in-process compensation，与 SharedPreferences 平台能力一致；不为低风险 settings merge 扩大为新的跨进程恢复协议 |
 
 ## 12. 数据迁移覆盖台账
 
@@ -450,7 +462,7 @@ dart run tool/run_restore_process_harness.dart \
 | Tool events | Hive / SQLite v1 | ordered message parts | message/revision FK 与 ordinal 验证 | `未开始` | — |
 | Gemini signature | Hive / SQLite v1 | provider artifacts | revision FK + hash | `未开始` | — |
 | MCP servers | Hive / SQLite v1 | conversation MCP mapping | ordinal 唯一 | `未开始` | — |
-| Attachments/uploads | 正文路径/目录 | assets/message_assets | hash、mime、尺寸；缺文件明确状态 | `未开始` | — |
+| Attachments/uploads | 正文路径/目录 | assets/message_assets | hash、mime、尺寸；缺文件明确状态 | `进行中` | 生产正文 marker 已登记 SHA-256/path/bytes/kind/revision reference，旧数据按 receipt 分页回填，缺文件不登记且不误删；7 天延迟 GC 真实文件回归通过。MIME、图片尺寸与缩略图派生尚未接线，不提前标记完成 |
 | Orphan messages/events | Hive boxes / SQLite v1 | Recovered conversation/rejects | 全量 key 差集，不静默丢弃 | `未开始` | — |
 | Search/stats cache | 当前派生数据 | v2 派生索引 | 不迁移为主数据，验证后重建 | `未开始` | — |
 | Draft/temporary conversation | 运行时/Hive | 待明确持久化边界 | 不默认混入永久 branch | `未开始` | — |
@@ -560,16 +572,23 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01/PD-02 已于 2026-07-12 修订，方案与 ADR-0001 均已同步；MSG-R3/R1/R2 自动化实现已完成。Phase 2 的 MSG-04 只待第三轮真机产品矩阵确认，Phase 4 继续等待 TL-R14/R15。完成前 Phase 5 不开工。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行与 TL-08 非 macOS 实机交互仍留在发布门禁。
+§10.3、Phase 5 可执行实现与 §11.1 OBS-1～OBS-4 修复均已完成。当前剩余阻塞全部为外部门禁，非代码工作：① Phase 2/4 关闭需要用户真机四症状矩阵（仅保存/默认重生成/切换器/滚动跳动），复测时一并确认 OBS-2 的中部编辑落点；② OPS-08 需要 Android/Windows/Linux release capability runner 原始行；③ OPS-09 需要 ≥30 天保留期、≥3 冷启动与用户显式授权；④ Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行与 TL-08 非 macOS 实机交互仍留在发布门禁。
 
 ## 19. 下一步
 
-§10.3 自动化实现已全部收敛，用户决定暂缓第三轮真机四症状矩阵并先执行 Phase 5。Phase 2/4 仍保持“实现完成，待真机确认”，不伪造关闭证据。Phase 5 的可执行代码已走完 OPS-01～09；OPS-08 仍需 Android/Windows/Linux release runner，OPS-09 仍需 ≥30 天、≥3 冷启动、显式用户授权及发布级 adapter 清理。上述条件属于真实时间/平台/授权门禁，当前不得伪造为完成或提前删除数据。
+Phase 5 复审观察已处理（见 §11.1）。按优先级：
+
+1. 用户真机执行第三轮四症状矩阵（关闭 MSG-04/Phase 2/Phase 4），同时确认中部消息"仅保存"后 `openAround` 的实际视口落点。
+2. 在其余三平台跑 `integration_test/database_v2_release_capabilities_test.dart` 补齐 OPS-08 发布矩阵。
+3. 迁移台账 Attachments 后续只剩 MIME、图片尺寸/缩略图派生与缺文件产品展示；生产 reference/延迟 GC 已接线。
+4. OPS-09 保持门禁等待，不提前删除任何数据；OBS-5 不扩大实现。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-12 | 处理 Phase 5 复审观察：生产消息持久化接入附件 hash/reference，首次迁移以 version+root receipt 分页回填，日常失败使用持久化 revision 小队列重放；删除后 7 天延迟且仅清理 AppData upload/images 普通文件。中部编辑保存改走 stable revision `openAround`；jump 重测上限 5 次；FTS 迁为 external-content 并以实例标记消除每次搜索 DDL/COUNT。OBS-5 按 SharedPreferences 能力边界接受。新增真实文件延迟 GC、旧写入冷启动回填、尾窗外编辑导航、非收敛 jump 与 external-content schema 回归；`flutter analyze` 无问题，1313/1313 tests PASS | OBS-1～OBS-5、OPS-04、OPS-06、TL-R15 | 本修复提交 | Codex |
+| 2026-07-12 | Phase 5 复审通过：逐 commit 审查 §10.3 返工（`8883fb39`/`67835df8`/`3bde190c`/`93319a03`/`6fa5ddcd`/`e938f3f9`）与 OPS-01～09（`8c11144c`～`c5986f93`），并独立复跑 analyze 无问题、1309/1309 tests PASS。确认 graft 全链 CAS 守卫、持久会话不再物理删除尾随、retirement hash 链 fail-closed、deprecated API 生产调用图为零、`_validateRawStructure` 兼容惰性建表。登记 §11.1 OBS-1～OBS-5（asset GC 未接生产附件路径、中部"仅保存"后视口落点、jump 收敛无迭代上限、FTS 冗余存储、settings merge 进程内补偿边界）；均不阻塞，OBS-2 并入真机矩阵验证。§18/§19 改写为纯外部门禁清单 | Phase 5、§10.3、OPS-01～09 | 本复审提交 | 用户 / Fable |
 | 2026-07-12 | OPS-08 统一 release runner 在 iOS 26.5 simulator 完成真实 secure-storage write/read/overwrite/delete，schema 8 与 rollback storage contract 2 均通过；平台发布证据由 1/5 推进到 2/5。当前未连接 Android，Windows/Linux 不在本机，三平台继续待原生运行 | OPS-08、OPS-07 | 本证据提交 | Codex |
 | 2026-07-12 | 完成 OPS-09 可执行退役实现：七个 legacy linear/compact repository API 明确 `@Deprecated('legacy/test only')`，生产调用图为零；新增精确 Hive artifact 诊断与 PD-10 双条件门禁，诊断 hash + 固定确认构成显式授权。删除采用 operation-ahead `deleting`→逐文件 hash 复验/删除→`completed` append-only receipt，中断后可续且不碰无关文件/restore previous。自动化覆盖未满门槛拒绝、只删白名单、receipt 与中断恢复；全量 analyze 与 1309/1309 tests PASS。因 30 天/其余平台/用户授权均未满足，本提交没有删除真实 Hive/previous，也保留 migration adapter/dependency，OPS-09 状态保持进行中 | OPS-09、PD-10、R-15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 OPS-08 应用实现：迁移后发布 secret-free append-only rollout ledger，冷启动按 process token 去重计数，灰度按 installation ID + basis points 稳定分 cohort；rollback build 明确继续读写 storage v2/schema 8、禁止 down migration/Hive writer。统一五平台 release runner 实测安全存储 CRUD 与 rollback contract；macOS 首轮捕获 Keychain entitlement `-34018`，修为 unsigned macOS 使用 login Keychain 且秘密只经 stdin，复跑 PASS。平台矩阵目前 1/5，Android/iOS/Windows/Linux 未测，OPS-08 保持进行中 | OPS-08、PD-10、R-03 | 本里程碑提交 | Codex |

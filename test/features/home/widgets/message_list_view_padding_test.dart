@@ -354,9 +354,15 @@ void main() {
       await tester.pump();
       for (
         var retry = 0;
-        retry < 4 && coordinator.programmaticTargetSlotId != null;
+        retry < 8 && coordinator.programmaticTargetSlotId != null;
         retry++
       ) {
+        if (scenario.label == '短 user') {
+          // A keyboard/composer animation can keep changing the spacer input
+          // every frame. The jump must still converge after a bounded number
+          // of latest-measurement retries.
+          dynamicBottomPadding.value = 88 + retry * 8;
+        }
         await tester.pump();
       }
       expect(coordinator.programmaticTargetSlotId, isNull);
@@ -365,7 +371,10 @@ void main() {
         expect(shortReplyPadding, maximumReservedBottom);
       } else if (scenario.label == '短 user') {
         expect(shortReplyPadding, lessThan(maximumReservedBottom));
-        expect(shortReplyPadding, greaterThan(80));
+        expect(
+          shortReplyPadding,
+          greaterThanOrEqualTo(dynamicBottomPadding.value),
+        );
       } else {
         expect(shortReplyPadding, lessThan(maximumReservedBottom));
         expect(shortReplyPadding, 16);

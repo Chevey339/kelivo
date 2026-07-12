@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
+import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -106,6 +108,72 @@ void main() {
       result.assistantMessage.id,
     ]);
   });
+
+  test(
+    'persistent attachment uses delayed reference GC after message delete',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Assets');
+      final upload = File('${tempDir.path}/upload/spec.pdf');
+      await upload.parent.create(recursive: true);
+      await upload.writeAsString('attachment payload');
+      final message = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: '[file:${upload.path}|spec.pdf|application/pdf]',
+      );
+
+      await service.deleteMessage(message.id);
+
+      expect(await upload.exists(), isTrue, reason: 'GC must be delayed');
+      await service.runAssetMaintenance(
+        now: DateTime.now().toUtc().add(const Duration(days: 8)),
+      );
+      expect(await upload.exists(), isFalse);
+    },
+  );
+
+  test(
+    'cold init backfills attachment references left by an older writer',
+    () async {
+      final first = createService();
+      await first.init();
+      final conversation = await first.createConversation(title: 'Assets');
+      final upload = File('${tempDir.path}/upload/legacy.txt');
+      await upload.parent.create(recursive: true);
+      await upload.writeAsString('legacy attachment payload');
+      final message = await first.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: '[file:${upload.path}|legacy.txt|text/plain]',
+      );
+      await first.close();
+      services.remove(first);
+
+      final database = sqlite.sqlite3.open(
+        '${tempDir.path}/${AppDatabase.databaseFileName}',
+      );
+      try {
+        database.execute('DELETE FROM asset_rows;');
+        database.execute(
+          "DELETE FROM chat_storage_meta_rows "
+          "WHERE key = 'asset_reference_backfill_version';",
+        );
+      } finally {
+        database.close();
+      }
+
+      final restarted = createService();
+      await restarted.init();
+      await restarted.deleteMessage(message.id);
+      await restarted.runAssetMaintenance(
+        now: DateTime.now().toUtc().add(const Duration(days: 8)),
+      );
+
+      expect(await upload.exists(), isFalse);
+    },
+  );
 
   group('ChatService temporary conversations', () {
     test('ordinary draft persists when its first message is added', () async {

@@ -985,7 +985,7 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return;
 
-    if (await _chatController.appendPersistedTailMessage(newMsg)) {
+    if (await _chatController.openAroundPersistedMessage(newMsg)) {
       _viewModel.restoreMessageUiState();
     }
     final gid = (newMsg.groupId ?? newMsg.id);
@@ -1108,7 +1108,7 @@ class HomePageController extends ChangeNotifier {
     );
     if (newMsg == null) return null;
 
-    if (await _chatController.appendPersistedTailMessage(newMsg)) {
+    if (await _chatController.openAroundPersistedMessage(newMsg)) {
       _viewModel.restoreMessageUiState();
     }
     final gid = newMsg.groupId ?? newMsg.id;

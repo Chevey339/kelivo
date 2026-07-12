@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -65,4 +66,54 @@ void main() {
       'revision-1',
     );
   });
+
+  test(
+    'FTS uses message rows as external content instead of copying bodies',
+    () async {
+      final root = await Directory.systemTemp.createTemp('chat_search_fts_');
+      final file = File('${root.path}/search.sqlite');
+      final repository = ChatDatabaseRepository.open(file: file);
+      final conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Search',
+        createdAt: DateTime.utc(2026, 7, 12),
+        updatedAt: DateTime.utc(2026, 7, 12),
+        messageIds: const ['revision-1'],
+      );
+      final message = ChatMessage(
+        id: 'revision-1',
+        role: 'user',
+        content: 'body stored only in message rows',
+        timestamp: DateTime.utc(2026, 7, 12),
+        conversationId: conversation.id,
+      );
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [(message: message, messageOrder: 0)],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+      await repository.backfillMissingMessageGraphs();
+      expect(
+        await repository.searchConversationMatches(tokens: const ['stored']),
+        isNotEmpty,
+      );
+      await repository.close();
+
+      final database = sqlite.sqlite3.open(file.path);
+      try {
+        final sql = database
+            .select(
+              "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'message_search_fts';",
+            )
+            .single['sql']
+            .toString();
+        expect(sql, contains("content='message_rows'"));
+        expect(sql, contains("content_rowid='rowid'"));
+      } finally {
+        database.close();
+        await root.delete(recursive: true);
+      }
+    },
+  );
 }

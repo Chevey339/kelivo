@@ -225,6 +225,7 @@ class MessageListView extends StatefulWidget {
 class _MessageListViewState extends State<MessageListView>
     with WidgetsBindingObserver {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
+  static const int _maximumProgrammaticSpacerRemeasurements = 5;
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
@@ -237,6 +238,7 @@ class _MessageListViewState extends State<MessageListView>
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
+  int _programmaticSpacerRemeasurements = 0;
   String? _preparedProgrammaticTargetSlotId;
   String? _preparedProgrammaticConversationId;
   String? _programmaticAnchorSlotId;
@@ -277,6 +279,7 @@ class _MessageListViewState extends State<MessageListView>
     if (preparedConversationChanged) {
       _preparedProgrammaticTargetSlotId = null;
       _preparedProgrammaticConversationId = null;
+      _programmaticSpacerRemeasurements = 0;
     }
     if (conversationChanged) {
       _programmaticAnchorSlotId = null;
@@ -294,6 +297,7 @@ class _MessageListViewState extends State<MessageListView>
     if (coordinator?.viewportMode == TimelineViewportMode.followingTail) {
       _preparedProgrammaticTargetSlotId = null;
       _preparedProgrammaticConversationId = null;
+      _programmaticSpacerRemeasurements = 0;
       _programmaticAnchorSlotId = null;
       _programmaticAnchorConversationId = null;
       _programmaticSpacer = 0;
@@ -674,11 +678,15 @@ class _MessageListViewState extends State<MessageListView>
           );
           _preparedProgrammaticTargetSlotId = targetId;
           _preparedProgrammaticConversationId = conversationId;
+          _programmaticSpacerRemeasurements = 0;
         });
         return;
       }
       final latestSpacer = _calculateProgrammaticSpacer(targetId, viewport);
-      if ((latestSpacer - _programmaticSpacer).abs() > 0.5) {
+      if ((latestSpacer - _programmaticSpacer).abs() > 0.5 &&
+          _programmaticSpacerRemeasurements <
+              _maximumProgrammaticSpacerRemeasurements) {
+        _programmaticSpacerRemeasurements += 1;
         setState(() => _programmaticSpacer = latestSpacer);
         return;
       }
@@ -689,6 +697,7 @@ class _MessageListViewState extends State<MessageListView>
         _programmaticAnchorConversationId = conversationId;
         _preparedProgrammaticTargetSlotId = null;
         _preparedProgrammaticConversationId = null;
+        _programmaticSpacerRemeasurements = 0;
       });
       coordinator!.completeProgrammaticJump();
       _captureVisualAnchor();
