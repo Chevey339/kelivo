@@ -125,4 +125,3 @@ gh pr create --repo Chevey339/kelivo --base master --head Agoniedi:codex/support
 ```
 
 Expected: GitHub returns a draft pull request URL targeting `Chevey339/kelivo:master`.
-

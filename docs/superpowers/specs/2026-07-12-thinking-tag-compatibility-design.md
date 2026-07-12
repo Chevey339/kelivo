@@ -38,4 +38,3 @@ OpenAI-compatible reasoning fields retain priority.
 - Failure path: keep mismatched `<thinking>...</think>` tags visible.
 - Regression: retain all existing `<think>`, `<thought>`, full-width, and plain
   text behavior.
-
