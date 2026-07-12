@@ -50,9 +50,14 @@ final class LoadedTimelinePage {
       hasMoreAfter && slots.isNotEmpty ? slots.last.identity.revisionId : null;
 }
 
+typedef AssetContentHash = Future<String> Function(File file);
+
 class ChatService extends ChangeNotifier {
-  ChatService({ChatDatabaseGateway? databaseGateway})
-    : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance;
+  ChatService({
+    ChatDatabaseGateway? databaseGateway,
+    AssetContentHash? assetContentHash,
+  }) : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance,
+       _assetContentHash = assetContentHash ?? _hashAssetFile;
 
   static const int defaultInitialMessageMin = 2;
   static const int defaultInitialMessageMax = 240;
@@ -66,7 +71,10 @@ class ChatService extends ChangeNotifier {
   late ChatDatabaseRepository _repo;
   late File _databaseFile;
   final ChatDatabaseGateway _databaseGateway;
+  final AssetContentHash _assetContentHash;
   ChatDatabaseLease? _databaseLease;
+  Future<void>? _assetReferenceMaintenanceFuture;
+  Future<void>? _postStartupAssetMaintenanceFuture;
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -126,8 +134,6 @@ class ChatService extends ChangeNotifier {
       // Versioned and transactional: normal launches return before scanning rows.
       await _migrateSandboxPaths();
       await _repo.backfillMissingMessageGraphs();
-      await _backfillAssetReferences(appDataDir);
-      await runAssetMaintenance();
       await _loadConversationsCache();
 
       // Reset any stale isStreaming flags left over from a previous app crash or
@@ -136,6 +142,22 @@ class ChatService extends ChangeNotifier {
 
       _initialized = true;
       notifyListeners();
+      late final Future<void> postStartupMaintenance;
+      postStartupMaintenance = _runAssetReferenceMaintenance(appDataDir)
+          .then((_) => runAssetMaintenance())
+          .catchError((Object error) {
+            debugPrint('Post-startup asset maintenance failed: $error');
+          })
+          .whenComplete(() {
+            if (identical(
+              _postStartupAssetMaintenanceFuture,
+              postStartupMaintenance,
+            )) {
+              _postStartupAssetMaintenanceFuture = null;
+            }
+          });
+      _postStartupAssetMaintenanceFuture = postStartupMaintenance;
+      unawaited(postStartupMaintenance);
     } catch (_) {
       _databaseLease = null;
       await lease.release();
@@ -153,6 +175,18 @@ class ChatService extends ChangeNotifier {
       }
     }
     if (!_initialized) return;
+    final postStartupMaintenance = _postStartupAssetMaintenanceFuture;
+    if (postStartupMaintenance != null) {
+      try {
+        await postStartupMaintenance;
+      } catch (_) {}
+    }
+    final assetMaintenance = _assetReferenceMaintenanceFuture;
+    if (assetMaintenance != null) {
+      try {
+        await assetMaintenance;
+      } catch (_) {}
+    }
     _initialized = false;
     final lease = _databaseLease;
     _databaseLease = null;
@@ -1015,8 +1049,13 @@ class ChatService extends ChangeNotifier {
       );
       if (messages.isEmpty) break;
       for (final message in messages) {
-        await _synchronizeMessageAssets(message);
+        try {
+          await _synchronizeMessageAssets(message);
+        } catch (error) {
+          debugPrint('Asset reference backfill skipped ${message.id}: $error');
+        }
         cursor = message.id;
+        await Future<void>.delayed(Duration.zero);
       }
     }
     if (includeLegacyCandidates) {
@@ -1027,8 +1066,28 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  Future<void> runAssetReferenceMaintenance() async {
+    if (!_initialized) await init();
+    return _runAssetReferenceMaintenance(
+      await AppDirectories.getAppDataDirectory(),
+    );
+  }
+
+  Future<void> _runAssetReferenceMaintenance(Directory appDataDir) {
+    final inFlight = _assetReferenceMaintenanceFuture;
+    if (inFlight != null) return inFlight;
+    late final Future<void> tracked;
+    tracked = _backfillAssetReferences(appDataDir).whenComplete(() {
+      if (identical(_assetReferenceMaintenanceFuture, tracked)) {
+        _assetReferenceMaintenanceFuture = null;
+      }
+    });
+    _assetReferenceMaintenanceFuture = tracked;
+    return tracked;
+  }
+
   Future<void> _backfillAssetReferencesForCurrentRoot() async {
-    await _backfillAssetReferences(await AppDirectories.getAppDataDirectory());
+    await runAssetReferenceMaintenance();
   }
 
   Future<void> _synchronizeMessageAssets(ChatMessage message) async {
@@ -1047,9 +1106,10 @@ class ChatService extends ChangeNotifier {
       final file = File(normalizedPath);
       if (await FileSystemEntity.type(file.path, followLinks: false) !=
           FileSystemEntityType.file) {
-        continue;
+        await _repo.markMessageAssetReferencesDirty(message.id);
+        throw StateError('asset_file_unavailable');
       }
-      final contentHash = (await sha256.bind(file.openRead()).first).toString();
+      final contentHash = await _assetContentHash(file);
       registrations.add(
         MessageAssetRegistration(
           assetId: 'asset_$contentHash',
@@ -1064,6 +1124,13 @@ class ChatService extends ChangeNotifier {
       conversationId: message.conversationId,
       revisionId: message.id,
       assets: registrations,
+    );
+  }
+
+  static Future<String> _hashAssetFile(File file) {
+    final path = file.path;
+    return Isolate.run(
+      () async => (await sha256.bind(File(path).openRead()).first).toString(),
     );
   }
 
@@ -1153,10 +1220,39 @@ class ChatService extends ChangeNotifier {
           }
         }
         if (!safe) continue;
-        for (final file in regularFiles) {
-          await file.delete();
+        if (!await _repo.isAssetGcClaimStillValid(candidate)) continue;
+        final quarantined = <({File original, File quarantine})>[];
+        try {
+          for (final file in regularFiles) {
+            final quarantine = File(
+              '${file.path}.kelivo-gc-${candidate.assetId}-'
+              '${candidate.generation}',
+            );
+            if (await quarantine.exists()) {
+              safe = false;
+              break;
+            }
+            await file.rename(quarantine.path);
+            quarantined.add((original: file, quarantine: quarantine));
+          }
+          if (!safe) continue;
+          final completed = await _repo.completeAssetGc(
+            assetId: candidate.assetId,
+            expectedGeneration: candidate.generation,
+          );
+          if (!completed) continue;
+          for (final moved in quarantined) {
+            await moved.quarantine.delete();
+          }
+          quarantined.clear();
+        } finally {
+          for (final moved in quarantined.reversed) {
+            if (!await moved.original.exists() &&
+                await moved.quarantine.exists()) {
+              await moved.quarantine.rename(moved.original.path);
+            }
+          }
         }
-        await _repo.completeAssetGc(assetId: candidate.assetId);
       }
     } catch (error) {
       debugPrint('Asset maintenance failed: $error');

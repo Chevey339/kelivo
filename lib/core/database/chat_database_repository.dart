@@ -2360,7 +2360,8 @@ class ChatDatabaseRepository {
         [conversationId, revisionId, assetId, kind],
       );
       await _db.customStatement(
-        'UPDATE asset_rows SET last_referenced_at = ? WHERE id = ?;',
+        'UPDATE asset_rows SET last_referenced_at = '
+        'MAX(last_referenced_at + 1, ?) WHERE id = ?;',
         [DateTime.now().microsecondsSinceEpoch, assetId],
       );
       await _db.customStatement(
@@ -2395,7 +2396,10 @@ class ChatDatabaseRepository {
             width = excluded.width,
             height = excluded.height,
             thumbnail_path = excluded.thumbnail_path,
-            last_referenced_at = excluded.last_referenced_at;
+            last_referenced_at = MAX(
+              asset_rows.last_referenced_at + 1,
+              excluded.last_referenced_at
+            );
         ''',
           [
             asset.assetId,
@@ -2444,8 +2448,10 @@ class ChatDatabaseRepository {
     await _ensureAssetGcSchema();
     await _db.customStatement(
       '''
-      INSERT OR IGNORE INTO asset_gc_rows(asset_id, not_before, attempts)
-      SELECT a.id, ?, 0 FROM asset_rows a
+      INSERT OR IGNORE INTO asset_gc_rows(
+        asset_id, not_before, attempts, generation
+      )
+      SELECT a.id, ?, 0, a.last_referenced_at FROM asset_rows a
       WHERE NOT EXISTS (
         SELECT 1 FROM message_asset_rows r WHERE r.asset_id = a.id
       );
@@ -2464,47 +2470,122 @@ class ChatDatabaseRepository {
   }) async {
     await _ensureAssetGcSchema();
     if (limit <= 0) return const <AssetGcCandidate>[];
-    final rows = await _db
+    return _db.transaction(() async {
+      final dueRows = await _db
+          .customSelect(
+            '''
+            SELECT g.asset_id FROM asset_gc_rows g
+            WHERE g.not_before <= ?
+              AND NOT EXISTS (
+                SELECT 1 FROM message_asset_rows r
+                WHERE r.asset_id = g.asset_id
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM asset_reference_dirty_rows d
+                JOIN message_rows m ON m.id = d.revision_id
+                JOIN asset_rows a ON a.id = g.asset_id
+                WHERE instr(m.content, a.path) > 0
+              )
+            ORDER BY g.not_before, g.asset_id LIMIT ?;
+          ''',
+            variables: [
+              Variable<int>(now.microsecondsSinceEpoch),
+              Variable<int>(limit),
+            ],
+          )
+          .get();
+      final ids = dueRows
+          .map((row) => row.read<String>('asset_id'))
+          .toList(growable: false);
+      if (ids.isEmpty) return const <AssetGcCandidate>[];
+      for (final id in ids) {
+        await _db.customStatement(
+          'UPDATE asset_gc_rows SET attempts = attempts + 1, '
+          'generation = generation + 1 WHERE asset_id = ?;',
+          [id],
+        );
+      }
+      final rows = await _db.customSelect(
+        '''
+            SELECT a.id, a.path, a.thumbnail_path, a.byte_size, g.generation
+            FROM asset_gc_rows g JOIN asset_rows a ON a.id = g.asset_id
+            WHERE a.id IN (${List.filled(ids.length, '?').join(',')})
+            ORDER BY g.not_before, a.id;
+          ''',
+        variables: ids.map(Variable<String>.new).toList(growable: false),
+      ).get();
+      return [
+        for (final row in rows)
+          AssetGcCandidate(
+            assetId: row.read<String>('id'),
+            path: row.read<String>('path'),
+            thumbnailPath: row.readNullable<String>('thumbnail_path'),
+            byteSize: row.read<int>('byte_size'),
+            generation: row.read<int>('generation'),
+          ),
+      ];
+    });
+  }
+
+  Future<bool> isAssetGcClaimStillValid(AssetGcCandidate candidate) async {
+    await _ensureAssetGcSchema();
+    final row = await _db
         .customSelect(
           '''
-      SELECT a.id, a.path, a.thumbnail_path, a.byte_size
-      FROM asset_gc_rows g JOIN asset_rows a ON a.id = g.asset_id
-      WHERE g.not_before <= ?
-        AND NOT EXISTS (
-          SELECT 1 FROM message_asset_rows r WHERE r.asset_id = a.id
-        )
-      ORDER BY g.not_before, a.id LIMIT ?;
-    ''',
+          SELECT 1 AS valid FROM asset_gc_rows g
+          WHERE g.asset_id = ? AND g.generation = ?
+            AND NOT EXISTS (
+              SELECT 1 FROM message_asset_rows r
+              WHERE r.asset_id = g.asset_id
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM asset_reference_dirty_rows d
+              JOIN message_rows m ON m.id = d.revision_id
+              JOIN asset_rows a ON a.id = g.asset_id
+              WHERE instr(m.content, a.path) > 0
+            )
+          LIMIT 1;
+        ''',
           variables: [
-            Variable<int>(now.microsecondsSinceEpoch),
-            Variable<int>(limit),
+            Variable<String>(candidate.assetId),
+            Variable<int>(candidate.generation),
           ],
         )
-        .get();
-    return [
-      for (final row in rows)
-        AssetGcCandidate(
-          assetId: row.read<String>('id'),
-          path: row.read<String>('path'),
-          thumbnailPath: row.readNullable<String>('thumbnail_path'),
-          byteSize: row.read<int>('byte_size'),
-        ),
-    ];
+        .getSingleOrNull();
+    return row != null;
   }
 
   Future<bool> completeAssetGc({
     required String assetId,
+    required int expectedGeneration,
     DateTime? completedAt,
   }) async {
     await _ensureAssetGcSchema();
     return _db.transaction(() async {
-      final references = await _db
+      final claim = await _db
           .customSelect(
-            'SELECT 1 AS found FROM message_asset_rows WHERE asset_id = ? LIMIT 1;',
-            variables: [Variable<String>(assetId)],
+            '''
+            SELECT 1 AS valid FROM asset_gc_rows g
+            WHERE g.asset_id = ? AND g.generation = ?
+              AND NOT EXISTS (
+                SELECT 1 FROM message_asset_rows r
+                WHERE r.asset_id = g.asset_id
+              )
+              AND NOT EXISTS (
+                SELECT 1 FROM asset_reference_dirty_rows d
+                JOIN message_rows m ON m.id = d.revision_id
+                JOIN asset_rows a ON a.id = g.asset_id
+                WHERE instr(m.content, a.path) > 0
+              )
+            LIMIT 1;
+          ''',
+            variables: [
+              Variable<String>(assetId),
+              Variable<int>(expectedGeneration),
+            ],
           )
           .getSingleOrNull();
-      if (references != null) return false;
+      if (claim == null) return false;
       await _db.customStatement('DELETE FROM asset_rows WHERE id = ?;', [
         assetId,
       ]);
@@ -2645,9 +2726,21 @@ class ChatDatabaseRepository {
         asset_id TEXT PRIMARY KEY NOT NULL
           REFERENCES asset_rows(id) ON DELETE CASCADE,
         not_before INTEGER NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0)
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),
+        generation INTEGER NOT NULL DEFAULT 0 CHECK(generation >= 0)
       );
     ''');
+    final assetGcColumns = await _db
+        .customSelect('PRAGMA table_info(asset_gc_rows);')
+        .get();
+    if (!assetGcColumns.any(
+      (row) => row.read<String>('name') == 'generation',
+    )) {
+      await _db.customStatement(
+        'ALTER TABLE asset_gc_rows ADD COLUMN generation '
+        'INTEGER NOT NULL DEFAULT 0 CHECK(generation >= 0);',
+      );
+    }
     await _db.customStatement('''
       CREATE TABLE IF NOT EXISTS gc_audit_rows(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -5045,11 +5138,13 @@ final class AssetGcCandidate {
     required this.path,
     required this.thumbnailPath,
     required this.byteSize,
+    required this.generation,
   });
   final String assetId;
   final String path;
   final String? thumbnailPath;
   final int byteSize;
+  final int generation;
 }
 
 final class MessageAssetRegistration {

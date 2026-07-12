@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -51,8 +52,8 @@ void main() {
     }
   });
 
-  ChatService createService() {
-    final service = ChatService();
+  ChatService createService({Future<String> Function(File)? assetContentHash}) {
+    final service = ChatService(assetContentHash: assetContentHash);
     services.add(service);
     return service;
   }
@@ -164,8 +165,20 @@ void main() {
         database.close();
       }
 
-      final restarted = createService();
-      await restarted.init();
+      final hashStarted = Completer<void>();
+      final hashResult = Completer<String>();
+      final restarted = createService(
+        assetContentHash: (file) {
+          if (!hashStarted.isCompleted) hashStarted.complete();
+          return hashResult.future;
+        },
+      );
+      await restarted.init().timeout(const Duration(seconds: 1));
+      await hashStarted.future.timeout(const Duration(seconds: 1));
+      expect(hashResult.isCompleted, isFalse);
+
+      hashResult.complete(List.filled(64, 'b').join());
+      await restarted.runAssetReferenceMaintenance();
       await restarted.deleteMessage(message.id);
       await restarted.runAssetMaintenance(
         now: DateTime.now().toUtc().add(const Duration(days: 8)),

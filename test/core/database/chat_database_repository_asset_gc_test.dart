@@ -66,6 +66,7 @@ void main() {
       final candidate = (await repository.claimAssetGc(now: now)).single;
       expect(candidate.assetId, 'asset-1');
       expect(candidate.thumbnailPath, endsWith('image.thumb.webp'));
+      expect(await repository.isAssetGcClaimStillValid(candidate), isTrue);
 
       await repository.linkMessageAsset(
         conversationId: conversation.id,
@@ -73,15 +74,38 @@ void main() {
         assetId: 'asset-1',
         kind: 'image',
       );
+      expect(await repository.isAssetGcClaimStillValid(candidate), isFalse);
       expect(await repository.claimAssetGc(now: now), isEmpty);
-      expect(await repository.completeAssetGc(assetId: 'asset-1'), isFalse);
+      expect(
+        await repository.completeAssetGc(
+          assetId: 'asset-1',
+          expectedGeneration: candidate.generation,
+        ),
+        isFalse,
+      );
 
       await repository.unlinkMessageAsset(
         revisionId: message.id,
         assetId: 'asset-1',
       );
       await repository.scheduleUnreferencedAssetGc(notBefore: now);
-      expect(await repository.completeAssetGc(assetId: 'asset-1'), isTrue);
+      expect(
+        await repository.completeAssetGc(
+          assetId: 'asset-1',
+          expectedGeneration: candidate.generation,
+        ),
+        isFalse,
+        reason: 'a stale claim cannot complete a newly scheduled generation',
+      );
+      final nextCandidate = (await repository.claimAssetGc(now: now)).single;
+      expect(nextCandidate.generation, isNot(candidate.generation));
+      expect(
+        await repository.completeAssetGc(
+          assetId: 'asset-1',
+          expectedGeneration: nextCandidate.generation,
+        ),
+        isTrue,
+      );
     },
   );
 }
