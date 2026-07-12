@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
 
 import '../../../core/models/chat_message.dart';
@@ -219,7 +220,8 @@ class MessageListView extends StatefulWidget {
   State<MessageListView> createState() => _MessageListViewState();
 }
 
-class _MessageListViewState extends State<MessageListView> {
+class _MessageListViewState extends State<MessageListView>
+    with WidgetsBindingObserver {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
 
   bool _historyLoadScheduled = false;
@@ -232,12 +234,16 @@ class _MessageListViewState extends State<MessageListView> {
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
   late List<MessageRenderModel> _effectiveRenderModels;
+  final FocusNode _keyboardFocusNode = FocusNode(
+    debugLabel: 'timeline-keyboard-scroll-region',
+  );
 
   String _slotId(ChatMessage message) => message.groupId ?? message.id;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refreshRenderModels();
   }
 
@@ -274,9 +280,21 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
+    _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (widget.timelineCoordinator?.viewportMode ==
+        TimelineViewportMode.followingTail) {
+      return;
+    }
+    _captureVisualAnchor();
+    _scheduleVisualAnchorRestore();
   }
 
   /// Build the context divider widget shown at truncate position.
@@ -373,12 +391,29 @@ class _MessageListViewState extends State<MessageListView> {
             );
 
             final userScrollAwareList = Listener(
+              onPointerDown: (event) {
+                if (_isDesktopPlatform) _keyboardFocusNode.requestFocus();
+                if (event.buttons == kSecondaryMouseButton) {
+                  _captureVisualAnchor();
+                  widget.timelineCoordinator?.userAnchored();
+                }
+              },
+              onPointerMove: (event) {
+                if (event.buttons == 0) return;
+                _captureVisualAnchor();
+                widget.timelineCoordinator?.userAnchored();
+              },
               onPointerSignal: (event) {
                 if (event is PointerScrollEvent) {
                   _schedulePointerScrollActivityCheck();
                 }
               },
-              child: historyList,
+              child: Focus(
+                key: const ValueKey('timeline-keyboard-scroll-region'),
+                focusNode: _keyboardFocusNode,
+                onKeyEvent: _handleTimelineKeyEvent,
+                child: historyList,
+              ),
             );
 
             return Stack(
@@ -393,6 +428,24 @@ class _MessageListViewState extends State<MessageListView> {
         );
       },
     );
+  }
+
+  KeyEventResult _handleTimelineKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    if (key != LogicalKeyboardKey.arrowUp &&
+        key != LogicalKeyboardKey.arrowDown &&
+        key != LogicalKeyboardKey.pageUp &&
+        key != LogicalKeyboardKey.pageDown &&
+        key != LogicalKeyboardKey.home &&
+        key != LogicalKeyboardKey.end) {
+      return KeyEventResult.ignored;
+    }
+    _captureVisualAnchor();
+    widget.timelineCoordinator?.userAnchored();
+    return KeyEventResult.ignored;
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -553,17 +606,23 @@ class _MessageListViewState extends State<MessageListView> {
         return;
       }
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _historyLoadScheduled = false;
-        if (!mounted || !widget.scrollController.hasClients) return;
-        final correction = _visualAnchorCorrection();
-        if (correction == null || correction.abs() <= 1) return;
-        final target = (widget.scrollController.offset + correction).clamp(
-          widget.scrollController.position.minScrollExtent,
-          widget.scrollController.position.maxScrollExtent,
-        );
-        widget.scrollController.jumpTo(target);
-      });
+      _scheduleVisualAnchorRestore(
+        onComplete: () => _historyLoadScheduled = false,
+      );
+    });
+  }
+
+  void _scheduleVisualAnchorRestore({VoidCallback? onComplete}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      onComplete?.call();
+      if (!mounted || !widget.scrollController.hasClients) return;
+      final correction = _visualAnchorCorrection();
+      if (correction == null || correction.abs() <= 1) return;
+      final target = (widget.scrollController.offset + correction).clamp(
+        widget.scrollController.position.minScrollExtent,
+        widget.scrollController.position.maxScrollExtent,
+      );
+      widget.scrollController.jumpTo(target);
     });
   }
 

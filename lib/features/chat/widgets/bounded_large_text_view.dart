@@ -77,6 +77,7 @@ class _BoundedLargeTextViewState extends State<BoundedLargeTextView> {
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: Semantics(
+            key: const ValueKey('bounded-large-text-semantics'),
             button: true,
             expanded: _expanded,
             child: TextButton.icon(

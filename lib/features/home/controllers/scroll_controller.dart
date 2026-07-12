@@ -419,6 +419,7 @@ class ChatScrollController {
   void scrollToTop({bool animate = true}) {
     try {
       if (!_scrollController.hasClients) return;
+      onUserAnchored?.call();
       _lastJumpUserMessageId = null;
       revealNavButtons();
 
@@ -453,6 +454,7 @@ class ChatScrollController {
       if (messages.isEmpty) return;
 
       revealNavButtons();
+      onUserAnchored?.call();
 
       // Determine anchor index
       int anchor;
@@ -506,6 +508,7 @@ class ChatScrollController {
       if (messages.isEmpty) return;
 
       revealNavButtons();
+      onUserAnchored?.call();
 
       // Determine anchor index
       int anchor;
@@ -556,6 +559,7 @@ class ChatScrollController {
     try {
       if (!_scrollController.hasClients) return;
       if (targetIndex < 0) return;
+      onUserAnchored?.call();
 
       await _observerController.animateTo(
         index: targetIndex,

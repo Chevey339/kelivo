@@ -40,7 +40,7 @@
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
 | Phase 2：Message Graph | 7 / 7 | `已完成` | graph timeline 与 stable-ID commands 已接管业务；Hive/legacy JSON 兼容输入保留只读解释边界 |
 | Phase 3：Generation State Machine | 7 / 7 | `已完成` | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 与竞态/长响应矩阵全部闭环 |
-| Phase 4：Timeline 与 Renderer | 7 / 8 | `进行中` | TL-01～07 完成 timeline/renderer 主链与 D5 超长内容边界；下一步五平台交互、resize 与可访问性验证 |
+| Phase 4：Timeline 与 Renderer | 8 / 8 | `已完成` | stable timeline、双预算、统一锚点、滚动意图、增量/有界 renderer 与五 TargetPlatform 交互契约全部闭环；全量 1270/1270 |
 | Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
 
 ## 3. 已完成的审计工作
@@ -349,7 +349,7 @@ dart run tool/run_restore_process_harness.dart \
 | TL-05 | `MessageRenderModel` 与细粒度订阅 | TL-01 | `已完成` | 无每行全列表扫描和无关整页 rebuild；render/lazy/widget 聚焦 35/35 | 本里程碑提交（2026-07-11） | `ChatController.messageRenderModels` 对 bounded snapshot 一次性投影 stable slot、排序 revisions、selected index、context divider 与 latest complete assistant，并随既有 snapshot cache 一起失效；row builder 删除反向全列表扫描、逐行 revision sort 和逐行 provider watch。Settings/Assistant 值只在 Home 列表边界订阅并作为窄 presentation 输入下传；每个非 stream slot 使用 stable-key RepaintBoundary，stream 继续只由对应 notifier 刷新 |
 | TL-06 | 增量 Markdown、字节 LRU、图片尺寸 | TL-05 | `已完成` | 长输出无平方级退化；图片不造成无控高度跳变；analyze + markdown/cache/stream 109/109 | 本里程碑提交（2026-07-11） | 4 KiB+ streaming Markdown 按 fence-aware blank boundary 切 stable source blocks，completed block 保持 identity/已渲染子树，仅 tail 随 120ms publish checkpoint 重建；1 MiB append 证明 scanner 累计只读 1 MiB 而非前缀和。新增通用 `ByteLruCache`，normalization 输入按 4 MiB decoded bytes、Mermaid bitmap 按 24 MiB 管理并暴露 bytes/evictions。Markdown 有宽高元数据时继续固定预留布局；所有支持图片按实际 logical size × DPR 包装 `ResizeImage`，避免 4K 原图按原尺寸 decode |
 | TL-07 | 长表格/代码/tool 虚拟化 | TL-05/06 | `已完成` | D5 不一次构造全部大 widget 树；analyze + markdown/tool/chat 128/128 | 本里程碑提交（2026-07-11） | 完成态 Markdown 表格默认只构造 header+39 body rows，按 100 rows 显式增量展开，copy/CSV/image export 仍使用全量数据；10,000 行 code 无论用户是否禁用自动折叠，超过 1,000 行即进入固定 420 px、每 chunk 200 行的 lazy ListView，高亮与选择仅作用于可见 chunks。tool arguments/result 超过 40 行或 12 KiB 默认 preview，展开为每 40 行/16 KiB chunk 的独立 selectable lazy viewport；桌面 dialog 与移动 bottom sheet 的两套 detail 路径全部接入。折叠/展开按钮含中英本地化与 expanded semantics |
-| TL-08 | 移动/桌面交互与可访问性 | TL-03～07 | `未开始` | 五平台 touch/mouse/keyboard/resize 验证 | — | — |
+| TL-08 | 移动/桌面交互与可访问性 | TL-03～07 | `已完成` | 5/5 TargetPlatform contract；analyze + 全量 1270/1270 | 本里程碑提交（2026-07-11） | Android/iOS 保持 drag-dismiss keyboard，macOS/Windows/Linux 保持 manual dismiss 并验证平台 ScrollBehavior scrollbar；桌面 timeline Focus 捕获 Arrow/Page/Home/End 并退出 followingTail，滚轮、主键拖选、右键、问题导航、mini-map/search jump 同样冻结 user anchor。`WidgetsBindingObserver.didChangeMetrics` 在 userAnchored/programmatic 状态下执行 mutation 前 capture + 下一 frame slotId/localDy correction，followingTail resize 不与 bottom pin 竞争。跳到最新、超长内容 toggle 均具 button/live/expanded semantics。5/5 指 TargetPlatform widget contract matrix；真实五 OS 的 touch/mouse/keyboard/resize 复测仍按 §16 发布门禁记录，不伪装为本机实测 |
 
 ## 11. Phase 5：Data Operations 与退役
 
@@ -460,7 +460,7 @@ dart run tool/run_restore_process_harness.dart \
 | WAL/FULL 实际 PRAGMA | PASS | PASS：simulator | PASS：主机 | PASS：用户侧 runner | PASS：用户侧 runner |
 | File close/rename/fsync | PASS：capability barrier | PASS：simulator capability barrier | PASS：主机 capability barrier | PASS：用户侧 capability runner | PASS：用户侧 capability runner |
 | Kill/restart recovery | 未开始 | 未开始 | 进行中：25/25 forward + committed/target terminal 6/6 + verified-origin rollback 18/18 + `rolledBack/before` terminal 6/6 + legacy archiving marker 3/3 高层 SIGKILL，以及 settings cold-readback 2/2 正常跨进程 case 通过；其余 rollback topology 与 raw 子窗口未覆盖 | 未开始 | 未开始 |
-| Timeline profile/anchor | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
+| Timeline profile/anchor | PASS：TargetPlatform widget touch/drag contract；真机交互待发布复测 | PASS：TargetPlatform widget touch/drag contract；真机交互待发布复测 | PASS：主机 unit/widget；mouse/wheel/keyboard/scrollbar/resize contract | PASS：TargetPlatform widget mouse/keyboard/scrollbar contract；真机交互待发布复测 | PASS：TargetPlatform widget mouse/keyboard/scrollbar contract；真机交互待发布复测 |
 | Secure storage/backup boundary | 未开始 | 未开始 | 未开始 | 未开始 | 未开始 |
 | Build/package ABI | PASS：`android_arm64` | PASS：`ios_arm64` simulator | PASS：`macos_arm64` | PASS：runner；ABI 未回传 | PASS：runner；ABI 未回传 |
 
@@ -490,11 +490,11 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2 已完成且无产品决策阻塞。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，精确 ABI/SQLite 元数据留给五平台发布门禁补证；这不重新打开已通过的 DB2-07 capability gate。
+PD-01～PD-14 已全部冻结，MSG-01 ADR 已接受，Phase 2～4 已完成且无产品决策阻塞。Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行未归档，TL-08 的非 macOS 实机交互也仍需发布门禁补证；这些不重新打开已经由 capability/TargetPlatform contract matrix 通过的实现工作项。
 
 ## 19. 下一步
 
-Phase 4 已完成 7/8。下一步进入 `TL-08`：补齐 touch/mouse/keyboard/scrollbar/resize 的滚动意图与统一 anchor 验证，并审计跳转、折叠控件的 semantics/focus 行为；五平台实际构建按可用设备证据登记。
+Phase 4 已完成 8/8：Timeline 与 Renderer 实现阶段关闭。下一步按方案进入 Phase 5 `OPS-01`，先冻结 SQLite bundle backup/restore/merge 的 manifest、hash、兼容 JSON 导入与 portable export 契约；真实五平台交互/profile 继续作为发布门禁证据补齐，不阻塞 Phase 5 的数据操作实现。
 
 ## 20. 变更日志
 
@@ -515,6 +515,7 @@ Phase 4 已完成 7/8。下一步进入 `TL-08`：补齐 touch/mouse/keyboard/sc
 | 2026-07-11 | TL-05 将 stable slot 的 versions/selection/context divider/latest assistant 一次性预计算为 `MessageRenderModel`；row builder 不再扫描全列表或排序版本，Settings/Assistant provider 订阅提升至列表边界，stream 与非 stream slot 分别由 message notifier 和 stable RepaintBoundary 隔离刷新 | TL-05 | 本里程碑提交 | Codex |
 | 2026-07-11 | TL-06 将长 streaming Markdown 拆为 fence-aware stable blocks，仅重建最后一个未闭合 block；1 MiB append scanner 为线性累计工作量。新增 decoded-byte LRU 并迁移 Markdown normalization 与 Mermaid bitmap，图片按布局尺寸×DPR resize，带原始宽高的 Markdown 图片固定预留尺寸 | TL-06 | 本里程碑提交 | Codex |
 | 2026-07-11 | TL-07 为 D5 建立硬渲染边界：1,000 行表格首批 40 行并按 100 行分页，10,000 行 code 按 200 行 chunk 在固定 lazy viewport 中构建，超大 tool arguments/result 默认 40 行 preview、展开后按 40 行/16 KiB chunk 虚拟化；导出/复制仍保留全量原文 | TL-07 | 本里程碑提交 | Codex |
+| 2026-07-11 | TL-08 完成 5/5 TargetPlatform 交互契约矩阵：移动 drag-dismiss、桌面 manual keyboard/scrollbar、Arrow/Page/Home/End、wheel/selection/right-click/navigation 均与 followingTail/userAnchored 合同一致；窗口与软键盘 metrics 变化接入统一 slotId+localDy 恢复，折叠/跳转控件补齐 expanded/live/button semantics。根目录 analyze 全绿、全量 1270/1270；真实非 macOS 交互明确留在发布门禁而未虚报 | TL-08、Phase 4 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 graph 业务切换：新增不可变 timeline/parts projection，selection/context/search/count 不再读取旧 conversation JSON/list 字段；正式 Hive migration 在 mark complete 前逐 conversation 生成 graph 与 ledger，开发 SQLite v1/旧 JSON 只走显式 best-effort adapter。普通 append、edit/regenerate、stable revision selection、context boundary、sparse delete、fork 与 streaming/final checkpoint 同步 graph；inactive alternate 删除保留物理 order 缺口且不调用 compact。controller fork/selection 提交 stable revision ID，旧字段限制在兼容 model/adapter/迁移与备份边界。Cherry/legacy JSON/overwrite 兼容回归、database 113/113、全量 1216/1216、analyze 全绿，Phase 2 7/7 关闭 | MSG-07、Phase 2 | 本里程碑提交 | Codex |
 | 2026-07-11 | 冻结真实 legacy fixture/digest：新增 released Hive backup JSON projection fixture，包含物理尾部旧 assistant alternate、ordinal/version selection 冲突、truncate 落 group 内、reasoning/text part、asset path 与 streaming orphan。fixture 直接走 Hive model JSON adapter，并另写入 frozen SQLite v1 schema 后读回走同一 adapter；两路径 active IDs/context 一致。冻结 visible/selection/prompt/asset 四个 SHA-256，验证旧可见序列、selected revision、stable prompt boundary、part order、资源引用和 Recovered orphan，不比较无法获知的 native ancestor history | MSG-06 | 本里程碑提交 | Codex |
 | 2026-07-11 | 完成 deterministic legacy graph adapter 与审计 ledger：Hive/SQLite v1 共用 typed ordered-message input，slot/group/revision stable ID 与排序确定；selection 同时按 ordinal/version 解释，歧义保留两候选并沿旧 UI ordinal 可见投影，非法值 latest fallback，均写 issue。duplicate ID/order/version、truncate 落 slot/越界、streaming partial、cross-conversation orphan reject 与显式 Recovered conversation 均覆盖；v6 新增 migration run/issue 表，graph/parts/issues 单事务替换并由 projector 复验。所有 legacy branch 仅标 `legacy_visible_projection`/`legacy_ambiguous` | MSG-05 | 本里程碑提交 | Codex |

@@ -1,3 +1,5 @@
+import 'dart:ui' show Tristate;
+
 import 'package:Kelivo/features/chat/widgets/bounded_large_text_view.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -54,5 +56,32 @@ void main() {
     );
     expect(find.byType(Text), findsWidgets);
     expect(find.textContaining('result-9999'), findsNothing);
+  });
+
+  testWidgets('large content toggle exposes expanded accessibility state', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final text = List<String>.generate(
+      100,
+      (index) => 'line-$index',
+    ).join('\n');
+    await tester.pumpWidget(harness(text));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('bounded-large-text-toggle')),
+    );
+
+    var node = tester.getSemantics(
+      find.byKey(const ValueKey('bounded-large-text-semantics')),
+    );
+    expect(node.flagsCollection.isExpanded, Tristate.isFalse);
+
+    await tester.tap(find.byKey(const ValueKey('bounded-large-text-toggle')));
+    await tester.pump();
+    node = tester.getSemantics(
+      find.byKey(const ValueKey('bounded-large-text-semantics')),
+    );
+    expect(node.flagsCollection.isExpanded, Tristate.isTrue);
+    semantics.dispose();
   });
 }
