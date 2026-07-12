@@ -43,14 +43,12 @@ class DataSync {
   static const _backupFormatVersion = 2;
   static const _manifestEntryName = 'manifest.json';
   static const _databaseEntryName = 'database/kelivo.sqlite';
-  // The ZIP writer supports up to 65,535 entries. A 16 MiB metadata cap keeps
-  // manifest parsing bounded while leaving room for that practical maximum.
+  // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
   static const _maxManifestBytes = 16 * 1024 * 1024;
-  // ZIP32 output is already limited to 4 GiB per entry. Restore also accepts
-  // older archives, so keep explicit, diagnosable bounds above that limit.
+  // ZIP64 supports larger entries. Restore keeps explicit, diagnosable bounds.
   static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
   static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
-  static const _maxRestoreEntries = 0xffff;
+  static const _maxRestoreEntries = 100000;
 
   final ChatService chatService;
   BackupMergeReport? _lastMergeReport;
@@ -2152,13 +2150,14 @@ class _StreamingZipWriter {
   static const int _localFileHeaderSignature = 0x04034b50;
   static const int _centralDirectoryHeaderSignature = 0x02014b50;
   static const int _endOfCentralDirectorySignature = 0x06054b50;
+  static const int _zip64EndOfCentralDirectorySignature = 0x06064b50;
+  static const int _zip64EndOfCentralDirectoryLocatorSignature = 0x07064b50;
   static const int _dataDescriptorSignature = 0x08074b50;
-  static const int _versionNeeded = 20;
+  static const int _versionNeeded = 45;
   static const int _utf8Flag = 1 << 11;
   static const int _dataDescriptorFlag = 1 << 3;
   static const int _deflateMethod = 8;
   static const int _maxZip32 = 0xffffffff;
-  static const int _maxZipEntries = 0xffff;
   static const int _chunkSize = 1024 * 1024;
 
   final OutputFileStream _output;
@@ -2175,8 +2174,9 @@ class _StreamingZipWriter {
 
     final stat = file.statSync();
     final uncompressedSize = stat.size;
-    _checkZip32(uncompressedSize, 'file size');
-    _checkZip32(_output.length, 'local header offset');
+    // Deflate may grow incompressible input slightly, so reserve ZIP64 before
+    // the 32-bit boundary instead of discovering overflow after streaming.
+    final usesZip64Entry = uncompressedSize > _maxZip32 - (16 * 1024 * 1024);
 
     final modified = stat.modified;
     final modTime = _zipTime(modified);
@@ -2187,13 +2187,15 @@ class _StreamingZipWriter {
     }
     final localHeaderOffset = _output.length;
 
-    _writeLocalHeader(nameBytes: nameBytes, modTime: modTime, modDate: modDate);
+    _writeLocalHeader(
+      nameBytes: nameBytes,
+      modTime: modTime,
+      modDate: modDate,
+      usesZip64: usesZip64Entry,
+    );
 
     final written = _writeDeflatedFile(file);
-    _checkZip32(written.compressedSize, 'compressed size');
-    _checkZip32(written.uncompressedSize, 'uncompressed size');
-
-    _writeDataDescriptor(written);
+    _writeDataDescriptor(written, usesZip64: usesZip64Entry);
 
     _entries.add(
       _StreamingZipEntry(
@@ -2212,16 +2214,11 @@ class _StreamingZipWriter {
 
   void closeSync() {
     if (_closed) return;
-    _checkEntryCount();
-
     final centralDirectoryOffset = _output.length;
-    _checkZip32(centralDirectoryOffset, 'central directory offset');
     for (final entry in _entries) {
       _writeCentralDirectoryHeader(entry);
     }
     final centralDirectorySize = _output.length - centralDirectoryOffset;
-    _checkZip32(centralDirectorySize, 'central directory size');
-
     _writeEndOfCentralDirectory(
       centralDirectoryOffset: centralDirectoryOffset,
       centralDirectorySize: centralDirectorySize,
@@ -2241,6 +2238,7 @@ class _StreamingZipWriter {
     required List<int> nameBytes,
     required int modTime,
     required int modDate,
+    required bool usesZip64,
   }) {
     _output.writeUint32(_localFileHeaderSignature);
     _output.writeUint16(_versionNeeded);
@@ -2249,11 +2247,18 @@ class _StreamingZipWriter {
     _output.writeUint16(modTime);
     _output.writeUint16(modDate);
     _output.writeUint32(0);
-    _output.writeUint32(0);
-    _output.writeUint32(0);
+    _output.writeUint32(usesZip64 ? _maxZip32 : 0);
+    _output.writeUint32(usesZip64 ? _maxZip32 : 0);
     _output.writeUint16(nameBytes.length);
-    _output.writeUint16(0);
+    _output.writeUint16(usesZip64 ? 20 : 0);
     _output.writeBytes(nameBytes);
+    if (usesZip64) {
+      _output.writeUint16(0x0001);
+      _output.writeUint16(16);
+      // Sizes are finalized by the ZIP64 data descriptor and central directory.
+      _output.writeUint64(0);
+      _output.writeUint64(0);
+    }
   }
 
   _StreamingZipWrittenFile _writeDeflatedFile(File file) {
@@ -2293,14 +2298,26 @@ class _StreamingZipWriter {
     );
   }
 
-  void _writeDataDescriptor(_StreamingZipWrittenFile written) {
+  void _writeDataDescriptor(
+    _StreamingZipWrittenFile written, {
+    required bool usesZip64,
+  }) {
     _output.writeUint32(_dataDescriptorSignature);
     _output.writeUint32(written.crc32);
-    _output.writeUint32(written.compressedSize);
-    _output.writeUint32(written.uncompressedSize);
+    if (usesZip64) {
+      _output.writeUint64(written.compressedSize);
+      _output.writeUint64(written.uncompressedSize);
+    } else {
+      _output.writeUint32(written.compressedSize);
+      _output.writeUint32(written.uncompressedSize);
+    }
   }
 
   void _writeCentralDirectoryHeader(_StreamingZipEntry entry) {
+    final usesZip64 =
+        entry.compressedSize > _maxZip32 ||
+        entry.uncompressedSize > _maxZip32 ||
+        entry.localHeaderOffset > _maxZip32;
     _output.writeUint32(_centralDirectoryHeaderSignature);
     _output.writeUint16(_versionNeeded);
     _output.writeUint16(_versionNeeded);
@@ -2309,29 +2326,53 @@ class _StreamingZipWriter {
     _output.writeUint16(entry.modTime);
     _output.writeUint16(entry.modDate);
     _output.writeUint32(entry.crc32);
-    _output.writeUint32(entry.compressedSize);
-    _output.writeUint32(entry.uncompressedSize);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.compressedSize);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.uncompressedSize);
     _output.writeUint16(entry.nameBytes.length);
-    _output.writeUint16(0);
+    _output.writeUint16(usesZip64 ? 28 : 0);
     _output.writeUint16(0);
     _output.writeUint16(0);
     _output.writeUint16(0);
     _output.writeUint32(entry.mode << 16);
-    _output.writeUint32(entry.localHeaderOffset);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.localHeaderOffset);
     _output.writeBytes(entry.nameBytes);
+    if (usesZip64) {
+      _output.writeUint16(0x0001);
+      _output.writeUint16(24);
+      _output.writeUint64(entry.uncompressedSize);
+      _output.writeUint64(entry.compressedSize);
+      _output.writeUint64(entry.localHeaderOffset);
+    }
   }
 
   void _writeEndOfCentralDirectory({
     required int centralDirectoryOffset,
     required int centralDirectorySize,
   }) {
+    final zip64EocdOffset = _output.length;
+    _output.writeUint32(_zip64EndOfCentralDirectorySignature);
+    _output.writeUint64(44);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint32(0);
+    _output.writeUint32(0);
+    _output.writeUint64(_entries.length);
+    _output.writeUint64(_entries.length);
+    _output.writeUint64(centralDirectorySize);
+    _output.writeUint64(centralDirectoryOffset);
+
+    _output.writeUint32(_zip64EndOfCentralDirectoryLocatorSignature);
+    _output.writeUint32(0);
+    _output.writeUint64(zip64EocdOffset);
+    _output.writeUint32(1);
+
     _output.writeUint32(_endOfCentralDirectorySignature);
     _output.writeUint16(0);
-    _output.writeUint16(0);
-    _output.writeUint16(_entries.length);
-    _output.writeUint16(_entries.length);
-    _output.writeUint32(centralDirectorySize);
-    _output.writeUint32(centralDirectoryOffset);
+    _output.writeUint16(0xffff);
+    _output.writeUint16(0xffff);
+    _output.writeUint16(0xffff);
+    _output.writeUint32(_maxZip32);
+    _output.writeUint32(_maxZip32);
     _output.writeUint16(0);
   }
 
@@ -2346,18 +2387,6 @@ class _StreamingZipWriter {
     return (((year - 1980) & 0x7f) << 9) |
         ((value.month & 0x0f) << 5) |
         (value.day & 0x1f);
-  }
-
-  static void _checkZip32(int value, String field) {
-    if (value > _maxZip32) {
-      throw FileSystemException('ZIP entry exceeds ZIP32 limit: $field');
-    }
-  }
-
-  void _checkEntryCount() {
-    if (_entries.length > _maxZipEntries) {
-      throw FileSystemException('ZIP entry count exceeds ZIP32 limit');
-    }
   }
 }
 

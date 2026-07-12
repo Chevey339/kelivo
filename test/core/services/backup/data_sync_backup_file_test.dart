@@ -26,6 +26,20 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 
 import 'restore_cold_process_test_helper.dart';
 
+bool _containsContiguousBytes(List<int> source, List<int> pattern) {
+  for (var start = 0; start <= source.length - pattern.length; start++) {
+    var matches = true;
+    for (var index = 0; index < pattern.length; index++) {
+      if (source[start + index] != pattern[index]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) return true;
+  }
+  return false;
+}
+
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.root);
 
@@ -424,6 +438,16 @@ void main() {
           archive?.clearSync();
           input.closeSync();
         }
+        expect(
+          _containsContiguousBytes(await backupFile.readAsBytes(), const [
+            0x50,
+            0x4b,
+            0x06,
+            0x06,
+          ]),
+          isTrue,
+          reason: 'normal backups must publish a ZIP64 end record',
+        );
 
         expect(
           await File('${backupFile.parent.path}/_bk_settings.json').exists(),

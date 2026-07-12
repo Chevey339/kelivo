@@ -3,7 +3,7 @@
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
 > - 最后更新：2026-07-12（第三轮复审：四个用户症状逐一定位，新登记 §10.3 MSG-R1～R3 / TL-R14～R15；PD-01/PD-02/§7.2 修订为默认 graft 语义）
-> - 当前结论：Phase 0/1/3 保持关闭。§10.3 MSG-R1～R3、TL-R14/R15 已全部完成自动化实现；版本/graft 产品语义、滚动唯一执行器、手势事务与 programmatic jump 收敛路径均已有回归。Phase 2/4 仍待第三轮真机四症状矩阵后关闭，Phase 5 暂不启动
+> - 当前结论：Phase 0/1/3 保持关闭。§10.3 MSG-R1～R3、TL-R14/R15 已全部完成自动化实现；Phase 2/4 的第三轮真机矩阵按用户决定暂缓，不阻塞 Phase 5 实现。Phase 5 已启动并完成 OPS-01
 
 ## 1. 文档使用规则
 
@@ -41,7 +41,7 @@
 | Phase 2：Message Graph | 6 / 7 | `进行中` | PD-01 修订后的 MSG-R1/R2 graft/fork 命令与设置分流已实现并自动化通过，schema 不变；MSG-04 与 Phase 2 只待第三轮真机产品矩阵确认后恢复完成 |
 | Phase 3：Generation State Machine | 7 / 7 | `已完成` | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 与竞态/长响应矩阵全部闭环 |
 | Phase 4：Timeline 与 Renderer | 8 / 8 | `进行中`（实现完成，待第三轮真机确认） | TL-R1～R6 已获第一轮真机确认；§10.2 TL-R7～R13 与 §10.3 TL-R14/R15 自动化闭环；经真机四症状矩阵前不关闭 |
-| Phase 5：Data Operations 与退役 | 0 / 9 | `未开始` | 部分可在 Database Kernel 后并行，最终退役依赖灰度证据 |
+| Phase 5：Data Operations 与退役 | 1 / 9 | `进行中` | OPS-01 已完成；按顺序继续 OPS-02，最终退役仍受灰度/保留证据约束 |
 
 ## 3. 已完成的审计工作
 
@@ -425,7 +425,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 | Commit/PR | 验证证据 |
 | --- | --- | --- | --- | --- | --- | --- |
-| OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `进行中` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | `4d810e21`、`e179737c`、`900811ec`、`6c3618b8` | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 流式 hash、ZIP 自校验、round trip 与应用已知认证凭据排除已实现；五平台/大数据 profile 与 Zip64 尚未完成 |
+| OPS-01 | 默认 SQLite snapshot ZIP + manifest/hash | DB2-03/07 | `已完成` | 活动库备份一致；完成前重开验证；新格式不写 `chats.json` | 既有提交 + 本里程碑提交（2026-07-12） | Online Backup、独立重开/integrity/FK/schema/count、DB/settings/assets 分块压缩与流式 hash、ZIP 自校验、round trip、秘密排除均已实现；writer 现发布 ZIP64 entry/central/end records，不再受 ZIP32 的 4 GiB/65,535 条目格式上限，restore 仍以 8 GiB/entry、16 GiB total、100,000 entries 显式拒绝资源滥用。五平台 SQLite snapshot 能力沿用 DB2-07 的 5/5 设备 runner；backup/restore 聚焦 47/47 与 analyze 通过 |
 | OPS-02 | Staging restore/merge + crash-safe bundle swap | P0-02、DB2-06/07 | `进行中` | DB/settings/assets 切换时阻止业务访问，receipt 恢复后只开放完整旧/新 bundle | 既有提交 + 本里程碑提交 | P0-02 应用层 overwrite 已完成 selected-only candidate、business lease、strict topology、receipt、bounded previous、WAL normalization、operation-ahead forward/rollback、cold ack/archive/startup UI，以及 selected missing/unselected payload 与两种 terminal settings 部分态回归。macOS 真实进程累计 240 phases/58 kills。OPS-02 仍承担 v2 merge、其他 rollback topology 的外部 kill、raw durability、旧 canonical 空/截断进程场景、硬件断电、资源故障与五平台发布验证，因此自身保持进行中 |
 | OPS-03 | 旧 JSON 只读 adapter + 显式 portable NDJSON v2 | MSG-05、OPS-01 | `进行中` | 新完整备份不写 `chats.json`；旧 ZIP/迁移 JSON 可导入且尽力保持有界内存 | `117f8386`、`900811ec` | 新备份不再用 JSON 承载聊天主数据；manifest/settings 仍为 JSON，旧 `chats.json` 和无 manifest settings-only 导入仍可用；Recovered/rejects、单次解析 candidate 与流式 parser 未完成 |
 | OPS-04 | FTS5/短中文 fallback/branch navigation | PD-06、DB2-07、MSG-03 | `未开始` | D2 正确率和 p95 达标，五平台一致性已验证 | — | — |
@@ -564,7 +564,7 @@ PD-01/PD-02 已于 2026-07-12 修订，方案与 ADR-0001 均已同步；MSG-R3/
 
 ## 19. 下一步
 
-§10.3 自动化实现已全部收敛。下一步执行用户真机四症状矩阵：发送置顶稳定、流式中点"到底"/慢速拖拽贴底无往复位移、"仅保存"与默认重生成后下方消息保留且切换器可用、开启删除尾随设置后行为符合预期。矩阵通过后恢复 MSG-04、TL-02/TL-04 与 Phase 2/4 为完成，再进入 Phase 5 `OPS-01`。
+§10.3 自动化实现已全部收敛，用户决定暂缓第三轮真机四症状矩阵并先执行 Phase 5。Phase 2/4 仍保持“实现完成，待真机确认”，不伪造关闭证据。Phase 5 按 OPS-01→09 顺序执行，当前 OPS-01 已完成，下一项 OPS-02。
 
 ## 20. 变更日志
 
@@ -573,6 +573,7 @@ PD-01/PD-02 已于 2026-07-12 修订，方案与 ADR-0001 均已同步；MSG-R3/
 | 2026-07-12 | 完成 MSG-R2：`truncateFuture` 从 ChatActions 显式贯穿 generation service/ChatService/repository；默认 false 的 generation begin 在同一事务 graft 新 assistant 并保留全部后续，true 只创建截断 branch且旧 branch/旧 message rows 完整保留。持久会话不再先调用 `removeTrailingMessages`，临时不落盘会话保留内存截断边界。回归覆盖默认 future/branch 不变、开启设置 active path 截断但旧 branch 可恢复且 message count 不减，以及持久会话永不物理删除的决策；generation/context 18/18 与 analyze 通过。MSG-04 实现收敛，待真机确认 | MSG-R2、MSG-04、PD-01/02、GEN-02 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 TL-R14：生成期显式“到底”改为一次 jump，后续只由 layout pin 跟随；普通驱动动画期间 layout pin 挂起。pointer drag 改为手势结束时一次性结算视口意图，move/update 不再发布互斥模式。回归覆盖流式到底随内容增长单调贴 max，以及慢拖多次 move 在结束前 0 次、结束后恰 1 次意图；controller/widget 18/18 与 analyze 通过 | TL-R14、TL-02、TL-04 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 TL-R15：programmatic jump 压缩为 spacer 布局与最新输入执行两阶段；执行前底部覆盖变化会重测，cacheExtent 外目标通过 observer index 先促使布局再精确置顶，缺失目标也显式结束而不滞留。回归覆盖 16→80px 动态底部输入仍 ±1px 置顶及 cache 外目标收敛；widget 13/13 与 analyze 通过。Phase 4 实现 8/8，待第三轮真机矩阵关闭 | TL-R15、TL-02、TL-04、Phase 4 | 本里程碑提交 | Codex |
+| 2026-07-12 | 完成 OPS-01：默认备份保持 SQLite Online Backup + manifest/全 entry hash + 自校验，新增 ZIP64 entry/central/end records，取消 ZIP32 格式上限；恢复仍以显式 entry/total/count 预算防止资源攻击。公开 prepareBackupFile 回归同时验证 ZIP64 签名、archive 解码、manifest hash 与清理；backup/restore 47/47 与 analyze 通过。用户授权暂缓 Phase 2/4 真机矩阵，Phase 5 正式启动 | OPS-01、PD-08、PD-14、Phase 5 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 MSG-R1：新增单事务 graft command，创建同 slot sibling 后把 active path 直接 child 改挂到新 revision（leaf 时移动原 branch leaf），映射 boundary 并 CAS 推进 state revision；branch ID/数量与全部后续 slot 不变，旧 revision 保留。稳定 graph edit API 与 Home `appendMessageVersion(user)` 均接入；native same-slot `selectRevision` 也改为 graft-select，切回旧版本不再截断后续，legacy ambiguous 保持安全 branch。两轮红色回归复现编辑/切换的旧截断，绿化后 domain/repository 均保持完整未来。ADR-0001 同步修订，analyze 通过 | MSG-R1、MSG-04、PD-01/02、MSG-01 | 本里程碑提交 + follow-up | Codex |
 | 2026-07-12 | 完成 MSG-R3：render model 的版本总数与选中索引改用 coordinator slot 的 DB 权威 `versionCount`/active revision，不再依赖会被窗口 retain 驱逐的 sibling cache；MessageList 的切换器、导航边界与删除全部入口统一读取权威 count，缺失 sibling 继续在用户点击时通过现有异步 group loader 懒加载。红色回归覆盖只剩 active v1、权威 count=2，绿化后立即投影 `<2/2>`；render/controller/widget 64/64 与 analyze 通过。第三轮方案/进度修订一并纳入本里程碑，Phase 2/4 保持进行中 | MSG-R3、PD-01/02、MSG-04、TL-R14/R15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 第三轮复审：逐一定位四个用户症状。"仅保存"删下方消息与"重新生成设置失效"根因为 PD-01 纯 fork 语义与既有产品合同冲突——`appendMessageVersion`/`beginRegeneration` 无条件 `createRevisionBranch`/fork 激活新 branch，active path（leaf 祖先链）随即截止于变更 slot，下方消息全部离开时间线（MSG-R1/R2）；切换器不显示根因为 render model 版本数依赖被 `retainTimelineWindow` 驱逐的 `_messagesCache` 而非窗口自带 DB 权威 `versionCount`，且发送/重生成路径不回填 siblings（MSG-R3）；无限跳动根因为流式期间 `animateTo(旧 max)` 与 layout `correctPixels(新 max)` 逐帧对抗，及单次拖拽内 pointer-move `userAnchored` 与贴底判定 `followTail` 交替翻转并销毁生成期 spacer（TL-R14）；发送弹距根因为 jump 管线跨 3 帧使用陈旧 `bottomContentPadding`/键盘 inset/occupied，且目标未布局时静默停摆（TL-R15）。修订 PD-01/PD-02/§7.2/§8.3 为"默认 graft 保留后代、仅删除尾随 fork"（schema 不变），§7.4 补充"同帧唯一执行器"“手势内不翻转意图”“jump 同帧输入"三条合同；MSG-04 重开，§10.3 冻结返工顺序与验收 | MSG-R1～R3、TL-R14/R15、MSG-04、PD-01/02 | 本复审提交 | 用户 / Fable |
