@@ -5,6 +5,7 @@ import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/database/message_graph_projector.dart';
 import 'timeline_coordinator.dart';
+import 'message_render_model.dart';
 
 /// Controller for managing conversation state in the home page.
 ///
@@ -82,6 +83,7 @@ class ChatController extends ChangeNotifier {
   Map<String, int>? _collapsedIdToIndex;
   Map<String, List<ChatMessage>>? _groupCache;
   List<ChatMessage>? _messagesWithVisibleGroupsCache;
+  List<MessageRenderModel>? _renderModelsCache;
 
   /// Conversation IDs that are currently generating (streaming).
   final Set<String> _loadingConversationIds = <String>{};
@@ -1032,6 +1034,29 @@ class ChatController extends ChangeNotifier {
     return _groupCache ??= groupMessagesByGroup();
   }
 
+  /// Complete renderer projection for the current bounded timeline window.
+  /// Computed once per message snapshot, never once per visible row.
+  List<MessageRenderModel> get messageRenderModels {
+    return _renderModelsCache ??= MessageRenderModelProjector.project(
+      messages: collapsedMessages,
+      byGroup: groupedMessages,
+      versionSelections: _versionSelections,
+      contextDividerIndex: _collapsedContextDividerIndex(),
+    );
+  }
+
+  int _collapsedContextDividerIndex() {
+    final raw = loadedWindowTruncateIndex();
+    if (raw <= 0) return -1;
+    final seen = <String>{};
+    final limit = raw.clamp(0, _messages.length);
+    var count = 0;
+    for (var index = 0; index < limit; index++) {
+      if (seen.add(_messages[index].groupId ?? _messages[index].id)) count++;
+    }
+    return count - 1;
+  }
+
   /// Group all messages by their groupId.
   Map<String, List<ChatMessage>> groupMessagesByGroup() {
     final Map<String, List<ChatMessage>> byGroup =
@@ -1056,6 +1081,7 @@ class ChatController extends ChangeNotifier {
     _collapsedIdToIndex = null;
     _groupCache = null;
     _messagesWithVisibleGroupsCache = null;
+    _renderModelsCache = null;
   }
 
   @override

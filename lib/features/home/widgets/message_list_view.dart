@@ -4,12 +4,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:provider/provider.dart';
 import 'package:scrollview_observer/scrollview_observer.dart';
 
 import '../../../core/models/chat_message.dart';
-import '../../../core/providers/settings_provider.dart';
-import '../../../core/providers/assistant_provider.dart';
+import '../../../core/models/assistant.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -17,6 +15,7 @@ import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
 import '../controllers/timeline_coordinator.dart';
+import '../controllers/message_render_model.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
@@ -89,6 +88,7 @@ class MessageListView extends StatefulWidget {
     required this.scrollController,
     required this.observerController,
     required this.messages,
+    this.renderModels,
     required this.byGroup,
     required this.versionSelections,
     this.truncCollapsedIndex = -1,
@@ -132,6 +132,11 @@ class MessageListView extends StatefulWidget {
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
     this.timelineCoordinator,
+    this.chatFontScale = 1,
+    this.showModelIcon = true,
+    this.showUserAvatar = true,
+    this.showTokenStats = false,
+    this.assistant,
   });
 
   final ScrollController scrollController;
@@ -139,6 +144,9 @@ class MessageListView extends StatefulWidget {
 
   /// Pre-collapsed messages (from ChatController.collapsedMessages).
   final List<ChatMessage> messages;
+
+  /// Precomputed one-per-slot renderer inputs. Must match [messages] order.
+  final List<MessageRenderModel>? renderModels;
 
   /// All messages grouped by groupId (from ChatController.groupedMessages).
   final Map<String, List<ChatMessage>> byGroup;
@@ -201,6 +209,11 @@ class MessageListView extends StatefulWidget {
   final bool hasMoreAfter;
   final Future<bool> Function()? onLoadMoreAfter;
   final TimelineCoordinator? timelineCoordinator;
+  final double chatFontScale;
+  final bool showModelIcon;
+  final bool showUserAvatar;
+  final bool showTokenStats;
+  final Assistant? assistant;
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
@@ -218,14 +231,33 @@ class _MessageListViewState extends State<MessageListView> {
   bool _pointerScrollActivityCheckScheduled = false;
   final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
   bool _programmaticJumpScheduled = false;
+  late List<MessageRenderModel> _effectiveRenderModels;
 
   String _slotId(ChatMessage message) => message.groupId ?? message.id;
 
   @override
+  void initState() {
+    super.initState();
+    _refreshRenderModels();
+  }
+
+  @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final active = widget.messages.map(_slotId).toSet();
+    _refreshRenderModels();
+    final active = _effectiveRenderModels.map((model) => model.slotId).toSet();
     _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
+  }
+
+  void _refreshRenderModels() {
+    _effectiveRenderModels =
+        widget.renderModels ??
+        MessageRenderModelProjector.project(
+          messages: widget.messages,
+          byGroup: widget.byGroup,
+          versionSelections: widget.versionSelections,
+          contextDividerIndex: widget.truncCollapsedIndex,
+        );
   }
 
   bool get _isDesktopPlatform =>
@@ -284,6 +316,13 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   Widget build(BuildContext context) {
+    final presentation = _MessagePresentation(
+      chatFontScale: widget.chatFontScale,
+      showModelIcon: widget.showModelIcon,
+      showUserAvatar: widget.showUserAvatar,
+      showTokenStats: widget.showTokenStats,
+      assistant: widget.assistant,
+    );
     return LayoutBuilder(
       builder: (context, constraints) {
         final horizontalPad =
@@ -308,16 +347,17 @@ class _MessageListViewState extends State<MessageListView> {
                     (widget.isPinnedIndicatorActive ? 12 : 0) +
                     programmaticSpacer,
               ),
-              itemCount: widget.messages.length,
+              itemCount: _effectiveRenderModels.length,
               keyboardDismissBehavior: _keyboardDismissBehavior,
               itemBuilder: (context, index) {
-                if (index < 0 || index >= widget.messages.length) {
+                if (index < 0 || index >= _effectiveRenderModels.length) {
                   return const SizedBox.shrink();
                 }
                 return _buildMessageItem(
                   context,
                   index: index,
                   isProcessingFiles: isProcessing,
+                  presentation: presentation,
                 );
               },
             );
@@ -574,31 +614,21 @@ class _MessageListViewState extends State<MessageListView> {
     BuildContext context, {
     required int index,
     required bool isProcessingFiles,
+    required _MessagePresentation presentation,
   }) {
-    final message = widget.messages[index];
+    final model = _effectiveRenderModels[index];
+    final message = model.message;
     final r = widget.reasoning[message.id];
     final t = widget.translations[message.id];
-    final chatScale = context.watch<SettingsProvider>().chatFontScale;
-    final assistant = context.watch<AssistantProvider>().currentAssistant;
+    final assistant = presentation.assistant;
     final useAssistAvatar = assistant?.useAssistantAvatar == true;
     final useAssistName = assistant?.useAssistantName == true;
-    final showDivider =
-        widget.truncCollapsedIndex >= 0 && index == widget.truncCollapsedIndex;
-    final gid = (message.groupId ?? message.id);
-    final vers = (widget.byGroup[gid] ?? const <ChatMessage>[]).toList()
-      ..sort((a, b) => a.version.compareTo(b.version));
-    int selectedIdx =
-        widget.versionSelections[gid] ??
-        (vers.isNotEmpty ? vers.length - 1 : 0);
-    final total = vers.length;
-    if (selectedIdx < 0) selectedIdx = 0;
-    if (total > 0 && selectedIdx > total - 1) selectedIdx = total - 1;
-    final latestAssistantIndex = _latestAssistantMessageIndex();
+    final gid = model.slotId;
+    final selectedIdx = model.selectedVersionIndex;
+    final total = model.versions.length;
     final messageSuggestions =
         !widget.selecting &&
-            index == latestAssistantIndex &&
-            message.role == 'assistant' &&
-            !message.isStreaming &&
+            model.isLatestCompleteAssistant &&
             widget.onSuggestionTap != null
         ? widget.suggestions
         : const <String>[];
@@ -645,7 +675,9 @@ class _MessageListViewState extends State<MessageListView> {
                     return MediaQuery(
                       // Keep chat font scaling without rebuilding on keyboard insets.
                       data: data.copyWith(
-                        textScaler: TextScaler.linear(textScale * chatScale),
+                        textScaler: TextScaler.linear(
+                          textScale * presentation.chatFontScale,
+                        ),
                       ),
                       child: isStreaming
                           ? _buildStreamingMessageWidget(
@@ -662,6 +694,7 @@ class _MessageListViewState extends State<MessageListView> {
                               total: total,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
+                              presentation: presentation,
                             )
                           : _buildChatMessageWidget(
                               context,
@@ -677,6 +710,7 @@ class _MessageListViewState extends State<MessageListView> {
                               total: total,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
+                              presentation: presentation,
                             ),
                     );
                   },
@@ -699,7 +733,7 @@ class _MessageListViewState extends State<MessageListView> {
             ),
           ],
         ),
-        if (showDivider)
+        if (model.showContextDivider)
           Padding(
             padding: widget.dividerPadding,
             child: _buildContextDivider(context),
@@ -710,7 +744,9 @@ class _MessageListViewState extends State<MessageListView> {
     final isSpotlight =
         widget.spotlightMessageId != null &&
         message.id == widget.spotlightMessageId;
-    if (!isSpotlight) return messageColumn;
+    if (!isSpotlight) {
+      return RepaintBoundary(key: ValueKey(model.slotId), child: messageColumn);
+    }
 
     return TweenAnimationBuilder<double>(
       key: ValueKey('spotlight-${widget.spotlightToken}'),
@@ -741,14 +777,6 @@ class _MessageListViewState extends State<MessageListView> {
     );
   }
 
-  int _latestAssistantMessageIndex() {
-    for (var i = widget.messages.length - 1; i >= 0; i--) {
-      final message = widget.messages[i];
-      if (message.role == 'assistant' && !message.isStreaming) return i;
-    }
-    return -1;
-  }
-
   /// Build a streaming message widget that uses ValueListenableBuilder
   /// to avoid full page rebuilds during streaming.
   Widget _buildStreamingMessageWidget(
@@ -765,6 +793,7 @@ class _MessageListViewState extends State<MessageListView> {
     required int total,
     required bool isProcessingFiles,
     required List<String> suggestions,
+    required _MessagePresentation presentation,
   }) {
     return _StreamingMessageDataGate(
       notifier: widget.streamingContentNotifier!.getNotifier(message.id),
@@ -815,6 +844,7 @@ class _MessageListViewState extends State<MessageListView> {
             total: total,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
+            presentation: presentation,
             enableStreamingTextMotion: !deferUpdates,
           ),
         );
@@ -837,6 +867,7 @@ class _MessageListViewState extends State<MessageListView> {
     required int total,
     required bool isProcessingFiles,
     required List<String> suggestions,
+    required _MessagePresentation presentation,
     bool enableStreamingTextMotion = true,
   }) {
     return ChatMessageWidget(
@@ -861,17 +892,15 @@ class _MessageListViewState extends State<MessageListView> {
               size: 30,
             )
           : null,
-      showModelIcon: useAssistAvatar
-          ? false
-          : context.watch<SettingsProvider>().showModelIcon,
+      showModelIcon: useAssistAvatar ? false : presentation.showModelIcon,
       useAssistantAvatar: useAssistAvatar && message.role == 'assistant',
       useAssistantName: useAssistName && message.role == 'assistant',
       assistantName: (useAssistAvatar || useAssistName)
           ? (assistant?.name ?? 'Assistant')
           : null,
       assistantAvatar: useAssistAvatar ? (assistant?.avatar ?? '') : null,
-      showUserAvatar: context.watch<SettingsProvider>().showUserAvatar,
-      showTokenStats: context.watch<SettingsProvider>().showTokenStats,
+      showUserAvatar: presentation.showUserAvatar,
+      showTokenStats: presentation.showTokenStats,
       hideStreamingIndicator:
           isProcessingFiles ||
           (widget.isPinnedIndicatorActive &&
@@ -983,6 +1012,22 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.onRecoveredAskUserAnswer!(message, part, result),
     );
   }
+}
+
+final class _MessagePresentation {
+  const _MessagePresentation({
+    required this.chatFontScale,
+    required this.showModelIcon,
+    required this.showUserAvatar,
+    required this.showTokenStats,
+    required this.assistant,
+  });
+
+  final double chatFontScale;
+  final bool showModelIcon;
+  final bool showUserAvatar;
+  final bool showTokenStats;
+  final Assistant? assistant;
 }
 
 class _StreamingMessageDataGate extends StatefulWidget {

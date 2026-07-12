@@ -1090,23 +1090,6 @@ class _HomePageState extends State<HomePage>
     return kToolbarHeight + MediaQuery.paddingOf(context).top;
   }
 
-  /// Map persisted truncateIndex (raw message count) to collapsed index.
-  int _computeTruncCollapsedIndex() {
-    final int truncRaw = _controller.chatController.loadedWindowTruncateIndex();
-    if (truncRaw <= 0) return -1;
-    final rawMessages = _controller.messages;
-    final seen = <String>{};
-    final int limit = truncRaw < rawMessages.length
-        ? truncRaw
-        : rawMessages.length;
-    int count = 0;
-    for (int i = 0; i < limit; i++) {
-      final gid = (rawMessages[i].groupId ?? rawMessages[i].id);
-      if (seen.add(gid)) count++;
-    }
-    return count - 1;
-  }
-
   Widget _buildMessageListView(
     BuildContext context, {
     required double topContentPadding,
@@ -1125,6 +1108,7 @@ class _HomePageState extends State<HomePage>
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
+    final assistant = context.watch<AssistantProvider>().currentAssistant;
     return BackdropGroup(
       backdropKey: _messageListBackdropKey,
       child: MessageListView(
@@ -1132,9 +1116,9 @@ class _HomePageState extends State<HomePage>
         scrollController: _scrollController,
         observerController: _controller.scrollCtrl.observerController,
         messages: _controller.chatController.collapsedMessages,
+        renderModels: _controller.chatController.messageRenderModels,
         byGroup: _controller.chatController.groupedMessages,
         versionSelections: _controller.versionSelections,
-        truncCollapsedIndex: _computeTruncCollapsedIndex(),
         reasoning: _controller.reasoning,
         reasoningSegments: _controller.reasoningSegments,
         contentSplits: _controller.contentSplits,
@@ -1157,6 +1141,11 @@ class _HomePageState extends State<HomePage>
         hasMoreAfter: _controller.chatController.hasMoreAfter,
         onLoadMoreAfter: _controller.loadMoreAfter,
         timelineCoordinator: _controller.chatController.timelineCoordinator,
+        chatFontScale: settings.chatFontScale,
+        showModelIcon: settings.showModelIcon,
+        showUserAvatar: settings.showUserAvatar,
+        showTokenStats: settings.showTokenStats,
+        assistant: assistant,
         onVersionChange: (groupId, version) async {
           await _controller.setSelectedVersion(groupId, version);
         },
