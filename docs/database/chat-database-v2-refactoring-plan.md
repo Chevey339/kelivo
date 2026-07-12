@@ -167,7 +167,7 @@ u1, a1-v0, u2, a2-v0, a1-v1
 - **PD-02：不物理删除旧后代。** 编辑 user 从其 parent revision fork 新 branch（新 user revision + 新 assistant generation）；重生成 assistant 在同 slot 创建新 revision 并成为新 branch head。删除是显式操作：删除单个 revision 时，若它是当前选中版本则自动切换到同 slot 最新剩余 revision；删除 slot 最后一个 revision 前必须提示将一并移除依赖它的后代 branch 段。物理 GC 延迟、批量执行并留审计记录。
 - **PD-03：中断保留 partial，不做"继续生成"。** 用户取消、断网或崩溃恢复后的输出保留 partial content，气泡显示"已中断"标识，提供"重新生成"（同 slot 新 revision）和"删除"。partial 被后续轮次引用时按原样纳入上下文并保持标注（与 Claude 行为一致）。"继续生成"依赖 provider 侧不可靠的续写语义，列为 v2 之后的评估项，不进入本次范围。
 - **PD-04：发送永远追加到 active branch leaf。** 用户在历史位置阅读时发送，执行一次 programmatic jump，把新 user 消息定位到 viewport 顶部附近（而不是贴底），assistant 回答随后向下流入，保证新一轮从头可读。编辑历史 user 消息走 PD-02 分支语义，该消息保持原 viewport 锚定，直到新回答首帧可见。
-- **PD-05：绝不违背用户意图移动 viewport。** 滚动离开底部、选择文本、使用键盘、打开链接、触发搜索都视为阅读信号，立即退出 followingTail；流式内容在屏外继续，不改变用户所见位置；显示"跳到最新"胶囊（含流式进行中指示），点击后恢复尾随。会话重新打开时定位到最后一条 user 消息顶部，而非绝对底部。
+- **PD-05：绝不违背用户意图移动 viewport。** 滚动离开底部、选择文本、使用键盘、打开链接、触发搜索都视为阅读信号，立即退出 followingTail；流式内容在屏外继续，不改变用户所见位置；复用右侧既有“到底”导航按钮恢复尾随，不新增重复胶囊。会话重新打开时定位到最后一条 user 消息顶部，而非绝对底部。
 - **PD-06：搜索默认只搜当前 active branch**（会话内与全局搜索一致），提供显式"包含所有版本/分支"开关。每个结果携带 branch/revision identity，跳转时切换到对应 branch 并按 slot 锚定。
 - **PD-07：统计默认展示 active branch 口径**（用户实际看到的对话消耗），同页另列"全部生成消耗"（所有 revisions/branches 的 token/费用），两个口径都注明定义，不混用。
 - **PD-08：完整备份包含全部数据。** 应用默认完整备份包含全部 branch、全部 revision（含 failed/interrupted partial）与 generation run 元数据。便携 NDJSON 导出默认仅 active branch + completed revision，提供"包含全部"选项。
@@ -453,7 +453,7 @@ stateDiagram-v2
 - **绝不违背用户意图移动 viewport**。auto-scroll 不是默认行为，只在 `followingTail` 下生效。
 - 退出 `followingTail` 的信号不止滚动手势：向上滚动、文本选择开始、键盘方向键/PageUp、打开链接、进入搜索都立即进入 `userAnchored`；恢复尾随只由用户显式触发（滚回底部或点击"跳到最新"）。
 - 发送新消息执行一次 `programmaticJump`：新 user 消息定位到 viewport 顶部附近（新一轮从头可读，保留上一轮尾部作为上下文衔接），assistant 回答向下流入屏幕，而不是把已有内容持续顶走。
-- 用户离开底部时流式在屏外继续；显示"跳到最新"胶囊，流式进行中带生成指示，有新完成回答时带未读标记。
+- 用户离开底部时流式在屏外继续；使用右侧既有“到底”导航按钮恢复尾随；如需生成/未读提示，只能附着于该现有按钮，不新增独立控件。
 - 重新打开会话定位到最后一条 user 消息顶部，不是绝对底部。
 - 停止、重试、重生成、版本切换、branch 切换和错误提示都不得移动用户当前阅读位置（目标消息在视口内时按其 slot 锚定）。
 
@@ -833,7 +833,7 @@ flowchart LR
 - `TL-01`：按 active ancestry cursor 加载逻辑 slot，删除 OFFSET/物理 revision 分页。
 - `TL-02`：建立行数 + 字节双预算窗口和可取消请求。
 - `TL-03`：使用 slot ID + localDy 的统一锚点协调器。
-- `TL-04`：实现 following tail / user anchored / programmatic jump 状态机；含发送新轮次置顶、"跳到最新"胶囊和重开会话定位最后一条 user 消息。
+- `TL-04`：实现 following tail / user anchored / programmatic jump 状态机；含发送新轮次置顶、复用右侧到底按钮恢复尾随和重开会话定位最后一条 user 消息。
 - `TL-05`：预计算 `MessageRenderModel`，缩小 provider/watch/rebuild 范围。
 - `TL-06`：增量 Markdown block、按字节 LRU、图片尺寸预留和 resize。
 - `TL-07`：长表格、代码、tool result 使用折叠/虚拟化视图。

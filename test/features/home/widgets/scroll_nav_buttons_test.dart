@@ -6,6 +6,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('existing bottom navigation invokes the explicit latest action', (
+    tester,
+  ) async {
+    var bottomTaps = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ScrollNavButtonsPanel(
+            visible: true,
+            onScrollToTop: () {},
+            onPreviousMessage: () {},
+            onNextMessage: () {},
+            onScrollToBottom: () => bottomTaps++,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byIcon(Lucide.ChevronsDown), findsOneWidget);
+    await tester.tap(find.byIcon(Lucide.ChevronsDown));
+    expect(bottomTaps, 1);
+  });
+
   testWidgets('desktop hover hot zone reveals hidden navigation buttons', (
     tester,
   ) async {
