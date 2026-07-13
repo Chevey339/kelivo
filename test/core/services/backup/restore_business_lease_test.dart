@@ -88,10 +88,11 @@ void main() {
             .where((entry) => p.basename(entry.path).startsWith('owner_'))
             .toList();
         expect(ownerFiles, hasLength(1));
-        expect(
-          await File(ownerFiles.single.path).readAsString(),
-          first.instanceId,
-        );
+        final ownerIdentity =
+            jsonDecode(await File(ownerFiles.single.path).readAsString())
+                as Map<String, dynamic>;
+        expect(ownerIdentity['instanceId'], first.instanceId);
+        expect(ownerIdentity['probePort'], isA<int>());
         if (!Platform.isWindows) {
           expect((await leaseDirectory.stat()).mode & 0x1ff, 0x1c0);
           expect((await first.lockFile.stat()).mode & 0x1ff, 0x180);
@@ -158,28 +159,27 @@ void main() {
       await lease.close();
     });
 
-    test('debug hot restart reclaims an orphaned same-process owner', () async {
-      final leaseDirectory = Directory(
-        p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
-      );
-      await leaseDirectory.create(recursive: true);
-      final staleOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
-      await staleOwner.writeAsString('stale-debug-isolate');
+    test(
+      'reclaims an orphaned same-process owner in every build mode',
+      () async {
+        final leaseDirectory = Directory(
+          p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+        );
+        await leaseDirectory.create(recursive: true);
+        final staleOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+        await staleOwner.writeAsString('stale-debug-isolate');
 
-      await expectLater(
-        RestoreBusinessLease.acquire(appDataDirectory: appData),
-        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
-      );
+        final lease = await RestoreBusinessLease.acquire(
+          appDataDirectory: appData,
+        );
 
-      final lease = await RestoreBusinessLease.acquire(
-        appDataDirectory: appData,
-        reclaimSameProcessOwner: true,
-      );
-
-      expect(lease.processId, pid);
-      expect(await staleOwner.readAsString(), lease.instanceId);
-      await lease.close();
-    });
+        expect(lease.processId, pid);
+        final ownerIdentity =
+            jsonDecode(await staleOwner.readAsString()) as Map<String, dynamic>;
+        expect(ownerIdentity['instanceId'], lease.instanceId);
+        await lease.close();
+      },
+    );
 
     test('rejects a duplicate acquire from another isolate', () async {
       final lease = await RestoreBusinessLease.acquire(

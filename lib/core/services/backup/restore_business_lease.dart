@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -31,9 +32,10 @@ final class RestoreBusinessLease {
     required this.instanceId,
     required this.processId,
     required this._processOwnerFile,
+    required _ProcessOwnerProbe processOwnerProbe,
     required this._registryKey,
     required this._handle,
-  });
+  }) : _processOwnerProbe = processOwnerProbe;
 
   static const leaseDirectoryName = '.kelivo_business_lease';
   static const lockFileName = 'lease.lock';
@@ -50,6 +52,7 @@ final class RestoreBusinessLease {
   /// this value unchanged. It is intentionally part of cold-restart proof.
   final int processId;
   final File _processOwnerFile;
+  final _ProcessOwnerProbe _processOwnerProbe;
   final String _registryKey;
   RandomAccessFile? _handle;
 
@@ -62,7 +65,6 @@ final class RestoreBusinessLease {
   static Future<RestoreBusinessLease> acquire({
     required Directory appDataDirectory,
     RestoreDurability? durability,
-    bool reclaimSameProcessOwner = false,
   }) async {
     final leaseDirectory = Directory(
       p.join(appDataDirectory.path, leaseDirectoryName),
@@ -78,6 +80,7 @@ final class RestoreBusinessLease {
     RandomAccessFile? handle;
     var locked = false;
     var ownsProcessMarker = false;
+    _ProcessOwnerProbe? processOwnerProbe;
     final instanceId = _newInstanceId();
     late final File processOwnerFile;
     try {
@@ -86,18 +89,6 @@ final class RestoreBusinessLease {
         leaseDirectory: leaseDirectory,
         durability: resolvedDurability,
       );
-      processOwnerFile = File(
-        p.join(leaseDirectory.path, '$_processOwnerPrefix$pid'),
-      );
-      await _claimProcessOwner(
-        ownerFile: processOwnerFile,
-        registryKey: registryKey,
-        instanceId: instanceId,
-        durability: resolvedDurability,
-        reclaimExistingOwner: reclaimSameProcessOwner,
-      );
-      ownsProcessMarker = true;
-
       final initialLockType = await FileSystemEntity.type(
         lockFile.path,
         followLinks: false,
@@ -123,6 +114,19 @@ final class RestoreBusinessLease {
         rethrow;
       }
 
+      processOwnerFile = File(
+        p.join(leaseDirectory.path, '$_processOwnerPrefix$pid'),
+      );
+      processOwnerProbe = await _ProcessOwnerProbe.open(instanceId);
+      await _claimProcessOwner(
+        ownerFile: processOwnerFile,
+        registryKey: registryKey,
+        instanceId: instanceId,
+        processOwnerProbe: processOwnerProbe,
+        durability: resolvedDurability,
+      );
+      ownsProcessMarker = true;
+
       await _removeStaleProcessOwners(
         leaseDirectory: leaseDirectory,
         currentOwner: processOwnerFile,
@@ -133,6 +137,7 @@ final class RestoreBusinessLease {
         instanceId: instanceId,
         processId: pid,
         processOwnerFile: processOwnerFile,
+        processOwnerProbe: processOwnerProbe,
         registryKey: registryKey,
         handle: handle,
       );
@@ -147,6 +152,7 @@ final class RestoreBusinessLease {
           await handle.close();
         }
       }
+      await processOwnerProbe?.close();
       if (ownsProcessMarker) {
         await _deleteProcessOwner(processOwnerFile);
       }
@@ -177,6 +183,12 @@ final class RestoreBusinessLease {
     }
     try {
       await _deleteProcessOwner(_processOwnerFile);
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
+    try {
+      await _processOwnerProbe.close();
     } catch (error, stackTrace) {
       firstError ??= error;
       firstStackTrace ??= stackTrace;
@@ -234,8 +246,8 @@ final class RestoreBusinessLease {
     required File ownerFile,
     required String registryKey,
     required String instanceId,
+    required _ProcessOwnerProbe processOwnerProbe,
     required RestoreDurability durability,
-    required bool reclaimExistingOwner,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       final type = await FileSystemEntity.type(
@@ -244,14 +256,12 @@ final class RestoreBusinessLease {
       );
       if (type != FileSystemEntityType.notFound) {
         if (type == FileSystemEntityType.file) {
-          if (!reclaimExistingOwner) {
+          if (await _ProcessOwnerProbe.isLive(ownerFile)) {
             throw RestoreBusinessLeaseUnavailable(registryKey);
           }
-          // Flutter hot restart replaces the Dart isolate without replacing
-          // the native process. The old isolate cannot release this marker,
-          // while the new isolate has an empty in-memory lease registry. This
-          // opt-in is restricted to the debug app entry point; release builds
-          // and ordinary callers remain fail-closed.
+          // The OS lock has already been acquired and the same-PID isolate
+          // probe is no longer live. This is the orphan left by hot restart or
+          // Android engine recreation, so every build mode may reclaim it.
           await _deleteProcessOwner(ownerFile);
         } else {
           throw StateError('restore_business_lease_process_owner');
@@ -279,10 +289,14 @@ final class RestoreBusinessLease {
           throw StateError('restore_business_lease_process_owner');
         }
         await durability.restrictFile(ownerFile);
-        await ownerFile.writeAsString(instanceId);
+        final identity = jsonEncode({
+          'instanceId': instanceId,
+          'probePort': processOwnerProbe.port,
+        });
+        await ownerFile.writeAsString(identity);
         if (await FileSystemEntity.type(ownerFile.path, followLinks: false) !=
                 FileSystemEntityType.file ||
-            await ownerFile.readAsString() != instanceId) {
+            await ownerFile.readAsString() != identity) {
           throw StateError('restore_business_lease_process_owner_identity');
         }
         return;
@@ -343,6 +357,79 @@ final class RestoreBusinessLease {
       (_) => random.nextInt(256),
     ).map((byte) => byte.toRadixString(16).padLeft(2, '0')).join();
   }
+}
+
+final class _ProcessOwnerProbe {
+  _ProcessOwnerProbe._(this._server, this._token);
+
+  static const _timeout = Duration(milliseconds: 300);
+
+  final ServerSocket _server;
+  final String _token;
+
+  int get port => _server.port;
+
+  static Future<_ProcessOwnerProbe> open(String token) async {
+    final server = await ServerSocket.bind(
+      InternetAddress.loopbackIPv4,
+      0,
+      shared: false,
+    );
+    final probe = _ProcessOwnerProbe._(server, token);
+    server.listen(probe._answer, onError: (_) {});
+    return probe;
+  }
+
+  static Future<bool> isLive(File ownerFile) async {
+    try {
+      final decoded = jsonDecode(await ownerFile.readAsString());
+      if (decoded is! Map<String, dynamic>) return false;
+      final token = decoded['instanceId'];
+      final port = decoded['probePort'];
+      if (token is! String || port is! int || port <= 0 || port > 65535) {
+        return false;
+      }
+      final socket = await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        port,
+        timeout: _timeout,
+      );
+      try {
+        socket.writeln(token);
+        await socket.flush();
+        final response = await socket
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .first
+            .timeout(_timeout);
+        return response == 'alive';
+      } finally {
+        socket.destroy();
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _answer(Socket socket) async {
+    try {
+      final request = await socket
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .first
+          .timeout(_timeout);
+      socket.writeln(request == _token ? 'alive' : 'denied');
+      await socket.flush();
+    } catch (_) {
+      // A malformed probe is not a lease failure.
+    } finally {
+      await socket.close();
+    }
+  }
+
+  Future<void> close() => _server.close();
 }
 
 bool _isLockUnavailable(FileSystemException error) {
