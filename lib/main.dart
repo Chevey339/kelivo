@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show kDebugMode, kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
@@ -80,6 +80,10 @@ Future<void> main() async {
         // process exit, preventing another instance from racing business I/O.
         final businessLease = await RestoreBusinessLease.acquire(
           appDataDirectory: appDataDirectory,
+          // A Flutter hot restart creates a new Dart isolate inside the same
+          // native process. Reclaim only that debug-only stale owner marker;
+          // release builds keep the strict fail-closed lease contract.
+          reclaimSameProcessOwner: kDebugMode,
         );
         restoreOutcome =
             await RestoreStartupGate.recoverAndRequireBusinessReady(
@@ -230,7 +234,10 @@ class _RestoreFailureApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: RestoreFailureScreen(diagnosticCode: diagnosticCode),
+      home: RestoreFailureScreen(
+        diagnosticCode: diagnosticCode,
+        restart: PlatformUtils.restartApp,
+      ),
     );
   }
 }

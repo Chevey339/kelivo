@@ -1520,6 +1520,22 @@ class AppLocalizationsZh extends AppLocalizations {
       'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
 
   @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
   String backupRestoreFailureDiagnostic(String code) {
     return '诊断码：$code';
   }
@@ -7031,6 +7047,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
 
   @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
   String backupRestoreFailureDiagnostic(String code) {
     return '诊断码：$code';
   }
@@ -12540,6 +12572,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupRestoreFailureContent =>
       'Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在執行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '複製診斷碼';
+
+  @override
+  String get backupRestoreFailureCopied => '已複製診斷碼';
 
   @override
   String backupRestoreFailureDiagnostic(String code) {

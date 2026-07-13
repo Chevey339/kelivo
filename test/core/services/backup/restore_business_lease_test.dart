@@ -158,6 +158,29 @@ void main() {
       await lease.close();
     });
 
+    test('debug hot restart reclaims an orphaned same-process owner', () async {
+      final leaseDirectory = Directory(
+        p.join(appData.path, RestoreBusinessLease.leaseDirectoryName),
+      );
+      await leaseDirectory.create(recursive: true);
+      final staleOwner = File(p.join(leaseDirectory.path, 'owner_$pid'));
+      await staleOwner.writeAsString('stale-debug-isolate');
+
+      await expectLater(
+        RestoreBusinessLease.acquire(appDataDirectory: appData),
+        throwsA(isA<RestoreBusinessLeaseUnavailable>()),
+      );
+
+      final lease = await RestoreBusinessLease.acquire(
+        appDataDirectory: appData,
+        reclaimSameProcessOwner: true,
+      );
+
+      expect(lease.processId, pid);
+      expect(await staleOwner.readAsString(), lease.instanceId);
+      await lease.close();
+    });
+
     test('rejects a duplicate acquire from another isolate', () async {
       final lease = await RestoreBusinessLease.acquire(
         appDataDirectory: appData,

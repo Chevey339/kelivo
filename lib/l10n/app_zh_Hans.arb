@@ -549,6 +549,11 @@
   "backupRestoreRolledBackContent": "恢复未能完成。Kelivo 已验证并保留原有数据。",
   "backupRestoreFailureTitle": "恢复需要处理",
   "backupRestoreFailureContent": "Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。",
+  "backupRestoreBusinessLeaseUnavailableTitle": "Kelivo 已在运行",
+  "backupRestoreBusinessLeaseUnavailableContent": "Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。",
+  "backupRestoreFailureRestartButton": "重启 Kelivo",
+  "backupRestoreFailureCopyButton": "复制诊断码",
+  "backupRestoreFailureCopied": "已复制诊断码",
   "backupRestoreFailureDiagnostic": "诊断码：{code}",
   "@backupRestoreFailureDiagnostic": {
     "placeholders": {

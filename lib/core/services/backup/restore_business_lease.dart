@@ -62,6 +62,7 @@ final class RestoreBusinessLease {
   static Future<RestoreBusinessLease> acquire({
     required Directory appDataDirectory,
     RestoreDurability? durability,
+    bool reclaimSameProcessOwner = false,
   }) async {
     final leaseDirectory = Directory(
       p.join(appDataDirectory.path, leaseDirectoryName),
@@ -93,6 +94,7 @@ final class RestoreBusinessLease {
         registryKey: registryKey,
         instanceId: instanceId,
         durability: resolvedDurability,
+        reclaimExistingOwner: reclaimSameProcessOwner,
       );
       ownsProcessMarker = true;
 
@@ -233,6 +235,7 @@ final class RestoreBusinessLease {
     required String registryKey,
     required String instanceId,
     required RestoreDurability durability,
+    required bool reclaimExistingOwner,
   }) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       final type = await FileSystemEntity.type(
@@ -241,9 +244,18 @@ final class RestoreBusinessLease {
       );
       if (type != FileSystemEntityType.notFound) {
         if (type == FileSystemEntityType.file) {
-          throw RestoreBusinessLeaseUnavailable(registryKey);
+          if (!reclaimExistingOwner) {
+            throw RestoreBusinessLeaseUnavailable(registryKey);
+          }
+          // Flutter hot restart replaces the Dart isolate without replacing
+          // the native process. The old isolate cannot release this marker,
+          // while the new isolate has an empty in-memory lease registry. This
+          // opt-in is restricted to the debug app entry point; release builds
+          // and ordinary callers remain fail-closed.
+          await _deleteProcessOwner(ownerFile);
+        } else {
+          throw StateError('restore_business_lease_process_owner');
         }
-        throw StateError('restore_business_lease_process_owner');
       }
       try {
         await ownerFile.create(exclusive: true);

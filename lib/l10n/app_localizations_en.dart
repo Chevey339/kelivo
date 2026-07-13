@@ -1574,6 +1574,23 @@ class AppLocalizationsEn extends AppLocalizations {
       'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.';
 
   @override
+  String get backupRestoreBusinessLeaseUnavailableTitle =>
+      'Kelivo is already running';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.';
+
+  @override
+  String get backupRestoreFailureRestartButton => 'Restart Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => 'Copy diagnostic code';
+
+  @override
+  String get backupRestoreFailureCopied => 'Diagnostic code copied';
+
+  @override
   String backupRestoreFailureDiagnostic(String code) {
     return 'Diagnostic code: $code';
   }

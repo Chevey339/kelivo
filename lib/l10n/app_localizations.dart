@@ -3023,6 +3023,36 @@ abstract class AppLocalizations {
   /// **'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
   String get backupRestoreFailureContent;
 
+  /// No description provided for @backupRestoreBusinessLeaseUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is already running'**
+  String get backupRestoreBusinessLeaseUnavailableTitle;
+
+  /// No description provided for @backupRestoreBusinessLeaseUnavailableContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.'**
+  String get backupRestoreBusinessLeaseUnavailableContent;
+
+  /// No description provided for @backupRestoreFailureRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Kelivo'**
+  String get backupRestoreFailureRestartButton;
+
+  /// No description provided for @backupRestoreFailureCopyButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostic code'**
+  String get backupRestoreFailureCopyButton;
+
+  /// No description provided for @backupRestoreFailureCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code copied'**
+  String get backupRestoreFailureCopied;
+
   /// No description provided for @backupRestoreFailureDiagnostic.
   ///
   /// In en, this message translates to:

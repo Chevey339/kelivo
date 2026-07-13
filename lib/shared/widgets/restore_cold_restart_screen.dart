@@ -57,9 +57,8 @@ class _RestoreColdRestartScreenState extends State<RestoreColdRestartScreen> {
               constraints: const BoxConstraints(maxWidth: 560),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: colors.surfaceContainer,
+                  color: colors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colors.outlineVariant),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(24),
@@ -67,10 +66,18 @@ class _RestoreColdRestartScreenState extends State<RestoreColdRestartScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.restart_alt_rounded,
-                        size: 36,
-                        color: colors.primary,
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          Icons.restart_alt_rounded,
+                          size: 30,
+                          color: colors.onPrimaryContainer,
+                        ),
                       ),
                       const SizedBox(height: 20),
                       Text(
