@@ -681,6 +681,87 @@ class ChatService extends ChangeNotifier {
     return messages;
   }
 
+  Future<List<ChatMessage>> loadSelectedContextMessages(
+    String conversationId, {
+    required int truncateIndex,
+    required int limit,
+    String? throughRevisionId,
+    bool includeFollowingAssistant = false,
+  }) async {
+    if (!_initialized || limit <= 0) return const <ChatMessage>[];
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      final messages = _messagesCache[conversationId] ?? const <ChatMessage>[];
+      final groups = <String, List<ChatMessage>>{};
+      final order = <String>[];
+      for (final message in messages) {
+        final groupId = message.groupId ?? message.id;
+        if (!groups.containsKey(groupId)) order.add(groupId);
+        groups.putIfAbsent(groupId, () => <ChatMessage>[]).add(message);
+      }
+      final selections = getVersionSelections(conversationId);
+      final selected = <ChatMessage>[];
+      for (final groupId in order) {
+        final versions = groups[groupId]!
+          ..sort((a, b) => a.version.compareTo(b.version));
+        final version = selections[groupId];
+        selected.add(
+          versions.cast<ChatMessage?>().firstWhere(
+                (message) => message!.version == version,
+                orElse: () => null,
+              ) ??
+              versions.last,
+        );
+      }
+      var end = selected.length;
+      if (throughRevisionId != null) {
+        final target = selected.indexWhere(
+          (message) => message.id == throughRevisionId,
+        );
+        if (target < 0) return const <ChatMessage>[];
+        end = target + 1;
+        if (includeFollowingAssistant && selected[target].role == 'user') {
+          final assistant = selected.indexWhere(
+            (message) => message.role == 'assistant',
+            target + 1,
+          );
+          if (assistant >= 0) end = assistant + 1;
+        }
+      }
+      final start = truncateIndex >= 0 && truncateIndex <= end
+          ? truncateIndex
+          : 0;
+      final available = end - start;
+      final boundedStart = start + (available - limit).clamp(0, available);
+      return selected.sublist(boundedStart, end);
+    }
+    final messages = await _repo.getSelectedContextMessages(
+      conversationId,
+      truncateIndex: truncateIndex,
+      limit: limit,
+      throughRevisionId: throughRevisionId,
+      includeFollowingAssistant: includeFollowingAssistant,
+    );
+    await _cacheMessageArtifacts(messages);
+    return messages;
+  }
+
+  Future<int> getMaxMessageVersionForGroup(
+    String conversationId,
+    String groupId,
+  ) {
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      final versions = (_messagesCache[conversationId] ?? const <ChatMessage>[])
+          .where((message) => (message.groupId ?? message.id) == groupId)
+          .map((message) => message.version);
+      return Future<int>.value(
+        versions.isEmpty ? -1 : versions.reduce((a, b) => a > b ? a : b),
+      );
+    }
+    return _repo.getMaxMessageVersionForGroup(conversationId, groupId);
+  }
+
   List<ChatMessage> getMessagesRange(
     String conversationId, {
     required int start,

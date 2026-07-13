@@ -1397,6 +1397,183 @@ class ChatDatabaseRepository {
     }, resultCount: (rows) => rows.length);
   }
 
+  /// Loads the selected linear message versions needed for model context.
+  ///
+  /// Version collapsing, truncate-index application, tail limiting, and part
+  /// hydration intentionally happen in one SQL statement so a large
+  /// conversation is never materialized merely to discard its prefix.
+  Future<List<ChatMessage>> getSelectedContextMessages(
+    String conversationId, {
+    required int truncateIndex,
+    required int limit,
+    String? throughRevisionId,
+    bool includeFollowingAssistant = false,
+  }) async {
+    if (limit <= 0) return const <ChatMessage>[];
+    return _observer.measure(ChatDatabaseOperation.queryMessageRange, () async {
+      final result = await _db
+          .customSelect(
+            '''
+            WITH group_rows AS (
+              SELECT
+                COALESCE(m.group_id, m.id) AS group_id,
+                MIN(m.message_order) AS anchor_order,
+                MAX(m.version) AS latest_version
+              FROM message_rows m
+              WHERE m.conversation_id = ?
+              GROUP BY COALESCE(m.group_id, m.id)
+            ),
+            selections AS (
+              SELECT j.key AS group_id, CAST(j.value AS INTEGER) AS version
+              FROM conversation_rows c, json_each(c.version_selections_json) j
+              WHERE c.id = ?
+            ),
+            ranked AS (
+              SELECT
+                m.id AS revision_id,
+                g.group_id,
+                m.role,
+                g.anchor_order,
+                ROW_NUMBER() OVER (
+                  PARTITION BY g.group_id
+                  ORDER BY
+                    CASE
+                      WHEN m.version = COALESCE(s.version, g.latest_version)
+                      THEN 0 ELSE 1
+                    END,
+                    m.version DESC,
+                    m.message_order DESC,
+                    m.id DESC
+                ) AS version_rank
+              FROM group_rows g
+              JOIN message_rows m
+                ON m.conversation_id = ?
+               AND COALESCE(m.group_id, m.id) = g.group_id
+              LEFT JOIN selections s ON s.group_id = g.group_id
+            ),
+            ordered AS (
+              SELECT
+                revision_id,
+                group_id,
+                role,
+                ROW_NUMBER() OVER (ORDER BY anchor_order, revision_id) - 1
+                  AS logical_index,
+                COUNT(*) OVER () AS total_count
+              FROM ranked
+              WHERE version_rank = 1
+            ),
+            target AS (
+              SELECT COALESCE(group_id, id) AS group_id, role
+              FROM message_rows
+              WHERE conversation_id = ? AND id = ?
+            ),
+            cutoff AS (
+              SELECT CASE
+                WHEN ? AND target.role = 'user' THEN COALESCE(
+                  (
+                    SELECT MIN(candidate.logical_index)
+                    FROM ordered candidate
+                    WHERE candidate.logical_index > selected.logical_index
+                      AND candidate.role = 'assistant'
+                  ),
+                  selected.logical_index
+                )
+                ELSE selected.logical_index
+              END AS logical_index
+              FROM target
+              JOIN ordered selected ON selected.group_id = target.group_id
+            ),
+            limited AS (
+              SELECT revision_id, logical_index
+              FROM ordered
+              WHERE logical_index >= CASE
+                WHEN ? >= 0 AND ? <= total_count THEN ?
+                ELSE 0
+              END
+                AND (
+                  ? IS NULL OR
+                  logical_index <= (SELECT logical_index FROM cutoff)
+                )
+              ORDER BY logical_index DESC
+              LIMIT ?
+            )
+            SELECT
+              m.*,
+              p.ordinal AS part_ordinal,
+              p.kind AS part_kind,
+              p.payload AS part_payload,
+              p.created_at AS part_created_at,
+              p.updated_at AS part_updated_at
+            FROM limited l
+            JOIN message_rows m ON m.id = l.revision_id
+            LEFT JOIN message_part_rows p ON p.revision_id = m.id
+            ORDER BY l.logical_index, p.ordinal;
+            ''',
+            variables: [
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(conversationId),
+              Variable<String>(throughRevisionId ?? ''),
+              Variable<bool>(includeFollowingAssistant),
+              Variable<int>(truncateIndex),
+              Variable<int>(truncateIndex),
+              Variable<int>(truncateIndex),
+              Variable<String>(throughRevisionId),
+              Variable<int>(limit),
+            ],
+            readsFrom: {
+              _db.conversationRows,
+              _db.messageRows,
+              _db.messagePartRows,
+            },
+          )
+          .get();
+      final rowsById = <String, MessageRow>{};
+      final partsById = <String, List<MessagePartRow>>{};
+      for (final row in result) {
+        final message = _db.messageRows.map(row.data);
+        rowsById.putIfAbsent(message.id, () => message);
+        final ordinal = row.readNullable<int>('part_ordinal');
+        if (ordinal == null) continue;
+        partsById
+            .putIfAbsent(message.id, () => <MessagePartRow>[])
+            .add(
+              MessagePartRow(
+                conversationId: message.conversationId,
+                revisionId: message.id,
+                ordinal: ordinal,
+                kind: row.read<String>('part_kind'),
+                payload: row.read<String>('part_payload'),
+                createdAt: _dateTimeFromSqlite(row.data['part_created_at']),
+                updatedAt: _dateTimeFromSqlite(row.data['part_updated_at']),
+              ),
+            );
+      }
+      return [
+        for (final message in rowsById.values)
+          _messageFromRow(message, authoritativeParts: partsById[message.id]),
+      ];
+    }, resultCount: (rows) => rows.length);
+  }
+
+  Future<int> getMaxMessageVersionForGroup(
+    String conversationId,
+    String groupId,
+  ) async {
+    final maxVersion = _db.messageRows.version.max();
+    final row =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([maxVersion])
+              ..where(
+                _db.messageRows.conversationId.equals(conversationId) &
+                    (_db.messageRows.groupId.equals(groupId) |
+                        _db.messageRows.id.equals(groupId)),
+              ))
+            .getSingle();
+    return row.read(maxVersion) ?? -1;
+  }
+
   Future<LinearMessageWindow> loadLinearMessageWindow({
     required String conversationId,
     String? beforeRevisionId,

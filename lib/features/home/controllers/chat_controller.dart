@@ -423,6 +423,21 @@ class ChatController extends ChangeNotifier {
     return _chatService.loadMessages(conversation.id);
   }
 
+  Future<List<ChatMessage>> messagesForGenerationContext(
+    Conversation conversation, {
+    required int maxMessages,
+    String? throughRevisionId,
+    bool includeFollowingAssistant = false,
+  }) {
+    return _chatService.loadSelectedContextMessages(
+      conversation.id,
+      truncateIndex: conversation.truncateIndex,
+      limit: maxMessages,
+      throughRevisionId: throughRevisionId,
+      includeFollowingAssistant: includeFollowingAssistant,
+    );
+  }
+
   Conversation conversationForCompleteHistoryContext(
     Conversation conversation,
   ) {

@@ -158,4 +158,107 @@ void main() {
       expect(await repository.getMessageIndex(conversation.id, later.id), 9);
     },
   );
+
+  test(
+    'context query collapses versions before truncate and tail limit',
+    () async {
+      final root = await Directory.systemTemp.createTemp('context_tail_test_');
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/chat.sqlite'),
+      );
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+
+      final conversation = Conversation(
+        id: 'conversation',
+        title: 'Context',
+        truncateIndex: 1,
+        versionSelections: const {'answer': 0},
+      );
+      final messages = <ChatMessage>[
+        ChatMessage(
+          id: 'user-0',
+          role: 'user',
+          content: 'ignored prefix',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'answer-v0',
+          role: 'assistant',
+          content: 'selected answer',
+          reasoningText: 'selected reasoning',
+          conversationId: conversation.id,
+          groupId: 'answer',
+          version: 0,
+        ),
+        ChatMessage(
+          id: 'user-1',
+          role: 'user',
+          content: 'middle',
+          conversationId: conversation.id,
+        ),
+        ChatMessage(
+          id: 'answer-v1',
+          role: 'assistant',
+          content: 'unselected answer',
+          conversationId: conversation.id,
+          groupId: 'answer',
+          version: 1,
+        ),
+        ChatMessage(
+          id: 'assistant-tail',
+          role: 'assistant',
+          content: 'tail',
+          conversationId: conversation.id,
+        ),
+      ];
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          for (final (index, message) in messages.indexed)
+            (message: message, messageOrder: index),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final complete = await repository.getSelectedContextMessages(
+        conversation.id,
+        truncateIndex: conversation.truncateIndex,
+        limit: 10,
+      );
+      final bounded = await repository.getSelectedContextMessages(
+        conversation.id,
+        truncateIndex: conversation.truncateIndex,
+        limit: 2,
+      );
+      final throughUser = await repository.getSelectedContextMessages(
+        conversation.id,
+        truncateIndex: -1,
+        limit: 10,
+        throughRevisionId: 'user-1',
+        includeFollowingAssistant: true,
+      );
+
+      expect(complete.map((message) => message.id), [
+        'answer-v0',
+        'user-1',
+        'assistant-tail',
+      ]);
+      expect(complete.first.content, 'selected answer');
+      expect(complete.first.reasoningText, 'selected reasoning');
+      expect(bounded.map((message) => message.id), [
+        'user-1',
+        'assistant-tail',
+      ]);
+      expect(throughUser.map((message) => message.id), [
+        'user-0',
+        'answer-v0',
+        'user-1',
+        'assistant-tail',
+      ]);
+    },
+  );
 }

@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
+import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
@@ -787,7 +788,10 @@ class ChatActions {
     }
 
     final existingContextMessages = await chatController
-        .messagesForCompleteHistoryContext(conversation);
+        .messagesForGenerationContext(
+          conversation,
+          maxMessages: _contextReadLimit(assistant),
+        );
     if (_hasUnsupportedAudioAttachments(
       messages: existingContextMessages,
       conversation: conversation,
@@ -851,16 +855,16 @@ class ChatActions {
         messageId: assistantMessage.id,
         enableReasoning: enableReasoning,
       );
-      final apiContextMessages = await chatController
-          .messagesForCompleteHistoryContext(conversation);
+      final apiContextMessages = <ChatMessage>[
+        ...existingContextMessages,
+        userMessage,
+        assistantMessage,
+      ];
       final prepared = await messageGenerationService
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: _conversationForMessageContext(
-              conversation,
-              apiContextMessages,
-            ),
+            currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -908,6 +912,17 @@ class ChatActions {
     }
   }
 
+  int _contextReadLimit(Assistant? assistant) {
+    if ((assistant?.limitContextMessages ?? true) &&
+        (assistant?.contextMessageSize ?? 0) > 0) {
+      return assistant!.contextMessageSize.clamp(
+        Assistant.minContextMessageSize,
+        Assistant.maxContextMessageSize,
+      );
+    }
+    return Assistant.maxContextMessageSize;
+  }
+
   // ============================================================================
   // Regenerate Message
   // ============================================================================
@@ -942,8 +957,17 @@ class ChatActions {
 
     await cancelStreaming(conversation);
 
-    final completeMessages = await chatController
-        .messagesForCompleteHistoryContext(conversation);
+    final isTemporaryConversation = chatService.isTemporaryConversation(
+      conversation.id,
+    );
+    final completeMessages = isTemporaryConversation
+        ? await chatController.messagesForCompleteHistoryContext(conversation)
+        : await chatController.messagesForGenerationContext(
+            conversation,
+            maxMessages: _contextReadLimit(assistant),
+            throughRevisionId: message.id,
+            includeFollowingAssistant: true,
+          );
     final idx = completeMessages.indexWhere((m) => m.id == message.id);
     if (idx < 0) {
       return ChatActionResult.error('message_not_found');
@@ -979,7 +1003,9 @@ class ChatActions {
     );
     if (_hasUnsupportedAudioAttachments(
       messages: projectedMessages,
-      conversation: conversation,
+      conversation: isTemporaryConversation
+          ? conversation
+          : conversation.copyWith(truncateIndex: -1),
       settings: settings,
       providerKey: providerKey,
       modelId: modelId,
@@ -990,9 +1016,7 @@ class ChatActions {
 
     if (shouldPhysicallyRemoveRegenerationTail(
       deleteTrailingEnabled: settings.regenerateDeleteTrailingMessages,
-      isTemporaryConversation: chatService.isTemporaryConversation(
-        conversation.id,
-      ),
+      isTemporaryConversation: isTemporaryConversation,
     )) {
       final removeIds = await messageGenerationService.removeTrailingMessages(
         messages: completeMessages,
@@ -1012,12 +1036,19 @@ class ChatActions {
     if (targetGroupId == null) {
       return ChatActionResult.error('invalid_versioning');
     }
+    final nextVersion = isTemporaryConversation
+        ? versioning.nextVersion
+        : await chatService.getMaxMessageVersionForGroup(
+                conversation.id,
+                targetGroupId,
+              ) +
+              1;
     final begin = await messageGenerationService.beginRegeneration(
       conversationId: conversation.id,
       modelId: modelId,
       providerKey: providerKey,
       groupId: targetGroupId,
-      version: versioning.nextVersion,
+      version: nextVersion,
       truncateFuture: settings.regenerateDeleteTrailingMessages,
     );
     final assistantMessage = begin.assistantMessage;
@@ -1067,11 +1098,13 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: regenerationMessages,
             versionSelections: _versionSelections,
-            currentConversation: _conversationForMessageContext(
-              conversation,
-              regenerationMessages,
-              maxRawTruncateIndex: versioning.lastKeep,
-            ),
+            currentConversation: isTemporaryConversation
+                ? _conversationForMessageContext(
+                    conversation,
+                    regenerationMessages,
+                    maxRawTruncateIndex: versioning.lastKeep,
+                  )
+                : conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistantId,
@@ -1141,8 +1174,11 @@ class ChatActions {
     if (visibleIndex < 0 || message.role != 'assistant') {
       return ChatActionResult.error('message_not_found');
     }
-    final completeMessages = await chatController
-        .messagesForCompleteHistoryContext(conversation);
+    final completeMessages = await chatController.messagesForGenerationContext(
+      conversation,
+      maxMessages: _contextReadLimit(assistant),
+      throughRevisionId: message.id,
+    );
     final contextIndex = completeMessages.indexWhere(
       (candidate) => candidate.id == message.id,
     );
@@ -1183,10 +1219,7 @@ class ChatActions {
           .prepareApiMessagesWithInjections(
             messages: apiContextMessages,
             versionSelections: _versionSelections,
-            currentConversation: _conversationForMessageContext(
-              conversation,
-              apiContextMessages,
-            ),
+            currentConversation: conversation.copyWith(truncateIndex: -1),
             settings: settings,
             assistant: assistant,
             assistantId: assistant?.id,
