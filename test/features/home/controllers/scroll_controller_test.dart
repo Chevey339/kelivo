@@ -154,9 +154,178 @@ void main() {
       chatScrollController.dispose();
       scrollController.dispose();
     });
+
+    testWidgets('terminal content growth does not auto-follow', (tester) async {
+      var itemCount = 20;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => false,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      final terminalOffset = scrollController.offset;
+
+      itemCount++;
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+
+      expect(scrollController.offset, terminalOffset);
+      expect(
+        scrollController.offset,
+        lessThan(scrollController.position.maxScrollExtent),
+      );
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
+    testWidgets('user scroll detaches and bottom button restores follow', (
+      tester,
+    ) async {
+      var itemCount = 24;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      scrollController.jumpTo(0);
+      chatScrollController.handleUserScrollIntent();
+      final detachedOffset = scrollController.offset;
+
+      itemCount++;
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      expect(scrollController.offset, detachedOffset);
+      expect(chatScrollController.autoStickToBottom, isFalse);
+
+      chatScrollController.forceScrollToBottom();
+      await tester.pump();
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      final restoredOffset = scrollController.offset;
+      itemCount++;
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      expect(scrollController.offset, greaterThan(restoredOffset));
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
+    testWidgets('streaming tail growth is monotonic without rebound', (
+      tester,
+    ) async {
+      var itemCount = 20;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      chatScrollController.scrollToBottom(animate: false);
+      await tester.pump();
+      var previous = scrollController.offset;
+
+      for (var frame = 0; frame < 6; frame++) {
+        itemCount++;
+        await tester.pumpWidget(
+          _ScrollHarness(
+            scrollController: scrollController,
+            itemCount: itemCount,
+          ),
+        );
+        expect(scrollController.offset, greaterThanOrEqualTo(previous));
+        expect(
+          scrollController.offset,
+          scrollController.position.maxScrollExtent,
+        );
+        previous = scrollController.offset;
+      }
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
   });
 
   group('ChatScrollController message navigation', () {
+    testWidgets('collapsed target index scrolls through the observer', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: i.isEven ? 'user' : 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+      await tester.pumpWidget(
+        _ObservedScrollHarness(
+          scrollController: scrollController,
+          observerController: chatScrollController.observerController,
+          messages: messages,
+        ),
+      );
+
+      final jump = chatScrollController.scrollToMessageId(
+        targetId: 'message-25',
+        targetIndex: 25,
+      );
+      await tester.pumpAndSettle();
+      await jump;
+
+      expect(chatScrollController.lastJumpUserMessageId, 'message-25');
+      expect(scrollController.offset, greaterThan(0));
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('上一条消息在没有观察回调时仍以当前可见项为锚点', (tester) async {
       final messages = <_NavMessage>[
         for (var i = 0; i < 40; i++)

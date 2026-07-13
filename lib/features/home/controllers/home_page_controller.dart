@@ -1796,7 +1796,6 @@ class HomePageController extends ChangeNotifier {
       try {
         await WidgetsBinding.instance.endOfFrame;
       } catch (_) {}
-      return;
     }
     final index = _chatController.indexOfCollapsedMessageId(targetId);
     if (index < 0) return;
