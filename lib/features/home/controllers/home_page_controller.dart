@@ -923,18 +923,20 @@ class HomePageController extends ChangeNotifier {
   }) async {
     if (!deleteAllVersions) return selectedMessageIds;
 
+    final conversation = currentConversation;
+    if (conversation == null) return const <String>{};
     final selectedGroupIds = <String>{};
-    final allMessages = await _loadAllCurrentConversationMessages();
-    for (final message in allMessages) {
+    final projections = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
+    for (final message in projections) {
       if (selectedMessageIds.contains(message.id)) {
         selectedGroupIds.add(message.groupId ?? message.id);
       }
     }
-    return {
-      for (final message in allMessages)
-        if (selectedGroupIds.contains(message.groupId ?? message.id))
-          message.id,
-    };
+    return _chatService.loadMessageIdsForGroups(
+      conversation.id,
+      selectedGroupIds,
+    );
   }
 
   Future<void> forkConversation(ChatMessage message) async {
@@ -1339,15 +1341,13 @@ class HomePageController extends ChangeNotifier {
     );
   }
 
-  Future<List<ChatMessage>> _loadAllCurrentConversationMessages() async {
-    final conversation = currentConversation;
-    if (conversation == null) return const [];
-    return _chatService.loadMessages(conversation.id);
+  void selectAll() {
+    unawaited(_selectAllProjected());
   }
 
-  void selectAll() {
-    final collapsed = _chatController
-        .allCollapsedMessagesForCurrentConversation();
+  Future<void> _selectAllProjected() async {
+    final collapsed = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
     for (final m in collapsed) {
       if (m.role == 'user' || m.role == 'assistant') {
         _selectedItems.add(m.id);
@@ -1357,8 +1357,12 @@ class HomePageController extends ChangeNotifier {
   }
 
   void toggleSelectAll() {
-    final collapsed = _chatController
-        .allCollapsedMessagesForCurrentConversation();
+    unawaited(_toggleSelectAllProjected());
+  }
+
+  Future<void> _toggleSelectAllProjected() async {
+    final collapsed = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
     final selectable = collapsed
         .where((m) => m.role == 'user' || m.role == 'assistant')
         .toList();
@@ -1378,8 +1382,12 @@ class HomePageController extends ChangeNotifier {
   }
 
   void invertSelection() {
-    final collapsed = _chatController
-        .allCollapsedMessagesForCurrentConversation();
+    unawaited(_invertProjectedSelection());
+  }
+
+  Future<void> _invertProjectedSelection() async {
+    final collapsed = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
     for (final m in collapsed) {
       if (m.role != 'user' && m.role != 'assistant') continue;
       if (_selectedItems.contains(m.id)) {
@@ -1406,12 +1414,20 @@ class HomePageController extends ChangeNotifier {
   Future<List<ChatMessage>> _selectedCollapsedMessages() async {
     final convo = currentConversation;
     if (convo == null) return const <ChatMessage>[];
-    final storedMessages = await _chatService.loadMessages(convo.id);
-    return ChatController.selectedCollapsedMessagesForExport(
-      collapsedMessages: _chatController.collapseVersions(storedMessages),
-      selectedIds: _selectedItems,
-      storedMessages: storedMessages,
-    );
+    final projections = await _chatController
+        .loadAllCollapsedMessagesForCurrentConversation();
+    final ids = [
+      for (final message in projections)
+        if (_selectedItems.contains(message.id)) message.id,
+    ];
+    final storedMessages = await _chatService.loadMessagesByIds(ids);
+    final storedById = {
+      for (final message in storedMessages) message.id: message,
+    };
+    return [
+      for (final id in ids)
+        if (storedById[id] != null) storedById[id]!,
+    ];
   }
 
   Future<void> exportSelectedAsMarkdown() async {

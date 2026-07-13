@@ -47,6 +47,14 @@ class _FakeLazyChatService extends ChatService {
   }
 
   @override
+  Future<List<ChatMessage>> loadSelectedMessageProjections(
+    String conversationId,
+  ) async {
+    activeTimelineLoadCalls++;
+    return List<ChatMessage>.of(_messages);
+  }
+
+  @override
   int getMessageCount(String conversationId) => _messages.length;
 
   @override
@@ -1039,9 +1047,7 @@ void main() {
         controller = ChatController(chatService: chatService);
         await controller.setCurrentConversationAndLoad(conversation);
 
-        final opened = await controller.openAroundPersistedMessage(
-          regenerated,
-        );
+        final opened = await controller.openAroundPersistedMessage(regenerated);
 
         expect(opened, isTrue);
         expect(

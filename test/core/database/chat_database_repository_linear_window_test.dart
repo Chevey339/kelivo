@@ -241,6 +241,10 @@ void main() {
         throughRevisionId: 'user-1',
         includeFollowingAssistant: true,
       );
+      final projections = await repository.getSelectedMessageProjections(
+        conversation.id,
+        summaryCharacters: 8,
+      );
 
       expect(complete.map((message) => message.id), [
         'answer-v0',
@@ -259,6 +263,13 @@ void main() {
         'user-1',
         'assistant-tail',
       ]);
+      expect(projections.map((message) => message.id), [
+        'user-0',
+        'answer-v0',
+        'user-1',
+        'assistant-tail',
+      ]);
+      expect(projections.first.content, 'ignored ');
     },
   );
 }

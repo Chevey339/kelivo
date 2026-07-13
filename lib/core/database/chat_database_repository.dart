@@ -1574,6 +1574,107 @@ class ChatDatabaseRepository {
     return row.read(maxVersion) ?? -1;
   }
 
+  Future<List<ChatMessage>> getSelectedMessageProjections(
+    String conversationId, {
+    int summaryCharacters = 200,
+  }) async {
+    final safeSummaryCharacters = summaryCharacters.clamp(0, 200);
+    final rows = await _db
+        .customSelect(
+          '''
+          WITH group_rows AS (
+            SELECT
+              COALESCE(m.group_id, m.id) AS group_id,
+              MIN(m.message_order) AS anchor_order,
+              MAX(m.version) AS latest_version
+            FROM message_rows m
+            WHERE m.conversation_id = ?
+            GROUP BY COALESCE(m.group_id, m.id)
+          ),
+          selections AS (
+            SELECT j.key AS group_id, CAST(j.value AS INTEGER) AS version
+            FROM conversation_rows c, json_each(c.version_selections_json) j
+            WHERE c.id = ?
+          ),
+          ranked AS (
+            SELECT
+              m.id,
+              m.role,
+              m.timestamp,
+              m.conversation_id,
+              COALESCE(m.group_id, m.id) AS group_id,
+              m.version,
+              g.anchor_order,
+              ROW_NUMBER() OVER (
+                PARTITION BY g.group_id
+                ORDER BY
+                  CASE
+                    WHEN m.version = COALESCE(s.version, g.latest_version)
+                    THEN 0 ELSE 1
+                  END,
+                  m.version DESC,
+                  m.message_order DESC,
+                  m.id DESC
+              ) AS version_rank
+            FROM group_rows g
+            JOIN message_rows m
+              ON m.conversation_id = ?
+             AND COALESCE(m.group_id, m.id) = g.group_id
+            LEFT JOIN selections s ON s.group_id = g.group_id
+          )
+          SELECT
+            ranked.id,
+            ranked.role,
+            SUBSTR(m.content, 1, ?) AS content_summary,
+            ranked.timestamp,
+            ranked.conversation_id,
+            ranked.group_id,
+            ranked.version
+          FROM ranked
+          JOIN message_rows m ON m.id = ranked.id
+          WHERE ranked.version_rank = 1
+          ORDER BY ranked.anchor_order, ranked.group_id;
+          ''',
+          variables: [
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<int>(safeSummaryCharacters),
+          ],
+          readsFrom: {_db.conversationRows, _db.messageRows},
+        )
+        .get();
+    return [
+      for (final row in rows)
+        ChatMessage(
+          id: row.read<String>('id'),
+          role: row.read<String>('role'),
+          content: row.read<String>('content_summary'),
+          timestamp: _dateTimeFromSqlite(row.data['timestamp']),
+          conversationId: row.read<String>('conversation_id'),
+          groupId: row.read<String>('group_id'),
+          version: row.read<int>('version'),
+        ),
+    ];
+  }
+
+  Future<Set<String>> getMessageIdsForGroups(
+    String conversationId,
+    Set<String> groupIds,
+  ) async {
+    if (groupIds.isEmpty) return const <String>{};
+    final rows =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([_db.messageRows.id])
+              ..where(
+                _db.messageRows.conversationId.equals(conversationId) &
+                    (_db.messageRows.groupId.isIn(groupIds) |
+                        _db.messageRows.id.isIn(groupIds)),
+              ))
+            .get();
+    return {for (final row in rows) row.read(_db.messageRows.id)!};
+  }
+
   Future<LinearMessageWindow> loadLinearMessageWindow({
     required String conversationId,
     String? beforeRevisionId,

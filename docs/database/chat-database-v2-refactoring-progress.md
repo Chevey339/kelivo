@@ -44,7 +44,7 @@
 | Phase 5：Data Operations 与退役 | 8 / 9 | `进行中`（仅 OPS-08 发布矩阵未完成） | OPS-01～07 已完成且按 PD-15 保留；OPS-04/05/03 已由 LIN-05 改为"选中版本/全部版本"；OPS-09 已改为迁移后用户主动清理“聊天记录（旧）”；OPS-08 发布证据仍为 2/5 |
 | Phase 6：线性回归 v3（PD-15） | 8 / 8 | `已完成` | LIN-01～08 全部闭环：完全线性读写、多版本旧行为、滚动/跳转、schema 10 graph 退役、周边双口径与最终门禁均通过 |
 | Phase 7：产品行为收尾（PD-16） | 4 / 4 | `已完成` | PL-01～04 已闭环：merge 重启弹窗、同 PID orphan lease 安全回收、统计全版本单口径、终态恢复痕迹用户清理 |
-| Phase 8：性能回归与数据库改名（PD-17） | 2 / 4 | `进行中` | PERF-01/02 已完成：启动路径零全库扫描；发送、持久会话重生成与工具续写改为 SQL 内版本折叠 + truncate + 有界上下文读取，单次发送只读取一次历史 |
+| Phase 8：性能回归与数据库改名（PD-17） | 3 / 4 | `进行中` | PERF-01～03 已完成：启动零全库扫描、生成上下文有界；消息缓存使用 720 条/8 MiB LRU 双上限，迷你地图/全选/批删计划只取轻量投影，导出按选中 ID hydrate 全文 |
 
 ## 3. 已完成的审计工作
 
@@ -501,7 +501,7 @@ dart run tool/run_restore_process_harness.dart \
 | --- | --- | --- | --- | --- |
 | PERF-01 | 启动零全库扫描：废除 session receipt 机制与 `_recoverUncleanSession`；迁移去掉前后全库校验；全库 PRAGMA 检查仅保留恢复页/快照/显式诊断 | 无 | `已完成` | gateway 不再发布/清理 session receipt；安装门不读取残留 receipt，正常启动、首次 adoption、迁移前后、identity 写入均只执行结构/schema/identity 校验。快照 `_validateRawSnapshot` 与显式 `validateIntegrity` 保持完整检查；定向 31 项与 analyze 通过。3GB 真机首帧仍待发布设备实测 |
 | PERF-02 | 上下文构建限量读取：repository 新增尾部限量查询；单次发送内合并复用一次；重生成/工具续写按目标游标读取有界前缀 | 无 | `已完成` | repository 单 SQL 先按持久化版本选择折叠，再应用 truncateIndex/目标游标/尾部上限，并在同一查询 hydrate parts；发送历史只读一次并复用于附件预检/API 构建，持久会话重生成不再全量载入。无限上下文设置按全局安全上限 1024 条读取；定向 51 项与 analyze 通过 |
-| PERF-03 | 消息缓存有界 + 重操作轻量投影：`_messagesCache` LRU 双上限；迷你地图/全选/批删计划/导出列表用投影查询，导出写文件流式取全文 | 无 | `待实施` | 退出 1GB 会话后内存回落；迷你地图/全选万条会话 < 300ms |
+| PERF-03 | 消息缓存有界 + 重操作轻量投影：`_messagesCache` LRU 双上限；迷你地图/全选/批删计划/导出列表用投影查询，导出按需取全文 | 无 | `已完成` | 非当前持久会话缓存按 LRU 受 720 条/8 MiB 双上限约束，当前窗口及临时会话豁免；切换会话立即驱逐超限旧缓存并同步清理 artifact cache。迷你地图/全选查询只返回选中版本的 id/group/version/role/时间戳/≤200 字摘要；删除所有版本只查 ID，选择导出仅 hydrate 已选 ID；portable 全量导出继续按 100 条分页流式写文件。定向 51 项与 analyze 通过；万条 <300ms/1GB RSS 回落待真机 profile |
 | PERF-04 | 数据库改名 `kelivo.db`：常量/备份 ZIP entry/restore 清单/存储统计；不读取或迁移旧 `kelivo.sqlite`，不读旧名 v2 备份 | PERF-01 同批 | `待实施` | 新安装与 Hive 升级只生成新名；新备份 round trip 通过；Hive JSON 导入不受影响 |
 
 ## 12. 数据迁移覆盖台账

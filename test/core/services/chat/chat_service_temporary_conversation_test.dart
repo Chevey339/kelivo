@@ -110,6 +110,23 @@ void main() {
     ]);
   });
 
+  test('switching conversations evicts an oversized previous cache', () async {
+    final service = createService();
+    await service.init();
+    final first = await service.createConversation(title: 'Large');
+    await service.addMessage(
+      conversationId: first.id,
+      role: 'user',
+      content: 'x' * (5 * 1024 * 1024),
+    );
+    expect(await service.loadMessages(first.id), hasLength(1));
+
+    await service.createConversation(title: 'Next');
+
+    expect(service.getMessages(first.id), isEmpty);
+    expect(service.getMessageCount(first.id), 1);
+  });
+
   test(
     'persistent attachment uses delayed reference GC after message delete',
     () async {

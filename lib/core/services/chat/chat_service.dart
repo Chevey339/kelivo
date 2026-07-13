@@ -64,6 +64,8 @@ class ChatService extends ChangeNotifier {
   static const int defaultInitialTextBudget = 20000;
   static const int defaultHistoryPageSize = 20;
   static const int defaultLoadedWindowMax = 360;
+  static const int _messageCacheMaxEntries = 720;
+  static const int _messageCacheMaxBytes = 8 * 1024 * 1024;
   static const int _assetReferenceBackfillVersion = 2;
   static const Duration _assetGcDelay = Duration(days: 7);
 
@@ -498,6 +500,54 @@ class ChatService extends ChangeNotifier {
       for (final id in _messageOrderIds[conversationId] ?? const <String>[])
         if (byId[id] != null) byId[id]!,
     ];
+    _touchMessageCache(conversationId);
+    _enforceMessageCacheLimits();
+  }
+
+  void _touchMessageCache(String conversationId) {
+    final messages = _messagesCache.remove(conversationId);
+    if (messages != null) _messagesCache[conversationId] = messages;
+  }
+
+  void _enforceMessageCacheLimits() {
+    var entries = 0;
+    var bytes = 0;
+    for (final entry in _messagesCache.entries) {
+      if (entry.key == _currentConversationId ||
+          _temporaryConversationIds.contains(entry.key)) {
+        continue;
+      }
+      entries += entry.value.length;
+      bytes += entry.value.fold<int>(0, (sum, message) {
+        return sum +
+            message.content.length * 2 +
+            (message.reasoningText?.length ?? 0) * 2 +
+            (message.translation?.length ?? 0) * 2;
+      });
+    }
+    while ((entries > _messageCacheMaxEntries ||
+            bytes > _messageCacheMaxBytes) &&
+        _messagesCache.isNotEmpty) {
+      final candidate = _messagesCache.entries.firstWhere(
+        (entry) =>
+            entry.key != _currentConversationId &&
+            !_temporaryConversationIds.contains(entry.key),
+        orElse: () => const MapEntry('', <ChatMessage>[]),
+      );
+      if (candidate.key.isEmpty) break;
+      _messagesCache.remove(candidate.key);
+      entries -= candidate.value.length;
+      bytes -= candidate.value.fold<int>(0, (sum, message) {
+        return sum +
+            message.content.length * 2 +
+            (message.reasoningText?.length ?? 0) * 2 +
+            (message.translation?.length ?? 0) * 2;
+      });
+      for (final message in candidate.value) {
+        _toolEventsCache.remove(message.id);
+        _geminiThoughtSigsCache.remove(message.id);
+      }
+    }
   }
 
   List<Conversation> getAllConversations() {
@@ -678,6 +728,8 @@ class ChatService extends ChangeNotifier {
 
     // Cache the result
     _messagesCache[conversationId] = List.of(messages);
+    _touchMessageCache(conversationId);
+    _enforceMessageCacheLimits();
     return messages;
   }
 
@@ -760,6 +812,51 @@ class ChatService extends ChangeNotifier {
       );
     }
     return _repo.getMaxMessageVersionForGroup(conversationId, groupId);
+  }
+
+  Future<List<ChatMessage>> loadSelectedMessageProjections(
+    String conversationId,
+  ) async {
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return loadSelectedContextMessages(
+        conversationId,
+        truncateIndex: -1,
+        limit: _messagesCache[conversationId]?.length ?? 0,
+      );
+    }
+    return _repo.getSelectedMessageProjections(conversationId);
+  }
+
+  Future<List<ChatMessage>> loadMessagesByIds(List<String> ids) async {
+    if (ids.isEmpty) return const <ChatMessage>[];
+    final temporaryById = <String, ChatMessage>{
+      for (final conversationId in _temporaryConversationIds)
+        for (final message
+            in _messagesCache[conversationId] ?? const <ChatMessage>[])
+          message.id: message,
+    };
+    if (ids.every(temporaryById.containsKey)) {
+      return [for (final id in ids) temporaryById[id]!];
+    }
+    final messages = await _repo.getMessagesByIds(ids);
+    await _cacheMessageArtifacts(messages);
+    return messages;
+  }
+
+  Future<Set<String>> loadMessageIdsForGroups(
+    String conversationId,
+    Set<String> groupIds,
+  ) {
+    if (_temporaryConversationIds.contains(conversationId) ||
+        _draftConversations.containsKey(conversationId)) {
+      return Future<Set<String>>.value({
+        for (final message
+            in _messagesCache[conversationId] ?? const <ChatMessage>[])
+          if (groupIds.contains(message.groupId ?? message.id)) message.id,
+      });
+    }
+    return _repo.getMessageIdsForGroups(conversationId, groupIds);
   }
 
   List<ChatMessage> getMessagesRange(
@@ -911,6 +1008,7 @@ class ChatService extends ChangeNotifier {
 
     await _saveConversation(conversation);
     _currentConversationId = conversation.id;
+    _enforceMessageCacheLimits();
     notifyListeners();
     return conversation;
   }
@@ -952,6 +1050,7 @@ class ChatService extends ChangeNotifier {
       _messagesCache[conversation.id] = <ChatMessage>[];
     }
     _currentConversationId = conversation.id;
+    _enforceMessageCacheLimits();
     notifyListeners();
     return conversation;
   }
@@ -2499,6 +2598,7 @@ class ChatService extends ChangeNotifier {
       _discardTemporaryConversation(_currentConversationId);
     }
     _currentConversationId = id;
+    _enforceMessageCacheLimits();
     notifyListeners();
   }
 

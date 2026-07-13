@@ -401,14 +401,7 @@ class ChatController extends ChangeNotifier {
   loadAllCollapsedMessagesForCurrentConversation() async {
     final conversation = _currentConversation;
     if (conversation == null) return const <ChatMessage>[];
-    final active = await _chatService.loadActiveTimelineMessages(
-      conversation.id,
-    );
-    if (active.isNotEmpty ||
-        _chatService.getMessageCount(conversation.id) == 0) {
-      return collapseVersions(active);
-    }
-    return collapseVersions(await _chatService.loadMessages(conversation.id));
+    return _chatService.loadSelectedMessageProjections(conversation.id);
   }
 
   Future<List<ChatMessage>> allMessagesForCurrentConversationContext() async {
