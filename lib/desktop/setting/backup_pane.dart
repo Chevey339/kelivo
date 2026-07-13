@@ -19,6 +19,7 @@ import '../../shared/widgets/ios_switch.dart';
 import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
+import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../../utils/platform_utils.dart';
 import '../widgets/desktop_select_dropdown.dart';
@@ -225,42 +226,11 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       return;
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    if (mode == RestoreMode.merge) {
-      final report = rootCtx.read<BackupProvider>().lastMergeReport;
-      if (report != null) {
-        showAppSnackBar(
-          rootCtx,
-          message: l10n.backupPageMergeReportSummary(
-            report.importedConversations,
-            report.deduplicatedConversations,
-            report.remappedConversations,
-          ),
-        );
-      }
-      return;
-    }
-    // Inform restart requirement
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              if (await requestAppRestart(ctx, PlatformUtils.restartApp) &&
-                  ctx.mounted) {
-                Navigator.of(ctx).pop();
-              }
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
+    await showBackupRestartRequiredDialog(
+      rootCtx,
+      mergeReport: mode == RestoreMode.merge
+          ? rootCtx.read<BackupProvider>().lastMergeReport
+          : null,
     );
   }
 
@@ -1469,42 +1439,9 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    if (mode == RestoreMode.merge) {
-      final report = widget.mergeReport();
-      if (report != null) {
-        showAppSnackBar(
-          rootCtx,
-          message: l10n.backupPageMergeReportSummary(
-            report.importedConversations,
-            report.deduplicatedConversations,
-            report.remappedConversations,
-          ),
-        );
-      }
-      return;
-    }
-    final cs = Theme.of(rootCtx).colorScheme;
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
-                  dctx.mounted) {
-                Navigator.of(dctx).pop();
-              }
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
+    await showBackupRestartRequiredDialog(
+      rootCtx,
+      mergeReport: mode == RestoreMode.merge ? widget.mergeReport() : null,
     );
   }
 

@@ -25,6 +25,7 @@ import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
 import '../../../utils/platform_utils.dart';
 import '../backup_restore_error_message.dart';
+import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 
 // File size formatter (B, KB, MB, GB)
@@ -625,23 +626,6 @@ class _BackupPageState extends State<BackupPage> {
                                               return;
                                             }
                                             if (!context.mounted) return;
-                                            if (mode == RestoreMode.merge) {
-                                              final report = vm.lastMergeReport;
-                                              if (report != null) {
-                                                showAppSnackBar(
-                                                  context,
-                                                  message: l10n.backupPageMergeReportSummary(
-                                                    report
-                                                        .importedConversations,
-                                                    report
-                                                        .deduplicatedConversations,
-                                                    report
-                                                        .remappedConversations,
-                                                  ),
-                                                );
-                                              }
-                                              return;
-                                            }
                                             final msg = vm.message;
                                             if (msg != null &&
                                                 msg != 'Restored') {
@@ -652,36 +636,12 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                               return;
                                             }
-                                            await showDialog(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder: (dctx) => AlertDialog(
-                                                title: Text(
-                                                  l10n.backupPageRestartRequired,
-                                                ),
-                                                content: Text(
-                                                  l10n.backupPageRestartContent,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () async {
-                                                      if (await requestAppRestart(
-                                                            dctx,
-                                                            PlatformUtils
-                                                                .restartApp,
-                                                          ) &&
-                                                          dctx.mounted) {
-                                                        Navigator.of(
-                                                          dctx,
-                                                        ).pop();
-                                                      }
-                                                    },
-                                                    child: Text(
-                                                      l10n.backupPageOK,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                            await showBackupRestartRequiredDialog(
+                                              context,
+                                              mergeReport:
+                                                  mode == RestoreMode.merge
+                                                  ? vm.lastMergeReport
+                                                  : null,
                                             );
                                           },
                                         ),
@@ -745,31 +705,11 @@ class _BackupPageState extends State<BackupPage> {
                                       );
                                       return;
                                     }
-                                    await showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dctx) => AlertDialog(
-                                        title: Text(
-                                          l10n.backupPageRestartRequired,
-                                        ),
-                                        content: Text(
-                                          l10n.backupPageRestartContent,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () async {
-                                              if (await requestAppRestart(
-                                                    dctx,
-                                                    PlatformUtils.restartApp,
-                                                  ) &&
-                                                  dctx.mounted) {
-                                                Navigator.of(dctx).pop();
-                                              }
-                                            },
-                                            child: Text(l10n.backupPageOK),
-                                          ),
-                                        ],
-                                      ),
+                                    await showBackupRestartRequiredDialog(
+                                      context,
+                                      mergeReport: mode == RestoreMode.merge
+                                          ? vm.lastMergeReport
+                                          : null,
                                     );
                                   },
                                 ),
@@ -1106,36 +1046,12 @@ class _BackupPageState extends State<BackupPage> {
                                               );
                                               return;
                                             }
-                                            await showDialog(
-                                              context: context,
-                                              barrierDismissible: false,
-                                              builder: (dctx) => AlertDialog(
-                                                title: Text(
-                                                  l10n.backupPageRestartRequired,
-                                                ),
-                                                content: Text(
-                                                  l10n.backupPageRestartContent,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () async {
-                                                      if (await requestAppRestart(
-                                                            dctx,
-                                                            PlatformUtils
-                                                                .restartApp,
-                                                          ) &&
-                                                          dctx.mounted) {
-                                                        Navigator.of(
-                                                          dctx,
-                                                        ).pop();
-                                                      }
-                                                    },
-                                                    child: Text(
-                                                      l10n.backupPageOK,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
+                                            await showBackupRestartRequiredDialog(
+                                              context,
+                                              mergeReport:
+                                                  mode == RestoreMode.merge
+                                                  ? s3Vm.lastMergeReport
+                                                  : null,
                                             );
                                           },
                                         ),
@@ -1197,31 +1113,11 @@ class _BackupPageState extends State<BackupPage> {
                                       );
                                       return;
                                     }
-                                    await showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (dctx) => AlertDialog(
-                                        title: Text(
-                                          l10n.backupPageRestartRequired,
-                                        ),
-                                        content: Text(
-                                          l10n.backupPageRestartContent,
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () async {
-                                              if (await requestAppRestart(
-                                                    dctx,
-                                                    PlatformUtils.restartApp,
-                                                  ) &&
-                                                  dctx.mounted) {
-                                                Navigator.of(dctx).pop();
-                                              }
-                                            },
-                                            child: Text(l10n.backupPageOK),
-                                          ),
-                                        ],
-                                      ),
+                                    await showBackupRestartRequiredDialog(
+                                      context,
+                                      mergeReport: mode == RestoreMode.merge
+                                          ? s3Vm.lastMergeReport
+                                          : null,
                                     );
                                   },
                                 ),
@@ -1526,37 +1422,9 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    if (mode == RestoreMode.merge) {
-      final report = vm.lastMergeReport;
-      if (report != null) {
-        showAppSnackBar(
-          context,
-          message: l10n.backupPageMergeReportSummary(
-            report.importedConversations,
-            report.deduplicatedConversations,
-            report.remappedConversations,
-          ),
-        );
-      }
-      return;
-    }
-    await showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              if (await requestAppRestart(dctx, PlatformUtils.restartApp) &&
-                  dctx.mounted) {
-                Navigator.of(dctx).pop();
-              }
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
+    await showBackupRestartRequiredDialog(
+      context,
+      mergeReport: mode == RestoreMode.merge ? vm.lastMergeReport : null,
     );
   }
 
