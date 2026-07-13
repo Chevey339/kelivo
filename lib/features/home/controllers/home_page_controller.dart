@@ -416,7 +416,7 @@ class HomePageController extends ChangeNotifier {
         };
     _viewModel.onConversationSwitched = () {
       _restoreMessageUiState();
-      _scrollToBottom(animate: false);
+      _scrollCtrl.positionAtBottomOnNextLayout();
     };
     _viewModel.onStreamFinished = () {
       // Trigger UI update when streaming finishes
@@ -589,8 +589,8 @@ class HomePageController extends ChangeNotifier {
         await _chatController.setCurrentConversationAndLoad(recent);
         _streamController.clearGeminiThoughtSigs();
         _restoreMessageUiState();
+        _scrollCtrl.positionAtBottomOnNextLayout();
         notifyListeners();
-        _scrollToBottomSoon(animate: false);
       } else {
         // No conversations exist — create a new empty one so the UI
         // correctly shows the temporary-chat toggle button instead of
@@ -800,10 +800,6 @@ class HomePageController extends ChangeNotifier {
     await _viewModel.switchConversation(id);
     _scrollCtrl.clearObserverCache();
     notifyListeners();
-    try {
-      await WidgetsBinding.instance.endOfFrame;
-    } catch (_) {}
-    _scrollToBottom(animate: false);
 
     if (!isDesktopPlatform) {
       try {

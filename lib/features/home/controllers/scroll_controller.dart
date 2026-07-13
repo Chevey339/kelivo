@@ -18,6 +18,25 @@ class ChatAutoFollowScrollController extends ScrollController {
   /// Callback checked during layout to decide whether to auto-follow bottom.
   bool Function() shouldAutoFollow = () => false;
 
+  /// One-frame positioning request used when a conversation window is opened.
+  ///
+  /// Unlike a post-frame `jumpTo`, this is consumed by the scroll position
+  /// while the new list is being laid out, so an old conversation offset is
+  /// never painted for the new conversation.
+  bool _positionAtBottomDuringLayout = false;
+  int _layoutBottomRequest = 0;
+
+  int requestPositionAtBottomDuringLayout() {
+    _positionAtBottomDuringLayout = true;
+    return ++_layoutBottomRequest;
+  }
+
+  void finishPositionAtBottomDuringLayout(int request) {
+    if (request == _layoutBottomRequest) {
+      _positionAtBottomDuringLayout = false;
+    }
+  }
+
   @override
   ScrollPosition createScrollPosition(
     ScrollPhysics physics,
@@ -54,8 +73,11 @@ class _AutoFollowScrollPosition extends ScrollPositionWithSingleContext {
     // controller listener that sets _isUserScrolling.  Without this check,
     // correctPixels would override the user's drag for one frame, causing a
     // "stuck / can't scroll up" feeling.
-    if (controller.shouldAutoFollow() &&
-        userScrollDirection == ScrollDirection.idle) {
+    final shouldPositionAtBottom =
+        controller._positionAtBottomDuringLayout ||
+        (controller.shouldAutoFollow() &&
+            userScrollDirection == ScrollDirection.idle);
+    if (shouldPositionAtBottom) {
       final gap = this.maxScrollExtent - pixels;
       if (gap > 0.5) {
         correctPixels(this.maxScrollExtent);
@@ -284,6 +306,27 @@ class ChatScrollController {
   // ============================================================================
   // Scroll To Bottom Methods
   // ============================================================================
+
+  /// Position a newly opened conversation at its tail before the next paint.
+  ///
+  /// RikkaHub uses the equivalent `requestScrollToItem` operation: the initial
+  /// position participates in layout instead of correcting a visible frame
+  /// afterward. The flag remains active for the whole frame because a lazy
+  /// viewport may refine its max extent more than once during layout.
+  void positionAtBottomOnNextLayout() {
+    _isUserScrolling = false;
+    _userScrollTimer?.cancel();
+    _autoStickToBottom = true;
+    final controller = _scrollController;
+    if (controller is! ChatAutoFollowScrollController) {
+      _scheduleExplicitScrollToBottom(animate: false);
+      return;
+    }
+    final request = controller.requestPositionAtBottomDuringLayout();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.finishPositionAtBottomDuringLayout(request);
+    });
+  }
 
   /// Scroll to the bottom of the list.
   ///

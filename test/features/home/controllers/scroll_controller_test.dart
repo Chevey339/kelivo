@@ -5,6 +5,43 @@ import 'package:scrollview_observer/scrollview_observer.dart';
 
 void main() {
   group('ChatScrollController streaming auto-follow', () {
+    testWidgets('conversation open reaches bottom in its first layout', (
+      tester,
+    ) async {
+      var itemCount = 8;
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+      expect(scrollController.position.maxScrollExtent, 0);
+
+      itemCount = 40;
+      chatScrollController.positionAtBottomOnNextLayout();
+      await tester.pumpWidget(
+        _ScrollHarness(
+          scrollController: scrollController,
+          itemCount: itemCount,
+        ),
+      );
+
+      expect(
+        scrollController.offset,
+        scrollController.position.maxScrollExtent,
+      );
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('streaming bottom command jumps once and layout owns follow', (
       tester,
     ) async {
