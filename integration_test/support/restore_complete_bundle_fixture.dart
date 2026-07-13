@@ -8,7 +8,6 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/conversation.dart';
-import 'package:Kelivo/core/services/backup/backup_settings_sanitizer.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 
 import 'restore_process_control.dart';
@@ -182,12 +181,6 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
       secretPreferenceKey.compareTo(targetOnlyPreferenceKey) >= 0) {
     throw StateError('restore_harness_preference_order');
   }
-  if (!BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite(
-    secretPreferenceKey,
-  )) {
-    throw StateError('restore_harness_secret_preference');
-  }
-
   await createHarnessDatabase(
     File(p.join(appData.path, AppDatabase.databaseFileName)),
     conversationId: oldConversationId,
@@ -242,7 +235,7 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
       'appVersion': 'restore-process-harness',
       'includeChats': true,
       'includeFiles': true,
-      'secretsIncluded': false,
+      'secretsIncluded': true,
       'database': {
         'entry': 'database/${AppDatabase.databaseFileName}',
         'schemaVersion': databaseInfo.schemaVersion,

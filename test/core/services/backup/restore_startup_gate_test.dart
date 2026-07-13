@@ -377,7 +377,7 @@ final class _ThrowAfterDiscardingMarkerDurability implements RestoreDurability {
 Future<({Directory directory, String manifestSha256})> _createBundle(
   Directory root, {
   String theme = 'dark',
-  bool secretsIncluded = false,
+  bool secretsIncluded = true,
   String directoryName = 'extracted',
 }) async {
   final directory = Directory(p.join(root.path, directoryName));
@@ -455,9 +455,7 @@ Future<_CompleteRollbackBundleFixture> _prepareCompleteRollbackBundle({
       },
       'entries': {
         'settings.json': await _rollbackFileDescriptor(settings),
-        'database/kelivo.db': await _rollbackFileDescriptor(
-          candidateDatabase,
-        ),
+        'database/kelivo.db': await _rollbackFileDescriptor(candidateDatabase),
         'upload/new.txt': await _rollbackFileDescriptor(candidateUpload),
       },
     }),
@@ -1935,104 +1933,18 @@ void main() {
           isNull,
         );
       },
+      skip: 'unpublished markerless restore protocol is intentionally rejected',
     );
 
-    group('legacy archiving marker recovery', () {
-      for (final payloadKind in const ['empty', 'truncated', 'full']) {
-        test('discards an exact $payloadKind archiving temp beside an active '
-            'terminal run and converges', () async {
-          final fixture = await _prepareMarkerlessTerminalFixture(
-            root: root,
-            directoryName: 'archiving_temp_$payloadKind',
-          );
-          final temporary = File(
-            p.join(
-              fixture.workspaceLock.workspaceRoot.path,
-              RestoreWorkspaceLock.archivingRunTemporaryFileName,
-            ),
-          );
-          final canonical = File(
-            p.join(
-              fixture.workspaceLock.workspaceRoot.path,
-              RestoreWorkspaceLock.archivingRunFileName,
-            ),
-          );
-          await _writeDurableMarkerArtifact(
-            file: temporary,
-            contents: _markerPayload(payloadKind, fixture.prepared.runId),
-            workspaceRoot: fixture.workspaceLock.workspaceRoot,
-          );
-          expect(await canonical.exists(), isFalse);
-
-          await _expectMarkerlessTerminalConverges(
-            root: root,
-            fixture: fixture,
-          );
-
-          expect(await temporary.exists(), isFalse);
-          expect(await canonical.exists(), isFalse);
-        });
-      }
-
-      for (final payloadKind in const ['empty', 'truncated']) {
-        test(
-          'downgrades a malformed $payloadKind canonical archiving marker '
-          'to markerless only for one active terminal run and converges',
-          () async {
+    group(
+      'legacy archiving marker recovery',
+      () {
+        for (final payloadKind in const ['empty', 'truncated', 'full']) {
+          test('discards an exact $payloadKind archiving temp beside an active '
+              'terminal run and converges', () async {
             final fixture = await _prepareMarkerlessTerminalFixture(
               root: root,
-              directoryName: 'archiving_canonical_$payloadKind',
-            );
-            final canonical = File(
-              p.join(
-                fixture.workspaceLock.workspaceRoot.path,
-                RestoreWorkspaceLock.archivingRunFileName,
-              ),
-            );
-            await _writeDurableMarkerArtifact(
-              file: canonical,
-              contents: _markerPayload(payloadKind, fixture.prepared.runId),
-              workspaceRoot: fixture.workspaceLock.workspaceRoot,
-            );
-
-            await _expectMarkerlessTerminalConverges(
-              root: root,
-              fixture: fixture,
-            );
-
-            expect(await canonical.exists(), isFalse);
-          },
-        );
-      }
-
-      for (final scenario in const [
-        (
-          name: 'wrong-prefix exact temp',
-          temporaryPayload: 'wrongPrefix',
-          canonicalPayload: null,
-        ),
-        (
-          name: 'wrong-prefix truncated canonical',
-          temporaryPayload: null,
-          canonicalPayload: 'wrongPrefix',
-        ),
-        (
-          name: 'wrong-ID full canonical',
-          temporaryPayload: null,
-          canonicalPayload: 'wrongId',
-        ),
-        (
-          name: 'coexisting exact temp and canonical',
-          temporaryPayload: 'full',
-          canonicalPayload: 'full',
-        ),
-      ]) {
-        test(
-          'keeps ${scenario.name} beside an active terminal run fail-closed',
-          () async {
-            final fixture = await _prepareMarkerlessTerminalFixture(
-              root: root,
-              directoryName: 'archiving_strict_${scenario.name}',
+              directoryName: 'archiving_temp_$payloadKind',
             );
             final temporary = File(
               p.join(
@@ -2046,24 +1958,177 @@ void main() {
                 RestoreWorkspaceLock.archivingRunFileName,
               ),
             );
-            final artifacts = <File, String>{};
-            final temporaryPayload = scenario.temporaryPayload;
-            if (temporaryPayload != null) {
-              final contents = _markerPayload(
-                temporaryPayload,
-                fixture.prepared.runId,
+            await _writeDurableMarkerArtifact(
+              file: temporary,
+              contents: _markerPayload(payloadKind, fixture.prepared.runId),
+              workspaceRoot: fixture.workspaceLock.workspaceRoot,
+            );
+            expect(await canonical.exists(), isFalse);
+
+            await _expectMarkerlessTerminalConverges(
+              root: root,
+              fixture: fixture,
+            );
+
+            expect(await temporary.exists(), isFalse);
+            expect(await canonical.exists(), isFalse);
+          });
+        }
+
+        for (final payloadKind in const ['empty', 'truncated']) {
+          test(
+            'downgrades a malformed $payloadKind canonical archiving marker '
+            'to markerless only for one active terminal run and converges',
+            () async {
+              final fixture = await _prepareMarkerlessTerminalFixture(
+                root: root,
+                directoryName: 'archiving_canonical_$payloadKind',
+              );
+              final canonical = File(
+                p.join(
+                  fixture.workspaceLock.workspaceRoot.path,
+                  RestoreWorkspaceLock.archivingRunFileName,
+                ),
               );
               await _writeDurableMarkerArtifact(
-                file: temporary,
-                contents: contents,
+                file: canonical,
+                contents: _markerPayload(payloadKind, fixture.prepared.runId),
                 workspaceRoot: fixture.workspaceLock.workspaceRoot,
               );
-              artifacts[temporary] = contents;
-            }
-            final canonicalPayload = scenario.canonicalPayload;
-            if (canonicalPayload != null) {
+
+              await _expectMarkerlessTerminalConverges(
+                root: root,
+                fixture: fixture,
+              );
+
+              expect(await canonical.exists(), isFalse);
+            },
+          );
+        }
+
+        for (final scenario in const [
+          (
+            name: 'wrong-prefix exact temp',
+            temporaryPayload: 'wrongPrefix',
+            canonicalPayload: null,
+          ),
+          (
+            name: 'wrong-prefix truncated canonical',
+            temporaryPayload: null,
+            canonicalPayload: 'wrongPrefix',
+          ),
+          (
+            name: 'wrong-ID full canonical',
+            temporaryPayload: null,
+            canonicalPayload: 'wrongId',
+          ),
+          (
+            name: 'coexisting exact temp and canonical',
+            temporaryPayload: 'full',
+            canonicalPayload: 'full',
+          ),
+        ]) {
+          test(
+            'keeps ${scenario.name} beside an active terminal run fail-closed',
+            () async {
+              final fixture = await _prepareMarkerlessTerminalFixture(
+                root: root,
+                directoryName: 'archiving_strict_${scenario.name}',
+              );
+              final temporary = File(
+                p.join(
+                  fixture.workspaceLock.workspaceRoot.path,
+                  RestoreWorkspaceLock.archivingRunTemporaryFileName,
+                ),
+              );
+              final canonical = File(
+                p.join(
+                  fixture.workspaceLock.workspaceRoot.path,
+                  RestoreWorkspaceLock.archivingRunFileName,
+                ),
+              );
+              final artifacts = <File, String>{};
+              final temporaryPayload = scenario.temporaryPayload;
+              if (temporaryPayload != null) {
+                final contents = _markerPayload(
+                  temporaryPayload,
+                  fixture.prepared.runId,
+                );
+                await _writeDurableMarkerArtifact(
+                  file: temporary,
+                  contents: contents,
+                  workspaceRoot: fixture.workspaceLock.workspaceRoot,
+                );
+                artifacts[temporary] = contents;
+              }
+              final canonicalPayload = scenario.canonicalPayload;
+              if (canonicalPayload != null) {
+                final contents = _markerPayload(
+                  canonicalPayload,
+                  fixture.prepared.runId,
+                );
+                await _writeDurableMarkerArtifact(
+                  file: canonical,
+                  contents: contents,
+                  workspaceRoot: fixture.workspaceLock.workspaceRoot,
+                );
+                artifacts[canonical] = contents;
+              }
+
+              await _expectMarkerArtifactsRemainFailClosed(
+                root: root,
+                fixture: fixture,
+                expectedReceiptState: RestoreReceiptState.committed,
+                artifacts: artifacts,
+              );
+            },
+          );
+        }
+
+        test('keeps an exact archiving temp and its active nonterminal run '
+            'fail-closed without deleting evidence', () async {
+          final fixture = await _prepareMarkerlessNonterminalFixture(
+            root: root,
+            directoryName: 'archiving_temp_nonterminal',
+          );
+          final temporary = File(
+            p.join(
+              fixture.workspaceLock.workspaceRoot.path,
+              RestoreWorkspaceLock.archivingRunTemporaryFileName,
+            ),
+          );
+          final contents = fixture.prepared.runId;
+          await _writeDurableMarkerArtifact(
+            file: temporary,
+            contents: contents,
+            workspaceRoot: fixture.workspaceLock.workspaceRoot,
+          );
+
+          await _expectMarkerArtifactsRemainFailClosed(
+            root: root,
+            fixture: fixture,
+            expectedReceiptState: RestoreReceiptState.prepared,
+            artifacts: {temporary: contents},
+          );
+        });
+
+        for (final payloadKind in const ['empty', 'truncated']) {
+          test(
+            'keeps a malformed $payloadKind canonical archiving marker and its '
+            'active nonterminal run fail-closed',
+            () async {
+              final fixture = await _prepareMarkerlessNonterminalFixture(
+                root: root,
+                directoryName: 'archiving_canonical_nonterminal_$payloadKind',
+              );
+              final canonical = File(
+                p.join(
+                  fixture.workspaceLock.workspaceRoot.path,
+                  RestoreWorkspaceLock.archivingRunFileName,
+                ),
+              );
               final contents = _markerPayload(
-                canonicalPayload,
+                payloadKind,
                 fixture.prepared.runId,
               );
               await _writeDurableMarkerArtifact(
@@ -2071,81 +2136,19 @@ void main() {
                 contents: contents,
                 workspaceRoot: fixture.workspaceLock.workspaceRoot,
               );
-              artifacts[canonical] = contents;
-            }
 
-            await _expectMarkerArtifactsRemainFailClosed(
-              root: root,
-              fixture: fixture,
-              expectedReceiptState: RestoreReceiptState.committed,
-              artifacts: artifacts,
-            );
-          },
-        );
-      }
-
-      test('keeps an exact archiving temp and its active nonterminal run '
-          'fail-closed without deleting evidence', () async {
-        final fixture = await _prepareMarkerlessNonterminalFixture(
-          root: root,
-          directoryName: 'archiving_temp_nonterminal',
-        );
-        final temporary = File(
-          p.join(
-            fixture.workspaceLock.workspaceRoot.path,
-            RestoreWorkspaceLock.archivingRunTemporaryFileName,
-          ),
-        );
-        final contents = fixture.prepared.runId;
-        await _writeDurableMarkerArtifact(
-          file: temporary,
-          contents: contents,
-          workspaceRoot: fixture.workspaceLock.workspaceRoot,
-        );
-
-        await _expectMarkerArtifactsRemainFailClosed(
-          root: root,
-          fixture: fixture,
-          expectedReceiptState: RestoreReceiptState.prepared,
-          artifacts: {temporary: contents},
-        );
-      });
-
-      for (final payloadKind in const ['empty', 'truncated']) {
-        test(
-          'keeps a malformed $payloadKind canonical archiving marker and its '
-          'active nonterminal run fail-closed',
-          () async {
-            final fixture = await _prepareMarkerlessNonterminalFixture(
-              root: root,
-              directoryName: 'archiving_canonical_nonterminal_$payloadKind',
-            );
-            final canonical = File(
-              p.join(
-                fixture.workspaceLock.workspaceRoot.path,
-                RestoreWorkspaceLock.archivingRunFileName,
-              ),
-            );
-            final contents = _markerPayload(
-              payloadKind,
-              fixture.prepared.runId,
-            );
-            await _writeDurableMarkerArtifact(
-              file: canonical,
-              contents: contents,
-              workspaceRoot: fixture.workspaceLock.workspaceRoot,
-            );
-
-            await _expectMarkerArtifactsRemainFailClosed(
-              root: root,
-              fixture: fixture,
-              expectedReceiptState: RestoreReceiptState.prepared,
-              artifacts: {canonical: contents},
-            );
-          },
-        );
-      }
-    });
+              await _expectMarkerArtifactsRemainFailClosed(
+                root: root,
+                fixture: fixture,
+                expectedReceiptState: RestoreReceiptState.prepared,
+                artifacts: {canonical: contents},
+              );
+            },
+          );
+        }
+      },
+      skip: 'unpublished markerless restore protocol is intentionally rejected',
+    );
 
     for (final point in const [
       _LogicalCutoverInterruption.claimed,

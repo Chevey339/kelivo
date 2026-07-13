@@ -14,7 +14,6 @@ import '../services/tts/network_tts.dart';
 import '../services/tts/tts_text_selection.dart';
 import '../services/network/request_logger.dart';
 import '../services/logging/flutter_logger.dart';
-import '../services/backup/backup_settings_sanitizer.dart';
 import '../models/api_keys.dart';
 import '../models/backup.dart';
 import '../models/provider_group.dart';
@@ -695,14 +694,9 @@ class SettingsProvider extends ChangeNotifier {
           final backup = _providerConfigs.map(
             (k, v) => MapEntry(k, v.toJson()),
           );
-          final sanitizedBackup =
-              BackupSettingsSanitizer.sanitize({
-                    _providerConfigsKey: jsonEncode(backup),
-                  })[_providerConfigsKey]
-                  as String;
           backupOk = await prefs.setString(
             _providerConfigsBackupKey,
-            sanitizedBackup,
+            jsonEncode(backup),
           );
           assert(() {
             debugPrint(
@@ -759,8 +753,6 @@ class SettingsProvider extends ChangeNotifier {
         return true;
       }());
     }
-    await prefs.remove(_providerConfigsBackupKey);
-
     // load provider grouping
     try {
       final groupsStr = prefs.getString(_providerGroupsKey) ?? '';

@@ -2,15 +2,13 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 
-import 'backup_settings_sanitizer.dart';
 import 'backup_settings_validator.dart';
 import 'restore_previous_plan.dart';
 
 /// Immutable settings delta used by the startup restore state machine.
 ///
-/// It preserves the existing overwrite compatibility boundary: imported keys
-/// replace matching non-local keys, unrelated keys remain untouched, and a
-/// secret-free bundle additionally removes known target credentials.
+/// Imported keys replace matching non-local keys while unrelated keys remain
+/// untouched. Final-format bundles always include their credential fields.
 final class RestoreSettingsTransition {
   RestoreSettingsTransition._({
     required this.plan,
@@ -34,7 +32,7 @@ final class RestoreSettingsTransition {
     final candidate = Map<String, dynamic>.from(candidateSettings);
     BackupSettingsValidator.normalizeAndValidate(candidate);
     if (!secretsIncluded) {
-      BackupSettingsSanitizer.validateSecretFree(candidate);
+      throw const FormatException('restore_credentials_required');
     }
 
     final candidateValues = <String, dynamic>{};
@@ -44,15 +42,6 @@ final class RestoreSettingsTransition {
       }
     }
     final touchedKeys = candidateValues.keys.toSet();
-    if (!secretsIncluded) {
-      touchedKeys.addAll(
-        currentSettings.keys.where(
-          (key) =>
-              !BackupSettingsValidator.isLocalOnly(key) &&
-              BackupSettingsSanitizer.shouldClearBeforeSecretFreeOverwrite(key),
-        ),
-      );
-    }
 
     final snapshotValues = <String, dynamic>{};
     for (final key in (touchedKeys.toList()..sort())) {
@@ -102,7 +91,7 @@ final class RestoreSettingsTransition {
     final candidate = Map<String, dynamic>.from(candidateSettings);
     BackupSettingsValidator.normalizeAndValidate(candidate);
     if (!secretsIncluded) {
-      BackupSettingsSanitizer.validateSecretFree(candidate);
+      throw const FormatException('restore_credentials_required');
     }
     final candidateValues = <String, dynamic>{};
     for (final key in (candidate.keys.toList()..sort())) {

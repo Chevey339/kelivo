@@ -203,12 +203,8 @@ class ChatDatabaseRepository {
     late final int schemaVersion;
     try {
       schemaVersion = database.userVersion;
-      if (schemaVersion > AppDatabase.currentSchemaVersion) {
-        throw StateError('database_schema_too_new');
-      }
-      if (schemaVersion == AppDatabase.currentSchemaVersion) return false;
-      if (schemaVersion < AppDatabase.oldestMigratableSchemaVersion) {
-        throw StateError('database_schema_too_old');
+      if (schemaVersion != AppDatabase.currentSchemaVersion) {
+        throw StateError('database_schema_version');
       }
       _validateRawStructure(database);
     } on sqlite.SqliteException {
@@ -217,14 +213,7 @@ class ChatDatabaseRepository {
       database.close();
     }
 
-    final driftDatabase = AppDatabase.open(file: file);
-    try {
-      await driftDatabase.customSelect('SELECT 1;').getSingle();
-    } finally {
-      await driftDatabase.close();
-    }
-    inspectInstalledDatabase(file);
-    return true;
+    return false;
   }
 
   static InstalledChatDatabaseInfo inspectInstalledDatabase(
@@ -583,13 +572,12 @@ class ChatDatabaseRepository {
         .map((row) => row['name'])
         .whereType<String>()
         .toSet();
-    if (database.userVersion >= AppDatabase.linearOnlySchemaVersion &&
-        tables.intersection(const {
-          'message_slot_rows',
-          'message_revision_rows',
-          'conversation_branch_rows',
-          'conversation_state_rows',
-        }).isNotEmpty) {
+    if (tables.intersection(const {
+      'message_slot_rows',
+      'message_revision_rows',
+      'conversation_branch_rows',
+      'conversation_state_rows',
+    }).isNotEmpty) {
       throw StateError('retired_tables');
     }
     if (!tables.containsAll(requiredTables)) {

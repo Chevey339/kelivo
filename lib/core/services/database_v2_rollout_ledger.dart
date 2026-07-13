@@ -41,7 +41,7 @@ final class DatabaseV2RetirementEligibility {
 /// files as the live writer.
 abstract final class DatabaseV2RollbackCompatibility {
   static const storageContractVersion = 2;
-  static const minimumReadableSchema = 8;
+  static const minimumReadableSchema = AppDatabase.currentSchemaVersion;
   static const maximumReadableSchema = AppDatabase.currentSchemaVersion;
 
   static bool supportsSchema(int schemaVersion) =>

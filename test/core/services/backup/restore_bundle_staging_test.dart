@@ -43,7 +43,7 @@ Future<Directory> _createExtractedBundle(
       'appVersion': 'test',
       'includeChats': includeDatabase,
       'includeFiles': includeFiles,
-      'secretsIncluded': false,
+      'secretsIncluded': true,
       if (includeDatabase)
         'database': {
           'entry': 'database/kelivo.db',
@@ -108,7 +108,7 @@ void main() {
         candidateDirectory: staged.payloadDirectory,
         expectedManifestSha256: staged.candidateManifestSha256,
       );
-      expect(validated.secretsIncluded, isFalse);
+      expect(validated.secretsIncluded, isTrue);
       expect(validated.settings, {'theme': 'dark'});
       expect(validated.entries.keys, ['settings.json']);
       expect(validated.databaseInfo, isNull);
@@ -333,7 +333,7 @@ void main() {
       final frozenManifestSha256 = await _manifestSha256(extracted);
       final manifestFile = File(p.join(extracted.path, 'manifest.json'));
       final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
-      manifest['secretsIncluded'] = true;
+      manifest['appVersion'] = 'tampered';
       await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
 
       await expectLater(
@@ -450,53 +450,41 @@ void main() {
       );
     });
 
-    test(
-      'rejects a falsely declared secret-free candidate before publication',
-      () async {
-        final extracted = await _createExtractedBundle(root);
-        final settingsFile = File(p.join(extracted.path, 'settings.json'));
-        await settingsFile.writeAsString(
-          jsonEncode({'global_proxy_password_v1': 'source-secret'}),
-          flush: true,
-        );
-        final manifestFile = File(p.join(extracted.path, 'manifest.json'));
-        final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
-        final settingsMetadata =
-            (manifest['entries'] as Map)['settings.json'] as Map;
-        settingsMetadata['bytes'] = await settingsFile.length();
-        settingsMetadata['sha256'] =
-            (await sha256.bind(settingsFile.openRead()).first).toString();
-        await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
+    test('rejects the unpublished secret-free backup format', () async {
+      final extracted = await _createExtractedBundle(root);
+      final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+      final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+      manifest['secretsIncluded'] = false;
+      await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
 
-        await expectLater(
-          RestoreBundleStaging.create(
-            appDataDirectory: root,
-            extractedDirectory: extracted,
-            includeChats: false,
-            includeFiles: false,
-            sourceManifestSha256: await _manifestSha256(extracted),
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: false,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        ),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'message',
+            'restore_staging_manifest_fields',
           ),
-          throwsA(
-            isA<FormatException>().having(
-              (error) => error.message,
-              'message',
-              'restore_settings_not_secret_free',
-            ),
-          ),
-        );
+        ),
+      );
 
-        final workspaceRoot = Directory(
-          p.join(root.path, RestoreBundleStaging.workspaceRootName),
-        );
-        expect(
-          await workspaceRoot
-              .list(followLinks: false)
-              .where((entry) => p.basename(entry.path).startsWith('run_'))
-              .toList(),
-          isEmpty,
-        );
-      },
-    );
+      final workspaceRoot = Directory(
+        p.join(root.path, RestoreBundleStaging.workspaceRootName),
+      );
+      expect(
+        await workspaceRoot
+            .list(followLinks: false)
+            .where((entry) => p.basename(entry.path).startsWith('run_'))
+            .toList(),
+        isEmpty,
+      );
+    });
 
     test('requires every declared empty asset root on revalidation', () async {
       final extracted = await _createExtractedBundle(root, includeFiles: true);

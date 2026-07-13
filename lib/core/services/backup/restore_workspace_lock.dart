@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
@@ -19,6 +18,8 @@ final class RestoreWorkspaceLock {
   static const publishingRunFileName = '.active_run.publishing';
   static const discardingRunFileName = '.active_run.discarding';
   static const archivingRunFileName = '.active_run.archiving';
+  // Reserved only so diagnostics/tests can identify and reject artifacts from
+  // the unpublished markerless protocol. Production never creates it.
   static const archivingRunTemporaryFileName = '$archivingRunFileName.tmp';
   static const completedRunsDirectoryName = 'completed';
   static const _markerFileNames = {
@@ -154,11 +155,10 @@ final class RestoreWorkspaceLock {
   /// The caller must hold this workspace lock and must already have verified a
   /// terminal committed/rolledBack receipt for [runId]. The archiving marker
   /// remains operation-ahead evidence until the run-directory rename and both
-  /// parent-directory barriers are complete. A null marker only resumes the
-  /// legacy window created by older builds that deleted the marker first.
+  /// parent-directory barriers are complete.
   Future<Directory> archiveTerminalRunWhileWorkspaceLocked({
     required String runId,
-    required String? observedMarkerFileName,
+    required String observedMarkerFileName,
   }) async {
     _validateRunId(runId);
     final source = Directory(p.join(workspaceRoot.path, 'run_$runId'));
@@ -179,50 +179,26 @@ final class RestoreWorkspaceLock {
       throw StateError('restore_workspace_terminal_archive_topology');
     }
     if ((sourceActive &&
-            observedMarkerFileName != null &&
             observedMarkerFileName != publishingRunFileName &&
             observedMarkerFileName != archivingRunFileName) ||
         (targetArchived && observedMarkerFileName != archivingRunFileName)) {
       throw StateError('restore_workspace_terminal_marker');
     }
-    final archivingTemporaryType = await FileSystemEntity.type(
-      p.join(workspaceRoot.path, archivingRunTemporaryFileName),
-      followLinks: false,
+    final observedMarker = File(
+      p.join(workspaceRoot.path, observedMarkerFileName),
     );
-    if (archivingTemporaryType != FileSystemEntityType.notFound) {
-      await reconcileLegacyArchivingArtifactWhileWorkspaceLocked(
-        runId: runId,
-        artifactFileName: archivingRunTemporaryFileName,
-      );
-    }
-    final observedMarker = observedMarkerFileName == null
-        ? null
-        : File(p.join(workspaceRoot.path, observedMarkerFileName));
-    if (observedMarker == null) {
-      await _requireAllMarkersMissing();
-    } else {
-      await _requireOtherMarkersMissing(except: observedMarkerFileName!);
-      await _requireRunFile(observedMarker, runId);
-    }
+    await _requireOtherMarkersMissing(except: observedMarkerFileName);
+    await _requireRunFile(observedMarker, runId);
     await _ensureCompletedRunsRoot();
 
-    var hasArchivingMarker = observedMarkerFileName != null;
-    if (observedMarker != null) {
-      await _requireOtherMarkersMissing(except: observedMarkerFileName!);
-      await _requireRunFile(observedMarker, runId);
-      if (observedMarkerFileName == publishingRunFileName) {
-        await durability.renameAndSync(
-          source: observedMarker,
-          targetPath: p.join(workspaceRoot.path, archivingRunFileName),
-        );
-      }
-      final archiving = File(p.join(workspaceRoot.path, archivingRunFileName));
-      await _requireRunFile(archiving, runId);
-    } else {
-      await _requireAllMarkersMissing();
-      await _publishArchivingMarker(runId);
-      hasArchivingMarker = true;
+    if (observedMarkerFileName == publishingRunFileName) {
+      await durability.renameAndSync(
+        source: observedMarker,
+        targetPath: p.join(workspaceRoot.path, archivingRunFileName),
+      );
     }
+    final archiving = File(p.join(workspaceRoot.path, archivingRunFileName));
+    await _requireRunFile(archiving, runId);
 
     if (sourceActive) {
       await durability.renameAndSync(source: source, targetPath: target.path);
@@ -240,136 +216,10 @@ final class RestoreWorkspaceLock {
       throw StateError('restore_workspace_terminal_archive_result');
     }
     await validateCompletedRunsDirectory(completedRunsRoot);
-    if (hasArchivingMarker) {
-      final archiving = File(p.join(workspaceRoot.path, archivingRunFileName));
-      await _requireRunFile(archiving, runId);
-      await archiving.delete();
-      await durability.syncDirectory(workspaceRoot, fullBarrier: true);
-    }
-    return target;
-  }
-
-  Future<void> _publishArchivingMarker(String runId) async {
-    final temporary = File(
-      p.join(workspaceRoot.path, archivingRunTemporaryFileName),
-    );
-    final archiving = File(p.join(workspaceRoot.path, archivingRunFileName));
-    if (await FileSystemEntity.type(temporary.path, followLinks: false) !=
-            FileSystemEntityType.notFound ||
-        await FileSystemEntity.type(archiving.path, followLinks: false) !=
-            FileSystemEntityType.notFound) {
-      throw StateError('restore_workspace_terminal_marker');
-    }
-    await temporary.create(exclusive: true);
-    await durability.restrictFile(temporary);
-    await temporary.writeAsString(runId, flush: true);
-    await durability.syncFile(temporary, fullBarrier: true);
-    await _requireRunFile(temporary, runId);
-    if (await FileSystemEntity.type(archiving.path, followLinks: false) !=
-        FileSystemEntityType.notFound) {
-      throw StateError('restore_workspace_terminal_marker');
-    }
-    await durability.renameAndSync(
-      source: temporary,
-      targetPath: archiving.path,
-    );
     await _requireRunFile(archiving, runId);
-  }
-
-  /// Removes one legacy archiving artifact only after the caller has proved
-  /// that the workspace contains one matching active terminal run.
-  ///
-  /// The caller must hold this workspace lock. This method repeats the
-  /// no-follow topology and byte-prefix checks immediately before deletion;
-  /// any conflict remains untouched and fail-closed.
-  Future<void> reconcileLegacyArchivingArtifactWhileWorkspaceLocked({
-    required String runId,
-    required String artifactFileName,
-  }) async {
-    _validateRunId(runId);
-    final isTemporary = artifactFileName == archivingRunTemporaryFileName;
-    final isMalformedCanonical = artifactFileName == archivingRunFileName;
-    if (!isTemporary && !isMalformedCanonical) {
-      throw ArgumentError.value(artifactFileName, 'artifactFileName');
-    }
-
-    final activeRunName = 'run_$runId';
-    var foundActiveRun = false;
-    File? artifact;
-    Directory? completedRoot;
-    await for (final entity in workspaceRoot.list(followLinks: false)) {
-      final name = p.basename(entity.path);
-      final type = await FileSystemEntity.type(entity.path, followLinks: false);
-      if (name == lockFileName && type == FileSystemEntityType.file) {
-        continue;
-      }
-      if (name == completedRunsDirectoryName &&
-          type == FileSystemEntityType.directory &&
-          completedRoot == null) {
-        completedRoot = Directory(entity.path);
-        await validateCompletedRunsDirectory(completedRoot);
-        continue;
-      }
-      if (name == activeRunName &&
-          type == FileSystemEntityType.directory &&
-          !foundActiveRun) {
-        foundActiveRun = true;
-        continue;
-      }
-      if (name == artifactFileName &&
-          type == FileSystemEntityType.file &&
-          artifact == null) {
-        artifact = File(entity.path);
-        continue;
-      }
-      throw StateError('restore_workspace_archiving_artifact_topology');
-    }
-    if (!foundActiveRun || artifact == null) {
-      throw StateError('restore_workspace_archiving_artifact_topology');
-    }
-    if (completedRoot != null &&
-        await FileSystemEntity.type(
-              p.join(completedRoot.path, activeRunName),
-              followLinks: false,
-            ) !=
-            FileSystemEntityType.notFound) {
-      throw StateError('restore_workspace_archiving_artifact_topology');
-    }
-    await _requireStableRunIdPrefix(
-      artifact,
-      runId,
-      allowComplete: isTemporary,
-    );
-    if (await FileSystemEntity.type(
-              p.join(workspaceRoot.path, activeRunName),
-              followLinks: false,
-            ) !=
-            FileSystemEntityType.directory ||
-        (completedRoot != null &&
-            await FileSystemEntity.type(
-                  p.join(completedRoot.path, activeRunName),
-                  followLinks: false,
-                ) !=
-                FileSystemEntityType.notFound)) {
-      throw StateError('restore_workspace_archiving_artifact_changed');
-    }
-    await artifact.delete();
+    await archiving.delete();
     await durability.syncDirectory(workspaceRoot, fullBarrier: true);
-    if (await FileSystemEntity.type(artifact.path, followLinks: false) !=
-            FileSystemEntityType.notFound ||
-        await FileSystemEntity.type(
-              p.join(workspaceRoot.path, activeRunName),
-              followLinks: false,
-            ) !=
-            FileSystemEntityType.directory ||
-        (completedRoot != null &&
-            await FileSystemEntity.type(
-                  p.join(completedRoot.path, activeRunName),
-                  followLinks: false,
-                ) !=
-                FileSystemEntityType.notFound)) {
-      throw StateError('restore_workspace_archiving_artifact_delete');
-    }
+    return target;
   }
 
   /// Durably removes a run that provably never published its first receipt.
@@ -382,16 +232,12 @@ final class RestoreWorkspaceLock {
     final observation = await _inspectWorkspaceForUnpublishedRun();
     final marker = observation.marker;
     final markerFileName = observation.markerFileName;
-    final archivingTemporary = observation.archivingTemporary;
     if (marker == null || markerFileName == null) return false;
 
     if (markerFileName == archivingRunFileName) return false;
     final runDirectory = observation.runDirectory;
     String? runId;
     if (runDirectory == null) {
-      if (archivingTemporary != null) {
-        throw StateError('restore_workspace_unpublished_archiving_artifact');
-      }
       if (markerFileName != activeRunFileName &&
           markerFileName != discardingRunFileName) {
         throw StateError('restore_workspace_unpublished_topology');
@@ -405,9 +251,6 @@ final class RestoreWorkspaceLock {
         runDirectory,
       );
       if (hasFinalReceipt) return false;
-      if (archivingTemporary != null) {
-        throw StateError('restore_workspace_unpublished_archiving_artifact');
-      }
     }
 
     await _requireOtherMarkersMissing(except: markerFileName);
@@ -455,7 +298,6 @@ final class RestoreWorkspaceLock {
       String? markerFileName,
       Directory? runDirectory,
       String? directoryRunId,
-      File? archivingTemporary,
     })
   >
   _inspectWorkspaceForUnpublishedRun() async {
@@ -463,7 +305,6 @@ final class RestoreWorkspaceLock {
     String? markerFileName;
     Directory? runDirectory;
     String? directoryRunId;
-    File? archivingTemporary;
     await for (final entity in workspaceRoot.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -482,12 +323,6 @@ final class RestoreWorkspaceLock {
         markerFileName = name;
         continue;
       }
-      if (name == archivingRunTemporaryFileName &&
-          type == FileSystemEntityType.file &&
-          archivingTemporary == null) {
-        archivingTemporary = File(entity.path);
-        continue;
-      }
       final match = _runDirectoryPattern.firstMatch(name);
       if (match != null &&
           type == FileSystemEntityType.directory &&
@@ -503,7 +338,6 @@ final class RestoreWorkspaceLock {
       markerFileName: markerFileName,
       runDirectory: runDirectory,
       directoryRunId: directoryRunId,
-      archivingTemporary: archivingTemporary,
     );
   }
 
@@ -699,46 +533,6 @@ final class RestoreWorkspaceLock {
     return runId;
   }
 
-  static Future<void> _requireStableRunIdPrefix(
-    File file,
-    String runId, {
-    required bool allowComplete,
-  }) async {
-    if (await FileSystemEntity.type(file.path, followLinks: false) !=
-        FileSystemEntityType.file) {
-      throw StateError('restore_workspace_archiving_artifact_type');
-    }
-    final expectedLength = await file.length();
-    final maximumLength = allowComplete ? runId.length : runId.length - 1;
-    if (expectedLength < 0 || expectedLength > maximumLength) {
-      throw StateError('restore_workspace_archiving_artifact_identity');
-    }
-    final handle = await file.open(mode: FileMode.read);
-    final builder = BytesBuilder(copy: false);
-    try {
-      while (builder.length <= runId.length) {
-        final chunk = await handle.read(runId.length + 1 - builder.length);
-        if (chunk.isEmpty) break;
-        builder.add(chunk);
-      }
-    } finally {
-      await handle.close();
-    }
-    final bytes = builder.takeBytes();
-    if (bytes.length != expectedLength ||
-        await FileSystemEntity.type(file.path, followLinks: false) !=
-            FileSystemEntityType.file ||
-        await file.length() != expectedLength) {
-      throw StateError('restore_workspace_archiving_artifact_changed');
-    }
-    final expected = runId.codeUnits;
-    for (var index = 0; index < bytes.length; index++) {
-      if (bytes[index] != expected[index]) {
-        throw StateError('restore_workspace_archiving_artifact_identity');
-      }
-    }
-  }
-
   Future<void> _requireOtherMarkersMissing({required String except}) async {
     for (final name in const {
       activeRunFileName,
@@ -756,9 +550,6 @@ final class RestoreWorkspaceLock {
       }
     }
   }
-
-  Future<void> _requireAllMarkersMissing() =>
-      _requireOtherMarkersMissing(except: '');
 
   Future<void> _ensureCompletedRunsRoot() async {
     final type = await FileSystemEntity.type(

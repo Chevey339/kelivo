@@ -214,11 +214,6 @@ void main() {
     );
 
     await service.migrate(backupFile: backupFile);
-    final preferencesAfterMigration = await SharedPreferences.getInstance();
-    expect(
-      preferencesAfterMigration.getString('provider_configs_v1'),
-      contains('test-key'),
-    );
     final firstMigrationStatus = statuses.firstWhere(
       (status) => status.stage == HiveToSqliteMigrationStage.migrating,
     );

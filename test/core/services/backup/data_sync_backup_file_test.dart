@@ -645,7 +645,7 @@ void main() {
             isA<FormatException>().having(
               (error) => error.message,
               'message',
-              'restore_settings_not_secret_free',
+              'manifest_fields',
             ),
           ),
         );
@@ -662,7 +662,7 @@ void main() {
       },
     );
 
-    test('secret-free settings merge preserves local credentials', () async {
+    test('complete settings merge applies source credentials', () async {
       SharedPreferences.setMockInitialValues({
         'provider_configs_v1': jsonEncode({
           'openai': {
@@ -703,7 +703,7 @@ void main() {
       final provider = providers['openai'] as Map;
       expect(provider['name'], 'Source Provider');
       expect(provider['baseUrl'], 'https://source.example');
-      expect(provider['apiKey'], 'target-api-secret');
+      expect(provider['apiKey'], 'source-api-secret');
     });
 
     test(
@@ -830,8 +830,7 @@ void main() {
         expect(manifest['includeChats'], isTrue);
         expect(manifest['appVersion'], '1.0.0-test+1');
         expect(
-          ((manifest['entries'] as Map)['database/kelivo.db']
-              as Map)['sha256'],
+          ((manifest['entries'] as Map)['database/kelivo.db'] as Map)['sha256'],
           archivedHash,
         );
       } finally {
@@ -1139,9 +1138,7 @@ void main() {
         ]),
       );
       expect(
-        await File(
-          p.join(candidate.path, 'database', 'kelivo.db'),
-        ).exists(),
+        await File(p.join(candidate.path, 'database', 'kelivo.db')).exists(),
         isTrue,
       );
       expect(
@@ -1166,9 +1163,9 @@ void main() {
           settings: const {
             'preserved_setting': 'imported',
             'incoming_only_setting': 'remove-on-rollback',
-            'global_proxy_password_v1': '',
+            'global_proxy_password_v1': 'source-secret',
           },
-          secretsIncluded: false,
+          secretsIncluded: true,
         );
 
         await DataSync(

@@ -250,7 +250,7 @@ class MigrationRunRows extends Table {
   TextColumn get sourceKind =>
       text()
       // ignore: recursive_getters
-      .check(sourceKind.isIn(const ['hive', 'sqlite_v1', 'legacy_json']))();
+      .check(sourceKind.isIn(const ['hive', 'legacy_json']))();
   TextColumn get sourceHash => text()();
   TextColumn get status =>
       text()
@@ -391,8 +391,9 @@ class AppDatabase extends _$AppDatabase {
   static const orderedPartsSchemaVersion = 8;
   static const linearMessagePartsSchemaVersion = 9;
   static const linearOnlySchemaVersion = 10;
-  static const currentSchemaVersion = linearOnlySchemaVersion;
-  static const oldestMigratableSchemaVersion = 1;
+  // Schema 11 is the first release-candidate SQLite contract. It deliberately
+  // separates the final format from every unpublished schema 1-10 database.
+  static const currentSchemaVersion = 11;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
   // source of truth.
@@ -427,6 +428,11 @@ class AppDatabase extends _$AppDatabase {
     return NativeDatabase.createInBackground(
       file,
       setup: (database) {
+        final installedSchema = database.userVersion;
+        if (installedSchema != 0 &&
+            installedSchema != AppDatabase.currentSchemaVersion) {
+          throw StateError('database_schema_version');
+        }
         // This callback is registered and invoked by SQLite on drift's worker
         // isolate. Keep it non-deterministic so a multi-row profile query
         // cannot be folded into a single callback by SQLite.

@@ -1,65 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:Kelivo/core/services/backup/backup_settings_sanitizer.dart';
 import 'package:Kelivo/core/services/backup/restore_settings_transition.dart';
 
 void main() {
   group('RestoreSettingsTransition', () {
-    test('builds an exact secret-free touched-key transition', () {
-      final current = <String, dynamic>{
-        'theme': 'old',
-        'keep_me': 7,
-        'window_width_v1': 900.0,
-        'old_api_key_v1': 'old-secret',
-        'provider_configs_backup_v1': 'legacy-secret-cache',
-      };
-      final candidate = BackupSettingsSanitizer.sanitize({
-        'theme': 'new',
-        'new_key': true,
-        'provider_api_key_v1': 'candidate-secret',
-      });
-
-      final transition = RestoreSettingsTransition.build(
-        currentSettings: current,
-        candidateSettings: candidate,
-        secretsIncluded: false,
-      );
-
-      expect(transition.valuesToSet, candidate);
-      expect(transition.keysToRemove, {
-        'old_api_key_v1',
-        'provider_configs_backup_v1',
-      });
-      expect(transition.plan.touchedKeys, {
-        ...candidate.keys,
-        'old_api_key_v1',
-        'provider_configs_backup_v1',
-      });
-      expect(
-        transition.plan.missingKeys,
-        candidate.keys.where((key) => key != 'theme').toSet(),
-      );
-      expect(jsonDecode(utf8.decode(transition.snapshotBytes)), {
-        'old_api_key_v1': 'old-secret',
-        'provider_configs_backup_v1': 'legacy-secret-cache',
-        'theme': 'old',
-      });
-      expect(transition.plan.validateSnapshotBytes(transition.snapshotBytes), {
-        'old_api_key_v1': 'old-secret',
-        'provider_configs_backup_v1': 'legacy-secret-cache',
-        'theme': 'old',
-      });
-      expect(current['keep_me'], 7);
-      expect(current['window_width_v1'], 900.0);
-    });
-
-    test('rejects a secret-free candidate that still contains credentials', () {
+    test('rejects the unpublished secret-free transition format', () {
       expect(
         () => RestoreSettingsTransition.build(
           currentSettings: const {},
-          candidateSettings: const {'provider_api_key_v1': 'secret'},
+          candidateSettings: const {'theme': 'dark'},
           secretsIncluded: false,
         ),
         throwsFormatException,
@@ -142,21 +91,21 @@ void main() {
     });
 
     test('rebuilds the same transition from a durable previous plan', () {
-      final candidate = BackupSettingsSanitizer.sanitize({
+      final candidate = <String, dynamic>{
         'theme': 'new',
         'provider_api_key_v1': 'candidate-secret',
-      });
+      };
       final initial = RestoreSettingsTransition.build(
         currentSettings: const {'theme': 'old', 'old_api_key_v1': 'old-secret'},
         candidateSettings: candidate,
-        secretsIncluded: false,
+        secretsIncluded: true,
       );
 
       final resumed = RestoreSettingsTransition.resume(
         plan: initial.plan,
         snapshotBytes: initial.snapshotBytes,
         candidateSettings: candidate,
-        secretsIncluded: false,
+        secretsIncluded: true,
       );
 
       expect(resumed.plan, same(initial.plan));

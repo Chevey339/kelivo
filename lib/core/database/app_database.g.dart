@@ -3846,7 +3846,7 @@ class $MigrationRunRowsTable extends MigrationRunRows
     'source_kind',
     aliasedName,
     false,
-    check: () => sourceKind.isIn(const ['hive', 'sqlite_v1', 'legacy_json']),
+    check: () => sourceKind.isIn(const ['hive', 'legacy_json']),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );

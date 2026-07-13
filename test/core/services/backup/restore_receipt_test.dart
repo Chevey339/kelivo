@@ -54,7 +54,7 @@ Future<String> _writeCandidateManifest(RestoreReceiptStore store) async {
       'appVersion': 'test',
       'includeChats': false,
       'includeFiles': false,
-      'secretsIncluded': false,
+      'secretsIncluded': true,
       'entries': {
         'settings.json': {
           'bytes': await settings.length(),
@@ -220,7 +220,7 @@ void main() {
           'appVersion': 'test',
           'includeChats': false,
           'includeFiles': true,
-          'secretsIncluded': false,
+          'secretsIncluded': true,
           'entries': {
             'settings.json': {
               'bytes': await settings.length(),

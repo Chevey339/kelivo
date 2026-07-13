@@ -19,7 +19,6 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
-import 'backup_settings_sanitizer.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
 
@@ -933,7 +932,7 @@ class DataSync {
         includeFiles is! bool ||
         manifest['appVersion'] is! String ||
         manifest['createdAtUtc'] is! String ||
-        manifest['secretsIncluded'] is! bool) {
+        manifest['secretsIncluded'] != true) {
       throw const FormatException('manifest_fields');
     }
 
@@ -1055,7 +1054,7 @@ class DataSync {
     return (
       includeChats: includeChats,
       includeFiles: includeFiles,
-      secretsIncluded: manifest['secretsIncluded'] as bool,
+      secretsIncluded: true,
       normalizedManifestSha256: normalizedManifestSha256,
     );
   }
@@ -1737,16 +1736,6 @@ class DataSync {
                 pendingSettings[key] = newValue;
               }
               // Skip existing non-mergeable keys to preserve user preferences
-            }
-            for (final entry in pendingSettings.entries.toList()) {
-              final localValue = existing[entry.key];
-              if (localValue == null) continue;
-              pendingSettings[entry.key] =
-                  BackupSettingsSanitizer.preserveLocalCredentialsForMerge(
-                    key: entry.key,
-                    localValue: localValue,
-                    mergedValue: entry.value,
-                  );
             }
             BackupSettingsValidator.validate(pendingSettings);
             await prefs.restoreAtomically(pendingSettings);

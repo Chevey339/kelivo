@@ -122,7 +122,6 @@ final class RestoreTraceService {
           name == RestoreWorkspaceLock.publishingRunFileName ||
           name == RestoreWorkspaceLock.discardingRunFileName ||
           name == RestoreWorkspaceLock.archivingRunFileName ||
-          name == RestoreWorkspaceLock.archivingRunTemporaryFileName ||
           RegExp(r'^run_[a-f0-9]{32}$').hasMatch(name)) {
         return true;
       }

@@ -7,7 +7,6 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import '../../database/chat_database_repository.dart';
-import 'backup_settings_sanitizer.dart';
 import 'backup_settings_validator.dart';
 import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
@@ -317,7 +316,7 @@ final class RestoreBundleStaging {
         payloadKind is! String ||
         manifest['createdAtUtc'] is! String ||
         manifest['appVersion'] is! String ||
-        manifest['secretsIncluded'] is! bool) {
+        manifest['secretsIncluded'] != true) {
       throw const FormatException('restore_staging_manifest_fields');
     }
     final expectedFields = <String>{
@@ -350,10 +349,7 @@ final class RestoreBundleStaging {
     final settings = await _validateSettings(
       File(p.join(candidateDirectory.path, 'settings.json')),
     );
-    final secretsIncluded = manifest['secretsIncluded'] as bool;
-    if (!secretsIncluded) {
-      BackupSettingsSanitizer.validateSecretFree(settings);
-    }
+    const secretsIncluded = true;
     return ValidatedRestoreCandidate(
       includeChats: includeChats,
       includeFiles: includeFiles,

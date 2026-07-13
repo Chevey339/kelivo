@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:Kelivo/core/services/backup/backup_settings_sanitizer.dart';
 import 'package:Kelivo/core/services/backup/restore_settings_store.dart';
 
 void main() {
@@ -22,15 +21,15 @@ void main() {
       store = RestoreSettingsStore(preferences);
     });
 
-    test('applies and reload-verifies a secret-free transition', () async {
-      final candidate = BackupSettingsSanitizer.sanitize({
+    test('applies and reload-verifies a complete transition', () async {
+      final candidate = <String, dynamic>{
         'theme': 'new',
         'new_key': true,
         'provider_api_key_v1': 'candidate-secret',
-      });
+      };
       final transition = await store.buildTransition(
         candidateSettings: candidate,
-        secretsIncluded: false,
+        secretsIncluded: true,
       );
 
       await store.validateBefore(transition);
@@ -40,8 +39,8 @@ void main() {
 
       expect(preferences.getString('theme'), 'new');
       expect(preferences.getBool('new_key'), isTrue);
-      expect(preferences.getString('provider_api_key_v1'), '');
-      expect(preferences.containsKey('old_api_key_v1'), isFalse);
+      expect(preferences.getString('provider_api_key_v1'), 'candidate-secret');
+      expect(preferences.getString('old_api_key_v1'), 'old-secret');
       expect(preferences.getInt('keep_me'), 7);
       expect(preferences.getDouble('window_width_v1'), 900.0);
       await store.apply(transition);

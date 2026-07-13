@@ -202,10 +202,9 @@ final class PortableNdjsonV2 {
           if (headerSeen ||
               record['format'] != _format ||
               record['version'] != _version ||
-              (PortableChatScope.values.every(
-                    (scope) => scope.name != record['scope'],
-                  ) &&
-                  record['scope'] != 'activeBranchCompleted')) {
+              PortableChatScope.values.every(
+                (scope) => scope.name != record['scope'],
+              )) {
             throw const FormatException('portable_header');
           }
           headerSeen = true;

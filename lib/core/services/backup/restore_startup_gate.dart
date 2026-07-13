@@ -30,7 +30,7 @@ final class PendingRestoreRun {
   });
 
   final String runId;
-  final String? markerFileName;
+  final String markerFileName;
   final RestoreReceipt receipt;
   final bool runInCompletedDirectory;
 }
@@ -79,7 +79,6 @@ final class RestoreStartupGate {
   static Future<PendingRestoreRun?> _inspectLocked({
     required Directory appDataDirectory,
     required RestoreWorkspaceLock workspaceLock,
-    bool allowArchivingArtifactReconcile = true,
   }) async {
     final workspaceRoot = workspaceLock.workspaceRoot;
     final rootType = await FileSystemEntity.type(
@@ -96,7 +95,6 @@ final class RestoreStartupGate {
     Directory? runDirectory;
     String? directoryRunId;
     Directory? completedRunsRoot;
-    File? archivingTemporary;
     await for (final entity in workspaceRoot.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -122,12 +120,6 @@ final class RestoreStartupGate {
         markerFileName = name;
         continue;
       }
-      if (name == RestoreWorkspaceLock.archivingRunTemporaryFileName &&
-          type == FileSystemEntityType.file &&
-          archivingTemporary == null) {
-        archivingTemporary = File(entity.path);
-        continue;
-      }
       final match = RegExp(_runPattern).firstMatch(name);
       if (match != null &&
           type == FileSystemEntityType.directory &&
@@ -139,31 +131,15 @@ final class RestoreStartupGate {
       throw StateError('restore_startup_workspace_entry');
     }
 
-    if (markerFile == null &&
-        runDirectory == null &&
-        archivingTemporary == null) {
+    if (markerFile == null && runDirectory == null) {
       return null;
     }
-    if (markerFile != null && markerFileName == null) {
+    if (markerFile == null || markerFileName == null) {
       throw StateError('restore_startup_run_topology');
     }
-    if (markerFile != null && archivingTemporary != null) {
-      throw StateError('restore_startup_archiving_artifact_collision');
-    }
-
-    String? markerRunId;
-    var malformedArchivingMarker = false;
-    if (markerFile != null) {
-      if (markerFileName == RestoreWorkspaceLock.archivingRunFileName &&
-          await markerFile.length() < 32) {
-        malformedArchivingMarker = true;
-      } else {
-        markerRunId = await _readRunId(markerFile);
-      }
-    }
+    final markerRunId = await _readRunId(markerFile);
     if (runDirectory == null || directoryRunId == null) {
       if (markerFileName != RestoreWorkspaceLock.archivingRunFileName ||
-          markerRunId == null ||
           completedRunsRoot == null) {
         throw StateError('restore_startup_run_topology');
       }
@@ -200,8 +176,8 @@ final class RestoreStartupGate {
       );
     }
 
-    final runId = markerRunId ?? directoryRunId;
-    if (markerRunId != null && markerRunId != directoryRunId) {
+    final runId = markerRunId;
+    if (markerRunId != directoryRunId) {
       throw StateError('restore_startup_run_identity');
     }
     if (completedRunsRoot != null &&
@@ -222,9 +198,7 @@ final class RestoreStartupGate {
     final terminal =
         receipt.state == RestoreReceiptState.committed ||
         receipt.state == RestoreReceiptState.rolledBack;
-    if (markerFileName == null) {
-      if (!terminal) throw StateError('restore_startup_run_topology');
-    } else if (terminal) {
+    if (terminal) {
       if (markerFileName != RestoreWorkspaceLock.publishingRunFileName &&
           markerFileName != RestoreWorkspaceLock.archivingRunFileName) {
         throw StateError('restore_startup_terminal_marker');
@@ -244,25 +218,6 @@ final class RestoreStartupGate {
       await _validatePreparedCandidate(
         runDirectory: runDirectory,
         receipt: receipt,
-      );
-    }
-    final artifactFileName = archivingTemporary != null
-        ? RestoreWorkspaceLock.archivingRunTemporaryFileName
-        : malformedArchivingMarker
-        ? RestoreWorkspaceLock.archivingRunFileName
-        : null;
-    if (artifactFileName != null) {
-      if (!terminal || !allowArchivingArtifactReconcile) {
-        throw StateError('restore_startup_archiving_artifact_topology');
-      }
-      await workspaceLock.reconcileLegacyArchivingArtifactWhileWorkspaceLocked(
-        runId: runId,
-        artifactFileName: artifactFileName,
-      );
-      return _inspectLocked(
-        appDataDirectory: appDataDirectory,
-        workspaceLock: workspaceLock,
-        allowArchivingArtifactReconcile: false,
       );
     }
     return PendingRestoreRun(
@@ -392,12 +347,8 @@ final class RestoreStartupGate {
           );
           return terminal;
         }
-        final markerFileName = pending.markerFileName;
-        if (markerFileName == null) {
-          throw StateError('restore_startup_cutover_marker');
-        }
         final result = await executor.executeWhileWorkspaceLocked(
-          observedMarkerFileName: markerFileName,
+          observedMarkerFileName: pending.markerFileName,
         );
         if (result.state != RestoreReceiptState.committed &&
             result.state != RestoreReceiptState.rolledBack) {

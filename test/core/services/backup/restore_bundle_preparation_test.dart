@@ -42,7 +42,7 @@ Future<({Directory directory, String manifestSha256})> _createBundle(
       'appVersion': 'test',
       'includeChats': false,
       'includeFiles': includeFiles,
-      'secretsIncluded': false,
+      'secretsIncluded': true,
       'entries': entries,
     }),
     flush: true,

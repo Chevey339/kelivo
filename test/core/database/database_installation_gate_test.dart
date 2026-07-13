@@ -144,7 +144,7 @@ void main() {
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            'database_schema_too_new',
+          'database_schema_version',
           ),
         ),
       );
