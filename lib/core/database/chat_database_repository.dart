@@ -210,7 +210,7 @@ class ChatDatabaseRepository {
       if (schemaVersion < AppDatabase.oldestMigratableSchemaVersion) {
         throw StateError('database_schema_too_old');
       }
-      _validateRawSnapshot(database);
+      _validateRawStructure(database);
     } on sqlite.SqliteException {
       throw StateError('database_corrupt');
     } finally {
@@ -223,7 +223,7 @@ class ChatDatabaseRepository {
     } finally {
       await driftDatabase.close();
     }
-    inspectInstalledDatabase(file, validateContents: true);
+    inspectInstalledDatabase(file);
     return true;
   }
 
@@ -314,8 +314,8 @@ class ChatDatabaseRepository {
     try {
       database.execute('PRAGMA foreign_keys = ON;');
       database.execute('PRAGMA synchronous = FULL;');
-      final info = _validateRawSnapshot(database);
-      if (info.schemaVersion != AppDatabase.currentSchemaVersion) {
+      _validateRawStructure(database);
+      if (database.userVersion != AppDatabase.currentSchemaVersion) {
         throw StateError('database_schema_version');
       }
       final existing = database.select(

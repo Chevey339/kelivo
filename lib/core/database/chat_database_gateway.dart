@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'chat_database_observer.dart';
 import 'chat_database_repository.dart';
-import 'database_installation_gate.dart';
 
 final class ChatDatabaseLease {
   ChatDatabaseLease._(this.repository, this._gateway);
@@ -29,7 +28,6 @@ final class ChatDatabaseGateway {
   Future<void>? _closing;
   String? _databasePath;
   int _leaseCount = 0;
-  DatabaseSessionReceipt? _sessionReceipt;
   final ChatDatabaseObserver _observer;
 
   Future<ChatDatabaseLease> acquire(File databaseFile) async {
@@ -72,12 +70,6 @@ final class ChatDatabaseGateway {
       try {
         await repository.ensureReady();
         await repository.validateConnectionContract();
-        final databaseId = await repository.getDatabaseIdentity();
-        _sessionReceipt =
-            await DatabaseInstallationGate.beginSessionIfInstalled(
-              appDataDirectory: databaseFile.absolute.parent,
-              databaseId: databaseId,
-            );
         return repository;
       } catch (_) {
         await repository.close();
@@ -93,19 +85,10 @@ final class ChatDatabaseGateway {
     _leaseCount--;
     if (_leaseCount != 0) return;
 
-    final databasePath = _databasePath;
-    final sessionReceipt = _sessionReceipt;
     _repository = null;
     _databasePath = null;
     final closing = () async {
       await repository.close();
-      if (sessionReceipt != null) {
-        await DatabaseInstallationGate.endSession(
-          appDataDirectory: File(databasePath!).parent,
-          sessionReceipt: sessionReceipt,
-        );
-        _sessionReceipt = null;
-      }
     }();
     _closing = closing;
     try {

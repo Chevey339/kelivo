@@ -173,7 +173,7 @@ u1, a1-v0, u2, a2-v0, a1-v1
 - **PD-04：发送永远追加到 active branch leaf。** 用户在历史位置阅读时发送，执行一次 programmatic jump，把新 user 消息定位到 viewport 顶部附近（而不是贴底），assistant 回答随后向下流入，保证新一轮从头可读。编辑历史 user 消息走 PD-02 分支语义，该消息保持原 viewport 锚定，直到新回答首帧可见。
 - **PD-05：绝不违背用户意图移动 viewport。** 滚动离开底部、选择文本、使用键盘、打开链接、触发搜索都视为阅读信号，立即退出 followingTail；流式内容在屏外继续，不改变用户所见位置；复用右侧既有“到底”导航按钮恢复尾随，不新增重复胶囊。会话重新打开时定位到最后一条 user 消息顶部，而非绝对底部。
 - **PD-06：搜索默认只搜当前 active branch**（会话内与全局搜索一致），提供显式"包含所有版本/分支"开关。每个结果携带 branch/revision identity，跳转时切换到对应 branch 并按 slot 锚定。
-- **PD-07：统计默认展示 active branch 口径**（用户实际看到的对话消耗），同页另列"全部生成消耗"（所有 revisions/branches 的 token/费用），两个口径都注明定义，不混用。
+- **PD-07：统计默认展示 active branch 口径**（用户实际看到的对话消耗），同页另列"全部生成消耗"（所有 revisions/branches 的 token/费用），两个口径都注明定义，不混用。**（已被 PD-16 第 3 条取代：统计页回单口径，按全部消息行计，与 `f7e11373` 一致。）**
 - **PD-08：完整备份包含全部数据。** 应用默认完整备份包含全部 branch、全部 revision（含 failed/interrupted partial）与 generation run 元数据。便携 NDJSON 导出默认仅 active branch + completed revision，提供"包含全部"选项。
 - **PD-09：merge 冲突按 hash 去重 + remap。** 同 ID 且内容 hash 相同的实体去重跳过；同 ID 内容不同时对导入侧整会话 remap 新 ID，生成用户可见的冲突报告；绝不静默覆盖 live 数据。
 - **PD-10：旧 Hive 数据由用户主动清理。** 成功迁移后，只要冻结清单内的 Hive 文件仍存在，存储空间展示“聊天记录（旧）”及占用；用户可立即清理，清理后项目消失。删除仍写 crash-resumable retirement receipt，但不再要求 30 天、3 次冷启动、诊断导出或 rollout 授权。`.previous` 恢复证据的保留策略与此独立。
@@ -219,6 +219,31 @@ u1, a1-v0, u2, a2-v0, a1-v1
 **保留的 v2 成果（与线性/graph 正交，不回退）**：Drift/SQLite 内核与安装门（Phase 1）、latest-wins 流式节流写库与崩溃恢复（P0-03/04、Phase 3 的 generation run，需改接线性写路径）、crash-safe 备份/恢复/合并（OPS-01/02/03）、FTS 搜索与 SQL 统计（OPS-04/05，需去掉 branch 口径）、附件引用/延迟 GC（OPS-06）、完整设置与凭据备份（OPS-07）、灰度能力与用户主动旧数据清理（OPS-08/09）。
 
 **明确拆除**：graph 三层（schema/commands/projector）、TimelineCoordinator 的 ancestry cursor 窗口与 viewport 状态机、programmaticJump/spacer/visual anchor 协调器、graft/fork 语义、`backfillMissingMessageGraphs`、搜索/统计/NDJSON 的 active-branch 口径（改为"选中版本 / 全部版本"口径）。
+
+### 5.4 PD-16：备份恢复与恢复页交互回归原产品（2026-07-13，用户裁决）
+
+Phase 6 之后用户对遗留的产品行为偏差做出裁决，原则与 PD-15 一致：**用户可见交互以 `f7e11373` 基线为准，v2 的崩溃安全内核保留但不得改变产品交互**。同时明确：未发布的中间实现（如已回退的 secure-storage 拆分）不需要任何迁移兼容，兼容目标只有两个——最终形态与上一个已发布的 Hive 版本。
+
+1. **任何备份导入完成后都弹"需要重启"对话框**（本地/WebDAV/S3、overwrite 与 merge 一律相同）。merge 完成后当前以 toast 结束是缺陷：merge 写入 SharedPreferences 的设置在重启前不生效，聊天合并结果也需重启后统一重载。合并报告改为并入重启对话框内容展示（参照基线 Cherry 导入完成对话框的样式），不再用 toast。
+2. **前后台切换/引擎重建绝不进入恢复失败页。** 业务租约的同进程 owner marker（`owner_<pid>` 与当前 PID 相同）在**所有构建模式**下直接回收，不再限定 debug：OS 排它锁才是跨进程权威判据，同 isolate 重复获取由进程内 registry 拦截，Android 引擎重建与 Flutter 热重启同属"同进程新 isolate"场景。恢复失败页只保留给真实障碍：数据库损坏/身份不符、OS 锁被另一个活动进程持有（桌面双开）、receipt 无法收敛。
+3. **统计页恢复单口径展示。** 指标格回到单值，口径与 `f7e11373` 相同：按全部消息行（含所有版本）计数/计 token；heatmap/trend/rank 同口径。删除"选中版本 / 全部生成"双值并列展示及相关 l10n；SQL 聚合下推的性能成果保留，仅统计口径与展示收敛。PD-07 的双口径设计作废。
+4. **恢复痕迹改为用户可清理。** `.kelivo_restore/completed/run_*` 归档（含恢复前旧数据库/设置/附件快照）仅用于人工回滚与诊断，恢复提交后删除不影响运行。存储空间新增"恢复痕迹"清理项，交互与"聊天记录（旧）"一致：有终态归档时显示占用与清理按钮，清理后消失。活动/未终态 run 不显示为可清理、绝不删除；工作区锁与在途恢复保持 fail-closed。
+
+### 5.5 PD-17：启动与大会话性能回归 + 数据库改名（2026-07-13，用户裁决）
+
+用户实测：数据库 3GB 以上、或单会话内容 1GB 以上时，冷启动黑屏极久、进入/使用大会话明显卡顿。根因诊断与裁决如下。参照对象 rikkahub（Room 直接 open）与 cherry-studio（better-sqlite3 直接 open）在启动路径上均为**零全库扫描**，崩溃恢复完全依赖 SQLite WAL 自身语义。
+
+**根因 A——启动黑屏与库大小成正比。** 移动端进程几乎从不干净退出（OS 直接杀进程，`ChatDatabaseGateway` 的 `endSession` 无机会执行），`.database_session_receipt.json` 因此几乎每次冷启动都残留；`DatabaseInstallationGate.ensureReady` 在 `runApp` 之前、主 isolate 上同步执行 `_recoverUncleanSession` → `PRAGMA quick_check` + `PRAGMA foreign_key_check`，需要读完整个数据库文件。schema 升级时 `migrateInstalledDatabase` 更是在迁移前后各做一次全库 `integrity_check` + `foreign_key_check`。
+
+**根因 B——大会话全量加载。** 消息列表窗口化本身正确，但：发送/重新生成每次经 `messagesForCompleteHistoryContext` → `ChatService.loadMessages` 全量加载整个会话内容（且单次发送内调用两次）；迷你地图、全选、导出选中同样全量；`_messagesCache` 无容量上限、不驱逐，1GB 会话进内存后常驻。
+
+裁决（原则：正常启动零全库扫描，全库校验只出现在显式恢复/诊断/快照路径；上下文与工具路径按需限量读取）：
+
+1. **废除会话收据机制及其全库检查。** 删除 `.database_session_receipt.json` 的写入/校验/`_recoverUncleanSession`；崩溃后恢复交给 SQLite WAL（这正是 WAL 的设计用途）。安装门正常路径只保留 O(1) 工作：`user_version` 读取、meta 表身份读取、receipt 匹配、`_validateRawStructure`（表结构 `table_info`，与数据量无关）。`quick_check`/`integrity_check`/`foreign_key_check` 仅保留在：恢复失败页诊断、备份快照制备与导入校验（`_validateRawSnapshot` 用于快照的语义不变）、显式人工诊断入口。
+2. **schema 迁移不再做前后全库校验。** `migrateInstalledDatabase` 去掉迁移前 `_validateRawSnapshot` 与迁移后 `validateContents: true` 复查，改为结构校验 + 迁移事务原子性兜底（drift 迁移失败即回滚、门 fail-closed）。迁移属一次性操作，可接受的上限是秒级，不是分钟级黑屏。
+3. **上下文构建限量读取。** 发送/重新生成的 API 上下文不再全量 `loadMessages`：按 `truncateIndex` 与助手上下文上限从 DB 只取尾部所需窗口（一条 SQL 限量查询）；单次发送内两处调用合并为一次并复用结果。
+4. **内存有界。** `_messagesCache` 改为有界缓存（当前会话窗口 + 近期访问 LRU，全局字节/条数上限）；迷你地图、全选、批量删除计划、导出列表改用轻量投影查询（id/role/截断摘要，不取全文），仅导出实际写文件时按需流式取全文。
+5. **数据库文件改名 `kelivo.sqlite` → `kelivo.db`。** 同步改：`AppDatabase.databaseFileName`、备份 ZIP entry `database/kelivo.db`、restore workspace/previous 清单、存储统计文件名映射。不做旧名读取兼容（v2 未发布）；唯一过渡处理是启动时"`kelivo.db` 不存在且 `kelivo.sqlite` 存在→一次性重命名主文件与 `-wal`/`-shm`"，否则现有开发设备会因 receipt 存在但库文件缺失而误入恢复失败页。旧名 v2 备份 ZIP 不做读取兼容；上一发布版（Hive JSON 备份）导入路径不受影响。
 
 ## 6. 目标架构
 
@@ -931,6 +956,32 @@ flowchart LR
 - 用户真机确认：仅保存、重生成（两种开关）、版本切换、删除、发送滚动、流式跟随均恢复原产品行为。
 
 实施顺序建议：LIN-02（读侧，最小风险）→ LIN-01（写侧）→ LIN-06（行为矩阵）→ LIN-03（UI 拆除）→ LIN-07（滚动矩阵）→ LIN-04（schema drop）→ LIN-05（周边）→ LIN-08（清理）。LIN-04 放在 UI 拆除之后，确保拆除期间随时可回退。
+
+### Phase 7：产品行为收尾（PD-16，2026-07-13 用户裁决）
+
+按 §5.4 执行。四项彼此独立，可并行；行为验收以 `f7e11373` 基线交互为准绳。
+
+工作项：
+
+- `PL-01`：**合并导入恢复重启对话框**。所有备份导入入口（本地文件、WebDAV、S3；桌面与移动两套 UI）在 merge 完成后显示与 overwrite 相同的"需要重启"对话框，合并报告（imported/deduplicated/remapped）并入对话框内容；删除 merge 完成 toast 路径。验收：每个入口 merge/overwrite 完成都走重启对话框；merge 后重启，合并进来的设置（如助手/Provider）生效。
+- `PL-02`：**业务租约同进程回收全构建生效**。`RestoreBusinessLease` 遇到与当前 PID 相同的 owner marker 时在 debug/profile/release 一律回收（删除 `main.dart` 的 `kDebugMode` 限定，收敛到 lease 内部规则）；不同 PID 的 marker 维持现状（OS 锁权威 + fail-closed）。验收：单测覆盖"同 PID marker 残留 + 新 isolate 获取成功"“不同 PID marker + OS 锁被占 → Unavailable”；Android 真机切后台触发引擎重建后回到前台不进入恢复失败页（用户真机确认项）。
+- `PL-03`：**统计页回单口径**。`StatsSummary`/metric grid/heatmap/trend/rank 全部只用"全部消息行（含所有版本）"单口径，与 `f7e11373` 一致；删除 selectedVersions/allRevisions 双值展示、模型字段与相关 l10n；repository 聚合查询收敛为单口径但保留 SQL 下推。验收：同组两个版本的会话在统计中计 2 条消息；页面无"x / y"并列。
+- `PL-04`：**恢复痕迹用户清理项**。存储空间新增"恢复痕迹"类别：统计 `.kelivo_restore/completed/run_*` 终态归档的文件数/字节；有归档时显示，用户确认后删除全部终态归档，删除后类别消失。在途/未终态 run 与 `.kelivo_business_lease`、retention receipt 不计入、不删除；删除期间持工作区锁，失败 fail-closed 并提示。验收：完成一次恢复后类别出现，清理后消失且应用功能不受影响；恢复进行中（prepared/committed 未 cold-ack）时类别不出现。
+
+退出条件：四项验收全部通过；`flutter analyze` 无问题；全量测试通过；用户真机确认 PL-01 弹窗、PL-02 前后台切换不再进恢复页。
+
+### Phase 8：性能回归与数据库改名（PD-17，2026-07-13 用户裁决）
+
+按 §5.5 执行。PERF-01 与 PERF-04 涉及同一批启动/文件路径代码，建议先做；PERF-02/03 相互独立。
+
+工作项：
+
+- `PERF-01`：**启动零全库扫描**。删除 `.database_session_receipt.json` 机制（`beginSessionIfInstalled`/`endSession`/`_recoverUncleanSession`/gateway 中的对应调用与字段）；`migrateInstalledDatabase` 去掉前后全库 `integrity_check`/`foreign_key_check`（保留 `_validateRawStructure` 与 schema 版本判定）；`inspectUncleanInstalledDatabase` 的全库检查仅保留给恢复失败页与显式诊断调用方。快照制备/导入路径的 `_validateRawSnapshot` 语义不变。验收：正常冷启动（含"上次被 OS 杀进程"场景）安装门内无任何读全库的 PRAGMA；黑屏时长与数据库大小解耦（3GB 库启动进入首帧 < 2s，固定设备实测）；损坏库仍 fail-closed 进恢复页。
+- `PERF-02`：**上下文构建限量读取**。新增 repository 限量查询：给定会话与 `truncateIndex`/上限 N，返回尾部选中版本消息（含 parts），一条 SQL 完成；`messagesForCompleteHistoryContext` 改走该查询；`chat_actions` 单次发送/重生成内的两次调用合并为一次并复用。验收：发送一条消息在 1GB 会话中不再触发全会话读取（观测 `queryMessagesByIds`/range 行数）；上下文内容与原全量路径在 truncate/上限语义下逐字节一致（回归测试）。
+- `PERF-03`：**消息缓存有界 + 重操作轻量投影**。`_messagesCache` 改为 LRU 有界（全局条数/字节双上限，当前会话窗口豁免）；迷你地图、全选、批量删除计划、导出选择列表改用轻量投影查询（id/groupId/version/role/时间戳/内容摘要 ≤200 字符），导出写文件时按 id 流式取全文。验收：打开-浏览-退出 1GB 会话后应用常驻内存回落到进入前量级；迷你地图/全选在万条消息会话上 < 300ms。
+- `PERF-04`：**数据库改名 `kelivo.db`**。改 `AppDatabase.databaseFileName` 与备份 ZIP entry `database/kelivo.db`，同步 restore workspace/previous 清单、存储统计映射与测试夹具；不读取、迁移或兼容旧名 `kelivo.sqlite` 及旧名 v2 备份（SQLite v2 从未发布，公开升级来源只有已发布 Hive 版本）。验收：新安装和 Hive 升级只生成 `kelivo.db`；新备份 round trip 通过；Hive JSON 备份导入不受影响。
+
+退出条件：四项验收全部通过；全量 analyze/test 通过；用户真机确认 3GB 库冷启动无长黑屏、1GB 会话进入/发送/滚动流畅。
 
 ## 12. 初始性能 SLO
 

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:Kelivo/core/database/app_database.dart';
@@ -205,7 +204,7 @@ void main() {
       );
     });
 
-    test('identity 替换同时存在 FK 损坏时先报告完整性失败', () async {
+    test('identity 替换不以全库 FK 扫描阻塞启动门', () async {
       await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
       final replacementRoot = await Directory.systemTemp.createTemp(
         'kelivo_database_replacement_corrupt_',
@@ -234,7 +233,7 @@ void main() {
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            'foreign_key_check',
+            'database_identity_mismatch',
           ),
         ),
       );
@@ -267,188 +266,18 @@ void main() {
       expect(updated.databaseId, replacement.databaseId);
     });
 
-    test('已验证 restore 可消费旧 identity 的 unclean session', () async {
-      final original = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-      await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: directory,
-        databaseId: original.databaseId,
-      );
-      final replacementRoot = await Directory.systemTemp.createTemp(
-        'kelivo_database_unclean_restore_',
-      );
-      addTearDown(() async {
-        if (await replacementRoot.exists()) {
-          await replacementRoot.delete(recursive: true);
-        }
-      });
-      final replacement = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: replacementRoot,
-      );
-      await databaseFile(directory).delete();
-      await databaseFile(replacementRoot).copy(databaseFile(directory).path);
-
-      final updated = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-        allowDatabaseIdentityChange: true,
-      );
-
-      expect(updated.installationId, original.installationId);
-      expect(updated.databaseId, replacement.databaseId);
-      expect(
-        await File(
-          p.join(directory.path, '.database_session_receipt.json'),
-        ).exists(),
-        isFalse,
-      );
-    });
-
-    test('残留 session receipt 触发 quick recovery 并在验证后清除', () async {
-      final installation = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-      final session = await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: directory,
-        databaseId: installation.databaseId,
-      );
-      final sessionFile = File(
-        p.join(directory.path, '.database_session_receipt.json'),
-      );
-      expect(session, isNotNull);
-      expect(await sessionFile.exists(), isTrue);
-
-      final recovered = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-
-      expect(recovered.databaseId, installation.databaseId);
-      expect(await sessionFile.exists(), isFalse);
-    });
-
-    test('installation receipt 存在时拒绝无 identity 的 live session', () async {
-      await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
-
-      await expectLater(
-        DatabaseInstallationGate.beginSessionIfInstalled(
-          appDataDirectory: directory,
-          databaseId: null,
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'database_identity_missing',
-          ),
-        ),
-      );
-    });
-
-    test('unclean 数据库损坏时保留 session receipt 并进入恢复入口', () async {
-      final installation = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-      await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: directory,
-        databaseId: installation.databaseId,
-      );
-      final sessionFile = File(
-        p.join(directory.path, '.database_session_receipt.json'),
-      );
-      await databaseFile(directory).writeAsString('not sqlite');
-
-      await expectLater(
-        DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'database_corrupt',
-          ),
-        ),
-      );
-      expect(await sessionFile.exists(), isTrue);
-      expect(await databaseFile(directory).readAsString(), 'not sqlite');
-    });
-
-    test('unclean quick recovery 拒绝 foreign key 损坏并保留证据', () async {
-      final installation = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-      await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: directory,
-        databaseId: installation.databaseId,
-      );
-      final raw = sqlite.sqlite3.open(databaseFile(directory).path);
-      raw.execute(
-        'INSERT INTO tool_event_rows (message_id, events_json) VALUES (?, ?);',
-        ['missing-message', '[]'],
-      );
-      raw.close();
-
-      await expectLater(
-        DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'foreign_key_check',
-          ),
-        ),
-      );
-      expect(
-        await File(
-          p.join(directory.path, '.database_session_receipt.json'),
-        ).exists(),
-        isTrue,
-      );
-    });
-
-    test('session identity 与 installation receipt 不一致时 fail closed', () async {
-      final installation = await DatabaseInstallationGate.ensureReady(
-        appDataDirectory: directory,
-      );
-      final session = await DatabaseInstallationGate.beginSessionIfInstalled(
-        appDataDirectory: directory,
-        databaseId: installation.databaseId,
-      );
-      final sessionFile = File(
-        p.join(directory.path, '.database_session_receipt.json'),
-      );
-      await sessionFile.writeAsString(
-        jsonEncode({
-          'version': DatabaseSessionReceipt.formatVersion,
-          'installationId': installation.installationId,
-          'databaseId': '00000000-0000-4000-8000-000000000000',
-          'sessionId': session!.sessionId,
-        }),
-        flush: true,
-      );
-
-      await expectLater(
-        DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'database_session_identity_mismatch',
-          ),
-        ),
-      );
-      expect(await sessionFile.exists(), isTrue);
-    });
-
-    test('损坏 session receipt 不删除数据库或 receipt 证据', () async {
+    test('废弃的 session receipt 不参与启动判定', () async {
       await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
       final sessionFile = File(
         p.join(directory.path, '.database_session_receipt.json'),
       );
       await sessionFile.writeAsString('{broken', flush: true);
 
-      await expectLater(
-        DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
-        throwsA(isA<FormatException>()),
+      final receipt = await DatabaseInstallationGate.ensureReady(
+        appDataDirectory: directory,
       );
+
+      expect(receipt.databaseId, isNotEmpty);
       expect(await databaseFile(directory).exists(), isTrue);
       expect(await sessionFile.readAsString(), '{broken');
     });
