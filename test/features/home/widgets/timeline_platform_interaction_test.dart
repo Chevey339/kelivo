@@ -1,4 +1,3 @@
-import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 import 'package:Kelivo/features/home/widgets/message_list_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -24,17 +23,7 @@ void main() {
       addTearDown(scrollController.dispose);
       final processing = ValueNotifier(false);
       addTearDown(processing.dispose);
-      final coordinator = TimelineCoordinator(
-        loadPage:
-            ({
-              required conversationId,
-              beforeRevisionId,
-              afterRevisionId,
-              fromStart,
-              required limit,
-            }) async => null,
-      );
-      addTearDown(coordinator.dispose);
+      var userScrollIntentCount = 0;
 
       await tester.pumpWidget(
         MaterialApp(
@@ -56,7 +45,7 @@ void main() {
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
               isProcessingFiles: processing,
-              timelineCoordinator: coordinator,
+              onUserScrollIntent: () => userScrollIntentCount++,
             ),
           ),
         ),
@@ -80,7 +69,7 @@ void main() {
         await tester.sendKeyDownEvent(LogicalKeyboardKey.pageUp);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.pageUp);
         await tester.pump();
-        expect(coordinator.viewportMode, TimelineViewportMode.userAnchored);
+        expect(userScrollIntentCount, greaterThanOrEqualTo(1));
       }
       debugDefaultTargetPlatformOverride = null;
     });

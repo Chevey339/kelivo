@@ -1,11 +1,7 @@
-import 'package:Kelivo/core/models/chat_input_data.dart';
-import 'package:Kelivo/core/models/conversation.dart';
-import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
 import 'package:Kelivo/features/home/controllers/scroll_controller.dart';
-import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 import 'package:Kelivo/features/home/widgets/chat_input_bar.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
@@ -37,44 +33,6 @@ void main() {
       controller!.scrollCtrl.scrollController,
       same(controller!.scrollController),
     );
-  });
-
-  testWidgets('sending owns only the programmatic user-message jump', (
-    tester,
-  ) async {
-    HomePageController? controller;
-    final chatService = ChatService();
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
-          ChangeNotifierProvider.value(value: chatService),
-          ChangeNotifierProvider(
-            create: (_) => AssistantProvider(chatService: chatService),
-          ),
-        ],
-        child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: _ControllerHarness(onCreated: (value) => controller = value),
-        ),
-      ),
-    );
-    final active = controller!;
-    active.chatController.updateCurrentConversation(
-      Conversation(id: 'conversation', title: 'conversation'),
-    );
-    active.chatController.timelineCoordinator.userAnchored();
-
-    await active.sendMessage(ChatInputData(text: 'new question'));
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(
-      active.chatController.timelineCoordinator.viewportMode,
-      TimelineViewportMode.userAnchored,
-    );
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
   });
 }
 

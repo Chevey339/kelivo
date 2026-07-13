@@ -84,9 +84,6 @@ class ChatScrollController {
     required this._onStateChanged,
     required this._getAutoScrollEnabled,
     required this._getAutoScrollIdleSeconds,
-    this.onUserAnchored,
-    this.onFollowingTail,
-    this.shouldFollowTail,
     this.isGenerating,
   }) {
     final scrollController = _scrollController;
@@ -98,10 +95,10 @@ class ChatScrollController {
     if (scrollController is ChatAutoFollowScrollController) {
       scrollController.shouldAutoFollow = () =>
           _getAutoScrollEnabled() &&
+          (isGenerating?.call() ?? false) &&
           _autoStickToBottom &&
           !_isUserScrolling &&
-          !_explicitBottomAnimationInProgress &&
-          (shouldFollowTail?.call() ?? true);
+          !_explicitBottomAnimationInProgress;
     }
   }
 
@@ -109,9 +106,6 @@ class ChatScrollController {
   final VoidCallback _onStateChanged;
   final bool Function() _getAutoScrollEnabled;
   final int Function() _getAutoScrollIdleSeconds;
-  final VoidCallback? onUserAnchored;
-  final VoidCallback? onFollowingTail;
-  final bool Function()? shouldFollowTail;
   final bool Function()? isGenerating;
 
   /// Observer controller for precise index-based scroll navigation.
@@ -224,7 +218,6 @@ class ChatScrollController {
         _isUserScrolling = false;
         _userScrollTimer?.cancel();
         _autoStickToBottom = true;
-        onFollowingTail?.call();
       } else if (autoScrollEnabled || _autoStickToBottom) {
         _autoStickToBottom = true;
       }
@@ -241,7 +234,6 @@ class ChatScrollController {
   void handleUserScrollIntent() {
     _isUserScrolling = true;
     _autoStickToBottom = false;
-    onUserAnchored?.call();
     _lastJumpUserMessageId = null;
     if (!_showNavButtons) {
       _showNavButtons = true;
@@ -298,7 +290,6 @@ class ChatScrollController {
   /// [animate] - Whether to animate the scroll (default: true).
   void scrollToBottom({bool animate = true}) {
     _autoStickToBottom = true;
-    onFollowingTail?.call();
     final generating = isGenerating?.call() ?? false;
     _scheduleExplicitScrollToBottom(animate: animate && !generating);
   }
@@ -428,7 +419,6 @@ class ChatScrollController {
   void scrollToTop({bool animate = true}) {
     try {
       if (!_scrollController.hasClients) return;
-      onUserAnchored?.call();
       _lastJumpUserMessageId = null;
       revealNavButtons();
 
@@ -463,7 +453,6 @@ class ChatScrollController {
       if (messages.isEmpty) return false;
 
       revealNavButtons();
-      onUserAnchored?.call();
 
       // Determine anchor index
       int anchor;
@@ -519,7 +508,6 @@ class ChatScrollController {
       if (messages.isEmpty) return false;
 
       revealNavButtons();
-      onUserAnchored?.call();
 
       // Determine anchor index
       int anchor;
@@ -572,8 +560,6 @@ class ChatScrollController {
     try {
       if (!_scrollController.hasClients) return;
       if (targetIndex < 0) return;
-      onUserAnchored?.call();
-
       await _observerController.animateTo(
         index: targetIndex,
         alignment: 0.1,

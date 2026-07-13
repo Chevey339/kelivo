@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
-import 'timeline_coordinator.dart';
 import 'message_render_model.dart';
 
 /// Controller for managing conversation state in the home page.
@@ -20,39 +19,10 @@ class ChatController extends ChangeNotifier {
   }
 
   ChatController._(this._chatService) {
-    timelineCoordinator = TimelineCoordinator(
-      loadPage:
-          ({
-            required conversationId,
-            beforeRevisionId,
-            afterRevisionId,
-            fromStart,
-            required limit,
-          }) => _chatService.loadTimelinePage(
-            conversationId,
-            beforeRevisionId: beforeRevisionId,
-            afterRevisionId: afterRevisionId,
-            fromStart: fromStart ?? false,
-            limit: limit,
-          ),
-      loadAroundPage:
-          ({
-            required conversationId,
-            required targetRevisionId,
-            required limit,
-          }) => _chatService.loadTimelinePage(
-            conversationId,
-            aroundRevisionId: targetRevisionId,
-            limit: limit,
-          ),
-      retainWindow: _chatService.retainTimelineWindow,
-    );
-    timelineCoordinator.addListener(_syncTimelineWindow);
     _chatService.addListener(_syncCurrentConversationWithService);
   }
 
   final ChatService _chatService;
-  late final TimelineCoordinator timelineCoordinator;
 
   // ============================================================================
   // State Fields
@@ -73,16 +43,9 @@ class ChatController extends ChangeNotifier {
   /// Total persisted message count for the current conversation.
   int _totalMessageCount = 0;
   int get totalMessageCount => _totalMessageCount;
-  int _lastTimelineWindowRevision = -1;
-
-  bool get hasMoreBefore =>
-      timelineCoordinator.conversationId == _currentConversation?.id
-      ? timelineCoordinator.hasMoreBefore
-      : _loadedStartIndex > 0;
+  bool get hasMoreBefore => _loadedStartIndex > 0;
   bool get hasMoreAfter =>
-      timelineCoordinator.conversationId == _currentConversation?.id
-      ? timelineCoordinator.hasMoreAfter
-      : _loadedStartIndex + _messages.length < _totalMessageCount;
+      _loadedStartIndex + _messages.length < _totalMessageCount;
 
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
@@ -127,22 +90,6 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _syncTimelineWindow() {
-    if (timelineCoordinator.conversationId != _currentConversation?.id) return;
-    final revision = timelineCoordinator.windowRevision;
-    if (_lastTimelineWindowRevision == revision) return;
-    _lastTimelineWindowRevision = revision;
-    _messages = timelineCoordinator.slots
-        .map((slot) => slot.message)
-        .toList(growable: true);
-    _totalMessageCount = timelineCoordinator.totalSlotCount;
-    _loadedStartIndex = timelineCoordinator.slots.isEmpty
-        ? 0
-        : timelineCoordinator.slots.first.identity.logicalIndex;
-    invalidateCache();
-    notifyListeners();
-  }
-
   // ============================================================================
   // Conversation Management
   // ============================================================================
@@ -153,7 +100,6 @@ class ChatController extends ChangeNotifier {
       throw StateError('persisted_conversation_requires_async_open');
     }
     _currentConversation = conversation;
-    timelineCoordinator.clear();
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
@@ -164,7 +110,6 @@ class ChatController extends ChangeNotifier {
   Future<void> setCurrentConversationAndLoad(Conversation? conversation) async {
     _currentConversation = conversation;
     if (conversation == null) {
-      timelineCoordinator.clear();
       _messages = [];
       _loadedStartIndex = 0;
       _totalMessageCount = 0;
@@ -212,7 +157,6 @@ class ChatController extends ChangeNotifier {
       assistantId: assistantId,
     );
     _currentConversation = conversation;
-    timelineCoordinator.clear();
     _messages = [];
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
@@ -242,7 +186,6 @@ class ChatController extends ChangeNotifier {
   }
 
   void _clearCurrentConversationState() {
-    timelineCoordinator.clear();
     _currentConversation = null;
     _messages = [];
     _loadedStartIndex = 0;
@@ -251,37 +194,60 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _loadInitialMessageWindow(String conversationId) async {
-    await timelineCoordinator.open(
+    final page = await _chatService.loadTimelinePage(
       conversationId,
       limit: ChatService.defaultTimelineInitialSlots,
     );
-    for (final slot in timelineCoordinator.slots.reversed) {
-      if (slot.message.role != 'user') continue;
-      timelineCoordinator.programmaticJump(slot.identity.slotId);
-      break;
-    }
+    _replaceWindow(page);
     invalidateCache();
     await _preloadVisibleGroupData();
   }
 
-  void refreshLoadedMessageCount() {
-    final conversation = _currentConversation;
-    if (conversation == null) {
-      _totalMessageCount = 0;
+  void _replaceWindow(LoadedTimelinePage? page) {
+    if (page == null) {
+      _messages = <ChatMessage>[];
       _loadedStartIndex = 0;
+      _totalMessageCount = 0;
       return;
     }
-    _totalMessageCount = _chatService.getMessageCount(conversation.id);
-    _loadedStartIndex = _loadedStartIndex.clamp(0, _totalMessageCount).toInt();
+    _messages = page.slots.map((slot) => slot.message).toList(growable: true);
+    _loadedStartIndex = page.slots.isEmpty
+        ? 0
+        : page.slots.first.identity.logicalIndex;
+    _totalMessageCount = page.totalSlotCount;
+    invalidateCache();
   }
 
   Future<bool> loadMoreBefore({
     int limit = ChatService.defaultHistoryPageSize,
   }) async {
     if (limit <= 0) return false;
-    final loaded = await timelineCoordinator.loadBefore(limit: limit);
-    if (!loaded) return false;
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty || !hasMoreBefore) {
+      return false;
+    }
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      beforeRevisionId: _messages.first.id,
+      limit: limit,
+    );
+    if (page == null || page.slots.isEmpty) return false;
+    final existing = {for (final message in _messages) message.id};
+    _messages.insertAll(0, [
+      for (final slot in page.slots)
+        if (existing.add(slot.message.id)) slot.message,
+    ]);
+    _loadedStartIndex = page.slots.first.identity.logicalIndex;
+    _totalMessageCount = page.totalSlotCount;
+    if (_messages.length > ChatService.defaultLoadedWindowMax) {
+      _messages.removeRange(
+        ChatService.defaultLoadedWindowMax,
+        _messages.length,
+      );
+    }
+    invalidateCache();
     await _preloadVisibleGroupData();
+    notifyListeners();
     return true;
   }
 
@@ -289,8 +255,28 @@ class ChatController extends ChangeNotifier {
     int limit = ChatService.defaultHistoryPageSize,
   }) async {
     if (limit <= 0) return false;
-    final loaded = await timelineCoordinator.loadAfter(limit: limit);
-    if (!loaded) return false;
+    final conversation = _currentConversation;
+    if (conversation == null || _messages.isEmpty || !hasMoreAfter) {
+      return false;
+    }
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      afterRevisionId: _messages.last.id,
+      limit: limit,
+    );
+    if (page == null || page.slots.isEmpty) return false;
+    final existing = {for (final message in _messages) message.id};
+    _messages.addAll([
+      for (final slot in page.slots)
+        if (existing.add(slot.message.id)) slot.message,
+    ]);
+    _totalMessageCount = page.totalSlotCount;
+    if (_messages.length > ChatService.defaultLoadedWindowMax) {
+      final removeCount = _messages.length - ChatService.defaultLoadedWindowMax;
+      _messages.removeRange(0, removeCount);
+      _loadedStartIndex += removeCount;
+    }
+    invalidateCache();
     await _preloadVisibleGroupData();
     notifyListeners();
     return true;
@@ -299,23 +285,27 @@ class ChatController extends ChangeNotifier {
   Future<bool> loadStartWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
-    await timelineCoordinator.openStart(
+    final page = await _chatService.loadTimelinePage(
       conversation.id,
+      fromStart: true,
       limit: ChatService.defaultLoadedWindowMax,
     );
+    _replaceWindow(page);
     await _preloadVisibleGroupData();
+    notifyListeners();
     return _messages.isNotEmpty;
   }
 
   Future<bool> loadEndWindow() async {
     final conversation = _currentConversation;
     if (conversation == null) return false;
-    await timelineCoordinator.open(
+    final page = await _chatService.loadTimelinePage(
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
     );
-    timelineCoordinator.followTail();
+    _replaceWindow(page);
     await _preloadVisibleGroupData();
+    notifyListeners();
     return _messages.isNotEmpty;
   }
 
@@ -345,33 +335,42 @@ class ChatController extends ChangeNotifier {
           ChatService.defaultLoadedWindowMax,
         )
         .toInt();
-    final loaded = await timelineCoordinator.openAround(
-      messageId,
+    final page = await _chatService.loadTimelinePage(
+      _currentConversation!.id,
+      aroundRevisionId: messageId,
       limit: limit,
     );
-    if (!loaded) return false;
+    if (page == null || page.slots.isEmpty) return false;
+    _replaceWindow(page);
     await _preloadVisibleGroupData();
+    notifyListeners();
     return _messages.any((message) => message.id == messageId);
   }
 
   Future<bool> refreshTimelineAfterMutation({
     Set<String> removedRevisionIds = const <String>{},
   }) async {
-    if (_currentConversation == null) return false;
-    final refreshed = await timelineCoordinator.refreshAfterMutation(
-      removedRevisionIds: removedRevisionIds,
+    final conversation = _currentConversation;
+    if (conversation == null) return false;
+    String? anchorId;
+    for (final message in _messages) {
+      if (removedRevisionIds.contains(message.id)) continue;
+      anchorId = message.id;
+      break;
+    }
+    final page = await _chatService.loadTimelinePage(
+      conversation.id,
+      aroundRevisionId: anchorId,
+      limit: ChatService.defaultLoadedWindowMax,
     );
-    if (!refreshed) return false;
+    _replaceWindow(page);
     await _preloadVisibleGroupData();
-    invalidateCache();
-    return true;
+    notifyListeners();
+    return page != null;
   }
 
   int loadedWindowTruncateIndex() {
-    final conversationId = _currentConversation?.id;
-    final raw = conversationId == null
-        ? -1
-        : _chatService.getContextStartIndex(conversationId);
+    final raw = _currentConversation?.truncateIndex ?? -1;
     if (raw < 0) return -1;
     if (raw <= _loadedStartIndex) return -1;
 
@@ -429,9 +428,7 @@ class ChatController extends ChangeNotifier {
   ) {
     final current =
         _chatService.getConversation(conversation.id) ?? conversation;
-    return current.copyWith(
-      truncateIndex: _chatService.getContextStartIndex(conversation.id),
-    );
+    return current;
   }
 
   Future<void> _preloadVisibleGroupData() async {
@@ -504,13 +501,11 @@ class ChatController extends ChangeNotifier {
     if (conversation == null || message.conversationId != conversation.id) {
       return false;
     }
-    final opened = await timelineCoordinator.openAround(
+    final opened = await loadWindowAroundMessage(
       message.id,
-      limit: ChatService.defaultLoadedWindowMax,
+      leadingContext: ChatService.defaultHistoryPageSize,
     );
-    if (!opened) return false;
-    timelineCoordinator.programmaticJump(message.groupId ?? message.id);
-    return true;
+    return opened;
   }
 
   /// Publishes one atomic persistence result to the loaded tail as one UI
@@ -525,15 +520,13 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
-    await timelineCoordinator.open(
+    final page = await _chatService.loadTimelinePage(
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
     );
-    final user = messages.firstWhere(
-      (message) => message.role == 'user',
-      orElse: () => messages.first,
-    );
-    timelineCoordinator.programmaticJump(user.groupId ?? user.id);
+    _replaceWindow(page);
+    await _preloadVisibleGroupData();
+    notifyListeners();
     return true;
   }
 
@@ -550,14 +543,14 @@ class ChatController extends ChangeNotifier {
   /// Mirrors an in-memory message snapshot into the timeline window without
   /// publishing a full-window change. Streaming UI has its own narrow notifier.
   bool replaceMessageSnapshot(ChatMessage updatedMessage) {
-    if (_currentConversation?.id != updatedMessage.conversationId ||
-        timelineCoordinator.conversationId != updatedMessage.conversationId ||
-        !timelineCoordinator.replaceMessage(updatedMessage, notify: false)) {
+    if (_currentConversation?.id != updatedMessage.conversationId) {
       return false;
     }
-    _messages = timelineCoordinator.slots
-        .map((slot) => slot.message)
-        .toList(growable: true);
+    final index = _messages.indexWhere(
+      (message) => message.id == updatedMessage.id,
+    );
+    if (index < 0) return false;
+    _messages[index] = updatedMessage;
     invalidateCache();
     return true;
   }
@@ -575,12 +568,7 @@ class ChatController extends ChangeNotifier {
     String conversationId, {
     required bool isGenerating,
   }) {
-    if (_currentConversation?.id != conversationId ||
-        timelineCoordinator.conversationId != conversationId) {
-      return false;
-    }
-    timelineCoordinator.noteContentChanged(isGenerating: isGenerating);
-    return true;
+    return _currentConversation?.id == conversationId;
   }
 
   /// Publishes a terminal generation snapshot and always closes the timeline's
@@ -894,8 +882,8 @@ class ChatController extends ChangeNotifier {
       byGroup: groupedMessages,
       versionSelections: _versionSelections,
       versionCounts: {
-        for (final slot in timelineCoordinator.slots)
-          slot.identity.slotId: slot.identity.versionCount,
+        for (final entry in groupedMessages.entries)
+          entry.key: entry.value.length,
       },
       contextDividerIndex: _collapsedContextDividerIndex(),
     );
@@ -953,9 +941,6 @@ class ChatController extends ChangeNotifier {
   @override
   void dispose() {
     _chatService.removeListener(_syncCurrentConversationWithService);
-    timelineCoordinator
-      ..removeListener(_syncTimelineWindow)
-      ..dispose();
     cancelAllStreams();
     super.dispose();
   }

@@ -5,7 +5,6 @@ import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/core/database/message_graph_projector.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
-import 'package:Kelivo/features/home/controllers/timeline_coordinator.dart';
 
 class _FakeLazyChatService extends ChatService {
   _FakeLazyChatService(this._messages);
@@ -366,8 +365,6 @@ void main() {
 
         final partial = placeholder.copyWith(content: 'partial answer');
         controller.replaceMessageSnapshot(partial);
-        controller.timelineCoordinator.noteContentChanged(isGenerating: true);
-        controller.timelineCoordinator.userAnchored();
         expect(await controller.loadMoreBefore(), isTrue);
         expect(controller.messages.last.content, 'partial answer');
         expect(controller.messages.last.isStreaming, isTrue);
@@ -377,44 +374,9 @@ void main() {
           isStreaming: false,
         );
         expect(controller.publishTerminalMessage(completed), isTrue);
-        expect(controller.timelineCoordinator.isGenerating, isFalse);
-        controller.timelineCoordinator.followTail();
 
         expect(controller.messages.last.content, 'complete answer');
         expect(controller.messages.last.isStreaming, isFalse);
-        expect(
-          controller.timelineCoordinator.slots.last.message.content,
-          'complete answer',
-        );
-        expect(
-          controller.timelineCoordinator.slots.last.message.isStreaming,
-          isFalse,
-        );
-      },
-    );
-
-    test(
-      'viewport intent changes do not republish the message window',
-      () async {
-        await controller.setCurrentConversationAndLoad(conversation);
-        final originalMessages = controller.messages;
-        var controllerNotifications = 0;
-        var coordinatorNotifications = 0;
-        controller.addListener(() => controllerNotifications++);
-        controller.timelineCoordinator.addListener(
-          () => coordinatorNotifications++,
-        );
-
-        for (var index = 0; index < 120; index++) {
-          controller.timelineCoordinator.userAnchored();
-        }
-        for (var index = 0; index < 120; index++) {
-          controller.timelineCoordinator.followTail();
-        }
-
-        expect(controllerNotifications, 0);
-        expect(coordinatorNotifications, 2);
-        expect(identical(controller.messages, originalMessages), isTrue);
       },
     );
 
@@ -435,25 +397,15 @@ void main() {
         isStreaming: true,
       );
 
-      expect(controller.publishGenerationStarted(background), isFalse);
-      expect(controller.timelineCoordinator.isGenerating, isFalse);
-      expect(controller.publishGenerationStarted(foreground), isFalse);
-      expect(controller.timelineCoordinator.isGenerating, isTrue);
+      controller.setConversationLoading(background.conversationId, true);
+      expect(controller.isCurrentConversationLoading, isFalse);
+      controller.setConversationLoading(foreground.conversationId, true);
+      expect(controller.isCurrentConversationLoading, isTrue);
 
-      expect(
-        controller.publishTerminalMessage(
-          background.copyWith(isStreaming: false),
-        ),
-        isFalse,
-      );
-      expect(controller.timelineCoordinator.isGenerating, isTrue);
-      expect(
-        controller.publishTerminalMessage(
-          foreground.copyWith(isStreaming: false),
-        ),
-        isFalse,
-      );
-      expect(controller.timelineCoordinator.isGenerating, isFalse);
+      controller.setConversationLoading(background.conversationId, false);
+      expect(controller.isCurrentConversationLoading, isTrue);
+      controller.setConversationLoading(foreground.conversationId, false);
+      expect(controller.isCurrentConversationLoading, isFalse);
     });
 
     test('clears current conversation when the service deletes it', () async {
@@ -1025,10 +977,6 @@ void main() {
           isTrue,
         );
         expect(controller.messages.last.id, isNot('message-499'));
-        expect(
-          controller.timelineCoordinator.programmaticTargetSlotId,
-          'message-10',
-        );
       },
     );
 
@@ -1064,10 +1012,6 @@ void main() {
           isTrue,
         );
         expect(controller.messages.last.id, isNot('message-499'));
-        expect(
-          controller.timelineCoordinator.programmaticTargetSlotId,
-          'message-10',
-        );
       },
     );
 
@@ -1075,13 +1019,6 @@ void main() {
       'mutation refresh removes a deleted slot from every window view',
       () async {
         await controller.setCurrentConversationAndLoad(conversation);
-        controller.timelineCoordinator.captureVisualAnchor(
-          geometries: const [
-            TimelineSlotGeometry(slotId: 'message-80', top: 120, bottom: 180),
-          ],
-          viewportTop: 100,
-          viewportBottom: 600,
-        );
         messages.removeWhere((message) => message.id == 'message-80');
 
         expect(
@@ -1090,23 +1027,15 @@ void main() {
           ),
           isTrue,
         );
-        controller.timelineCoordinator.userAnchored();
-        controller.timelineCoordinator.followTail();
 
         expect(
           controller.messages.any((message) => message.id == 'message-80'),
           isFalse,
         );
-        expect(
-          controller.timelineCoordinator.slots.any(
-            (slot) => slot.identity.revisionId == 'message-80',
-          ),
-          isFalse,
-        );
       },
     );
 
-    test('temporary sends publish through coordinator slots', () async {
+    test('temporary sends append directly to the linear window', () async {
       messages = <ChatMessage>[];
       conversation = Conversation(
         id: 'temporary-conversation',
@@ -1140,11 +1069,6 @@ void main() {
       );
 
       expect(controller.messages, [user, assistant]);
-      expect(controller.timelineCoordinator.slots.map((slot) => slot.message), [
-        user,
-        assistant,
-      ]);
-      expect(controller.timelineCoordinator.programmaticTargetSlotId, user.id);
     });
 
     test('maps persisted truncate index into the loaded tail window', () async {

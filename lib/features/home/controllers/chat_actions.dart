@@ -151,6 +151,9 @@ class ChatActions {
   /// Called when messages list is updated.
   VoidCallback? onMessagesChanged;
 
+  /// Called once after a successful send pair is visible in the tail window.
+  VoidCallback? onSendPairAppended;
+
   /// Called when conversation loading state changes.
   void Function(String conversationId, bool loading)? onLoadingChanged;
 
@@ -738,7 +741,7 @@ class ChatActions {
   /// UI is responsible for:
   /// - Adding messages to the list (user + assistant)
   /// - Showing snackbars on errors
-  /// - Rendering the coordinator-owned user-message programmatic jump
+  /// - Scrolling once to the newly appended tail
   /// - Haptic feedback
   Future<ChatActionResult> sendMessage({
     required ChatInputData input,
@@ -829,6 +832,7 @@ class ChatActions {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();
+    onSendPairAppended?.call();
 
     // Reset tool parts and initialize reasoning
     streamController.toolParts.remove(assistantMessage.id);

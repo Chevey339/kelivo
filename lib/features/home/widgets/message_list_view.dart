@@ -15,7 +15,6 @@ import '../../chat/widgets/chat_message_widget.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
-import '../controllers/timeline_coordinator.dart';
 import '../controllers/message_render_model.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
@@ -132,7 +131,6 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
-    this.timelineCoordinator,
     this.onUserScrollIntent,
     this.chatFontScale = 1,
     this.showModelIcon = true,
@@ -210,7 +208,6 @@ class MessageListView extends StatefulWidget {
   final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
   final Future<bool> Function()? onLoadMoreAfter;
-  final TimelineCoordinator? timelineCoordinator;
   final VoidCallback? onUserScrollIntent;
   final double chatFontScale;
   final bool showModelIcon;
@@ -222,10 +219,8 @@ class MessageListView extends StatefulWidget {
   State<MessageListView> createState() => _MessageListViewState();
 }
 
-class _MessageListViewState extends State<MessageListView>
-    with WidgetsBindingObserver {
+class _MessageListViewState extends State<MessageListView> {
   static const double _streamingUpdateDeferBottomTolerance = 24.0;
-  static const int _maximumProgrammaticSpacerRemeasurements = 5;
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
@@ -236,16 +231,6 @@ class _MessageListViewState extends State<MessageListView>
   DateTime? _lastHistoryLoadAt;
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
-  final Map<String, GlobalKey> _slotKeys = <String, GlobalKey>{};
-  bool _programmaticJumpScheduled = false;
-  int _programmaticSpacerRemeasurements = 0;
-  String? _preparedProgrammaticTargetSlotId;
-  String? _preparedProgrammaticConversationId;
-  String? _programmaticAnchorSlotId;
-  String? _programmaticAnchorConversationId;
-  double _programmaticSpacer = 0;
-  bool _retainTerminalAnchorSpacer = false;
-  bool _wasGenerating = false;
   late List<MessageRenderModel> _effectiveRenderModels;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
@@ -256,8 +241,6 @@ class _MessageListViewState extends State<MessageListView>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _wasGenerating = widget.timelineCoordinator?.isGenerating == true;
     _refreshRenderModels();
   }
 
@@ -265,63 +248,6 @@ class _MessageListViewState extends State<MessageListView>
   void didUpdateWidget(covariant MessageListView oldWidget) {
     super.didUpdateWidget(oldWidget);
     _refreshRenderModels();
-    final active = _effectiveRenderModels.map((model) => model.slotId).toSet();
-    _slotKeys.removeWhere((slotId, _) => !active.contains(slotId));
-    final coordinator = widget.timelineCoordinator;
-    final isGenerating = coordinator?.isGenerating == true;
-    final hasPendingTarget = coordinator?.programmaticTargetSlotId != null;
-    final conversationChanged =
-        _programmaticAnchorConversationId != null &&
-        _programmaticAnchorConversationId != coordinator?.conversationId;
-    final preparedConversationChanged =
-        _preparedProgrammaticConversationId != null &&
-        _preparedProgrammaticConversationId != coordinator?.conversationId;
-    if (preparedConversationChanged) {
-      _preparedProgrammaticTargetSlotId = null;
-      _preparedProgrammaticConversationId = null;
-      _programmaticSpacerRemeasurements = 0;
-    }
-    if (conversationChanged) {
-      _programmaticAnchorSlotId = null;
-      _programmaticAnchorConversationId = null;
-      _programmaticSpacer = 0;
-      _retainTerminalAnchorSpacer = false;
-    } else if (_wasGenerating && !isGenerating) {
-      _programmaticSpacer = _requiredTerminalAnchorSpacer();
-      _retainTerminalAnchorSpacer = _programmaticSpacer > 0.5;
-      if (!_retainTerminalAnchorSpacer) {
-        _programmaticAnchorSlotId = null;
-        _programmaticAnchorConversationId = null;
-      }
-    }
-    if (coordinator?.viewportMode == TimelineViewportMode.followingTail) {
-      _preparedProgrammaticTargetSlotId = null;
-      _preparedProgrammaticConversationId = null;
-      _programmaticSpacerRemeasurements = 0;
-      _programmaticAnchorSlotId = null;
-      _programmaticAnchorConversationId = null;
-      _programmaticSpacer = 0;
-      _retainTerminalAnchorSpacer = false;
-    } else if (!isGenerating &&
-        !hasPendingTarget &&
-        !_retainTerminalAnchorSpacer) {
-      _programmaticAnchorSlotId = null;
-      _programmaticAnchorConversationId = null;
-      _programmaticSpacer = 0;
-    }
-    _wasGenerating = isGenerating;
-  }
-
-  double _requiredTerminalAnchorSpacer() {
-    if (!widget.scrollController.hasClients || _programmaticSpacer <= 0) {
-      return 0;
-    }
-    final position = widget.scrollController.position;
-    final contentMax = (position.maxScrollExtent - _programmaticSpacer).clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    return (position.pixels - contentMax).clamp(0.0, _programmaticSpacer);
   }
 
   void _refreshRenderModels() {
@@ -349,21 +275,10 @@ class _MessageListViewState extends State<MessageListView>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (widget.timelineCoordinator?.viewportMode ==
-        TimelineViewportMode.followingTail) {
-      return;
-    }
-    _captureVisualAnchor();
-    _scheduleVisualAnchorRestore();
   }
 
   /// Build the context divider widget shown at truncate position.
@@ -419,31 +334,6 @@ class _MessageListViewState extends State<MessageListView>
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
-            _scheduleProgrammaticJump();
-            final timelineCoordinator = widget.timelineCoordinator;
-            final targetPending =
-                timelineCoordinator?.programmaticTargetSlotId != null;
-            final preparedTarget =
-                targetPending &&
-                _preparedProgrammaticTargetSlotId ==
-                    timelineCoordinator?.programmaticTargetSlotId &&
-                _preparedProgrammaticConversationId ==
-                    timelineCoordinator?.conversationId;
-            final activeGenerationAnchor =
-                (timelineCoordinator?.isGenerating == true ||
-                    _retainTerminalAnchorSpacer) &&
-                _programmaticAnchorSlotId != null &&
-                _programmaticAnchorConversationId ==
-                    timelineCoordinator?.conversationId &&
-                timelineCoordinator?.viewportMode !=
-                    TimelineViewportMode.followingTail;
-            final programmaticSpacer = targetPending
-                ? preparedTarget
-                      ? _programmaticSpacer
-                      : constraints.maxHeight
-                : activeGenerationAnchor
-                ? _programmaticSpacer
-                : 0.0;
             final list = ListView.builder(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(
@@ -451,8 +341,7 @@ class _MessageListViewState extends State<MessageListView>
                 widget.topContentPadding,
                 horizontalPad,
                 widget.bottomContentPadding +
-                    (widget.isPinnedIndicatorActive ? 12 : 0) +
-                    programmaticSpacer,
+                    (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
               itemCount: _effectiveRenderModels.length,
               keyboardDismissBehavior: _keyboardDismissBehavior,
@@ -482,17 +371,11 @@ class _MessageListViewState extends State<MessageListView>
             final userScrollAwareList = Listener(
               onPointerDown: (event) {
                 if (_isDesktopPlatform) _keyboardFocusNode.requestFocus();
-                if (event.buttons == kSecondaryMouseButton) {
-                  _captureVisualAnchor();
-                  widget.timelineCoordinator?.userAnchored();
-                } else if (event.buttons != 0) {
+                if (event.buttons != 0 &&
+                    event.buttons != kSecondaryMouseButton) {
                   _pointerDragInProgress = true;
                   _latestPointerDragMetrics = null;
                 }
-              },
-              onPointerMove: (event) {
-                if (event.buttons == 0) return;
-                _captureVisualAnchor();
               },
               onPointerUp: (_) => _settlePointerDrag(),
               onPointerCancel: (_) => _settlePointerDrag(),
@@ -536,9 +419,7 @@ class _MessageListViewState extends State<MessageListView>
         key != LogicalKeyboardKey.end) {
       return KeyEventResult.ignored;
     }
-    _captureVisualAnchor();
     widget.onUserScrollIntent?.call();
-    widget.timelineCoordinator?.userAnchored();
     return KeyEventResult.ignored;
   }
 
@@ -623,109 +504,11 @@ class _MessageListViewState extends State<MessageListView>
   void _handleUserScrollActivity([ScrollMetrics? metrics]) {
     widget.onUserScrollIntent?.call();
     if (_isWithinStreamingAutoFollowBand(metrics)) {
-      widget.timelineCoordinator?.followTail();
       _resumeStreamingMessageUpdates();
       return;
     }
-    _captureVisualAnchor();
-    widget.timelineCoordinator?.userAnchored();
     _setDeferStreamingMessageUpdates(true);
     _scheduleStreamingUpdateResume();
-  }
-
-  void _scheduleProgrammaticJump() {
-    final coordinator = widget.timelineCoordinator;
-    final targetId = coordinator?.programmaticTargetSlotId;
-    if (coordinator?.viewportMode != TimelineViewportMode.programmaticJump ||
-        targetId == null ||
-        _programmaticJumpScheduled) {
-      return;
-    }
-    _programmaticJumpScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _programmaticJumpScheduled = false;
-      if (!mounted || !widget.scrollController.hasClients) return;
-      final target = _slotKeys[targetId]?.currentContext?.findRenderObject();
-      final viewport = context.findRenderObject();
-      if (viewport is! RenderBox) return;
-      final conversationId = coordinator?.conversationId;
-      if (target is! RenderBox || !target.attached) {
-        final targetIndex = _effectiveRenderModels.indexWhere(
-          (model) => model.slotId == targetId,
-        );
-        if (targetIndex < 0) {
-          coordinator?.completeProgrammaticJump();
-          return;
-        }
-        unawaited(
-          widget.observerController
-              .jumpTo(index: targetIndex, alignment: 0)
-              .then((_) {
-                if (!mounted) return;
-                setState(() {});
-              }),
-        );
-        return;
-      }
-      final spacerPrepared =
-          _preparedProgrammaticTargetSlotId == targetId &&
-          _preparedProgrammaticConversationId == conversationId;
-      if (!spacerPrepared) {
-        setState(() {
-          _programmaticSpacer = _calculateProgrammaticSpacer(
-            targetId,
-            viewport,
-          );
-          _preparedProgrammaticTargetSlotId = targetId;
-          _preparedProgrammaticConversationId = conversationId;
-          _programmaticSpacerRemeasurements = 0;
-        });
-        return;
-      }
-      final latestSpacer = _calculateProgrammaticSpacer(targetId, viewport);
-      if ((latestSpacer - _programmaticSpacer).abs() > 0.5 &&
-          _programmaticSpacerRemeasurements <
-              _maximumProgrammaticSpacerRemeasurements) {
-        _programmaticSpacerRemeasurements += 1;
-        setState(() => _programmaticSpacer = latestSpacer);
-        return;
-      }
-      final position = widget.scrollController.position;
-      position.ensureVisible(target, alignment: 0, duration: Duration.zero);
-      setState(() {
-        _programmaticAnchorSlotId = targetId;
-        _programmaticAnchorConversationId = conversationId;
-        _preparedProgrammaticTargetSlotId = null;
-        _preparedProgrammaticConversationId = null;
-        _programmaticSpacerRemeasurements = 0;
-      });
-      coordinator!.completeProgrammaticJump();
-      _captureVisualAnchor();
-    });
-  }
-
-  double _calculateProgrammaticSpacer(String anchorSlotId, RenderBox viewport) {
-    final anchor = _slotKeys[anchorSlotId]?.currentContext?.findRenderObject();
-    final lastSlotId = _effectiveRenderModels.isEmpty
-        ? null
-        : _effectiveRenderModels.last.slotId;
-    final tail = lastSlotId == null
-        ? null
-        : _slotKeys[lastSlotId]?.currentContext?.findRenderObject();
-    final maximum = viewport.size.height;
-    if (anchor is! RenderBox ||
-        !anchor.attached ||
-        tail is! RenderBox ||
-        !tail.attached) {
-      return maximum;
-    }
-    final anchorTop = anchor.localToGlobal(Offset.zero).dy;
-    final tailBottom = tail.localToGlobal(Offset(0, tail.size.height)).dy;
-    final fixedBottom =
-        widget.bottomContentPadding +
-        (widget.isPinnedIndicatorActive ? 12.0 : 0.0);
-    final occupied = (tailBottom - anchorTop).clamp(0.0, double.infinity);
-    return (maximum - occupied - fixedBottom).clamp(0.0, maximum).toDouble();
   }
 
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
@@ -740,17 +523,7 @@ class _MessageListViewState extends State<MessageListView>
   }
 
   double _contentMaxScrollExtent(ScrollMetrics metrics) {
-    final coordinator = widget.timelineCoordinator;
-    final anchoredGeneration =
-        coordinator?.isGenerating == true &&
-        coordinator?.viewportMode == TimelineViewportMode.userAnchored &&
-        _programmaticAnchorSlotId != null &&
-        _programmaticAnchorConversationId == coordinator?.conversationId;
-    if (!anchoredGeneration) return metrics.maxScrollExtent;
-    return (metrics.maxScrollExtent - _programmaticSpacer).clamp(
-      metrics.minScrollExtent,
-      metrics.maxScrollExtent,
-    );
+    return metrics.maxScrollExtent;
   }
 
   void _setDeferStreamingMessageUpdates(bool value) {
@@ -782,8 +555,6 @@ class _MessageListViewState extends State<MessageListView>
         return;
       }
 
-      _captureVisualAnchor();
-
       final loaded = await load();
       if (!mounted) {
         _historyLoadScheduled = false;
@@ -794,67 +565,8 @@ class _MessageListViewState extends State<MessageListView>
         return;
       }
 
-      _scheduleVisualAnchorRestore(
-        onComplete: () => _historyLoadScheduled = false,
-      );
+      _historyLoadScheduled = false;
     });
-  }
-
-  void _scheduleVisualAnchorRestore({VoidCallback? onComplete}) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      onComplete?.call();
-      if (!mounted || !widget.scrollController.hasClients) return;
-      final correction = _visualAnchorCorrection();
-      if (correction == null || correction.abs() <= 1) return;
-      final target = (widget.scrollController.offset + correction).clamp(
-        widget.scrollController.position.minScrollExtent,
-        widget.scrollController.position.maxScrollExtent,
-      );
-      widget.scrollController.jumpTo(target);
-    });
-  }
-
-  void _captureVisualAnchor() {
-    final coordinator = widget.timelineCoordinator;
-    final viewport = context.findRenderObject();
-    if (coordinator == null || viewport is! RenderBox || !viewport.attached) {
-      return;
-    }
-    final top = viewport.localToGlobal(Offset.zero).dy;
-    coordinator.captureVisualAnchor(
-      geometries: _slotGeometries(),
-      viewportTop: top,
-      viewportBottom: top + viewport.size.height,
-    );
-  }
-
-  double? _visualAnchorCorrection() {
-    final coordinator = widget.timelineCoordinator;
-    final viewport = context.findRenderObject();
-    if (coordinator == null || viewport is! RenderBox || !viewport.attached) {
-      return null;
-    }
-    return coordinator.resolveVisualAnchorCorrection(
-      geometries: _slotGeometries(),
-      viewportTop: viewport.localToGlobal(Offset.zero).dy,
-    );
-  }
-
-  List<TimelineSlotGeometry> _slotGeometries() {
-    final result = <TimelineSlotGeometry>[];
-    for (final entry in _slotKeys.entries) {
-      final box = entry.value.currentContext?.findRenderObject();
-      if (box is! RenderBox || !box.attached) continue;
-      final top = box.localToGlobal(Offset.zero).dy;
-      result.add(
-        TimelineSlotGeometry(
-          slotId: entry.key,
-          top: top,
-          bottom: top + box.size.height,
-        ),
-      );
-    }
-    return result;
   }
 
   Widget _buildMessageItem(
@@ -888,10 +600,7 @@ class _MessageListViewState extends State<MessageListView>
         widget.streamingContentNotifier!.hasNotifier(message.id);
 
     final messageColumn = Column(
-      key: _slotKeys.putIfAbsent(
-        _slotId(message),
-        () => GlobalKey(debugLabel: 'timeline-slot:${_slotId(message)}'),
-      ),
+      key: ValueKey<String>('timeline-slot:${_slotId(message)}'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(

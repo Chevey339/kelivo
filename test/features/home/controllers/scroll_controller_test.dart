@@ -51,17 +51,15 @@ void main() {
       scrollController.dispose();
     });
 
-    testWidgets('programmatic animation does not publish user scroll intent', (
+    testWidgets('programmatic animation does not become user scroll intent', (
       tester,
     ) async {
-      var userAnchoredCalls = 0;
       final scrollController = ChatAutoFollowScrollController();
       final chatScrollController = ChatScrollController(
         scrollController: scrollController,
         onStateChanged: () {},
         getAutoScrollEnabled: () => false,
         getAutoScrollIdleSeconds: () => 8,
-        onUserAnchored: () => userAnchoredCalls++,
       );
       await tester.pumpWidget(
         _ScrollHarness(scrollController: scrollController, itemCount: 30),
@@ -69,10 +67,7 @@ void main() {
 
       chatScrollController.scrollToBottom();
       await tester.pumpAndSettle();
-      expect(userAnchoredCalls, 0);
-
       chatScrollController.handleUserScrollIntent();
-      expect(userAnchoredCalls, 1);
       expect(chatScrollController.isUserScrolling, isTrue);
       expect(chatScrollController.autoStickToBottom, isFalse);
 
@@ -91,6 +86,7 @@ void main() {
         onStateChanged: () {},
         getAutoScrollEnabled: () => autoScrollEnabled,
         getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
       );
 
       await tester.pumpWidget(
@@ -131,6 +127,7 @@ void main() {
         onStateChanged: () {},
         getAutoScrollEnabled: () => autoScrollEnabled,
         getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
       );
 
       await tester.pumpWidget(

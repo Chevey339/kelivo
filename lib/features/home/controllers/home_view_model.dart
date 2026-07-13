@@ -130,6 +130,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Wire up callbacks
     _chatActions.onMessagesChanged = _onMessagesChanged;
+    _chatActions.onSendPairAppended = () => onScrollToBottom?.call();
     _chatActions.onLoadingChanged = _onLoadingChanged;
     _chatActions.onContentUpdated = _onContentUpdated;
     _chatActions.onStreamError = _onStreamError;
@@ -235,7 +236,6 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onMessagesChanged() {
     _chatController.invalidateCache();
-    _chatController.refreshLoadedMessageCount();
     notifyListeners();
   }
 

@@ -398,7 +398,8 @@ class HomePageController extends ChangeNotifier {
         );
       }
     };
-    _viewModel.onScrollToBottom = () => _scrollToBottomSoon();
+    _viewModel.onScrollToBottom = () =>
+        _scrollToBottom(animate: !_chatController.isCurrentConversationLoading);
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -441,11 +442,7 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
-      onUserAnchored: () => _chatController.timelineCoordinator.userAnchored(),
-      onFollowingTail: _chatController.timelineCoordinator.followTail,
-      shouldFollowTail: () =>
-          _chatController.timelineCoordinator.shouldFollowTail,
-      isGenerating: () => _chatController.timelineCoordinator.isGenerating,
+      isGenerating: () => _chatController.isCurrentConversationLoading,
     );
   }
 
