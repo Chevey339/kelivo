@@ -32,10 +32,10 @@ final class RestoreBusinessLease {
     required this.instanceId,
     required this.processId,
     required this._processOwnerFile,
-    required _ProcessOwnerProbe processOwnerProbe,
+    required this._processOwnerProbe,
     required this._registryKey,
     required this._handle,
-  }) : _processOwnerProbe = processOwnerProbe;
+  });
 
   static const leaseDirectoryName = '.kelivo_business_lease';
   static const lockFileName = 'lease.lock';

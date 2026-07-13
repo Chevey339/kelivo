@@ -79,6 +79,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return const Color(0xFF22C55E);
       case StorageUsageCategoryKey.legacyChatData:
         return const Color(0xFFF59E0B);
+      case StorageUsageCategoryKey.restoreTraces:
+        return const Color(0xFF0EA5E9);
       case StorageUsageCategoryKey.assistantData:
         return const Color(0xFF3B82F6); // blue (distinct from chat green)
       case StorageUsageCategoryKey.cache:
@@ -100,6 +102,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return Lucide.MessagesSquare;
       case StorageUsageCategoryKey.legacyChatData:
         return Lucide.History;
+      case StorageUsageCategoryKey.restoreTraces:
+        return Lucide.RotateCcw;
       case StorageUsageCategoryKey.assistantData:
         return Lucide.Bot;
       case StorageUsageCategoryKey.cache:
@@ -121,6 +125,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceCategoryChatData;
       case StorageUsageCategoryKey.legacyChatData:
         return l10n.storageSpaceCategoryLegacyChatData;
+      case StorageUsageCategoryKey.restoreTraces:
+        return l10n.storageSpaceCategoryRestoreTraces;
       case StorageUsageCategoryKey.assistantData:
         return l10n.storageSpaceCategoryAssistantData;
       case StorageUsageCategoryKey.cache:
@@ -146,6 +152,8 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubChatWriteAheadLog;
       case 'sqlite_shm':
         return l10n.storageSpaceSubChatSharedMemory;
+      case 'completed_restore_runs':
+        return l10n.storageSpaceSubCompletedRestoreRuns;
       case 'avatars':
         return l10n.storageSpaceSubAssistantAvatars;
       case 'images':
@@ -368,6 +376,40 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     }
   }
 
+  Future<void> _doClearRestoreTraces() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryRestoreTraces;
+    final ok = await _confirmAction(
+      context,
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearRestoreTracesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearRestoreTraces();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      await _refreshReport();
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   Future<void> _openCategoryDetail(StorageUsageCategoryKey key) async {
     final report = _report;
     if (report == null) return;
@@ -558,6 +600,9 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
                         onClearLegacyChatData: _clearing
                             ? null
                             : _doClearLegacyChatData,
+                        onClearRestoreTraces: _clearing
+                            ? null
+                            : _doClearRestoreTraces,
                         refreshReport: _refreshReport,
                       ),
                     ),
@@ -908,6 +953,45 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
     }
   }
 
+  Future<void> _clearRestoreTraces() async {
+    if (_clearing) return;
+    final l10n = AppLocalizations.of(context)!;
+    final targetName = l10n.storageSpaceCategoryRestoreTraces;
+    final ok = await _confirmAction(
+      title: l10n.storageSpaceClearConfirmTitle,
+      message: l10n.storageSpaceClearRestoreTracesConfirmMessage,
+      actionLabel: l10n.storageSpaceClearButton,
+    );
+    if (!ok) return;
+
+    setState(() => _clearing = true);
+    try {
+      await StorageUsageService.clearRestoreTraces();
+      final next = await widget.refreshReport();
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearDone(targetName),
+        type: NotificationType.success,
+      );
+      if (next != null &&
+          !next.categories.any(
+            (category) => category.key == StorageUsageCategoryKey.restoreTraces,
+          )) {
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceClearFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    } finally {
+      if (mounted) setState(() => _clearing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -959,6 +1043,10 @@ class _StorageCategoryPageState extends State<_StorageCategoryPage> {
           onClearLegacyChatData:
               (category.key == StorageUsageCategoryKey.legacyChatData)
               ? _clearLegacyChatData
+              : null,
+          onClearRestoreTraces:
+              (category.key == StorageUsageCategoryKey.restoreTraces)
+              ? _clearRestoreTraces
               : null,
           refreshReport: _refresh,
         ),
@@ -1159,6 +1247,7 @@ class _CategoryDetail extends StatelessWidget {
     required this.onClearSystemCache,
     required this.onClearLogs,
     required this.onClearLegacyChatData,
+    required this.onClearRestoreTraces,
     required this.refreshReport,
   });
 
@@ -1172,6 +1261,7 @@ class _CategoryDetail extends StatelessWidget {
   final Future<void> Function()? onClearSystemCache;
   final Future<void> Function()? onClearLogs;
   final Future<void> Function()? onClearLegacyChatData;
+  final Future<void> Function()? onClearRestoreTraces;
   final Future<void> Function() refreshReport;
 
   @override
@@ -1184,12 +1274,18 @@ class _CategoryDetail extends StatelessWidget {
     final bool safeToClear =
         category.key == StorageUsageCategoryKey.cache ||
         category.key == StorageUsageCategoryKey.logs ||
-        category.key == StorageUsageCategoryKey.legacyChatData;
-    final String hint = category.key == StorageUsageCategoryKey.legacyChatData
-        ? l10n.storageSpaceLegacyChatDataHint
-        : safeToClear
-        ? l10n.storageSpaceSafeToClearHint
-        : l10n.storageSpaceNotSafeToClearHint;
+        category.key == StorageUsageCategoryKey.legacyChatData ||
+        category.key == StorageUsageCategoryKey.restoreTraces;
+    final String hint = switch (category.key) {
+      StorageUsageCategoryKey.legacyChatData =>
+        l10n.storageSpaceLegacyChatDataHint,
+      StorageUsageCategoryKey.restoreTraces =>
+        l10n.storageSpaceRestoreTracesHint,
+      _ =>
+        safeToClear
+            ? l10n.storageSpaceSafeToClearHint
+            : l10n.storageSpaceNotSafeToClearHint,
+    };
 
     Widget? actions;
     if (category.key == StorageUsageCategoryKey.cache) {
@@ -1244,6 +1340,14 @@ class _CategoryDetail extends StatelessWidget {
         backgroundColor: cs.primary,
         enabled: !clearing && onClearLegacyChatData != null,
         onTap: () => onClearLegacyChatData?.call(),
+      );
+    } else if (category.key == StorageUsageCategoryKey.restoreTraces) {
+      actions = IosTileButton(
+        label: l10n.storageSpaceClearRestoreTracesButton,
+        icon: Lucide.Trash2,
+        backgroundColor: cs.primary,
+        enabled: !clearing && onClearRestoreTraces != null,
+        onTap: () => onClearRestoreTraces?.call(),
       );
     }
 

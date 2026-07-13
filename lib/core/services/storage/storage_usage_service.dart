@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import '../../database/app_database.dart';
 import '../database_v2_rollout_ledger.dart';
 import '../legacy_data_retirement_service.dart';
+import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
@@ -15,6 +16,7 @@ enum StorageUsageCategoryKey {
   files,
   chatData,
   legacyChatData,
+  restoreTraces,
   assistantData,
   cache,
   logs,
@@ -131,6 +133,12 @@ abstract final class StorageUsageService {
     } catch (_) {
       // A malformed rollout receipt must not make legacy files clearable.
     }
+    var restoreTraces = RestoreTraceSnapshot.empty;
+    try {
+      restoreTraces = await RestoreTraceService(root).inspect();
+    } catch (_) {
+      // Malformed or active restore workspaces stay hidden and non-clearable.
+    }
 
     final byCat = <StorageUsageCategoryKey, _MutableStats>{
       for (final k in StorageUsageCategoryKey.values) k: _MutableStats(),
@@ -217,6 +225,14 @@ abstract final class StorageUsageService {
         }
 
         final top = parts.first.toLowerCase();
+        if (restoreTraces.visible &&
+            top == '.kelivo_restore' &&
+            parts.length >= 4 &&
+            parts[1] == 'completed' &&
+            RegExp(r'^run_[a-f0-9]{32}$').hasMatch(parts[2])) {
+          byCat[StorageUsageCategoryKey.restoreTraces]!.add(bytes);
+          continue;
+        }
         switch (top) {
           case 'upload':
             final name = parts.last;
@@ -295,11 +311,13 @@ abstract final class StorageUsageService {
       fileCount:
           byCat[StorageUsageCategoryKey.cache]!.fileCount +
           byCat[StorageUsageCategoryKey.logs]!.fileCount +
-          byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount,
+          byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount +
+          byCat[StorageUsageCategoryKey.restoreTraces]!.fileCount,
       bytes:
           byCat[StorageUsageCategoryKey.cache]!.bytes +
           byCat[StorageUsageCategoryKey.logs]!.bytes +
-          byCat[StorageUsageCategoryKey.legacyChatData]!.bytes,
+          byCat[StorageUsageCategoryKey.legacyChatData]!.bytes +
+          byCat[StorageUsageCategoryKey.restoreTraces]!.bytes,
     );
 
     final categories = <StorageUsageCategory>[
@@ -336,6 +354,18 @@ abstract final class StorageUsageService {
                   stats: entry.value.toStats(),
                   path: p.join(root.path, entry.key),
                 ),
+          ],
+        ),
+      if (byCat[StorageUsageCategoryKey.restoreTraces]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.restoreTraces,
+          stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
+          subcategories: [
+            StorageUsageSubcategory(
+              id: 'completed_restore_runs',
+              stats: byCat[StorageUsageCategoryKey.restoreTraces]!.toStats(),
+              path: p.join(root.path, '.kelivo_restore', 'completed'),
+            ),
           ],
         ),
       StorageUsageCategory(
@@ -491,6 +521,11 @@ abstract final class StorageUsageService {
     await LegacyDataRetirementService(root).retireHiveArtifacts();
   }
 
+  static Future<void> clearRestoreTraces() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    await RestoreTraceService(root).clear();
+  }
+
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
   }) async {
@@ -630,6 +665,7 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.files,
   StorageUsageCategoryKey.chatData,
   StorageUsageCategoryKey.legacyChatData,
+  StorageUsageCategoryKey.restoreTraces,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,

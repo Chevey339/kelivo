@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
+import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -148,4 +149,61 @@ void main() {
       );
     },
   );
+
+  test('completed restore traces are clearable and then disappear', () async {
+    const runId = '0123456789abcdef0123456789abcdef';
+    final run = Directory(
+      p.join(
+        tempDir.path,
+        RestoreWorkspaceLock.workspaceRootName,
+        RestoreWorkspaceLock.completedRunsDirectoryName,
+        'run_$runId',
+      ),
+    );
+    await run.create(recursive: true);
+    await _writeSizedFile(run, 'database.sqlite', 64);
+
+    final before = await StorageUsageService.computeReport();
+    final traces = before.categories.singleWhere(
+      (category) => category.key == StorageUsageCategoryKey.restoreTraces,
+    );
+    expect(traces.stats.bytes, 64);
+    expect(traces.stats.fileCount, 1);
+
+    await StorageUsageService.clearRestoreTraces();
+    final after = await StorageUsageService.computeReport();
+    expect(
+      after.categories.where(
+        (category) => category.key == StorageUsageCategoryKey.restoreTraces,
+      ),
+      isEmpty,
+    );
+  });
+
+  test('restore traces stay hidden while a restore run is active', () async {
+    const runId = '0123456789abcdef0123456789abcdef';
+    final workspace = Directory(
+      p.join(tempDir.path, RestoreWorkspaceLock.workspaceRootName),
+    );
+    final completedRun = Directory(
+      p.join(
+        workspace.path,
+        RestoreWorkspaceLock.completedRunsDirectoryName,
+        'run_$runId',
+      ),
+    );
+    await completedRun.create(recursive: true);
+    await _writeSizedFile(completedRun, 'settings.json', 64);
+    await File(
+      p.join(workspace.path, RestoreWorkspaceLock.activeRunFileName),
+    ).writeAsString(runId);
+
+    final report = await StorageUsageService.computeReport();
+    expect(
+      report.categories.where(
+        (category) => category.key == StorageUsageCategoryKey.restoreTraces,
+      ),
+      isEmpty,
+    );
+  });
 }

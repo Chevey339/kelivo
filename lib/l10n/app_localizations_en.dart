@@ -128,6 +128,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryLegacyChatData => 'Chat Records (Old)';
 
   @override
+  String get storageSpaceCategoryRestoreTraces => 'Restore Traces';
+
+  @override
+  String get storageSpaceRestoreTracesHint =>
+      'Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => 'Clear Restore Traces';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      'Clear completed restore snapshots? Your current database, settings, and files will not be affected.';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns =>
+      'Completed restore snapshots';
+
+  @override
   String get storageSpaceCategoryAssistantData => 'Assistants';
 
   @override
@@ -323,10 +341,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statsPageSummaryTitle => 'Overview';
-
-  @override
-  String get statsPageUsageScopesTitle =>
-      'Current Branch / All Generation Usage';
 
   @override
   String get statsPageTotalConversations => 'Total Conversations';

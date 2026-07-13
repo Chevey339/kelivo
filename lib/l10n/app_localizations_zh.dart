@@ -126,6 +126,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
 
   @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -319,9 +335,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statsPageSummaryTitle => '总览';
-
-  @override
-  String get statsPageUsageScopesTitle => '当前分支 / 全部生成用量';
 
   @override
   String get statsPageTotalConversations => '总对话数';
@@ -5667,6 +5680,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
 
   @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -5860,9 +5889,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get statsPageSummaryTitle => '总览';
-
-  @override
-  String get statsPageUsageScopesTitle => '当前分支 / 全部生成用量';
 
   @override
   String get statsPageTotalConversations => '总对话数';
@@ -11208,6 +11234,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryLegacyChatData => '聊天記錄（舊）';
 
   @override
+  String get storageSpaceCategoryRestoreTraces => '還原痕跡';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '確定清理已完成還原留下的舊資料快照嗎？目前的資料庫、設定和檔案不會受到影響。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的還原快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
@@ -11401,9 +11443,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get statsPageSummaryTitle => '總覽';
-
-  @override
-  String get statsPageUsageScopesTitle => '目前分支 / 全部生成用量';
 
   @override
   String get statsPageTotalConversations => '總對話數';

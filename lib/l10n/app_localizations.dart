@@ -322,6 +322,36 @@ abstract class AppLocalizations {
   /// **'Chat Records (Old)'**
   String get storageSpaceCategoryLegacyChatData;
 
+  /// No description provided for @storageSpaceCategoryRestoreTraces.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Traces'**
+  String get storageSpaceCategoryRestoreTraces;
+
+  /// No description provided for @storageSpaceRestoreTracesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.'**
+  String get storageSpaceRestoreTracesHint;
+
+  /// No description provided for @storageSpaceClearRestoreTracesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Restore Traces'**
+  String get storageSpaceClearRestoreTracesButton;
+
+  /// No description provided for @storageSpaceClearRestoreTracesConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear completed restore snapshots? Your current database, settings, and files will not be affected.'**
+  String get storageSpaceClearRestoreTracesConfirmMessage;
+
+  /// No description provided for @storageSpaceSubCompletedRestoreRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed restore snapshots'**
+  String get storageSpaceSubCompletedRestoreRuns;
+
   /// No description provided for @storageSpaceCategoryAssistantData.
   ///
   /// In en, this message translates to:
@@ -675,12 +705,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Overview'**
   String get statsPageSummaryTitle;
-
-  /// No description provided for @statsPageUsageScopesTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Current Branch / All Generation Usage'**
-  String get statsPageUsageScopesTitle;
 
   /// No description provided for @statsPageTotalConversations.
   ///
