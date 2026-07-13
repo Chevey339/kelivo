@@ -1849,22 +1849,6 @@ class ChatDatabaseRepository {
     required DateTime trendStart,
     required DateTime trendEndExclusive,
   }) async {
-    const activeCte = '''
-      WITH active_revisions(conversation_id, revision_id, parent_revision_id) AS (
-        SELECT m.conversation_id, m.id, NULL
-        FROM message_rows m
-        JOIN conversation_rows c ON c.id = m.conversation_id
-        LEFT JOIN json_each(c.version_selections_json) selected
-          ON selected.key = COALESCE(m.group_id, m.id)
-        WHERE m.version = COALESCE(
-          CAST(selected.value AS INTEGER),
-          (SELECT MAX(sibling.version) FROM message_rows sibling
-           WHERE sibling.conversation_id = m.conversation_id
-             AND COALESCE(sibling.group_id, sibling.id) =
-                 COALESCE(m.group_id, m.id))
-        )
-      )
-    ''';
     final start = rangeStart?.microsecondsSinceEpoch;
     final end = rangeEndExclusive?.microsecondsSinceEpoch;
     final rangeClause = <String>[
@@ -1884,41 +1868,26 @@ class ChatDatabaseRepository {
     final summary = await _db
         .customSelect(
           '''
-      $activeCte,
-      active_messages AS (
-        SELECT m.* FROM active_revisions a
-        JOIN message_rows m ON m.id = a.revision_id
-        WHERE 1 = 1 $rangeWhere
-      )
       SELECT
         (SELECT COUNT(*) FROM conversation_rows c
           ${conversationRangeClause.isEmpty ? '' : 'WHERE $conversationRangeClause'}) AS conversations,
-        COUNT(*) AS active_messages,
-        COALESCE(SUM(prompt_tokens), 0) AS active_input,
-        COALESCE(SUM(completion_tokens), 0) AS active_output,
-        COALESCE(SUM(cached_tokens), 0) AS active_cached
-      FROM active_messages;
+        COUNT(*) AS messages,
+        COALESCE(SUM(prompt_tokens), 0) AS input_tokens,
+        COALESCE(SUM(completion_tokens), 0) AS output_tokens,
+        COALESCE(SUM(cached_tokens), 0) AS cached_tokens
+      FROM message_rows m WHERE 1 = 1 $rangeWhere;
     ''',
           variables: [...rangeVariables, ...rangeVariables],
         )
         .getSingle();
 
-    final all = await _db.customSelect('''
-      SELECT COUNT(*) AS messages,
-        COALESCE(SUM(prompt_tokens), 0) AS input_tokens,
-        COALESCE(SUM(completion_tokens), 0) AS output_tokens,
-        COALESCE(SUM(cached_tokens), 0) AS cached_tokens
-      FROM message_rows m WHERE 1 = 1 $rangeWhere;
-    ''', variables: rangeVariables).getSingle();
-
     final heatmapRows = await _db
         .customSelect(
           '''
-      $activeCte
       SELECT strftime('%Y-%m-%d', m.timestamp / 1000000.0,
           'unixepoch', 'localtime') AS day,
         COUNT(*) AS message_count
-      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      FROM message_rows m
       WHERE m.timestamp >= ?
       GROUP BY day ORDER BY day;
     ''',
@@ -1929,7 +1898,6 @@ class ChatDatabaseRepository {
     final trendRows = await _db
         .customSelect(
           '''
-      $activeCte
       SELECT strftime('%Y-%m-%d', m.timestamp / 1000000.0,
           'unixepoch', 'localtime') AS day,
         COALESCE(NULLIF(TRIM(m.provider_id), ''), '_unknown') AS provider_id,
@@ -1940,7 +1908,7 @@ class ChatDatabaseRepository {
         COALESCE(SUM(CASE WHEN COALESCE(m.prompt_tokens, 0) = 0
           AND COALESCE(m.completion_tokens, 0) = 0
           THEN COALESCE(m.total_tokens, 0) ELSE 0 END), 0) AS uncategorized_tokens
-      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      FROM message_rows m
       WHERE m.timestamp >= ? AND m.timestamp < ?
       GROUP BY day, provider_id ORDER BY day, provider_id;
     ''',
@@ -1952,19 +1920,16 @@ class ChatDatabaseRepository {
         .get();
 
     final modelRows = await _db.customSelect('''
-      $activeCte
       SELECT m.model_id AS id, MIN(m.provider_id) AS provider_id,
         COUNT(*) AS item_count
-      FROM active_revisions a JOIN message_rows m ON m.id = a.revision_id
+      FROM message_rows m
       WHERE NULLIF(TRIM(m.model_id), '') IS NOT NULL $rangeWhere
       GROUP BY m.model_id ORDER BY item_count DESC, id;
     ''', variables: rangeVariables).get();
     final topicRows = await _db.customSelect('''
-      $activeCte
       SELECT c.id AS id, c.title AS label, COUNT(*) AS item_count
-      FROM active_revisions a
-      JOIN message_rows m ON m.id = a.revision_id
-      JOIN conversation_rows c ON c.id = a.conversation_id
+      FROM message_rows m
+      JOIN conversation_rows c ON c.id = m.conversation_id
       WHERE 1 = 1 $rangeWhere
       GROUP BY c.id, c.title ORDER BY item_count DESC, c.id;
     ''', variables: rangeVariables).get();
@@ -1982,17 +1947,11 @@ class ChatDatabaseRepository {
 
     return ChatStatsAggregate(
       conversations: summary.read<int>('conversations'),
-      selectedVersions: ChatStatsTotals(
-        messages: summary.read<int>('active_messages'),
-        inputTokens: summary.read<int>('active_input'),
-        outputTokens: summary.read<int>('active_output'),
-        cachedTokens: summary.read<int>('active_cached'),
-      ),
-      allRevisions: ChatStatsTotals(
-        messages: all.read<int>('messages'),
-        inputTokens: all.read<int>('input_tokens'),
-        outputTokens: all.read<int>('output_tokens'),
-        cachedTokens: all.read<int>('cached_tokens'),
+      totals: ChatStatsTotals(
+        messages: summary.read<int>('messages'),
+        inputTokens: summary.read<int>('input_tokens'),
+        outputTokens: summary.read<int>('output_tokens'),
+        cachedTokens: summary.read<int>('cached_tokens'),
       ),
       heatmap: [
         for (final row in heatmapRows)
@@ -4394,8 +4353,7 @@ final class ChatStatsRank {
 final class ChatStatsAggregate {
   const ChatStatsAggregate({
     required this.conversations,
-    required this.selectedVersions,
-    required this.allRevisions,
+    required this.totals,
     required this.heatmap,
     required this.trend,
     required this.models,
@@ -4403,8 +4361,7 @@ final class ChatStatsAggregate {
     required this.topics,
   });
   final int conversations;
-  final ChatStatsTotals selectedVersions;
-  final ChatStatsTotals allRevisions;
+  final ChatStatsTotals totals;
   final List<ChatStatsDayCount> heatmap;
   final List<ChatStatsTrendBucket> trend;
   final List<ChatStatsRank> models;

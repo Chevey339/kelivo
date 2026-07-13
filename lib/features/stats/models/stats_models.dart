@@ -110,10 +110,6 @@ class StatsSummary {
     required this.outputTokens,
     required this.cachedTokens,
     required this.launchCount,
-    this.allRevisionMessages = 0,
-    this.allRevisionInputTokens = 0,
-    this.allRevisionOutputTokens = 0,
-    this.allRevisionCachedTokens = 0,
   });
 
   final int totalConversations;
@@ -122,10 +118,6 @@ class StatsSummary {
   final int outputTokens;
   final int cachedTokens;
   final int launchCount;
-  final int allRevisionMessages;
-  final int allRevisionInputTokens;
-  final int allRevisionOutputTokens;
-  final int allRevisionCachedTokens;
 }
 
 class StatsRankItem {

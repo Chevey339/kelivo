@@ -236,6 +236,9 @@ void main() {
     expect(find.text('Chat Heatmap'), findsOneWidget);
     expect(find.text('Total Conversations'), findsOneWidget);
     expect(find.text('Input Tokens'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.textContaining('12 /'), findsNothing);
+    expect(find.textContaining('Current Branch'), findsNothing);
     expect(find.text('Usage Trend'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -700));

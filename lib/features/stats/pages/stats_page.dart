@@ -73,7 +73,7 @@ class _StatsPageState extends State<StatsPage> {
         ),
         const SizedBox(height: 12),
         StatsSectionCard(
-          title: l10n.statsPageUsageScopesTitle,
+          title: l10n.statsPageSummaryTitle,
           child: StatsMetricGrid(summary: snapshot.summary),
         ),
         const SizedBox(height: 12),
@@ -242,13 +242,7 @@ class _StatsPageState extends State<StatsPage> {
           range: _range,
           aggregate: const ChatStatsAggregate(
             conversations: 0,
-            selectedVersions: ChatStatsTotals(
-              messages: 0,
-              inputTokens: 0,
-              outputTokens: 0,
-              cachedTokens: 0,
-            ),
-            allRevisions: ChatStatsTotals(
+            totals: ChatStatsTotals(
               messages: 0,
               inputTokens: 0,
               outputTokens: 0,

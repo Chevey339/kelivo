@@ -22,30 +22,22 @@ class StatsMetricGrid extends StatelessWidget {
       _MetricItem(
         icon: Lucide.MessageCircle,
         label: l10n.statsPageTotalMessages,
-        value:
-            '${_formatCompact(summary.totalMessages)} / '
-            '${_formatCompact(summary.allRevisionMessages)}',
+        value: _formatCompact(summary.totalMessages),
       ),
       _MetricItem(
         icon: Lucide.Activity,
         label: l10n.statsPageInputTokens,
-        value:
-            '${_formatCompact(summary.inputTokens)} / '
-            '${_formatCompact(summary.allRevisionInputTokens)}',
+        value: _formatCompact(summary.inputTokens),
       ),
       _MetricItem(
         icon: Lucide.Activity,
         label: l10n.statsPageOutputTokens,
-        value:
-            '${_formatCompact(summary.outputTokens)} / '
-            '${_formatCompact(summary.allRevisionOutputTokens)}',
+        value: _formatCompact(summary.outputTokens),
       ),
       _MetricItem(
         icon: Lucide.Zap,
         label: l10n.statsPageCachedTokens,
-        value:
-            '${_formatCompact(summary.cachedTokens)} / '
-            '${_formatCompact(summary.allRevisionCachedTokens)}',
+        value: _formatCompact(summary.cachedTokens),
       ),
       _MetricItem(
         icon: Lucide.Activity,

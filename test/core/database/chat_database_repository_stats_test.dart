@@ -7,7 +7,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 
 void main() {
-  test('SQL stats separate selected versions from all version usage', () async {
+  test('SQL stats count every message version in one usage total', () async {
     final root = await Directory.systemTemp.createTemp('chat_stats_test_');
     final repository = ChatDatabaseRepository.open(
       file: File('${root.path}/stats.sqlite'),
@@ -58,14 +58,11 @@ void main() {
     );
 
     expect(aggregate.conversations, 1);
-    expect(aggregate.selectedVersions.messages, 1);
-    expect(aggregate.selectedVersions.inputTokens, 20);
-    expect(aggregate.selectedVersions.outputTokens, 40);
-    expect(aggregate.allRevisions.messages, 2);
-    expect(aggregate.allRevisions.inputTokens, 30);
-    expect(aggregate.allRevisions.outputTokens, 60);
-    expect(aggregate.models.single.count, 1);
-    expect(aggregate.topics.single.count, 1);
-    expect(aggregate.trend.single.activityCount, 1);
+    expect(aggregate.totals.messages, 2);
+    expect(aggregate.totals.inputTokens, 30);
+    expect(aggregate.totals.outputTokens, 60);
+    expect(aggregate.models.single.count, 2);
+    expect(aggregate.topics.single.count, 2);
+    expect(aggregate.trend.single.activityCount, 2);
   });
 }
