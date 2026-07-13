@@ -1038,7 +1038,11 @@ class ChatActions {
       assistantPlaceholder: assistantMessage,
     );
 
-    if (await chatController.appendPersistedTailMessage(assistantMessage)) {
+    // Regeneration mutates an existing logical group. Keep the loaded window
+    // around that group instead of replacing a distant reading position with
+    // the conversation tail (which can exclude this streaming revision in a
+    // long conversation).
+    if (await chatController.openAroundPersistedMessage(assistantMessage)) {
       viewModel.restoreMessageUiState();
     }
     onMessagesChanged?.call();

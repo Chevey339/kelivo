@@ -1015,6 +1015,47 @@ void main() {
     );
 
     test(
+      'regenerated middle revision opens around its stable cursor instead of tail',
+      () async {
+        messages = List<ChatMessage>.generate(5000, _message);
+        final regenerated = ChatMessage(
+          id: 'message-2500-v2',
+          role: messages[2500].role,
+          content: '',
+          conversationId: 'conversation-1',
+          groupId: 'message-2500',
+          version: 1,
+          isStreaming: true,
+        );
+        messages.add(regenerated);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Very long regeneration',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const {'message-2500': 1};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        final opened = await controller.openAroundPersistedMessage(
+          regenerated,
+        );
+
+        expect(opened, isTrue);
+        expect(
+          controller.messages.any((message) => message.id == regenerated.id),
+          isTrue,
+        );
+        expect(controller.messages.first.id, 'message-2480');
+        expect(controller.messages.last.id, 'message-2520');
+        expect(controller.hasMoreBefore, isTrue);
+        expect(controller.hasMoreAfter, isTrue);
+      },
+    );
+
+    test(
       'mutation refresh removes a deleted slot from every window view',
       () async {
         await controller.setCurrentConversationAndLoad(conversation);
