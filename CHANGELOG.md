@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.6.0] - 2026-07-13
+
+> 💡 **What's new**
+>
+> This release introduces the **Memory Mode Switcher** — a per-assistant toggle that
+> lets you choose between **Auto Injection** (memories always injected into the system
+> prompt) and **On Demand (Tool)** (memories accessed via the `read_memory` tool only
+> when needed). Tool mode keeps the system prompt stable, significantly improving API
+> cache hit rates and reducing latency.
+
+### Added
+- Memory mode switcher — per-assistant toggle between Auto Injection and On Demand (Tool) mode
+- `read_memory` tool for on-demand memory retrieval in Tool mode
+
+### Changed
+- Memory system now supports on-demand (Tool) mode: instead of always injecting all
+  memories into the system prompt, assistants can read memories via tools only when
+  needed. This keeps the system prompt stable, dramatically improving API cache hit rates
+- Extracted `_cleanupStreamingError` utility; fixed copy-paste log tag error
+
 ## [1.5.0] - 2026-07-13
 
 > ⚠️ **Before Upgrading**

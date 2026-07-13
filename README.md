@@ -29,8 +29,8 @@ Currently known to be used by the author and at least 2 other stable users with 
    - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
    - *Note*: Ideal for high-resolution captures and low-detail tasks.
 
-4. **Memory tool with time-aware caching** — The original implementation invalidated the entire cache on every interaction. Cuplivo introduces time-based refresh (daily/hourly), thereby improving cache hit rates.
-   - *Note*: CRUD operations on memory still flush the cache — a full refactor is planned for a future release.
+4. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
+   - *Tip*: For best cache performance, disable Recent Chats Reference and switch to On Demand mode.
 
 5. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
 
