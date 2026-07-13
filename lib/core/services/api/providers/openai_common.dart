@@ -213,9 +213,12 @@ Map<String, dynamic> _buildAssistantToolCallMessage({
 
 String _openAIEffortForBudget(int? budget, String upstreamModelId) {
   final baseEffort = _effortForBudget(budget);
-  final requestedEffort =
-      baseEffort == 'high' && budget != null && budget >= 64000
-      ? 'xhigh'
+  final requestedEffort = baseEffort == 'high' && budget != null
+      ? budget >= 128000
+            ? 'max'
+            : budget >= 64000
+            ? 'xhigh'
+            : baseEffort
       : baseEffort;
   return openAINormalizeReasoningEffort(requestedEffort, upstreamModelId);
 }
