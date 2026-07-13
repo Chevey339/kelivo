@@ -7,6 +7,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('retired legacy message graph adapter', () {
   final timestamp = DateTime.fromMicrosecondsSinceEpoch(1783784523123456);
 
   ChatMessage message({
@@ -256,4 +257,5 @@ void main() {
       'completed',
     );
   });
+  }, skip: 'PD-15 replaced the message graph with the linear model');
 }

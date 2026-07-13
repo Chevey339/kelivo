@@ -365,8 +365,8 @@ class MessagePartRows extends Table {
 
   @override
   List<String> get customConstraints => [
-    'FOREIGN KEY (conversation_id, revision_id) '
-        'REFERENCES message_revision_rows (conversation_id, id) '
+    'FOREIGN KEY (revision_id) '
+        'REFERENCES message_rows (id) '
         'ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
     'CHECK (updated_at >= created_at)',
   ];
@@ -394,8 +394,8 @@ class ProviderArtifactRows extends Table {
 
   @override
   List<String> get customConstraints => [
-    'FOREIGN KEY (conversation_id, revision_id) '
-        'REFERENCES message_revision_rows (conversation_id, id) '
+    'FOREIGN KEY (revision_id) '
+        'REFERENCES message_rows (id) '
         'ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
     'CHECK (updated_at >= created_at)',
   ];
@@ -502,8 +502,8 @@ class GenerationRunRows extends Table {
 
   @override
   List<String> get customConstraints => [
-    'FOREIGN KEY (conversation_id, target_revision_id) '
-        'REFERENCES message_revision_rows (conversation_id, id) '
+    'FOREIGN KEY (target_revision_id) '
+        'REFERENCES message_rows (id) '
         'DEFERRABLE INITIALLY DEFERRED',
     'CHECK (updated_at >= created_at)',
     'CHECK (terminal_at IS NULL OR terminal_at >= created_at)',
@@ -549,7 +549,8 @@ class AppDatabase extends _$AppDatabase {
   static const legacyGraphAdapterSchemaVersion = 6;
   static const generationRunSchemaVersion = 7;
   static const orderedPartsSchemaVersion = 8;
-  static const currentSchemaVersion = orderedPartsSchemaVersion;
+  static const linearMessagePartsSchemaVersion = 9;
+  static const currentSchemaVersion = linearMessagePartsSchemaVersion;
   static const oldestMigratableSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
@@ -726,7 +727,7 @@ FROM probe;
       },
       from4To5: (migrator, schema) async {
         await transaction(() async {
-          await migrator.createTable(messagePartRows);
+          await migrator.createTable(schema.messagePartRows);
           await migrator.createIndex(idxMessagePartsRevisionOrdinal);
         });
       },
@@ -739,14 +740,14 @@ FROM probe;
       },
       from6To7: (migrator, schema) async {
         await transaction(() async {
-          await migrator.createTable(generationRunRows);
+          await migrator.createTable(schema.generationRunRows);
           await migrator.createIndex(idxGenerationRunsActiveTarget);
           await migrator.createIndex(idxGenerationRunsStateUpdated);
         });
       },
       from7To8: (migrator, schema) async {
         await transaction(() async {
-          await migrator.createTable(providerArtifactRows);
+          await migrator.createTable(schema.providerArtifactRows);
           await migrator.createIndex(idxProviderArtifactsRevisionKind);
           await customStatement('''
 INSERT INTO provider_artifact_rows (
@@ -765,8 +766,89 @@ WHERE trim(signature.signature) <> ''
 ON CONFLICT (revision_id, kind) DO UPDATE SET
   payload = excluded.payload,
   updated_at = excluded.updated_at;
-''');
+          ''');
         });
+      },
+      from8To9: (migrator, schema) async {
+        final foreignKeysEnabled = (await customSelect(
+          'PRAGMA foreign_keys;',
+        ).getSingle()).read<bool>('foreign_keys');
+        Future<bool> tableExists(String name) async =>
+            await customSelect(
+              "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?;",
+              variables: [Variable<String>(name)],
+            ).getSingleOrNull() !=
+            null;
+        if (foreignKeysEnabled) {
+          await customStatement('PRAGMA foreign_keys = OFF;');
+        }
+        try {
+          await transaction(() async {
+            await migrator.alterTable(TableMigration(messagePartRows));
+            await migrator.alterTable(TableMigration(providerArtifactRows));
+            await migrator.alterTable(TableMigration(generationRunRows));
+            if (await tableExists('message_asset_rows')) {
+              await customStatement(
+                'DROP INDEX IF EXISTS idx_message_assets_asset;',
+              );
+              await customStatement(
+                'ALTER TABLE message_asset_rows '
+                'RENAME TO message_asset_rows_graph;',
+              );
+              await customStatement('''
+                CREATE TABLE message_asset_rows(
+                  conversation_id TEXT NOT NULL,
+                  revision_id TEXT NOT NULL,
+                  asset_id TEXT NOT NULL
+                    REFERENCES asset_rows(id) ON DELETE CASCADE,
+                  kind TEXT NOT NULL CHECK(kind <> ''),
+                  PRIMARY KEY(revision_id, asset_id, kind),
+                  FOREIGN KEY(revision_id)
+                    REFERENCES message_rows(id) ON DELETE CASCADE
+                );
+              ''');
+              await customStatement('''
+                INSERT INTO message_asset_rows(
+                  conversation_id, revision_id, asset_id, kind
+                )
+                SELECT old.conversation_id, old.revision_id,
+                       old.asset_id, old.kind
+                FROM message_asset_rows_graph old
+                JOIN message_rows message ON message.id = old.revision_id;
+              ''');
+              await customStatement('DROP TABLE message_asset_rows_graph;');
+              await customStatement(
+                'CREATE INDEX idx_message_assets_asset '
+                'ON message_asset_rows(asset_id, revision_id);',
+              );
+            }
+            if (await tableExists('asset_reference_dirty_rows')) {
+              await customStatement(
+                'ALTER TABLE asset_reference_dirty_rows '
+                'RENAME TO asset_reference_dirty_rows_graph;',
+              );
+              await customStatement('''
+                CREATE TABLE asset_reference_dirty_rows(
+                  revision_id TEXT PRIMARY KEY NOT NULL
+                    REFERENCES message_rows(id) ON DELETE CASCADE
+                );
+              ''');
+              await customStatement('''
+                INSERT INTO asset_reference_dirty_rows(revision_id)
+                SELECT old.revision_id
+                FROM asset_reference_dirty_rows_graph old
+                JOIN message_rows message ON message.id = old.revision_id;
+              ''');
+              await customStatement(
+                'DROP TABLE asset_reference_dirty_rows_graph;',
+              );
+            }
+          });
+        } finally {
+          if (foreignKeysEnabled) {
+            await customStatement('PRAGMA foreign_keys = ON;');
+          }
+        }
       },
     ),
     beforeOpen: (details) async {

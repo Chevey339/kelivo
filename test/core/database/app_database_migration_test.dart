@@ -27,7 +27,17 @@ void main() {
       const versions = GeneratedHelper.versions;
       expect(
         versions,
-        orderedEquals([1, 2, 3, 4, 5, 6, 7, AppDatabase.currentSchemaVersion]),
+        orderedEquals([
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          AppDatabase.currentSchemaVersion,
+        ]),
       );
 
       for (final (index, fromVersion) in versions.indexed) {

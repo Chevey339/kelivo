@@ -103,4 +103,59 @@ void main() {
       expect(after.slots.map((slot) => slot.revisionId), ['later-user']);
     },
   );
+
+  test(
+    'append version selects it without moving or deleting later groups',
+    () async {
+      final root = await Directory.systemTemp.createTemp('linear_edit_test_');
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/chat.sqlite'),
+      );
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+
+      final conversation = Conversation(id: 'conversation', title: 'Linear');
+      final original = ChatMessage(
+        id: 'answer-v0',
+        role: 'assistant',
+        content: 'old answer',
+        conversationId: conversation.id,
+      );
+      final later = ChatMessage(
+        id: 'later-user',
+        role: 'user',
+        content: 'later question',
+        conversationId: conversation.id,
+      );
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          (message: original, messageOrder: 4),
+          (message: later, messageOrder: 9),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final appended = await repository.appendMessageVersion(
+        messageId: original.id,
+        content: 'new answer',
+      );
+      final window = await repository.loadLinearMessageWindow(
+        conversationId: conversation.id,
+        fromStart: true,
+      );
+
+      expect(appended, isNotNull);
+      expect(appended!.message.version, 1);
+      expect(appended.conversation.versionSelections, {original.id: 1});
+      expect(window.slots.map((slot) => slot.revisionId), [
+        appended.message.id,
+        later.id,
+      ]);
+      expect(await repository.getMessageIndex(conversation.id, later.id), 9);
+    },
+  );
 }

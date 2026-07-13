@@ -33,6 +33,22 @@ void main() {
         ),
       );
 
+  Future<void> insertMessage({
+    required String id,
+    required String conversationId,
+  }) => database
+      .into(database.messageRows)
+      .insert(
+        MessageRowsCompanion.insert(
+          id: id,
+          conversationId: conversationId,
+          role: 'assistant',
+          content: 'message',
+          timestamp: timestamp,
+          messageOrder: 0,
+        ),
+      );
+
   Future<void> insertSlot({
     required String id,
     required String conversationId,
@@ -388,16 +404,11 @@ void main() {
   });
 
   test(
-    'message parts require a same-conversation revision and unique ordinal',
+    'message parts require an existing linear message and unique ordinal',
     () async {
       await insertConversation('conversation-1');
       await insertConversation('conversation-2');
-      await insertSlot(id: 'slot-1', conversationId: 'conversation-1');
-      await insertRevision(
-        id: 'revision-1',
-        conversationId: 'conversation-1',
-        slotId: 'slot-1',
-      );
+      await insertMessage(id: 'revision-1', conversationId: 'conversation-1');
       final part = MessagePartRowsCompanion.insert(
         conversationId: 'conversation-1',
         revisionId: 'revision-1',
@@ -419,7 +430,7 @@ void main() {
             .insert(
               MessagePartRowsCompanion.insert(
                 conversationId: 'conversation-2',
-                revisionId: 'revision-1',
+                revisionId: 'missing-message',
                 ordinal: 1,
                 kind: 'text',
                 payload: 'cross',

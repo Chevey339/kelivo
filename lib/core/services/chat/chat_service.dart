@@ -133,7 +133,6 @@ class ChatService extends ChangeNotifier {
     try {
       // Versioned and transactional: normal launches return before scanning rows.
       await _migrateSandboxPaths();
-      await _repo.backfillMissingMessageGraphs();
       await _loadConversationsCache();
 
       // Reset any stale isStreaming flags left over from a previous app crash or
@@ -285,15 +284,19 @@ class ChatService extends ChangeNotifier {
         _messagesCache[conversationId] ?? const <ChatMessage>[],
       );
     }
-    final timeline = await loadMessageGraphTimeline(
-      conversationId,
-      force: true,
+    final probe = await _repo.loadLinearMessageWindow(
+      conversationId: conversationId,
+      fromStart: true,
+      limit: 1,
     );
-    if (timeline == null || timeline.activeRevisions.isEmpty) {
-      return const <ChatMessage>[];
-    }
-    final revisionIds = timeline.activeRevisions
-        .map((revision) => revision.revisionId)
+    if (probe.totalSlotCount == 0) return const <ChatMessage>[];
+    final timeline = await _repo.loadLinearMessageWindow(
+      conversationId: conversationId,
+      fromStart: true,
+      limit: probe.totalSlotCount,
+    );
+    final revisionIds = timeline.slots
+        .map((slot) => slot.revisionId)
         .toList(growable: false);
     final messages = await _repo.getMessagesByIds(revisionIds);
     final byId = {for (final message in messages) message.id: message};
@@ -1313,7 +1316,6 @@ class ChatService extends ChangeNotifier {
       toolEventsByMessageId: const {},
       geminiSignaturesByMessageId: const {},
     );
-    await _repo.backfillMissingMessageGraphs();
     await _backfillAssetReferencesForCurrentRoot();
     await _refreshConversation(restored.id);
 
@@ -1323,8 +1325,6 @@ class ChatService extends ChangeNotifier {
         .map((message) => message.id)
         .toList(growable: true);
     _messageCounts[restored.id] = messages.length;
-    await loadMessageGraphTimeline(restored.id, force: true);
-
     notifyListeners();
   }
 
@@ -1381,7 +1381,6 @@ class ChatService extends ChangeNotifier {
     if (!_initialized) await init();
     final report = await _repo.mergeBackupSnapshot(snapshotFile);
     _messagesCache.clear();
-    await _repo.backfillMissingMessageGraphs();
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
@@ -1407,7 +1406,6 @@ class ChatService extends ChangeNotifier {
       source: source,
     );
     _messagesCache.clear();
-    await _repo.backfillMissingMessageGraphs();
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
@@ -1428,7 +1426,6 @@ class ChatService extends ChangeNotifier {
     _graphVersionSelections.clear();
     _graphContextStartIndices.clear();
     _currentConversationId = null;
-    await _repo.backfillMissingMessageGraphs();
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
     notifyListeners();
@@ -1445,7 +1442,7 @@ class ChatService extends ChangeNotifier {
     if (conversation == null) return;
     final order = await _loadMessageOrder(conversationId);
     if (order.contains(message.id)) return;
-    final persisted = await _repo.appendGraphMessageToConversation(
+    final persisted = await _repo.appendLinearMessageToConversation(
       conversation: conversation,
       message: message,
       touchUpdatedAt: false,
@@ -1456,7 +1453,6 @@ class ChatService extends ChangeNotifier {
     _conversationsCache[conversationId] = persisted;
     order.add(message.id);
     _messageCounts[conversationId] = order.length;
-    await loadMessageGraphTimeline(conversationId, force: true);
 
     // Update cache
     if (_messagesCache.containsKey(conversationId)) {
@@ -1718,7 +1714,7 @@ class ChatService extends ChangeNotifier {
       if (_conversationsCache.containsKey(conversationId)) {
         await _loadMessageOrder(conversationId);
       }
-      final persisted = await _repo.appendGraphMessageToConversation(
+      final persisted = await _repo.appendLinearMessageToConversation(
         conversation: conversation,
         message: message,
         selectVersion: selectVersion,
@@ -1735,7 +1731,6 @@ class ChatService extends ChangeNotifier {
       );
       if (!order.contains(message.id)) order.add(message.id);
       _messageCounts[conversationId] = order.length;
-      await loadMessageGraphTimeline(conversationId, force: true);
     }
 
     // Update cache
@@ -1818,6 +1813,11 @@ class ChatService extends ChangeNotifier {
       runId: const Uuid().v4(),
       truncateFuture: truncateFuture,
     );
+    if (truncateFuture) {
+      _messagesCache.remove(conversationId);
+      _messageOrderIds.remove(conversationId);
+      await _loadMessageOrder(conversationId);
+    }
     await _publishGenerationBegin(result);
     return result;
   }
@@ -1845,7 +1845,6 @@ class ChatService extends ChangeNotifier {
     if (_messagesCache.containsKey(conversationId)) {
       _messagesCache[conversationId]!.addAll(messages);
     }
-    await loadMessageGraphTimeline(conversationId, force: true);
     notifyListeners();
   }
 
@@ -2208,35 +2207,62 @@ class ChatService extends ChangeNotifier {
     required String title,
   }) async {
     if (!_initialized) await init();
-    final timeline = await loadMessageGraphTimeline(sourceConversationId);
-    if (timeline?.branchId == null ||
-        !timeline!.activeRevisions.any(
-          (revision) => revision.revisionId == sourceRevisionId,
-        )) {
-      throw StateError('message_graph_target_not_on_branch');
+    final source = _conversationsCache[sourceConversationId];
+    if (source == null) throw StateError('conversation_missing');
+    final targetMessage = await _repo.getMessage(sourceRevisionId);
+    if (targetMessage == null ||
+        targetMessage.conversationId != sourceConversationId) {
+      throw StateError('linear_fork_target_missing');
     }
-    final target = Conversation(title: title);
-    await _repo.forkMessageGraphConversationWithShadow(
-      sourceConversationId: sourceConversationId,
-      sourceBranchId: timeline.branchId!,
-      sourceRevisionId: sourceRevisionId,
-      targetConversationId: target.id,
-      title: title,
+    final targetGroupId = targetMessage.groupId ?? targetMessage.id;
+    final probe = await _repo.loadLinearMessageWindow(
+      conversationId: sourceConversationId,
+      fromStart: true,
+      limit: 1,
     );
-    final persisted = await _repo.getConversation(target.id);
-    if (persisted == null) throw StateError('message_graph_fork_missing');
-    _conversationsCache[persisted.id] = persisted;
-    final messages = await _repo.getMessagesRange(
-      persisted.id,
-      start: 0,
-      limit: await _repo.getMessageCount(persisted.id),
+    final window = await _repo.loadLinearMessageWindow(
+      conversationId: sourceConversationId,
+      fromStart: true,
+      limit: probe.totalSlotCount,
     );
-    _messagesCache[persisted.id] = messages;
-    _messageOrderIds[persisted.id] = messages
-        .map((message) => message.id)
-        .toList(growable: true);
-    _messageCounts[persisted.id] = messages.length;
-    await loadMessageGraphTimeline(persisted.id, force: true);
+    final targetIndex = window.slots.indexWhere(
+      (slot) => slot.groupId == targetGroupId,
+    );
+    if (targetIndex < 0) throw StateError('linear_fork_target_not_visible');
+    final sourceMessages = await _repo.getMessagesByIds([
+      for (final slot in window.slots.take(targetIndex + 1)) slot.revisionId,
+    ]);
+    final persisted = await createConversation(
+      title: source.title,
+      assistantId: source.assistantId,
+    );
+    _messagesCache[persisted.id] = <ChatMessage>[];
+    _messageOrderIds[persisted.id] = <String>[];
+    _messageCounts[persisted.id] = 0;
+    for (final message in sourceMessages) {
+      await addMessageDirectly(
+        persisted.id,
+        ChatMessage(
+          role: message.role,
+          content: message.content,
+          timestamp: message.timestamp,
+          modelId: message.modelId,
+          providerId: message.providerId,
+          totalTokens: message.totalTokens,
+          conversationId: persisted.id,
+          isStreaming: false,
+          reasoningText: message.reasoningText,
+          reasoningStartAt: message.reasoningStartAt,
+          reasoningFinishedAt: message.reasoningFinishedAt,
+          translation: message.translation,
+          reasoningSegmentsJson: message.reasoningSegmentsJson,
+          promptTokens: message.promptTokens,
+          completionTokens: message.completionTokens,
+          cachedTokens: message.cachedTokens,
+          durationMs: message.durationMs,
+        ),
+      );
+    }
     _currentConversationId = persisted.id;
     notifyListeners();
     return persisted;
@@ -2263,7 +2289,6 @@ class ChatService extends ChangeNotifier {
     final order = _messageOrderIds.putIfAbsent(cid, () => <String>[]);
     if (!order.contains(newMsg.id)) order.add(newMsg.id);
     _messageCounts[cid] = order.length;
-    await loadMessageGraphTimeline(cid, force: true);
     // Update caches
     final arr = _messagesCache[cid];
     if (arr != null) arr.add(newMsg);
@@ -2367,19 +2392,18 @@ class ChatService extends ChangeNotifier {
     // Persisted case
     final c = _conversationsCache[conversationId];
     if (c == null) return null;
-    final timeline = await loadMessageGraphTimeline(conversationId);
-    if (timeline == null || timeline.activeRevisions.isEmpty) return c;
-    final currentBoundary = timeline.contextStartRevisionId;
-    final tailRevisionId = timeline.activeRevisions.last.revisionId;
-    await _repo.setMessageGraphContextBoundary(
+    final probe = await _repo.loadLinearMessageWindow(
       conversationId: conversationId,
-      revisionId: currentBoundary == tailRevisionId ? null : tailRevisionId,
-      expectedStateRevision: timeline.stateRevision,
+      fromStart: true,
+      limit: 1,
     );
+    if (probe.totalSlotCount == 0) return c;
+    c.truncateIndex = c.truncateIndex == probe.totalSlotCount
+        ? -1
+        : probe.totalSlotCount;
     if ((defaultTitle ?? '').isNotEmpty) c.title = defaultTitle!;
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
-    await loadMessageGraphTimeline(conversationId, force: true);
     notifyListeners();
     return c;
   }
@@ -2443,9 +2467,10 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return Set<String>.unmodifiable(deletedIds);
     }
-    final result = await _repo.deleteGraphMessages(
+    final result = await _repo.deleteMessages(
       conversationId: conversationId,
-      revisionIds: messageIds,
+      messageIds: messageIds,
+      versionSelectionChanges: versionSelectionChanges,
     );
     if (result == null) return const <String>{};
 
@@ -2464,7 +2489,6 @@ class ChatService extends ChangeNotifier {
     _messageGraphCache.remove(conversationId);
     _graphVersionSelections.remove(conversationId);
     _graphContextStartIndices.remove(conversationId);
-    await loadMessageGraphTimeline(conversationId, force: true);
     await _cleanupOrphanUploads();
     notifyListeners();
     return Set<String>.unmodifiable(deletedIds);

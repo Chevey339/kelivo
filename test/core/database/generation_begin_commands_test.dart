@@ -92,69 +92,64 @@ void main() {
     return current;
   }
 
-  test(
-    'begin send commits user, assistant, graph, branch and run together',
-    () async {
-      final result = await beginFirstSend();
+  test('begin send commits linear messages, parts and run together', () async {
+    final result = await beginFirstSend();
 
-      expect(result.userMessage?.id, 'user-1');
-      expect(result.assistantMessage.id, 'assistant-1');
-      expect(result.run.state, GenerationRunState.preparing);
-      expect(result.run.targetRevisionId, 'assistant-1');
-      expect(
-        (await repository.projectActiveMessageGraph(
-          conversationId: conversation.id,
-        ))?.revisions.map((revision) => revision.id),
-        ['user-1', 'assistant-1'],
-      );
-      expect(await repository.getMessageCount(conversation.id), 2);
-      expect(
-        await (database.select(database.messagePartRows)
-              ..orderBy([(row) => OrderingTerm.asc(row.revisionId)]))
-            .get()
-            .then((rows) => rows.map((row) => row.payload).toList()),
-        ['', 'Question'],
-      );
-    },
-  );
+    expect(result.userMessage?.id, 'user-1');
+    expect(result.assistantMessage.id, 'assistant-1');
+    expect(result.run.state, GenerationRunState.preparing);
+    expect(result.run.targetRevisionId, 'assistant-1');
+    expect(await repository.getMessageIds(conversation.id), [
+      'user-1',
+      'assistant-1',
+    ]);
+    expect(await database.select(database.messageSlotRows).get(), isEmpty);
+    expect(await database.select(database.messageRevisionRows).get(), isEmpty);
+    expect(
+      await database.select(database.conversationBranchRows).get(),
+      isEmpty,
+    );
+    expect(
+      await database.select(database.conversationStateRows).get(),
+      isEmpty,
+    );
+    expect(await repository.getMessageCount(conversation.id), 2);
+    expect(
+      await (database.select(database.messagePartRows)
+            ..orderBy([(row) => OrderingTerm.asc(row.revisionId)]))
+          .get()
+          .then((rows) => rows.map((row) => row.payload).toList()),
+      ['', 'Question'],
+    );
+  });
 
-  test(
-    'run insert failure rolls back every send row and branch mutation',
-    () async {
-      final first = await beginFirstSend();
-      final before = await repository.projectActiveMessageGraph(
-        conversationId: conversation.id,
-      );
+  test('run insert failure rolls back every linear send row', () async {
+    final first = await beginFirstSend();
 
-      await expectLater(
-        repository.beginSendGeneration(
-          conversation: first.conversation,
-          userMessage: user('user-2'),
-          assistantMessage: assistant('assistant-2'),
-          runId: 'run-1',
-        ),
-        throwsA(anything),
-      );
+    await expectLater(
+      repository.beginSendGeneration(
+        conversation: first.conversation,
+        userMessage: user('user-2'),
+        assistantMessage: assistant('assistant-2'),
+        runId: 'run-1',
+      ),
+      throwsA(anything),
+    );
 
-      expect(await repository.getMessage('user-2'), isNull);
-      expect(await repository.getMessage('assistant-2'), isNull);
-      expect(await repository.getMessageCount(conversation.id), 2);
-      final after = await repository.projectActiveMessageGraph(
-        conversationId: conversation.id,
-      );
-      expect(after?.targetRevisionId, before?.targetRevisionId);
-      expect(after?.stateRevision, before?.stateRevision);
-    },
-  );
+    expect(await repository.getMessage('user-2'), isNull);
+    expect(await repository.getMessage('assistant-2'), isNull);
+    expect(await repository.getMessageCount(conversation.id), 2);
+    expect(await repository.getMessageIds(conversation.id), [
+      'user-1',
+      'assistant-1',
+    ]);
+  });
 
   test(
-    'default regeneration grafts the alternate and preserves the future',
+    'default regeneration adds a selected version and preserves the future',
     () async {
       final first = await beginFirstSend();
       final withFuture = await appendFuture(first.conversation);
-      final before = await repository.projectActiveMessageGraph(
-        conversationId: conversation.id,
-      );
       final result = await repository.beginRegeneration(
         conversation: withFuture,
         assistantMessage: assistant(
@@ -168,26 +163,24 @@ void main() {
 
       expect(result.userMessage, isNull);
       expect(result.run.targetRevisionId, 'assistant-2');
-      final active = await repository.projectActiveMessageGraph(
+      final window = await repository.loadLinearMessageWindow(
         conversationId: conversation.id,
+        fromStart: true,
       );
-      expect(active?.revisions.map((revision) => revision.id), [
+      expect(window.slots.map((slot) => slot.revisionId), [
         'user-1',
         'assistant-2',
         'user-2',
         'assistant-tail',
       ]);
-      expect(active?.branchId, before?.branchId);
       expect(await repository.getMessageCount(conversation.id), 5);
+      expect(result.conversation.versionSelections['assistant-1'], 1);
     },
   );
 
-  test('truncate regeneration forks without deleting the old future', () async {
+  test('truncate regeneration physically deletes only later groups', () async {
     final first = await beginFirstSend();
     final withFuture = await appendFuture(first.conversation);
-    final before = await repository.projectActiveMessageGraph(
-      conversationId: conversation.id,
-    );
 
     final result = await repository.beginRegeneration(
       conversation: withFuture,
@@ -200,26 +193,19 @@ void main() {
       truncateFuture: true,
     );
 
-    final active = await repository.projectActiveMessageGraph(
+    final window = await repository.loadLinearMessageWindow(
       conversationId: conversation.id,
+      fromStart: true,
     );
-    expect(active?.revisions.map((revision) => revision.id), [
+    expect(window.slots.map((slot) => slot.revisionId), [
       'user-1',
       'assistant-2',
     ]);
-    expect(active?.branchId, isNot(before?.branchId));
-    final oldBranch = await repository.projectMessageGraphBranch(
-      conversationId: conversation.id,
-      branchId: before!.branchId!,
-    );
-    expect(oldBranch.revisions.map((revision) => revision.id), [
-      'user-1',
-      'assistant-1',
-      'user-2',
-      'assistant-tail',
-    ]);
+    expect(await repository.getMessage('assistant-1'), isNotNull);
+    expect(await repository.getMessage('user-2'), isNull);
+    expect(await repository.getMessage('assistant-tail'), isNull);
     expect(result.run.targetRevisionId, 'assistant-2');
-    expect(await repository.getMessageCount(conversation.id), 5);
+    expect(await repository.getMessageCount(conversation.id), 3);
   });
 
   test('invalid begin input is rejected before any database write', () async {

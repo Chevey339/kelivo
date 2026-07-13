@@ -236,7 +236,6 @@ final class PortableNdjsonV2 {
       if (!headerSeen || !footerSeen) {
         throw const FormatException('portable_incomplete');
       }
-      await candidate.backfillMissingMessageGraphs();
       await candidate.close();
       return await target.mergeBackupSnapshot(candidateFile);
     } finally {

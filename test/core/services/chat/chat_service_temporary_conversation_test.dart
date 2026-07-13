@@ -202,9 +202,12 @@ void main() {
 
       expect(service.getAllConversations().map((c) => c.id), [conversation.id]);
       expect(await service.loadMessages(conversation.id), hasLength(1));
-      final timeline = await service.loadMessageGraphTimeline(conversation.id);
-      expect(timeline!.activeRevisions.single.revisionId, message.id);
-      expect(timeline.activeRevisions.single.text, 'hello');
+      final timeline = await service.loadTimelinePage(
+        conversation.id,
+        fromStart: true,
+      );
+      expect(timeline!.slots.single.message.id, message.id);
+      expect(timeline.slots.single.message.content, 'hello');
     });
 
     test(
@@ -448,6 +451,7 @@ void main() {
           title: 'Fork',
         );
 
+        expect(fork.title, source.title);
         final forkMessages = service.getMessages(fork.id);
         expect(forkMessages, hasLength(1));
         expect(forkMessages.single.conversationId, fork.id);

@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
+  group('retired message graph projector', () {
+
   late AppDatabase database;
   late ChatDatabaseRepository repository;
   final timestamp = DateTime.fromMicrosecondsSinceEpoch(1783784523123456);
@@ -624,4 +626,5 @@ void main() {
       );
     },
   );
+  }, skip: 'PD-15 replaced the message graph with the linear model');
 }

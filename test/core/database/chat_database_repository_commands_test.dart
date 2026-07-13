@@ -116,7 +116,7 @@ void main() {
   );
 
   test(
-    'append version creates a selected graph revision without JSON selection',
+    'append version selects the new row in the linear group',
     () async {
       await repository.appendGraphMessageToConversation(
         conversation: conversation(),
@@ -129,13 +129,14 @@ void main() {
       );
 
       expect(result?.message.version, 1);
-      final timeline = await repository.projectMessageGraphTimeline(
+      final timeline = await repository.loadLinearMessageWindow(
         conversationId: 'conversation-1',
+        fromStart: true,
       );
-      expect(timeline!.activeRevisions.single.revisionId, result!.message.id);
+      expect(timeline.slots.single.revisionId, result!.message.id);
       expect(
         (await repository.getConversation('conversation-1'))?.versionSelections,
-        isEmpty,
+        const {'group-1': 1},
       );
     },
   );
@@ -158,11 +159,12 @@ void main() {
       messageId: 'u2',
       content: 'u2 edited',
     );
-    final timeline = await repository.projectMessageGraphTimeline(
+    final timeline = await repository.loadLinearMessageWindow(
       conversationId: base.id,
+      fromStart: true,
     );
 
-    expect(timeline!.activeRevisions.map((revision) => revision.revisionId), [
+    expect(timeline.slots.map((slot) => slot.revisionId), [
       'u1',
       'a1',
       result!.message.id,
@@ -278,7 +280,7 @@ void main() {
         'user-2',
       ]);
       final persisted = await repository.getConversation('conversation-1');
-      expect(persisted?.versionSelections, const {'group-1': 0});
+      expect(persisted?.versionSelections, const {'group-1': 1});
       expect(persisted?.chatSuggestions, isEmpty);
       expect(await repository.getToolEvents('message-v0'), isEmpty);
       expect(await repository.getGeminiThoughtSignature('message-v0'), isNull);

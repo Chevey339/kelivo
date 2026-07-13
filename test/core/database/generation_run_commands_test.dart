@@ -52,6 +52,18 @@ void main() {
             updatedAt: createdAt,
           ),
         );
+    await database
+        .into(database.messageRows)
+        .insert(
+          MessageRowsCompanion.insert(
+            id: 'revision-a1',
+            conversationId: 'conversation-1',
+            role: 'assistant',
+            content: '',
+            timestamp: createdAt,
+            messageOrder: 0,
+          ),
+        );
   });
 
   tearDown(() => repository.close());

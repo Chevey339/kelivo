@@ -2,7 +2,7 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-12（**LIN-02 完成：读路径已回归线性 collapse 窗口，版本选择改回 `version_selections_json`**）
+> - 最后更新：2026-07-12（**LIN-01 完成：发送/生成/编辑/重生成/删除与 fork 已回归纯线性写路径**）
 > - 当前结论：Phase 0/1/3/5 的基础设施成果保留。**Phase 2（Message Graph）与 Phase 4 的 TimelineCoordinator/programmatic jump 按 PD-15 整体作废**，不再等待真机矩阵；当前唯一实施目标是 Phase 6 线性回归。OPS-08 发布矩阵 2/5 与 OPS-09 门禁不受影响，继续保持
 
 ## 1. 文档使用规则
@@ -42,7 +42,7 @@
 | Phase 3：Generation State Machine | 7 / 7 | `已完成`（需 LIN-01 改接） | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 保留；begin/regeneration 由 Phase 6 LIN-01 改接线性写路径 |
 | Phase 4：Timeline 与 Renderer | — | `部分作废`（PD-15） | TimelineCoordinator/ancestry cursor 窗口/viewport 模式机/programmaticJump+spacer 作废，由 LIN-03 拆除；保留 TL-05～07 渲染成果（render model、增量 Markdown、有界大内容）与 TL-R14 单执行器/手势结算修复 |
 | Phase 5：Data Operations 与退役 | 7 / 9 | `进行中`（可执行实现完成，外部门禁未满足） | OPS-01～07 已完成且按 PD-15 保留；OPS-04/05/03 的 branch 口径由 LIN-05 改为"选中版本/全部版本"；OPS-08 发布证据 2/5；OPS-09 门禁不变 |
-| Phase 6：线性回归 v3（PD-15） | 1 / 8 | `进行中` | LIN-02 已完成：分页窗口按 `message_order` 的组首位置折叠，选中版本/默认最新版与聚合版本数均由 SQLite 直接投影；下一项 LIN-01 |
+| Phase 6：线性回归 v3（PD-15） | 2 / 8 | `进行中` | LIN-02/01 已完成：线性 collapse 读窗口与纯线性写事务均已扶正，GenerationRun/ordered parts/附件/搜索已改接 `message_rows`；下一项 LIN-06 |
 
 ## 3. 已完成的审计工作
 
@@ -456,7 +456,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | ID | 工作项 | 依赖 | 状态 | 验收摘要 |
 | --- | --- | --- | --- | --- |
-| LIN-01 | 写路径扶正线性：发送/生成 begin/编辑版本/重生成改纯线性追加（order max+1、组内 version max+1、更新 versionSelections），`regenerateDeleteTrailingMessages=true` 恢复物理删尾随，删除即删行（order 允许空洞、禁止全会话重写）；generation run 原子事务保留但不再调用 graph command | 无 | `未开始` | 全部写操作不触碰 graph 表；与 `f7e11373` 写行为一致 |
+| LIN-01 | 写路径扶正线性：发送/生成 begin/编辑版本/重生成改纯线性追加（order max+1、组内 version max+1、更新 versionSelections），`regenerateDeleteTrailingMessages=true` 恢复物理删尾随，删除即删行（order 允许空洞、禁止全会话重写）；generation run 原子事务保留但不再调用 graph command | 无 | `已完成`（2026-07-12，本里程碑提交） | 生产发送/生成/编辑/重生成/删除/fork 不再调用 graph command；默认重生成保留下方，开关开启时同事务物理删非本组尾随；删除保持 order 空洞。schema 9 将 parts/provider artifacts/generation run 外键改接 `message_rows`，动态附件引用表同步改接；fork 复制所选可见前缀并继承原标题。全量 1288 通过、28 项已取消 graph 测试显式跳过，analyze 通过 |
 | LIN-02 | 读路径回归 collapse 渲染：按 groupId 分组折叠、组位次 = 组内首条位置、每组显示选中版本（默认最新）；切换器 n/m 与"删除全部版本"入口用 `GROUP BY group_id` 聚合计数；保留按 message_order 的懒加载 | 无 | `已完成`（2026-07-12，本里程碑提交） | SQLite CTE 以 `COALESCE(group_id,id)` 聚合、组内最小 order 定位、DB 聚合 n/m；tail/start/before/after/around 均按逻辑组游标分页。ChatService 读侧已切线性窗口，版本选择/清除回归 `version_selections_json`；稀疏 version 按值匹配。聚焦 45/45、全量 1315/1315 与 analyze 通过 |
 | LIN-03 | 拆除 UI 层 graph 依赖：删 TimelineCoordinator（ancestry cursor 窗口/viewport 模式机/visual anchor/programmaticJump+spacer）及全部接线；发送=追加+滚到底；自动跟随三条件（生成中+在底部+未在滚）；跳转恢复 loadUntilMessageVisible + observer 按 collapsed 索引 | LIN-01/02 | `未开始` | 无推顶无 spacer；保留 TL-R14 单执行器/手势结算修复 |
 | LIN-04 | schema 收口：新版本迁移 drop graph 四表；删 message_graph_commands/projector/legacy adapter/backfillMissingMessageGraphs 与 repository 全部 graph API；安装门 `_validateRawStructure` 与 rollback 兼容窗口同步更新 | LIN-03 | `未开始` | 迁移后安装门通过；`rg "MessageGraph\|TimelineCoordinator\|graftRevision\|createRevisionBranch"` 在 `lib/` 为零 |
@@ -605,6 +605,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-12 | 完成 LIN-01：发送 begin 在单事务按 `max(message_order)+1` 写 user/assistant 与 GenerationRun；编辑/assistant 重生成按组内 max version 追加并更新 `version_selections_json`，默认保留下方，删除尾随开关开启时只物理删除组后其它组；单/批删除不再 compact order，并自动修复失效选择。新增 schema 9，把 ordered parts、provider artifacts、GenerationRun 及动态附件引用外键从 graph revision 改接 `message_rows`，迁移保留原数据；流式 checkpoint/final 继续原子写 parts/run。生产启动/导入不再 backfill graph，线性 fork 复制目标可见前缀并继承源标题，上下文尾部分隔恢复 `truncateIndex`。默认搜索先改接线性选中版本以保证新消息可发现。全量 1288 项通过，28 项已取消 graph 单测显式跳过，`flutter analyze` 无问题 | LIN-01、PD-15、GEN-01～05 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 LIN-02：新增完全基于 `message_rows` 的线性 collapse 窗口，按组首 `message_order` 保持稳定位置，SQLite 内直接解析 `version_selections_json`、默认选最新版并聚合真实版本数；tail/start/before/after/around 游标均以逻辑组工作，旧 sibling 也可定位当前选中版本。ChatService 分页读侧由 active ancestry 切到线性窗口，版本选择/清除恢复旧 Kelivo 的 conversation 元数据语义；controller 稀疏版本按 version 值而非数组下标折叠。聚焦 45/45、全量 1315/1315 与 `flutter analyze` 通过 | LIN-02、PD-15 | 本里程碑提交 | Codex |
 | 2026-07-12 | **PD-15 用户裁决：放弃 graph/branch 消息模型，回归完全线性。** 依据：真机使用后 graph 版本与既有产品行为冲突且 bug 密度过高（仅保存、重生成等均不正常）；调研 rikkahub（Room/SQLite）证实其采用与旧 Kelivo 同构的线性模型（线性节点 + 节点内版本 + selectIndex、发送滚到底、无推顶、自动跟随三条件）。方案新增 §5.3 行为合同（以 `f7e11373` 为准绳）与 §11 Phase 6（LIN-01～08）；§6.3 graph 模型、§7.2 graft/fork、§7.4 coordinator 标记存档；PD-01/02 标记被取代，PD-04/05/06/07 收窄。进度文档：Phase 2 改`已取消`、Phase 4 改`部分作废`（保留渲染成果与 TL-R14 修复）、新增 §11.2 Phase 6 表；原真机四症状矩阵由 LIN-06/07 取代。保留成果清单：DB 内核、流式节流写库、generation run、备份/恢复/合并、FTS、统计、附件 GC、安全存储、灰度/退役门禁 | PD-15、Phase 6、PD-01/02/04/05/06/07 | 本设计修订 | 用户 / Fable |
 | 2026-07-12 | 完成 OBS-6：首次 asset receipt 回填移出业务启动关键路径，以 single-flight 后台任务逐 revision 串行处理并 yield，SHA-256 默认在工作 isolate 执行；close/restore/import 正确等待同一任务。asset GC ledger 兼容升级 generation 列，claim 原子推进代际；删除前复验 generation/reference/dirty revision，文件先同目录隔离，completion generation CAS 失败时恢复，成功后才物理清理。新增“哈希挂起但 init 返回”和“重新链接使旧 claim/旧代际失效”回归；`flutter analyze` 无问题，15/15 聚焦与 1313/1313 全量测试通过 | OBS-6、OPS-06 | 本修复提交 | Codex |

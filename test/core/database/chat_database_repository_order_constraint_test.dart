@@ -64,7 +64,7 @@ void main() {
   );
 
   test(
-    'graph deletion leaves sparse physical order without compaction',
+    'linear deletion leaves sparse physical order without compaction',
     () async {
       await repository.clearAllData();
       var conversation = Conversation(id: 'graph-conversation', title: 'Graph');
@@ -76,7 +76,7 @@ void main() {
         groupId: 'assistant-slot',
         version: 0,
       );
-      conversation = await repository.appendGraphMessageToConversation(
+      conversation = await repository.appendLinearMessageToConversation(
         conversation: conversation,
         message: original,
       );
@@ -88,14 +88,15 @@ void main() {
         groupId: 'assistant-slot',
         version: 1,
       );
-      conversation = await repository.appendGraphMessageToConversation(
+      conversation = await repository.appendLinearMessageToConversation(
         conversation: conversation,
         message: alternate,
         selectVersion: true,
       );
-      await repository.selectMessageGraphRevision(
+      await repository.setSelectedVersion(
         conversationId: conversation.id,
-        revisionId: original.id,
+        groupId: 'assistant-slot',
+        version: 0,
       );
       final tail = ChatMessage(
         id: 'user-tail',
@@ -103,14 +104,15 @@ void main() {
         content: 'tail',
         conversationId: conversation.id,
       );
-      await repository.appendGraphMessageToConversation(
+      await repository.appendLinearMessageToConversation(
         conversation: conversation,
         message: tail,
       );
 
-      await repository.deleteGraphMessages(
+      await repository.deleteMessages(
         conversationId: conversation.id,
-        revisionIds: {alternate.id},
+        messageIds: {alternate.id},
+        versionSelectionChanges: const {'assistant-slot': 0},
       );
 
       expect(await repository.getMessageIds(conversation.id), [
