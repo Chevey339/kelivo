@@ -462,40 +462,29 @@ void main() {
     );
   });
 
-  test(
-    'business selection and context are projected from stable graph IDs',
-    () async {
-      final service = createService();
-      await service.init();
-      final conversation = await service.createConversation(title: 'Graph');
-      final original = await service.addMessage(
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: 'v0',
-      );
-      final edited = await service.appendMessageVersion(
-        messageId: original.id,
-        content: 'v1',
-      );
+  test('business selection uses linear group versions', () async {
+    final service = createService();
+    await service.init();
+    final conversation = await service.createConversation(title: 'Graph');
+    final original = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: 'v0',
+    );
+    final edited = await service.appendMessageVersion(
+      messageId: original.id,
+      content: 'v1',
+    );
 
-      var timeline = await service.loadMessageGraphTimeline(
-        conversation.id,
-        force: true,
-      );
-      expect(timeline!.activeRevisions.single.revisionId, edited!.id);
-      expect(service.getVersionSelections(conversation.id), {original.id: 1});
+    expect(edited, isNotNull);
+    final groupId = edited!.groupId ?? original.id;
 
-      await service.setSelectedVersion(conversation.id, original.id, 0);
-      timeline = await service.loadMessageGraphTimeline(
-        conversation.id,
-        force: true,
-      );
-      expect(timeline!.activeRevisions.single.revisionId, original.id);
-
-      await service.toggleTruncateAtTail(conversation.id);
-      expect(service.getContextStartRevisionId(conversation.id), original.id);
-      await service.toggleTruncateAtTail(conversation.id);
-      expect(service.getContextStartRevisionId(conversation.id), isNull);
-    },
-  );
+    await service.setSelectedVersion(conversation.id, groupId, 0);
+    expect(service.getVersionSelections(conversation.id), {groupId: 0});
+    final page = await service.loadTimelinePage(
+      conversation.id,
+      fromStart: true,
+    );
+    expect(page!.slots.single.message.id, original.id);
+  });
 }

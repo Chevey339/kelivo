@@ -322,7 +322,7 @@ class ChatService extends ChangeNotifier {
         limit: limit,
       );
     }
-    final page = await _repo.loadActiveTimelinePage(
+    final page = await _repo.loadLinearMessageWindow(
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
       afterRevisionId: afterRevisionId,
@@ -330,17 +330,34 @@ class ChatService extends ChangeNotifier {
       fromStart: fromStart,
       limit: limit,
     );
-    if (page == null) return null;
     final revisionIds = page.slots
         .map((slot) => slot.revisionId)
         .toList(growable: false);
     final messages = await _repo.getMessagesByIds(revisionIds);
     final byId = {for (final message in messages) message.id: message};
-    final loadedSlots = [
-      for (final slot in page.slots)
-        if (byId[slot.revisionId] != null)
-          LoadedTimelineSlot(identity: slot, message: byId[slot.revisionId]!),
-    ];
+    String? parentRevisionId;
+    final loadedSlots = <LoadedTimelineSlot>[];
+    for (final slot in page.slots) {
+      final message = byId[slot.revisionId];
+      if (message == null) continue;
+      loadedSlots.add(
+        LoadedTimelineSlot(
+          identity: ActiveTimelineSlot(
+            slotId: slot.groupId,
+            revisionId: slot.revisionId,
+            parentRevisionId: parentRevisionId,
+            role: message.role,
+            createdAt: message.timestamp,
+            updatedAt: message.timestamp,
+            finalizedAt: message.isStreaming ? null : message.timestamp,
+            versionCount: slot.versionCount,
+            logicalIndex: slot.logicalIndex,
+          ),
+          message: message,
+        ),
+      );
+      parentRevisionId = message.id;
+    }
     if (loadedSlots.length != page.slots.length) {
       throw StateError('timeline_selected_revision_shadow_missing');
     }
@@ -358,8 +375,12 @@ class ChatService extends ChangeNotifier {
     await _cacheMessageArtifacts(messages);
     return LoadedTimelinePage(
       conversationId: conversationId,
-      stateRevision: page.stateRevision,
-      contextStartRevisionId: page.contextStartRevisionId,
+      stateRevision:
+          _conversationsCache[conversationId]
+              ?.updatedAt
+              .microsecondsSinceEpoch ??
+          0,
+      contextStartRevisionId: null,
       slots: loadedSlots,
       hasMoreBefore: page.hasMoreBefore,
       hasMoreAfter: page.hasMoreAfter,
@@ -2251,13 +2272,11 @@ class ChatService extends ChangeNotifier {
   }
 
   Map<String, int> getVersionSelections(String conversationId) {
-    if (_draftConversations.containsKey(conversationId)) {
-      return Map<String, int>.from(
-        _draftConversations[conversationId]!.versionSelections,
-      );
-    }
     return Map<String, int>.from(
-      _graphVersionSelections[conversationId] ?? const <String, int>{},
+      (_draftConversations[conversationId] ??
+                  _conversationsCache[conversationId])
+              ?.versionSelections ??
+          const <String, int>{},
     );
   }
 
@@ -2283,8 +2302,15 @@ class ChatService extends ChangeNotifier {
         break;
       }
     }
-    if (target == null) throw StateError('message_graph_revision_missing');
-    await selectMessageRevision(conversationId, target.id);
+    if (target == null) throw StateError('message_version_missing');
+    final conversation = await _repo.setSelectedVersion(
+      conversationId: conversationId,
+      groupId: groupId,
+      version: version,
+    );
+    if (conversation == null) return;
+    _conversationsCache[conversationId] = conversation;
+    notifyListeners();
   }
 
   Future<void> selectMessageRevision(
@@ -2310,10 +2336,13 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    // A graph path always selects exactly one revision for every visible slot.
-    // Clearing a legacy JSON override therefore means refreshing the derived
-    // selection rather than writing an absent ordinal.
-    await loadMessageGraphTimeline(conversationId, force: true);
+    final conversation = await _repo.setSelectedVersion(
+      conversationId: conversationId,
+      groupId: groupId,
+      version: null,
+    );
+    if (conversation == null) return;
+    _conversationsCache[conversationId] = conversation;
     notifyListeners();
   }
 

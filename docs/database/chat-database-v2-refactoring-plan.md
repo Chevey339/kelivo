@@ -1,8 +1,8 @@
 # Kelivo 聊天数据库与消息系统 v2 重构方案
 
-> - 文档状态：设计基线；PD-01～PD-14 产品决策已全部冻结（见 §5.1/§5.2），性能基线待 P0-09 冻结
+> - 文档状态：设计基线；**PD-15（2026-07-12，用户裁决）已推翻 graph/branch 消息模型，最终形态为完全线性模型，见 §5.3 与 §11 Phase 6**。§6.3 的 graph 数据模型、§7.2 的 graft/fork 语义与 §7.4 的 timeline coordinator 设计保留为历史记录，不再是实施目标
 > - 审计基线：分支 `sql`，提交 `df1dae8a`
-> - 最后更新：2026-07-10
+> - 最后更新：2026-07-12
 > - 实施状态：[chat-database-v2-refactoring-progress.md](./chat-database-v2-refactoring-progress.md)
 
 ## 1. 文档目的
@@ -194,6 +194,32 @@ u1, a1-v0, u2, a2-v0, a1-v1
 - 旧 JSON 导入和 Hive → SQLite 迁移页灾难备份继续保持历史设置语义，因而可能包含明文凭据；它们不经过正常备份 sanitizer。该历史路径允许比新格式慢，但仍应使用流式 ZIP/文件写入、分批扫描和有界中间对象，尽力避免 OOM 与长时间阻塞。
 - NDJSON/chunk 仅用于显式便携导出或 legacy/v2 数据转换，不作为应用默认完整备份格式。
 
+### 5.3 PD-15：回归完全线性消息模型（2026-07-12，用户裁决，最高优先级）
+
+用户在真机使用 graph/branch 版本后裁决：**该模型与 Kelivo 既有产品行为冲突且引入了大量原本不存在的 bug（仅保存、重生成等行为均不正常），放弃 ChatGPT 式 graph/branch 设计，回归重构前（`f7e11373` 基线）的完全线性模型。** 本决策取代 PD-01、PD-02 的 graph/graft/fork 语义，并收窄 PD-04/05/06/07 中与 branch 相关的部分。参考实现：rikkahub（Room/SQLite，线性节点列表 + 节点内版本数组 + selectIndex，与 Kelivo 旧模型同构），其成熟度佐证线性模型足以支撑同类产品全部功能。
+
+**数据模型（最终形态）**：
+
+- `message_rows` 是唯一消息真相：按 `message_order` 排序的线性列表；多版本 = 同 `group_id` 下的多行（`version` 递增）；`conversation_rows.version_selections_json` 记录每组选中版本（缺省为最新）。该结构在 v2 期间一直作为影子完整维护，回归即"扶正"，不需要数据搬迁。
+- **删除** graph 四表（`message_slot_rows`、`message_revision_rows`、`conversation_branch_rows`、`conversation_state_rows`）及其命令/投影器/legacy adapter。v2 从未发布（PD-13：公开数据源是 Hive），删除无兼容负担。
+- 保留 `message_part_rows`（ordered parts 读写）与 `generation_run_rows`（崩溃恢复），它们与线性/graph 无关。
+
+**行为合同（恢复 `f7e11373` 基线行为，rikkahub 行为一致处已注明）**：
+
+1. **仅保存（编辑 user/assistant 消息）**：组内追加新版本并选中；不删除任何消息、不触发重发、不改变列表其它位置。（rikkahub `editMessage` 同）
+2. **重生成 assistant**：组内追加新版本并选中；`regenerateDeleteTrailingMessages=true` 时物理删除该组之后的消息，false（默认）时全部保留。（rikkahub assistant 重生成保留后续节点，同默认行为）
+3. **重发 user 消息**：保持 `f7e11373` 基线行为（与重生成共用 `regenerateAtMessage` 入口）。
+4. **版本切换**：只改该组的 `versionSelections`，渲染层换显示的行，下方消息不受影响。切换器 `< n/m >` 的 n/m 来自组内行数（一条 `GROUP BY group_id` 聚合查询，不依赖全量加载）。
+5. **删除**：删单个版本 = 删该行，组内还有版本则选中合法的相邻版本；删组内最后一个版本 = 该组从列表消失；均不级联删除下方消息。（rikkahub 同）
+6. **发送**：追加到列表尾部 + **滚动到底部**。**彻底移除"把用户消息推到视口顶部"的 programmatic jump/spacer 机制**（PD-04 中该部分作废）。（rikkahub 同：发送后 `requestScrollToItem` 到底）
+7. **自动跟随**：仅当"正在生成 + 用户当前在底部 + 用户未在滚动"时贴底跟随；用户向上滚动立即脱离；右侧既有"到底"按钮恢复跟随。（rikkahub 同此三条件）
+8. **跳转**（搜索/迷你地图/引用）：按 `message_order` 定位目标索引，必要时先加载到目标可见，再用 observer 按索引滚动；无 spacer、无 viewport 模式机。
+9. **上下文**：`truncateIndex`/context divider 语义照旧作用于线性列表。
+
+**保留的 v2 成果（与线性/graph 正交，不回退）**：Drift/SQLite 内核与安装门（Phase 1）、latest-wins 流式节流写库与崩溃恢复（P0-03/04、Phase 3 的 generation run，需改接线性写路径）、crash-safe 备份/恢复/合并（OPS-01/02/03）、FTS 搜索与 SQL 统计（OPS-04/05，需去掉 branch 口径）、附件引用/延迟 GC（OPS-06）、安全存储（OPS-07）、灰度与退役门禁（OPS-08/09）。
+
+**明确拆除**：graph 三层（schema/commands/projector）、TimelineCoordinator 的 ancestry cursor 窗口与 viewport 状态机、programmaticJump/spacer/visual anchor 协调器、graft/fork 语义、`backfillMissingMessageGraphs`、搜索/统计/NDJSON 的 active-branch 口径（改为"选中版本 / 全部版本"口径）。
+
 ## 6. 目标架构
 
 ### 6.1 总体数据流
@@ -267,7 +293,7 @@ flowchart LR
 - 数据库身份、迁移 receipt、完整性检查和恢复入口；
 - portable export 的 schema、manifest、hash 和兼容策略。
 
-### 6.3 目标数据模型
+### 6.3 目标数据模型（graph 部分**已被 PD-15 取代，仅存档**——最终 schema 为线性 `message_rows` + `message_part_rows` + `generation_run_rows`，见 §5.3 与 Phase 6 LIN-04）
 
 ```mermaid
 erDiagram
@@ -380,7 +406,7 @@ erDiagram
 7. final 先关闭新 checkpoint 入队，等待/取消旧 snapshot，并用 barrier 串行执行最终 parts、usage、finalized time、provider artifacts 和 `completed` 事务；旧 checkpoint 永远不能越过 final。
 8. prepare、网络、解析、工具或持久化失败统一进入明确终态并清理 loading；错误信息不写入权威 message parts。
 
-### 7.2 重生成和编辑（2026-07-12 按 PD-01 修订）
+### 7.2 重生成和编辑（2026-07-12 按 PD-01 修订；**已被 PD-15 取代，仅存档**——最终行为见 §5.3 行为合同）
 
 - 默认语义（graft，保留后代）：
   - 重生成 assistant（`regenerateDeleteTrailingMessages=false`）：同 slot 创建新 revision（parent 与被替换 revision 相同），把被替换 revision 在 active path 上的直接 child re-parent 到新 revision；branch leaf 仅在目标是 leaf 时前移，其余 slot 不变。
@@ -440,7 +466,7 @@ stateDiagram-v2
 - 同一个 conversation 的领域命令串行化；数据库约束作为第二道防线。
 - iOS background activity、通知和桌面状态更新与数据库一样合并节流，不允许逐 chunk MethodChannel 阻塞网络流。
 
-### 7.4 时间线分页和滚动
+### 7.4 时间线分页和滚动（**已被 PD-15 大幅取代，仅存档**——保留 TL-R14 单执行器/手势结算合同，其余 coordinator/jump/spacer 设计作废，见 §5.3 与 Phase 6 LIN-03）
 
 分页单位必须是 active branch 上的逻辑 slot，不是物理 revision 行：
 
@@ -881,6 +907,30 @@ flowchart LR
 - 每个 swap failpoint 重启后只得到完整旧库或完整新库；
 - 五平台搜索、snapshot、文件切换和安全存储验证通过；
 - Hive/v1 清理有数据证明、保留期和明确授权。
+
+### Phase 6：线性回归 v3（PD-15，当前最高优先级）
+
+按 §5.3 PD-15 执行。原则：**先立线性真相，再拆 graph，每步全量测试保持绿**；行为验收以 `f7e11373` 基线为准绳（该提交的 `chat_service.dart`/`chat_controller.dart`/`chat_actions.dart` 是行为参考实现，但存储层保留 v2 内核，不回退到旧仓储代码）。
+
+工作项：
+
+- `LIN-01`：**写路径扶正线性**。发送/生成 begin/`appendMessageVersion`/重生成全部改为纯线性操作：按 `max(message_order)+1` 追加行、组内 `max(version)+1` 分配版本、更新 `version_selections_json` 选中新版本；generation run 的 begin/finalize 保留原子事务与 CAS，但不再调用任何 graph command。`regenerateDeleteTrailingMessages=true` 恢复物理删除尾随行（含临时会话与持久会话一致）。删除消息 = 直接删行（order 允许空洞，禁止全会话 order 重写）。
+- `LIN-02`：**读路径回归 collapse 渲染**。恢复 `collapseVersions` 逻辑（按 `groupId` 分组、组位次 = 组内首条消息的位置、每组显示选中版本）；切换器 n/m 与"删除全部版本"入口改用 `GROUP BY group_id` 聚合计数；保留现有"初始加载最近若干条 + 向上翻页"的懒加载（按 `message_order` 范围查询），组内 sibling 明细在需要时按组补载。
+- `LIN-03`：**拆除 UI 层 graph 依赖**。删除 `TimelineCoordinator`（ancestry cursor 窗口、viewport 模式机、visual anchor、programmaticJump/spacer）及 `MessageListView`/`ChatController`/`HomePageController` 中全部接线；`ChatController._messages` 回归唯一 UI 窗口真相。发送 = 追加 + `scrollToBottom`；自动跟随恢复"生成中 + 在底部 + 未在滚动"三条件（保留 TL-R14 的单执行器修复：生成期到底用 jumpTo、动画期挂起 layout pin、手势结束一次性结算意图——这些修复与线性模型正交且已验证）。跳转恢复 `loadUntilMessageVisible` + observer 按 collapsed 索引滚动。
+- `LIN-04`：**schema 收口**。新 schema 版本迁移：drop `message_slot_rows`/`message_revision_rows`/`conversation_branch_rows`/`conversation_state_rows`；删除 `message_graph_commands.dart`/`message_graph_projector.dart`/`legacy_message_graph_adapter.dart` 与 repository 中全部 graph API 及 `backfillMissingMessageGraphs`；`message_part_rows.revision_id` 语义改为直接引用 `message_rows.id`（列名可保留）；安装门 `_validateRawStructure` 同步收口。`DatabaseV2RollbackCompatibility` 的 readable schema 窗口更新。
+- `LIN-05`：**周边口径改线性**。FTS 搜索去掉 active-ancestry 约束，默认搜"各组选中版本"，开关扩至全部版本；统计口径改为"选中版本 / 全部版本"双值；portable NDJSON 默认导出选中版本、`allRevisions` 导出全部行；Hive→v2 迁移目标改为纯线性表（去掉 graph 建图步骤，迁移 ledger/rollout/退役门禁不变）。
+- `LIN-06`：**多版本行为矩阵回归**（先红后绿，逐条对照 §5.3 行为合同 1～5）：中部仅保存后下方原样、默认重生成下方原样且 `<n/m>` 立即显示、开启开关重生成物理删尾随、版本切换不动下方、删单版本/删全组不级联。以 `f7e11373` 的行为为期望值。
+- `LIN-07`：**滚动行为矩阵回归**（对照 §5.3 行为合同 6～8）：发送滚到底无推顶无回弹、流式贴底跟随单调无跳动、上滚立即脱离、到底按钮恢复、搜索/迷你地图跳转准确、重开会话定位正确。
+- `LIN-08`：**清理与全量验证**。删除 graph/coordinator 相关测试与死代码，`flutter analyze` 全绿 + 全量测试通过；更新备份/恢复/合并回归确保 drop 表后 round trip 与 legacy 导入仍通过。
+
+退出条件：
+
+- §5.3 行为合同 1～9 全部有自动化回归且与 `f7e11373` 基线行为一致；
+- `lib/` 无任何 graph/coordinator 残留符号（`rg "MessageGraph|TimelineCoordinator|graftRevision|createRevisionBranch"` 为零）；
+- 全量 analyze/test 通过；备份 round trip、Hive 迁移、FTS、统计在线性 schema 上通过；
+- 用户真机确认：仅保存、重生成（两种开关）、版本切换、删除、发送滚动、流式跟随均恢复原产品行为。
+
+实施顺序建议：LIN-02（读侧，最小风险）→ LIN-01（写侧）→ LIN-06（行为矩阵）→ LIN-03（UI 拆除）→ LIN-07（滚动矩阵）→ LIN-04（schema drop）→ LIN-05（周边）→ LIN-08（清理）。LIN-04 放在 UI 拆除之后，确保拆除期间随时可回退。
 
 ## 12. 初始性能 SLO
 

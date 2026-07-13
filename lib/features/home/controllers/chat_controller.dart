@@ -635,30 +635,12 @@ class ChatController extends ChangeNotifier {
 
   /// Set the selected version for a message group.
   Future<void> setSelectedVersion(String groupId, int version) async {
-    var candidates = _chatService.getMessagesForGroups(
-      _currentConversation?.id ?? '',
-      [groupId],
-    );
-    if (!candidates.any((message) => message.version == version) &&
-        _currentConversation != null) {
-      candidates = await _chatService.loadMessagesForGroups(
-        _currentConversation!.id,
-        [groupId],
-      );
-    }
-    ChatMessage? target;
-    for (final candidate in candidates) {
-      if (candidate.version == version) {
-        target = candidate;
-        break;
-      }
-    }
-    if (target == null) throw StateError('message_graph_revision_missing');
     _versionSelections[groupId] = version;
     if (_currentConversation != null) {
-      await _chatService.selectMessageRevision(
+      await _chatService.setSelectedVersion(
         _currentConversation!.id,
-        target.id,
+        groupId,
+        version,
       );
     }
     notifyListeners();
@@ -755,10 +737,16 @@ class ChatController extends ChangeNotifier {
     for (final gid in order) {
       final vers = byGroup[gid]!;
       final sel = _versionSelections[gid];
-      final idx = (sel != null && sel >= 0 && sel < vers.length)
-          ? sel
-          : (vers.length - 1);
-      out.add(vers[idx]);
+      ChatMessage? selected;
+      if (sel != null) {
+        for (final candidate in vers) {
+          if (candidate.version == sel) {
+            selected = candidate;
+            break;
+          }
+        }
+      }
+      out.add(selected ?? vers.last);
     }
 
     return out;

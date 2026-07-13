@@ -717,6 +717,40 @@ void main() {
     );
 
     test(
+      'collapse treats version selection as a version value, not an index',
+      () async {
+        messages = <ChatMessage>[
+          _versionedMessage(
+            id: 'answer-v1',
+            role: 'assistant',
+            groupId: 'answer',
+            version: 1,
+          ),
+          _versionedMessage(
+            id: 'answer-v2',
+            role: 'assistant',
+            groupId: 'answer',
+            version: 2,
+          ),
+        ];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Sparse versions',
+          messageIds: messages.map((message) => message.id).toList(),
+          versionSelections: const <String, int>{'answer': 1},
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const <String, int>{'answer': 1};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        expect(controller.collapsedMessages.single.id, 'answer-v1');
+      },
+    );
+
+    test(
       'collapsed tail window loads selected version when recent window starts inside final version group',
       () async {
         final finalVersions = List<ChatMessage>.generate(

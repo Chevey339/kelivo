@@ -23,6 +23,34 @@ typedef ChatDatabaseSnapshotInfo = ({
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
 
+final class LinearMessageWindowSlot {
+  const LinearMessageWindowSlot({
+    required this.groupId,
+    required this.revisionId,
+    required this.versionCount,
+    required this.logicalIndex,
+  });
+
+  final String groupId;
+  final String revisionId;
+  final int versionCount;
+  final int logicalIndex;
+}
+
+final class LinearMessageWindow {
+  const LinearMessageWindow({
+    required this.slots,
+    required this.totalSlotCount,
+    required this.hasMoreBefore,
+    required this.hasMoreAfter,
+  });
+
+  final List<LinearMessageWindowSlot> slots;
+  final int totalSlotCount;
+  final bool hasMoreBefore;
+  final bool hasMoreAfter;
+}
+
 typedef AppendedMessageVersion = ({
   Conversation conversation,
   ChatMessage message,
@@ -1829,6 +1857,167 @@ class ChatDatabaseRepository {
               .get();
       return _messagesFromRowsWithParts(rows);
     }, resultCount: (rows) => rows.length);
+  }
+
+  Future<LinearMessageWindow> loadLinearMessageWindow({
+    required String conversationId,
+    String? beforeRevisionId,
+    String? afterRevisionId,
+    String? aroundRevisionId,
+    bool fromStart = false,
+    int limit = 40,
+  }) async {
+    if (limit <= 0) {
+      return const LinearMessageWindow(
+        slots: <LinearMessageWindowSlot>[],
+        totalSlotCount: 0,
+        hasMoreBefore: false,
+        hasMoreAfter: false,
+      );
+    }
+    final cursorCount = <String?>[
+      beforeRevisionId,
+      afterRevisionId,
+      aroundRevisionId,
+    ].whereType<String>().length;
+    if (cursorCount > 1 || (fromStart && cursorCount > 0)) {
+      throw ArgumentError('Only one linear message cursor may be supplied.');
+    }
+    final cursorVariables = <Variable<Object>>[];
+    late final String pageSql;
+    if (fromStart) {
+      pageSql = 'SELECT * FROM ordered ORDER BY logical_index LIMIT ?';
+    } else if (beforeRevisionId != null || afterRevisionId != null) {
+      final cursor = beforeRevisionId ?? afterRevisionId!;
+      cursorVariables.add(Variable<String>(cursor));
+      final comparison = beforeRevisionId != null ? '<' : '>';
+      final direction = beforeRevisionId != null ? 'DESC' : 'ASC';
+      pageSql =
+          '''
+        , target_group AS (
+          SELECT COALESCE(group_id, id) AS group_id
+          FROM message_rows WHERE conversation_id = ? AND id = ?
+        ),
+        target_index AS (
+          SELECT logical_index FROM ordered
+          WHERE group_id = (SELECT group_id FROM target_group)
+        )
+        SELECT * FROM ordered
+        WHERE logical_index $comparison (SELECT logical_index FROM target_index)
+        ORDER BY logical_index $direction LIMIT ?
+      ''';
+      cursorVariables.insert(0, Variable<String>(conversationId));
+    } else if (aroundRevisionId != null) {
+      cursorVariables
+        ..add(Variable<String>(conversationId))
+        ..add(Variable<String>(aroundRevisionId));
+      pageSql = '''
+        , target_group AS (
+          SELECT COALESCE(group_id, id) AS group_id
+          FROM message_rows WHERE conversation_id = ? AND id = ?
+        ),
+        target_index AS (
+          SELECT logical_index FROM ordered
+          WHERE group_id = (SELECT group_id FROM target_group)
+        ),
+        nearest AS (
+          SELECT ordered.* FROM ordered, target_index
+          ORDER BY ABS(ordered.logical_index - target_index.logical_index),
+                   ordered.logical_index
+          LIMIT ?
+        )
+        SELECT * FROM nearest ORDER BY logical_index
+      ''';
+    } else {
+      pageSql = 'SELECT * FROM ordered ORDER BY logical_index DESC LIMIT ?';
+    }
+    final rows = await _db
+        .customSelect(
+          '''
+          WITH group_rows AS (
+            SELECT
+              COALESCE(m.group_id, m.id) AS group_id,
+              MIN(m.message_order) AS anchor_order,
+              COUNT(*) AS version_count,
+              MAX(m.version) AS latest_version
+            FROM message_rows m
+            WHERE m.conversation_id = ?
+            GROUP BY COALESCE(m.group_id, m.id)
+          ),
+          selections AS (
+            SELECT j.key AS group_id, CAST(j.value AS INTEGER) AS version
+            FROM conversation_rows c, json_each(c.version_selections_json) j
+            WHERE c.id = ?
+          ),
+          ranked AS (
+            SELECT
+              m.id AS revision_id,
+              g.group_id,
+              g.anchor_order,
+              g.version_count,
+              ROW_NUMBER() OVER (
+                PARTITION BY g.group_id
+                ORDER BY
+                  CASE
+                    WHEN m.version = COALESCE(s.version, g.latest_version)
+                    THEN 0 ELSE 1
+                  END,
+                  m.version DESC,
+                  m.message_order DESC,
+                  m.id DESC
+              ) AS version_rank
+            FROM group_rows g
+            JOIN message_rows m
+              ON m.conversation_id = ?
+             AND COALESCE(m.group_id, m.id) = g.group_id
+            LEFT JOIN selections s ON s.group_id = g.group_id
+          ),
+          ordered AS (
+            SELECT
+              revision_id,
+              group_id,
+              version_count,
+              ROW_NUMBER() OVER (
+                ORDER BY anchor_order, group_id
+              ) - 1 AS logical_index,
+              COUNT(*) OVER () AS total_count
+            FROM ranked
+            WHERE version_rank = 1
+          )
+          $pageSql;
+        ''',
+          variables: [
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            Variable<String>(conversationId),
+            ...cursorVariables,
+            Variable<int>(limit),
+          ],
+          readsFrom: {_db.conversationRows, _db.messageRows},
+        )
+        .get();
+    final orderedRows =
+        beforeRevisionId != null ||
+            (!fromStart && afterRevisionId == null && aroundRevisionId == null)
+        ? rows.reversed
+        : rows;
+    final slots = orderedRows
+        .map(
+          (row) => LinearMessageWindowSlot(
+            groupId: row.read<String>('group_id'),
+            revisionId: row.read<String>('revision_id'),
+            versionCount: row.read<int>('version_count'),
+            logicalIndex: row.read<int>('logical_index'),
+          ),
+        )
+        .toList(growable: false);
+    final total = rows.isEmpty ? 0 : rows.first.read<int>('total_count');
+    return LinearMessageWindow(
+      slots: slots,
+      totalSlotCount: total,
+      hasMoreBefore: slots.isNotEmpty && slots.first.logicalIndex > 0,
+      hasMoreAfter: slots.isNotEmpty && slots.last.logicalIndex + 1 < total,
+    );
   }
 
   Future<List<ChatMessage>> getMessagesByIds(List<String> ids) async {
