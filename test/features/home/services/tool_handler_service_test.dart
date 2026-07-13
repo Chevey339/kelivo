@@ -57,7 +57,7 @@ void main() {
         'content': 'new memory',
       });
 
-      expect(result, 'new memory');
+      expect(result, contains('<content>new memory</content>'));
     });
 
     testWidgets('edit_memory returns tool error when id does not exist', (

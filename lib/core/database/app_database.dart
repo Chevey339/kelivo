@@ -111,6 +111,8 @@ class AssistantRows extends Table {
 
   // --- Memory ---
   BoolColumn get enableMemory => boolean().withDefault(const Constant(false))();
+  TextColumn get memoryMode =>
+      text().withDefault(const Constant('injection'))();
   BoolColumn get enableRecentChatsReference =>
       boolean().withDefault(const Constant(false))();
   IntColumn get recentChatsSummaryMessageCount =>
@@ -218,7 +220,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -230,6 +232,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await migrator.createTable(assistantRows);
         await migrator.createTable(cacheRows);
+      }
+      if (from < 3) {
+        await migrator.addColumn(assistantRows, assistantRows.memoryMode);
       }
     },
   );

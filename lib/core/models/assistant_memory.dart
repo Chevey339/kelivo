@@ -27,4 +27,21 @@ class AssistantMemory {
     assistantId: (json['assistantId'] ?? '').toString(),
     content: (json['content'] ?? '').toString(),
   );
+
+  /// Build a single XML record, e.g. `<record>\n<id>1</id>\n<content>...</content>\n</record>`.
+  static String buildRecordXml(int id, String content) {
+    final escaped = content.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+    return '<record>\n<id>$id</id>\n<content>$escaped</content>\n</record>';
+  }
+
+  /// Build a full `<memories>` XML block from a list of memories.
+  static String buildMemoryXml(List<AssistantMemory> memories) {
+    final sb = StringBuffer();
+    sb.writeln('<memories>');
+    for (final m in memories) {
+      sb.writeln(buildRecordXml(m.id, m.content));
+    }
+    sb.writeln('</memories>');
+    return sb.toString();
+  }
 }

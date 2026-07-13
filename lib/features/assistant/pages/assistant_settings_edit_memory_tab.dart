@@ -381,6 +381,18 @@ class _MemoryTabState extends State<_MemoryTab> {
                 },
               ),
               _iosDivider(context),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: a.enableMemory
+                    ? Column(
+                        children: [
+                          _MemoryModeSelector(assistant: a),
+                          _iosDivider(context),
+                        ],
+                      )
+                    : const SizedBox.shrink(),
+              ),
               _iosSwitchRow(
                 context,
                 icon: Lucide.History,
@@ -406,6 +418,46 @@ class _MemoryTabState extends State<_MemoryTab> {
               ),
             ],
           ),
+        ),
+        // Memory hint
+        AnimatedSize(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          child: a.enableMemory
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: cs.primary.withValues(alpha: isDark ? 0.12 : 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: cs.primary.withValues(
+                          alpha: isDark ? 0.2 : 0.15,
+                        ),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Lucide.Lightbulb, size: 16, color: cs.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.assistantEditMemoryModeToolHint,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
 
         // Memory record prompt section
@@ -1265,7 +1317,6 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final ap = context.read<AssistantProvider>();
     final selected = assistant.recentChatsSummaryMessageCount;
     final options = <int>{
@@ -1278,42 +1329,11 @@ class _RecentChatsSummaryFrequencySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 36,
-                child: Icon(
-                  Lucide.FileClock,
-                  size: 20,
-                  color: cs.onSurface.withValues(alpha: 0.9),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.assistantEditRecentChatsSummaryFrequencyTitle,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: cs.onSurface.withValues(alpha: 0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n.assistantEditRecentChatsSummaryFrequencyDescription,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 1.35,
-                        color: cs.onSurface.withValues(alpha: 0.65),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          _SettingSectionHeader(
+            icon: Lucide.FileClock,
+            title: l10n.assistantEditRecentChatsSummaryFrequencyTitle,
+            description:
+                l10n.assistantEditRecentChatsSummaryFrequencyDescription,
           ),
           const SizedBox(height: 12),
           Padding(
@@ -1430,6 +1450,178 @@ class _FrequencyChipButton extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// Reusable header row with icon, title, and description.
+/// Used by both MemoryModeSelector and RecentChatsSummaryFrequencySection.
+class _SettingSectionHeader extends StatelessWidget {
+  const _SettingSectionHeader({
+    required this.icon,
+    required this.title,
+    this.description,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? description;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 36,
+          child: Icon(
+            icon,
+            size: 20,
+            color: cs.onSurface.withValues(alpha: 0.9),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: cs.onSurface.withValues(alpha: 0.9),
+                ),
+              ),
+              if (description != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  description!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.35,
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MemoryModeSelector extends StatelessWidget {
+  const _MemoryModeSelector({required this.assistant});
+
+  final Assistant assistant;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final isTool = assistant.memoryMode == 'tool';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SettingSectionHeader(
+            icon: Lucide.Layers,
+            title: l10n.assistantEditMemoryModeTitle,
+            description: isTool
+                ? l10n.assistantEditMemoryModeToolDescription
+                : l10n.assistantEditMemoryModeAutoDescription,
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.only(left: 48),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ModeOption(
+                    label: l10n.assistantEditMemoryModeAuto,
+                    selected: !isTool,
+                    onTap: () => _setMode(context, 'injection'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ModeOption(
+                    label: l10n.assistantEditMemoryModeTool,
+                    selected: isTool,
+                    onTap: () => _setMode(context, 'tool'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _setMode(BuildContext context, String mode) {
+    if (assistant.memoryMode == mode) return;
+    context.read<AssistantProvider>().updateAssistant(
+      assistant.copyWith(memoryMode: mode),
+    );
+  }
+}
+
+class _ModeOption extends StatelessWidget {
+  const _ModeOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _TactileRow(
+      onTap: onTap,
+      pressedScale: 0.97,
+      builder: (_) {
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
+                : (isDark ? Colors.white10 : const Color(0xFFF2F3F5)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: selected
+                  ? cs.primary.withValues(alpha: isDark ? 0.4 : 0.25)
+                  : cs.outlineVariant.withValues(alpha: 0.2),
+              width: selected ? 1.2 : 0.6,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: selected
+                    ? AppFontWeights.semibold
+                    : AppFontWeights.regular,
+                color: selected
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

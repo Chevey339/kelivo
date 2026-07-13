@@ -65,6 +65,8 @@ Do **not** store sensitive information, including:
   final List<Map<String, String>> customBody; // [{key:'foo', value:'{"a":1}'}]
   // Memory features
   final bool enableMemory; // assistant memory feature switch
+  final String
+  memoryMode; // 'injection' = inject memories into prompt, 'tool' = read via tool
   final bool enableRecentChatsReference; // include recent chat titles in prompt
   final int
   recentChatsSummaryMessageCount; // refresh summary after N new messages
@@ -100,6 +102,7 @@ Do **not** store sensitive information, including:
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
     this.enableMemory = false,
+    this.memoryMode = 'injection',
     this.enableRecentChatsReference = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
     this.memoryRecordPrompt = defaultMemoryRecordPrompt,
@@ -134,6 +137,7 @@ Do **not** store sensitive information, including:
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
     bool? enableMemory,
+    String? memoryMode,
     bool? enableRecentChatsReference,
     int? recentChatsSummaryMessageCount,
     String? memoryRecordPrompt,
@@ -177,6 +181,7 @@ Do **not** store sensitive information, including:
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
       enableMemory: enableMemory ?? this.enableMemory,
+      memoryMode: memoryMode ?? this.memoryMode,
       enableRecentChatsReference:
           enableRecentChatsReference ?? this.enableRecentChatsReference,
       recentChatsSummaryMessageCount:
@@ -213,6 +218,7 @@ Do **not** store sensitive information, including:
     'customHeaders': customHeaders,
     'customBody': customBody,
     'enableMemory': enableMemory,
+    'memoryMode': memoryMode,
     'enableRecentChatsReference': enableRecentChatsReference,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
     'memoryRecordPrompt': memoryRecordPrompt,
@@ -276,6 +282,7 @@ Do **not** store sensitive information, including:
       return const <Map<String, String>>[];
     })(),
     enableMemory: json['enableMemory'] as bool? ?? false,
+    memoryMode: (json['memoryMode'] as String?) ?? 'injection',
     enableRecentChatsReference:
         json['enableRecentChatsReference'] as bool? ?? false,
     recentChatsSummaryMessageCount: (() {

@@ -2243,6 +2243,18 @@ class $AssistantRowsTable extends AssistantRows
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _memoryModeMeta = const VerificationMeta(
+    'memoryMode',
+  );
+  @override
+  late final GeneratedColumn<String> memoryMode = GeneratedColumn<String>(
+    'memory_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('auto'),
+  );
   static const VerificationMeta _enableRecentChatsReferenceMeta =
       const VerificationMeta('enableRecentChatsReference');
   @override
@@ -2342,6 +2354,7 @@ class $AssistantRowsTable extends AssistantRows
     localToolIdsJson,
     regexRulesJson,
     enableMemory,
+    memoryMode,
     enableRecentChatsReference,
     recentChatsSummaryMessageCount,
     memoryRecordPrompt,
@@ -2569,6 +2582,12 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('memory_mode')) {
+      context.handle(
+        _memoryModeMeta,
+        memoryMode.isAcceptableOrUnknown(data['memory_mode']!, _memoryModeMeta),
+      );
+    }
     if (data.containsKey('enable_recent_chats_reference')) {
       context.handle(
         _enableRecentChatsReferenceMeta,
@@ -2729,6 +2748,10 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.bool,
         data['${effectivePrefix}enable_memory'],
       )!,
+      memoryMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}memory_mode'],
+      )!,
       enableRecentChatsReference: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}enable_recent_chats_reference'],
@@ -2788,6 +2811,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String localToolIdsJson;
   final String regexRulesJson;
   final bool enableMemory;
+  final String memoryMode;
   final bool enableRecentChatsReference;
   final int recentChatsSummaryMessageCount;
   final String memoryRecordPrompt;
@@ -2820,6 +2844,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.localToolIdsJson,
     required this.regexRulesJson,
     required this.enableMemory,
+    required this.memoryMode,
     required this.enableRecentChatsReference,
     required this.recentChatsSummaryMessageCount,
     required this.memoryRecordPrompt,
@@ -2871,6 +2896,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['local_tool_ids_json'] = Variable<String>(localToolIdsJson);
     map['regex_rules_json'] = Variable<String>(regexRulesJson);
     map['enable_memory'] = Variable<bool>(enableMemory);
+    map['memory_mode'] = Variable<String>(memoryMode);
     map['enable_recent_chats_reference'] = Variable<bool>(
       enableRecentChatsReference,
     );
@@ -2925,6 +2951,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       localToolIdsJson: Value(localToolIdsJson),
       regexRulesJson: Value(regexRulesJson),
       enableMemory: Value(enableMemory),
+      memoryMode: Value(memoryMode),
       enableRecentChatsReference: Value(enableRecentChatsReference),
       recentChatsSummaryMessageCount: Value(recentChatsSummaryMessageCount),
       memoryRecordPrompt: Value(memoryRecordPrompt),
@@ -2971,6 +2998,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       localToolIdsJson: serializer.fromJson<String>(json['localToolIdsJson']),
       regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
       enableMemory: serializer.fromJson<bool>(json['enableMemory']),
+      memoryMode: serializer.fromJson<String>(json['memoryMode']),
       enableRecentChatsReference: serializer.fromJson<bool>(
         json['enableRecentChatsReference'],
       ),
@@ -3014,6 +3042,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'localToolIdsJson': serializer.toJson<String>(localToolIdsJson),
       'regexRulesJson': serializer.toJson<String>(regexRulesJson),
       'enableMemory': serializer.toJson<bool>(enableMemory),
+      'memoryMode': serializer.toJson<String>(memoryMode),
       'enableRecentChatsReference': serializer.toJson<bool>(
         enableRecentChatsReference,
       ),
@@ -3053,6 +3082,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? localToolIdsJson,
     String? regexRulesJson,
     bool? enableMemory,
+    String? memoryMode,
     bool? enableRecentChatsReference,
     int? recentChatsSummaryMessageCount,
     String? memoryRecordPrompt,
@@ -3089,6 +3119,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
     regexRulesJson: regexRulesJson ?? this.regexRulesJson,
     enableMemory: enableMemory ?? this.enableMemory,
+    memoryMode: memoryMode ?? this.memoryMode,
     enableRecentChatsReference:
         enableRecentChatsReference ?? this.enableRecentChatsReference,
     recentChatsSummaryMessageCount:
@@ -3165,6 +3196,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       enableMemory: data.enableMemory.present
           ? data.enableMemory.value
           : this.enableMemory,
+      memoryMode: data.memoryMode.present
+          ? data.memoryMode.value
+          : this.memoryMode,
       enableRecentChatsReference: data.enableRecentChatsReference.present
           ? data.enableRecentChatsReference.value
           : this.enableRecentChatsReference,
@@ -3209,6 +3243,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableMemory: $enableMemory, ')
+          ..write('memoryMode: $memoryMode, ')
           ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
           ..write(
             'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
@@ -3248,6 +3283,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     localToolIdsJson,
     regexRulesJson,
     enableMemory,
+    memoryMode,
     enableRecentChatsReference,
     recentChatsSummaryMessageCount,
     memoryRecordPrompt,
@@ -3284,6 +3320,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.localToolIdsJson == this.localToolIdsJson &&
           other.regexRulesJson == this.regexRulesJson &&
           other.enableMemory == this.enableMemory &&
+          other.memoryMode == this.memoryMode &&
           other.enableRecentChatsReference == this.enableRecentChatsReference &&
           other.recentChatsSummaryMessageCount ==
               this.recentChatsSummaryMessageCount &&
@@ -3319,6 +3356,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> localToolIdsJson;
   final Value<String> regexRulesJson;
   final Value<bool> enableMemory;
+  final Value<String> memoryMode;
   final Value<bool> enableRecentChatsReference;
   final Value<int> recentChatsSummaryMessageCount;
   final Value<String> memoryRecordPrompt;
@@ -3352,6 +3390,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.localToolIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableMemory = const Value.absent(),
+    this.memoryMode = const Value.absent(),
     this.enableRecentChatsReference = const Value.absent(),
     this.recentChatsSummaryMessageCount = const Value.absent(),
     this.memoryRecordPrompt = const Value.absent(),
@@ -3386,6 +3425,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.localToolIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableMemory = const Value.absent(),
+    this.memoryMode = const Value.absent(),
     this.enableRecentChatsReference = const Value.absent(),
     this.recentChatsSummaryMessageCount = const Value.absent(),
     this.memoryRecordPrompt = const Value.absent(),
@@ -3424,6 +3464,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? localToolIdsJson,
     Expression<String>? regexRulesJson,
     Expression<bool>? enableMemory,
+    Expression<String>? memoryMode,
     Expression<bool>? enableRecentChatsReference,
     Expression<int>? recentChatsSummaryMessageCount,
     Expression<String>? memoryRecordPrompt,
@@ -3462,6 +3503,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (localToolIdsJson != null) 'local_tool_ids_json': localToolIdsJson,
       if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
       if (enableMemory != null) 'enable_memory': enableMemory,
+      if (memoryMode != null) 'memory_mode': memoryMode,
       if (enableRecentChatsReference != null)
         'enable_recent_chats_reference': enableRecentChatsReference,
       if (recentChatsSummaryMessageCount != null)
@@ -3501,6 +3543,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? localToolIdsJson,
     Value<String>? regexRulesJson,
     Value<bool>? enableMemory,
+    Value<String>? memoryMode,
     Value<bool>? enableRecentChatsReference,
     Value<int>? recentChatsSummaryMessageCount,
     Value<String>? memoryRecordPrompt,
@@ -3535,6 +3578,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
       regexRulesJson: regexRulesJson ?? this.regexRulesJson,
       enableMemory: enableMemory ?? this.enableMemory,
+      memoryMode: memoryMode ?? this.memoryMode,
       enableRecentChatsReference:
           enableRecentChatsReference ?? this.enableRecentChatsReference,
       recentChatsSummaryMessageCount:
@@ -3627,6 +3671,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (enableMemory.present) {
       map['enable_memory'] = Variable<bool>(enableMemory.value);
     }
+    if (memoryMode.present) {
+      map['memory_mode'] = Variable<String>(memoryMode.value);
+    }
     if (enableRecentChatsReference.present) {
       map['enable_recent_chats_reference'] = Variable<bool>(
         enableRecentChatsReference.value,
@@ -3683,6 +3730,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableMemory: $enableMemory, ')
+          ..write('memoryMode: $memoryMode, ')
           ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
           ..write(
             'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
@@ -6483,6 +6531,7 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> localToolIdsJson,
       Value<String> regexRulesJson,
       Value<bool> enableMemory,
+      Value<String> memoryMode,
       Value<bool> enableRecentChatsReference,
       Value<int> recentChatsSummaryMessageCount,
       Value<String> memoryRecordPrompt,
@@ -6518,6 +6567,7 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> localToolIdsJson,
       Value<String> regexRulesJson,
       Value<bool> enableMemory,
+      Value<String> memoryMode,
       Value<bool> enableRecentChatsReference,
       Value<int> recentChatsSummaryMessageCount,
       Value<String> memoryRecordPrompt,
@@ -6658,6 +6708,11 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<bool> get enableMemory => $composableBuilder(
     column: $table.enableMemory,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get memoryMode => $composableBuilder(
+    column: $table.memoryMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6826,6 +6881,11 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get memoryMode => $composableBuilder(
+    column: $table.memoryMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get enableRecentChatsReference => $composableBuilder(
     column: $table.enableRecentChatsReference,
     builder: (column) => ColumnOrderings(column),
@@ -6981,6 +7041,11 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get memoryMode => $composableBuilder(
+    column: $table.memoryMode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get enableRecentChatsReference => $composableBuilder(
     column: $table.enableRecentChatsReference,
     builder: (column) => column,
@@ -7062,6 +7127,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableMemory = const Value.absent(),
+                Value<String> memoryMode = const Value.absent(),
                 Value<bool> enableRecentChatsReference = const Value.absent(),
                 Value<int> recentChatsSummaryMessageCount =
                     const Value.absent(),
@@ -7096,6 +7162,7 @@ class $$AssistantRowsTableTableManager
                 localToolIdsJson: localToolIdsJson,
                 regexRulesJson: regexRulesJson,
                 enableMemory: enableMemory,
+                memoryMode: memoryMode,
                 enableRecentChatsReference: enableRecentChatsReference,
                 recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
                 memoryRecordPrompt: memoryRecordPrompt,
@@ -7131,6 +7198,7 @@ class $$AssistantRowsTableTableManager
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableMemory = const Value.absent(),
+                Value<String> memoryMode = const Value.absent(),
                 Value<bool> enableRecentChatsReference = const Value.absent(),
                 Value<int> recentChatsSummaryMessageCount =
                     const Value.absent(),
@@ -7165,6 +7233,7 @@ class $$AssistantRowsTableTableManager
                 localToolIdsJson: localToolIdsJson,
                 regexRulesJson: regexRulesJson,
                 enableMemory: enableMemory,
+                memoryMode: memoryMode,
                 enableRecentChatsReference: enableRecentChatsReference,
                 recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
                 memoryRecordPrompt: memoryRecordPrompt,

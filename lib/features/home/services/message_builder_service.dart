@@ -8,6 +8,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/models/instruction_injection.dart';
 import '../../../core/models/world_book.dart';
+import '../../../core/models/assistant_memory.dart';
 import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
@@ -539,20 +540,14 @@ class MessageBuilderService {
         final mems = mp.getForAssistant(assistant!.id);
         final now = DateTime.now();
         final buf = StringBuffer();
-        buf.writeln('## Memories');
-        buf.writeln(
-          'These are memories that you can reference in the future conversations.',
-        );
-        buf.writeln('<memories>');
-        for (final m in mems) {
-          buf.writeln('<record>');
-          buf.writeln('<id>${m.id}</id>');
-          buf.writeln('<content>${m.content}</content>');
-          buf.writeln('</record>');
-        }
-        buf.writeln('</memories>');
-        // Fixed header for Memory Tool (always included)
-        buf.writeln('''
+        if (assistant.memoryMode != 'tool') {
+          buf.writeln('## Memories');
+          buf.writeln(
+            'These are memories that you can reference in the future conversations.',
+          );
+          buf.writeln(AssistantMemory.buildMemoryXml(mems));
+          // Fixed header for Memory Tool (always included)
+          buf.writeln('''
 ## Memory Tool
 You are a stateless language model without persistent memory. To retain information, use **memory tools**.
 You can use `create_memory`, `edit_memory`, and `delete_memory` tools to create, update, or delete memories.
@@ -561,6 +556,7 @@ You can use `create_memory`, `edit_memory`, and `delete_memory` tools to create,
 - If a memory is outdated or no longer useful, use delete_memory to remove it.
 These memories are automatically included in future conversation contexts within the <memories> tag.
 ''');
+        }
         // Customizable record prompt from assistant settings
         final recordPrompt =
             (assistant.memoryRecordPrompt.isNotEmpty

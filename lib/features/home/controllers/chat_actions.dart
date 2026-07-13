@@ -897,7 +897,10 @@ class ChatActions {
       await _executeGeneration(ctx);
       return ChatActionResult.success(streamingMessage);
     } catch (e) {
-      FlutterLogger.log('[ContinueAssistantMessageAfterToolAnswer] $e', tag: 'ChatActions');
+      FlutterLogger.log(
+        '[ContinueAssistantMessageAfterToolAnswer] $e',
+        tag: 'ChatActions',
+      );
       await _cleanupStreamingError(streamingMessage, conversation.id);
       return ChatActionResult.error(e.toString());
     }
