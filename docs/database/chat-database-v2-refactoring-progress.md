@@ -2,7 +2,7 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-12（**LIN-05 完成：搜索/统计/导出/迁移周边口径线性化**）
+> - 最后更新：2026-07-12（**Phase 6 / LIN-01～08 全部完成：线性消息系统恢复闭环**）
 > - 当前结论：Phase 0/1/3/5 的基础设施成果保留。**Phase 2（Message Graph）与 Phase 4 的 TimelineCoordinator/programmatic jump 按 PD-15 整体作废**，不再等待真机矩阵；当前唯一实施目标是 Phase 6 线性回归。OPS-08 发布矩阵 2/5 与 OPS-09 门禁不受影响，继续保持
 
 ## 1. 文档使用规则
@@ -39,10 +39,10 @@
 | Phase 0：止血与基线 | 9 / 9 | `已完成` | P0-01～P0-09 全部完成；macOS baseline 已冻结，D4 renderer/RSS 超标已显式进入后续工作流 |
 | Phase 1：Database Kernel v2 | 8 / 8 | `已完成` | DB2-01～08 全部闭环；五平台 capability runner 5/5 通过 |
 | Phase 2：Message Graph | — | `已取消并移除`（PD-15/LIN-04） | graph/branch 模型经真机使用被用户裁决与产品行为冲突且 bug 密度过高；schema 10 已 drop 四表，commands/projector/adapter 与 repository API 已删除。事务纪律、CAS、双写影子经验沉淀到线性写路径 |
-| Phase 3：Generation State Machine | 7 / 7 | `已完成`（需 LIN-01 改接） | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 保留；begin/regeneration 由 Phase 6 LIN-01 改接线性写路径 |
+| Phase 3：Generation State Machine | 7 / 7 | `已完成`（已由 LIN-01 改接） | GenerationRun、原子 begin/final、三链解耦、ordered parts、启动 interruption recovery 全部保留并直接引用线性 message rows |
 | Phase 4：Timeline 与 Renderer | — | `部分作废`（PD-15） | TimelineCoordinator/ancestry cursor 窗口/viewport 模式机/programmaticJump+spacer 作废，由 LIN-03 拆除；保留 TL-05～07 渲染成果（render model、增量 Markdown、有界大内容）与 TL-R14 单执行器/手势结算修复 |
 | Phase 5：Data Operations 与退役 | 7 / 9 | `进行中`（可执行实现完成，外部门禁未满足） | OPS-01～07 已完成且按 PD-15 保留；OPS-04/05/03 已由 LIN-05 改为"选中版本/全部版本"；OPS-08 发布证据 2/5；OPS-09 门禁不变 |
-| Phase 6：线性回归 v3（PD-15） | 7 / 8 | `进行中` | LIN-02/01/06/03/07/04/05 已完成；仅余 LIN-08 最终清理与验证 |
+| Phase 6：线性回归 v3（PD-15） | 8 / 8 | `已完成` | LIN-01～08 全部闭环：完全线性读写、多版本旧行为、滚动/跳转、schema 10 graph 退役、周边双口径与最终门禁均通过 |
 
 ## 3. 已完成的审计工作
 
@@ -463,7 +463,7 @@ dart run tool/run_restore_process_harness.dart \
 | LIN-05 | 周边口径改线性：FTS 搜索默认"各组选中版本"、开关扩全部版本；统计"选中版本/全部版本"双口径；NDJSON 默认选中版本、allRevisions 全部行；Hive→v2 迁移目标改纯线性表（ledger/rollout/退役门禁不变） | LIN-04 | `已完成`（2026-07-12，本里程碑提交） | 搜索 CTE 默认只允许选中版本命中（含 conversation EXISTS 路径），显式开关可命中旧版本；统计公开模型改名 `selectedVersions/allRevisions`；portable 默认 scope 改 `selectedVersionsCompleted`，仍只读兼容旧 `activeBranchCompleted`，allRevisions 写全部行；Hive 已在 LIN-04 直接批量写线性表且 rollout ledger 保留。聚焦 9/9、全量 1272/1272、analyze 通过 |
 | LIN-06 | 多版本行为矩阵（先红后绿，对照方案 §5.3 合同 1～5）：中部仅保存下方原样、默认重生成下方原样且 `<n/m>` 立即显示、开启开关物理删尾随、版本切换不动下方、删单版本/删全组不级联 | LIN-01/02 | `已完成`（2026-07-12，本里程碑提交） | 新增五项线性矩阵，逐项断言下方消息、组首位置、DB 聚合 versionCount、选择修复和稀疏 order；user 重发上下文继续由 `f7e11373` 同构的既有回归覆盖。矩阵/生成/上下文 21/21 与 analyze 通过；LIN-01 全量 1288+28 retired skips 仍为当前全量基线 |
 | LIN-07 | 滚动行为矩阵（对照 §5.3 合同 6～8）：发送滚到底无回弹、流式贴底跟随单调无跳动、上滚立即脱离、到底按钮恢复、搜索/迷你地图跳转准确、重开会话定位正确 | LIN-03 | `已完成`（2026-07-12，本里程碑提交；待用户真机确认） | 自动化覆盖：生成期发送/显式到底使用单次 jump、连续内容增长 offset 单调且始终等于 max；非生成期不跟随；真实上滚立即断开，既有到底按钮恢复并继续跟随；cross-window 先 around cursor 加载再由 observer 滚到 collapsed index（修复加载后提前 return）；会话切换沿用无动画滚底。滚动/分页聚焦 49/49、全量 1281 通过 + 28 graph skip，analyze 通过 |
-| LIN-08 | 清理与全量验证：删 graph/coordinator 测试与死代码；备份 round trip/legacy 导入/Hive 迁移在新 schema 回归；analyze 全绿 + 全量测试通过 | LIN-01～07 | `未开始` | 无残留符号；全量验证通过 |
+| LIN-08 | 清理与全量验证：删 graph/coordinator 测试与死代码；备份 round trip/legacy 导入/Hive 迁移在新 schema 回归；analyze 全绿 + 全量测试通过 | LIN-01～07 | `已完成`（2026-07-12，本里程碑提交） | 删除最后一个无引用 graph fixture；生产关键符号扫描为零。schema 全版本迁移、SQLite snapshot/merge、legacy `data.json` ZIP、portable selected/all、Hive 多批迁移聚焦 66/66；最终全量 1272/1272，analyze 与 diff check 通过。用户工作树四个平台生成文件未纳入任何提交 |
 
 ## 12. 数据迁移覆盖台账
 
@@ -590,20 +590,22 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-**PD-15 已裁决，无待输入的产品决策。** Phase 6 仅余 LIN-08 最终清理与验证。外部门禁照旧：① OPS-08 需要 Android/Windows/Linux release capability runner 原始行；② OPS-09 需要 ≥30 天保留期、≥3 冷启动与用户显式授权；③ Windows/Linux 的 `DB2_CAPABILITY_RESULT` 原始行仍留在发布门禁。LIN-07 自动化已完成，最终仍需用户真机确认发送/跟随手感。
+**PD-15 与 Phase 6 已全部完成，无待输入的产品决策或代码工作项。** 仅剩发布/运营外部门禁：① OPS-08 尚需 Android/Windows/Linux release capability runner 原始行；② OPS-09 尚需 ≥30 天保留期、≥3 冷启动与用户显式授权；③ LIN-07 自动化已完成，发布前仍建议用户真机确认发送、重生成、多版本和流式跟随手感。
 
 ## 19. 下一步
 
 按 PD-15 执行 Phase 6 线性回归（见 §11.2 与方案 §11 Phase 6），建议顺序：
 
-1. 已完成：LIN-02 → LIN-01 → LIN-06 → LIN-03 → LIN-07 → LIN-04 → LIN-05。
-2. 下一项 LIN-08：残留术语/死代码清理，备份 round trip、legacy JSON、Hive 迁移与全量门禁最终验证。
+1. Phase 6 LIN-01～08 已全部完成；按 PD-15 恢复的线性产品合同已有自动化证据。
+2. 用户真机复测：仅保存、两种重生成、多版本切换/删除、发送滚底、上滚脱离与到底恢复、搜索/迷你地图跨窗口跳转。
+3. 发布前继续完成 OPS-08/09 外部门禁；它们不阻塞当前代码收口状态。
 4. 完成后用户真机确认 §5.3 行为合同；OPS-08 三平台 runner 与 OPS-09 门禁照旧推进，不受本次影响。
 
 ## 20. 变更日志
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
+| 2026-07-12 | 完成 LIN-08 与 Phase 6：删除最后一个已无引用的 legacy graph fixture，确认 `MessageGraph|TimelineCoordinator|graftRevision|createRevisionBranch|programmaticJump` 在生产代码为零。独立复跑 schema 1～10 step migration、SQLite snapshot/merge、legacy `data.json` ZIP 导入、portable selected/all version、Hive 多批迁移共 66/66；最终 `flutter analyze` 无问题、全量 1272/1272。Phase 6 LIN-01～08 状态全部关闭；未触碰用户已有 iOS/Linux/macOS/Windows 生成文件改动 | LIN-08、Phase 6、PD-15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 LIN-05：FTS/substring 搜索的 message join 与 conversation EXISTS 两条路径都默认约束到每组选中版本，`includeAllRevisions` 才允许旧版本命中；新增隐藏旧版本默认搜不到、显式全版本可命中的回归。统计聚合公开口径由 `active` 改名 `selectedVersions`，与 `allRevisions` 双值并列，heatmap/trend/model/topic 均继续使用选中版本。portable NDJSON 默认 scope 改为 `selectedVersionsCompleted` 并仅写选中完成版本，`allRevisions` 写全部行；导入继续接受旧 `activeBranchCompleted` header。Hive 迁移直接写纯线性表且 rollout/retirement ledger 不变。聚焦 9/9、全量 1272/1272、`flutter analyze` 无问题 | LIN-05、OPS-03/04/05、PD-15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 LIN-04：发布 schema 10，9→10 在关闭 FK 的事务中按依赖顺序 drop `conversation_state_rows`、`conversation_branch_rows`、`message_revision_rows`、`message_slot_rows`；重生成 Drift schema/g.dart/step schema/测试 schema。安装门对 4～9 继续验证历史结构，对 10 拒绝退役表残留；rollback 最大可读版本自动推进至 10。删除 message graph commands/projector/legacy adapter、repository 投影/命令/backfill/graph GC/影子写、ChatService graph cache/API 及全部 graph 测试。provider artifact 和启动 interruption recovery 直接以 `message_rows` 为真相，portable active export 改用线性窗口，Hive 迁移不再建图但保留 rollout ledger。统计临时改用选中版本 CTE，LIN-05 继续完成周边双口径。关键符号 rg 为零，聚焦 40/40、全量 1271/1271、`flutter analyze` 无问题 | LIN-04、PD-15 | 本里程碑提交 | Codex |
 | 2026-07-12 | 完成 LIN-07 滚动行为矩阵：生成期显式到底用 jump，连续六轮内容增长 offset 只增不减且每帧贴住 max；非生成期即使开启自动滚动也不被内容增长带走；真实用户上滚立即关闭 auto-stick，既有到底按钮恢复后下一轮增长继续贴底。补齐 collapsed target 的 observer 索引跳转回归，并修复跨窗口目标完成 `loadUntilMessageVisible` 后提前 return、实际未执行 observer 滚动的问题；重开会话继续单次无动画滚底，无推顶/spacer。滚动/分页聚焦 49/49、全量 1281 通过（另 28 graph skip），`flutter analyze` 无问题 | LIN-07、PD-15、TL-R14 | 本里程碑提交 | Codex |
