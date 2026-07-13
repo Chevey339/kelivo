@@ -242,7 +242,7 @@ class _StatsPageState extends State<StatsPage> {
           range: _range,
           aggregate: const ChatStatsAggregate(
             conversations: 0,
-            active: ChatStatsTotals(
+            selectedVersions: ChatStatsTotals(
               messages: 0,
               inputTokens: 0,
               outputTokens: 0,

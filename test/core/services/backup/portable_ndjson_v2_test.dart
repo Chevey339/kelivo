@@ -27,7 +27,8 @@ void main() {
         title: 'Portable',
         createdAt: DateTime.utc(2026, 7, 12),
         updatedAt: DateTime.utc(2026, 7, 12),
-        messageIds: const ['user-1', 'assistant-1'],
+        messageIds: const ['user-1', 'assistant-1', 'assistant-2'],
+        versionSelections: const {'assistant-slot': 2},
       );
       final messages = [
         ChatMessage(
@@ -48,6 +49,15 @@ void main() {
           groupId: 'assistant-slot',
           version: 1,
         ),
+        ChatMessage(
+          id: 'assistant-2',
+          role: 'assistant',
+          content: 'current world',
+          timestamp: DateTime.utc(2026, 7, 12, 0, 0, 2),
+          conversationId: conversation.id,
+          groupId: 'assistant-slot',
+          version: 2,
+        ),
       ];
       await source.putMigrationBatch(
         conversations: [conversation],
@@ -67,7 +77,7 @@ void main() {
     });
 
     test(
-      'active portable export round-trips through transactional merge',
+      'selected-version export round-trips through transactional merge',
       () async {
         final file = File('${root.path}/portable.ndjson');
         final exported = await PortableNdjsonV2.exportToFile(
@@ -79,6 +89,10 @@ void main() {
         expect(exported.messages, 2);
         final lines = await file.readAsLines();
         expect(jsonDecode(lines.first)['format'], 'kelivo-portable-chat');
+        expect(
+          jsonDecode(lines.first)['scope'],
+          PortableChatScope.selectedVersionsCompleted.name,
+        );
         expect(jsonDecode(lines.last)['recordsSha256'], exported.sha256);
 
         final report = await PortableNdjsonV2.importFromFile(
@@ -93,7 +107,7 @@ void main() {
             start: 0,
             limit: 10,
           )).map((message) => message.content),
-          ['hello', 'world'],
+          ['hello', 'current world'],
         );
       },
     );

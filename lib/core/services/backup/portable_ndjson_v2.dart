@@ -8,7 +8,7 @@ import '../../database/chat_database_repository.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 
-enum PortableChatScope { activeBranchCompleted, allRevisions }
+enum PortableChatScope { selectedVersionsCompleted, allRevisions }
 
 final class PortableChatExportResult {
   const PortableChatExportResult({
@@ -34,7 +34,7 @@ final class PortableNdjsonV2 {
   static Future<PortableChatExportResult> exportToFile({
     required ChatDatabaseRepository repository,
     required File destination,
-    PortableChatScope scope = PortableChatScope.activeBranchCompleted,
+    PortableChatScope scope = PortableChatScope.selectedVersionsCompleted,
   }) async {
     await destination.parent.create(recursive: true);
     final sink = destination.openWrite(mode: FileMode.writeOnly);
@@ -59,7 +59,7 @@ final class PortableNdjsonV2 {
         );
         conversationCount++;
 
-        if (scope == PortableChatScope.activeBranchCompleted) {
+        if (scope == PortableChatScope.selectedVersionsCompleted) {
           String? afterRevisionId;
           while (true) {
             final page = await repository.loadLinearMessageWindow(
@@ -202,9 +202,10 @@ final class PortableNdjsonV2 {
           if (headerSeen ||
               record['format'] != _format ||
               record['version'] != _version ||
-              PortableChatScope.values.every(
-                (scope) => scope.name != record['scope'],
-              )) {
+              (PortableChatScope.values.every(
+                    (scope) => scope.name != record['scope'],
+                  ) &&
+                  record['scope'] != 'activeBranchCompleted')) {
             throw const FormatException('portable_header');
           }
           headerSeen = true;

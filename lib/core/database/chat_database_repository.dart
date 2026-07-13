@@ -1708,6 +1708,7 @@ class ChatDatabaseRepository {
           WHERE mx.conversation_id = c.id
             AND mx.role IN ('user', 'assistant')
             AND LOWER(mx.content) LIKE ? ESCAPE '\\'
+            ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM linear_ranked visible WHERE visible.id = mx.id AND visible.version_rank = 1)'}
         )
         ''');
       existsArgs.add(pattern);
@@ -1731,6 +1732,7 @@ class ChatDatabaseRepository {
         EXISTS (
           SELECT 1 FROM message_search_fts fx
           WHERE fx.conversation_id = c.id AND fx.content MATCH ?
+            ${includeAllRevisions ? '' : 'AND EXISTS (SELECT 1 FROM linear_ranked visible WHERE visible.id = fx.id AND visible.version_rank = 1)'}
         )
         ''');
       existsArgs
@@ -1980,7 +1982,7 @@ class ChatDatabaseRepository {
 
     return ChatStatsAggregate(
       conversations: summary.read<int>('conversations'),
-      active: ChatStatsTotals(
+      selectedVersions: ChatStatsTotals(
         messages: summary.read<int>('active_messages'),
         inputTokens: summary.read<int>('active_input'),
         outputTokens: summary.read<int>('active_output'),
@@ -4392,7 +4394,7 @@ final class ChatStatsRank {
 final class ChatStatsAggregate {
   const ChatStatsAggregate({
     required this.conversations,
-    required this.active,
+    required this.selectedVersions,
     required this.allRevisions,
     required this.heatmap,
     required this.trend,
@@ -4401,7 +4403,7 @@ final class ChatStatsAggregate {
     required this.topics,
   });
   final int conversations;
-  final ChatStatsTotals active;
+  final ChatStatsTotals selectedVersions;
   final ChatStatsTotals allRevisions;
   final List<ChatStatsDayCount> heatmap;
   final List<ChatStatsTrendBucket> trend;

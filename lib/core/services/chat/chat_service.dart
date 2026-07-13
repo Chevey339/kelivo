@@ -1326,7 +1326,7 @@ class ChatService extends ChangeNotifier {
 
   Future<PortableChatExportResult> exportPortableChats(
     File destination, {
-    PortableChatScope scope = PortableChatScope.activeBranchCompleted,
+    PortableChatScope scope = PortableChatScope.selectedVersionsCompleted,
   }) async {
     if (!_initialized) await init();
     return PortableNdjsonV2.exportToFile(

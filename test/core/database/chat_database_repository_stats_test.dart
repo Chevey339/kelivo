@@ -7,7 +7,7 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 
 void main() {
-  test('SQL stats separate active branch from all revision usage', () async {
+  test('SQL stats separate selected versions from all version usage', () async {
     final root = await Directory.systemTemp.createTemp('chat_stats_test_');
     final repository = ChatDatabaseRepository.open(
       file: File('${root.path}/stats.sqlite'),
@@ -58,9 +58,9 @@ void main() {
     );
 
     expect(aggregate.conversations, 1);
-    expect(aggregate.active.messages, 1);
-    expect(aggregate.active.inputTokens, 20);
-    expect(aggregate.active.outputTokens, 40);
+    expect(aggregate.selectedVersions.messages, 1);
+    expect(aggregate.selectedVersions.inputTokens, 20);
+    expect(aggregate.selectedVersions.outputTokens, 40);
     expect(aggregate.allRevisions.messages, 2);
     expect(aggregate.allRevisions.inputTokens, 30);
     expect(aggregate.allRevisions.outputTokens, 60);

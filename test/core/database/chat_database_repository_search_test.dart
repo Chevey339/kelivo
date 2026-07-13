@@ -8,6 +8,68 @@ import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 
 void main() {
+  test(
+    'search defaults to selected versions and can include every version',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'chat_search_versions_',
+      );
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/search.sqlite'),
+      );
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+      final now = DateTime.utc(2026, 7, 12);
+      final conversation = Conversation(
+        id: 'conversation-1',
+        title: 'Versions',
+        createdAt: now,
+        updatedAt: now,
+        versionSelections: const {'slot-1': 2},
+      );
+      ChatMessage version(String id, int number, String content) => ChatMessage(
+        id: id,
+        role: 'assistant',
+        content: content,
+        timestamp: now,
+        conversationId: conversation.id,
+        groupId: 'slot-1',
+        version: number,
+      );
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          (message: version('v1', 1, 'hidden-only-token'), messageOrder: 0),
+          (message: version('v2', 2, 'visible-only-token'), messageOrder: 1),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      expect(
+        await repository.searchConversationMatches(
+          tokens: const ['hidden-only-token'],
+        ),
+        isEmpty,
+      );
+      expect(
+        (await repository.searchConversationMatches(
+          tokens: const ['visible-only-token'],
+        )).single.messageId,
+        'v2',
+      );
+      expect(
+        (await repository.searchConversationMatches(
+          tokens: const ['hidden-only-token'],
+          includeAllRevisions: true,
+        )).single.messageId,
+        'v1',
+      );
+    },
+  );
+
   test('search uses FTS for words and substring fallback for CJK', () async {
     final root = await Directory.systemTemp.createTemp('chat_search_test_');
     final repository = ChatDatabaseRepository.open(
