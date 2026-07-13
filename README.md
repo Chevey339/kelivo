@@ -36,10 +36,11 @@ Currently known to be used by the author and at least 2 other stable users with 
 
 6. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-7. **Additional fixes across the repo**
+7. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
+
+8. **Additional fixes across the repo**
    - OCR result caching now persists across restarts (SQLite-backed)
    - `fetch_markdown` tool output now strips `<script>` and `<style>` tags to reduce excessive token consumption
-   - Qwen/Doubao model capability detection
    - Accurate Gemini cached-token reporting
    - Optimized title generation logic (auto-retry on first failure)
    - Various other stability improvements
