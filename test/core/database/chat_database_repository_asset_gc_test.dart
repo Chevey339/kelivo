@@ -39,7 +39,6 @@ void main() {
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
       );
-      await repository.backfillMissingMessageGraphs();
       await repository.registerAsset(
         id: 'asset-1',
         contentHash: List.filled(64, 'a').join(),

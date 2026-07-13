@@ -48,7 +48,6 @@ void main() {
       toolEventsByMessageId: const {},
       geminiSignaturesByMessageId: const {},
     );
-    await repository.backfillMissingMessageGraphs();
 
     final aggregate = await repository.queryStatsAggregate(
       rangeStart: DateTime(2026, 7, 12),

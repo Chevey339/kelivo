@@ -219,31 +219,6 @@ void main() {
       );
     });
 
-    test('rejects a v4 database missing a graph kernel table', () async {
-      await sourceRepository.close();
-      sourceClosed = true;
-      final raw = sqlite.sqlite3.open(sourceFile.path);
-      try {
-        raw.execute('PRAGMA foreign_keys = OFF;');
-        raw.execute('DROP TABLE conversation_state_rows;');
-      } finally {
-        raw.close();
-      }
-
-      expect(
-        () => ChatDatabaseRepository.inspectInstalledDatabase(
-          sourceFile,
-          validateContents: true,
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'required_tables',
-          ),
-        ),
-      );
-    });
 
     test('rejects a v7 database missing generation run state', () async {
       await sourceRepository.close();
@@ -272,7 +247,6 @@ void main() {
     });
   });
 }
-
 Future<void> _createSnapshotFixture({
   required File databaseFile,
   required String conversationId,

@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
-import 'package:Kelivo/core/database/message_graph_projector.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 
 class _FakeLazyChatService extends ChatService {

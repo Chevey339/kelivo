@@ -17,7 +17,6 @@ enum ChatDatabaseOperation {
   queryMessagesForGroups,
   queryMessageIds,
   querySearch,
-  queryMessageGraphPath,
   commandAppendMessage,
   commandCreateConversation,
   commandAppendVersion,
@@ -26,7 +25,6 @@ enum ChatDatabaseOperation {
   commandStreamingCheckpoint,
   commandFinalCheckpoint,
   commandSetContextBoundary,
-  commandMessageGraphMutation,
   walCheckpoint,
   integrityCheck,
 }

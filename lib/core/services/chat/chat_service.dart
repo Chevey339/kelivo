@@ -10,7 +10,6 @@ import '../../database/app_database.dart';
 import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
 import '../../database/generation_run.dart';
-import '../../database/message_graph_projector.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -89,9 +88,6 @@ class ChatService extends ChangeNotifier {
   final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
   final Map<String, int> _messageCounts = {};
   final Map<String, List<String>> _messageOrderIds = {};
-  final Map<String, MessageGraphTimelineProjection> _messageGraphCache = {};
-  final Map<String, Map<String, int>> _graphVersionSelections = {};
-  final Map<String, int> _graphContextStartIndices = {};
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
@@ -205,9 +201,6 @@ class ChatService extends ChangeNotifier {
     final messageCounts = await _repo.getMessageCountsByConversation();
     _toolEventsCache.clear();
     _geminiThoughtSigsCache.clear();
-    _messageGraphCache.clear();
-    _graphVersionSelections.clear();
-    _graphContextStartIndices.clear();
     _messageOrderIds.clear();
     _messageCounts
       ..clear()
@@ -230,49 +223,6 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds[conversationId] = ids;
     _messageCounts[conversationId] = ids.length;
     return ids;
-  }
-
-  Future<MessageGraphTimelineProjection?> loadMessageGraphTimeline(
-    String conversationId, {
-    bool force = false,
-  }) async {
-    if (!_initialized && _initFuture == null) return null;
-    if (!force) {
-      final cached = _messageGraphCache[conversationId];
-      if (cached != null) return cached;
-    }
-    final timeline = await _repo.projectMessageGraphTimeline(
-      conversationId: conversationId,
-    );
-    if (timeline == null) return null;
-    _messageGraphCache[conversationId] = timeline;
-
-    final selectedIds = [
-      for (final entry in timeline.selectedRevisionBySlot.entries)
-        if ((timeline.revisionsBySlot[entry.key]?.length ?? 0) > 1) entry.value,
-    ];
-    final selectedMessages = await _repo.getMessagesByIds(selectedIds);
-    _graphVersionSelections[conversationId] = {
-      for (final message in selectedMessages)
-        message.groupId ?? message.id: message.version,
-    };
-
-    final boundaryId = timeline.contextStartRevisionId;
-    if (boundaryId == null) {
-      _graphContextStartIndices.remove(conversationId);
-    } else {
-      final boundary = await _repo.getMessage(boundaryId);
-      if (boundary != null) {
-        final groupId = boundary.groupId ?? boundary.id;
-        final indices = await _repo.getFirstMessageIndicesForGroups(
-          conversationId,
-          [groupId],
-        );
-        final index = indices[groupId];
-        if (index != null) _graphContextStartIndices[conversationId] = index;
-      }
-    }
-    return timeline;
   }
 
   Future<List<ChatMessage>> loadActiveTimelineMessages(
@@ -363,16 +313,6 @@ class ChatService extends ChangeNotifier {
     }
     if (loadedSlots.length != page.slots.length) {
       throw StateError('timeline_selected_revision_shadow_missing');
-    }
-    final selections = _graphVersionSelections.putIfAbsent(
-      conversationId,
-      () => <String, int>{},
-    );
-    for (final slot in loadedSlots) {
-      if (slot.identity.versionCount > 1) {
-        selections[slot.message.groupId ?? slot.message.id] =
-            slot.message.version;
-      }
     }
     _cacheLoadedMessages(conversationId, messages);
     await _cacheMessageArtifacts(messages);
@@ -525,10 +465,7 @@ class ChatService extends ChangeNotifier {
   }
 
   int getContextStartIndex(String conversationId) =>
-      _graphContextStartIndices[conversationId] ?? -1;
-
-  String? getContextStartRevisionId(String conversationId) =>
-      _messageGraphCache[conversationId]?.contextStartRevisionId;
+      _conversationsCache[conversationId]?.truncateIndex ?? -1;
 
   Future<void> _cacheMessageArtifacts(Iterable<ChatMessage> messages) async {
     final ids = messages.map((message) => message.id).toSet();
@@ -1422,9 +1359,6 @@ class ChatService extends ChangeNotifier {
     _geminiThoughtSigsCache.clear();
     _messageCounts.clear();
     _messageOrderIds.clear();
-    _messageGraphCache.clear();
-    _graphVersionSelections.clear();
-    _graphContextStartIndices.clear();
     _currentConversationId = null;
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
@@ -2338,18 +2272,6 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> selectMessageRevision(
-    String conversationId,
-    String revisionId,
-  ) async {
-    await _repo.selectMessageGraphRevision(
-      conversationId: conversationId,
-      revisionId: revisionId,
-    );
-    await loadMessageGraphTimeline(conversationId, force: true);
-    notifyListeners();
-  }
-
   Future<void> clearSelectedVersion(
     String conversationId,
     String groupId,
@@ -2486,9 +2408,6 @@ class ChatService extends ChangeNotifier {
     _messageCounts[conversationId] = await _repo.getMessageCount(
       conversationId,
     );
-    _messageGraphCache.remove(conversationId);
-    _graphVersionSelections.remove(conversationId);
-    _graphContextStartIndices.remove(conversationId);
     await _cleanupOrphanUploads();
     notifyListeners();
     return Set<String>.unmodifiable(deletedIds);
@@ -2516,9 +2435,6 @@ class ChatService extends ChangeNotifier {
     _geminiThoughtSigsCache.clear();
     _messageCounts.clear();
     _messageOrderIds.clear();
-    _messageGraphCache.clear();
-    _graphVersionSelections.clear();
-    _graphContextStartIndices.clear();
     _currentConversationId = null;
     if (deleteUploads) {
       final uploadDir = await AppDirectories.getUploadDirectory();
@@ -2584,4 +2500,28 @@ class UploadStats {
   final int fileCount;
   final int totalBytes;
   const UploadStats({required this.fileCount, required this.totalBytes});
+}
+
+final class ActiveTimelineSlot {
+  const ActiveTimelineSlot({
+    required this.slotId,
+    required this.revisionId,
+    required this.parentRevisionId,
+    required this.role,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.finalizedAt,
+    required this.versionCount,
+    required this.logicalIndex,
+  });
+
+  final String slotId;
+  final String revisionId;
+  final String? parentRevisionId;
+  final String role;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? finalizedAt;
+  final int versionCount;
+  final int logicalIndex;
 }

@@ -11,9 +11,6 @@ import 'app_database.dart';
 import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
-import 'message_graph_projector.dart';
-import 'message_graph_commands.dart';
-import 'legacy_message_graph_adapter.dart';
 
 typedef ChatDatabaseSnapshotInfo = ({
   int schemaVersion,
@@ -547,19 +544,20 @@ class ChatDatabaseRepository {
       'gemini_thought_signature_rows',
       'chat_storage_meta_rows',
     };
-    final includesMessageGraph =
-        database.userVersion >= AppDatabase.messageGraphSchemaVersion;
+    final includesLegacyBranchTables =
+        database.userVersion >= AppDatabase.legacyBranchSchemaVersion &&
+        database.userVersion < AppDatabase.linearOnlySchemaVersion;
     final includesMessageParts =
         database.userVersion >= AppDatabase.messagePartsSchemaVersion;
     final includesMigrationLedger =
-        database.userVersion >= AppDatabase.legacyGraphAdapterSchemaVersion;
+        database.userVersion >= AppDatabase.migrationLedgerSchemaVersion;
     final includesGenerationRuns =
         database.userVersion >= AppDatabase.generationRunSchemaVersion;
     final includesProviderArtifacts =
         database.userVersion >= AppDatabase.orderedPartsSchemaVersion;
     final usesLinearRevisionReferences =
         database.userVersion >= AppDatabase.linearMessagePartsSchemaVersion;
-    if (includesMessageGraph) {
+    if (includesLegacyBranchTables) {
       requiredTables.addAll(const {
         'message_slot_rows',
         'message_revision_rows',
@@ -585,12 +583,21 @@ class ChatDatabaseRepository {
         .map((row) => row['name'])
         .whereType<String>()
         .toSet();
+    if (database.userVersion >= AppDatabase.linearOnlySchemaVersion &&
+        tables.intersection(const {
+          'message_slot_rows',
+          'message_revision_rows',
+          'conversation_branch_rows',
+          'conversation_state_rows',
+        }).isNotEmpty) {
+      throw StateError('retired_tables');
+    }
     if (!tables.containsAll(requiredTables)) {
       throw StateError('required_tables');
     }
     _validateRawSchema(
       database,
-      includesMessageGraph: includesMessageGraph,
+      includesLegacyBranchTables: includesLegacyBranchTables,
       includesMessageParts: includesMessageParts,
       includesMigrationLedger: includesMigrationLedger,
       includesGenerationRuns: includesGenerationRuns,
@@ -601,7 +608,7 @@ class ChatDatabaseRepository {
 
   static void _validateRawSchema(
     sqlite.Database database, {
-    required bool includesMessageGraph,
+    required bool includesLegacyBranchTables,
     required bool includesMessageParts,
     required bool includesMigrationLedger,
     required bool includesGenerationRuns,
@@ -654,7 +661,7 @@ class ChatDatabaseRepository {
       'gemini_thought_signature_rows': ['message_id', 'signature'],
       'chat_storage_meta_rows': ['key', 'value'],
     };
-    if (includesMessageGraph) {
+    if (includesLegacyBranchTables) {
       expectedColumns.addAll(const {
         'message_slot_rows': ['id', 'conversation_id', 'role', 'created_at'],
         'message_revision_rows': [
@@ -762,7 +769,7 @@ class ChatDatabaseRepository {
       'tool_event_rows': {'message_id->message_rows.id:CASCADE'},
       'gemini_thought_signature_rows': {'message_id->message_rows.id:CASCADE'},
     };
-    if (includesMessageGraph) {
+    if (includesLegacyBranchTables) {
       expectedForeignKeys.addAll(const {
         'message_slot_rows': {'conversation_id->conversation_rows.id:CASCADE'},
         'message_revision_rows': {
@@ -880,490 +887,7 @@ class ChatDatabaseRepository {
     await _db.customSelect('SELECT 1').get();
   }
 
-  Future<ActiveMessageGraphProjection?> projectActiveMessageGraph({
-    required String conversationId,
-    String? targetRevisionId,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.queryMessageGraphPath,
-      () => MessageGraphProjector(_db).projectActivePath(
-        conversationId: conversationId,
-        targetRevisionId: targetRevisionId,
-      ),
-      resultCount: (projection) => projection?.revisions.length ?? 0,
-    );
-  }
-
-  Future<MessageGraphTimelineProjection?> projectMessageGraphTimeline({
-    required String conversationId,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.queryMessageGraphPath,
-      () => MessageGraphProjector(
-        _db,
-      ).projectTimeline(conversationId: conversationId),
-      resultCount: (projection) => projection?.activeRevisions.length ?? 0,
-    );
-  }
-
-  Future<ActiveTimelinePage?> loadActiveTimelinePage({
-    required String conversationId,
-    String? beforeRevisionId,
-    String? afterRevisionId,
-    String? aroundRevisionId,
-    bool fromStart = false,
-    int limit = 40,
-  }) => _observer.measure(
-    ChatDatabaseOperation.queryMessageRange,
-    () => MessageGraphProjector(_db).projectActiveTimelinePage(
-      conversationId: conversationId,
-      beforeRevisionId: beforeRevisionId,
-      afterRevisionId: afterRevisionId,
-      aroundRevisionId: aroundRevisionId,
-      fromStart: fromStart,
-      limit: limit,
-    ),
-    resultCount: (page) => page?.slots.length ?? 0,
-  );
-
-  Future<MessageGraphPath> projectMessageGraphBranch({
-    required String conversationId,
-    required String branchId,
-    String? targetRevisionId,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.queryMessageGraphPath,
-      () => MessageGraphProjector(_db).projectBranchPath(
-        conversationId: conversationId,
-        branchId: branchId,
-        targetRevisionId: targetRevisionId,
-      ),
-      resultCount: (path) => path.revisions.length,
-    );
-  }
-
-  Future<MessageGraphValidationResult> validateMessageGraph(
-    String conversationId,
-  ) {
-    return _observer.measure(
-      ChatDatabaseOperation.queryMessageGraphPath,
-      () =>
-          MessageGraphProjector(_db).validateConversationGraph(conversationId),
-      resultCount: (result) => result.pathRevisionCount,
-    );
-  }
-
-  Future<ActiveMessageGraphProjection?> setMessageGraphContextBoundary({
-    required String conversationId,
-    required String? revisionId,
-    int? expectedStateRevision,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.commandSetContextBoundary,
-      () => _setMessageGraphContextBoundary(
-        conversationId: conversationId,
-        revisionId: revisionId,
-        expectedStateRevision: expectedStateRevision,
-      ),
-      resultCount: (projection) => projection?.contextRevisions.length ?? 0,
-    );
-  }
-
-  Future<ActiveMessageGraphProjection?> _setMessageGraphContextBoundary({
-    required String conversationId,
-    required String? revisionId,
-    int? expectedStateRevision,
-  }) {
-    return _db.transaction(() async {
-      final projector = MessageGraphProjector(_db);
-      final current = await projector.projectActivePath(
-        conversationId: conversationId,
-      );
-      if (current == null) return null;
-      if (expectedStateRevision != null &&
-          current.stateRevision != expectedStateRevision) {
-        throw StateError('message_graph_state_conflict');
-      }
-      if (revisionId != null &&
-          !current.revisions.any((revision) => revision.id == revisionId)) {
-        throw ArgumentError.value(
-          revisionId,
-          'revisionId',
-          'must identify a revision on the active path',
-        );
-      }
-      if (current.contextStartRevisionId == revisionId) return current;
-
-      final updated =
-          await (_db.update(_db.conversationStateRows)..where(
-                (row) =>
-                    row.conversationId.equals(conversationId) &
-                    row.stateRevision.equals(current.stateRevision),
-              ))
-              .write(
-                ConversationStateRowsCompanion(
-                  contextStartRevisionId: Value(revisionId),
-                  stateRevision: Value(current.stateRevision + 1),
-                ),
-              );
-      if (updated != 1) throw StateError('message_graph_state_conflict');
-      return projector.projectActivePath(conversationId: conversationId);
-    });
-  }
-
-  Future<MessageGraphMutationResult> editMessageGraphUser({
-    required String conversationId,
-    required String targetRevisionId,
-    required String text,
-    int? expectedStateRevision,
-  }) => _observer.measure(
-    ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).graftRevision(
-      conversationId: conversationId,
-      targetRevisionId: targetRevisionId,
-      text: text,
-      mutation: MessageGraphRevisionMutation.editUser,
-      expectedStateRevision: expectedStateRevision,
-    ),
-  );
-
-  Future<MessageGraphMutationResult> regenerateMessageGraphAssistant({
-    required String conversationId,
-    required String targetRevisionId,
-    int? expectedStateRevision,
-  }) => _observer.measure(
-    ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).createRevisionBranch(
-      conversationId: conversationId,
-      targetRevisionId: targetRevisionId,
-      text: '',
-      mutation: MessageGraphRevisionMutation.regenerateAssistant,
-      expectedStateRevision: expectedStateRevision,
-    ),
-  );
-
-  Future<ActiveMessageGraphProjection> selectMessageGraphRevision({
-    required String conversationId,
-    required String revisionId,
-    int? expectedStateRevision,
-  }) => _observer.measure(
-    ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).selectRevision(
-      conversationId: conversationId,
-      revisionId: revisionId,
-      expectedStateRevision: expectedStateRevision,
-    ),
-  );
-
-  Future<MessageGraphDeleteResult> deleteMessageGraphRevision({
-    required String conversationId,
-    required String revisionId,
-    required bool confirmCascade,
-    int? expectedStateRevision,
-  }) => _observer.measure(
-    ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).deleteRevision(
-      conversationId: conversationId,
-      revisionId: revisionId,
-      confirmCascade: confirmCascade,
-      expectedStateRevision: expectedStateRevision,
-    ),
-  );
-
-  Future<MessageGraphForkResult> forkMessageGraphConversation({
-    required String sourceConversationId,
-    required String sourceBranchId,
-    required String sourceRevisionId,
-    required String targetConversationId,
-    required String title,
-  }) => _observer.measure(
-    ChatDatabaseOperation.commandMessageGraphMutation,
-    () => MessageGraphCommands(_db).forkConversation(
-      sourceConversationId: sourceConversationId,
-      sourceBranchId: sourceBranchId,
-      sourceRevisionId: sourceRevisionId,
-      targetConversationId: targetConversationId,
-      title: title,
-    ),
-  );
-
-  Future<MessageGraphForkResult> forkMessageGraphConversationWithShadow({
-    required String sourceConversationId,
-    required String sourceBranchId,
-    required String sourceRevisionId,
-    required String targetConversationId,
-    required String title,
-  }) {
-    return _observer.measure(
-      ChatDatabaseOperation.commandMessageGraphMutation,
-      () => _db.transaction(() async {
-        final sourcePath = await MessageGraphProjector(_db).projectBranchPath(
-          conversationId: sourceConversationId,
-          branchId: sourceBranchId,
-          targetRevisionId: sourceRevisionId,
-        );
-        final result = await MessageGraphCommands(_db).forkConversation(
-          sourceConversationId: sourceConversationId,
-          sourceBranchId: sourceBranchId,
-          sourceRevisionId: sourceRevisionId,
-          targetConversationId: targetConversationId,
-          title: title,
-        );
-        final sourceIds = sourcePath.revisions
-            .map((revision) => revision.id)
-            .toList(growable: false);
-        final sourceRows = await (_db.select(
-          _db.messageRows,
-        )..where((row) => row.id.isIn(sourceIds))).get();
-        final byId = {for (final row in sourceRows) row.id: row};
-        for (final (index, sourceRevision) in sourcePath.revisions.indexed) {
-          final sourceRow = byId[sourceRevision.id];
-          if (sourceRow == null) continue;
-          final targetRevisionId = result.revisionIds[sourceRevision.id]!;
-          final source = _messageFromRow(sourceRow);
-          final clone = ChatMessage(
-            id: targetRevisionId,
-            role: source.role,
-            content: source.content,
-            timestamp: source.timestamp,
-            modelId: source.modelId,
-            providerId: source.providerId,
-            totalTokens: source.totalTokens,
-            conversationId: targetConversationId,
-            isStreaming: false,
-            reasoningText: source.reasoningText,
-            reasoningStartAt: source.reasoningStartAt,
-            reasoningFinishedAt: source.reasoningFinishedAt,
-            translation: source.translation,
-            reasoningSegmentsJson: source.reasoningSegmentsJson,
-            groupId: targetRevisionId,
-            version: 0,
-            promptTokens: source.promptTokens,
-            completionTokens: source.completionTokens,
-            cachedTokens: source.cachedTokens,
-            durationMs: source.durationMs,
-          );
-          await _db
-              .into(_db.messageRows)
-              .insert(_messageCompanion(clone, index), mode: InsertMode.insert);
-        }
-        return result;
-      }),
-    );
-  }
-
-  Future<void> beginLegacyGraphMigration({
-    required String migrationRunId,
-    required String sourceKind,
-    required String sourceHash,
-    required DateTime startedAt,
-  }) => _db
-      .into(_db.migrationRunRows)
-      .insert(
-        MigrationRunRowsCompanion.insert(
-          id: migrationRunId,
-          sourceKind: sourceKind,
-          sourceHash: sourceHash,
-          status: 'building',
-          startedAt: startedAt,
-        ),
-        mode: InsertMode.insertOrIgnore,
-      );
-
-  /// Converts one already-copied legacy conversation into the authoritative
-  /// graph representation. Memory is bounded to one conversation, never the
-  /// complete Hive store.
-  Future<ActiveMessageGraphProjection> migrateStoredLegacyConversationGraph({
-    required String migrationRunId,
-    required String conversationId,
-  }) async {
-    final conversationRow = await (_db.select(
-      _db.conversationRows,
-    )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
-    if (conversationRow == null) {
-      throw StateError('legacy_graph_conversation_missing');
-    }
-    final conversation = await _conversationFromRow(conversationRow);
-    final messageRows =
-        await (_db.select(_db.messageRows)
-              ..where((row) => row.conversationId.equals(conversationId))
-              ..orderBy([
-                (row) => OrderingTerm.asc(row.messageOrder),
-                (row) => OrderingTerm.asc(row.id),
-              ]))
-            .get();
-    final graph = const LegacyMessageGraphAdapter().adapt(
-      conversation: conversation,
-      messages: [
-        for (final row in messageRows)
-          LegacyOrderedMessage(
-            message: _messageFromRow(row),
-            order: row.messageOrder,
-          ),
-      ],
-    );
-    return putLegacyMessageGraph(migrationRunId: migrationRunId, graph: graph);
-  }
-
-  /// Best-effort bridge for development SQLite v1 databases and legacy JSON
-  /// imports. Released installations enter through the Hive migration above.
-  Future<int> backfillMissingMessageGraphs() async {
-    final conversations = await _db.select(_db.conversationRows).get();
-    final states = await _db.select(_db.conversationStateRows).get();
-    final existing = states.map((state) => state.conversationId).toSet();
-    final missing = conversations
-        .where((conversation) => !existing.contains(conversation.id))
-        .map((conversation) => conversation.id)
-        .toList(growable: false);
-    if (missing.isEmpty) return 0;
-
-    const runId = 'sqlite-v1-development-backfill-v1';
-    await beginLegacyGraphMigration(
-      migrationRunId: runId,
-      sourceKind: 'sqlite_v1',
-      sourceHash: 'development-sqlite-v1-best-effort-v1',
-      startedAt: DateTime.fromMicrosecondsSinceEpoch(0, isUtc: true),
-    );
-    for (final conversationId in missing) {
-      await migrateStoredLegacyConversationGraph(
-        migrationRunId: runId,
-        conversationId: conversationId,
-      );
-    }
-    await completeLegacyGraphMigration(
-      migrationRunId: runId,
-      completedAt: DateTime.now().toUtc(),
-    );
-    return missing.length;
-  }
-
-  Future<ActiveMessageGraphProjection> putLegacyMessageGraph({
-    required String migrationRunId,
-    required LegacyMessageGraphProjection graph,
-  }) {
-    return _db.transaction(() async {
-      final conversation = await (_db.select(
-        _db.conversationRows,
-      )..where((row) => row.id.equals(graph.conversationId))).getSingleOrNull();
-      if (conversation == null) {
-        throw StateError('legacy_graph_conversation_missing');
-      }
-      await (_db.delete(_db.migrationIssueRows)..where(
-            (row) =>
-                row.migrationRunId.equals(migrationRunId) &
-                row.conversationId.equals(graph.conversationId),
-          ))
-          .go();
-      await (_db.delete(
-        _db.conversationStateRows,
-      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
-      await (_db.delete(
-        _db.conversationBranchRows,
-      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
-      await (_db.delete(
-        _db.messageRevisionRows,
-      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
-      await (_db.delete(
-        _db.messageSlotRows,
-      )..where((row) => row.conversationId.equals(graph.conversationId))).go();
-
-      for (final slot in graph.slots) {
-        await _db
-            .into(_db.messageSlotRows)
-            .insert(
-              MessageSlotRowsCompanion.insert(
-                id: slot.id,
-                conversationId: graph.conversationId,
-                role: slot.role,
-                createdAt: slot.createdAt,
-              ),
-            );
-        for (final revision in slot.revisions) {
-          await _db
-              .into(_db.messageRevisionRows)
-              .insert(
-                MessageRevisionRowsCompanion.insert(
-                  id: revision.id,
-                  conversationId: graph.conversationId,
-                  slotId: slot.id,
-                  parentRevisionId: Value(revision.parentRevisionId),
-                  revisionNo: revision.revisionNo,
-                  createdAt: revision.createdAt,
-                  updatedAt: revision.updatedAt,
-                  finalizedAt: Value(revision.finalizedAt),
-                ),
-              );
-          for (final part in revision.parts) {
-            await _db
-                .into(_db.messagePartRows)
-                .insert(
-                  MessagePartRowsCompanion.insert(
-                    conversationId: graph.conversationId,
-                    revisionId: revision.id,
-                    ordinal: part.ordinal,
-                    kind: part.kind,
-                    payload: part.payload,
-                    createdAt: revision.createdAt,
-                    updatedAt: revision.updatedAt,
-                  ),
-                );
-          }
-        }
-      }
-      await _db
-          .into(_db.conversationBranchRows)
-          .insert(
-            ConversationBranchRowsCompanion.insert(
-              id: graph.branchId,
-              conversationId: graph.conversationId,
-              leafRevisionId: Value(
-                graph.activeRevisionIds.isEmpty
-                    ? null
-                    : graph.activeRevisionIds.last,
-              ),
-              causalityKind: graph.causalityKind,
-              createdAt: conversation.updatedAt,
-            ),
-          );
-      await _db
-          .into(_db.conversationStateRows)
-          .insert(
-            ConversationStateRowsCompanion.insert(
-              conversationId: graph.conversationId,
-              activeBranchId: Value(graph.branchId),
-              contextStartRevisionId: Value(graph.contextStartRevisionId),
-            ),
-          );
-      for (final (index, issue) in graph.issues.indexed) {
-        final details = jsonEncode(issue.details);
-        final issueId = _deterministicMergeId(
-          'migration_issue',
-          '$migrationRunId:${graph.conversationId}:$index:${issue.kind}',
-          sha256.convert(utf8.encode(details)).toString(),
-        );
-        await _db
-            .into(_db.migrationIssueRows)
-            .insert(
-              MigrationIssueRowsCompanion.insert(
-                id: issueId,
-                migrationRunId: migrationRunId,
-                conversationId: Value(graph.conversationId),
-                sourceEntityId: Value(issue.sourceEntityId),
-                kind: issue.kind,
-                severity: issue.severity,
-                detailsJson: Value(details),
-                createdAt: conversation.updatedAt,
-              ),
-              mode: InsertMode.insertOrReplace,
-            );
-      }
-      return (await MessageGraphProjector(
-        _db,
-      ).projectActivePath(conversationId: graph.conversationId))!;
-    });
-  }
-
-  Future<void> completeLegacyGraphMigration({
+  Future<void> completeMigrationRun({
     required String migrationRunId,
     required DateTime completedAt,
   }) async {
@@ -2324,19 +1848,19 @@ class ChatDatabaseRepository {
     required DateTime trendEndExclusive,
   }) async {
     const activeCte = '''
-      WITH RECURSIVE active_revisions(conversation_id, revision_id, parent_revision_id) AS (
-        SELECT s.conversation_id, b.leaf_revision_id, r.parent_revision_id
-        FROM conversation_state_rows s
-        JOIN conversation_branch_rows b
-          ON b.conversation_id = s.conversation_id AND b.id = s.active_branch_id
-        JOIN message_revision_rows r
-          ON r.conversation_id = b.conversation_id AND r.id = b.leaf_revision_id
-        UNION
-        SELECT p.conversation_id, p.id, p.parent_revision_id
-        FROM message_revision_rows p
-        JOIN active_revisions child
-          ON child.conversation_id = p.conversation_id
-         AND child.parent_revision_id = p.id
+      WITH active_revisions(conversation_id, revision_id, parent_revision_id) AS (
+        SELECT m.conversation_id, m.id, NULL
+        FROM message_rows m
+        JOIN conversation_rows c ON c.id = m.conversation_id
+        LEFT JOIN json_each(c.version_selections_json) selected
+          ON selected.key = COALESCE(m.group_id, m.id)
+        WHERE m.version = COALESCE(
+          CAST(selected.value AS INTEGER),
+          (SELECT MAX(sibling.version) FROM message_rows sibling
+           WHERE sibling.conversation_id = m.conversation_id
+             AND COALESCE(sibling.group_id, sibling.id) =
+                 COALESCE(m.group_id, m.id))
+        )
       )
     ''';
     final start = rangeStart?.microsecondsSinceEpoch;
@@ -2816,93 +2340,6 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<GraphGcResult> collectDeletedGraphRows({
-    required DateTime cutoff,
-    int limit = 100,
-  }) async {
-    if (limit <= 0) return const GraphGcResult(branches: 0, revisions: 0);
-    await _ensureAssetGcSchema();
-    return _db.transaction(() async {
-      final branchRows = await _db
-          .customSelect(
-            '''
-        SELECT id FROM conversation_branch_rows
-        WHERE deleted_at IS NOT NULL AND deleted_at <= ?
-        ORDER BY deleted_at, id LIMIT ?;
-      ''',
-            variables: [
-              Variable<int>(cutoff.microsecondsSinceEpoch),
-              Variable<int>(limit),
-            ],
-          )
-          .get();
-      for (final row in branchRows) {
-        final id = row.read<String>('id');
-        await _db.customStatement(
-          'DELETE FROM conversation_branch_rows WHERE id = ?;',
-          [id],
-        );
-        await _db.customStatement(
-          '''
-          INSERT INTO gc_audit_rows(kind, entity_id, completed_at)
-          VALUES ('branch', ?, ?);
-        ''',
-          [id, DateTime.now().microsecondsSinceEpoch],
-        );
-      }
-      final remaining = limit - branchRows.length;
-      if (remaining <= 0) {
-        return GraphGcResult(branches: branchRows.length, revisions: 0);
-      }
-      final revisionRows = await _db
-          .customSelect(
-            '''
-        SELECT r.id FROM message_revision_rows r
-        WHERE r.deleted_at IS NOT NULL AND r.deleted_at <= ?
-          AND NOT EXISTS (
-            SELECT 1 FROM message_revision_rows child
-            WHERE child.parent_revision_id = r.id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM conversation_branch_rows b
-            WHERE b.leaf_revision_id = r.id OR b.forked_from_revision_id = r.id
-          )
-          AND NOT EXISTS (
-            SELECT 1 FROM conversation_state_rows s
-            WHERE s.context_start_revision_id = r.id
-          )
-        ORDER BY r.deleted_at, r.id LIMIT ?;
-      ''',
-            variables: [
-              Variable<int>(cutoff.microsecondsSinceEpoch),
-              Variable<int>(remaining),
-            ],
-          )
-          .get();
-      for (final row in revisionRows) {
-        final id = row.read<String>('id');
-        await _db.customStatement('DELETE FROM message_rows WHERE id = ?;', [
-          id,
-        ]);
-        await _db.customStatement(
-          'DELETE FROM message_revision_rows WHERE id = ?;',
-          [id],
-        );
-        await _db.customStatement(
-          '''
-          INSERT INTO gc_audit_rows(kind, entity_id, completed_at)
-          VALUES ('revision', ?, ?);
-        ''',
-          [id, DateTime.now().microsecondsSinceEpoch],
-        );
-      }
-      return GraphGcResult(
-        branches: branchRows.length,
-        revisions: revisionRows.length,
-      );
-    });
-  }
-
   Future<void> _ensureAssetGcSchema() async {
     if (_assetGcSchemaReady) return;
     await _db.customStatement('''
@@ -3070,7 +2507,7 @@ class ChatDatabaseRepository {
     });
   }
 
-  @Deprecated('legacy/test only; use graph append/generation commands')
+  @Deprecated('legacy/test only; use linear append/generation commands')
   Future<Conversation> appendMessageToConversation({
     required Conversation conversation,
     required ChatMessage message,
@@ -3104,19 +2541,6 @@ class ChatDatabaseRepository {
       ),
     );
   }
-
-  @Deprecated('use appendLinearMessageToConversation')
-  Future<Conversation> appendGraphMessageToConversation({
-    required Conversation conversation,
-    required ChatMessage message,
-    bool selectVersion = false,
-    bool touchUpdatedAt = true,
-  }) => appendLinearMessageToConversation(
-    conversation: conversation,
-    message: message,
-    selectVersion: selectVersion,
-    touchUpdatedAt: touchUpdatedAt,
-  );
 
   Future<GenerationBeginResult> beginSendGeneration({
     required Conversation conversation,
@@ -3299,46 +2723,6 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<void> _insertGraphRevision({
-    required ChatMessage message,
-    required String slotId,
-    required String? parentRevisionId,
-    required int requestedRevisionNo,
-  }) async {
-    final maxRevision = _db.messageRevisionRows.revisionNo.max();
-    final row =
-        await (_db.selectOnly(_db.messageRevisionRows)
-              ..addColumns([maxRevision])
-              ..where(
-                _db.messageRevisionRows.conversationId.equals(
-                      message.conversationId,
-                    ) &
-                    _db.messageRevisionRows.slotId.equals(slotId),
-              ))
-            .getSingle();
-    final maximum = row.read(maxRevision);
-    final revisionNo = maximum != null && requestedRevisionNo <= maximum
-        ? maximum + 1
-        : requestedRevisionNo;
-    await _db
-        .into(_db.messageRevisionRows)
-        .insert(
-          MessageRevisionRowsCompanion.insert(
-            id: message.id,
-            conversationId: message.conversationId,
-            slotId: slotId,
-            parentRevisionId: Value(parentRevisionId),
-            revisionNo: revisionNo,
-            createdAt: message.timestamp,
-            updatedAt: message.timestamp,
-            finalizedAt: message.isStreaming
-                ? const Value.absent()
-                : Value(message.timestamp),
-          ),
-        );
-    await _replaceMessageParts(message);
-  }
-
   Future<void> _replaceMessageParts(
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
@@ -3462,7 +2846,7 @@ class ChatDatabaseRepository {
     return persisted;
   }
 
-  @Deprecated('legacy/test only; use createGraphConversationWithMessages')
+  @Deprecated('legacy/test only; use linear repository commands')
   Future<void> createConversationWithMessages({
     required Conversation conversation,
     required List<ChatMessage> messages,
@@ -3474,94 +2858,6 @@ class ChatDatabaseRepository {
         messages: messages,
       ),
     );
-  }
-
-  Future<void> createGraphConversationWithMessages({
-    required Conversation conversation,
-    required List<ChatMessage> messages,
-  }) async {
-    for (final message in messages) {
-      if (message.conversationId != conversation.id) {
-        throw ArgumentError.value(
-          message.conversationId,
-          'messages',
-          'Every message must belong to the new conversation.',
-        );
-      }
-    }
-    await _db.transaction(() async {
-      final persisted = conversation.copyWith(
-        messageIds: const [],
-        versionSelections: const {},
-        truncateIndex: -1,
-      );
-      await _db
-          .into(_db.conversationRows)
-          .insert(_conversationCompanion(persisted), mode: InsertMode.insert);
-      await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
-      final branchId = _deterministicMergeId(
-        'graph_branch',
-        persisted.id,
-        'native-main',
-      );
-      await _db
-          .into(_db.conversationBranchRows)
-          .insert(
-            ConversationBranchRowsCompanion.insert(
-              id: branchId,
-              conversationId: persisted.id,
-              causalityKind: 'native',
-              createdAt: persisted.createdAt,
-            ),
-          );
-      String? parentRevisionId;
-      for (final (index, message) in messages.indexed) {
-        await _db
-            .into(_db.messageRows)
-            .insert(_messageCompanion(message, index), mode: InsertMode.insert);
-        final slotId = _deterministicMergeId(
-          'graph_slot',
-          persisted.id,
-          message.id,
-        );
-        await _db
-            .into(_db.messageSlotRows)
-            .insert(
-              MessageSlotRowsCompanion.insert(
-                id: slotId,
-                conversationId: persisted.id,
-                role: message.role,
-                createdAt: message.timestamp,
-              ),
-            );
-        await _insertGraphRevision(
-          message: message,
-          slotId: slotId,
-          parentRevisionId: parentRevisionId,
-          requestedRevisionNo: 0,
-        );
-        parentRevisionId = message.id;
-      }
-      await (_db.update(_db.conversationBranchRows)..where(
-            (row) =>
-                row.conversationId.equals(persisted.id) &
-                row.id.equals(branchId),
-          ))
-          .write(
-            ConversationBranchRowsCompanion(
-              leafRevisionId: Value(parentRevisionId),
-            ),
-          );
-      await _db
-          .into(_db.conversationStateRows)
-          .insert(
-            ConversationStateRowsCompanion.insert(
-              conversationId: persisted.id,
-              activeBranchId: Value(branchId),
-              stateRevision: Value(messages.length),
-            ),
-          );
-    });
   }
 
   Future<void> _createConversationWithMessages({
@@ -4378,81 +3674,6 @@ class ChatDatabaseRepository {
     );
   }
 
-  Future<DeletedMessagesResult?> deleteGraphMessages({
-    required String conversationId,
-    required Set<String> revisionIds,
-  }) {
-    if (revisionIds.isEmpty) return Future.value(null);
-    return _observer.measure(
-      ChatDatabaseOperation.commandDeleteMessages,
-      () async {
-        await _ensureAssetGcSchema();
-        return _db.transaction(() async {
-          final conversationRow = await (_db.select(
-            _db.conversationRows,
-          )..where((row) => row.id.equals(conversationId))).getSingleOrNull();
-          if (conversationRow == null) return null;
-          final beforeRows = await (_db.select(
-            _db.messageRows,
-          )..where((row) => row.conversationId.equals(conversationId))).get();
-          final commands = MessageGraphCommands(_db);
-          for (final revisionId in revisionIds) {
-            final revision =
-                await (_db.select(_db.messageRevisionRows)..where(
-                      (row) =>
-                          row.conversationId.equals(conversationId) &
-                          row.id.equals(revisionId) &
-                          row.deletedAt.isNull(),
-                    ))
-                    .getSingleOrNull();
-            if (revision == null) continue;
-            await commands.deleteRevision(
-              conversationId: conversationId,
-              revisionId: revisionId,
-              confirmCascade: true,
-            );
-          }
-          final deletedRevisionRows =
-              await (_db.select(_db.messageRevisionRows)..where(
-                    (row) =>
-                        row.conversationId.equals(conversationId) &
-                        row.deletedAt.isNotNull(),
-                  ))
-                  .get();
-          final deletedIds = deletedRevisionRows.map((row) => row.id).toSet();
-          if (deletedIds.isNotEmpty) {
-            await _db.customStatement(
-              'DELETE FROM message_asset_rows WHERE revision_id IN '
-              '(${List.filled(deletedIds.length, '?').join(',')});',
-              deletedIds.toList(growable: false),
-            );
-          }
-          final deletedMessages = beforeRows
-              .where((row) => deletedIds.contains(row.id))
-              .map(_messageFromRow)
-              .toList(growable: false);
-          if (deletedIds.isNotEmpty) {
-            await (_db.delete(
-              _db.messageRows,
-            )..where((row) => row.id.isIn(deletedIds))).go();
-          }
-          final current = await _conversationFromRow(
-            conversationRow,
-            includeMessageIds: false,
-          );
-          final conversation = current.copyWith(
-            chatSuggestions: const [],
-            updatedAt: DateTime.now(),
-          );
-          await (_db.update(_db.conversationRows)
-                ..where((row) => row.id.equals(conversationId)))
-              .write(_conversationCompanion(conversation));
-          return (conversation: conversation, messages: deletedMessages);
-        });
-      },
-    );
-  }
-
   Future<DeletedMessagesResult?> _deleteMessages({
     required String conversationId,
     required Set<String> messageIds,
@@ -4681,10 +3902,10 @@ class ChatDatabaseRepository {
     String messageId,
     String signature,
   ) async {
-    final revision = await (_db.select(
-      _db.messageRevisionRows,
+    final message = await (_db.select(
+      _db.messageRows,
     )..where((row) => row.id.equals(messageId))).getSingleOrNull();
-    if (revision == null) {
+    if (message == null) {
       throw StateError('provider_artifact_revision_missing');
     }
     final now = DateTime.now().toUtc();
@@ -4692,13 +3913,13 @@ class ChatDatabaseRepository {
         .into(_db.providerArtifactRows)
         .insertOnConflictUpdate(
           ProviderArtifactRowsCompanion.insert(
-            conversationId: revision.conversationId,
+            conversationId: message.conversationId,
             revisionId: messageId,
             kind: 'gemini_thought_signature',
             payload: signature,
-            createdAt: revision.createdAt,
-            updatedAt: now.isBefore(revision.createdAt)
-                ? revision.createdAt
+            createdAt: message.timestamp,
+            updatedAt: now.isBefore(message.timestamp)
+                ? message.timestamp
                 : now,
           ),
         );
@@ -4759,7 +3980,6 @@ class ChatDatabaseRepository {
         _db.generationRunRows,
       )..where((row) => row.state.isIn(activeStates))).get();
       final now = DateTime.now().toUtc();
-      final targetIds = runs.map((run) => run.targetRevisionId).toSet();
       if (runs.isNotEmpty) {
         await (_db.update(
           _db.generationRunRows,
@@ -4783,17 +4003,6 @@ class ChatDatabaseRepository {
       await (_db.update(_db.messageRows)
             ..where((row) => row.isStreaming.equals(true)))
           .write(const MessageRowsCompanion(isStreaming: Value(false)));
-      if (targetIds.isNotEmpty) {
-        await (_db.update(_db.messageRevisionRows)..where(
-              (row) => row.id.isIn(targetIds) & row.finalizedAt.isNull(),
-            ))
-            .write(
-              MessageRevisionRowsCompanion(
-                updatedAt: Value(now),
-                finalizedAt: Value(now),
-              ),
-            );
-      }
       await clearActiveStreamingIds();
       return runs.length;
     });
@@ -4968,8 +4177,8 @@ class ChatDatabaseRepository {
     ];
   }
 
-  /// Legacy row metadata remains as a compatibility shadow. Whenever graph
-  /// parts exist, text/reasoning are projected exclusively from those parts.
+  /// Ordered parts are authoritative when present; legacy row columns remain
+  /// a compatibility fallback for older imported data.
   ChatMessage _messageFromRow(
     MessageRow row, {
     List<MessagePartRow>? authoritativeParts,
@@ -5236,12 +4445,6 @@ final class MessageAssetRegistration {
   final int? width;
   final int? height;
   final String? thumbnailPath;
-}
-
-final class GraphGcResult {
-  const GraphGcResult({required this.branches, required this.revisions});
-  final int branches;
-  final int revisions;
 }
 
 class ChatStorageMetaKeys {

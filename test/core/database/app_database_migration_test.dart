@@ -36,6 +36,7 @@ void main() {
           6,
           7,
           8,
+          9,
           AppDatabase.currentSchemaVersion,
         ]),
       );
@@ -241,19 +242,14 @@ void main() {
           (await database.select(database.conversationRows).getSingle()).title,
           'Legacy input',
         );
-        expect(await database.select(database.messageSlotRows).get(), isEmpty);
-        expect(
-          await database.select(database.messageRevisionRows).get(),
-          isEmpty,
-        );
-        expect(
-          await database.select(database.conversationBranchRows).get(),
-          isEmpty,
-        );
-        expect(
-          await database.select(database.conversationStateRows).get(),
-          isEmpty,
-        );
+        final retiredTables = await database
+            .customSelect(
+              "SELECT name FROM sqlite_master WHERE type='table' AND "
+              "name IN ('message_slot_rows','message_revision_rows',"
+              "'conversation_branch_rows','conversation_state_rows');",
+            )
+            .get();
+        expect(retiredTables, isEmpty);
       } finally {
         await database.close();
         schema.close();

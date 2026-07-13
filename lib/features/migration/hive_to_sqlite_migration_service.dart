@@ -402,14 +402,8 @@ class HiveToSqliteMigrationService {
       );
 
       await repo.clearAllData();
-      final graphSourceHash = await _legacyGraphSourceHash();
-      final graphMigrationRunId = 'hive-${graphSourceHash.substring(0, 32)}';
-      await repo.beginLegacyGraphMigration(
-        migrationRunId: graphMigrationRunId,
-        sourceKind: 'hive',
-        sourceHash: graphSourceHash,
-        startedAt: DateTime.now().toUtc(),
-      );
+      final sourceHash = await _legacySourceHash();
+      final migrationRunId = 'hive-${sourceHash.substring(0, 32)}';
       for (final conversation in conversations) {
         var needsConversationInsert = true;
         var order = 0;
@@ -473,19 +467,8 @@ class HiveToSqliteMigrationService {
             geminiSignaturesByMessageId: const <String, String>{},
           );
         }
-        await repo.migrateStoredLegacyConversationGraph(
-          migrationRunId: graphMigrationRunId,
-          conversationId: conversation.id,
-        );
       }
-
-      await repo.completeLegacyGraphMigration(
-        migrationRunId: graphMigrationRunId,
-        completedAt: DateTime.now().toUtc(),
-      );
-      final migrationIssueCounts = await repo.legacyMigrationIssueCounts(
-        graphMigrationRunId,
-      );
+      const migrationIssueCounts = <String, int>{};
 
       _emit(
         HiveToSqliteMigrationStage.migrating,
@@ -518,9 +501,9 @@ class HiveToSqliteMigrationService {
         await DatabaseV2RolloutLedger(
           decision.appDataDir,
         ).recordMigrationCompleted(
-          migrationRunId: graphMigrationRunId,
+          migrationRunId: migrationRunId,
           sourceKind: 'hive',
-          sourceHash: graphSourceHash,
+          sourceHash: sourceHash,
           migratedAtUtc: DateTime.now().toUtc(),
           conversationCount: conversations.length,
           messageCount: totalMessages,
@@ -566,7 +549,7 @@ class HiveToSqliteMigrationService {
     }
   }
 
-  Future<String> _legacyGraphSourceHash() async {
+  Future<String> _legacySourceHash() async {
     final entries = <String>[];
     for (final file
         in decision.hiveFiles.toList()

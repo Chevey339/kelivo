@@ -118,7 +118,7 @@ void main() {
   test(
     'append version selects the new row in the linear group',
     () async {
-      await repository.appendGraphMessageToConversation(
+      await repository.appendLinearMessageToConversation(
         conversation: conversation(),
         message: message(id: 'message-0', groupId: 'group-1'),
       );
@@ -149,7 +149,7 @@ void main() {
       message(id: 'u2', role: 'user'),
       message(id: 'a2'),
     ]) {
-      await repository.appendGraphMessageToConversation(
+      await repository.appendLinearMessageToConversation(
         conversation: base,
         message: item,
       );

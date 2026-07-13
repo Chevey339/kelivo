@@ -64,11 +64,11 @@ void main() {
       );
 
   Future<Conversation> appendFuture(Conversation current) async {
-    final afterUser = await repository.appendGraphMessageToConversation(
+    final afterUser = await repository.appendLinearMessageToConversation(
       conversation: current,
       message: user('user-2'),
     );
-    return repository.appendGraphMessageToConversation(
+    return repository.appendLinearMessageToConversation(
       conversation: afterUser,
       message: assistant('assistant-tail').copyWith(isStreaming: false),
     );
@@ -103,16 +103,6 @@ void main() {
       'user-1',
       'assistant-1',
     ]);
-    expect(await database.select(database.messageSlotRows).get(), isEmpty);
-    expect(await database.select(database.messageRevisionRows).get(), isEmpty);
-    expect(
-      await database.select(database.conversationBranchRows).get(),
-      isEmpty,
-    );
-    expect(
-      await database.select(database.conversationStateRows).get(),
-      isEmpty,
-    );
     expect(await repository.getMessageCount(conversation.id), 2);
     expect(
       await (database.select(database.messagePartRows)

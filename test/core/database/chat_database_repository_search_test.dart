@@ -39,7 +39,6 @@ void main() {
       toolEventsByMessageId: const {},
       geminiSignaturesByMessageId: const {},
     );
-    await repository.backfillMissingMessageGraphs();
 
     final word = await repository.searchConversationMatches(
       tokens: const ['needle'],
@@ -93,7 +92,6 @@ void main() {
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
       );
-      await repository.backfillMissingMessageGraphs();
       expect(
         await repository.searchConversationMatches(tokens: const ['stored']),
         isNotEmpty,

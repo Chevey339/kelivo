@@ -245,8 +245,10 @@ void main() {
     ]);
     expect(migratedMessages[0].timestamp, userMessage.timestamp);
     expect(migratedMessages[1].timestamp, assistantMessage.timestamp);
-    final graph = await chatService.loadMessageGraphTimeline(conversation.id);
-    expect(graph!.activeRevisions.map((revision) => revision.revisionId), [
+    final timeline = await chatService.loadActiveTimelineMessages(
+      conversation.id,
+    );
+    expect(timeline.map((message) => message.id), [
       userMessage.id,
       assistantMessage.id,
     ]);
@@ -366,9 +368,11 @@ void main() {
     expect(migratedMessages.last.timestamp, messages.last.timestamp);
     expect(migratedMessages.last.modelId, messages.last.modelId);
     expect(migratedMessages.last.promptTokens, messages.last.promptTokens);
-    final graph = await chatService.loadMessageGraphTimeline(conversation.id);
-    expect(graph!.activeRevisions, hasLength(messageCount));
-    expect(graph.contextStartRevisionId, 'message-12');
+    final timeline = await chatService.loadActiveTimelineMessages(
+      conversation.id,
+    );
+    expect(timeline, hasLength(messageCount));
+    expect(chatService.getContextStartIndex(conversation.id), 12);
     expect(
       chatService.getToolEvents('message-129').single['name'],
       'batch-check',

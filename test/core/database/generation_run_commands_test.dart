@@ -31,28 +31,6 @@ void main() {
           ),
         );
     await database
-        .into(database.messageSlotRows)
-        .insert(
-          MessageSlotRowsCompanion.insert(
-            id: 'slot-a1',
-            conversationId: 'conversation-1',
-            role: 'assistant',
-            createdAt: createdAt,
-          ),
-        );
-    await database
-        .into(database.messageRevisionRows)
-        .insert(
-          MessageRevisionRowsCompanion.insert(
-            id: 'revision-a1',
-            conversationId: 'conversation-1',
-            slotId: 'slot-a1',
-            revisionNo: 0,
-            createdAt: createdAt,
-            updatedAt: createdAt,
-          ),
-        );
-    await database
         .into(database.messageRows)
         .insert(
           MessageRowsCompanion.insert(

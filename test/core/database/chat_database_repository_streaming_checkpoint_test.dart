@@ -52,7 +52,6 @@ void main() {
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
       );
-      await repository.backfillMissingMessageGraphs();
     });
 
     tearDown(() async {

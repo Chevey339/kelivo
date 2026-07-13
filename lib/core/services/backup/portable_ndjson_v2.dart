@@ -62,13 +62,13 @@ final class PortableNdjsonV2 {
         if (scope == PortableChatScope.activeBranchCompleted) {
           String? afterRevisionId;
           while (true) {
-            final page = await repository.loadActiveTimelinePage(
+            final page = await repository.loadLinearMessageWindow(
               conversationId: conversation.id,
               afterRevisionId: afterRevisionId,
               fromStart: afterRevisionId == null,
               limit: _pageSize,
             );
-            if (page == null || page.slots.isEmpty) break;
+            if (page.slots.isEmpty) break;
             final ids = page.slots
                 .map((slot) => slot.revisionId)
                 .toList(growable: false);
