@@ -8996,6 +8996,42 @@ abstract class AppLocalizations {
   /// **'Allow the assistant to create and use memories across chats.'**
   String get assistantEditMemorySwitchDescription;
 
+  /// No description provided for @assistantEditMemoryModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory Mode'**
+  String get assistantEditMemoryModeTitle;
+
+  /// No description provided for @assistantEditMemoryModeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Injection'**
+  String get assistantEditMemoryModeAuto;
+
+  /// No description provided for @assistantEditMemoryModeTool.
+  ///
+  /// In en, this message translates to:
+  /// **'On Demand (Tool)'**
+  String get assistantEditMemoryModeTool;
+
+  /// No description provided for @assistantEditMemoryModeAutoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically inject memories into each conversation.'**
+  String get assistantEditMemoryModeAutoDescription;
+
+  /// No description provided for @assistantEditMemoryModeToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant reads memories via tool call. Reduces cache misses.'**
+  String get assistantEditMemoryModeToolDescription;
+
+  /// No description provided for @assistantEditMemoryModeToolHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip: For best cache performance, disable Recent Chats Reference and switch to On Demand memory mode.'**
+  String get assistantEditMemoryModeToolHint;
+
   /// No description provided for @assistantEditRecentChatsSwitchTitle.
   ///
   /// In en, this message translates to:

@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_memory.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/mcp_provider.dart';
 import '../../../core/providers/memory_provider.dart';
@@ -185,7 +186,9 @@ class ToolHandlerService {
 
     // Memory tools
     if (assistant?.enableMemory == true && supportsTools) {
-      toolDefs.addAll(_buildMemoryToolDefinitions());
+      toolDefs.addAll(
+        _buildMemoryToolDefinitions(memoryMode: assistant!.memoryMode),
+      );
     }
 
     // Local tools
@@ -208,15 +211,31 @@ class ToolHandlerService {
     return toolDefs;
   }
 
-  /// Build memory tool definitions (create/edit/delete).
-  List<Map<String, dynamic>> _buildMemoryToolDefinitions() {
-    return [
+  /// Build memory tool definitions (create/edit/delete + read_memory in tool mode).
+  List<Map<String, dynamic>> _buildMemoryToolDefinitions({
+    String memoryMode = 'injection',
+  }) {
+    final tools = <Map<String, dynamic>>[
+      if (memoryMode == 'tool')
+        const {
+          'type': 'function',
+          'function': {
+            'name': 'read_memory',
+            'description':
+                'Read all stored memory records for this assistant. '
+                'Call this at the start of a conversation before the first response '
+                'to load existing memories.',
+            'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+          },
+        },
+    ];
+    tools.addAll(<Map<String, dynamic>>[
       {
         'type': 'function',
         'function': {
           'name': 'create_memory',
           'description':
-              'Create a new long-term memory record that persists across conversations for user preferences, personal details, plans, work facts, and other important context. Act like a personal secretary by actively recording useful information when you learn it, without waiting for the user to ask. check existing memories first to avoid duplicated memory for the same fact. DO NOT store sensitive information (ethnicity, religion, sexual orientation, political views, criminal records, or other protected data). DO NOT inform the user about the memory write unless they explicitly ask you to.',
+              'Create a new long-term memory record that persists across conversations for user preferences, personal details, plans, work facts, and other important context. Act like a personal secretary by actively recording useful information when you learn it, without waiting for the user to ask. If the user has just shared important new personal information, call this tool (or edit_memory to update an existing record) before writing your response, so you don\'t forget. Check existing memories first to avoid duplicated memory for the same fact. DO NOT store sensitive information (ethnicity, religion, sexual orientation, political views, criminal records, or other protected data). DO NOT inform the user about the memory write unless they explicitly ask you to.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -234,7 +253,7 @@ class ToolHandlerService {
         'function': {
           'name': 'edit_memory',
           'description':
-              'Update an existing memory record identified by its numeric "id" (shown in the <memories> context). Use when a stored memory is outdated, incorrect, or needs supplementary details. Only update the specific fact that changed. DO NOT delete unrelated information. DO NOT use this to create new memories (use create_memory instead). Do NOT inform the user about the update unless they explicitly ask you to.',
+              'Update an existing memory record identified by its numeric "id" (shown in the <memories> context). Use when a stored memory is outdated, incorrect, or needs supplementary details. Only update the specific fact that changed. Keep each record focused on one topic — do not merge different categories into the same record. If new information belongs to a different category, use create_memory instead. DO NOT delete unrelated information. DO NOT use this to create new memories (use create_memory instead). Do NOT inform the user about the update unless they explicitly ask you to.',
           'parameters': {
             'type': 'object',
             'properties': {
@@ -269,7 +288,8 @@ class ToolHandlerService {
           },
         },
       },
-    ];
+    ]);
+    return tools;
   }
 
   /// Build MCP tool definitions from connected servers.
@@ -474,7 +494,8 @@ class ToolHandlerService {
     if (assistant?.enableMemory != true) return null;
     if (name != 'create_memory' &&
         name != 'edit_memory' &&
-        name != 'delete_memory') {
+        name != 'delete_memory' &&
+        name != 'read_memory') {
       return null;
     }
 
@@ -491,7 +512,7 @@ class ToolHandlerService {
           );
         }
         final m = await mp.add(assistantId: assistant!.id, content: content);
-        return m.content;
+        return AssistantMemory.buildRecordXml(m.id, m.content);
       } else if (name == 'edit_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
         final content = (args['content'] ?? '').toString();
@@ -519,7 +540,7 @@ class ToolHandlerService {
                 'Use the available memory records shown in context, or create a new memory instead of editing a missing one.',
           );
         }
-        return m.content;
+        return AssistantMemory.buildRecordXml(m.id, m.content);
       } else if (name == 'delete_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
         if (id <= 0) {
@@ -540,6 +561,10 @@ class ToolHandlerService {
           );
         }
         return 'deleted';
+      } else if (name == 'read_memory') {
+        await mp.initialize();
+        final mems = mp.getForAssistant(assistant!.id);
+        return AssistantMemory.buildMemoryXml(mems);
       }
     } catch (e) {
       return _toolError(

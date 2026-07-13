@@ -4857,6 +4857,27 @@ class AppLocalizationsEn extends AppLocalizations {
       'Allow the assistant to create and use memories across chats.';
 
   @override
+  String get assistantEditMemoryModeTitle => 'Memory Mode';
+
+  @override
+  String get assistantEditMemoryModeAuto => 'Auto Injection';
+
+  @override
+  String get assistantEditMemoryModeTool => 'On Demand (Tool)';
+
+  @override
+  String get assistantEditMemoryModeAutoDescription =>
+      'Automatically inject memories into each conversation.';
+
+  @override
+  String get assistantEditMemoryModeToolDescription =>
+      'Assistant reads memories via tool call. Reduces cache misses.';
+
+  @override
+  String get assistantEditMemoryModeToolHint =>
+      'Tip: For best cache performance, disable Recent Chats Reference and switch to On Demand memory mode.';
+
+  @override
   String get assistantEditRecentChatsSwitchTitle => 'Recent Chats Reference';
 
   @override

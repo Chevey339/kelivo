@@ -4663,6 +4663,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
+  String get assistantEditMemoryModeTitle => '记忆模式';
+
+  @override
+  String get assistantEditMemoryModeAuto => '自动注入';
+
+  @override
+  String get assistantEditMemoryModeTool => '按需读取（工具调用）';
+
+  @override
+  String get assistantEditMemoryModeAutoDescription => '每次对话自动注入记忆内容。';
+
+  @override
+  String get assistantEditMemoryModeToolDescription => '助手通过工具调用读取记忆。降低缓存未命中。';
+
+  @override
+  String get assistantEditMemoryModeToolHint =>
+      '提示：为获得最佳缓存性能，建议关闭「参考历史聊天记录」并切换到按需读取模式。';
+
+  @override
   String get assistantEditRecentChatsSwitchTitle => '参考历史聊天记录';
 
   @override
@@ -10106,6 +10125,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get assistantEditMemorySwitchDescription => '允许助手主动存储并在对话间引用用户相关信息';
 
   @override
+  String get assistantEditMemoryModeTitle => '记忆模式';
+
+  @override
+  String get assistantEditMemoryModeAuto => '自动注入';
+
+  @override
+  String get assistantEditMemoryModeTool => '按需读取（工具调用）';
+
+  @override
+  String get assistantEditMemoryModeAutoDescription => '每次对话自动注入记忆内容。';
+
+  @override
+  String get assistantEditMemoryModeToolDescription => '助手通过工具调用读取记忆。降低缓存未命中。';
+
+  @override
+  String get assistantEditMemoryModeToolHint =>
+      '提示：为获得最佳缓存性能，建议关闭「参考历史聊天记录」并切换到按需读取模式。';
+
+  @override
   String get assistantEditRecentChatsSwitchTitle => '参考历史聊天记录';
 
   @override
@@ -15547,6 +15585,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditMemorySwitchDescription => '允許助理主動儲存並在對話間引用使用者相關資訊';
+
+  @override
+  String get assistantEditMemoryModeTitle => '記憶模式';
+
+  @override
+  String get assistantEditMemoryModeAuto => '自動注入';
+
+  @override
+  String get assistantEditMemoryModeTool => '按需讀取（工具呼叫）';
+
+  @override
+  String get assistantEditMemoryModeAutoDescription => '每次對話自動注入記憶內容。';
+
+  @override
+  String get assistantEditMemoryModeToolDescription => '助理透過工具呼叫讀取記憶。降低快取未命中。';
+
+  @override
+  String get assistantEditMemoryModeToolHint =>
+      '提示：為獲得最佳快取效能，建議關閉「參考歷史聊天記錄」並切換到按需讀取模式。';
 
   @override
   String get assistantEditRecentChatsSwitchTitle => '參考歷史聊天記錄';
