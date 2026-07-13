@@ -7,6 +7,7 @@ import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/backup/backup_settings_sanitizer.dart';
 import 'package:Kelivo/core/services/backup/data_sync.dart' as backup_sync;
 import 'package:Kelivo/core/services/search/search_service.dart';
 import 'package:Kelivo/core/services/tts/network_tts.dart';
@@ -36,7 +37,7 @@ void main() {
     });
 
     test(
-      'regular backup snapshot strips credentials and preserves safe fields',
+      'regular backup snapshot includes credentials for full restore',
       () async {
         const secretMarkers = [
           'provider-api-secret',
@@ -266,13 +267,16 @@ void main() {
 
         final prefs = await backup_sync.SharedPreferencesAsync.instance;
         final migrationSnapshot = await prefs.snapshot();
-        final regularBackupSnapshot = await prefs.snapshotForRegularBackup();
+        final backupSnapshot = await prefs.snapshotForRegularBackup();
+        final regularBackupSnapshot = BackupSettingsSanitizer.sanitize(
+          migrationSnapshot,
+        );
         final migrationJson = jsonEncode(migrationSnapshot);
-        final regularBackupJson = jsonEncode(regularBackupSnapshot);
+        final regularBackupJson = jsonEncode(backupSnapshot);
 
         for (final marker in secretMarkers) {
           expect(migrationJson, contains(marker));
-          expect(regularBackupJson, isNot(contains(marker)));
+          expect(regularBackupJson, contains(marker));
         }
         expect(regularBackupSnapshot['safe_setting_v1'], 'safe-value');
         expect(regularBackupSnapshot['display_show_token_stats_v1'], isTrue);
@@ -491,21 +495,24 @@ void main() {
       },
     );
 
-    test('regular backup snapshot rejects malformed credential JSON', () async {
-      SharedPreferences.setMockInitialValues({
-        'provider_configs_v1': '{invalid provider json',
-      });
+    test(
+      'legacy secret-free sanitizer rejects malformed credential JSON',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'provider_configs_v1': '{invalid provider json',
+        });
 
-      final prefs = await backup_sync.SharedPreferencesAsync.instance;
+        final prefs = await backup_sync.SharedPreferencesAsync.instance;
 
-      await expectLater(
-        prefs.snapshotForRegularBackup(),
-        throwsA(isA<FormatException>()),
-      );
-    });
+        await expectLater(
+          () async => BackupSettingsSanitizer.sanitize(await prefs.snapshot()),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
 
     test(
-      'regular backup snapshot rejects malformed credential shapes',
+      'legacy secret-free sanitizer rejects malformed credential shapes',
       () async {
         final invalidSettings = <Map<String, Object>>[
           {
@@ -520,7 +527,8 @@ void main() {
           SharedPreferences.setMockInitialValues(initialValues);
           final prefs = await backup_sync.SharedPreferencesAsync.instance;
           await expectLater(
-            prefs.snapshotForRegularBackup(),
+            () async =>
+                BackupSettingsSanitizer.sanitize(await prefs.snapshot()),
             throwsA(isA<FormatException>()),
           );
         }

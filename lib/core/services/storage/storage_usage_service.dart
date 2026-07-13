@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
+import '../database_v2_rollout_ledger.dart';
+import '../legacy_data_retirement_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/avatar_cache.dart';
 import '../logging/flutter_logger.dart';
@@ -12,6 +14,7 @@ enum StorageUsageCategoryKey {
   images,
   files,
   chatData,
+  legacyChatData,
   assistantData,
   cache,
   logs,
@@ -122,6 +125,12 @@ abstract final class StorageUsageService {
 
   static Future<StorageUsageReport> computeReport() async {
     final root = await AppDirectories.getAppDataDirectory();
+    var migrationCompleted = false;
+    try {
+      migrationCompleted = await DatabaseV2RolloutLedger(root).read() != null;
+    } catch (_) {
+      // A malformed rollout receipt must not make legacy files clearable.
+    }
 
     final byCat = <StorageUsageCategoryKey, _MutableStats>{
       for (final k in StorageUsageCategoryKey.values) k: _MutableStats(),
@@ -131,6 +140,10 @@ abstract final class StorageUsageService {
       'sqlite_database': _MutableStats(),
       'sqlite_wal': _MutableStats(),
       'sqlite_shm': _MutableStats(),
+    };
+    final legacyChatSubs = <String, _MutableStats>{
+      for (final name in LegacyDataRetirementService.hiveArtifactNames)
+        name: _MutableStats(),
     };
 
     final assistantSubs = <String, _MutableStats>{'avatars': _MutableStats()};
@@ -193,6 +206,10 @@ abstract final class StorageUsageService {
           if (chatSubId != null) {
             byCat[StorageUsageCategoryKey.chatData]!.add(bytes);
             chatSubs[chatSubId]!.add(bytes);
+          } else if (migrationCompleted &&
+              LegacyDataRetirementService.hiveArtifactNames.contains(name)) {
+            byCat[StorageUsageCategoryKey.legacyChatData]!.add(bytes);
+            legacyChatSubs[name]!.add(bytes);
           } else {
             byCat[StorageUsageCategoryKey.other]!.add(bytes);
           }
@@ -277,10 +294,12 @@ abstract final class StorageUsageService {
     final clearable = StorageUsageStats(
       fileCount:
           byCat[StorageUsageCategoryKey.cache]!.fileCount +
-          byCat[StorageUsageCategoryKey.logs]!.fileCount,
+          byCat[StorageUsageCategoryKey.logs]!.fileCount +
+          byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount,
       bytes:
           byCat[StorageUsageCategoryKey.cache]!.bytes +
-          byCat[StorageUsageCategoryKey.logs]!.bytes,
+          byCat[StorageUsageCategoryKey.logs]!.bytes +
+          byCat[StorageUsageCategoryKey.legacyChatData]!.bytes,
     );
 
     final categories = <StorageUsageCategory>[
@@ -305,6 +324,20 @@ abstract final class StorageUsageService {
               ),
         ],
       ),
+      if (byCat[StorageUsageCategoryKey.legacyChatData]!.fileCount > 0)
+        StorageUsageCategory(
+          key: StorageUsageCategoryKey.legacyChatData,
+          stats: byCat[StorageUsageCategoryKey.legacyChatData]!.toStats(),
+          subcategories: [
+            for (final entry in legacyChatSubs.entries)
+              if (entry.value.fileCount > 0)
+                StorageUsageSubcategory(
+                  id: entry.key,
+                  stats: entry.value.toStats(),
+                  path: p.join(root.path, entry.key),
+                ),
+          ],
+        ),
       StorageUsageCategory(
         key: StorageUsageCategoryKey.assistantData,
         stats: byCat[StorageUsageCategoryKey.assistantData]!.toStats(),
@@ -449,6 +482,15 @@ abstract final class StorageUsageService {
     }
   }
 
+  static Future<void> clearLegacyChatData() async {
+    final root = await AppDirectories.getAppDataDirectory();
+    final migration = await DatabaseV2RolloutLedger(root).read();
+    if (migration == null) {
+      throw StateError('legacy_retirement_untracked');
+    }
+    await LegacyDataRetirementService(root).retireHiveArtifacts();
+  }
+
   static Future<List<StorageFileEntry>> listUploadEntries({
     required bool images,
   }) async {
@@ -587,6 +629,7 @@ const List<StorageUsageCategoryKey> _categoryOrder = <StorageUsageCategoryKey>[
   StorageUsageCategoryKey.images,
   StorageUsageCategoryKey.files,
   StorageUsageCategoryKey.chatData,
+  StorageUsageCategoryKey.legacyChatData,
   StorageUsageCategoryKey.assistantData,
   StorageUsageCategoryKey.cache,
   StorageUsageCategoryKey.logs,

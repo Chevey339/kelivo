@@ -316,6 +316,12 @@ abstract class AppLocalizations {
   /// **'Chat Records'**
   String get storageSpaceCategoryChatData;
 
+  /// No description provided for @storageSpaceCategoryLegacyChatData.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Records (Old)'**
+  String get storageSpaceCategoryLegacyChatData;
+
   /// No description provided for @storageSpaceCategoryAssistantData.
   ///
   /// In en, this message translates to:
@@ -351,6 +357,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Safe to clear. This will not affect your chat history.'**
   String get storageSpaceSafeToClearHint;
+
+  /// No description provided for @storageSpaceLegacyChatDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.'**
+  String get storageSpaceLegacyChatDataHint;
 
   /// No description provided for @storageSpaceNotSafeToClearHint.
   ///
@@ -495,6 +507,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear Logs'**
   String get storageSpaceClearLogsButton;
+
+  /// No description provided for @storageSpaceClearLegacyChatDataButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Old Chat Records'**
+  String get storageSpaceClearLegacyChatDataButton;
+
+  /// No description provided for @storageSpaceClearLegacyChatDataConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the retained old chat files? Your current SQLite chat records will remain available.'**
+  String get storageSpaceClearLegacyChatDataConfirmMessage;
 
   /// No description provided for @storageSpaceViewLogsButton.
   ///

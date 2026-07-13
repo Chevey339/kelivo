@@ -890,7 +890,7 @@ class DataSync {
       'appVersion': appVersion,
       'includeChats': includeChats,
       'includeFiles': includeFiles,
-      'secretsIncluded': false,
+      'secretsIncluded': true,
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -2477,10 +2477,10 @@ class SharedPreferencesAsync {
     return map;
   }
 
-  /// Regular app backups exclude known authentication credentials.
-  /// Migration disaster backups intentionally keep using [snapshot].
+  /// Regular app backups include credentials so a restored installation keeps
+  /// working provider, proxy, WebDAV, S3, TTS, MCP, and search configuration.
   Future<Map<String, dynamic>> snapshotForRegularBackup() async {
-    return BackupSettingsSanitizer.sanitize(await snapshot());
+    return snapshot();
   }
 
   Future<void> restore(Map<String, dynamic> data) async {

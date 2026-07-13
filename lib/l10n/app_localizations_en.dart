@@ -125,6 +125,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryChatData => 'Chat Records';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => 'Chat Records (Old)';
+
+  @override
   String get storageSpaceCategoryAssistantData => 'Assistants';
 
   @override
@@ -144,6 +147,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get storageSpaceSafeToClearHint =>
       'Safe to clear. This will not affect your chat history.';
+
+  @override
+  String get storageSpaceLegacyChatDataHint =>
+      'These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.';
 
   @override
   String get storageSpaceNotSafeToClearHint =>
@@ -223,6 +230,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => 'Clear Logs';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => 'Clear Old Chat Records';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      'Clear the retained old chat files? Your current SQLite chat records will remain available.';
 
   @override
   String get storageSpaceViewLogsButton => 'View Logs';

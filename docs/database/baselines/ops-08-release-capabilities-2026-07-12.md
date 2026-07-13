@@ -4,10 +4,14 @@ Date: 2026-07-12
 
 Runner: `integration_test/database_v2_release_capabilities_test.dart`
 
-The runner performs a real platform secure-store write/read/overwrite/delete
-round trip and verifies that the build declares the current database schema as
-v2-readable while forbidding down migration and a Hive writer. It prints one
-machine-readable `OPS08_RELEASE_CAPABILITY_RESULT` line.
+The current runner verifies that a credential-shaped value survives platform
+SharedPreferences write/overwrite, appears in the regular backup snapshot, and
+that the build declares the current database schema as v2-readable while
+forbidding down migration and a Hive writer. It prints one machine-readable
+`OPS08_RELEASE_CAPABILITY_RESULT` line. The first two recorded lines below were
+captured before PD-11 removed the unreleased secure-storage split; they remain
+valid rollback-platform evidence, while future runs use
+`credentialPrefsAndBackupRoundTrip`.
 
 ## Recorded result
 
@@ -17,7 +21,7 @@ machine-readable `OPS08_RELEASE_CAPABILITY_RESULT` line.
 | iOS | PASS | iOS 26.5 simulator; secure-store round trip `true`; schema `8`; rollback-compatible `true`; storage contract `2` |
 | macOS | PASS | macOS 26.5.2; secure-store round trip `true`; schema `8`; rollback-compatible `true`; storage contract `2` |
 | Windows | pending | Run on the native Windows runner; do not infer from macOS |
-| Linux | pending | Run with the desktop secret service available; do not infer from macOS |
+| Linux | pending | Run on the native Linux runner; do not infer from macOS |
 
 Recorded macOS line:
 
@@ -31,13 +35,10 @@ Recorded iOS simulator line:
 OPS08_RELEASE_CAPABILITY_RESULT:{"platform":"iOS","operatingSystem":"ios","operatingSystemVersion":"Version 26.5 (Build 23F77)","secureStorageWriteReadOverwriteDelete":true,"databaseSchemaVersion":8,"rollbackCompatible":true,"storageContractVersion":2}
 ```
 
-The first macOS run correctly failed with Keychain error `-34018` because an
-unsigned development app cannot use the data-protection Keychain without a
-provisioned entitlement. The production credential adapter now falls back on
-macOS only to the user's platform login Keychain via `/usr/bin/security`; the
-secret is base64-wrapped and supplied on stdin, never in process arguments,
-preferences, diagnostics, or logs. The same runner then passed. This fallback
-does not apply to other platforms.
+Historical note: the original secure-storage experiment exposed Keychain error
+`-34018` on unsigned macOS and later passed with a login-Keychain fallback.
+PD-11 superseded and deleted that unreleased implementation; current builds do
+not use that fallback.
 
 ## Commands for the remaining platforms
 
@@ -54,8 +55,8 @@ flutter test integration_test/database_v2_release_capabilities_test.dart -d <dev
 ```
 
 Archive the complete machine-readable result line. A successful build alone is
-not evidence: the test must reach `All tests passed` after the secure-store
-round trip.
+not evidence: the test must reach `All tests passed` after the credential prefs
+and backup-snapshot round trip.
 
 ## Rollback build contract
 

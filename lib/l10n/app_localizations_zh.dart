@@ -123,6 +123,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -141,6 +144,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
+
+  @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
 
   @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
@@ -219,6 +226,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -5650,6 +5664,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -5668,6 +5685,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
+
+  @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
 
   @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
@@ -5746,6 +5767,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -11177,6 +11205,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天記錄';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天記錄（舊）';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
@@ -11195,6 +11226,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSafeToClearHint => '可安全清理，不影響聊天記錄。';
+
+  @override
+  String get storageSpaceLegacyChatDataHint =>
+      '這是遷移到 SQLite 前保留的 Hive 舊檔案。清理後不會刪除目前的聊天記錄。';
 
   @override
   String get storageSpaceNotSafeToClearHint => '可能影響聊天記錄，請謹慎刪除。';
@@ -11273,6 +11308,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理舊聊天記錄';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '確定清理保留的舊聊天檔案嗎？目前的 SQLite 聊天記錄不會受到影響。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日誌';

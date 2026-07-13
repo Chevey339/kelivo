@@ -462,7 +462,7 @@ void main() {
     );
 
     test(
-      'normal backup excludes secrets and declares that in manifest',
+      'normal backup includes credentials and declares that in manifest',
       () async {
         SharedPreferences.setMockInitialValues({
           'safe_setting_v1': 'safe-value',
@@ -496,18 +496,21 @@ void main() {
           final settingsBytes = settingsEntry!.readBytes()!;
           final settings =
               jsonDecode(utf8.decode(settingsBytes)) as Map<String, dynamic>;
-          expect(manifest['secretsIncluded'], isFalse);
+          expect(manifest['secretsIncluded'], isTrue);
           expect(settings['safe_setting_v1'], 'safe-value');
-          expect(settings['global_proxy_password_v1'], '');
+          expect(
+            settings['global_proxy_password_v1'],
+            'normal-backup-proxy-secret',
+          );
           final providers =
               jsonDecode(settings['provider_configs_v1'] as String) as Map;
           final provider = providers['openai'] as Map;
           expect(provider['name'], 'Safe Provider');
           expect(provider['baseUrl'], 'https://safe.example');
-          expect(provider['apiKey'], '');
+          expect(provider['apiKey'], 'normal-backup-api-secret');
           expect(
             utf8.decode(settingsBytes),
-            isNot(contains('normal-backup-api-secret')),
+            contains('normal-backup-api-secret'),
           );
         } finally {
           archive?.clearSync();
@@ -518,7 +521,7 @@ void main() {
     );
 
     test(
-      'secret-free overwrite clears a target credential absent from source',
+      'credential backup restores saved secrets and preserves unrelated ones',
       () async {
         SharedPreferences.setMockInitialValues({
           'global_proxy_enabled_v1': true,
@@ -597,12 +600,15 @@ void main() {
         await prefs.reload();
         expect(prefs.getBool('global_proxy_enabled_v1'), isTrue);
         expect(prefs.getString('global_proxy_host_v1'), 'source.example');
-        expect(prefs.getString('global_proxy_password_v1'), '');
+        expect(
+          prefs.getString('global_proxy_password_v1'),
+          'target-proxy-secret',
+        );
         final providers =
             jsonDecode(prefs.getString('provider_configs_v1')!) as Map;
         final provider = providers['openai'] as Map;
         expect(provider['name'], 'Source Provider');
-        expect(provider['apiKey'], '');
+        expect(provider['apiKey'], 'source-api-secret');
         for (final key in [
           'provider_configs_backup_v1',
           'search_services_v1',
@@ -612,7 +618,7 @@ void main() {
           'webdav_config_v1',
           's3_config_v1',
         ]) {
-          expect(prefs.containsKey(key), isFalse, reason: key);
+          expect(prefs.containsKey(key), isTrue, reason: key);
         }
       },
     );
@@ -701,7 +707,7 @@ void main() {
     });
 
     test(
-      'secret-free overwrite rolls back a credential cleanup failure',
+      'credential backup does not remove unrelated credential settings',
       () async {
         SharedPreferences.setMockInitialValues({'source_setting': 'source'});
         final sync = DataSync(chatService: ChatService());
@@ -735,10 +741,11 @@ void main() {
           appDataDirectory: root,
           preferences: prefs,
         );
-        expect(result?.state, RestoreReceiptState.rolledBack);
+        expect(result?.state, RestoreReceiptState.committed);
 
         await prefs.reload();
         expect(prefs.getString('search_services_v1'), targetSearchServices);
+        expect(prefs.getString('source_setting'), 'source');
         expect(
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,
@@ -749,7 +756,7 @@ void main() {
             runId: result!.runId,
             archived: true,
           ).readLatest())?.state,
-          RestoreReceiptState.rolledBack,
+          RestoreReceiptState.committed,
         );
       },
     );

@@ -7,30 +7,30 @@ import 'package:integration_test/integration_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/services/backup/data_sync.dart' as backup_sync;
 import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
-import 'package:Kelivo/core/services/secure_credential_store.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('OPS-08 release capabilities', (tester) async {
-    const storage = SecureCredentialStore();
     final preferences = await SharedPreferences.getInstance();
     final key =
         'kelivo.ops08.${DateTime.now().toUtc().microsecondsSinceEpoch}.$pid';
     const firstValue = 'secret-value-one';
     const secondValue = 'secret-value-two';
-    var secureStorage = false;
+    var credentialBackup = false;
     try {
-      await storage.writeSecret(preferences, key, firstValue);
-      expect(await storage.readSecret(preferences, key), firstValue);
-      await storage.writeSecret(preferences, key, secondValue);
-      expect(await storage.readSecret(preferences, key), secondValue);
-      await storage.writeSecret(preferences, key, '');
-      expect(await storage.readSecret(preferences, key), isEmpty);
-      secureStorage = true;
+      await preferences.setString(key, firstValue);
+      expect(preferences.getString(key), firstValue);
+      await preferences.setString(key, secondValue);
+      expect(preferences.getString(key), secondValue);
+      final snapshot = await (await backup_sync.SharedPreferencesAsync.instance)
+          .snapshotForRegularBackup();
+      expect(snapshot[key], secondValue);
+      credentialBackup = true;
     } finally {
-      await storage.writeSecret(preferences, key, '');
+      await preferences.remove(key);
     }
 
     final rollbackCompatible =
@@ -47,7 +47,7 @@ void main() {
       'platform': defaultTargetPlatform.name,
       'operatingSystem': Platform.operatingSystem,
       'operatingSystemVersion': Platform.operatingSystemVersion,
-      'secureStorageWriteReadOverwriteDelete': secureStorage,
+      'credentialPrefsAndBackupRoundTrip': credentialBackup,
       'databaseSchemaVersion': AppDatabase.currentSchemaVersion,
       'rollbackCompatible': rollbackCompatible,
       'storageContractVersion':

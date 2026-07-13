@@ -6,6 +6,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -83,6 +84,48 @@ void main() {
         ]),
       );
       expect(report.totalBytes, 1023);
+      expect(
+        report.categories.where(
+          (category) => category.key == StorageUsageCategoryKey.legacyChatData,
+        ),
+        isEmpty,
+      );
+    },
+  );
+
+  test(
+    'migrated legacy chat data is clearable and disappears after cleanup',
+    () async {
+      await DatabaseV2RolloutLedger(tempDir).recordMigrationCompleted(
+        migrationRunId: 'hive-0123456789abcdef0123456789abcdef',
+        sourceKind: 'hive',
+        sourceHash: List.filled(64, 'a').join(),
+        migratedAtUtc: DateTime.utc(2026, 7, 12),
+        conversationCount: 2,
+        messageCount: 4,
+        issueCounts: const {},
+      );
+      await _writeSizedFile(tempDir, 'conversations.hive', 100);
+      await _writeSizedFile(tempDir, 'messages.hive', 200);
+      await _writeSizedFile(tempDir, 'tool_events_v1.hive', 300);
+
+      final before = await StorageUsageService.computeReport();
+      final legacy = before.categories.singleWhere(
+        (category) => category.key == StorageUsageCategoryKey.legacyChatData,
+      );
+      expect(legacy.stats.bytes, 600);
+      expect(legacy.stats.fileCount, 3);
+      expect(before.clearable.bytes, greaterThanOrEqualTo(600));
+
+      await StorageUsageService.clearLegacyChatData();
+      final after = await StorageUsageService.computeReport();
+
+      expect(
+        after.categories.where(
+          (category) => category.key == StorageUsageCategoryKey.legacyChatData,
+        ),
+        isEmpty,
+      );
     },
   );
 
