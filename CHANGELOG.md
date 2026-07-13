@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.1] - 2026-07-14
+
+### Added
+- GPT-5.6 model family support (sol/luna/terra) with low/medium/high/xhigh/max reasoning effort
+
+### Fixed
+- Tool schema sanitization now preserves `additionalProperties` for OpenAI and Claude function/tool definitions
+
 ## [1.6.0] - 2026-07-13
 
 > 💡 **What's new**
