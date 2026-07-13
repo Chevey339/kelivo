@@ -378,7 +378,7 @@ class GenerationRunRows extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
-  static const databaseFileName = 'kelivo.sqlite';
+  static const databaseFileName = 'kelivo.db';
 
   // Version 2 established the Database Kernel v2 format boundary. Version 3
   // adds enforced invariants, stable ordering indexes, and microsecond time.

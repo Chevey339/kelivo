@@ -138,7 +138,7 @@ void main() {
     expect(entryNames, contains('settings.json'));
     expect(entryNames, contains('chats.json'));
     expect(entryNames, isNot(contains('manifest.json')));
-    expect(entryNames, isNot(contains('database/kelivo.sqlite')));
+    expect(entryNames, isNot(contains('database/kelivo.db')));
     expect(entryNames, contains('conversations.hive'));
     expect(entryNames, contains('messages.hive'));
     expect(entryNames, contains('tool_events_v1.hive'));
@@ -395,7 +395,7 @@ void main() {
         HiveToSqliteMigrationDecision(
           needsMigration: true,
           appDataDir: tempDir,
-          sqliteFile: File('${tempDir.path}/kelivo.sqlite'),
+          sqliteFile: File('${tempDir.path}/kelivo.db'),
           hiveFiles: [hiveFile],
         ),
       );

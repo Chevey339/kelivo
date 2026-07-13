@@ -233,7 +233,7 @@ void main() {
       previous = Directory(p.join(temporary.path, 'run_$_runId', 'previous'));
       previousDatabaseDirectory = Directory(p.join(previous.path, 'database'));
       previousDatabase = File(
-        p.join(previousDatabaseDirectory.path, 'kelivo.sqlite'),
+        p.join(previousDatabaseDirectory.path, 'kelivo.db'),
       );
       candidateDatabase = File(
         p.join(
@@ -241,10 +241,10 @@ void main() {
           'run_$_runId',
           'candidate',
           'database',
-          'kelivo.sqlite',
+          'kelivo.db',
         ),
       );
-      liveDatabase = File(p.join(temporary.path, 'app_data', 'kelivo.sqlite'));
+      liveDatabase = File(p.join(temporary.path, 'app_data', 'kelivo.db'));
       await previousDatabase.parent.create(recursive: true);
       await previousDatabase.writeAsString('old');
       await liveDatabase.parent.create(recursive: true);

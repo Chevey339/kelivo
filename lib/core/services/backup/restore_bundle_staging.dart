@@ -66,7 +66,7 @@ final class RestoreBundleStaging {
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
   static const _assetRoots = ['upload', 'images', 'avatars', 'fonts'];
-  static const _databaseEntry = 'database/kelivo.sqlite';
+  static const _databaseEntry = 'database/kelivo.db';
   static const _maximumManifestBytes = 16 * 1024 * 1024;
   // Settings contain structured preferences, never chat rows or binary assets.
   // Cap JSON before copying/parsing to bound UTF-8 and DOM amplification.

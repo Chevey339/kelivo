@@ -2,8 +2,8 @@
 
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
-> - 最后更新：2026-07-13（**PD-17 用户裁决：启动与大会话性能回归 + 数据库改名，新增 Phase 8 / PERF-01～04 待实施**）
-> - 当前结论：Phase 0/1/3/5 的基础设施成果保留。**Phase 2（Message Graph）与 Phase 4 的 TimelineCoordinator/programmatic jump 按 PD-15 整体作废**。Phase 6 线性回归与 Phase 7 产品行为收尾均已完成。当前焦点：Phase 8 性能回归（启动零全库扫描、上下文限量读取、内存有界、`kelivo.db` 改名）
+> - 最后更新：2026-07-13（**Phase 8 / PERF-01～04 已完成**）
+> - 当前结论：Phase 0/1/3/5 的基础设施成果保留。**Phase 2（Message Graph）与 Phase 4 的 TimelineCoordinator/programmatic jump 按 PD-15 整体作废**。Phase 6 线性回归、Phase 7 产品行为收尾及 Phase 8 性能回归均已完成。
 
 ## 1. 文档使用规则
 
@@ -44,7 +44,7 @@
 | Phase 5：Data Operations 与退役 | 8 / 9 | `进行中`（仅 OPS-08 发布矩阵未完成） | OPS-01～07 已完成且按 PD-15 保留；OPS-04/05/03 已由 LIN-05 改为"选中版本/全部版本"；OPS-09 已改为迁移后用户主动清理“聊天记录（旧）”；OPS-08 发布证据仍为 2/5 |
 | Phase 6：线性回归 v3（PD-15） | 8 / 8 | `已完成` | LIN-01～08 全部闭环：完全线性读写、多版本旧行为、滚动/跳转、schema 10 graph 退役、周边双口径与最终门禁均通过 |
 | Phase 7：产品行为收尾（PD-16） | 4 / 4 | `已完成` | PL-01～04 已闭环：merge 重启弹窗、同 PID orphan lease 安全回收、统计全版本单口径、终态恢复痕迹用户清理 |
-| Phase 8：性能回归与数据库改名（PD-17） | 3 / 4 | `进行中` | PERF-01～03 已完成：启动零全库扫描、生成上下文有界；消息缓存使用 720 条/8 MiB LRU 双上限，迷你地图/全选/批删计划只取轻量投影，导出按选中 ID hydrate 全文 |
+| Phase 8：性能回归与数据库改名（PD-17） | 4 / 4 | `已完成` | PERF-01～04 全部完成：启动零全库扫描、生成上下文与缓存有界、重操作轻量投影；正式数据库/备份/恢复格式统一为 `kelivo.db`，无旧 SQLite 名兼容。analyze 与全量 1277/1277 通过 |
 
 ## 3. 已完成的审计工作
 
@@ -502,7 +502,7 @@ dart run tool/run_restore_process_harness.dart \
 | PERF-01 | 启动零全库扫描：废除 session receipt 机制与 `_recoverUncleanSession`；迁移去掉前后全库校验；全库 PRAGMA 检查仅保留恢复页/快照/显式诊断 | 无 | `已完成` | gateway 不再发布/清理 session receipt；安装门不读取残留 receipt，正常启动、首次 adoption、迁移前后、identity 写入均只执行结构/schema/identity 校验。快照 `_validateRawSnapshot` 与显式 `validateIntegrity` 保持完整检查；定向 31 项与 analyze 通过。3GB 真机首帧仍待发布设备实测 |
 | PERF-02 | 上下文构建限量读取：repository 新增尾部限量查询；单次发送内合并复用一次；重生成/工具续写按目标游标读取有界前缀 | 无 | `已完成` | repository 单 SQL 先按持久化版本选择折叠，再应用 truncateIndex/目标游标/尾部上限，并在同一查询 hydrate parts；发送历史只读一次并复用于附件预检/API 构建，持久会话重生成不再全量载入。无限上下文设置按全局安全上限 1024 条读取；定向 51 项与 analyze 通过 |
 | PERF-03 | 消息缓存有界 + 重操作轻量投影：`_messagesCache` LRU 双上限；迷你地图/全选/批删计划/导出列表用投影查询，导出按需取全文 | 无 | `已完成` | 非当前持久会话缓存按 LRU 受 720 条/8 MiB 双上限约束，当前窗口及临时会话豁免；切换会话立即驱逐超限旧缓存并同步清理 artifact cache。迷你地图/全选查询只返回选中版本的 id/group/version/role/时间戳/≤200 字摘要；删除所有版本只查 ID，选择导出仅 hydrate 已选 ID；portable 全量导出继续按 100 条分页流式写文件。定向 51 项与 analyze 通过；万条 <300ms/1GB RSS 回落待真机 profile |
-| PERF-04 | 数据库改名 `kelivo.db`：常量/备份 ZIP entry/restore 清单/存储统计；不读取或迁移旧 `kelivo.sqlite`，不读旧名 v2 备份 | PERF-01 同批 | `待实施` | 新安装与 Hive 升级只生成新名；新备份 round trip 通过；Hive JSON 导入不受影响 |
+| PERF-04 | 数据库改名 `kelivo.db`：常量/备份 ZIP entry/restore 清单/存储统计；不读取或迁移旧 `kelivo.sqlite`，不读旧名 v2 备份 | PERF-01 同批 | `已完成` | `AppDatabase.databaseFileName`、ZIP `database/kelivo.db`、restore candidate/previous/allowlist、storage 分类与测试夹具已统一；生产代码不存在旧名探测/迁移路径。新备份 round trip、恢复切换与 Hive JSON 迁移定向测试通过 |
 
 ## 12. 数据迁移覆盖台账
 
@@ -629,12 +629,12 @@ dart run tool/run_restore_process_harness.dart \
 
 ## 18. 当前阻塞与待输入
 
-**当前待实施：Phase 8（PERF-01～04，PD-17）。** 另剩发布证据：① OPS-08 尚需 Android/Windows/Linux release capability runner 原始行；② 用户真机确认 Phase 6 手感、PL-01 merge 弹窗与 PL-02 Android 前后台切换。OPS-09 不再受时间/rollout 门禁阻塞。
+**当前无待实施开发 Phase。** 另剩发布证据：① OPS-08 尚需 Android/Windows/Linux release capability runner 原始行；② 用户真机确认 Phase 6 手感、PL-01 merge 弹窗、PL-02 Android 前后台切换及 PERF-01/03 大库性能。OPS-09 不再受时间/rollout 门禁阻塞。
 
 ## 19. 下一步
 
-1. 实施 PERF-01（启动零全库扫描）与 PERF-04（`kelivo.db` 改名），同批处理安装门代码。
-2. 实施 PERF-02（上下文限量读取）与 PERF-03（缓存有界 + 轻量投影）。
+1. 在 Android 真机以大库复测 PERF-01 首帧与 PERF-03 RSS 回落/迷你地图延迟。
+2. 补齐 OPS-08 release capability runner 原始证据。
 3. 用户真机复测：3GB 库冷启动无长黑屏；1GB 会话进入/发送/滚动流畅；merge 导入重启弹窗；Android 前后台切换不进恢复页。
 4. 发布前继续补 OPS-08 Android/Windows/Linux 三平台证据。
 
@@ -642,7 +642,7 @@ dart run tool/run_restore_process_harness.dart \
 
 | 日期 | 变更 | 工作项 | Commit/PR | 作者 |
 | --- | --- | --- | --- | --- |
-| 2026-07-13 | **PD-17 用户裁决：启动与大会话性能回归 + 数据库改名，冻结 Phase 8（PERF-01～04）。** 根因诊断：① 冷启动黑屏与库大小成正比——移动端进程从不干净退出致 session receipt 每次残留，安装门在 `runApp` 前主 isolate 同步跑全库 `quick_check`+`foreign_key_check`，schema 升级再加迁移前后两次全库 `integrity_check`；对照 rikkahub/cherry-studio 启动路径均零全库扫描、崩溃恢复交给 WAL。② 大会话卡——发送/重生成全量 `loadMessages`（单次发送两次）、迷你地图/全选/导出全量、`_messagesCache` 无上限。裁决：废除 session receipt 全库检查、迁移只保留结构校验、上下文限量读取、缓存 LRU 有界 + 重操作轻量投影、`kelivo.sqlite` → `kelivo.db`（唯一过渡为一次性重命名，防现有设备误入恢复页）。同轮复审 Phase 7 四提交（`f6508191`/`d4494441`/`884fd327`/`cfb94d92`）通过 | PD-17、Phase 8 PERF-01～04 | 本设计修订 | 用户 / Fable |
+| 2026-07-13 | **完成 Phase 8（PERF-01～04）。** 废除 session receipt 与启动/迁移全库扫描；生成上下文按选中版本、truncate、目标游标及 1024 安全上限单 SQL 有界读取；消息缓存加入 720 条/8 MiB LRU 双上限，迷你地图/全选/批删/导出选择改轻量投影与按需全文；正式数据库、备份 ZIP、恢复清单、存储统计统一为 `kelivo.db`，按最终用户裁决不探测/迁移旧 SQLite 文件名 | PD-17、Phase 8 PERF-01～04 | `3cdfb441`、`5c7c0719`、`9e06770c`、本里程碑提交 | Codex |
 | 2026-07-13 | 完成 Phase 7 / PD-16：所有本地/WebDAV/S3、桌面/移动 merge 导入统一进入不可跳过的重启弹窗并附合并报告；业务租约取消 debug-only 回收，以 OS 锁 + loopback isolate 存活探针安全区分活跃同进程 isolate 与 Android 引擎重建 orphan；统计 summary/heatmap/trend/rank 全部按 `message_rows` 全版本单口径 SQL 聚合；存储空间新增“恢复痕迹”，只统计/清理 `.kelivo_restore/completed/run_*`，active run 时隐藏且 fail-closed。`flutter analyze` 无问题，Phase 7 定向 30/30、全量 1281/1281 通过 | Phase 7、PL-01～04、PD-16 | `f6508191`、`d4494441`、`884fd327`、`cfb94d92` | Codex |
 | 2026-07-13 | **PD-16 用户裁决：备份恢复与恢复页交互回归原产品，冻结 Phase 7（PL-01～04）。** ① merge 导入完成必须与 overwrite 一样弹"需要重启"对话框（merge 设置重启前不生效，toast 结束是缺陷），合并报告并入弹窗；② 业务租约同 PID owner marker 回收从 debug-only 扩至全部构建模式——根因定位为 Android 引擎重建（进程存活）重跑 `main()` 时同 PID 残留 marker 在 release 抛 lease Unavailable 误进恢复失败页；③ 统计页废除"选中版本/全部生成"双值并列，回 `f7e11373` 单口径（全部消息行），PD-07 作废；④ 存储空间新增"恢复痕迹"清理项（`.kelivo_restore/completed` 终态归档，删除不影响运行）。同时确认：未发布中间实现（含已回退的 secure-storage 拆分）不做迁移兼容，兼容目标仅最终形态与已发布 Hive 版本。复审 Sol 前轮三提交（旧数据用户清理/凭据回 prefs/OBS-7 修复/debug 热重启）通过：独立复跑 analyze 无问题、全量 1276/1276 PASS | PD-16、Phase 7 PL-01～04、PD-07 | 本设计修订 | 用户 / Fable |
 | 2026-07-12 | 修订 PD-10/11：未发布实现不保留兼容桥。旧 Hive 文件在迁移完成后作为存储空间“聊天记录（旧）”展示，用户可立即清理，删完隐藏；删除仍使用 operation-ahead receipt，但移除 30 天/3 冷启动/诊断/rollout 授权。删除 secure credential store 与插件依赖，Provider/代理/WebDAV/S3/TTS/搜索凭据统一回 SharedPreferences；正常 v2 备份改为完整 settings snapshot 并声明 `secretsIncluded: true`，恢复凭据，历史 secret-free bundle 仅保留读取兼容。服务、存储统计、UI 确认与备份恢复聚焦回归通过 | PD-10/11、P0-08、OPS-07/09 | 本产品修订提交 | 用户 / Codex |

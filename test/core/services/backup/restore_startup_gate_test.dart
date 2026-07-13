@@ -414,7 +414,7 @@ Future<_CompleteRollbackBundleFixture> _prepareCompleteRollbackBundle({
   required Directory root,
   required String directoryName,
 }) async {
-  final liveDatabase = File(p.join(root.path, 'kelivo.sqlite'));
+  final liveDatabase = File(p.join(root.path, 'kelivo.db'));
   await _createRollbackDatabase(liveDatabase, conversationId: 'old');
   final liveOldUpload = File(p.join(root.path, 'upload', 'old.txt'));
   await liveOldUpload.parent.create();
@@ -426,7 +426,7 @@ Future<_CompleteRollbackBundleFixture> _prepareCompleteRollbackBundle({
   final settings = File(p.join(extracted.path, 'settings.json'));
   await settings.writeAsString('{"theme":"new"}', flush: true);
   final candidateDatabase = File(
-    p.join(extracted.path, 'database', 'kelivo.sqlite'),
+    p.join(extracted.path, 'database', 'kelivo.db'),
   );
   await candidateDatabase.parent.create(recursive: true);
   await _createRollbackDatabase(candidateDatabase, conversationId: 'new');
@@ -448,14 +448,14 @@ Future<_CompleteRollbackBundleFixture> _prepareCompleteRollbackBundle({
       'includeFiles': true,
       'secretsIncluded': true,
       'database': {
-        'entry': 'database/kelivo.sqlite',
+        'entry': 'database/kelivo.db',
         'schemaVersion': databaseInfo.schemaVersion,
         'conversationCount': databaseInfo.conversationCount,
         'messageCount': databaseInfo.messageCount,
       },
       'entries': {
         'settings.json': await _rollbackFileDescriptor(settings),
-        'database/kelivo.sqlite': await _rollbackFileDescriptor(
+        'database/kelivo.db': await _rollbackFileDescriptor(
           candidateDatabase,
         ),
         'upload/new.txt': await _rollbackFileDescriptor(candidateUpload),
@@ -2342,7 +2342,7 @@ void main() {
         final candidateDirectory = fixture.prepared.candidateDirectory;
         expect(
           await _rollbackConversationIds(
-            File(p.join(candidateDirectory.path, 'database', 'kelivo.sqlite')),
+            File(p.join(candidateDirectory.path, 'database', 'kelivo.db')),
           ),
           ['new'],
         );

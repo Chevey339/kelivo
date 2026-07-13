@@ -167,7 +167,7 @@ final class RestorePreviousDatabasePlan {
     required this.descriptor,
   });
 
-  static const databasePath = 'database/kelivo.sqlite';
+  static const databasePath = 'database/kelivo.db';
 
   final RestorePreviousDatabaseState state;
   final RestoreFileDescriptor? descriptor;

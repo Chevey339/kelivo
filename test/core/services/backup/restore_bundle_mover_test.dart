@@ -80,7 +80,7 @@ void main() {
     test(
       'resumes old DB and asset moves after a post-rename failure',
       () async {
-        final database = File(p.join(appData.path, 'kelivo.sqlite'));
+        final database = File(p.join(appData.path, 'kelivo.db'));
         await database.writeAsBytes([1, 2, 3], flush: true);
         final upload = File(p.join(appData.path, 'upload', 'item'));
         await upload.parent.create();
@@ -127,7 +127,7 @@ void main() {
     );
 
     test('syncs every old asset before the first bundle rename', () async {
-      final database = File(p.join(appData.path, 'kelivo.sqlite'));
+      final database = File(p.join(appData.path, 'kelivo.db'));
       await database.writeAsBytes([1, 2, 3], flush: true);
       final asset = File(p.join(appData.path, 'upload', 'nested', 'item.txt'));
       await asset.parent.create(recursive: true);
@@ -164,7 +164,7 @@ void main() {
       );
       final phaseBarrier = durability.events.indexOf('directory:.:true');
       final databaseRename = durability.events.indexWhere(
-        (event) => event.endsWith('/previous.pending/database/kelivo.sqlite'),
+        (event) => event.endsWith('/previous.pending/database/kelivo.db'),
       );
       expect(fileSync, inInclusiveRange(0, firstRename - 1));
       expect(phaseBarrier, inInclusiveRange(0, firstRename - 1));

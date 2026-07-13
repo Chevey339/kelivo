@@ -42,7 +42,7 @@ class DataSync {
   static const _backupFormat = 'kelivo-backup';
   static const _backupFormatVersion = 2;
   static const _manifestEntryName = 'manifest.json';
-  static const _databaseEntryName = 'database/kelivo.sqlite';
+  static const _databaseEntryName = 'database/kelivo.db';
   // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
   static const _maxManifestBytes = 16 * 1024 * 1024;
   // ZIP64 supports larger entries. Restore keeps explicit, diagnosable bounds.
@@ -193,7 +193,7 @@ class DataSync {
 
       ChatDatabaseSnapshotInfo? snapshotInfo;
       if (cfg.includeChats) {
-        final databaseFile = File(p.join(workDir.path, '_bk_kelivo.sqlite'));
+        final databaseFile = File(p.join(workDir.path, '_bk_kelivo.db'));
         databaseTmp = databaseFile;
         snapshotInfo = await chatService.createBackupDatabaseSnapshot(
           databaseFile,
@@ -303,7 +303,7 @@ class DataSync {
                 name == '_bk_settings.json' ||
                 name == '_bk_chats.json' ||
                 name == '_bk_manifest.json' ||
-                name == '_bk_kelivo.sqlite')) {
+                name == '_bk_kelivo.db')) {
           await _deleteFileQuietly(ent);
         }
       }

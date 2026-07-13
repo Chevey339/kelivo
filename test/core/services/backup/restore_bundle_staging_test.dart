@@ -29,7 +29,7 @@ Future<Directory> _createExtractedBundle(
   if (includeSettings) {
     await settings.writeAsString(jsonEncode({'theme': 'dark'}), flush: true);
   }
-  final database = File(p.join(extracted.path, 'database', 'kelivo.sqlite'));
+  final database = File(p.join(extracted.path, 'database', 'kelivo.db'));
   if (includeDatabase) {
     await database.parent.create(recursive: true);
     await database.writeAsBytes([1, 2, 3, 4], flush: true);
@@ -46,7 +46,7 @@ Future<Directory> _createExtractedBundle(
       'secretsIncluded': false,
       if (includeDatabase)
         'database': {
-          'entry': 'database/kelivo.sqlite',
+          'entry': 'database/kelivo.db',
           'schemaVersion': 1,
           'conversationCount': 0,
           'messageCount': 0,
@@ -60,7 +60,7 @@ Future<Directory> _createExtractedBundle(
               }
             : {'bytes': 2, 'sha256': List.filled(64, '0').join()},
         if (includeDatabase)
-          'database/kelivo.sqlite': {
+          'database/kelivo.db': {
             'bytes': await database.length(),
             'sha256': (await sha256.bind(database.openRead()).first).toString(),
           },

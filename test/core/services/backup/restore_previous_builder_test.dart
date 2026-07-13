@@ -47,7 +47,7 @@ void main() {
     });
 
     test('describes selected database and all four asset roots', () async {
-      final database = File(p.join(root.path, 'kelivo.sqlite'));
+      final database = File(p.join(root.path, 'kelivo.db'));
       await database.writeAsBytes([1, 2, 3, 4], flush: true);
       final upload = File(p.join(root.path, 'upload', 'nested', 'note.txt'));
       await upload.parent.create(recursive: true);
@@ -107,7 +107,7 @@ void main() {
     });
 
     test('does not inspect unselected database or assets', () async {
-      await File(p.join(root.path, 'kelivo.sqlite-wal')).writeAsBytes([1]);
+      await File(p.join(root.path, 'kelivo.db-wal')).writeAsBytes([1]);
       await File(p.join(root.path, 'upload')).writeAsBytes([2]);
 
       final bundle = await RestorePreviousBuilder.build(
@@ -122,8 +122,8 @@ void main() {
     });
 
     test('rejects database sidecars before describing the main file', () async {
-      await File(p.join(root.path, 'kelivo.sqlite')).writeAsBytes([1]);
-      await File(p.join(root.path, 'kelivo.sqlite-shm')).writeAsBytes([2]);
+      await File(p.join(root.path, 'kelivo.db')).writeAsBytes([1]);
+      await File(p.join(root.path, 'kelivo.db-shm')).writeAsBytes([2]);
 
       await expectLater(
         RestorePreviousBuilder.build(

@@ -287,7 +287,7 @@ Future<File> _createSqliteBackupFixture({
       'bytes': await settingsFile.length(),
       'sha256': await _fileSha256(settingsFile),
     },
-    'database/kelivo.sqlite': {
+    'database/kelivo.db': {
       'bytes': await databaseFile.length(),
       'sha256': databaseSha256 ?? await _fileSha256(databaseFile),
     },
@@ -309,7 +309,7 @@ Future<File> _createSqliteBackupFixture({
       'includeFiles': includeFiles,
       'secretsIncluded': secretsIncluded,
       'database': {
-        'entry': 'database/kelivo.sqlite',
+        'entry': 'database/kelivo.db',
         'schemaVersion': snapshotInfo.schemaVersion,
         'conversationCount': snapshotInfo.conversationCount,
         'messageCount': snapshotInfo.messageCount,
@@ -322,7 +322,7 @@ Future<File> _createSqliteBackupFixture({
   encoder.create(zipFile.path);
   encoder.addFileSync(manifestFile, 'manifest.json');
   encoder.addFileSync(settingsFile, 'settings.json');
-  encoder.addFileSync(databaseFile, 'database/kelivo.sqlite');
+  encoder.addFileSync(databaseFile, 'database/kelivo.db');
   if (assetFile != null) {
     encoder.addFileSync(assetFile, 'upload/fixture.txt');
   }
@@ -792,7 +792,7 @@ void main() {
       try {
         archive = ZipDecoder().decodeStream(input);
         final manifestEntry = archive.findFile('manifest.json');
-        final databaseEntry = archive.findFile('database/kelivo.sqlite');
+        final databaseEntry = archive.findFile('database/kelivo.db');
 
         expect(manifestEntry, isNotNull);
         expect(databaseEntry, isNotNull);
@@ -830,7 +830,7 @@ void main() {
         expect(manifest['includeChats'], isTrue);
         expect(manifest['appVersion'], '1.0.0-test+1');
         expect(
-          ((manifest['entries'] as Map)['database/kelivo.sqlite']
+          ((manifest['entries'] as Map)['database/kelivo.db']
               as Map)['sha256'],
           archivedHash,
         );
@@ -889,7 +889,7 @@ void main() {
           'appVersion': '1.0.0-test+1',
           'secretsIncluded': true,
           'database': {
-            'entry': 'database/kelivo.sqlite',
+            'entry': 'database/kelivo.db',
             'schemaVersion': AppDatabase.currentSchemaVersion,
             'conversationCount': 1,
             'messageCount': 1,
@@ -899,7 +899,7 @@ void main() {
               'bytes': await settingsFile.length(),
               'sha256': await _fileSha256(settingsFile),
             },
-            'database/kelivo.sqlite': {
+            'database/kelivo.db': {
               'bytes': await sourceFile.length(),
               'sha256': await _fileSha256(sourceFile),
             },
@@ -911,7 +911,7 @@ void main() {
       encoder.create(zipFile.path);
       encoder.addFileSync(manifestFile, 'manifest.json');
       encoder.addFileSync(settingsFile, 'settings.json');
-      encoder.addFileSync(sourceFile, 'database/kelivo.sqlite');
+      encoder.addFileSync(sourceFile, 'database/kelivo.db');
       encoder.closeSync();
 
       final chatService = ChatService();
@@ -972,7 +972,7 @@ void main() {
         isTrue,
       );
       final candidateDatabase = File(
-        '${runDirectory.path}/candidate/database/kelivo.sqlite',
+        '${runDirectory.path}/candidate/database/kelivo.db',
       );
       final candidateManifest =
           jsonDecode(
@@ -982,7 +982,7 @@ void main() {
               )
               as Map<String, dynamic>;
       expect(
-        ((candidateManifest['entries'] as Map)['database/kelivo.sqlite']
+        ((candidateManifest['entries'] as Map)['database/kelivo.db']
             as Map)['sha256'],
         await _fileSha256(candidateDatabase),
       );
@@ -1134,13 +1134,13 @@ void main() {
         (manifest['entries'] as Map<String, dynamic>).keys,
         containsAll([
           'settings.json',
-          'database/kelivo.sqlite',
+          'database/kelivo.db',
           'upload/fixture.txt',
         ]),
       );
       expect(
         await File(
-          p.join(candidate.path, 'database', 'kelivo.sqlite'),
+          p.join(candidate.path, 'database', 'kelivo.db'),
         ).exists(),
         isTrue,
       );
@@ -1437,7 +1437,7 @@ void main() {
       final encoder = ZipFileEncoder();
       encoder.create(zipFile.path);
       encoder.addFileSync(settingsFile, 'settings.json');
-      encoder.addFileSync(databaseFile, 'database/kelivo.sqlite');
+      encoder.addFileSync(databaseFile, 'database/kelivo.db');
       encoder.closeSync();
       SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
 

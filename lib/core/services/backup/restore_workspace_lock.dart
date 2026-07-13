@@ -597,7 +597,7 @@ final class RestoreWorkspaceLock {
         await for (final databaseEntry in Directory(
           entity.path,
         ).list(followLinks: false)) {
-          if (p.basename(databaseEntry.path) != 'kelivo.sqlite' ||
+          if (p.basename(databaseEntry.path) != 'kelivo.db' ||
               await FileSystemEntity.type(
                     databaseEntry.path,
                     followLinks: false,

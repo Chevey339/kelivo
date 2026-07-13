@@ -21,7 +21,7 @@ void main() {
     });
 
     test('preserves a completely missing database family', () async {
-      final database = File(p.join(root.path, 'kelivo.sqlite'));
+      final database = File(p.join(root.path, 'kelivo.db'));
 
       expect(
         await RestoreLiveDatabase.normalize(databaseFile: database),
@@ -32,7 +32,7 @@ void main() {
 
     test('checkpoints a crash-style WAL family into one main file', () async {
       final source = File(p.join(root.path, 'source.sqlite'));
-      final target = File(p.join(root.path, 'kelivo.sqlite'));
+      final target = File(p.join(root.path, 'kelivo.db'));
       final open = sqlite.sqlite3.open(source.path);
       try {
         open.execute('PRAGMA journal_mode = WAL;');
@@ -65,7 +65,7 @@ void main() {
     });
 
     test('normalizes WAL mode even after its sidecars disappeared', () async {
-      final databaseFile = File(p.join(root.path, 'kelivo.sqlite'));
+      final databaseFile = File(p.join(root.path, 'kelivo.db'));
       final database = sqlite.sqlite3.open(databaseFile.path);
       try {
         expect(
@@ -104,7 +104,7 @@ void main() {
     });
 
     test('rejects an orphan sidecar without creating a new database', () async {
-      final database = File(p.join(root.path, 'kelivo.sqlite'));
+      final database = File(p.join(root.path, 'kelivo.db'));
       await File('${database.path}-wal').writeAsBytes([1], flush: true);
 
       await expectLater(
@@ -124,7 +124,7 @@ void main() {
       if (Platform.isWindows) return;
       final target = File(p.join(root.path, 'target.sqlite'));
       await target.writeAsString('not sqlite', flush: true);
-      final link = Link(p.join(root.path, 'kelivo.sqlite'));
+      final link = Link(p.join(root.path, 'kelivo.db'));
       await link.create(target.path);
 
       await expectLater(

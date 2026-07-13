@@ -149,7 +149,7 @@ void main() {
     test(
       'requires every selected database and asset payload before promotion',
       () async {
-        final database = File(p.join(appData.path, 'kelivo.sqlite'));
+        final database = File(p.join(appData.path, 'kelivo.db'));
         await database.writeAsBytes([1, 2, 3], flush: true);
         final upload = File(p.join(appData.path, 'upload', 'item'));
         await upload.parent.create();
@@ -173,7 +173,7 @@ void main() {
           p.join(store.pendingDirectory.path, 'database'),
         ).create();
         await database.rename(
-          p.join(store.pendingDirectory.path, 'database', 'kelivo.sqlite'),
+          p.join(store.pendingDirectory.path, 'database', 'kelivo.db'),
         );
         await Directory(
           p.join(appData.path, 'upload'),

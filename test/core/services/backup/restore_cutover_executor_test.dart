@@ -100,10 +100,10 @@ const List<_CutoverCase> _cutoverCases = [
 ];
 
 const _databaseFamilyFileNames = [
-  'kelivo.sqlite',
-  'kelivo.sqlite-wal',
-  'kelivo.sqlite-shm',
-  'kelivo.sqlite-journal',
+  'kelivo.db',
+  'kelivo.db-wal',
+  'kelivo.db-shm',
+  'kelivo.db-journal',
 ];
 const _assetRootNames = ['upload', 'images', 'avatars', 'fonts'];
 
@@ -205,7 +205,7 @@ void main() {
         final previousManifest = await _previousManifest(previousDirectory);
         expect(previousManifest['database'], {
           'state': 'missing',
-          'path': 'database/kelivo.sqlite',
+          'path': 'database/kelivo.db',
           'descriptor': null,
         });
         expect(previousManifest['assets'], isNull);
@@ -214,18 +214,18 @@ void main() {
             receiptStore.runDirectory.path,
             'candidate',
             'database',
-            'kelivo.sqlite',
+            'kelivo.db',
           ),
         );
 
         if (cutoverCase.expectedState == RestoreReceiptState.committed) {
           expect(await _databaseFamilySnapshot(appData), {
-            'kelivo.sqlite': fixture.candidateDescriptor,
+            'kelivo.db': fixture.candidateDescriptor,
             for (final name in _databaseFamilyFileNames.skip(1)) name: null,
           });
           expect(await archivedCandidateDatabase.exists(), isFalse);
           expect(
-            await _conversationIds(File(p.join(appData.path, 'kelivo.sqlite'))),
+            await _conversationIds(File(p.join(appData.path, 'kelivo.db'))),
             ['new'],
           );
         } else {
@@ -236,7 +236,7 @@ void main() {
           );
           expect(await _conversationIds(archivedCandidateDatabase), ['new']);
           expect(await _topLevelNames(archivedCandidateDatabase.parent), [
-            'kelivo.sqlite',
+            'kelivo.db',
           ]);
         }
       });
@@ -324,7 +324,7 @@ void main() {
         ),
       );
       final previousDatabase = File(
-        p.join(previousDirectory.path, 'database', 'kelivo.sqlite'),
+        p.join(previousDirectory.path, 'database', 'kelivo.db'),
       );
       expect(await _conversationIds(previousDatabase), ['old']);
       expect(
@@ -457,7 +457,7 @@ void main() {
           );
           expect(
             await _conversationIds(
-              File(p.join(previousDirectory.path, 'database', 'kelivo.sqlite')),
+              File(p.join(previousDirectory.path, 'database', 'kelivo.db')),
             ),
             ['old'],
           );
@@ -507,7 +507,7 @@ void main() {
         );
         expect(
           await _conversationIds(
-            File(p.join(candidateDirectory.path, 'database', 'kelivo.sqlite')),
+            File(p.join(candidateDirectory.path, 'database', 'kelivo.db')),
           ),
           ['new'],
         );
@@ -609,7 +609,7 @@ Future<_SelectedDatabaseFixture> _prepareSelectedDatabaseBundle({
   final settings = File(p.join(extracted.path, 'settings.json'));
   await settings.writeAsString('{"theme":"new"}', flush: true);
   final sourceDatabase = File(
-    p.join(extracted.path, 'database', 'kelivo.sqlite'),
+    p.join(extracted.path, 'database', 'kelivo.db'),
   );
   await sourceDatabase.parent.create(recursive: true);
   await _createDatabase(sourceDatabase, conversationId: 'new');
@@ -628,14 +628,14 @@ Future<_SelectedDatabaseFixture> _prepareSelectedDatabaseBundle({
       'includeFiles': false,
       'secretsIncluded': true,
       'database': {
-        'entry': 'database/kelivo.sqlite',
+        'entry': 'database/kelivo.db',
         'schemaVersion': databaseInfo.schemaVersion,
         'conversationCount': databaseInfo.conversationCount,
         'messageCount': databaseInfo.messageCount,
       },
       'entries': {
         'settings.json': await _descriptor(settings),
-        'database/kelivo.sqlite': await _descriptor(sourceDatabase),
+        'database/kelivo.db': await _descriptor(sourceDatabase),
       },
     }),
     flush: true,
@@ -652,7 +652,7 @@ Future<_SelectedDatabaseFixture> _prepareSelectedDatabaseBundle({
     createdAtUtc: DateTime.utc(2026, 7, 9, 12),
   );
   final candidateDatabase = File(
-    p.join(prepared.candidateDirectory.path, 'database', 'kelivo.sqlite'),
+    p.join(prepared.candidateDirectory.path, 'database', 'kelivo.db'),
   );
   return _SelectedDatabaseFixture(
     prepared: prepared,
@@ -666,17 +666,17 @@ Future<_SettingsOnlyFixture> _prepareSettingsOnlyBundle({
   required String directoryName,
 }) async {
   await _createDatabase(
-    File(p.join(appData.path, 'kelivo.sqlite')),
+    File(p.join(appData.path, 'kelivo.db')),
     conversationId: 'old',
   );
   await File(
-    p.join(appData.path, 'kelivo.sqlite-wal'),
+    p.join(appData.path, 'kelivo.db-wal'),
   ).writeAsBytes([0x77, 0x61, 0x6c], flush: true);
   await File(
-    p.join(appData.path, 'kelivo.sqlite-shm'),
+    p.join(appData.path, 'kelivo.db-shm'),
   ).writeAsBytes([0x73, 0x68, 0x6d], flush: true);
   await File(
-    p.join(appData.path, 'kelivo.sqlite-journal'),
+    p.join(appData.path, 'kelivo.db-journal'),
   ).writeAsBytes([0x6a, 0x6f, 0x75, 0x72, 0x6e, 0x61, 0x6c], flush: true);
   final upload = File(p.join(appData.path, 'upload', 'nested', 'note.bin'));
   await upload.parent.create(recursive: true);
@@ -798,7 +798,7 @@ Future<_CompleteBundleFixture> _prepareCompleteBundle({
   required Directory appData,
   required String directoryName,
 }) async {
-  final liveDatabase = File(p.join(appData.path, 'kelivo.sqlite'));
+  final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
   await _createDatabase(liveDatabase, conversationId: 'old');
   final oldUpload = File(p.join(appData.path, 'upload', 'old.txt'));
   await oldUpload.parent.create();
@@ -810,7 +810,7 @@ Future<_CompleteBundleFixture> _prepareCompleteBundle({
   final settings = File(p.join(extracted.path, 'settings.json'));
   await settings.writeAsString('{"theme":"new"}', flush: true);
   final candidateDatabase = File(
-    p.join(extracted.path, 'database', 'kelivo.sqlite'),
+    p.join(extracted.path, 'database', 'kelivo.db'),
   );
   await candidateDatabase.parent.create(recursive: true);
   await _createDatabase(candidateDatabase, conversationId: 'new');
@@ -832,14 +832,14 @@ Future<_CompleteBundleFixture> _prepareCompleteBundle({
       'includeFiles': true,
       'secretsIncluded': true,
       'database': {
-        'entry': 'database/kelivo.sqlite',
+        'entry': 'database/kelivo.db',
         'schemaVersion': databaseInfo.schemaVersion,
         'conversationCount': databaseInfo.conversationCount,
         'messageCount': databaseInfo.messageCount,
       },
       'entries': {
         'settings.json': await _descriptor(settings),
-        'database/kelivo.sqlite': await _descriptor(candidateDatabase),
+        'database/kelivo.db': await _descriptor(candidateDatabase),
         'upload/new.txt': await _descriptor(candidateUpload),
       },
     }),

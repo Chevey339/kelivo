@@ -22,7 +22,7 @@ final class RestoreBundleMover {
     RestoreDurability? durability,
   }) : durability = durability ?? RestorePlatformDurability();
 
-  static const _databaseEntry = 'database/kelivo.sqlite';
+  static const _databaseEntry = 'database/kelivo.db';
 
   final Directory appDataDirectory;
   final Directory candidateDirectory;
