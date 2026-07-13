@@ -33,6 +33,7 @@ import 'core/providers/memory_provider.dart';
 import 'core/providers/backup_provider.dart';
 import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
+import 'core/services/legacy_secure_credential_recovery.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/database/database_installation_gate.dart';
 import 'core/services/chat/chat_service.dart';
@@ -105,6 +106,14 @@ Future<void> main() async {
         final enabled = prefs.getBool('flutter_log_enabled_v1') ?? false;
         await FlutterLogger.setEnabled(enabled);
       } catch (_) {}
+      // An unreleased intermediate build moved credential leaves out of
+      // SharedPreferences. Recover them before migration backup/settings load.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await const LegacySecureCredentialRecovery().recover(prefs);
+      } catch (error, stackTrace) {
+        stderr.writeln('[LegacyCredentialRecovery] $error\n$stackTrace');
+      }
       // Trim Flutter global image cache to reduce memory pressure from large images
       try {
         PaintingBinding.instance.imageCache.maximumSize = 200;

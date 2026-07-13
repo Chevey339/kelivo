@@ -48,6 +48,9 @@ dependencies:
   dynamic_color: ^1.8.1
   lucide_icons_flutter: ^3.1.13
   shared_preferences: ^2.2.3
+  # Read-only bridge for recovering credentials written by an unreleased
+  # intermediate build. New credentials remain in SharedPreferences.
+  flutter_secure_storage: ^10.3.1
   image_picker: 1.1.2
   image_cropper: ^12.2.1
   flutter_svg: ^2.2.1

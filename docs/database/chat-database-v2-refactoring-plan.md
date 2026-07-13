@@ -178,6 +178,7 @@ u1, a1-v0, u2, a2-v0, a1-v1
 - **PD-09：merge 冲突按 hash 去重 + remap。** 同 ID 且内容 hash 相同的实体去重跳过；同 ID 内容不同时对导入侧整会话 remap 新 ID，生成用户可见的冲突报告；绝不静默覆盖 live 数据。
 - **PD-10：旧 Hive 数据由用户主动清理。** 成功迁移后，只要冻结清单内的 Hive 文件仍存在，存储空间展示“聊天记录（旧）”及占用；用户可立即清理，清理后项目消失。删除仍写 crash-resumable retirement receipt，但不再要求 30 天、3 次冷启动、诊断导出或 rollout 授权。`.previous` 恢复证据的保留策略与此独立。
 - **PD-11：v2 不引入应用层数据库加密，也不拆分平台安全存储。** API key、代理密码、WebDAV/S3/TTS/搜索等配置继续由 SharedPreferences 管理并随正常备份恢复；manifest 必须如实声明包含凭据。SQLCipher 等数据库/备份加密列为 v2 之后的独立评估，不阻塞本次重构。
+- 由于未发布的 secure-storage 实验构建曾把上述字段从 SharedPreferences 抽成空壳，启动路径保留一个只读的一次性回收桥：在 Hive 迁移备份与 SettingsProvider 加载前读取旧 `kelivo.credentials.v1.*` overlay，回填 prefs 后删除旧 secure entry；它不得承接任何新写入，也不得覆盖用户后来重新填写的凭据。公开 v1.1.17 → v2 路径仍直接沿用原 prefs，不依赖此桥。
 - **PD-12：损坏数据进入只读恢复页。** 展示诊断摘要，可导出脱敏诊断包与 rejects，可选择"从备份恢复"或显式确认"以恢复出的数据继续"；绝不静默创建空库。
 - **PD-13：SQLite v1 从未发布（已核实）。** 2026-07-10 以 git 证据确认：全部已发布 tag（≤ `v1.1.17`）、`origin/master` 与 `origin/beta` 均不含 drift/sqlite 依赖，SQLite v1 仅存在于未发布的 `sql`/`hive2sql`/`sqlite` 开发分支。因此：
   - 已发布用户的唯一数据源是 Hive，公开迁移主路径为 **Hive → v2**；
