@@ -133,6 +133,97 @@ void main() {
       expect(payload['message'], contains('storage offline'));
     });
   });
+
+  group('ToolHandlerService.sanitizeToolParametersForProvider', () {
+    group('OpenAI / Claude', () {
+      for (final kind in const [ProviderKind.openai, ProviderKind.claude]) {
+        test(
+          'preserves additionalProperties (top-level and nested) for $kind',
+          () {
+            final out = ToolHandlerService.sanitizeToolParametersForProvider(
+              _sampleSchema(),
+              kind,
+            );
+
+            expect(
+              out['additionalProperties'],
+              isTrue,
+              reason: 'top-level additionalProperties must survive',
+            );
+
+            final props = out['properties'] as Map<String, dynamic>;
+            expect(props.keys, containsAll(<String>['config', 'items']));
+
+            final config = props['config'] as Map<String, dynamic>;
+            expect(config['additionalProperties'], isTrue);
+            expect((config['properties'] as Map).containsKey('name'), isTrue);
+
+            final arrItem =
+                (props['items'] as Map)['items'] as Map<String, dynamic>;
+            expect(arrItem['additionalProperties'], isTrue);
+            expect((arrItem['properties'] as Map).containsKey('id'), isTrue);
+
+            expect(out.containsKey(r'$schema'), isFalse);
+            expect(out['type'], 'object');
+            expect(out['required'], ['config']);
+          },
+        );
+      }
+
+      test(
+        'preserves a subschema-valued additionalProperties and sanitizes it',
+        () {
+          final schema = {
+            'type': 'object',
+            'additionalProperties': {
+              r'$schema': 'should-be-removed',
+              'type': 'string',
+              'const': 'x',
+            },
+          };
+
+          final out = ToolHandlerService.sanitizeToolParametersForProvider(
+            schema,
+            ProviderKind.openai,
+          );
+
+          final ap = out['additionalProperties'] as Map<String, dynamic>;
+          expect(ap.containsKey(r'$schema'), isFalse);
+          expect(ap['type'], 'string');
+          expect(ap['enum'], ['x']);
+        },
+      );
+
+      test('does not mutate the input schema (deep clone)', () {
+        final input = _sampleSchema();
+        ToolHandlerService.sanitizeToolParametersForProvider(
+          input,
+          ProviderKind.openai,
+        );
+        expect(input.containsKey(r'$schema'), isTrue);
+        expect(input['additionalProperties'], isTrue);
+      });
+    });
+
+    group('Google / Gemini', () {
+      test('drops additionalProperties because Gemini rejects it', () {
+        final out = ToolHandlerService.sanitizeToolParametersForProvider(
+          _sampleSchema(),
+          ProviderKind.google,
+        );
+
+        expect(out.containsKey('additionalProperties'), isFalse);
+
+        final props = out['properties'] as Map<String, dynamic>;
+        expect(props.keys, containsAll(<String>['config', 'items']));
+        expect(
+          (props['config'] as Map).containsKey('additionalProperties'),
+          isFalse,
+        );
+        expect((props['config'] as Map)['properties'], isA<Map>());
+      });
+    });
+  });
 }
 
 class _ToolHandlerTestScope extends StatelessWidget {
@@ -165,3 +256,32 @@ class _ThrowingMemoryProvider extends MemoryProvider {
     throw StateError('storage offline');
   }
 }
+
+/// Builds a sample JSON Schema with open/free-form object params.
+Map<String, dynamic> _sampleSchema() => {
+  r'$schema': 'http://json-schema.org/draft-07/schema#',
+  'type': 'object',
+  'description': 'MCP tool params',
+  'additionalProperties': true,
+  'required': ['config'],
+  'properties': {
+    'config': {
+      'type': 'object',
+      'description': 'Free-form config bag',
+      'additionalProperties': true,
+      'properties': {
+        'name': {'type': 'string'},
+      },
+    },
+    'items': {
+      'type': 'array',
+      'items': {
+        'type': 'object',
+        'additionalProperties': true,
+        'properties': {
+          'id': {'type': 'string'},
+        },
+      },
+    },
+  },
+};

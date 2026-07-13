@@ -108,6 +108,15 @@ class ToolHandlerService {
       m['properties'] = norm;
     }
 
+    // additionalProperties may be a bool or a subschema (Map). When Map,
+    // recurse so nested nodes (e.g. $schema, const) are normalized too.
+    if (m['additionalProperties'] is Map) {
+      m['additionalProperties'] = _sanitizeNode(
+        m['additionalProperties'],
+        kind,
+      );
+    }
+
     // Keep only allowed keys based on provider
     Set<String> allowed;
     switch (kind) {
@@ -130,6 +139,12 @@ class ToolHandlerService {
           'required',
           'items',
           'enum',
+          // Standard JSON Schema field. Must be preserved so MCP servers
+          // that declare open/free-form object params are not silently
+          // narrowed to closed objects. Strict models (e.g. GLM-5.1)
+          // otherwise refuse to fill undeclared params.
+          // Google/Gemini rejects this key so it stays dropped there.
+          'additionalProperties',
         };
         break;
     }
