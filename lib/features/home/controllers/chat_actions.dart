@@ -931,7 +931,9 @@ class ChatActions {
         Assistant.maxContextMessageSize,
       );
     }
-    return persistedMessageCount;
+    return persistedMessageCount > 0
+        ? persistedMessageCount
+        : Assistant.maxContextMessageSize;
   }
 
   // ============================================================================

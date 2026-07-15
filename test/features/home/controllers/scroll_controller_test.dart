@@ -598,6 +598,57 @@ void main() {
       scrollController.dispose();
     });
 
+    testWidgets('streaming previous navigation disables bottom follow first', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: i.isEven ? 'user' : 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => true,
+        getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
+      );
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+        ),
+      );
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      expect(chatScrollController.autoStickToBottom, isTrue);
+
+      final navigation = chatScrollController.jumpToPreviousQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+      );
+      expect(chatScrollController.autoStickToBottom, isFalse);
+      await tester.pump(const Duration(milliseconds: 16));
+
+      messages.add(const _NavMessage(id: 'message-40', role: 'assistant'));
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+        ),
+      );
+      expect(
+        scrollController.offset,
+        lessThan(scrollController.position.maxScrollExtent),
+      );
+
+      await tester.pumpAndSettle();
+      await navigation;
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('顶部覆盖层下的连续消息跳转保持精确落点', (tester) async {
       final messages = <_NavMessage>[
         for (var i = 0; i < 40; i++)

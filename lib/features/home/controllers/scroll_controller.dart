@@ -569,6 +569,10 @@ class ChatScrollController {
           _messageListController.isAttached &&
           _messageListController.numberOfItems > 0;
       if (hasIndexedTail) {
+        // Indexed tail resolution intentionally jumps even when [animate] is
+        // true. Animating toward a lazy estimated offset would require visible
+        // corrections as the real last-item extent is measured. The parameter
+        // only controls the plain ScrollController fallback below.
         final lastIndex = _messageListController.numberOfItems - 1;
         for (var pass = 0; pass < 4; pass++) {
           if (request != _bottomScrollRequest ||
@@ -856,6 +860,7 @@ class ChatScrollController {
       return;
     }
     _cancelProgrammaticNavigation(stopDrivenScroll: true);
+    _autoStickToBottom = false;
     final request = ++_indexedNavigationRequest;
     final position = _scrollController.position;
     final estimatedDistance =

@@ -519,6 +519,7 @@ class ChatController extends ChangeNotifier {
       // current bounded window intact so the list can preserve its visible
       // anchor while only this slot remeasures its extent.
       _messages[visibleIndex] = message;
+      invalidateCache();
       _loadVersionSelections();
       await Future.wait([
         _chatService.loadMessagesForGroups(conversation.id, [groupId]),

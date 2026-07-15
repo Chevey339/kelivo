@@ -44,6 +44,17 @@ void main() {
       ),
       64,
     );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited with missing count',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 0,
+      ),
+      Assistant.maxContextMessageSize,
+    );
   });
 
   test('only temporary regeneration physically removes trailing messages', () {

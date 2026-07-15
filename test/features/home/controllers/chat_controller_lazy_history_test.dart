@@ -15,6 +15,7 @@ class _FakeLazyChatService extends ChatService {
   int fullLoadCalls = 0;
   int recentLoadCalls = 0;
   int rangeLoadCalls = 0;
+  int timelinePageCalls = 0;
   int activeTimelineLoadCalls = 0;
   int messageIndexCalls = 0;
   int contextStartIndex = -1;
@@ -118,6 +119,7 @@ class _FakeLazyChatService extends ChatService {
     bool fromStart = false,
     int limit = 40,
   }) async {
+    timelinePageCalls++;
     rangeLoadCalls++;
     final grouped = <String, List<ChatMessage>>{};
     for (final message in _messages) {
@@ -1037,10 +1039,18 @@ void main() {
         await controller.setCurrentConversationAndLoad(conversation);
 
         final startBeforeEdit = controller.loadedStartIndex;
+        expect(
+          controller.collapsedMessages
+              .singleWhere(
+                (message) => (message.groupId ?? message.id) == 'message-470',
+              )
+              .id,
+          'message-470',
+        );
         final idsBeforeEdit = controller.messages
             .map((message) => message.groupId ?? message.id)
             .toList();
-        final timelineLoadsBeforeEdit = chatService.rangeLoadCalls;
+        final timelineLoadsBeforeEdit = chatService.timelinePageCalls;
         final edited = ChatMessage(
           id: 'message-470-v2',
           role: messages[470].role,
@@ -1052,11 +1062,21 @@ void main() {
         messages.add(edited);
         chatService.versionSelections = const {'message-470': 1};
 
-        final opened = await controller.openAroundPersistedMessage(edited);
+        final opening = controller.openAroundPersistedMessage(edited);
+
+        expect(
+          controller.collapsedMessages
+              .singleWhere(
+                (message) => (message.groupId ?? message.id) == 'message-470',
+              )
+              .id,
+          edited.id,
+        );
+        final opened = await opening;
 
         expect(opened, isTrue);
         expect(controller.loadedStartIndex, startBeforeEdit);
-        expect(chatService.rangeLoadCalls, timelineLoadsBeforeEdit);
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeEdit);
         expect(
           controller.messages.map((message) => message.groupId ?? message.id),
           idsBeforeEdit,
