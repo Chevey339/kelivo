@@ -730,8 +730,10 @@ class HomeViewModel extends ChangeNotifier {
       }
       await _chatController.setCurrentConversationAndLoad(convo);
       _streamController.clearGeminiThoughtSigs();
-      notifyListeners();
+      // Arm the new list's initial position before listeners can paint it with
+      // the previous conversation's scroll offset.
       onConversationSwitched?.call();
+      notifyListeners();
       unawaited(_drainQueuedInputIfReady(id));
     }
   }
@@ -822,8 +824,8 @@ class HomeViewModel extends ChangeNotifier {
     _chatService.setCurrentConversation(newConvo.id);
     await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
-    notifyListeners();
     onConversationSwitched?.call();
+    notifyListeners();
     onScrollToBottom?.call();
   }
 
@@ -919,8 +921,8 @@ class HomeViewModel extends ChangeNotifier {
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
       _streamController.clearAllState();
-      notifyListeners();
       onConversationSwitched?.call();
+      notifyListeners();
       onScrollToBottom?.call();
 
       return null; // success

@@ -117,7 +117,7 @@ class HomePageController extends ChangeNotifier {
   final FocusNode _inputFocus;
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
-  final ScrollController _scrollController;
+  ScrollController _scrollController;
 
   // ============================================================================
   // Services & Controllers (created internally)
@@ -144,6 +144,8 @@ class HomePageController extends ChangeNotifier {
 
   late AnimationController _convoFadeController;
   late Animation<double> _convoFade;
+  late AnimationController _messageJumpTransitionController;
+  late Animation<double> _messageJumpOpacity;
   bool _chatControllerReady = false;
 
   // ============================================================================
@@ -154,7 +156,7 @@ class HomePageController extends ChangeNotifier {
   final Map<String, TranslationData> _translations =
       <String, TranslationData>{};
 
-  // Note: GlobalKey-based message navigation removed; using ListObserverController instead.
+  // Note: GlobalKey-based message navigation was replaced by indexed scrolling.
 
   // Selection mode
   bool _selecting = false;
@@ -210,6 +212,7 @@ class HomePageController extends ChangeNotifier {
   ScrollController get scrollController => _scrollController;
   Animation<double> get convoFade => _convoFade;
   AnimationController get convoFadeController => _convoFadeController;
+  Animation<double> get messageJumpOpacity => _messageJumpOpacity;
 
   Map<String, TranslationData> get translations => _translations;
   ChatController get chatController => _chatController;
@@ -314,6 +317,18 @@ class HomePageController extends ChangeNotifier {
       curve: Curves.easeOutCubic,
     );
     _convoFadeController.value = 1.0;
+
+    _messageJumpTransitionController = AnimationController(
+      vsync: _vsync,
+      duration: const Duration(milliseconds: 180),
+    );
+    final messageJumpCurve = CurvedAnimation(
+      parent: _messageJumpTransitionController,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    _messageJumpOpacity = messageJumpCurve;
+    _messageJumpTransitionController.value = 1.0;
   }
 
   void _initializeControllers() {
@@ -398,8 +413,12 @@ class HomePageController extends ChangeNotifier {
         );
       }
     };
-    _viewModel.onScrollToBottom = () =>
-        _scrollToBottom(animate: !_chatController.isCurrentConversationLoading);
+    _viewModel.onScrollToBottom = () {
+      _scrollCtrl.resetUserScrolling();
+      _scrollCtrl.scrollToBottom(
+        animate: !_chatController.isCurrentConversationLoading,
+      );
+    };
     _viewModel.onHapticFeedback = () {
       try {
         final settings = _context.read<SettingsProvider>();
@@ -442,8 +461,20 @@ class HomePageController extends ChangeNotifier {
           _context.read<SettingsProvider>().autoScrollEnabled,
       getAutoScrollIdleSeconds: () =>
           _context.read<SettingsProvider>().autoScrollIdleSeconds,
+      getTopRevealInset: () =>
+          kToolbarHeight + MediaQuery.paddingOf(_context).top,
       isGenerating: () => _chatController.isCurrentConversationLoading,
     );
+  }
+
+  /// Give a newly opened conversation its own scroll state, matching
+  /// RikkaHub's per-ChatPage `rememberLazyListState` lifecycle.
+  void replaceScrollController(ScrollController controller) {
+    if (identical(_scrollController, controller)) return;
+    _scrollCtrl.dispose();
+    _scrollController = controller;
+    _initializeScrollController();
+    _scrollCtrl.positionAtBottomOnNextLayout();
   }
 
   void _initializeProviders() {
@@ -557,8 +588,8 @@ class HomePageController extends ChangeNotifier {
     required String messageId,
   }) async {
     await switchConversationAnimated(conversationId);
-    // Wait one extra frame so the new conversation's message widgets have
-    // had a chance to build for the observer controller.
+    // Wait one extra frame so the new conversation's indexed message list is
+    // attached before resolving the target.
     try {
       await WidgetsBinding.instance.endOfFrame;
     } catch (_) {}
@@ -798,11 +829,20 @@ class HomePageController extends ChangeNotifier {
     }
 
     await _viewModel.switchConversation(id);
-    _scrollCtrl.clearObserverCache();
     notifyListeners();
 
     if (!isDesktopPlatform) {
       try {
+        await WidgetsBinding.instance.endOfFrame;
+        if (currentConversation?.id != id) return;
+        // Resolve the real last item while the new conversation is still
+        // transparent. Its first maxScrollExtent can contain lazy estimates.
+        final activeScrollController = _scrollCtrl;
+        await activeScrollController.settleAtBottomBeforeReveal();
+        if (currentConversation?.id != id ||
+            !identical(_scrollCtrl, activeScrollController)) {
+          return;
+        }
         await _convoFadeController.forward();
       } catch (_) {}
     }
@@ -824,9 +864,9 @@ class HomePageController extends ChangeNotifier {
       } catch (_) {}
     }
     await _createNewConversation();
-    _scrollCtrl.clearObserverCache();
     if (!isDesktopPlatform) {
       try {
+        await WidgetsBinding.instance.endOfFrame;
         await _convoFadeController.forward();
       } catch (_) {}
     }
@@ -1800,54 +1840,94 @@ class HomePageController extends ChangeNotifier {
   Future<List<ChatMessage>> loadAllCollapsedMessagesForCurrentConversation() =>
       _chatController.loadAllCollapsedMessagesForCurrentConversation();
 
-  Future<void> scrollToMessageId(String targetId) async {
-    if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
-      final loaded = await _viewModel.loadUntilMessageVisible(targetId);
-      if (!loaded) return;
-      _scrollCtrl.clearObserverCache();
+  Future<void> scrollToMessageId(
+    String targetId, {
+    bool useRikkaTransition = false,
+  }) async {
+    if (useRikkaTransition) {
       try {
-        await WidgetsBinding.instance.endOfFrame;
+        await _messageJumpTransitionController.reverse();
       } catch (_) {}
     }
-    final index = _chatController.indexOfCollapsedMessageId(targetId);
-    if (index < 0) return;
-    await _scrollCtrl.scrollToMessageId(targetId: targetId, targetIndex: index);
+
+    try {
+      if (_chatController.indexOfCollapsedMessageId(targetId) < 0) {
+        final loaded = await _viewModel.loadUntilMessageVisible(targetId);
+        if (!loaded) return;
+        try {
+          await WidgetsBinding.instance.endOfFrame;
+        } catch (_) {}
+      }
+      final index = _chatController.indexOfCollapsedMessageId(targetId);
+      if (index < 0) return;
+      await _scrollCtrl.scrollToMessageId(
+        targetId: targetId,
+        targetIndex: index,
+      );
+    } finally {
+      if (useRikkaTransition) {
+        try {
+          await _messageJumpTransitionController.forward();
+        } catch (_) {}
+      }
+    }
   }
 
-  Future<void> jumpToPreviousQuestion() async {
-    final moved = await _scrollCtrl.jumpToPreviousQuestion(
-      messages: _chatController.collapsedMessages,
-      indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-    );
-    if (!moved) await _jumpToAdjacentQuestionOutsideWindow(previous: true);
+  Future<void> jumpToPreviousQuestion() =>
+      _jumpToAdjacentMessage(previous: true);
+
+  Future<void> jumpToNextQuestion() => _jumpToAdjacentMessage(previous: false);
+
+  Future<void> _jumpToAdjacentMessage({required bool previous}) async {
+    final moved = await (previous
+        ? _scrollCtrl.jumpToPreviousQuestion(
+            messages: _chatController.collapsedMessages,
+            indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+          )
+        : _scrollCtrl.jumpToNextQuestion(
+            messages: _chatController.collapsedMessages,
+            indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+          ));
+    if (!moved) {
+      await _jumpToAdjacentMessageOutsideWindow(previous: previous);
+    }
   }
 
-  Future<void> jumpToNextQuestion() async {
-    final moved = await _scrollCtrl.jumpToNextQuestion(
-      messages: _chatController.collapsedMessages,
-      indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-    );
-    if (!moved) await _jumpToAdjacentQuestionOutsideWindow(previous: false);
-  }
-
-  Future<void> _jumpToAdjacentQuestionOutsideWindow({
+  Future<void> _jumpToAdjacentMessageOutsideWindow({
     required bool previous,
   }) async {
     final window = _chatController.collapsedMessages;
     if (window.isEmpty) return;
-    final all = await _chatController
-        .loadAllCollapsedMessagesForCurrentConversation();
     final boundaryId = previous ? window.first.id : window.last.id;
-    final boundary = all.indexWhere((message) => message.id == boundaryId);
+    final loaded = previous ? await loadMoreBefore() : await loadMoreAfter();
+    if (!loaded) {
+      if (previous) {
+        await scrollToTop();
+      } else {
+        await forceScrollToBottom();
+      }
+      return;
+    }
+    try {
+      await WidgetsBinding.instance.endOfFrame;
+    } catch (_) {}
+    final updatedWindow = _chatController.collapsedMessages;
+    final boundary = updatedWindow.indexWhere(
+      (message) => message.id == boundaryId,
+    );
     if (boundary < 0) return;
     final step = previous ? -1 : 1;
-    for (
-      var index = boundary + step;
-      index >= 0 && index < all.length;
-      index += step
-    ) {
-      if (all[index].role != 'user') continue;
-      await scrollToMessageId(all[index].id);
+    final target = boundary + step;
+    if (target >= 0 && target < updatedWindow.length) {
+      await (previous
+          ? _scrollCtrl.jumpToPreviousQuestion(
+              messages: updatedWindow,
+              indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+            )
+          : _scrollCtrl.jumpToNextQuestion(
+              messages: updatedWindow,
+              indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+            ));
       return;
     }
     if (previous) {
@@ -1862,7 +1942,6 @@ class HomePageController extends ChangeNotifier {
       final loaded = await _chatController.loadStartWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
     _scrollCtrl.scrollToTop(animate: animate);
@@ -1873,10 +1952,9 @@ class HomePageController extends ChangeNotifier {
       final loaded = await _chatController.loadEndWindow();
       if (loaded) {
         _viewModel.restoreMessageUiState();
-        _scrollCtrl.clearObserverCache();
       }
     }
-    _scrollToBottom(animate: animate);
+    _scrollCtrl.forceScrollToBottom(animate: animate);
   }
 
   // ============================================================================
@@ -1977,7 +2055,7 @@ class HomePageController extends ChangeNotifier {
   void _scrollToBottomSoon({bool animate = true}) =>
       _scrollCtrl.scrollToBottomSoon(animate: animate);
 
-  // _getViewportBounds removed: ListObserverController handles visibility.
+  // _getViewportBounds removed: the indexed list exposes its visible range.
 
   void _restoreMessageUiState() {
     for (int i = 0; i < messages.length; i++) {
@@ -2068,6 +2146,7 @@ class HomePageController extends ChangeNotifier {
   @override
   void dispose() {
     _convoFadeController.dispose();
+    _messageJumpTransitionController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();
     try {

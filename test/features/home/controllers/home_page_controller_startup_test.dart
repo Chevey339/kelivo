@@ -33,6 +33,20 @@ void main() {
       controller!.scrollCtrl.scrollController,
       same(controller!.scrollController),
     );
+
+    final replacement = ChatAutoFollowScrollController();
+    controller!.replaceScrollController(replacement);
+    expect(controller!.scrollController, same(replacement));
+    expect(controller!.scrollCtrl.scrollController, same(replacement));
+
+    controller!.scrollCtrl.handleUserScrollIntent();
+    expect(controller!.scrollCtrl.isUserScrolling, isTrue);
+    await controller!.forceScrollToBottom(animate: false);
+    expect(controller!.scrollCtrl.isUserScrolling, isFalse);
+    expect(controller!.scrollCtrl.autoStickToBottom, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    replacement.dispose();
   });
 }
 
@@ -46,7 +60,7 @@ class _ControllerHarness extends StatefulWidget {
 }
 
 class _ControllerHarnessState extends State<_ControllerHarness>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _inputBarKey = GlobalKey();
   final _inputFocus = FocusNode();

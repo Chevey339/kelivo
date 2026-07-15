@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 void main() {
   const platforms = <TargetPlatform>[
@@ -21,6 +21,8 @@ void main() {
       debugDefaultTargetPlatformOverride = platform;
       final scrollController = ScrollController();
       addTearDown(scrollController.dispose);
+      final listController = ListController();
+      addTearDown(listController.dispose);
       final processing = ValueNotifier(false);
       addTearDown(processing.dispose);
       var userScrollIntentCount = 0;
@@ -30,9 +32,7 @@ void main() {
           home: Scaffold(
             body: MessageListView(
               scrollController: scrollController,
-              observerController: ListObserverController(
-                controller: scrollController,
-              ),
+              listController: listController,
               messages: const [],
               byGroup: const {},
               versionSelections: const {},
@@ -51,7 +51,7 @@ void main() {
         ),
       );
 
-      final list = tester.widget<ListView>(find.byType(ListView));
+      final list = tester.widget<SuperListView>(find.byType(SuperListView));
       final desktop =
           platform == TargetPlatform.macOS ||
           platform == TargetPlatform.windows ||
@@ -65,7 +65,7 @@ void main() {
       expect(find.byType(Scrollbar), desktop ? findsOneWidget : findsNothing);
 
       if (desktop) {
-        await tester.tap(find.byType(ListView));
+        await tester.tap(find.byType(SuperListView));
         await tester.sendKeyDownEvent(LogicalKeyboardKey.pageUp);
         await tester.sendKeyUpEvent(LogicalKeyboardKey.pageUp);
         await tester.pump();

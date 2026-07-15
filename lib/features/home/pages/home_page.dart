@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io' show File;
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:provider/provider.dart';
 import '../../../l10n/app_localizations.dart';
@@ -414,7 +413,7 @@ class _DialogActionButton extends StatelessWidget {
 }
 
 class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
+    with TickerProviderStateMixin, RouteAware, WidgetsBindingObserver {
   // ============================================================================
   // UI Controllers (owned by State for lifecycle management)
   // ============================================================================
@@ -426,13 +425,15 @@ class _HomePageState extends State<HomePage>
   final FocusNode _inputFocus = FocusNode();
   final TextEditingController _inputController = TextEditingController();
   final ChatInputBarController _mediaController = ChatInputBarController();
-  final scroll_ctrl.ChatAutoFollowScrollController _scrollController =
+  scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
+  String? _scrollConversationId;
   final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
   bool _scrollNavHovering = false;
+  double _lastViewInsetBottom = 0;
   StreamSubscription<String>? _processTextSub;
 
   // ============================================================================
@@ -470,6 +471,9 @@ class _HomePageState extends State<HomePage>
     _initProcessText();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _lastViewInsetBottom = View.of(context).viewInsets.bottom;
+      }
       _controller.measureInputBar();
       if (!mounted) return;
       context.read<WorldBookProvider>().initialize();
@@ -488,6 +492,16 @@ class _HomePageState extends State<HomePage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _controller.onAppLifecycleStateChanged(state);
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    final nextInset = View.of(context).viewInsets.bottom;
+    final keyboardOpening = nextInset > _lastViewInsetBottom + 0.5;
+    _lastViewInsetBottom = nextInset;
+    if (!keyboardOpening || !PlatformUtils.isMobileTarget) return;
+    _controller.scrollCtrl.pinBottomDuringViewportResizeIfNeeded();
   }
 
   @override
@@ -510,13 +524,22 @@ class _HomePageState extends State<HomePage>
     _drawerController.removeListener(_onDrawerValueChanged);
     _inputFocus.dispose();
     _inputController.dispose();
-    _scrollController.dispose();
     _controller.dispose();
+    _scrollController.dispose();
     routeObserver.unsubscribe(this);
     super.dispose();
   }
 
   void _onControllerChanged() {
+    final conversationId = _controller.currentConversation?.id;
+    if (conversationId != null && conversationId != _scrollConversationId) {
+      _scrollConversationId = conversationId;
+      final previous = _scrollController;
+      final replacement = scroll_ctrl.ChatAutoFollowScrollController();
+      _scrollController = replacement;
+      _controller.replaceScrollController(replacement);
+      WidgetsBinding.instance.addPostFrameCallback((_) => previous.dispose());
+    }
     if (mounted) setState(() {});
   }
 
@@ -712,20 +735,10 @@ class _HomePageState extends State<HomePage>
               ),
             ),
           );
-          final isAndroid =
-              Theme.of(context).platform == TargetPlatform.android;
-          Widget w = content;
-          if (!isAndroid) {
-            w = w
-                .animate(
-                  key: ValueKey(
-                    'mob_body_${_controller.currentConversation?.id ?? 'none'}',
-                  ),
-                )
-                .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic);
-            w = FadeTransition(opacity: _controller.convoFade, child: w);
-          }
-          return w;
+          return FadeTransition(
+            opacity: _controller.convoFade,
+            child: _wrapMessageJumpTransition(content),
+          );
         },
       ),
       bottomOverlay: _controller.selecting
@@ -905,27 +918,22 @@ class _HomePageState extends State<HomePage>
       backgroundImageActive: backgroundImageActive,
       content: FadeTransition(
         opacity: _controller.convoFade,
-        child:
-            KeyedSubtree(
-                  key: ValueKey<String>(
-                    _controller.currentConversation?.id ?? 'none',
-                  ),
-                  child: _buildMessageListView(
-                    context,
-                    topContentPadding: topContentPadding,
-                    bottomContentPadding: bottomContentPadding,
-                    dividerPadding: const EdgeInsets.symmetric(
-                      vertical: 8,
-                      horizontal: 12,
-                    ),
-                  ),
-                )
-                .animate(
-                  key: ValueKey(
-                    'tab_body_${_controller.currentConversation?.id ?? 'none'}',
-                  ),
-                )
-                .fadeIn(duration: 200.ms, curve: Curves.easeOutCubic),
+        child: _wrapMessageJumpTransition(
+          KeyedSubtree(
+            key: ValueKey<String>(
+              _controller.currentConversation?.id ?? 'none',
+            ),
+            child: _buildMessageListView(
+              context,
+              topContentPadding: topContentPadding,
+              bottomContentPadding: bottomContentPadding,
+              dividerPadding: const EdgeInsets.symmetric(
+                vertical: 8,
+                horizontal: 12,
+              ),
+            ),
+          ),
+        ),
       ),
       bottomOverlay: _controller.selecting
           ? ConstrainedBox(
@@ -1115,7 +1123,7 @@ class _HomePageState extends State<HomePage>
       child: MessageListView(
         isProcessingFiles: _controller.isProcessingFiles,
         scrollController: _scrollController,
-        observerController: _controller.scrollCtrl.observerController,
+        listController: _controller.scrollCtrl.messageListController,
         messages: _controller.chatController.collapsedMessages,
         renderModels: _controller.chatController.messageRenderModels,
         byGroup: _controller.chatController.groupedMessages,
@@ -1338,10 +1346,11 @@ class _HomePageState extends State<HomePage>
                 }
               : null,
           bottomOffset: _controller.inputBarHeight + 12,
-          onScrollToTop: _controller.scrollToTop,
+          onScrollToTop: () => _controller.scrollToTop(animate: false),
           onPreviousMessage: _controller.jumpToPreviousQuestion,
           onNextMessage: _controller.jumpToNextQuestion,
-          onScrollToBottom: _controller.forceScrollToBottom,
+          onScrollToBottom: () =>
+              _controller.forceScrollToBottom(animate: false),
         );
       },
     );
@@ -1386,8 +1395,15 @@ class _HomePageState extends State<HomePage>
     }
     if (!mounted) return;
     if (selectedId != null && selectedId.isNotEmpty) {
-      await _controller.scrollToMessageId(selectedId);
+      await _controller.scrollToMessageId(selectedId, useRikkaTransition: true);
     }
+  }
+
+  Widget _wrapMessageJumpTransition(Widget child) {
+    return FadeTransition(
+      opacity: _controller.messageJumpOpacity,
+      child: child,
+    );
   }
 
   Widget _wrapWithDropTarget(Widget child) {

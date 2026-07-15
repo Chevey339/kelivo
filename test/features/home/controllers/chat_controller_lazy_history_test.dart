@@ -1023,6 +1023,56 @@ void main() {
     );
 
     test(
+      'edited visible revision preserves the current bounded timeline window',
+      () async {
+        messages = List<ChatMessage>.generate(500, _message);
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Visible edit',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        final startBeforeEdit = controller.loadedStartIndex;
+        final idsBeforeEdit = controller.messages
+            .map((message) => message.groupId ?? message.id)
+            .toList();
+        final timelineLoadsBeforeEdit = chatService.rangeLoadCalls;
+        final edited = ChatMessage(
+          id: 'message-470-v2',
+          role: messages[470].role,
+          content: 'edited visible message with a different height',
+          conversationId: 'conversation-1',
+          groupId: 'message-470',
+          version: 1,
+        );
+        messages.add(edited);
+        chatService.versionSelections = const {'message-470': 1};
+
+        final opened = await controller.openAroundPersistedMessage(edited);
+
+        expect(opened, isTrue);
+        expect(controller.loadedStartIndex, startBeforeEdit);
+        expect(chatService.rangeLoadCalls, timelineLoadsBeforeEdit);
+        expect(
+          controller.messages.map((message) => message.groupId ?? message.id),
+          idsBeforeEdit,
+        );
+        expect(
+          controller.messages
+              .singleWhere(
+                (message) => (message.groupId ?? message.id) == 'message-470',
+              )
+              .id,
+          edited.id,
+        );
+      },
+    );
+
+    test(
       'regenerated middle revision opens around its stable cursor instead of tail',
       () async {
         messages = List<ChatMessage>.generate(5000, _message);

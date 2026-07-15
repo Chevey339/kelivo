@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
@@ -20,6 +21,31 @@ ChatMessage _message({
 }
 
 void main() {
+  test('unlimited context reads the complete persisted conversation', () {
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      1507,
+    );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Limited',
+          contextMessageSize: 64,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      64,
+    );
+  });
+
   test('only temporary regeneration physically removes trailing messages', () {
     expect(
       ChatActions.shouldPhysicallyRemoveRegenerationTail(

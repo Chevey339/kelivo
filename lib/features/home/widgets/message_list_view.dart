@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
-import 'package:scrollview_observer/scrollview_observer.dart';
+import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/assistant.dart';
@@ -16,6 +16,7 @@ import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
 import '../controllers/streaming_content_notifier.dart';
 import '../controllers/message_render_model.dart';
+import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import '../services/ask_user_interaction_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
@@ -80,13 +81,14 @@ class TranslationUiState {
 /// Widget that displays the chat message list.
 ///
 /// Accepts pre-collapsed messages and pre-computed byGroup from the controller
-/// to avoid redundant computation on every build. Wraps the ListView with
-/// ListViewObserver for precise index-based scroll navigation.
+/// to avoid redundant computation on every build. Uses a variable-extent lazy
+/// list so large histories can scroll and navigate by index without laying out
+/// every preceding message.
 class MessageListView extends StatefulWidget {
   const MessageListView({
     super.key,
     required this.scrollController,
-    required this.observerController,
+    required this.listController,
     required this.messages,
     this.renderModels,
     required this.byGroup,
@@ -140,7 +142,7 @@ class MessageListView extends StatefulWidget {
   });
 
   final ScrollController scrollController;
-  final ListObserverController observerController;
+  final ListController listController;
 
   /// Pre-collapsed messages (from ChatController.collapsedMessages).
   final List<ChatMessage> messages;
@@ -220,10 +222,11 @@ class MessageListView extends StatefulWidget {
 }
 
 class _MessageListViewState extends State<MessageListView> {
-  static const double _streamingUpdateDeferBottomTolerance = 24.0;
+  static const double _streamingUpdateDeferBottomTolerance = 56.0;
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
+  bool _userScrollActive = false;
   ScrollMetrics? _latestPointerDragMetrics;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
     false,
@@ -232,6 +235,7 @@ class _MessageListViewState extends State<MessageListView> {
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
   late List<MessageRenderModel> _effectiveRenderModels;
+  late Map<String, int> _slotIndexById;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -247,7 +251,9 @@ class _MessageListViewState extends State<MessageListView> {
   @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
+    _synchronizeExtentCache(oldWidget, oldRenderModels);
   }
 
   void _refreshRenderModels() {
@@ -259,6 +265,188 @@ class _MessageListViewState extends State<MessageListView> {
           versionSelections: widget.versionSelections,
           contextDividerIndex: widget.truncCollapsedIndex,
         );
+    _slotIndexById = <String, int>{
+      for (var index = 0; index < _effectiveRenderModels.length; index++)
+        _effectiveRenderModels[index].slotId: index,
+    };
+  }
+
+  int? _findMessageIndexByKey(Key key) {
+    if (key is! ValueKey<String>) return null;
+    return _slotIndexById[key.value];
+  }
+
+  void _synchronizeExtentCache(
+    MessageListView oldWidget,
+    List<MessageRenderModel> oldModels,
+  ) {
+    final controller = widget.listController;
+    if (!identical(controller, oldWidget.listController) ||
+        !controller.isAttached) {
+      return;
+    }
+    if (controller.isLocked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && controller.isAttached && !controller.isLocked) {
+          controller.invalidateAllExtents();
+        }
+      });
+      return;
+    }
+
+    final newModels = _effectiveRenderModels;
+    final metricInputsChanged =
+        oldWidget.chatFontScale != widget.chatFontScale ||
+        oldWidget.selecting != widget.selecting ||
+        oldWidget.showModelIcon != widget.showModelIcon ||
+        oldWidget.showUserAvatar != widget.showUserAvatar ||
+        oldWidget.showTokenStats != widget.showTokenStats ||
+        !identical(oldWidget.assistant, widget.assistant);
+    if (metricInputsChanged) {
+      controller.invalidateAllExtents();
+      return;
+    }
+
+    if (oldModels.length < newModels.length &&
+        _isPrefix(oldModels, newModels)) {
+      return;
+    }
+    if (oldModels.length < newModels.length &&
+        _isSuffix(oldModels, newModels)) {
+      final anchor = _captureVisibleAnchor(controller);
+      final added = newModels.length - oldModels.length;
+      for (var index = 0; index < added; index++) {
+        controller.addItem(index);
+      }
+      if (anchor != null) {
+        controller.jumpToItem(
+          index: anchor.index + added,
+          scrollController: widget.scrollController,
+          alignment: anchor.alignment,
+        );
+      }
+      return;
+    }
+    if (newModels.length < oldModels.length &&
+        _isPrefix(newModels, oldModels)) {
+      return;
+    }
+    if (newModels.length < oldModels.length &&
+        _isSuffix(newModels, oldModels)) {
+      final anchor = _captureVisibleAnchor(controller);
+      final removed = oldModels.length - newModels.length;
+      for (var index = 0; index < removed; index++) {
+        controller.removeItem(0);
+      }
+      if (anchor != null && anchor.index >= removed) {
+        controller.jumpToItem(
+          index: anchor.index - removed,
+          scrollController: widget.scrollController,
+          alignment: anchor.alignment,
+        );
+      }
+      return;
+    }
+
+    if (oldModels.length == newModels.length) {
+      var slotsMatch = true;
+      final changedIndices = <int>[];
+      for (var index = 0; index < newModels.length; index++) {
+        if (oldModels[index].slotId != newModels[index].slotId) {
+          slotsMatch = false;
+          break;
+        }
+        if (_messageExtentMayHaveChanged(
+          oldModels[index].message,
+          newModels[index].message,
+        )) {
+          changedIndices.add(index);
+        }
+      }
+      if (slotsMatch) {
+        final visible = controller.visibleRange;
+        final scrollController = widget.scrollController;
+        if (changedIndices.length == 1 &&
+            visible != null &&
+            changedIndices.single < visible.$1 &&
+            scrollController is scroll_ctrl.ChatAutoFollowScrollController) {
+          final request = scrollController
+              .requestPreserveDistanceFromEndDuringLayout();
+          if (request != null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              scrollController.finishPreserveDistanceFromEndDuringLayout(
+                request,
+              );
+            });
+          }
+        }
+        for (final index in changedIndices) {
+          controller.invalidateExtent(index);
+        }
+        return;
+      }
+    }
+
+    controller.invalidateAllExtents();
+  }
+
+  ({int index, double alignment})? _captureVisibleAnchor(
+    ListController controller,
+  ) {
+    if (!widget.scrollController.hasClients) return null;
+    final visible = controller.visibleRange;
+    if (visible == null) return null;
+    final index = visible.$1;
+    final position = widget.scrollController.position;
+    final itemExtent = controller.extentForIndex(index).$1;
+    // This is the same offset query used by jumpToItem. It is safe here,
+    // before the new child list enters layout.
+    // ignore: invalid_use_of_visible_for_testing_member
+    final itemLeading = controller.getOffsetToReveal(index, 0);
+    final availableAlignmentExtent = position.viewportDimension - itemExtent;
+    final alignment = availableAlignmentExtent.abs() < 0.5
+        ? 0.0
+        : (itemLeading - position.pixels) / availableAlignmentExtent;
+    return (index: index, alignment: alignment);
+  }
+
+  bool _messageExtentMayHaveChanged(ChatMessage old, ChatMessage current) {
+    return old.id != current.id ||
+        old.role != current.role ||
+        old.content != current.content ||
+        old.reasoningText != current.reasoningText ||
+        old.translation != current.translation ||
+        old.reasoningSegmentsJson != current.reasoningSegmentsJson ||
+        old.modelId != current.modelId ||
+        old.providerId != current.providerId ||
+        old.totalTokens != current.totalTokens ||
+        old.promptTokens != current.promptTokens ||
+        old.completionTokens != current.completionTokens ||
+        old.cachedTokens != current.cachedTokens ||
+        old.durationMs != current.durationMs;
+  }
+
+  bool _isPrefix(
+    List<MessageRenderModel> prefix,
+    List<MessageRenderModel> values,
+  ) {
+    if (prefix.length > values.length) return false;
+    for (var index = 0; index < prefix.length; index++) {
+      if (prefix[index].slotId != values[index].slotId) return false;
+    }
+    return true;
+  }
+
+  bool _isSuffix(
+    List<MessageRenderModel> suffix,
+    List<MessageRenderModel> values,
+  ) {
+    if (suffix.length > values.length) return false;
+    final offset = values.length - suffix.length;
+    for (var index = 0; index < suffix.length; index++) {
+      if (suffix[index].slotId != values[offset + index].slotId) return false;
+    }
+    return true;
   }
 
   bool get _isDesktopPlatform =>
@@ -334,8 +522,13 @@ class _MessageListViewState extends State<MessageListView> {
         return ValueListenableBuilder<bool>(
           valueListenable: widget.isProcessingFiles,
           builder: (context, isProcessing, child) {
-            final list = ListView.builder(
+            final list = SuperListView.builder(
               controller: widget.scrollController,
+              listController: widget.listController,
+              cacheExtent: 600,
+              delayPopulatingCacheArea: false,
+              addRepaintBoundaries: false,
+              findChildIndexCallback: _findMessageIndexByKey,
               padding: EdgeInsets.fromLTRB(
                 horizontalPad,
                 widget.topContentPadding,
@@ -358,14 +551,9 @@ class _MessageListViewState extends State<MessageListView> {
               },
             );
 
-            final observedList = ListViewObserver(
-              controller: widget.observerController,
-              child: list,
-            );
-
             final historyList = NotificationListener<ScrollNotification>(
               onNotification: _handleScrollNotification,
-              child: observedList,
+              child: list,
             );
 
             final userScrollAwareList = Listener(
@@ -430,15 +618,9 @@ class _MessageListViewState extends State<MessageListView> {
       if (notification.dragDetails != null) {
         _recordPointerDrag(notification.metrics);
       }
-      if (_deferStreamingMessageUpdates.value) {
-        _scheduleStreamingUpdateResume();
-      }
     } else if (notification is OverscrollNotification) {
       if (notification.dragDetails != null) {
         _recordPointerDrag(notification.metrics);
-      }
-      if (_deferStreamingMessageUpdates.value) {
-        _scheduleStreamingUpdateResume();
       }
     } else if (notification is ScrollStartNotification &&
         notification.dragDetails != null) {
@@ -447,13 +629,17 @@ class _MessageListViewState extends State<MessageListView> {
     if (notification is UserScrollNotification) {
       final shouldDefer = notification.direction != ScrollDirection.idle;
       if (shouldDefer) {
+        _userScrollActive = true;
+        _scrollIdleTimer?.cancel();
+        _scrollIdleTimer = null;
         _setDeferStreamingMessageUpdates(true);
       } else {
+        _userScrollActive = false;
         _scheduleStreamingUpdateResume();
       }
     }
     if (notification is ScrollEndNotification) {
-      _settlePointerDrag(notification.metrics);
+      _userScrollActive = false;
       _scheduleStreamingUpdateResume();
     }
     if (_historyLoadScheduled) return false;
@@ -502,11 +688,11 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   void _handleUserScrollActivity([ScrollMetrics? metrics]) {
-    widget.onUserScrollIntent?.call();
     if (_isWithinStreamingAutoFollowBand(metrics)) {
       _resumeStreamingMessageUpdates();
       return;
     }
+    widget.onUserScrollIntent?.call();
     _setDeferStreamingMessageUpdates(true);
     _scheduleStreamingUpdateResume();
   }
@@ -514,12 +700,12 @@ class _MessageListViewState extends State<MessageListView> {
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
     if (metrics != null) {
       final gap = _contentMaxScrollExtent(metrics) - metrics.pixels;
-      return gap >= -0.5 && gap <= _streamingUpdateDeferBottomTolerance;
+      return gap <= _streamingUpdateDeferBottomTolerance;
     }
     if (!widget.scrollController.hasClients) return true;
     final position = widget.scrollController.position;
     final gap = _contentMaxScrollExtent(position) - position.pixels;
-    return gap >= -0.5 && gap <= _streamingUpdateDeferBottomTolerance;
+    return gap <= _streamingUpdateDeferBottomTolerance;
   }
 
   double _contentMaxScrollExtent(ScrollMetrics metrics) {
@@ -532,6 +718,7 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   void _scheduleStreamingUpdateResume() {
+    if (_pointerDragInProgress || _userScrollActive) return;
     _scrollIdleTimer?.cancel();
     _scrollIdleTimer = Timer(
       const Duration(milliseconds: 160),
@@ -700,35 +887,41 @@ class _MessageListViewState extends State<MessageListView> {
         widget.spotlightMessageId != null &&
         message.id == widget.spotlightMessageId;
     if (!isSpotlight) {
-      return RepaintBoundary(key: ValueKey(model.slotId), child: messageColumn);
+      return RepaintBoundary(
+        key: ValueKey<String>(model.slotId),
+        child: messageColumn,
+      );
     }
 
-    return TweenAnimationBuilder<double>(
-      key: ValueKey('spotlight-${widget.spotlightToken}'),
-      tween: Tween<double>(begin: 1.0, end: 0.0),
-      duration: const Duration(milliseconds: 1200),
-      curve: Curves.easeOut,
-      builder: (context, opacity, child) {
-        return Stack(
-          children: [
-            child!,
-            if (opacity > 0.0)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(
-                        0xFFFFA726,
-                      ).withValues(alpha: opacity * 0.30),
-                      borderRadius: BorderRadius.circular(4),
+    return RepaintBoundary(
+      key: ValueKey<String>(model.slotId),
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey('spotlight-${widget.spotlightToken}'),
+        tween: Tween<double>(begin: 1.0, end: 0.0),
+        duration: const Duration(milliseconds: 1200),
+        curve: Curves.easeOut,
+        builder: (context, opacity, child) {
+          return Stack(
+            children: [
+              child!,
+              if (opacity > 0.0)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(
+                          0xFFFFA726,
+                        ).withValues(alpha: opacity * 0.30),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
                 ),
-              ),
-          ],
-        );
-      },
-      child: messageColumn,
+            ],
+          );
+        },
+        child: messageColumn,
+      ),
     );
   }
 

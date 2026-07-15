@@ -509,6 +509,27 @@ class ChatController extends ChangeNotifier {
     if (conversation == null || message.conversationId != conversation.id) {
       return false;
     }
+
+    final groupId = message.groupId ?? message.id;
+    final visibleIndex = _messages.indexWhere(
+      (candidate) => (candidate.groupId ?? candidate.id) == groupId,
+    );
+    if (visibleIndex >= 0) {
+      // An edited revision belongs to the same logical timeline slot. Keep the
+      // current bounded window intact so the list can preserve its visible
+      // anchor while only this slot remeasures its extent.
+      _messages[visibleIndex] = message;
+      _loadVersionSelections();
+      await Future.wait([
+        _chatService.loadMessagesForGroups(conversation.id, [groupId]),
+        _chatService.loadFirstMessageIndicesForGroups(conversation.id, [
+          groupId,
+        ]),
+      ]);
+      notifyListeners();
+      return true;
+    }
+
     final opened = await loadWindowAroundMessage(
       message.id,
       leadingContext: ChatService.defaultHistoryPageSize,

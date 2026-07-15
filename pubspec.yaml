@@ -96,7 +96,7 @@ dependencies:
   webview_windows: ^0.4.0
   flutter_math_fork: ^0.7.4
   scrollable_positioned_list: ^0.3.8
-  scrollview_observer: ^1.26.0
+  super_sliver_list: ^0.4.1
   image_gallery_saver_plus: ^4.0.1
   haptic_feedback: ^0.6.4+3
   system_fonts: ^1.0.1

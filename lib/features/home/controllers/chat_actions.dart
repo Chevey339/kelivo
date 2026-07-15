@@ -790,7 +790,7 @@ class ChatActions {
     final existingContextMessages = await chatController
         .messagesForGenerationContext(
           conversation,
-          maxMessages: _contextReadLimit(assistant),
+          maxMessages: _contextReadLimit(assistant, conversation),
         );
     if (_hasUnsupportedAudioAttachments(
       messages: existingContextMessages,
@@ -912,7 +912,18 @@ class ChatActions {
     }
   }
 
-  int _contextReadLimit(Assistant? assistant) {
+  int _contextReadLimit(Assistant? assistant, Conversation conversation) {
+    return contextReadLimit(
+      assistant: assistant,
+      persistedMessageCount: chatService.getMessageCount(conversation.id),
+    );
+  }
+
+  @visibleForTesting
+  static int contextReadLimit({
+    required Assistant? assistant,
+    required int persistedMessageCount,
+  }) {
     if ((assistant?.limitContextMessages ?? true) &&
         (assistant?.contextMessageSize ?? 0) > 0) {
       return assistant!.contextMessageSize.clamp(
@@ -920,7 +931,7 @@ class ChatActions {
         Assistant.maxContextMessageSize,
       );
     }
-    return Assistant.maxContextMessageSize;
+    return persistedMessageCount;
   }
 
   // ============================================================================
@@ -964,7 +975,7 @@ class ChatActions {
         ? await chatController.messagesForCompleteHistoryContext(conversation)
         : await chatController.messagesForGenerationContext(
             conversation,
-            maxMessages: _contextReadLimit(assistant),
+            maxMessages: _contextReadLimit(assistant, conversation),
             throughRevisionId: message.id,
             includeFollowingAssistant: true,
           );
@@ -1176,7 +1187,7 @@ class ChatActions {
     }
     final completeMessages = await chatController.messagesForGenerationContext(
       conversation,
-      maxMessages: _contextReadLimit(assistant),
+      maxMessages: _contextReadLimit(assistant, conversation),
       throughRevisionId: message.id,
     );
     final contextIndex = completeMessages.indexWhere(
