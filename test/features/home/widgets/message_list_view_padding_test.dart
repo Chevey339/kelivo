@@ -480,7 +480,7 @@ void main() {
     streamingNotifier.dispose();
   });
 
-  testWidgets('贴近底部时用户滚动不暂停应用流式内容更新', (tester) async {
+  testWidgets('贴近底部时用户滚动仍登记意图并在松手后恢复流式内容', (tester) async {
     var userIntentCalls = 0;
     final scrollController = ScrollController();
     final listController = ListController();
@@ -569,7 +569,7 @@ void main() {
 
     await gesture.up();
     await tester.pump(const Duration(milliseconds: 220));
-    expect(userIntentCalls, 0);
+    expect(userIntentCalls, 1);
     expect(find.text('updated while still near bottom'), findsOneWidget);
 
     scrollController.dispose();

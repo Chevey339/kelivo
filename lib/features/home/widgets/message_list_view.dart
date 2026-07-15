@@ -688,11 +688,11 @@ class _MessageListViewState extends State<MessageListView> {
   }
 
   void _handleUserScrollActivity([ScrollMetrics? metrics]) {
+    widget.onUserScrollIntent?.call();
     if (_isWithinStreamingAutoFollowBand(metrics)) {
       _resumeStreamingMessageUpdates();
       return;
     }
-    widget.onUserScrollIntent?.call();
     _setDeferStreamingMessageUpdates(true);
     _scheduleStreamingUpdateResume();
   }
