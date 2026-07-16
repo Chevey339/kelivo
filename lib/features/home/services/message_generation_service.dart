@@ -227,6 +227,7 @@ class MessageGenerationService {
     required String conversationId,
     required ChatInputData input,
     required Assistant? assistant,
+    String? groupId,
   }) async {
     return chatService.addMessage(
       conversationId: conversationId,
@@ -235,6 +236,7 @@ class MessageGenerationService {
         input,
         assistant: assistant,
       ),
+      groupId: groupId,
     );
   }
 
@@ -265,6 +267,7 @@ class MessageGenerationService {
     required String modelId,
     required String providerKey,
     String? groupId,
+    String? subgroupId,
     int version = 0,
   }) async {
     return chatService.addMessage(
@@ -275,6 +278,7 @@ class MessageGenerationService {
       providerId: providerKey,
       isStreaming: true,
       groupId: groupId,
+      subgroupId: subgroupId,
       version: version,
     );
   }

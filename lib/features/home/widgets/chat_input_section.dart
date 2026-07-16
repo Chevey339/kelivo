@@ -66,6 +66,9 @@ class ChatInputSection extends StatelessWidget {
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
+    this.multiAIModelCount,
+    this.onExitMultiAI,
+    this.onMultiSelectModel,
   });
 
   final GlobalKey inputBarKey;
@@ -84,6 +87,9 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onMore;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
+  final int? multiAIModelCount;
+  final VoidCallback? onExitMultiAI;
+  final VoidCallback? onMultiSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
@@ -210,6 +216,9 @@ class ChatInputSection extends StatelessWidget {
       backgroundImageActive: backgroundImageActive,
       inputBackgroundOpacityLight: settings.chatInputBackgroundOpacityLight,
       inputBackgroundOpacityDark: settings.chatInputBackgroundOpacityDark,
+      multiAIModelCount: multiAIModelCount,
+      onExitMultiAI: onExitMultiAI,
+      onMultiSelectModel: onMultiSelectModel,
     );
   }
 

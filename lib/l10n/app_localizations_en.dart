@@ -5687,4 +5687,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String imageCompressionBatchResult(String saved, String pct) {
     return 'Compressed all images, saved $saved (-$pct%)';
   }
+
+  @override
+  String get messageMoreSheetMultiAI => 'Start Comparison';
+
+  @override
+  String get multiAIModeLockedToast =>
+      'Multi-AI mode is active. Manage models from the comparison cards.';
+
+  @override
+  String multiAIModelsBadge(int count) {
+    return '$count models';
+  }
+
+  @override
+  String get modelSelectorMultiSelect => 'Multi-select';
+
+  @override
+  String modelSelectorMultiConfirm(int count) {
+    return 'Confirm ($count)';
+  }
+
+  @override
+  String get multiAIAdoptVersion => 'Adopt';
+
+  @override
+  String get multiAISelectModelsTitle => 'Select Models';
+
+  @override
+  String multiAIStartComparison(int count) {
+    return 'Start Comparison ($count models)';
+  }
+
+  @override
+  String get multiAISelectModelHint => 'Select at least 2 models to compare';
+
+  @override
+  String multiAISelectedCount(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get multiAIDropThread => 'Drop';
 }

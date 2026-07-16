@@ -64,6 +64,33 @@
   - Import automatically skips mode selection for `cuplivo_incr_` files
   - Empty export (0 conversations matched) shows a confirmation warning before producing the file
 
+## Multi-AI Comparison Mode (Side-by-side)
+
+- **Trigger**: 
+  - **User messages**: No entry point.
+  - **Assistant messages**: MessageMoreSheet "Multi AI" action → "让其他 AI 也回答". Uses pre-selected models from model selector; if none pre-selected, opens multi-model selector via `showMultiModelSelector()`. Comparison starts **immediately** via `startRoundFromHistory()`.
+  - **Model selector**: Dual-mode (single/multi) in `_ModelSelectSheet`. Select ≥2 models → 确定 → enters multi-AI mode via `multiAIEngine.enter()`.
+- **Data model**: `ChatMessage.subgroupId` (nullable TEXT). Within the same `groupId`, multiple `subgroupId`s represent different model responses as **cards**. `subgroupId = null` messages follow existing collapse/version behavior.
+- **Card rendering**: When a `groupId` has any message with `subgroupId != null`, render cards (PageView) instead of a single collapsed message. Each card shows one subgroup's selected version using full `ChatMessageWidget`.
+- **Resolve (adopt)**: ALL threads across ALL rounds get `subgroupId = NULL`, reassigned continuous versions, adopt version stored in `versionSelections[groupId]`. Exits card mode. Exits multi-AI engine mode.
+- **Drop**: A single thread's messages get `subgroupId = NULL` (keeping version), exits that card but stays in version pool. Model pool shrinks by 1 via `removeThread()`. Physical DB rows unchanged.
+- **Streaming**: N concurrent streams, each writing to their own messageId. Existing `StreamingContentNotifier` per-message architecture handles this.
+- **Engine state** (MultiAIEngine, in-memory only): `_models`, `_threadIds`, `_isActive`. NOT persisted — recovery happens from `ChatMessage.subgroupId` + `providerId`/`modelId` in conversation history.
+- **Persistence recovery**: On conversation switch via `switchConversationAnimated`, scan `_messages` for `subgroupActiveGroupIds`, extract `{providerId, modelId}` from latest round's subgroup messages, restore model selector badge via `multiAIEngine.recoverFromMessages()`.
+- **Mode lifecycle**:
+  - Enter: Select ≥2 models → 确定. Or: assistant message "更多" + trigger.
+  - Lock: Once active, model selector button is locked → shows pill badge with ✕ and model count. Click shows snackbar "多 AI 模式已激活".
+  - Exit: Click ✕ on badge, resolve (adopt), deselect to 1 model, switch conversation.
+  - Drop: Reduces model pool synchronously via `removeThread()`.
+- **Model selector interaction**:
+  - Normal: single-select (existing behavior).
+  - Multi-select mode: checkboxes in `_ModelSelectSheet` + 确定 button. Long-press still opens ProvidersPage.
+  - When N≥2 selected → enter multi-AI mode.
+  - When locked: click → snackbar toast.
+- **Send behavior**: When multi-AI mode active, typing send triggers `startRound` for ALL models (N parallel threads).
+- **startRoundFromHistory**: Called when user clicks "让其他 AI 也回答". Finds preceding user message, assigns it `roundGroupId` (persisted via `chatService.updateMessage` with `groupId`), creates N assistant placeholders with `subgroupId`s, starts N streams using conversation history as API context. No new user message created.
+- **UI**: `MultiAICardGroup` with PageView (horizontal swipe). Card has Resolve ✓ / Drop ✕ per card. `ChatInputBar` retained with badge `{count} 个模型` and ✕ button.
+
 ## Image Attachment Compression
 
 - **Trigger**: Per-image via clicking file size label below thumbnail; batch via dialog's "全部压缩" button. All ingress paths (gallery, camera, file picker, drag-and-drop, clipboard paste) treated identically.

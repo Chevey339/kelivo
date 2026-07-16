@@ -50,6 +50,7 @@ import '../widgets/world_book_sheet.dart';
 import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
+import '../widgets/multi_ai_comparison_view.dart';
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
@@ -656,7 +657,10 @@ class _HomePageState extends State<HomePage>
       canToggleTemporaryConversation:
           _controller.canToggleTemporaryConversation,
       temporaryConversationEnabled: _controller.isTemporaryConversation,
-      onSelectModel: () => showModelSelectSheet(context),
+      onSelectModel: () => showModelSelectSheet(
+        context,
+        onMultiSelectConfirm: _controller.enterMultiAIMode,
+      ),
       globalSearchMode: _controller.isGlobalSearchMode,
       globalSearchQuery: _controller.globalSearchQuery,
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
@@ -803,7 +807,10 @@ class _HomePageState extends State<HomePage>
       onGlobalSearchQueryChanged: _controller.setGlobalSearchQuery,
       onOpenGlobalSearchResult: (convId, msgId) => _controller
           .openGlobalSearchResult(conversationId: convId, messageId: msgId),
-      onSelectModel: () => showModelSelectSheet(context),
+      onSelectModel: () => showModelSelectSheet(
+        context,
+        onMultiSelectConfirm: _controller.enterMultiAIMode,
+      ),
       onSidebarWidthChanged: _controller.updateSidebarWidth,
       onSidebarWidthChangeEnd: _controller.saveSidebarWidth,
       onRightSidebarWidthChanged: _controller.updateRightSidebarWidth,
@@ -1125,79 +1132,99 @@ class _HomePageState extends State<HomePage>
     final suggestionsEnabled =
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
+    // Build inline multi-AI card widgets keyed by anchor user message ID
+    final messages = _controller.chatController.collapsedMessages;
+    final afterMessageWidgets = <String, Widget>{};
+    for (final anchorId in _controller.multiAIEngine.anchorMessageIds) {
+      final subgrouped = _controller.multiAIEngine.getMessagesForAnchor(
+        anchorId,
+      );
+      if (subgrouped.isEmpty) continue;
+      afterMessageWidgets[anchorId] = MultiAICardGroup(
+        key: ValueKey('multi-ai-anchor-$anchorId'),
+        anchorUserMessageId: anchorId,
+        subgroupedMessages: subgrouped,
+        controller: _controller,
+        isLatestRound: _controller.multiAIEngine.latestAnchorId == anchorId,
+      );
+    }
+
+    final messageList = MessageListView(
+      isProcessingFiles: _controller.isProcessingFiles,
+      scrollController: _scrollController,
+      observerController: _controller.scrollCtrl.observerController,
+      messages: messages,
+      byGroup: _controller.chatController.groupedMessages,
+      versionSelections: _controller.versionSelections,
+      truncCollapsedIndex: _computeTruncCollapsedIndex(),
+      reasoning: _controller.reasoning,
+      reasoningSegments: _controller.reasoningSegments,
+      contentSplits: _controller.contentSplits,
+      toolParts: _controller.toolParts,
+      translations: _buildTranslationUiStates(),
+      selecting: _controller.selecting,
+      selectedItems: _controller.selectedItems,
+      suggestions: suggestionsEnabled
+          ? (_controller.currentConversation?.chatSuggestions ??
+                const <String>[])
+          : const <String>[],
+      topContentPadding: topContentPadding,
+      bottomContentPadding: bottomContentPadding,
+      dividerPadding: dividerPadding,
+      streamingContentNotifier: _controller.streamingContentNotifier,
+      spotlightMessageId: _controller.spotlightMessageId,
+      spotlightToken: _controller.spotlightToken,
+      afterMessageWidgets: afterMessageWidgets,
+      hasMoreBefore: _controller.chatController.hasMoreBefore,
+      onLoadMoreBefore: _controller.loadMoreBefore,
+      hasMoreAfter: _controller.chatController.hasMoreAfter,
+      onLoadMoreAfter: _controller.loadMoreAfter,
+      onVersionChange: (groupId, version) async {
+        await _controller.setSelectedVersion(groupId, version);
+      },
+      onRegenerateMessage: (message) =>
+          _controller.regenerateAtMessage(message),
+      onResendMessage: (message) => _controller.regenerateAtMessage(message),
+      onTranslateMessage: (message) => _controller.translateMessage(message),
+      onEditMessage: (message) => _controller.editMessage(message),
+      onDeleteMessage: (message, byGroup) =>
+          _handleDeleteMessage(context, message, byGroup),
+      onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
+        context,
+        message,
+        byGroup,
+        deleteAllVersions: true,
+      ),
+      onMultiAI: (message) => _controller.handleMultiAIAction(message),
+      onForkConversation: (message) => _controller.forkConversation(message),
+      onShareMessage: (index, messages) =>
+          _controller.shareMessage(index, messages),
+      onSelectMessages: (index, messages) => _controller.startMessageSelection(
+        messageIndex: index,
+        messageList: messages,
+        mode: ChatSelectionMode.delete,
+      ),
+      onSpeakMessage: (message) => _controller.speakMessage(message),
+      onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
+      onRecoveredAskUserAnswer: (message, part, result) =>
+          _controller.submitRecoveredAskUserAnswer(message, part, result),
+      onToggleSelection: (messageId, selected) {
+        _controller.toggleSelection(messageId, selected);
+      },
+      onToggleReasoning: (messageId) {
+        _controller.toggleReasoning(messageId);
+      },
+      onToggleTranslation: (messageId) {
+        _controller.toggleTranslation(messageId);
+      },
+      onToggleReasoningSegment: (messageId, segmentIndex) {
+        _controller.toggleReasoningSegment(messageId, segmentIndex);
+      },
+    );
+
     return BackdropGroup(
       backdropKey: _messageListBackdropKey,
-      child: MessageListView(
-        isProcessingFiles: _controller.isProcessingFiles,
-        scrollController: _scrollController,
-        observerController: _controller.scrollCtrl.observerController,
-        messages: _controller.chatController.collapsedMessages,
-        byGroup: _controller.chatController.groupedMessages,
-        versionSelections: _controller.versionSelections,
-        truncCollapsedIndex: _computeTruncCollapsedIndex(),
-        reasoning: _controller.reasoning,
-        reasoningSegments: _controller.reasoningSegments,
-        contentSplits: _controller.contentSplits,
-        toolParts: _controller.toolParts,
-        translations: _buildTranslationUiStates(),
-        selecting: _controller.selecting,
-        selectedItems: _controller.selectedItems,
-        suggestions: suggestionsEnabled
-            ? (_controller.currentConversation?.chatSuggestions ??
-                  const <String>[])
-            : const <String>[],
-        topContentPadding: topContentPadding,
-        bottomContentPadding: bottomContentPadding,
-        dividerPadding: dividerPadding,
-        streamingContentNotifier: _controller.streamingContentNotifier,
-        spotlightMessageId: _controller.spotlightMessageId,
-        spotlightToken: _controller.spotlightToken,
-        hasMoreBefore: _controller.chatController.hasMoreBefore,
-        onLoadMoreBefore: _controller.loadMoreBefore,
-        hasMoreAfter: _controller.chatController.hasMoreAfter,
-        onLoadMoreAfter: _controller.loadMoreAfter,
-        onVersionChange: (groupId, version) async {
-          await _controller.setSelectedVersion(groupId, version);
-        },
-        onRegenerateMessage: (message) =>
-            _controller.regenerateAtMessage(message),
-        onResendMessage: (message) => _controller.regenerateAtMessage(message),
-        onTranslateMessage: (message) => _controller.translateMessage(message),
-        onEditMessage: (message) => _controller.editMessage(message),
-        onDeleteMessage: (message, byGroup) =>
-            _handleDeleteMessage(context, message, byGroup),
-        onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
-          context,
-          message,
-          byGroup,
-          deleteAllVersions: true,
-        ),
-        onForkConversation: (message) => _controller.forkConversation(message),
-        onShareMessage: (index, messages) =>
-            _controller.shareMessage(index, messages),
-        onSelectMessages: (index, messages) =>
-            _controller.startMessageSelection(
-              messageIndex: index,
-              messageList: messages,
-              mode: ChatSelectionMode.delete,
-            ),
-        onSpeakMessage: (message) => _controller.speakMessage(message),
-        onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
-        onRecoveredAskUserAnswer: (message, part, result) =>
-            _controller.submitRecoveredAskUserAnswer(message, part, result),
-        onToggleSelection: (messageId, selected) {
-          _controller.toggleSelection(messageId, selected);
-        },
-        onToggleReasoning: (messageId) {
-          _controller.toggleReasoning(messageId);
-        },
-        onToggleTranslation: (messageId) {
-          _controller.toggleTranslation(messageId);
-        },
-        onToggleReasoningSegment: (messageId, segmentIndex) {
-          _controller.toggleReasoningSegment(messageId, segmentIndex);
-        },
-      ),
+      child: messageList,
     );
   }
 
@@ -1217,7 +1244,10 @@ class _HomePageState extends State<HomePage>
           ? AppLocalizations.of(context)!.messageEditPageSaveAndSend
           : null,
       onMore: _toggleTools,
-      onSelectModel: () => showModelSelectSheet(context),
+      onSelectModel: () => showModelSelectSheet(
+        context,
+        onMultiSelectConfirm: _controller.enterMultiAIMode,
+      ),
       onLongPressSelectModel: () {
         Navigator.of(
           context,
@@ -1292,6 +1322,22 @@ class _HomePageState extends State<HomePage>
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
       backgroundImageActive: _assistantBackgroundActive(context),
+      multiAIModelCount: _controller.multiAIEngine.isActive
+          ? _controller.multiAIEngine.models.length
+          : null,
+      onExitMultiAI:
+          _controller.multiAIEngine.isActive &&
+              _controller.chatController.subgroupActiveGroupIds.isEmpty
+          ? _controller.exitMultiAIMode
+          : null,
+      onMultiSelectModel: () {
+        final l10n = AppLocalizations.of(context)!;
+        showAppSnackBar(
+          context,
+          message: l10n.multiAIModeLockedToast,
+          type: NotificationType.info,
+        );
+      },
     );
   }
 

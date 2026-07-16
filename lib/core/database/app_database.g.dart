@@ -874,6 +874,17 @@ class $MessageRowsTable extends MessageRows
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _subgroupIdMeta = const VerificationMeta(
+    'subgroupId',
+  );
+  @override
+  late final GeneratedColumn<String> subgroupId = GeneratedColumn<String>(
+    'subgroup_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _versionMeta = const VerificationMeta(
     'version',
   );
@@ -958,6 +969,7 @@ class $MessageRowsTable extends MessageRows
     translation,
     reasoningSegmentsJson,
     groupId,
+    subgroupId,
     version,
     promptTokens,
     completionTokens,
@@ -1098,6 +1110,12 @@ class $MessageRowsTable extends MessageRows
         groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
       );
     }
+    if (data.containsKey('subgroup_id')) {
+      context.handle(
+        _subgroupIdMeta,
+        subgroupId.isAcceptableOrUnknown(data['subgroup_id']!, _subgroupIdMeta),
+      );
+    }
     if (data.containsKey('version')) {
       context.handle(
         _versionMeta,
@@ -1217,6 +1235,10 @@ class $MessageRowsTable extends MessageRows
         DriftSqlType.string,
         data['${effectivePrefix}group_id'],
       ),
+      subgroupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subgroup_id'],
+      ),
       version: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}version'],
@@ -1266,6 +1288,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
   final String? translation;
   final String? reasoningSegmentsJson;
   final String? groupId;
+  final String? subgroupId;
   final int version;
   final int? promptTokens;
   final int? completionTokens;
@@ -1288,6 +1311,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     this.translation,
     this.reasoningSegmentsJson,
     this.groupId,
+    this.subgroupId,
     required this.version,
     this.promptTokens,
     this.completionTokens,
@@ -1330,6 +1354,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     }
     if (!nullToAbsent || groupId != null) {
       map['group_id'] = Variable<String>(groupId);
+    }
+    if (!nullToAbsent || subgroupId != null) {
+      map['subgroup_id'] = Variable<String>(subgroupId);
     }
     map['version'] = Variable<int>(version);
     if (!nullToAbsent || promptTokens != null) {
@@ -1383,6 +1410,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
       groupId: groupId == null && nullToAbsent
           ? const Value.absent()
           : Value(groupId),
+      subgroupId: subgroupId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(subgroupId),
       version: Value(version),
       promptTokens: promptTokens == null && nullToAbsent
           ? const Value.absent()
@@ -1427,6 +1457,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
         json['reasoningSegmentsJson'],
       ),
       groupId: serializer.fromJson<String?>(json['groupId']),
+      subgroupId: serializer.fromJson<String?>(json['subgroupId']),
       version: serializer.fromJson<int>(json['version']),
       promptTokens: serializer.fromJson<int?>(json['promptTokens']),
       completionTokens: serializer.fromJson<int?>(json['completionTokens']),
@@ -1456,6 +1487,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
         reasoningSegmentsJson,
       ),
       'groupId': serializer.toJson<String?>(groupId),
+      'subgroupId': serializer.toJson<String?>(subgroupId),
       'version': serializer.toJson<int>(version),
       'promptTokens': serializer.toJson<int?>(promptTokens),
       'completionTokens': serializer.toJson<int?>(completionTokens),
@@ -1481,6 +1513,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     Value<String?> translation = const Value.absent(),
     Value<String?> reasoningSegmentsJson = const Value.absent(),
     Value<String?> groupId = const Value.absent(),
+    Value<String?> subgroupId = const Value.absent(),
     int? version,
     Value<int?> promptTokens = const Value.absent(),
     Value<int?> completionTokens = const Value.absent(),
@@ -1511,6 +1544,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
         ? reasoningSegmentsJson.value
         : this.reasoningSegmentsJson,
     groupId: groupId.present ? groupId.value : this.groupId,
+    subgroupId: subgroupId.present ? subgroupId.value : this.subgroupId,
     version: version ?? this.version,
     promptTokens: promptTokens.present ? promptTokens.value : this.promptTokens,
     completionTokens: completionTokens.present
@@ -1555,6 +1589,9 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ? data.reasoningSegmentsJson.value
           : this.reasoningSegmentsJson,
       groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      subgroupId: data.subgroupId.present
+          ? data.subgroupId.value
+          : this.subgroupId,
       version: data.version.present ? data.version.value : this.version,
       promptTokens: data.promptTokens.present
           ? data.promptTokens.value
@@ -1592,6 +1629,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           ..write('translation: $translation, ')
           ..write('reasoningSegmentsJson: $reasoningSegmentsJson, ')
           ..write('groupId: $groupId, ')
+          ..write('subgroupId: $subgroupId, ')
           ..write('version: $version, ')
           ..write('promptTokens: $promptTokens, ')
           ..write('completionTokens: $completionTokens, ')
@@ -1619,6 +1657,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
     translation,
     reasoningSegmentsJson,
     groupId,
+    subgroupId,
     version,
     promptTokens,
     completionTokens,
@@ -1645,6 +1684,7 @@ class MessageRow extends DataClass implements Insertable<MessageRow> {
           other.translation == this.translation &&
           other.reasoningSegmentsJson == this.reasoningSegmentsJson &&
           other.groupId == this.groupId &&
+          other.subgroupId == this.subgroupId &&
           other.version == this.version &&
           other.promptTokens == this.promptTokens &&
           other.completionTokens == this.completionTokens &&
@@ -1669,6 +1709,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
   final Value<String?> translation;
   final Value<String?> reasoningSegmentsJson;
   final Value<String?> groupId;
+  final Value<String?> subgroupId;
   final Value<int> version;
   final Value<int?> promptTokens;
   final Value<int?> completionTokens;
@@ -1692,6 +1733,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.translation = const Value.absent(),
     this.reasoningSegmentsJson = const Value.absent(),
     this.groupId = const Value.absent(),
+    this.subgroupId = const Value.absent(),
     this.version = const Value.absent(),
     this.promptTokens = const Value.absent(),
     this.completionTokens = const Value.absent(),
@@ -1716,6 +1758,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     this.translation = const Value.absent(),
     this.reasoningSegmentsJson = const Value.absent(),
     this.groupId = const Value.absent(),
+    this.subgroupId = const Value.absent(),
     this.version = const Value.absent(),
     this.promptTokens = const Value.absent(),
     this.completionTokens = const Value.absent(),
@@ -1745,6 +1788,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Expression<String>? translation,
     Expression<String>? reasoningSegmentsJson,
     Expression<String>? groupId,
+    Expression<String>? subgroupId,
     Expression<int>? version,
     Expression<int>? promptTokens,
     Expression<int>? completionTokens,
@@ -1771,6 +1815,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       if (reasoningSegmentsJson != null)
         'reasoning_segments_json': reasoningSegmentsJson,
       if (groupId != null) 'group_id': groupId,
+      if (subgroupId != null) 'subgroup_id': subgroupId,
       if (version != null) 'version': version,
       if (promptTokens != null) 'prompt_tokens': promptTokens,
       if (completionTokens != null) 'completion_tokens': completionTokens,
@@ -1797,6 +1842,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     Value<String?>? translation,
     Value<String?>? reasoningSegmentsJson,
     Value<String?>? groupId,
+    Value<String?>? subgroupId,
     Value<int>? version,
     Value<int?>? promptTokens,
     Value<int?>? completionTokens,
@@ -1822,6 +1868,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
       reasoningSegmentsJson:
           reasoningSegmentsJson ?? this.reasoningSegmentsJson,
       groupId: groupId ?? this.groupId,
+      subgroupId: subgroupId ?? this.subgroupId,
       version: version ?? this.version,
       promptTokens: promptTokens ?? this.promptTokens,
       completionTokens: completionTokens ?? this.completionTokens,
@@ -1884,6 +1931,9 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
     if (groupId.present) {
       map['group_id'] = Variable<String>(groupId.value);
     }
+    if (subgroupId.present) {
+      map['subgroup_id'] = Variable<String>(subgroupId.value);
+    }
     if (version.present) {
       map['version'] = Variable<int>(version.value);
     }
@@ -1926,6 +1976,7 @@ class MessageRowsCompanion extends UpdateCompanion<MessageRow> {
           ..write('translation: $translation, ')
           ..write('reasoningSegmentsJson: $reasoningSegmentsJson, ')
           ..write('groupId: $groupId, ')
+          ..write('subgroupId: $subgroupId, ')
           ..write('version: $version, ')
           ..write('promptTokens: $promptTokens, ')
           ..write('completionTokens: $completionTokens, ')
@@ -2253,7 +2304,7 @@ class $AssistantRowsTable extends AssistantRows
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('auto'),
+    defaultValue: const Constant('injection'),
   );
   static const VerificationMeta _enableRecentChatsReferenceMeta =
       const VerificationMeta('enableRecentChatsReference');
@@ -5038,6 +5089,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_messages_group',
     'CREATE INDEX idx_messages_group ON message_rows (group_id)',
   );
+  late final Index idxMessagesSubgroup = Index(
+    'idx_messages_subgroup',
+    'CREATE INDEX idx_messages_subgroup ON message_rows (subgroup_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5056,6 +5111,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMessagesConversationOrder,
     idxMessagesConversationTimestamp,
     idxMessagesGroup,
+    idxMessagesSubgroup,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5661,6 +5717,7 @@ typedef $$MessageRowsTableCreateCompanionBuilder =
       Value<String?> translation,
       Value<String?> reasoningSegmentsJson,
       Value<String?> groupId,
+      Value<String?> subgroupId,
       Value<int> version,
       Value<int?> promptTokens,
       Value<int?> completionTokens,
@@ -5686,6 +5743,7 @@ typedef $$MessageRowsTableUpdateCompanionBuilder =
       Value<String?> translation,
       Value<String?> reasoningSegmentsJson,
       Value<String?> groupId,
+      Value<String?> subgroupId,
       Value<int> version,
       Value<int?> promptTokens,
       Value<int?> completionTokens,
@@ -5838,6 +5896,11 @@ class $$MessageRowsTableFilterComposer
 
   ColumnFilters<String> get groupId => $composableBuilder(
     column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subgroupId => $composableBuilder(
+    column: $table.subgroupId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6026,6 +6089,11 @@ class $$MessageRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subgroupId => $composableBuilder(
+    column: $table.subgroupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get version => $composableBuilder(
     column: $table.version,
     builder: (column) => ColumnOrderings(column),
@@ -6146,6 +6214,11 @@ class $$MessageRowsTableAnnotationComposer
 
   GeneratedColumn<String> get groupId =>
       $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<String> get subgroupId => $composableBuilder(
+    column: $table.subgroupId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<int> get version =>
       $composableBuilder(column: $table.version, builder: (column) => column);
@@ -6300,6 +6373,7 @@ class $$MessageRowsTableTableManager
                 Value<String?> translation = const Value.absent(),
                 Value<String?> reasoningSegmentsJson = const Value.absent(),
                 Value<String?> groupId = const Value.absent(),
+                Value<String?> subgroupId = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<int?> promptTokens = const Value.absent(),
                 Value<int?> completionTokens = const Value.absent(),
@@ -6323,6 +6397,7 @@ class $$MessageRowsTableTableManager
                 translation: translation,
                 reasoningSegmentsJson: reasoningSegmentsJson,
                 groupId: groupId,
+                subgroupId: subgroupId,
                 version: version,
                 promptTokens: promptTokens,
                 completionTokens: completionTokens,
@@ -6348,6 +6423,7 @@ class $$MessageRowsTableTableManager
                 Value<String?> translation = const Value.absent(),
                 Value<String?> reasoningSegmentsJson = const Value.absent(),
                 Value<String?> groupId = const Value.absent(),
+                Value<String?> subgroupId = const Value.absent(),
                 Value<int> version = const Value.absent(),
                 Value<int?> promptTokens = const Value.absent(),
                 Value<int?> completionTokens = const Value.absent(),
@@ -6371,6 +6447,7 @@ class $$MessageRowsTableTableManager
                 translation: translation,
                 reasoningSegmentsJson: reasoningSegmentsJson,
                 groupId: groupId,
+                subgroupId: subgroupId,
                 version: version,
                 promptTokens: promptTokens,
                 completionTokens: completionTokens,

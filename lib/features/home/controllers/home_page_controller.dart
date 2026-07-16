@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
@@ -36,6 +37,8 @@ import 'scroll_controller.dart' as scroll_ctrl;
 import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
+import '../services/multi_ai_engine.dart';
+import '../services/message_pipeline.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
@@ -166,6 +169,9 @@ class HomePageController extends ChangeNotifier {
   // Desktop drag-and-drop
   bool _isDragHovering = false;
 
+  // Multi-AI comparison mode engine
+  late final MultiAIEngine multiAIEngine;
+
   // App lifecycle (currently unused but kept for future notification logic)
   // ignore: unused_field
   bool _appInForeground = true;
@@ -220,6 +226,10 @@ class HomePageController extends ChangeNotifier {
   bool get showThinkingTools => _showThinkingTools;
   bool get showThinkingContent => _showThinkingContent;
   bool get isDragHovering => _isDragHovering;
+
+  // Multi-AI comparison mode
+  bool get isMultiAIMode => multiAIEngine.isActive;
+
   bool get tabletSidebarOpen => _tabletSidebarOpen;
   bool get rightSidebarOpen => _rightSidebarOpen;
   double get embeddedSidebarWidth => _embeddedSidebarWidth;
@@ -377,6 +387,28 @@ class HomePageController extends ChangeNotifier {
       getTitleForLocale: _titleForLocale,
     );
     _viewModel.addListener(notifyListeners);
+
+    final pipeline = MessagePipeline(
+      chatService: _chatService,
+      messageGenerationService: _messageGenerationService,
+      streamController: _streamController,
+      generationController: _generationController,
+      executeStream: (ctx, {streamKeyOverride, requestIdOverride}) =>
+          _viewModel.executeStream(
+            ctx,
+            streamKeyOverride: streamKeyOverride,
+            requestIdOverride: requestIdOverride,
+          ),
+    );
+
+    multiAIEngine = MultiAIEngine(
+      chatService: _chatService,
+      chatController: _chatController,
+      messageGenerationService: _messageGenerationService,
+      streamController: _streamController,
+      pipeline: pipeline,
+    );
+    multiAIEngine.addListener(notifyListeners);
   }
 
   void _wireViewModelCallbacks() {
@@ -598,6 +630,7 @@ class HomePageController extends ChangeNotifier {
         // falling back to "new conversation" button.
         await _createNewConversation();
       }
+      recoverMultiAIState();
     }
   }
 
@@ -643,7 +676,23 @@ class HomePageController extends ChangeNotifier {
       await _createNewConversation();
     }
 
-    final result = await _viewModel.sendMessage(input);
+    ChatInputSubmissionResult result;
+    if (multiAIEngine.isActive) {
+      if (!_context.mounted) return ChatInputSubmissionResult.rejected;
+      final settings = _context.read<SettingsProvider>();
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      final gid = await multiAIEngine.startRound(
+        input: input,
+        conversation: currentConversation!,
+        settings: settings,
+        assistant: assistant,
+      );
+      result = gid.isNotEmpty
+          ? ChatInputSubmissionResult.sent
+          : ChatInputSubmissionResult.rejected;
+    } else {
+      result = await _viewModel.sendMessage(input);
+    }
     if (result != ChatInputSubmissionResult.rejected) {
       notifyListeners();
     }
@@ -695,11 +744,64 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _isRetryableInMultiAI(ChatMessage message) {
+    // In multi-AI mode with active rounds, only the last assistant message or
+    // its immediately preceding user message can be retried.
+    if (!multiAIEngine.isActive ||
+        _chatController.subgroupActiveGroupIds.isEmpty) {
+      return true;
+    }
+
+    final msgs = _chatController.messages;
+    ChatMessage? lastAssistant;
+    int? lastAssistantIdx;
+    for (int i = msgs.length - 1; i >= 0; i--) {
+      if (msgs[i].role == 'assistant' && msgs[i].subgroupId != null) {
+        lastAssistant = msgs[i];
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistant == null) return true;
+
+    // Allow retry of the last subgroup assistant message.
+    if (message.id == lastAssistant.id) return true;
+
+    // Allow retry of the user message immediately before the last assistant.
+    if (lastAssistantIdx != null && lastAssistantIdx > 0) {
+      final preceding = msgs[lastAssistantIdx - 1];
+      if (preceding.role == 'user' && message.id == preceding.id) return true;
+    }
+
+    return false;
+  }
+
   Future<void> regenerateAtMessage(
     ChatMessage message, {
     bool assistantAsNewReply = false,
   }) async {
     if (currentConversation == null) return;
+
+    // Restrict retry ability when multi-AI rounds are active.
+    if (!_isRetryableInMultiAI(message)) return;
+
+    // User message retry in multi-select mode: create version+1 for every
+    // thread in the following round.
+    if (message.role == 'user' &&
+        multiAIEngine.isActive &&
+        _chatController.subgroupActiveGroupIds.isNotEmpty) {
+      final anchorUserMsgId = message.id;
+      final settings = _context.read<SettingsProvider>();
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      await multiAIEngine.retryRound(
+        anchorUserMsgId: anchorUserMsgId,
+        conversation: currentConversation!,
+        settings: settings,
+        assistant: assistant,
+      );
+      notifyListeners();
+      return;
+    }
 
     final settings = _context.read<SettingsProvider>();
     if (settings.regenerateDeleteTrailingMessages) {
@@ -725,6 +827,24 @@ class HomePageController extends ChangeNotifier {
     if (success) {
       notifyListeners();
     }
+  }
+
+  Future<void> retryMultiAIThread({
+    required String threadId,
+    required String anchorUserMsgId,
+    required ChatMessage message,
+  }) async {
+    if (currentConversation == null || !multiAIEngine.isActive) return;
+    final settings = _context.read<SettingsProvider>();
+    final assistant = _context.read<AssistantProvider>().currentAssistant;
+    await multiAIEngine.retryThread(
+      threadId: threadId,
+      anchorUserMsgId: anchorUserMsgId,
+      conversation: currentConversation!,
+      settings: settings,
+      assistant: assistant,
+    );
+    notifyListeners();
   }
 
   Future<void> submitRecoveredAskUserAnswer(
@@ -782,6 +902,7 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   Future<void> switchConversationAnimated(String id) async {
+    multiAIEngine.exit();
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
@@ -800,6 +921,7 @@ class HomePageController extends ChangeNotifier {
 
     await _viewModel.switchConversation(id);
     _scrollCtrl.clearObserverCache();
+    recoverMultiAIState();
     notifyListeners();
     try {
       await WidgetsBinding.instance.endOfFrame;
@@ -1567,6 +1689,108 @@ class HomePageController extends ChangeNotifier {
 
   List<ChatMessage> collapseVersions(List<ChatMessage> items) {
     return _chatController.collapseVersions(items);
+  }
+
+  // ============================================================================
+  // Public Methods - Multi-AI Comparison Mode
+  // ============================================================================
+
+  void exitMultiAIMode() => multiAIEngine.exit();
+
+  /// Recover multi-AI state from current conversation's messages.
+  void recoverMultiAIState() {
+    if (currentConversation == null) return;
+    multiAIEngine.recoverFromMessages(_chatController.messages);
+    if (multiAIEngine.isActive) {
+      _chatController.invalidateCache();
+    }
+  }
+
+  /// Get current multi-AI model selections for input bar badge.
+  List<ModelSelection> get multiAIModelSelections => multiAIEngine.models;
+
+  /// Handle "启动对比" (Start Comparison) action from assistant message more
+  /// sheet. Requires multi-select mode already active with ≥2 models and zero
+  /// existing subgroup messages in the conversation.
+  Future<void> handleMultiAIAction(ChatMessage triggerMessage) async {
+    if (triggerMessage.role != 'assistant') return;
+    if (currentConversation == null) return;
+    if (!multiAIEngine.isActive || multiAIEngine.models.length < 2) return;
+    // Prevent starting comparison after multi-AI rounds have begun.
+    if (_chatController.subgroupActiveGroupIds.isNotEmpty) return;
+
+    final threadIds = multiAIEngine.threadIds.toList();
+    final triggerKey = '${triggerMessage.providerId}|${triggerMessage.modelId}';
+    final modelIdx = multiAIEngine.models.indexWhere(
+      (m) => '${m.providerKey}|${m.modelId}' == triggerKey,
+    );
+
+    if (modelIdx >= 0) {
+      // Reuse the trigger message: its AI is in the pre-selected model list.
+      final tid = threadIds[modelIdx];
+      final idx = _chatController.messages.indexWhere(
+        (m) => m.id == triggerMessage.id,
+      );
+      if (idx != -1) {
+        final updated = triggerMessage.copyWith(subgroupId: tid);
+        _chatController.messages[idx] = updated;
+        await _chatService.updateMessage(
+          triggerMessage.id,
+          subgroupId: tid,
+          content: updated.content,
+          totalTokens: updated.totalTokens,
+          isStreaming: updated.isStreaming,
+        );
+      }
+    }
+    // If trigger message's model is NOT in the pre-selected list, leave it
+    // untouched (no subgroupId). The message stays as a regular assistant
+    // message.
+
+    _chatController.invalidateCache();
+    notifyListeners();
+
+    if (!_context.mounted) return;
+    final settings = _context.read<SettingsProvider>();
+    final assistant = _context.read<AssistantProvider>().currentAssistant;
+    unawaited(
+      multiAIEngine
+          .startRoundFromHistory(
+            triggerMessage: triggerMessage,
+            conversation: currentConversation!,
+            settings: settings,
+            assistant: assistant,
+          )
+          .then((_) {
+            notifyListeners();
+          }),
+    );
+  }
+
+  /// Enter multi-AI mode with pre-selected models (from model selector multi-select).
+  void enterMultiAIMode(List<ModelSelection> models) {
+    if (models.length < 2 || currentConversation == null) return;
+    final threadIds = List<String>.generate(
+      models.length,
+      (_) => const Uuid().v4(),
+    );
+    multiAIEngine.enter(models, existingThreadIds: threadIds);
+    notifyListeners();
+  }
+
+  /// Show multi-model selector from input bar.
+  Future<void> showMultiAIModelSelector() async {
+    if (multiAIEngine.isActive) return;
+    final models = await showMultiModelSelector(_context);
+    if (models == null || models.length < 2) return;
+    if (currentConversation == null) return;
+
+    final threadIds = List<String>.generate(
+      models.length,
+      (_) => const Uuid().v4(),
+    );
+    multiAIEngine.enter(models, existingThreadIds: threadIds);
+    notifyListeners();
   }
 
   // ============================================================================
