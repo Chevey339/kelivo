@@ -316,6 +316,42 @@ abstract class AppLocalizations {
   /// **'Chat Records'**
   String get storageSpaceCategoryChatData;
 
+  /// No description provided for @storageSpaceCategoryLegacyChatData.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat Records (Old)'**
+  String get storageSpaceCategoryLegacyChatData;
+
+  /// No description provided for @storageSpaceCategoryRestoreTraces.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Traces'**
+  String get storageSpaceCategoryRestoreTraces;
+
+  /// No description provided for @storageSpaceRestoreTracesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.'**
+  String get storageSpaceRestoreTracesHint;
+
+  /// No description provided for @storageSpaceClearRestoreTracesButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Restore Traces'**
+  String get storageSpaceClearRestoreTracesButton;
+
+  /// No description provided for @storageSpaceClearRestoreTracesConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear completed restore snapshots? Your current database, settings, and files will not be affected.'**
+  String get storageSpaceClearRestoreTracesConfirmMessage;
+
+  /// No description provided for @storageSpaceSubCompletedRestoreRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed restore snapshots'**
+  String get storageSpaceSubCompletedRestoreRuns;
+
   /// No description provided for @storageSpaceCategoryAssistantData.
   ///
   /// In en, this message translates to:
@@ -352,6 +388,12 @@ abstract class AppLocalizations {
   /// **'Safe to clear. This will not affect your chat history.'**
   String get storageSpaceSafeToClearHint;
 
+  /// No description provided for @storageSpaceLegacyChatDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.'**
+  String get storageSpaceLegacyChatDataHint;
+
   /// No description provided for @storageSpaceNotSafeToClearHint.
   ///
   /// In en, this message translates to:
@@ -381,6 +423,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tool events'**
   String get storageSpaceSubChatToolEvents;
+
+  /// No description provided for @storageSpaceSubChatDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat database'**
+  String get storageSpaceSubChatDatabase;
+
+  /// No description provided for @storageSpaceSubChatWriteAheadLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Write-ahead log'**
+  String get storageSpaceSubChatWriteAheadLog;
+
+  /// No description provided for @storageSpaceSubChatSharedMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared memory index'**
+  String get storageSpaceSubChatSharedMemory;
 
   /// No description provided for @storageSpaceSubAssistantAvatars.
   ///
@@ -477,6 +537,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Clear Logs'**
   String get storageSpaceClearLogsButton;
+
+  /// No description provided for @storageSpaceClearLegacyChatDataButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear Old Chat Records'**
+  String get storageSpaceClearLegacyChatDataButton;
+
+  /// No description provided for @storageSpaceClearLegacyChatDataConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear the retained old chat files? Your current SQLite chat records will remain available.'**
+  String get storageSpaceClearLegacyChatDataConfirmMessage;
 
   /// No description provided for @storageSpaceViewLogsButton.
   ///
@@ -2948,8 +3020,98 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageRestartContent.
   ///
   /// In en, this message translates to:
-  /// **'Restore completed. Please restart the app.'**
+  /// **'Import successful. Restart Kelivo to apply it safely.'**
   String get backupPageRestartContent;
+
+  /// No description provided for @restartAppFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo could not restart automatically. Fully close it, then open it again.'**
+  String get restartAppFailedMessage;
+
+  /// No description provided for @backupRestoreColdRestartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'One more restart is required'**
+  String get backupRestoreColdRestartTitle;
+
+  /// No description provided for @backupRestoreColdRestartContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.'**
+  String get backupRestoreColdRestartContent;
+
+  /// No description provided for @backupRestoreColdRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Kelivo'**
+  String get backupRestoreColdRestartButton;
+
+  /// No description provided for @backupRestoreRolledBackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore was rolled back'**
+  String get backupRestoreRolledBackTitle;
+
+  /// No description provided for @backupRestoreRolledBackContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The restore could not be completed. Kelivo verified and kept your previous data.'**
+  String get backupRestoreRolledBackContent;
+
+  /// No description provided for @backupRestoreFailureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore requires attention'**
+  String get backupRestoreFailureTitle;
+
+  /// No description provided for @backupRestoreFailureContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.'**
+  String get backupRestoreFailureContent;
+
+  /// No description provided for @backupRestoreBusinessLeaseUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is already running'**
+  String get backupRestoreBusinessLeaseUnavailableTitle;
+
+  /// No description provided for @backupRestoreBusinessLeaseUnavailableContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.'**
+  String get backupRestoreBusinessLeaseUnavailableContent;
+
+  /// No description provided for @backupRestoreFailureRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Kelivo'**
+  String get backupRestoreFailureRestartButton;
+
+  /// No description provided for @backupRestoreFailureCopyButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy diagnostic code'**
+  String get backupRestoreFailureCopyButton;
+
+  /// No description provided for @backupRestoreFailureCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code copied'**
+  String get backupRestoreFailureCopied;
+
+  /// No description provided for @backupRestoreFailureDiagnostic.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostic code: {code}'**
+  String backupRestoreFailureDiagnostic(String code);
+
+  /// No description provided for @backupPageRestoreFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String backupPageRestoreFailedMessage(String error);
 
   /// No description provided for @backupPageOK.
   ///
@@ -2972,7 +3134,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageSelectImportModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Choose how to import the backup data:'**
+  /// **'Choose a restore mode. The chat and file switches determine which components are included.'**
   String get backupPageSelectImportModeDescription;
 
   /// No description provided for @backupPageOverwriteMode.
@@ -2984,19 +3146,19 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageOverwriteModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Clear all local data and restore from backup'**
+  /// **'Replace the selected components; keep unselected components and unrelated local settings'**
   String get backupPageOverwriteModeDescription;
 
   /// No description provided for @backupPageMergeMode.
   ///
   /// In en, this message translates to:
-  /// **'Smart Merge'**
+  /// **'Merge'**
   String get backupPageMergeMode;
 
   /// No description provided for @backupPageMergeModeDescription.
   ///
   /// In en, this message translates to:
-  /// **'Add only non-existing data (intelligent deduplication)'**
+  /// **'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.'**
   String get backupPageMergeModeDescription;
 
   /// No description provided for @backupPageRestore.
@@ -10189,6 +10351,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{role} message #{index}: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.'**
   String debugPageManyMessagesSeedText(String role, int index);
+
+  /// No description provided for @migrationIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade Chat Storage'**
+  String get migrationIntroTitle;
+
+  /// No description provided for @migrationIntroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.'**
+  String get migrationIntroSubtitle;
+
+  /// No description provided for @migrationBackupNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.'**
+  String get migrationBackupNote;
+
+  /// No description provided for @migrationPerformanceNote.
+  ///
+  /// In en, this message translates to:
+  /// **'After migration, startup, history loading, and search use SQLite indexes for smoother long-chat performance.'**
+  String get migrationPerformanceNote;
+
+  /// No description provided for @migrationSourceDatabaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Hive'**
+  String get migrationSourceDatabaseLabel;
+
+  /// No description provided for @migrationTargetDatabaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'SQLite'**
+  String get migrationTargetDatabaseLabel;
+
+  /// No description provided for @migrationChooseFolderButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose Folder and Back Up'**
+  String get migrationChooseFolderButton;
+
+  /// No description provided for @migrationSaveBackupButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Backup ZIP'**
+  String get migrationSaveBackupButton;
+
+  /// No description provided for @migrationBackingUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing Up'**
+  String get migrationBackingUpTitle;
+
+  /// No description provided for @migrationBackingUpSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.'**
+  String get migrationBackingUpSubtitle;
+
+  /// No description provided for @migrationMigratingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrating to SQLite'**
+  String get migrationMigratingTitle;
+
+  /// No description provided for @migrationMigratingSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.'**
+  String get migrationMigratingSubtitle;
+
+  /// No description provided for @migrationBackingUpDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Backing up {fileName}'**
+  String migrationBackingUpDetail(String fileName);
+
+  /// No description provided for @migrationMigratingDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrated {count} messages'**
+  String migrationMigratingDetail(int count);
+
+  /// No description provided for @migrationMigratingPrepareDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing SQLite database'**
+  String get migrationMigratingPrepareDetail;
+
+  /// No description provided for @migrationMigratingToolEventsDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrating tool records'**
+  String get migrationMigratingToolEventsDetail;
+
+  /// No description provided for @migrationMigratingValidateDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating migrated data'**
+  String get migrationMigratingValidateDetail;
+
+  /// No description provided for @migrationBackupReadyDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup ZIP is ready'**
+  String get migrationBackupReadyDetail;
+
+  /// No description provided for @migrationSavingBackupZipDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving backup ZIP'**
+  String get migrationSavingBackupZipDetail;
+
+  /// No description provided for @migrationBackupFileSavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup ZIP saved'**
+  String get migrationBackupFileSavedTitle;
+
+  /// No description provided for @migrationChecklistBackupFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Hive backup ZIP'**
+  String get migrationChecklistBackupFiles;
+
+  /// No description provided for @migrationChecklistPrepareSqlite.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare SQLite database'**
+  String get migrationChecklistPrepareSqlite;
+
+  /// No description provided for @migrationChecklistMigrateMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrate conversations and messages'**
+  String get migrationChecklistMigrateMessages;
+
+  /// No description provided for @migrationChecklistMigrateToolEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrate tool records'**
+  String get migrationChecklistMigrateToolEvents;
+
+  /// No description provided for @migrationChecklistValidate.
+  ///
+  /// In en, this message translates to:
+  /// **'Validate migrated data'**
+  String get migrationChecklistValidate;
+
+  /// No description provided for @migrationStepBackup.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get migrationStepBackup;
+
+  /// No description provided for @migrationStepMigrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrate'**
+  String get migrationStepMigrate;
+
+  /// No description provided for @migrationStepComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get migrationStepComplete;
+
+  /// No description provided for @migrationCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upgrade Complete'**
+  String get migrationCompleteTitle;
+
+  /// No description provided for @migrationCompleteSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.'**
+  String get migrationCompleteSubtitle;
+
+  /// No description provided for @migrationConversationCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get migrationConversationCount;
+
+  /// No description provided for @migrationMessageCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages'**
+  String get migrationMessageCount;
+
+  /// No description provided for @migrationRestartButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart Kelivo'**
+  String get migrationRestartButton;
+
+  /// No description provided for @migrationFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Migration Failed'**
+  String get migrationFailedTitle;
+
+  /// No description provided for @migrationFailedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The original Hive data and your backup are still intact. Review the reason below, then retry.'**
+  String get migrationFailedSubtitle;
+
+  /// No description provided for @migrationUnknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown migration error.'**
+  String get migrationUnknownError;
+
+  /// No description provided for @migrationFailureLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Failure log'**
+  String get migrationFailureLogTitle;
+
+  /// No description provided for @migrationRetryButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry Migration'**
+  String get migrationRetryButton;
+
+  /// No description provided for @timelineJumpToLatest.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to latest'**
+  String get timelineJumpToLatest;
+
+  /// No description provided for @largeContentShowMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Show {count} more'**
+  String largeContentShowMore(int count);
+
+  /// No description provided for @largeContentCollapse.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse'**
+  String get largeContentCollapse;
 }
 
 class _AppLocalizationsDelegate

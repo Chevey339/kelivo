@@ -43,6 +43,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'bounded_large_text_view.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
 import 'token_display_widget.dart';
@@ -447,7 +448,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                     ),
                                   ),
                                 ),
-                                child: SelectableText(
+                                child: BoundedLargeTextView(
                                   argsPretty,
                                   style: TextStyle(fontSize: 12),
                                 ),
@@ -477,7 +478,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                                     ),
                                   ),
                                 ),
-                                child: SelectableText(
+                                child: BoundedLargeTextView(
                                   resultText,
                                   style: TextStyle(fontSize: 12),
                                 ),
@@ -590,7 +591,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                         color: cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
-                    child: SelectableText(
+                    child: BoundedLargeTextView(
                       argsPretty,
                       style: TextStyle(fontSize: 12),
                     ),
@@ -616,7 +617,7 @@ void _showToolDetail(BuildContext context, ToolUIPart part) {
                         color: cs.outlineVariant.withValues(alpha: 0.2),
                       ),
                     ),
-                    child: SelectableText(
+                    child: BoundedLargeTextView(
                       resultText,
                       style: TextStyle(fontSize: 12),
                     ),
@@ -4638,7 +4639,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                       ),
                                     ),
                                   ),
-                                  child: SelectableText(
+                                  child: BoundedLargeTextView(
                                     argsPretty,
                                     style: TextStyle(fontSize: 12),
                                   ),
@@ -4668,7 +4669,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                                       ),
                                     ),
                                   ),
-                                  child: SelectableText(
+                                  child: BoundedLargeTextView(
                                     resultText,
                                     style: TextStyle(fontSize: 12),
                                   ),
@@ -4786,7 +4787,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           color: cs.outlineVariant.withValues(alpha: 0.2),
                         ),
                       ),
-                      child: SelectableText(
+                      child: BoundedLargeTextView(
                         argsPretty,
                         style: TextStyle(fontSize: 12),
                       ),
@@ -4812,7 +4813,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                           color: cs.outlineVariant.withValues(alpha: 0.2),
                         ),
                       ),
-                      child: SelectableText(
+                      child: BoundedLargeTextView(
                         resultText,
                         style: TextStyle(fontSize: 12),
                       ),

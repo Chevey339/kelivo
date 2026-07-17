@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -32,6 +35,12 @@ class StatsPage extends StatefulWidget {
 
 class _StatsPageState extends State<StatsPage> {
   late StatsDateRange _range;
+  StatsSnapshot? _databaseSnapshot;
+  String? _statsSignature;
+  String? _pendingStatsSignature;
+  String? _failedStatsSignature;
+  bool _loadingStats = false;
+  int _statsRequestId = 0;
 
   @override
   void initState() {
@@ -60,7 +69,17 @@ class _StatsPageState extends State<StatsPage> {
           onChanged: _setPreset,
           onCustom: _pickCustomRange,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 2,
+          child: widget.snapshotOverride == null && _loadingStats
+              ? LinearProgressIndicator(
+                  minHeight: 2,
+                  semanticsLabel: l10n.settingsPageCalculating,
+                )
+              : null,
+        ),
+        const SizedBox(height: 10),
         StatsSectionCard(
           title: l10n.statsPageHeatmapTitle,
           child: StatsHeatmap(days: snapshot.heatmap),
@@ -161,36 +180,134 @@ class _StatsPageState extends State<StatsPage> {
     final chatService = context.watch<ChatService>();
     final settings = context.watch<SettingsProvider>();
     final assistantProvider = context.watch<AssistantProvider>();
-    final conversations = chatService.getAllConversations();
-    final messagesByConversation = {
-      for (final conversation in conversations)
-        conversation.id: chatService.getMessages(conversation.id),
-    };
+    final conversations = chatService.getAllCompleteConversations();
     final assistantNames = {
       for (final assistant in assistantProvider.assistants)
-        assistant.id: assistant.name,
+        assistant.id: assistant.name.trim().isEmpty
+            ? l10n.statsPageUnknownAssistant
+            : assistant.name.trim(),
       '_default': l10n.statsPageUnknownAssistant,
-    };
-    final existingAssistantIds = {
-      for (final assistant in assistantProvider.assistants) assistant.id,
-      '_default',
     };
     final providerNames = {
       for (final entry in settings.providerConfigs.entries)
         entry.key: entry.value.name,
     };
-    return StatsAggregationService.buildSnapshot(
-      now: now,
-      range: _range,
-      conversations: conversations,
-      messagesByConversation: messagesByConversation,
-      launchCount: settings.appLaunchCount,
-      assistantNames: assistantNames,
-      existingAssistantIds: existingAssistantIds,
-      providerNames: providerNames,
-      unknownProviderLabel: l10n.statsPageUnknownProvider,
-      unknownTopicLabel: l10n.statsPageUnknownTopic,
-    );
+    final conversationSignature = conversations
+        .map(
+          (conversation) =>
+              '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
+              '${conversation.createdAt.microsecondsSinceEpoch}:'
+              '${conversation.assistantId ?? '_default'}:'
+              '${chatService.getMessageCount(conversation.id)}',
+        )
+        .join('|');
+    final signature =
+        '$conversationSignature|${_range.preset.name}:'
+        '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
+        '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}:'
+        '${chatService.statisticsRevision}';
+    if (_failedStatsSignature != null && _failedStatsSignature != signature) {
+      _failedStatsSignature = null;
+    }
+    if (_statsSignature == signature &&
+        _pendingStatsSignature != null &&
+        _pendingStatsSignature != signature) {
+      _statsRequestId++;
+      _pendingStatsSignature = null;
+      _loadingStats = false;
+    } else if (_statsSignature != signature &&
+        _pendingStatsSignature != signature &&
+        _failedStatsSignature != signature) {
+      _loadingStats = true;
+      _pendingStatsSignature = signature;
+      final requestId = ++_statsRequestId;
+      final requestedRange = _range;
+      final requestedAssistantNames = Map<String, String>.of(assistantNames);
+      final requestedProviderNames = Map<String, String>.of(providerNames);
+      final rangeStart = requestedRange.start;
+      final rangeEndExclusive = requestedRange.end == null
+          ? null
+          : StatsDateRange.addCalendarDays(requestedRange.end!, 1);
+      final today = StatsDateRange.normalizeDate(now);
+      final trendStart = requestedRange.isAllTime
+          ? StatsDateRange.addCalendarDays(today, -29)
+          : (requestedRange.start ??
+                StatsDateRange.addCalendarDays(today, -29));
+      final trendEnd = StatsDateRange.addCalendarDays(
+        requestedRange.isAllTime ? today : (requestedRange.end ?? today),
+        1,
+      );
+      unawaited(
+        chatService
+            .loadStatsAggregate(
+              rangeStart: rangeStart,
+              rangeEndExclusive: rangeEndExclusive,
+              heatmapStart: StatsDateRange.addCalendarDays(today, -364),
+              trendStart: trendStart,
+              trendEndExclusive: trendEnd,
+            )
+            .then(
+              (aggregate) {
+                if (!mounted || requestId != _statsRequestId) return;
+                setState(() {
+                  _databaseSnapshot =
+                      StatsAggregationService.buildDatabaseSnapshot(
+                        now: now,
+                        range: requestedRange,
+                        aggregate: aggregate,
+                        launchCount: settings.appLaunchCount,
+                        assistantNames: requestedAssistantNames,
+                        providerNames: requestedProviderNames,
+                        unknownProviderLabel: l10n.statsPageUnknownProvider,
+                        unknownTopicLabel: l10n.statsPageUnknownTopic,
+                      );
+                  _statsSignature = signature;
+                  _pendingStatsSignature = null;
+                  _failedStatsSignature = null;
+                  _loadingStats = false;
+                });
+              },
+              onError: (Object _, StackTrace __) {
+                if (!mounted || requestId != _statsRequestId) return;
+                setState(() {
+                  _pendingStatsSignature = null;
+                  _failedStatsSignature = signature;
+                  _loadingStats = false;
+                });
+              },
+            ),
+      );
+    }
+    return _databaseSnapshot ??
+        StatsAggregationService.buildDatabaseSnapshot(
+          now: now,
+          range: _range,
+          aggregate: const ChatStatsAggregate(
+            conversations: 0,
+            totals: ChatStatsTotals(
+              messages: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              cachedTokens: 0,
+            ),
+            heatmap: [],
+            trend: [],
+            models: [],
+            assistants: [],
+            topics: [],
+          ),
+          launchCount: settings.appLaunchCount,
+          assistantNames: assistantNames,
+          providerNames: providerNames,
+          unknownProviderLabel: l10n.statsPageUnknownProvider,
+          unknownTopicLabel: l10n.statsPageUnknownTopic,
+        );
+  }
+
+  String _mapSignature(Map<String, String> values) {
+    final entries = values.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries.map((entry) => '${entry.key}=${entry.value}').join(',');
   }
 
   void _setPreset(StatsDateRangePreset preset) {

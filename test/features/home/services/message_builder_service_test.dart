@@ -450,6 +450,33 @@ void main() {
       ]);
     });
 
+    test('无限制上下文不会裁掉一千条以上的消息', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final apiMessages = <Map<String, dynamic>>[
+        for (var index = 0; index < 1507; index++)
+          {
+            'role': index.isEven ? 'user' : 'assistant',
+            'content': 'message-$index',
+          },
+      ];
+
+      service.applyContextLimit(
+        apiMessages,
+        const Assistant(
+          id: 'assistant-1',
+          name: 'test',
+          limitContextMessages: false,
+        ),
+      );
+
+      expect(apiMessages, hasLength(1507));
+      expect(apiMessages.first['content'], 'message-0');
+      expect(apiMessages.last['content'], 'message-1506');
+    });
+
     test('上下文裁剪不会保留缺少 tool result 的 assistant tool call', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),

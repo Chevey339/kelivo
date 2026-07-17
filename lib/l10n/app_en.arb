@@ -59,6 +59,12 @@
   "storageSpaceCategoryImages": "Images",
   "storageSpaceCategoryFiles": "Files",
   "storageSpaceCategoryChatData": "Chat Records",
+  "storageSpaceCategoryLegacyChatData": "Chat Records (Old)",
+  "storageSpaceCategoryRestoreTraces": "Restore Traces",
+  "storageSpaceRestoreTracesHint": "Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.",
+  "storageSpaceClearRestoreTracesButton": "Clear Restore Traces",
+  "storageSpaceClearRestoreTracesConfirmMessage": "Clear completed restore snapshots? Your current database, settings, and files will not be affected.",
+  "storageSpaceSubCompletedRestoreRuns": "Completed restore snapshots",
   "storageSpaceCategoryAssistantData": "Assistants",
   "storageSpaceCategoryCache": "Cache",
   "storageSpaceCategoryLogs": "Logs",
@@ -72,11 +78,15 @@
     }
   },
   "storageSpaceSafeToClearHint": "Safe to clear. This will not affect your chat history.",
+  "storageSpaceLegacyChatDataHint": "These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.",
   "storageSpaceNotSafeToClearHint": "May affect your chat history. Delete with care.",
   "storageSpaceBreakdownTitle": "Breakdown",
   "storageSpaceSubChatMessages": "Messages",
   "storageSpaceSubChatConversations": "Conversations",
   "storageSpaceSubChatToolEvents": "Tool events",
+  "storageSpaceSubChatDatabase": "Chat database",
+  "storageSpaceSubChatWriteAheadLog": "Write-ahead log",
+  "storageSpaceSubChatSharedMemory": "Shared memory index",
   "storageSpaceSubAssistantAvatars": "Avatars",
   "storageSpaceSubAssistantImages": "Images",
   "storageSpaceSubCacheAvatars": "Avatar cache",
@@ -114,6 +124,8 @@
   "storageSpaceClearAvatarCacheButton": "Clear Avatar Cache",
   "storageSpaceClearCacheButton": "Clear Cache",
   "storageSpaceClearLogsButton": "Clear Logs",
+  "storageSpaceClearLegacyChatDataButton": "Clear Old Chat Records",
+  "storageSpaceClearLegacyChatDataConfirmMessage": "Clear the retained old chat files? Your current SQLite chat records will remain available.",
   "storageSpaceViewLogsButton": "View Logs",
   "storageSpaceDeleteConfirmTitle": "Confirm deletion",
   "storageSpaceDeleteUploadsConfirmMessage": "Delete {count} items? Attachments in chat history may become unavailable.",
@@ -629,15 +641,44 @@
   "backupPageTestDone": "Test done",
   "backupPageTestConnection": "Test",
   "backupPageRestartRequired": "Restart Required",
-  "backupPageRestartContent": "Restore completed. Please restart the app.",
+  "backupPageRestartContent": "Import successful. Restart Kelivo to apply it safely.",
+  "restartAppFailedMessage": "Kelivo could not restart automatically. Fully close it, then open it again.",
+  "backupRestoreColdRestartTitle": "One more restart is required",
+  "backupRestoreColdRestartContent": "Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.",
+  "backupRestoreColdRestartButton": "Restart Kelivo",
+  "backupRestoreRolledBackTitle": "Restore was rolled back",
+  "backupRestoreRolledBackContent": "The restore could not be completed. Kelivo verified and kept your previous data.",
+  "backupRestoreFailureTitle": "Restore requires attention",
+  "backupRestoreFailureContent": "Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.",
+  "backupRestoreBusinessLeaseUnavailableTitle": "Kelivo is already running",
+  "backupRestoreBusinessLeaseUnavailableContent": "Kelivo's data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.",
+  "backupRestoreFailureRestartButton": "Restart Kelivo",
+  "backupRestoreFailureCopyButton": "Copy diagnostic code",
+  "backupRestoreFailureCopied": "Diagnostic code copied",
+  "backupRestoreFailureDiagnostic": "Diagnostic code: {code}",
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "backupPageRestoreFailedMessage": "Restore failed: {error}",
+  "@backupPageRestoreFailedMessage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageOK": "OK",
   "backupPageCancel": "Cancel",
   "backupPageSelectImportMode": "Select Import Mode",
-  "backupPageSelectImportModeDescription": "Choose how to import the backup data:",
+  "backupPageSelectImportModeDescription": "Choose a restore mode. The chat and file switches determine which components are included.",
   "backupPageOverwriteMode": "Complete Overwrite",
-  "backupPageOverwriteModeDescription": "Clear all local data and restore from backup",
-  "backupPageMergeMode": "Smart Merge",
-  "backupPageMergeModeDescription": "Add only non-existing data (intelligent deduplication)",
+  "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
+  "backupPageMergeMode": "Merge",
+  "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",
@@ -2378,5 +2419,61 @@
         "type": "int"
       }
     }
-  }
+  },
+  "migrationIntroTitle": "Upgrade Chat Storage",
+  "migrationIntroSubtitle": "Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.",
+  "migrationBackupNote": "Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.",
+  "migrationPerformanceNote": "After migration, startup, history loading, and search use SQLite indexes for smoother long-chat performance.",
+  "migrationSourceDatabaseLabel": "Hive",
+  "migrationTargetDatabaseLabel": "SQLite",
+  "migrationChooseFolderButton": "Choose Folder and Back Up",
+  "migrationSaveBackupButton": "Save Backup ZIP",
+  "migrationBackingUpTitle": "Backing Up",
+  "migrationBackingUpSubtitle": "Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.",
+  "migrationMigratingTitle": "Migrating to SQLite",
+  "migrationMigratingSubtitle": "Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.",
+  "migrationBackingUpDetail": "Backing up {fileName}",
+  "@migrationBackingUpDetail": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "migrationMigratingDetail": "Migrated {count} messages",
+  "@migrationMigratingDetail": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "migrationMigratingPrepareDetail": "Preparing SQLite database",
+  "migrationMigratingToolEventsDetail": "Migrating tool records",
+  "migrationMigratingValidateDetail": "Validating migrated data",
+  "migrationBackupReadyDetail": "Backup ZIP is ready",
+  "migrationSavingBackupZipDetail": "Saving backup ZIP",
+  "migrationBackupFileSavedTitle": "Backup ZIP saved",
+  "migrationChecklistBackupFiles": "Export Hive backup ZIP",
+  "migrationChecklistPrepareSqlite": "Prepare SQLite database",
+  "migrationChecklistMigrateMessages": "Migrate conversations and messages",
+  "migrationChecklistMigrateToolEvents": "Migrate tool records",
+  "migrationChecklistValidate": "Validate migrated data",
+  "migrationStepBackup": "Backup",
+  "migrationStepMigrate": "Migrate",
+  "migrationStepComplete": "Done",
+  "migrationCompleteTitle": "Upgrade Complete",
+  "migrationCompleteSubtitle": "Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.",
+  "migrationConversationCount": "Conversations",
+  "migrationMessageCount": "Messages",
+  "migrationRestartButton": "Restart Kelivo",
+  "migrationFailedTitle": "Migration Failed",
+  "migrationFailedSubtitle": "The original Hive data and your backup are still intact. Review the reason below, then retry.",
+  "migrationUnknownError": "Unknown migration error.",
+  "migrationFailureLogTitle": "Failure log",
+  "migrationRetryButton": "Retry Migration",
+  "timelineJumpToLatest": "Jump to latest",
+  "largeContentShowMore": "Show {count} more",
+  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "largeContentCollapse": "Collapse"
 }

@@ -741,7 +741,7 @@ class DesktopScrollNavigationButtons extends StatelessWidget {
             ),
           ),
         ),
-        // Scroll to previous question button
+        // Scroll to previous message button
         Align(
           alignment: Alignment.bottomRight,
           child: SafeArea(

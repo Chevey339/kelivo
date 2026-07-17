@@ -56,51 +56,6 @@ String buildConversationTextForCompression(List<ChatMessage> messages) {
       .join('\n\n');
 }
 
-List<ChatMessage> selectForkConversationMessages({
-  required List<ChatMessage> messages,
-  required ChatMessage targetMessage,
-  Map<String, int> versionSelections = const <String, int>{},
-}) {
-  final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
-  final List<String> groupOrder = <String>[];
-  for (final message in messages) {
-    final groupId = message.groupId ?? message.id;
-    byGroup
-        .putIfAbsent(groupId, () {
-          groupOrder.add(groupId);
-          return <ChatMessage>[];
-        })
-        .add(message);
-  }
-
-  final targetGroup = (targetMessage.groupId ?? targetMessage.id);
-  final targetOrderIndex = groupOrder.indexOf(targetGroup);
-  if (targetOrderIndex < 0) return const <ChatMessage>[];
-
-  final selected = <ChatMessage>[];
-  for (final groupId in groupOrder.take(targetOrderIndex + 1)) {
-    final versions = byGroup[groupId]!
-      ..sort((a, b) => a.version.compareTo(b.version));
-    final targetVersionIndex = versions.indexWhere(
-      (message) => message.id == targetMessage.id,
-    );
-    if (targetVersionIndex >= 0) {
-      selected.add(versions[targetVersionIndex]);
-      continue;
-    }
-
-    final selectedVersion = versionSelections[groupId];
-    final selectedIndex =
-        selectedVersion != null &&
-            selectedVersion >= 0 &&
-            selectedVersion < versions.length
-        ? selectedVersion
-        : versions.length - 1;
-    selected.add(versions[selectedIndex]);
-  }
-  return selected;
-}
-
 class BatchDeleteGroupPlan {
   const BatchDeleteGroupPlan({
     required this.groupId,
@@ -175,6 +130,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Wire up callbacks
     _chatActions.onMessagesChanged = _onMessagesChanged;
+    _chatActions.onSendPairAppended = () => onScrollToBottom?.call();
     _chatActions.onLoadingChanged = _onLoadingChanged;
     _chatActions.onContentUpdated = _onContentUpdated;
     _chatActions.onStreamError = _onStreamError;
@@ -280,7 +236,6 @@ class HomeViewModel extends ChangeNotifier {
 
   void _onMessagesChanged() {
     _chatController.invalidateCache();
-    _chatController.refreshLoadedMessageCount();
     notifyListeners();
   }
 
@@ -294,11 +249,9 @@ class HomeViewModel extends ChangeNotifier {
   void _onContentUpdated(String messageId, String content, int totalTokens) {
     final index = messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
-      messages[index] = messages[index].copyWith(
-        content: content,
-        totalTokens: totalTokens,
+      _chatController.replaceMessageSnapshot(
+        messages[index].copyWith(content: content, totalTokens: totalTokens),
       );
-      _chatController.invalidateCache();
       // NOTE: Do NOT call notifyListeners() here!
       // Streaming content updates are now handled by StreamingContentNotifier
       // via ValueListenableBuilder, which only rebuilds the streaming message widget.
@@ -411,7 +364,6 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     onHapticFeedback?.call();
-    onScrollToBottom?.call();
 
     final result = await _chatActions.sendMessage(
       input: input,
@@ -427,7 +379,6 @@ class HomeViewModel extends ChangeNotifier {
       return false;
     }
 
-    onScrollToBottom?.call();
     return true;
   }
 
@@ -681,13 +632,7 @@ class HomeViewModel extends ChangeNotifier {
     final conversation = currentConversation;
     if (conversation == null || messageIds.isEmpty) return;
 
-    await _clearSuggestionsFor(conversation.id);
-
-    final allMessages = _chatService.getMessagesRange(
-      conversation.id,
-      start: 0,
-      limit: _chatService.getMessageCount(conversation.id),
-    );
+    final allMessages = await _chatService.loadMessages(conversation.id);
     final plan = buildBatchDeletePlan(
       messages: allMessages,
       selectedMessageIds: messageIds,
@@ -696,31 +641,26 @@ class HomeViewModel extends ChangeNotifier {
     );
     if (plan.isEmpty) return;
 
-    for (final id in plan.deletedMessageIds) {
+    final deletedMessageIds = await _chatService.deleteMessages(
+      conversationId: conversation.id,
+      messageIds: plan.deletedMessageIds,
+      versionSelectionChanges: {
+        for (final groupId in plan.clearedVersionSelectionGroupIds)
+          groupId: null,
+        ...plan.nextVersionSelections,
+      },
+    );
+    for (final id in deletedMessageIds) {
       _streamController.clearMessageState(id);
     }
+    _chatController.loadVersionSelections();
+    _chatController.updateCurrentConversation(
+      _chatService.getConversation(conversation.id),
+    );
 
-    for (final groupId in plan.clearedVersionSelectionGroupIds) {
-      _chatController.versionSelections.remove(groupId);
-      await _chatService.clearSelectedVersion(conversation.id, groupId);
-    }
-    for (final entry in plan.nextVersionSelections.entries) {
-      _chatController.versionSelections[entry.key] = entry.value;
-      await _chatService.setSelectedVersion(
-        conversation.id,
-        entry.key,
-        entry.value,
-      );
-    }
-
-    final messagesToDelete = allMessages
-        .where((message) => plan.deletedMessageIds.contains(message.id))
-        .toList();
-    for (final message in messagesToDelete) {
-      await _chatService.deleteMessage(message.id);
-    }
-
-    _chatController.reloadMessages();
+    await _chatController.refreshTimelineAfterMutation(
+      removedRevisionIds: deletedMessageIds,
+    );
     notifyListeners();
   }
 
@@ -731,11 +671,6 @@ class HomeViewModel extends ChangeNotifier {
   }) async {
     if (deletedMessageIds.isEmpty) return;
 
-    final cid = currentConversation?.id;
-    if (cid != null) {
-      await _clearSuggestionsFor(cid);
-    }
-
     final oldSel =
         versionSelections[gid] ??
         (versionsBefore.isNotEmpty ? versionsBefore.length - 1 : 0);
@@ -745,41 +680,26 @@ class HomeViewModel extends ChangeNotifier {
       oldSelection: oldSel,
     );
 
-    // Clean up message UI state
-    for (final id in deletedMessageIds) {
+    final conversation = currentConversation;
+    var removedRevisionIds = deletedMessageIds;
+    if (conversation != null) {
+      removedRevisionIds = await _chatService.deleteMessages(
+        conversationId: conversation.id,
+        messageIds: deletedMessageIds,
+        versionSelectionChanges: {gid: newSel},
+      );
+      _chatController.updateCurrentConversation(
+        _chatService.getConversation(conversation.id),
+      );
+    }
+    for (final id in removedRevisionIds) {
       _streamController.clearMessageState(id);
     }
+    _chatController.loadVersionSelections();
 
-    // Adjust selected version index for this group
-    if (newSel == null) {
-      _chatController.versionSelections.remove(gid);
-    } else {
-      _chatController.versionSelections[gid] = newSel;
-    }
-
-    if (currentConversation != null) {
-      try {
-        if (newSel == null) {
-          await _chatService.clearSelectedVersion(currentConversation!.id, gid);
-        } else {
-          await _chatService.setSelectedVersion(
-            currentConversation!.id,
-            gid,
-            newSel,
-          );
-        }
-      } catch (_) {}
-    }
-
-    final messagesToDelete = versionsBefore
-        .where((message) => deletedMessageIds.contains(message.id))
-        .toList();
-    for (final message in messagesToDelete) {
-      await _chatService.deleteMessage(message.id);
-    }
-
-    // Reload messages
-    _chatController.reloadMessages();
+    await _chatController.refreshTimelineAfterMutation(
+      removedRevisionIds: removedRevisionIds,
+    );
     notifyListeners();
   }
 
@@ -808,10 +728,12 @@ class HomeViewModel extends ChangeNotifier {
           assistantProvider.getById(convoAssistantId) != null) {
         await assistantProvider.setCurrentAssistant(convoAssistantId);
       }
-      _chatController.setCurrentConversation(convo);
+      await _chatController.setCurrentConversationAndLoad(convo);
       _streamController.clearGeminiThoughtSigs();
-      notifyListeners();
+      // Arm the new list's initial position before listeners can paint it with
+      // the previous conversation's scroll offset.
       onConversationSwitched?.call();
+      notifyListeners();
       unawaited(_drainQueuedInputIfReady(id));
     }
   }
@@ -834,7 +756,7 @@ class HomeViewModel extends ChangeNotifier {
       assistantId: assistantId,
     );
 
-    _chatController.setCurrentConversation(conversation);
+    _chatController.setDraftConversation(conversation);
     _streamController.clearAllState();
     notifyListeners();
 
@@ -846,12 +768,12 @@ class HomeViewModel extends ChangeNotifier {
           final role = (pm['role'] == 'assistant') ? 'assistant' : 'user';
           final content = (pm['content'] ?? '').trim();
           if (content.isEmpty) continue;
-          await _chatService.addMessage(
+          final presetMessage = await _chatService.addMessage(
             conversationId: currentConversation!.id,
             role: role,
             content: content,
           );
-          _chatController.reloadMessages();
+          await _chatController.appendPersistedTailMessage(presetMessage);
           notifyListeners();
         }
       }
@@ -881,7 +803,7 @@ class HomeViewModel extends ChangeNotifier {
       temporary: true,
     );
 
-    _chatController.setCurrentConversation(conversation);
+    _chatController.setDraftConversation(conversation);
     _streamController.clearAllState();
     notifyListeners();
     onScrollToBottom?.call();
@@ -889,27 +811,21 @@ class HomeViewModel extends ChangeNotifier {
 
   /// Fork conversation at a specific message.
   Future<void> forkConversation(ChatMessage message) async {
-    final allMessages = _chatController
-        .allMessagesForCurrentConversationContext();
-    final selected = selectForkConversationMessages(
-      messages: allMessages,
-      targetMessage: message,
-      versionSelections: versionSelections,
-    );
-    if (selected.isEmpty) return;
-
-    final newConvo = await _chatService.forkConversation(
-      title: getTitleForLocale(_contextProvider),
-      assistantId: currentConversation?.assistantId,
-      sourceMessages: selected,
+    final title = getTitleForLocale(_contextProvider);
+    final sourceConversation = currentConversation;
+    if (sourceConversation == null) return;
+    final newConvo = await _chatService.forkConversationAtRevision(
+      sourceConversationId: sourceConversation.id,
+      sourceRevisionId: message.id,
+      title: title,
     );
 
     // Switch to the new conversation
     _chatService.setCurrentConversation(newConvo.id);
-    _chatController.setCurrentConversation(newConvo);
+    await _chatController.setCurrentConversationAndLoad(newConvo);
     _restoreMessageUiState();
-    notifyListeners();
     onConversationSwitched?.call();
+    notifyListeners();
     onScrollToBottom?.call();
   }
 
@@ -938,8 +854,16 @@ class HomeViewModel extends ChangeNotifier {
     final convo = currentConversation;
     if (convo == null) return 'no_conversation';
 
+    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
+    final settings = _contextProvider.read<SettingsProvider>();
+    final ap = _contextProvider.read<AssistantProvider>();
+    final assistant = convo.assistantId != null
+        ? ap.getById(convo.assistantId!)
+        : ap.currentAssistant;
+
     // Get messages and collapse to selected versions
-    final allMsgs = _chatController.allMessagesForCurrentConversationContext();
+    final allMsgs = await _chatController
+        .allMessagesForCurrentConversationContext();
     final collapsed = collapseVersions(allMsgs);
     if (collapsed.isEmpty) return 'no_messages';
 
@@ -948,15 +872,7 @@ class HomeViewModel extends ChangeNotifier {
     if (joined.trim().isEmpty) return 'no_messages';
 
     final content = buildCompressContextContent(joined, options);
-    final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
-
     // Resolve model: compress model → summary model → title model → assistant model → global default
-    final settings = _contextProvider.read<SettingsProvider>();
-    final ap = _contextProvider.read<AssistantProvider>();
-    final assistant = convo.assistantId != null
-        ? ap.getById(convo.assistantId!)
-        : ap.currentAssistant;
-
     final provKey =
         settings.compressModelProvider ??
         settings.summaryModelProvider ??
@@ -1001,12 +917,12 @@ class HomeViewModel extends ChangeNotifier {
 
       // Switch to the new conversation
       _chatService.setCurrentConversation(newConvo.id);
-      _chatController.setCurrentConversation(
+      await _chatController.setCurrentConversationAndLoad(
         _chatService.getConversation(newConvo.id) ?? newConvo,
       );
       _streamController.clearAllState();
-      notifyListeners();
       onConversationSwitched?.call();
+      notifyListeners();
       onScrollToBottom?.call();
 
       return null; // success
@@ -1021,30 +937,24 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Reload messages from storage.
-  void reloadMessages() {
-    _chatController.reloadMessages();
-    notifyListeners();
-  }
-
-  bool loadMoreBefore() {
-    final loaded = _chatController.loadMoreBefore();
+  Future<bool> loadMoreBefore() async {
+    final loaded = await _chatController.loadMoreBefore();
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
     return true;
   }
 
-  bool loadMoreAfter() {
-    final loaded = _chatController.loadMoreAfter();
+  Future<bool> loadMoreAfter() async {
+    final loaded = await _chatController.loadMoreAfter();
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
     return true;
   }
 
-  bool loadUntilMessageVisible(String messageId) {
-    final loaded = _chatController.loadUntilMessageVisible(messageId);
+  Future<bool> loadUntilMessageVisible(String messageId) async {
+    final loaded = await _chatController.loadUntilMessageVisible(messageId);
     if (!loaded) return false;
     _restoreMessageUiState();
     notifyListeners();
@@ -1089,7 +999,7 @@ class HomeViewModel extends ChangeNotifier {
         );
         if (cleanedContent != m.content) {
           final updated = m.copyWith(content: cleanedContent);
-          messages[i] = updated;
+          _chatController.replaceMessageSnapshot(updated);
           unawaited(_chatService.updateMessage(m.id, content: cleanedContent));
         }
 
@@ -1131,13 +1041,16 @@ class HomeViewModel extends ChangeNotifier {
     final configured = (assistant?.limitContextMessages ?? true)
         ? (assistant?.contextMessageSize ?? 0)
         : 0;
-    final completeMessages = _chatController
-        .allMessagesForCurrentConversationContext();
+    final completeMessages = _chatService.getMessages(
+      currentConversation?.id ?? '',
+    );
     final collapsed = collapseVersions(completeMessages);
     final remaining = computeClearContextRemainingMessageCount(
       completeMessages: completeMessages,
       collapsedMessages: collapsed,
-      truncateIndex: currentConversation?.truncateIndex ?? -1,
+      truncateIndex: currentConversation == null
+          ? -1
+          : _chatService.getContextStartIndex(currentConversation!.id),
     );
     if (configured > 0) {
       final actual = remaining > configured ? configured : remaining;
@@ -1216,7 +1129,7 @@ class HomeViewModel extends ChangeNotifier {
 
     // Build content from messages (truncate to reasonable length)
     final msgs = _chatService.getMessages(convo.id);
-    final tIndex = convo.truncateIndex;
+    final tIndex = _chatService.getContextStartIndex(convo.id);
     final List<ChatMessage> sourceAll = (tIndex >= 0 && tIndex <= msgs.length)
         ? msgs.sublist(tIndex)
         : msgs;
@@ -1279,7 +1192,7 @@ class HomeViewModel extends ChangeNotifier {
     if (convo == null) return;
 
     final settings = _contextProvider.read<SettingsProvider>();
-    final msgCount = convo.messageIds.length;
+    final msgCount = _chatService.getMessageCount(conversationId);
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // Get assistant for this conversation
@@ -1429,7 +1342,7 @@ class HomeViewModel extends ChangeNotifier {
         providerKey: provKey,
         modelId: mdlId,
         messages: msgs,
-        truncateIndex: convo.truncateIndex,
+        truncateIndex: _chatService.getContextStartIndex(conversationId),
         locale: locale,
         thinkingBudget: budget,
       );
@@ -1437,7 +1350,7 @@ class HomeViewModel extends ChangeNotifier {
 
       final latest = _chatService.getConversation(conversationId);
       if (latest == null ||
-          latest.messageIds.length != convo.messageIds.length) {
+          _chatService.getMessageCount(latest.id) != msgs.length) {
         return;
       }
 

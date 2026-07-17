@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
@@ -20,6 +21,66 @@ ChatMessage _message({
 }
 
 void main() {
+  test('unlimited context reads the complete persisted conversation', () {
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      1507,
+    );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Limited',
+          contextMessageSize: 64,
+        ),
+        persistedMessageCount: 1507,
+      ),
+      64,
+    );
+    expect(
+      ChatActions.contextReadLimit(
+        assistant: const Assistant(
+          id: 'assistant-1',
+          name: 'Unlimited with missing count',
+          limitContextMessages: false,
+        ),
+        persistedMessageCount: 0,
+      ),
+      Assistant.maxContextMessageSize,
+    );
+  });
+
+  test('only temporary regeneration physically removes trailing messages', () {
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: false,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: false,
+      ),
+      isFalse,
+    );
+    expect(
+      ChatActions.shouldPhysicallyRemoveRegenerationTail(
+        deleteTrailingEnabled: true,
+        isTemporaryConversation: true,
+      ),
+      isTrue,
+    );
+  });
+
   group('ChatActions.buildRegenerationMessages', () {
     test('长会话窗口重试会保留目标消息之前的完整历史前缀', () {
       final messages = <ChatMessage>[

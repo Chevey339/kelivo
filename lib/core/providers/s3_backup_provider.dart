@@ -132,6 +132,7 @@ class S3BackupProvider extends ChangeNotifier {
       _message = 'Restored';
     } catch (e) {
       _message = e.toString();
+      rethrow;
     } finally {
       try {
         if (file != null && await file.exists()) {

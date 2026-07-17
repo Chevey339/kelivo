@@ -1,8 +1,90 @@
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
+import '../../../core/database/chat_database_repository.dart';
 import '../models/stats_models.dart';
 
 class StatsAggregationService {
+  static StatsSnapshot buildDatabaseSnapshot({
+    required DateTime now,
+    required StatsDateRange range,
+    required ChatStatsAggregate aggregate,
+    required int launchCount,
+    required String unknownProviderLabel,
+    required String unknownTopicLabel,
+    Map<String, String> assistantNames = const {},
+    Map<String, String> providerNames = const {},
+  }) {
+    final assistantCounts = <String, int>{};
+    for (final row in aggregate.assistants) {
+      assistantCounts[row.id] = (assistantCounts[row.id] ?? 0) + row.count;
+    }
+    final heatmapCounts = {
+      for (final row in aggregate.heatmap) row.day: row.count,
+    };
+    final trendRange = _trendRange(now, range);
+    final trendBuckets = <DateTime, Map<String, StatsTokenBucket>>{
+      for (
+        var day = trendRange.start;
+        !day.isAfter(trendRange.end);
+        day = StatsDateRange.addCalendarDays(day, 1)
+      )
+        day: <String, StatsTokenBucket>{},
+    };
+    for (final row in aggregate.trend) {
+      final providerLabel = row.providerId == '_unknown'
+          ? unknownProviderLabel
+          : (providerNames[row.providerId] ?? row.providerId);
+      trendBuckets[row.day]![providerLabel] = StatsTokenBucket(
+        inputTokens: row.inputTokens,
+        outputTokens: row.outputTokens,
+        cachedTokens: row.cachedTokens,
+        uncategorizedTokens: row.uncategorizedTokens,
+        activityCount: row.activityCount,
+      );
+    }
+    return StatsSnapshot(
+      range: range,
+      summary: StatsSummary(
+        totalConversations: aggregate.conversations,
+        totalMessages: aggregate.totals.messages,
+        inputTokens: aggregate.totals.inputTokens,
+        outputTokens: aggregate.totals.outputTokens,
+        cachedTokens: aggregate.totals.cachedTokens,
+        launchCount: launchCount,
+      ),
+      heatmap: _buildHeatmap(now, heatmapCounts),
+      trend: [
+        for (final entry in trendBuckets.entries)
+          StatsTrendDay(
+            date: entry.key,
+            providerTokens: Map.unmodifiable(entry.value),
+          ),
+      ],
+      modelRank: [
+        for (final row in aggregate.models)
+          StatsRankItem(
+            id: row.id,
+            label: row.label,
+            value: row.count,
+            providerId: row.providerId,
+          ),
+      ],
+      assistantRank: _assistantRank(
+        assistantCounts,
+        assistantNames,
+        hideUnresolved: assistantNames.isNotEmpty,
+      ),
+      topicRank: [
+        for (final row in aggregate.topics)
+          StatsRankItem(
+            id: row.id,
+            label: row.label.trim().isEmpty ? unknownTopicLabel : row.label,
+            value: row.count,
+          ),
+      ],
+    );
+  }
+
   static StatsSnapshot buildSnapshot({
     required DateTime now,
     required StatsDateRange range,
@@ -101,7 +183,11 @@ class StatsAggregationService {
         (id) => id,
         providerFor: (id) => modelProviders[id],
       ),
-      assistantRank: _rank(assistantCounts, (id) => assistantNames[id] ?? id),
+      assistantRank: _assistantRank(
+        assistantCounts,
+        assistantNames,
+        existingAssistantIds: existingAssistantIds,
+      ),
       topicRank: _rank(topicCounts, (id) => topicLabels[id] ?? id),
     );
   }
@@ -220,5 +306,54 @@ class StatsAggregationService {
           providerId: providerFor?.call(entry.key),
         ),
     ];
+  }
+
+  static List<StatsRankItem> _assistantRank(
+    Map<String, int> counts,
+    Map<String, String> assistantNames, {
+    Set<String>? existingAssistantIds,
+    bool hideUnresolved = false,
+  }) {
+    final valuesByLabel = <String, int>{};
+    final representativeIdByLabel = <String, String>{};
+    final representativeValueByLabel = <String, int>{};
+
+    for (final entry in counts.entries) {
+      final id = entry.key;
+      final isDefault = id == '_default';
+      final isKnown = assistantNames.containsKey(id);
+      if (!isDefault &&
+          existingAssistantIds != null &&
+          !existingAssistantIds.contains(id)) {
+        continue;
+      }
+      if (!isDefault && hideUnresolved && !isKnown) continue;
+
+      final resolvedLabel = assistantNames[id]?.trim();
+      final label = resolvedLabel == null || resolvedLabel.isEmpty
+          ? id
+          : resolvedLabel;
+      valuesByLabel[label] = (valuesByLabel[label] ?? 0) + entry.value;
+      final representativeValue = representativeValueByLabel[label];
+      if (representativeValue == null || entry.value > representativeValue) {
+        representativeIdByLabel[label] = id;
+        representativeValueByLabel[label] = entry.value;
+      }
+    }
+
+    final items = [
+      for (final entry in valuesByLabel.entries)
+        StatsRankItem(
+          id: representativeIdByLabel[entry.key]!,
+          label: entry.key,
+          value: entry.value,
+        ),
+    ];
+    items.sort((a, b) {
+      final byValue = b.value.compareTo(a.value);
+      if (byValue != 0) return byValue;
+      return a.label.compareTo(b.label);
+    });
+    return items;
   }
 }

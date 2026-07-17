@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/backup.dart';
+import 'package:Kelivo/core/database/chat_database_gateway.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/cherry_importer.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -79,7 +80,7 @@ void main() {
             ], compressed: true),
       });
 
-      final chatService = ChatService();
+      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -111,23 +112,23 @@ void main() {
       expect(conversations['topic-2'].assistantId, 'assistant-1');
       expect(conversations['topic-empty'].title, 'Empty Topic');
       expect(conversations['topic-standalone'].title, 'Standalone Topic');
-      expect(chatService.getMessages('topic-empty'), isEmpty);
+      expect(await chatService.loadMessages('topic-empty'), isEmpty);
 
-      final message = chatService.getMessages('topic-1').single;
+      final message = (await chatService.loadMessages('topic-1')).single;
       expect(message.id, 'msg-1');
       expect(message.role, 'user');
       expect(message.content, '你好 from block');
       expect(message.modelId, 'gpt-test');
       expect(message.providerId, 'openai');
 
-      final ldbMessage = chatService.getMessages('topic-2').single;
+      final ldbMessage = (await chatService.loadMessages('topic-2')).single;
       expect(ldbMessage.id, 'msg-2');
       expect(ldbMessage.role, 'assistant');
       expect(ldbMessage.content, 'hello from ldb');
 
-      final standaloneMessage = chatService
-          .getMessages('topic-standalone')
-          .single;
+      final standaloneMessage = (await chatService.loadMessages(
+        'topic-standalone',
+      )).single;
       expect(standaloneMessage.id, 'msg-3');
       expect(standaloneMessage.role, 'user');
       expect(standaloneMessage.content, 'hello from standalone message');
@@ -178,7 +179,7 @@ void main() {
         ),
       });
 
-      final chatService = ChatService();
+      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
@@ -189,7 +190,7 @@ void main() {
       expect(result.conversations, 1);
       expect(result.messages, 1);
       expect(
-        chatService.getMessages('topic-1').single.content,
+        (await chatService.loadMessages('topic-1')).single.content,
         'hello from legacy',
       );
     });
@@ -210,7 +211,7 @@ void main() {
           file: backup,
           mode: RestoreMode.overwrite,
           settings: SettingsProvider(),
-          chatService: ChatService(),
+          chatService: ChatService(databaseGateway: ChatDatabaseGateway()),
         ),
         throwsA(anything),
       );

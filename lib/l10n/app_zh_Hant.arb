@@ -35,17 +35,27 @@
   "storageSpaceCategoryImages": "圖片",
   "storageSpaceCategoryFiles": "檔案",
   "storageSpaceCategoryChatData": "聊天記錄",
+  "storageSpaceCategoryLegacyChatData": "聊天記錄（舊）",
+  "storageSpaceCategoryRestoreTraces": "還原痕跡",
+  "storageSpaceRestoreTracesHint": "還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。",
+  "storageSpaceClearRestoreTracesButton": "清理還原痕跡",
+  "storageSpaceClearRestoreTracesConfirmMessage": "確定清理已完成還原留下的舊資料快照嗎？目前的資料庫、設定和檔案不會受到影響。",
+  "storageSpaceSubCompletedRestoreRuns": "已完成的還原快照",
   "storageSpaceCategoryAssistantData": "助理",
   "storageSpaceCategoryCache": "快取",
   "storageSpaceCategoryLogs": "日誌",
   "storageSpaceCategoryOther": "應用",
   "storageSpaceFilesCount": "{count} 個檔案",
   "storageSpaceSafeToClearHint": "可安全清理，不影響聊天記錄。",
+  "storageSpaceLegacyChatDataHint": "這是遷移到 SQLite 前保留的 Hive 舊檔案。清理後不會刪除目前的聊天記錄。",
   "storageSpaceNotSafeToClearHint": "可能影響聊天記錄，請謹慎刪除。",
   "storageSpaceBreakdownTitle": "明細",
   "storageSpaceSubChatMessages": "訊息",
   "storageSpaceSubChatConversations": "對話",
   "storageSpaceSubChatToolEvents": "工具事件",
+  "storageSpaceSubChatDatabase": "聊天資料庫",
+  "storageSpaceSubChatWriteAheadLog": "寫入日誌",
+  "storageSpaceSubChatSharedMemory": "共享記憶體索引",
   "storageSpaceSubAssistantAvatars": "頭像",
   "storageSpaceSubAssistantImages": "圖片",
   "storageSpaceSubCacheAvatars": "頭像快取",
@@ -62,6 +72,8 @@
   "storageSpaceClearAvatarCacheButton": "清理頭像快取",
   "storageSpaceClearCacheButton": "清理快取",
   "storageSpaceClearLogsButton": "清理日誌",
+  "storageSpaceClearLegacyChatDataButton": "清理舊聊天記錄",
+  "storageSpaceClearLegacyChatDataConfirmMessage": "確定清理保留的舊聊天檔案嗎？目前的 SQLite 聊天記錄不會受到影響。",
   "storageSpaceViewLogsButton": "查看日誌",
   "storageSpaceDeleteConfirmTitle": "確認刪除",
   "storageSpaceDeleteUploadsConfirmMessage": "刪除 {count} 個項目？刪除後聊天記錄中的附件可能無法開啟。",
@@ -503,15 +515,37 @@
   "backupPageTestDone": "測試完成",
   "backupPageTestConnection": "測試連線",
   "backupPageRestartRequired": "需要重啟應用程式",
-  "backupPageRestartContent": "還原完成，需要重啟以完全生效。",
+  "backupPageRestartContent": "匯入成功。重新啟動 Kelivo 後將安全套用。",
+  "restartAppFailedMessage": "Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。",
+  "backupRestoreColdRestartTitle": "還需要再重新啟動一次",
+  "backupRestoreColdRestartContent": "還原已進入可恢復終態。請再重新啟動一次 Kelivo，以便從新程序重新驗證設定；確認前不會開啟聊天資料。",
+  "backupRestoreColdRestartButton": "重新啟動 Kelivo",
+  "backupRestoreRolledBackTitle": "已保留原有資料",
+  "backupRestoreRolledBackContent": "還原未能完成。Kelivo 已驗證並保留先前的資料。",
+  "backupRestoreFailureTitle": "還原需要處理",
+  "backupRestoreFailureContent": "Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。",
+  "backupRestoreBusinessLeaseUnavailableTitle": "Kelivo 已在執行",
+  "backupRestoreBusinessLeaseUnavailableContent": "Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。",
+  "backupRestoreFailureRestartButton": "重新啟動 Kelivo",
+  "backupRestoreFailureCopyButton": "複製診斷碼",
+  "backupRestoreFailureCopied": "已複製診斷碼",
+  "backupRestoreFailureDiagnostic": "診斷碼：{code}",
+  "@backupRestoreFailureDiagnostic": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "backupPageRestoreFailedMessage": "還原失敗：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",
   "backupPageSelectImportMode": "選擇匯入模式",
-  "backupPageSelectImportModeDescription": "請選擇如何匯入備份資料：",
+  "backupPageSelectImportModeDescription": "請選擇還原方式。聊天與檔案開關決定本次還原的元件。",
   "backupPageOverwriteMode": "完全覆蓋",
-  "backupPageOverwriteModeDescription": "清空本地所有資料後恢復",
-  "backupPageMergeMode": "智能合併",
-  "backupPageMergeModeDescription": "僅添加不存在的資料（智能去重）",
+  "backupPageOverwriteModeDescription": "僅替換已選元件；保留未選元件及無關的本機設定",
+  "backupPageMergeMode": "合併",
+  "backupPageMergeModeDescription": "保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。",
   "backupPageRestore": "還原",
   "backupPageBackupUploaded": "已上傳備份",
   "backupPageBackup": "立即備份",
@@ -1955,5 +1989,61 @@
         "type": "int"
       }
     }
-  }
+  },
+  "migrationIntroTitle": "升級聊天記錄儲存",
+  "migrationIntroSubtitle": "Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。",
+  "migrationBackupNote": "遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。",
+  "migrationPerformanceNote": "遷移後，啟動、歷史載入和搜尋都會使用 SQLite 索引，長對話會更流暢。",
+  "migrationSourceDatabaseLabel": "Hive",
+  "migrationTargetDatabaseLabel": "SQLite",
+  "migrationChooseFolderButton": "選擇資料夾並備份",
+  "migrationSaveBackupButton": "儲存備份 ZIP",
+  "migrationBackingUpTitle": "正在備份",
+  "migrationBackingUpSubtitle": "正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。",
+  "migrationMigratingTitle": "正在遷移到 SQLite",
+  "migrationMigratingSubtitle": "正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。",
+  "migrationBackingUpDetail": "正在備份 {fileName}",
+  "@migrationBackingUpDetail": {
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "migrationMigratingDetail": "已遷移 {count} 條訊息",
+  "@migrationMigratingDetail": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "migrationMigratingPrepareDetail": "正在準備 SQLite 資料庫",
+  "migrationMigratingToolEventsDetail": "正在遷移工具呼叫記錄",
+  "migrationMigratingValidateDetail": "正在校驗遷移資料",
+  "migrationBackupReadyDetail": "備份 ZIP 已準備好",
+  "migrationSavingBackupZipDetail": "正在儲存備份 ZIP",
+  "migrationBackupFileSavedTitle": "備份 ZIP 已保存",
+  "migrationChecklistBackupFiles": "匯出 Hive 備份 ZIP",
+  "migrationChecklistPrepareSqlite": "準備 SQLite 資料庫",
+  "migrationChecklistMigrateMessages": "遷移對話和訊息",
+  "migrationChecklistMigrateToolEvents": "遷移工具呼叫記錄",
+  "migrationChecklistValidate": "校驗遷移資料",
+  "migrationStepBackup": "備份",
+  "migrationStepMigrate": "遷移",
+  "migrationStepComplete": "完成",
+  "migrationCompleteTitle": "升級完成",
+  "migrationCompleteSubtitle": "你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。",
+  "migrationConversationCount": "對話",
+  "migrationMessageCount": "訊息",
+  "migrationRestartButton": "重啟 Kelivo",
+  "migrationFailedTitle": "遷移失敗",
+  "migrationFailedSubtitle": "原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。",
+  "migrationUnknownError": "未知遷移錯誤。",
+  "migrationFailureLogTitle": "失敗日誌",
+  "migrationRetryButton": "重試遷移",
+  "timelineJumpToLatest": "跳到最新",
+  "largeContentShowMore": "再顯示 {count} 項",
+  "@largeContentShowMore": {"placeholders": {"count": {"type": "int"}}},
+  "largeContentCollapse": "收起"
 }

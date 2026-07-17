@@ -1,0 +1,5 @@
+#include "AppInfo.xcconfig"
+
+// Keep destructive restore-process tests isolated from the production app's
+// preferences and application container.
+PRODUCT_BUNDLE_IDENTIFIER = com.psyche.kelivo.restoreharness

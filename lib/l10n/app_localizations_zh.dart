@@ -123,6 +123,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -143,6 +162,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
 
   @override
@@ -156,6 +179,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -210,6 +242,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -1479,7 +1518,59 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '还需要再重启一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -1491,19 +1582,21 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -5320,6 +5413,140 @@ class AppLocalizationsZh extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再显示 $count 项';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5441,6 +5668,25 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天记录';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天记录（旧）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '恢复痕迹';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '恢复完成后保留的旧数据快照。清理不会影响当前应用数据。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理恢复痕迹';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '确定清理已完成恢复留下的旧数据快照吗？当前数据库、设置和文件不会受到影响。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的恢复快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助手';
 
   @override
@@ -5461,6 +5707,10 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceSafeToClearHint => '可安全清理，不影响聊天记录。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影响聊天记录，请谨慎删除。';
 
   @override
@@ -5474,6 +5724,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天数据库';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '写入日志';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享内存索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '头像';
@@ -5528,6 +5787,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日志';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日志';
@@ -6797,7 +7063,59 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复完成，需要重启以完全生效。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '还需要再重启一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '恢复已回滚';
+
+  @override
+  String get backupRestoreRolledBackContent => '恢复未能完成。Kelivo 已验证并保留原有数据。';
+
+  @override
+  String get backupRestoreFailureTitle => '恢复需要处理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 无法验证完整的原有或新数据，因此未打开聊天数据。请关闭 Kelivo 后重试；若问题反复出现，请保留诊断码以便支持人员排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在运行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的数据仍被另一个应用进程占用。请关闭其他 Kelivo 窗口后重新启动；当前进程尚未打开聊天数据。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重启 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '复制诊断码';
+
+  @override
+  String get backupRestoreFailureCopied => '已复制诊断码';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '诊断码：$code';
+  }
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '恢复失败：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -6809,19 +7127,21 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '选择导入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '请选择如何导入备份数据：';
+  String get backupPageSelectImportModeDescription =>
+      '请选择恢复方式。聊天和文件开关决定本次恢复的组件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆盖';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有数据后恢复';
+  String get backupPageOverwriteModeDescription => '仅替换已选组件；保留未选组件及无关本地设置';
 
   @override
-  String get backupPageMergeMode => '智能合并';
+  String get backupPageMergeMode => '合并';
 
   @override
-  String get backupPageMergeModeDescription => '仅添加不存在的数据（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
 
   @override
   String get backupPageRestore => '恢复';
@@ -10638,6 +10958,140 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 消息 #$index：快速随机调试样例，用于测试列表渲染、滚动稳定性、消息分组和会话历史性能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升级聊天记录存储';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 将聊天记录迁移到更快的 SQLite 数据库。升级会在应用打开前完成，避免新旧数据同时写入。';
+
+  @override
+  String get migrationBackupNote => '迁移开始前，会先导出包含设置、聊天记录和本地文件的 ZIP 备份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '迁移后，启动、历史加载和搜索都会使用 SQLite 索引，长对话会更流畅。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '选择文件夹并备份';
+
+  @override
+  String get migrationSaveBackupButton => '保存备份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在备份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在导出设置、聊天记录、上传文件、图片和字体。请保持 Kelivo 开启，等待备份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在迁移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批写入会话和消息，避免超大聊天记录占满内存。请保持 Kelivo 在前台，等待迁移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在备份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已迁移 $count 条消息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在准备 SQLite 数据库';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在迁移工具调用记录';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校验迁移数据';
+
+  @override
+  String get migrationBackupReadyDetail => '备份 ZIP 已准备好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在保存备份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '备份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '导出 Hive 备份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '准备 SQLite 数据库';
+
+  @override
+  String get migrationChecklistMigrateMessages => '迁移会话和消息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '迁移工具调用记录';
+
+  @override
+  String get migrationChecklistValidate => '校验迁移数据';
+
+  @override
+  String get migrationStepBackup => '备份';
+
+  @override
+  String get migrationStepMigrate => '迁移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升级完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天记录已迁移到 SQLite。请重启 Kelivo 进入升级后的应用。';
+
+  @override
+  String get migrationConversationCount => '对话';
+
+  @override
+  String get migrationMessageCount => '消息';
+
+  @override
+  String get migrationRestartButton => '重启 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '迁移失败';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+
+  @override
+  String get migrationUnknownError => '未知迁移错误。';
+
+  @override
+  String get migrationFailureLogTitle => '失败日志';
+
+  @override
+  String get migrationRetryButton => '重试迁移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再显示 $count 项';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -10759,6 +11213,25 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceCategoryChatData => '聊天記錄';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => '聊天記錄（舊）';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => '還原痕跡';
+
+  @override
+  String get storageSpaceRestoreTracesHint => '還原完成後保留的舊資料快照。清理不會影響目前的應用程式資料。';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => '清理還原痕跡';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      '確定清理已完成還原留下的舊資料快照嗎？目前的資料庫、設定和檔案不會受到影響。';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns => '已完成的還原快照';
+
+  @override
   String get storageSpaceCategoryAssistantData => '助理';
 
   @override
@@ -10779,6 +11252,10 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get storageSpaceSafeToClearHint => '可安全清理，不影響聊天記錄。';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      '這是遷移到 SQLite 前保留的 Hive 舊檔案。清理後不會刪除目前的聊天記錄。';
+
+  @override
   String get storageSpaceNotSafeToClearHint => '可能影響聊天記錄，請謹慎刪除。';
 
   @override
@@ -10792,6 +11269,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceSubChatToolEvents => '工具事件';
+
+  @override
+  String get storageSpaceSubChatDatabase => '聊天資料庫';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => '寫入日誌';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => '共享記憶體索引';
 
   @override
   String get storageSpaceSubAssistantAvatars => '頭像';
@@ -10846,6 +11332,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLogsButton => '清理日誌';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => '清理舊聊天記錄';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      '確定清理保留的舊聊天檔案嗎？目前的 SQLite 聊天記錄不會受到影響。';
 
   @override
   String get storageSpaceViewLogsButton => '查看日誌';
@@ -12115,7 +12608,59 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重啟應用程式';
 
   @override
-  String get backupPageRestartContent => '還原完成，需要重啟以完全生效。';
+  String get backupPageRestartContent => '匯入成功。重新啟動 Kelivo 後將安全套用。';
+
+  @override
+  String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
+
+  @override
+  String get backupRestoreColdRestartTitle => '還需要再重新啟動一次';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      '還原已進入可恢復終態。請再重新啟動一次 Kelivo，以便從新程序重新驗證設定；確認前不會開啟聊天資料。';
+
+  @override
+  String get backupRestoreColdRestartButton => '重新啟動 Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => '已保留原有資料';
+
+  @override
+  String get backupRestoreRolledBackContent => '還原未能完成。Kelivo 已驗證並保留先前的資料。';
+
+  @override
+  String get backupRestoreFailureTitle => '還原需要處理';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo 無法驗證完整的原有或新資料，因此未開啟聊天資料。請關閉 Kelivo 後重試；若問題持續發生，請保留診斷碼以供支援人員排查。';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle => 'Kelivo 已在執行';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo 的資料仍由另一個應用程式程序使用。請關閉其他 Kelivo 視窗後重新啟動；目前程序尚未開啟聊天資料。';
+
+  @override
+  String get backupRestoreFailureRestartButton => '重新啟動 Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => '複製診斷碼';
+
+  @override
+  String get backupRestoreFailureCopied => '已複製診斷碼';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return '診斷碼：$code';
+  }
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return '還原失敗：$error';
+  }
 
   @override
   String get backupPageOK => '好的';
@@ -12127,19 +12672,21 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageSelectImportMode => '選擇匯入模式';
 
   @override
-  String get backupPageSelectImportModeDescription => '請選擇如何匯入備份資料：';
+  String get backupPageSelectImportModeDescription =>
+      '請選擇還原方式。聊天與檔案開關決定本次還原的元件。';
 
   @override
   String get backupPageOverwriteMode => '完全覆蓋';
 
   @override
-  String get backupPageOverwriteModeDescription => '清空本地所有資料後恢復';
+  String get backupPageOverwriteModeDescription => '僅替換已選元件；保留未選元件及無關的本機設定';
 
   @override
-  String get backupPageMergeMode => '智能合併';
+  String get backupPageMergeMode => '合併';
 
   @override
-  String get backupPageMergeModeDescription => '僅添加不存在的資料（智能去重）';
+  String get backupPageMergeModeDescription =>
+      '保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。';
 
   @override
   String get backupPageRestore => '還原';
@@ -15956,4 +16503,138 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role 訊息 #$index：快速隨機調試樣例，用於測試列表渲染、捲動穩定性、訊息分組和會話歷史效能。';
   }
+
+  @override
+  String get migrationIntroTitle => '升級聊天記錄儲存';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo 將聊天記錄遷移到更快的 SQLite 資料庫。升級會在應用程式開啟前完成，避免新舊資料同時寫入。';
+
+  @override
+  String get migrationBackupNote => '遷移開始前，會先匯出包含設定、聊天記錄和本地檔案的 ZIP 備份。';
+
+  @override
+  String get migrationPerformanceNote =>
+      '遷移後，啟動、歷史載入和搜尋都會使用 SQLite 索引，長對話會更流暢。';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => '選擇資料夾並備份';
+
+  @override
+  String get migrationSaveBackupButton => '儲存備份 ZIP';
+
+  @override
+  String get migrationBackingUpTitle => '正在備份';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      '正在匯出設定、聊天記錄、上傳檔案、圖片和字體。請保持 Kelivo 開啟，等待備份完成。';
+
+  @override
+  String get migrationMigratingTitle => '正在遷移到 SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      '正在分批寫入對話和訊息，避免超大聊天記錄占滿記憶體。請保持 Kelivo 在前台，等待遷移完成。';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return '正在備份 $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return '已遷移 $count 條訊息';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => '正在準備 SQLite 資料庫';
+
+  @override
+  String get migrationMigratingToolEventsDetail => '正在遷移工具呼叫記錄';
+
+  @override
+  String get migrationMigratingValidateDetail => '正在校驗遷移資料';
+
+  @override
+  String get migrationBackupReadyDetail => '備份 ZIP 已準備好';
+
+  @override
+  String get migrationSavingBackupZipDetail => '正在儲存備份 ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => '備份 ZIP 已保存';
+
+  @override
+  String get migrationChecklistBackupFiles => '匯出 Hive 備份 ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => '準備 SQLite 資料庫';
+
+  @override
+  String get migrationChecklistMigrateMessages => '遷移對話和訊息';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => '遷移工具呼叫記錄';
+
+  @override
+  String get migrationChecklistValidate => '校驗遷移資料';
+
+  @override
+  String get migrationStepBackup => '備份';
+
+  @override
+  String get migrationStepMigrate => '遷移';
+
+  @override
+  String get migrationStepComplete => '完成';
+
+  @override
+  String get migrationCompleteTitle => '升級完成';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      '你的聊天記錄已遷移到 SQLite。請重啟 Kelivo 進入升級後的應用程式。';
+
+  @override
+  String get migrationConversationCount => '對話';
+
+  @override
+  String get migrationMessageCount => '訊息';
+
+  @override
+  String get migrationRestartButton => '重啟 Kelivo';
+
+  @override
+  String get migrationFailedTitle => '遷移失敗';
+
+  @override
+  String get migrationFailedSubtitle => '原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。';
+
+  @override
+  String get migrationUnknownError => '未知遷移錯誤。';
+
+  @override
+  String get migrationFailureLogTitle => '失敗日誌';
+
+  @override
+  String get migrationRetryButton => '重試遷移';
+
+  @override
+  String get timelineJumpToLatest => '跳到最新';
+
+  @override
+  String largeContentShowMore(int count) {
+    return '再顯示 $count 項';
+  }
+
+  @override
+  String get largeContentCollapse => '收起';
 }

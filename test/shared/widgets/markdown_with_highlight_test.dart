@@ -534,6 +534,7 @@ Inline ***strong emphasis*** text.
     final image = tester.widget<Image>(find.byType(Image));
     expect(image.width, 42.0);
     expect(image.height, 24.0);
+    expect(image.image, isA<ResizeImage>());
   });
 
   testWidgets(
@@ -964,6 +965,67 @@ ${rows.join('\n')}
       expect(plainText, isNot(contains('row39')));
     },
   );
+
+  testWidgets('D5 completed table builds bounded row pages', (tester) async {
+    final rows = List<String>.generate(
+      1000,
+      (index) => '| row$index | value$index |',
+    );
+    await tester.pumpWidget(
+      _markdownHarness('''
+| Name | Value |
+| - | - |
+${rows.join('\n')}
+''', width: 360),
+    );
+    await tester.pump();
+
+    String renderedTableText() => tester
+        .widgetList<RichText>(
+          find.descendant(
+            of: find.byKey(const ValueKey('markdown-table-body')),
+            matching: find.byType(RichText),
+          ),
+        )
+        .map((widget) => widget.text.toPlainText())
+        .join('\n');
+
+    expect(renderedTableText(), contains('row0'));
+    expect(renderedTableText(), isNot(contains('row999')));
+    expect(
+      find.byKey(const ValueKey('markdown-table-row-pager')),
+      findsOneWidget,
+    );
+
+    tester
+        .widget<TextButton>(
+          find.byKey(const ValueKey('markdown-table-show-more')),
+        )
+        .onPressed!();
+    await tester.pump();
+
+    expect(renderedTableText(), contains('row100'));
+    expect(renderedTableText(), isNot(contains('row999')));
+  });
+
+  testWidgets('D5 completed code uses a lazy chunk viewport', (tester) async {
+    final code = List<String>.generate(
+      10000,
+      (index) => 'line$index',
+    ).join('\n');
+    await tester.pumpWidget(
+      _markdownHarness('```text\n$code\n```', width: 500),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('virtualized-code-view')), findsOneWidget);
+    expect(find.byType(SelectableHighlightView), findsWidgets);
+    expect(
+      find.byType(SelectableHighlightView).evaluate().length,
+      lessThan(10),
+    );
+    expect(find.textContaining('line9999'), findsNothing);
+  });
 
   testWidgets(
     'MarkdownWithCodeHighlight keeps an unfinished streaming table row in table layout',

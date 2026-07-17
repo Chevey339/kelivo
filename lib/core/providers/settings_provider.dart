@@ -620,8 +620,7 @@ class SettingsProvider extends ChangeNotifier {
     try {
       final map = nextProviderConfigs.map((k, v) => MapEntry(k, v.toJson()));
       final encoded = jsonEncode(map);
-      final ok = await prefs.setString(_providerConfigsKey, encoded);
-      if (!ok) return _MigrationResult.failed;
+      await prefs.setString(_providerConfigsKey, encoded);
     } catch (e, st) {
       assert(() {
         debugPrint(
@@ -754,7 +753,6 @@ class SettingsProvider extends ChangeNotifier {
         return true;
       }());
     }
-
     // load provider grouping
     try {
       final groupsStr = prefs.getString(_providerGroupsKey) ?? '';
@@ -1323,7 +1321,11 @@ class SettingsProvider extends ChangeNotifier {
     _globalProxyPassword = v;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_globalProxyPasswordKey, _globalProxyPassword);
+    if (_globalProxyPassword.isEmpty) {
+      await prefs.remove(_globalProxyPasswordKey);
+    } else {
+      await prefs.setString(_globalProxyPasswordKey, _globalProxyPassword);
+    }
   }
 
   Future<void> setGlobalProxyBypass(String v) async {
@@ -4510,6 +4512,8 @@ enum ChatMessageBackgroundStyle { defaultStyle, frosted, solid }
 enum AndroidBackgroundChatMode { off, on, onNotify }
 
 class ProviderConfig {
+  static const _kelivoInPublicApiKey = 'kelivo';
+
   final String id;
   final bool enabled;
   final String name;
@@ -4735,7 +4739,7 @@ class ProviderConfig {
     id: json['id'] as String? ?? (json['name'] as String? ?? ''),
     enabled: json['enabled'] as bool? ?? true,
     name: json['name'] as String? ?? '',
-    apiKey: json['apiKey'] as String? ?? '',
+    apiKey: _apiKeyFromJson(json),
     baseUrl: json['baseUrl'] as String? ?? '',
     providerType: json['providerType'] != null
         ? ProviderKind.values.firstWhere(
@@ -4783,6 +4787,13 @@ class ProviderConfig {
       json['claudePromptCachingTtl'] as String?,
     ),
   );
+
+  static String _apiKeyFromJson(Map<String, dynamic> json) {
+    final stored = json['apiKey'] as String? ?? '';
+    if (stored.isNotEmpty) return stored;
+    final id = json['id'] as String? ?? json['name'] as String? ?? '';
+    return id.trim().toLowerCase() == 'kelivoin' ? _kelivoInPublicApiKey : '';
+  }
 
   static ProviderKind classify(String key, {ProviderKind? explicitType}) {
     // If an explicit type is provided, use it
@@ -4905,7 +4916,7 @@ class ProviderConfig {
             id: key,
             enabled: defaultEnabled(key),
             name: displayName ?? key,
-            apiKey: 'kelivo',
+            apiKey: _kelivoInPublicApiKey,
             baseUrl: _defaultBase(key),
             providerType: ProviderKind.openai,
             chatPath:

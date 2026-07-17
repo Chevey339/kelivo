@@ -14,10 +14,13 @@ import '../../core/providers/settings_provider.dart';
 import '../../core/services/chat/chat_service.dart';
 import '../../core/services/backup/cherry_importer.dart';
 import '../../core/services/backup/chatbox_importer.dart';
-import '../../utils/platform_utils.dart';
 import '../../shared/widgets/ios_switch.dart';
+import '../../shared/widgets/restart_app_action.dart';
 import '../../shared/widgets/snackbar.dart';
+import '../../features/backup/backup_restore_error_message.dart';
+import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../utils/platform_utils.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 
@@ -216,33 +219,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    // Inform restart requirement
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(ctx).colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showBackupRestartRequiredDialog(rootCtx);
   }
 
   @override
@@ -951,8 +934,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         actions: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.of(rootCtx).pop();
-                              PlatformUtils.restartApp();
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
                             },
                             child: Text(l10n.backupPageOK),
                           ),
@@ -1034,8 +1022,13 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                         actions: [
                           TextButton(
                             onPressed: () async {
-                              Navigator.of(rootCtx).pop();
-                              PlatformUtils.restartApp();
+                              if (await requestAppRestart(
+                                    rootCtx,
+                                    PlatformUtils.restartApp,
+                                  ) &&
+                                  rootCtx.mounted) {
+                                Navigator.of(rootCtx).pop();
+                              }
                             },
                             child: Text(l10n.backupPageOK),
                           ),
@@ -1426,7 +1419,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (!rootCtx.mounted) return;
       showAppSnackBar(
         rootCtx,
-        message: e.toString(),
+        message: backupRestoreErrorMessage(AppLocalizations.of(rootCtx)!, e),
         type: NotificationType.error,
       );
       return;
@@ -1434,27 +1427,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    final l10n = AppLocalizations.of(rootCtx)!;
-    final cs = Theme.of(rootCtx).colorScheme;
-    await showDialog(
-      context: rootCtx,
-      barrierDismissible: false,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(l10n.backupPageRestartRequired),
-        content: Text(l10n.backupPageRestartContent),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(dctx).pop();
-              PlatformUtils.restartApp();
-            },
-            child: Text(l10n.backupPageOK),
-          ),
-        ],
-      ),
-    );
+    await showBackupRestartRequiredDialog(rootCtx);
   }
 
   @override

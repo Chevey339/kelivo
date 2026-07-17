@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/assistant.dart';
+import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/stats/models/stats_models.dart';
 import 'package:Kelivo/features/stats/pages/stats_page.dart';
 import 'package:Kelivo/features/stats/widgets/stats_heatmap.dart';
@@ -58,7 +64,121 @@ StatsSnapshot _snapshot({
   );
 }
 
+class _StableSettingsProvider extends SettingsProvider {
+  @override
+  Map<String, ProviderConfig> get providerConfigs => const {};
+
+  @override
+  int get appLaunchCount => 0;
+}
+
+class _StableAssistantProvider extends AssistantProvider {
+  @override
+  List<Assistant> get assistants => const [];
+}
+
+class _ControllableStatsChatService extends ChatService {
+  var queryCount = 0;
+  var failQueries = true;
+  var _revision = 0;
+
+  @override
+  int get statisticsRevision => _revision;
+
+  @override
+  List<Conversation> getAllCompleteConversations() => const [];
+
+  @override
+  int getMessageCount(String conversationId) => 0;
+
+  @override
+  Future<ChatStatsAggregate> loadStatsAggregate({
+    required DateTime? rangeStart,
+    required DateTime? rangeEndExclusive,
+    required DateTime heatmapStart,
+    required DateTime trendStart,
+    required DateTime trendEndExclusive,
+  }) async {
+    queryCount++;
+    if (failQueries) throw StateError('stats query failed');
+    return const ChatStatsAggregate(
+      conversations: 1,
+      totals: ChatStatsTotals(
+        messages: 7,
+        inputTokens: 11,
+        outputTokens: 13,
+        cachedTokens: 0,
+      ),
+      heatmap: [],
+      trend: [],
+      models: [],
+      assistants: [],
+      topics: [],
+    );
+  }
+
+  void allowSuccessAndInvalidate() {
+    failQueries = false;
+    _revision++;
+    notifyListeners();
+  }
+}
+
+Widget _liveHarness({
+  required ChatService chatService,
+  required SettingsProvider settings,
+  required AssistantProvider assistants,
+}) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<ChatService>.value(value: chatService),
+      ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+      ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+    ],
+    child: MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: const StatsPage(),
+    ),
+  );
+}
+
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('failed database stats query waits for state change to retry', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+    final chatService = _ControllableStatsChatService();
+    final settings = _StableSettingsProvider();
+    final assistants = _StableAssistantProvider();
+    addTearDown(chatService.dispose);
+    addTearDown(settings.dispose);
+    addTearDown(assistants.dispose);
+
+    await tester.pumpWidget(
+      _liveHarness(
+        chatService: chatService,
+        settings: settings,
+        assistants: assistants,
+      ),
+    );
+    for (var i = 0; i < 5; i++) {
+      await tester.pump();
+    }
+
+    expect(chatService.queryCount, 1);
+
+    chatService.allowSuccessAndInvalidate();
+    for (var i = 0; i < 3; i++) {
+      await tester.pump();
+    }
+
+    expect(chatService.queryCount, 2);
+    expect(find.text('7'), findsOneWidget);
+  });
+
   testWidgets('heatmap shows month labels above columns', (tester) async {
     final days = [
       for (var i = 0; i < 14; i++)
@@ -236,6 +356,9 @@ void main() {
     expect(find.text('Chat Heatmap'), findsOneWidget);
     expect(find.text('Total Conversations'), findsOneWidget);
     expect(find.text('Input Tokens'), findsOneWidget);
+    expect(find.text('12'), findsOneWidget);
+    expect(find.textContaining('12 /'), findsNothing);
+    expect(find.textContaining('Current Branch'), findsNothing);
     expect(find.text('Usage Trend'), findsOneWidget);
 
     await tester.drag(find.byType(ListView), const Offset(0, -700));

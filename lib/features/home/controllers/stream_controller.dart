@@ -1332,6 +1332,7 @@ class GenerationContext {
     required this.streamOutput,
     this.ocrActive = false,
     this.generateTitleOnFinish = true,
+    this.generationRunId,
   });
 
   final ChatMessage assistantMessage;
@@ -1352,6 +1353,7 @@ class GenerationContext {
   final bool streamOutput;
   final bool ocrActive;
   final bool generateTitleOnFinish;
+  final String? generationRunId;
 }
 
 /// State object for streaming message generation.
@@ -1367,6 +1369,8 @@ class StreamingState {
   bool finishHandled = false;
   bool titleQueued = false;
   DateTime? streamStartedAt;
+  int? generationStateRevision;
+  bool generationStreamingStarted = false;
   bool hadThinkingBlock = false;
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];

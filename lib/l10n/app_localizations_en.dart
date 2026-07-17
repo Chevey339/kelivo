@@ -125,6 +125,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceCategoryChatData => 'Chat Records';
 
   @override
+  String get storageSpaceCategoryLegacyChatData => 'Chat Records (Old)';
+
+  @override
+  String get storageSpaceCategoryRestoreTraces => 'Restore Traces';
+
+  @override
+  String get storageSpaceRestoreTracesHint =>
+      'Previous data snapshots kept after completed restores. Clearing them does not affect the current app data.';
+
+  @override
+  String get storageSpaceClearRestoreTracesButton => 'Clear Restore Traces';
+
+  @override
+  String get storageSpaceClearRestoreTracesConfirmMessage =>
+      'Clear completed restore snapshots? Your current database, settings, and files will not be affected.';
+
+  @override
+  String get storageSpaceSubCompletedRestoreRuns =>
+      'Completed restore snapshots';
+
+  @override
   String get storageSpaceCategoryAssistantData => 'Assistants';
 
   @override
@@ -146,6 +167,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Safe to clear. This will not affect your chat history.';
 
   @override
+  String get storageSpaceLegacyChatDataHint =>
+      'These are retained Hive files from before the SQLite migration. Clearing them does not delete your current chat records.';
+
+  @override
   String get storageSpaceNotSafeToClearHint =>
       'May affect your chat history. Delete with care.';
 
@@ -160,6 +185,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceSubChatToolEvents => 'Tool events';
+
+  @override
+  String get storageSpaceSubChatDatabase => 'Chat database';
+
+  @override
+  String get storageSpaceSubChatWriteAheadLog => 'Write-ahead log';
+
+  @override
+  String get storageSpaceSubChatSharedMemory => 'Shared memory index';
 
   @override
   String get storageSpaceSubAssistantAvatars => 'Avatars';
@@ -214,6 +248,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageSpaceClearLogsButton => 'Clear Logs';
+
+  @override
+  String get storageSpaceClearLegacyChatDataButton => 'Clear Old Chat Records';
+
+  @override
+  String get storageSpaceClearLegacyChatDataConfirmMessage =>
+      'Clear the retained old chat files? Your current SQLite chat records will remain available.';
 
   @override
   String get storageSpaceViewLogsButton => 'View Logs';
@@ -1530,7 +1571,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageRestartContent =>
-      'Restore completed. Please restart the app.';
+      'Import successful. Restart Kelivo to apply it safely.';
+
+  @override
+  String get restartAppFailedMessage =>
+      'Kelivo could not restart automatically. Fully close it, then open it again.';
+
+  @override
+  String get backupRestoreColdRestartTitle => 'One more restart is required';
+
+  @override
+  String get backupRestoreColdRestartContent =>
+      'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.';
+
+  @override
+  String get backupRestoreColdRestartButton => 'Restart Kelivo';
+
+  @override
+  String get backupRestoreRolledBackTitle => 'Restore was rolled back';
+
+  @override
+  String get backupRestoreRolledBackContent =>
+      'The restore could not be completed. Kelivo verified and kept your previous data.';
+
+  @override
+  String get backupRestoreFailureTitle => 'Restore requires attention';
+
+  @override
+  String get backupRestoreFailureContent =>
+      'Kelivo could not verify a complete old or new data set, so chat data was not opened. Close Kelivo and try again. If this repeats, keep the diagnostic code for support.';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableTitle =>
+      'Kelivo is already running';
+
+  @override
+  String get backupRestoreBusinessLeaseUnavailableContent =>
+      'Kelivo\'s data is still in use by another app process. Close any other Kelivo window, then restart. Your chat data has not been opened by this process.';
+
+  @override
+  String get backupRestoreFailureRestartButton => 'Restart Kelivo';
+
+  @override
+  String get backupRestoreFailureCopyButton => 'Copy diagnostic code';
+
+  @override
+  String get backupRestoreFailureCopied => 'Diagnostic code copied';
+
+  @override
+  String backupRestoreFailureDiagnostic(String code) {
+    return 'Diagnostic code: $code';
+  }
+
+  @override
+  String backupPageRestoreFailedMessage(String error) {
+    return 'Restore failed: $error';
+  }
 
   @override
   String get backupPageOK => 'OK';
@@ -1543,21 +1639,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageSelectImportModeDescription =>
-      'Choose how to import the backup data:';
+      'Choose a restore mode. The chat and file switches determine which components are included.';
 
   @override
   String get backupPageOverwriteMode => 'Complete Overwrite';
 
   @override
   String get backupPageOverwriteModeDescription =>
-      'Clear all local data and restore from backup';
+      'Replace the selected components; keep unselected components and unrelated local settings';
 
   @override
-  String get backupPageMergeMode => 'Smart Merge';
+  String get backupPageMergeMode => 'Merge';
 
   @override
   String get backupPageMergeModeDescription =>
-      'Add only non-existing data (intelligent deduplication)';
+      'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.';
 
   @override
   String get backupPageRestore => 'Restore';
@@ -5537,4 +5633,141 @@ class AppLocalizationsEn extends AppLocalizations {
   String debugPageManyMessagesSeedText(String role, int index) {
     return '$role message #$index: quick random debug sample for testing list rendering, scrolling stability, message grouping, and conversation history performance.';
   }
+
+  @override
+  String get migrationIntroTitle => 'Upgrade Chat Storage';
+
+  @override
+  String get migrationIntroSubtitle =>
+      'Kelivo is moving chat history to a faster SQLite database. The upgrade runs before the app opens so your data stays consistent.';
+
+  @override
+  String get migrationBackupNote =>
+      'Before migration starts, Kelivo exports a ZIP backup with settings, chat history, and local files.';
+
+  @override
+  String get migrationPerformanceNote =>
+      'After migration, startup, history loading, and search use SQLite indexes for smoother long-chat performance.';
+
+  @override
+  String get migrationSourceDatabaseLabel => 'Hive';
+
+  @override
+  String get migrationTargetDatabaseLabel => 'SQLite';
+
+  @override
+  String get migrationChooseFolderButton => 'Choose Folder and Back Up';
+
+  @override
+  String get migrationSaveBackupButton => 'Save Backup ZIP';
+
+  @override
+  String get migrationBackingUpTitle => 'Backing Up';
+
+  @override
+  String get migrationBackingUpSubtitle =>
+      'Exporting settings, chat history, uploaded files, images, and fonts. Keep Kelivo open until this finishes.';
+
+  @override
+  String get migrationMigratingTitle => 'Migrating to SQLite';
+
+  @override
+  String get migrationMigratingSubtitle =>
+      'Writing conversations and messages in batches so large histories do not overload memory. Keep Kelivo in the foreground until migration finishes.';
+
+  @override
+  String migrationBackingUpDetail(String fileName) {
+    return 'Backing up $fileName';
+  }
+
+  @override
+  String migrationMigratingDetail(int count) {
+    return 'Migrated $count messages';
+  }
+
+  @override
+  String get migrationMigratingPrepareDetail => 'Preparing SQLite database';
+
+  @override
+  String get migrationMigratingToolEventsDetail => 'Migrating tool records';
+
+  @override
+  String get migrationMigratingValidateDetail => 'Validating migrated data';
+
+  @override
+  String get migrationBackupReadyDetail => 'Backup ZIP is ready';
+
+  @override
+  String get migrationSavingBackupZipDetail => 'Saving backup ZIP';
+
+  @override
+  String get migrationBackupFileSavedTitle => 'Backup ZIP saved';
+
+  @override
+  String get migrationChecklistBackupFiles => 'Export Hive backup ZIP';
+
+  @override
+  String get migrationChecklistPrepareSqlite => 'Prepare SQLite database';
+
+  @override
+  String get migrationChecklistMigrateMessages =>
+      'Migrate conversations and messages';
+
+  @override
+  String get migrationChecklistMigrateToolEvents => 'Migrate tool records';
+
+  @override
+  String get migrationChecklistValidate => 'Validate migrated data';
+
+  @override
+  String get migrationStepBackup => 'Backup';
+
+  @override
+  String get migrationStepMigrate => 'Migrate';
+
+  @override
+  String get migrationStepComplete => 'Done';
+
+  @override
+  String get migrationCompleteTitle => 'Upgrade Complete';
+
+  @override
+  String get migrationCompleteSubtitle =>
+      'Your chat history is now stored in SQLite. Restart Kelivo to enter the upgraded app.';
+
+  @override
+  String get migrationConversationCount => 'Conversations';
+
+  @override
+  String get migrationMessageCount => 'Messages';
+
+  @override
+  String get migrationRestartButton => 'Restart Kelivo';
+
+  @override
+  String get migrationFailedTitle => 'Migration Failed';
+
+  @override
+  String get migrationFailedSubtitle =>
+      'The original Hive data and your backup are still intact. Review the reason below, then retry.';
+
+  @override
+  String get migrationUnknownError => 'Unknown migration error.';
+
+  @override
+  String get migrationFailureLogTitle => 'Failure log';
+
+  @override
+  String get migrationRetryButton => 'Retry Migration';
+
+  @override
+  String get timelineJumpToLatest => 'Jump to latest';
+
+  @override
+  String largeContentShowMore(int count) {
+    return 'Show $count more';
+  }
+
+  @override
+  String get largeContentCollapse => 'Collapse';
 }
