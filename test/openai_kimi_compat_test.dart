@@ -502,5 +502,129 @@ void main() {
         ]);
       },
     );
+
+    test(
+      'kimi-k3 uses reasoning_effort max and strips sampling params unconditionally',
+      () async {
+        final requestBodyCompleter = Completer<Map<String, dynamic>>();
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          final body =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          if (!requestBodyCompleter.isCompleted) {
+            requestBodyCompleter.complete(body);
+          }
+
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          request.response.write(
+            'data: ${jsonEncode({
+              'id': 'cmpl-k3',
+              'object': 'chat.completion.chunk',
+              'created': 0,
+              'model': 'kimi-k3',
+              'choices': [
+                {
+                  'index': 0,
+                  'delta': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            })}\n\n',
+          );
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _moonshotConfig(baseUrl),
+          modelId: 'kimi-k3',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          thinkingBudget: 128000, // maps to max effort
+          temperature: 0.7,
+          topP: 0.8,
+        ).toList();
+
+        final body = await requestBodyCompleter.future;
+        expect(chunks.last.isDone, isTrue);
+        expect(body['reasoning_effort'], 'max');
+        expect(body.containsKey('thinking'), isFalse);
+        expect(body.containsKey('temperature'), isFalse);
+        expect(body.containsKey('top_p'), isFalse);
+        expect(body.containsKey('n'), isFalse);
+      },
+    );
+
+    test('bare k3 uses reasoning_effort and strips sampling params', () async {
+      final requestBodyCompleter = Completer<Map<String, dynamic>>();
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        final body =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        if (!requestBodyCompleter.isCompleted) {
+          requestBodyCompleter.complete(body);
+        }
+
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'id': 'cmpl-k3-bare',
+            'object': 'chat.completion.chunk',
+            'created': 0,
+            'model': 'k3',
+            'choices': [
+              {
+                'index': 0,
+                'delta': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final baseUrl = 'http://${server.address.address}:${server.port}/v1';
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _moonshotConfig(baseUrl),
+        modelId: 'k3',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 32000, // maps to high effort
+        temperature: 0.9,
+        topP: 0.95,
+      ).toList();
+
+      final body = await requestBodyCompleter.future;
+      expect(chunks.last.isDone, isTrue);
+      expect(body['reasoning_effort'], 'high');
+      expect(body.containsKey('thinking'), isFalse);
+      expect(body.containsKey('temperature'), isFalse);
+      expect(body.containsKey('top_p'), isFalse);
+    });
   });
 }
