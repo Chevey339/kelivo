@@ -21,6 +21,7 @@ import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import 'backup_settings_validator.dart';
 import 'restore_bundle_preparation.dart';
+import 'temporary_restore_file.dart';
 
 typedef _ParsedChatBackup = ({
   List<Conversation> conversations,
@@ -816,7 +817,7 @@ class DataSync {
         throw Exception('Download failed: ${streamed.statusCode}');
       }
       final tmpDir = await _ensureTempDir();
-      file = File(p.join(tmpDir.path, item.displayName));
+      file = await createTemporaryRestoreFile(tmpDir);
       final sink = file.openWrite();
       await streamed.stream.pipe(sink);
       await _restoreFromBackupFile(file, cfg, mode: mode);

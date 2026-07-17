@@ -2539,7 +2539,7 @@ void main() {
       expect(chatService.replaced, isFalse);
     });
 
-    test('cleans temporary restore files when WebDAV restore fails', () async {
+    test('WebDAV restore ignores untrusted display names', () async {
       final sourceDir = Directory('${root.path}/source_upload');
       await sourceDir.create(recursive: true);
       final sourceFile = File('${sourceDir.path}/file.txt');
@@ -2567,22 +2567,36 @@ void main() {
 
       final sync = DataSync(chatService: ChatService());
       final tmpDir = Directory('${root.path}/tmp');
-      final item = BackupFileItem(
-        href: Uri.parse('http://127.0.0.1:${server.port}/restore_source.zip'),
-        displayName: 'restore_source.zip',
-        size: await zipFile.length(),
-        lastModified: null,
-      );
+      final relativeSentinel = File('${root.path}/webdav_relative.zip');
+      final absoluteSentinel = File('${root.path}/webdav_absolute.zip');
+      await relativeSentinel.writeAsString('keep relative');
+      await absoluteSentinel.writeAsString('keep absolute');
+      final remoteNames = <String>[
+        '../webdav_relative.zip',
+        absoluteSentinel.path,
+      ];
 
-      await expectLater(
-        sync.restoreFromWebDav(
-          const WebDavConfig(includeChats: false, includeFiles: true),
-          item,
-        ),
-        throwsA(anything),
-      );
+      for (var i = 0; i < remoteNames.length; i++) {
+        final item = BackupFileItem(
+          href: Uri.parse(
+            'http://127.0.0.1:${server.port}/restore_source_$i.zip',
+          ),
+          displayName: remoteNames[i],
+          size: await zipFile.length(),
+          lastModified: null,
+        );
 
-      expect(await File('${tmpDir.path}/restore_source.zip').exists(), isFalse);
+        await expectLater(
+          sync.restoreFromWebDav(
+            const WebDavConfig(includeChats: false, includeFiles: true),
+            item,
+          ),
+          throwsA(anything),
+        );
+      }
+
+      expect(await relativeSentinel.readAsString(), 'keep relative');
+      expect(await absoluteSentinel.readAsString(), 'keep absolute');
       expect(await tmpDir.list().toList(), isEmpty);
     });
   });
