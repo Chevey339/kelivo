@@ -383,8 +383,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       <String, int>{}; // 'pk::modelId' in favorites -> index
 
   // Multi-select state
-  bool _inMultiSelectMode = false;
-  final Set<String> _multiSelected = <String>{};
+  final _multiSelect = _ModelMultiSelectState();
 
   // Async loading state
   bool _isLoading = true;
@@ -457,7 +456,6 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   @override
   void initState() {
     super.initState();
-    if (widget.onMultiSelectConfirm != null) _inMultiSelectMode = true;
     _itemPositionsListener.itemPositions.addListener(
       _scheduleActiveProviderUpdate,
     );
@@ -1014,22 +1012,32 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                           child: Row(
                             children: [
                               GestureDetector(
-                                onTap: () => setState(
-                                  () =>
-                                      _inMultiSelectMode = !_inMultiSelectMode,
-                                ),
+                                onTap: () => setState(() {
+                                  final currentKey = _currentModelKey(
+                                    context.read<SettingsProvider>(),
+                                    context.read<AssistantProvider>(),
+                                  );
+                                  final preSelected = currentKey.isEmpty
+                                      ? null
+                                      : <String>{
+                                          currentKey.replaceFirst('::', '|'),
+                                        };
+                                  _multiSelect.toggleActive(
+                                    preSelected: preSelected,
+                                  );
+                                }),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: _inMultiSelectMode
+                                    color: _multiSelect.isActive
                                         ? cs.primary.withValues(alpha: 0.15)
                                         : Colors.transparent,
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
-                                      color: _inMultiSelectMode
+                                      color: _multiSelect.isActive
                                           ? cs.primary.withValues(alpha: 0.4)
                                           : cs.outlineVariant.withValues(
                                               alpha: 0.3,
@@ -1037,24 +1045,24 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                                     ),
                                   ),
                                   child: Text(
-                                    _inMultiSelectMode
-                                        ? '${l10n.modelSelectorMultiConfirm(_multiSelected.length)} ✕'
+                                    _multiSelect.isActive
+                                        ? '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕'
                                         : l10n.modelSelectorMultiSelect,
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: AppFontWeights.medium,
-                                      color: _inMultiSelectMode
+                                      color: _multiSelect.isActive
                                           ? cs.primary
                                           : cs.onSurface.withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ),
                               ),
-                              if (_inMultiSelectMode)
+                              if (_multiSelect.isActive)
                                 Padding(
                                   padding: const EdgeInsets.only(left: 8),
                                   child: Text(
-                                    '${_multiSelected.length}',
+                                    '${_multiSelect.count}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: cs.onSurface.withValues(
@@ -1079,7 +1087,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                   ),
                 ),
                 // Multi-select confirm bar
-                if (_inMultiSelectMode)
+                if (_multiSelect.isActive)
                   _buildMultiConfirmBar(context, cs, l10n),
                 // Fixed bottom tabs
                 Container(
@@ -1230,8 +1238,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     ColorScheme cs,
     AppLocalizations l10n,
   ) {
-    final count = _multiSelected.length;
-    final canConfirm = count >= 2;
+    final count = _multiSelect.count;
+    final canConfirm = _multiSelect.canConfirm(2);
     return SafeArea(
       top: false,
       child: Padding(
@@ -1252,10 +1260,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               onTap: canConfirm
                   ? () {
-                      final list = _multiSelected.map((key) {
-                        final parts = key.split('|');
-                        return ModelSelection(parts[0], parts[1]);
-                      }).toList();
+                      final list = _multiSelect.toModelSelections();
                       widget.onMultiSelectConfirm?.call(list);
                       Navigator.of(context).maybePop();
                     }
@@ -1449,9 +1454,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   }) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = m.selected
+    final mSelectKey = _ModelMultiSelectState.keyFor(m.providerKey, m.id);
+    final isMultiSelected = _multiSelect.contains(mSelectKey);
+    final bg = _multiSelect.isActive
+        ? (isMultiSelected
+              ? cs.primary.withValues(alpha: 0.15)
+              : Colors.transparent)
+        : m.selected
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
@@ -1464,19 +1474,14 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           borderRadius: BorderRadius.circular(14),
           pressedBlendStrength: 0.10,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          onTap: _inMultiSelectMode
+          onTap: _multiSelect.isActive
               ? () => setState(() {
-                  final key = '${m.providerKey}|${m.id}';
-                  if (_multiSelected.contains(key)) {
-                    _multiSelected.remove(key);
-                  } else {
-                    _multiSelected.add(key);
-                  }
+                  _multiSelect.toggle(mSelectKey);
                 })
               : () => Navigator.of(
                   context,
                 ).pop(ModelSelection(m.providerKey, m.id)),
-          onLongPress: _inMultiSelectMode
+          onLongPress: _multiSelect.isActive
               ? null
               : () async {
                   await showModelDetailSheet(
@@ -1494,6 +1499,17 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             width: double.infinity,
             child: Row(
               children: [
+                if (_multiSelect.isActive)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(
+                      isMultiSelected ? Lucide.CheckSquare : Lucide.Square,
+                      size: 18,
+                      color: isMultiSelected
+                          ? cs.primary
+                          : cs.onSurface.withValues(alpha: 0.4),
+                    ),
+                  ),
                 _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1550,8 +1566,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         icon: icon,
                         size: 20,
                         color: cs.primary,
-                        onTap: () =>
-                            settings.togglePinModel(m.providerKey, m.id),
+                        onTap: () => context
+                            .read<SettingsProvider>()
+                            .togglePinModel(m.providerKey, m.id),
                         padding: const EdgeInsets.all(6),
                         minSize: 36,
                       ),
@@ -1772,6 +1789,61 @@ class _ModelItem {
   );
 }
 
+/// Shared multi-select state for model selector sheets.
+///
+/// Encapsulates: entering/exiting multi-select mode, selected key set,
+/// key format (providerKey|modelId), and confirmation conversion.
+/// Used by both mobile [_ModelSelectSheetState] and desktop
+/// [_DesktopModelSelectDialogBodyState] to eliminate duplicated
+/// toggle, confirm, and pre-selection logic.
+class _ModelMultiSelectState {
+  bool isActive = false;
+  final Set<String> _selected = {};
+
+  static String keyFor(String providerKey, String modelId) =>
+      '$providerKey|$modelId';
+
+  int get count => _selected.length;
+  bool canConfirm(int minCount) => count >= minCount;
+  bool contains(String key) => _selected.contains(key);
+
+  void toggle(String key) {
+    if (_selected.contains(key)) {
+      _selected.remove(key);
+    } else {
+      _selected.add(key);
+    }
+  }
+
+  /// Enter multi-select mode, optionally pre-selecting keys.
+  void activate({Iterable<String>? preSelected}) {
+    isActive = true;
+    _selected.clear();
+    if (preSelected != null) _selected.addAll(preSelected);
+  }
+
+  void deactivate() {
+    isActive = false;
+    _selected.clear();
+  }
+
+  /// Toggle between active and inactive; optionally pre-select on activation.
+  void toggleActive({Iterable<String>? preSelected}) {
+    if (isActive) {
+      deactivate();
+    } else {
+      activate(preSelected: preSelected);
+    }
+  }
+
+  List<ModelSelection> toModelSelections() {
+    return _selected.map((key) {
+      final parts = key.split('|');
+      return ModelSelection(parts[0], parts[1]);
+    }).toList();
+  }
+}
+
 // Virtualization entry: fixed height + lazy builder
 // Rows for flattened list
 abstract class _ListRow {}
@@ -1900,8 +1972,7 @@ class _DesktopModelSelectDialogBodyState
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _loading = true;
-  bool _inMultiSelectMode = false;
-  final Set<String> _multiSelected = <String>{};
+  final _multiSelect = _ModelMultiSelectState();
   Map<String, _ProviderGroup> _groups = const {};
   List<String> _orderedKeys = const [];
   // Flattened rows and precise index mapping for jump
@@ -2249,22 +2320,32 @@ class _DesktopModelSelectDialogBodyState
                             child: Row(
                               children: [
                                 GestureDetector(
-                                  onTap: () => setState(
-                                    () => _inMultiSelectMode =
-                                        !_inMultiSelectMode,
-                                  ),
+                                  onTap: () => setState(() {
+                                    final currentKey = _currentModelKey(
+                                      context.read<SettingsProvider>(),
+                                      context.read<AssistantProvider>(),
+                                    );
+                                    final preSelected = currentKey.isEmpty
+                                        ? null
+                                        : <String>{
+                                            currentKey.replaceFirst('::', '|'),
+                                          };
+                                    _multiSelect.toggleActive(
+                                      preSelected: preSelected,
+                                    );
+                                  }),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
                                       vertical: 3,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: _inMultiSelectMode
+                                      color: _multiSelect.isActive
                                           ? cs.primary.withValues(alpha: 0.15)
                                           : Colors.transparent,
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: _inMultiSelectMode
+                                        color: _multiSelect.isActive
                                             ? cs.primary.withValues(alpha: 0.4)
                                             : cs.outlineVariant.withValues(
                                                 alpha: 0.3,
@@ -2272,13 +2353,13 @@ class _DesktopModelSelectDialogBodyState
                                       ),
                                     ),
                                     child: Text(
-                                      _inMultiSelectMode
-                                          ? '${l10n.modelSelectorMultiConfirm(_multiSelected.length)} ✕'
+                                      _multiSelect.isActive
+                                          ? '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕'
                                           : l10n.modelSelectorMultiSelect,
                                       style: TextStyle(
                                         fontSize: 11,
                                         fontWeight: AppFontWeights.medium,
-                                        color: _inMultiSelectMode
+                                        color: _multiSelect.isActive
                                             ? cs.primary
                                             : cs.onSurface.withValues(
                                                 alpha: 0.6,
@@ -2287,11 +2368,11 @@ class _DesktopModelSelectDialogBodyState
                                     ),
                                   ),
                                 ),
-                                if (_inMultiSelectMode)
+                                if (_multiSelect.isActive)
                                   Padding(
                                     padding: const EdgeInsets.only(left: 8),
                                     child: Text(
-                                      '${_multiSelected.length}',
+                                      '${_multiSelect.count}',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: cs.onSurface.withValues(
@@ -2313,7 +2394,7 @@ class _DesktopModelSelectDialogBodyState
                   ),
                 ),
                 // Multi-select confirm bar
-                if (_inMultiSelectMode)
+                if (_multiSelect.isActive)
                   _buildDesktopMultiConfirmBar(context, cs, l10n),
               ],
             ),
@@ -2433,8 +2514,8 @@ class _DesktopModelSelectDialogBodyState
     ColorScheme cs,
     AppLocalizations l10n,
   ) {
-    final count = _multiSelected.length;
-    final canConfirm = count >= 2;
+    final count = _multiSelect.count;
+    final canConfirm = _multiSelect.canConfirm(2);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
       decoration: BoxDecoration(
@@ -2458,10 +2539,7 @@ class _DesktopModelSelectDialogBodyState
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             onTap: canConfirm
                 ? () {
-                    final list = _multiSelected.map((key) {
-                      final parts = key.split('|');
-                      return ModelSelection(parts[0], parts[1]);
-                    }).toList();
+                    final list = _multiSelect.toModelSelections();
                     widget.onMultiSelectConfirm?.call(list);
                     Navigator.of(context).maybePop();
                   }
@@ -2492,9 +2570,9 @@ class _DesktopModelSelectDialogBodyState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final key = '${m.providerKey}|${m.id}';
-    final isMultiSelected = _multiSelected.contains(key);
-    final bg = _inMultiSelectMode
+    final key = _ModelMultiSelectState.keyFor(m.providerKey, m.id);
+    final isMultiSelected = _multiSelect.contains(key);
+    final bg = _multiSelect.isActive
         ? (isMultiSelected
               ? cs.primary.withValues(alpha: 0.15)
               : Colors.transparent)
@@ -2511,20 +2589,16 @@ class _DesktopModelSelectDialogBodyState
         borderRadius: BorderRadius.circular(14),
         pressedBlendStrength: 0.10,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        onTap: _inMultiSelectMode
+        onTap: _multiSelect.isActive
             ? () => setState(() {
-                if (isMultiSelected) {
-                  _multiSelected.remove(key);
-                } else {
-                  _multiSelected.add(key);
-                }
+                _multiSelect.toggle(key);
               })
             : () => Navigator.of(
                 context,
               ).pop(ModelSelection(m.providerKey, m.id)),
         child: Row(
           children: [
-            if (_inMultiSelectMode)
+            if (_multiSelect.isActive)
               Padding(
                 padding: const EdgeInsets.only(right: 6),
                 child: Icon(

@@ -902,11 +902,11 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   Future<void> switchConversationAnimated(String id) async {
+    if (currentConversation?.id == id) return;
     multiAIEngine.exit();
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
-    if (currentConversation?.id == id) return;
     _exitUserMessageEdit(clearDraft: true);
     if (!isDesktopPlatform) {
       try {
