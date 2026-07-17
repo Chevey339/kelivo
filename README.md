@@ -25,20 +25,23 @@ Currently known to be used by the author and at least 2 other stable users with 
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
    - *Note*: Periodic full snapshots are still recommended.
 
-3. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
+3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses in the same view side by side, so you can pick the best result.
+   - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
+
+4. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
    - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
    - *Note*: Ideal for high-resolution captures and low-detail tasks.
 
-4. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
+5. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
    - *Tip*: For best cache performance, disable Recent Chats Reference and switch to On Demand mode.
 
-5. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
+6. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
 
-6. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+7. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-7. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
+8. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
 
-8. **Additional fixes across the repo**
+9. **Additional fixes across the repo**
    - OCR result caching now persists across restarts (SQLite-backed)
    - `fetch_markdown` tool output now strips `<script>` and `<style>` tags to reduce excessive token consumption
    - Accurate Gemini cached-token reporting
