@@ -2,10 +2,12 @@ class OpenAIReasoningSupport {
   const OpenAIReasoningSupport({
     required this.supportedEfforts,
     this.samplingRequiresNone = false,
+    this.alwaysStripSampling = false,
   });
 
   final List<String> supportedEfforts;
   final bool samplingRequiresNone;
+  final bool alwaysStripSampling;
 
   bool get supportsNone => supportedEfforts.contains('none');
   bool get supportsXhigh => supportedEfforts.contains('xhigh');
@@ -69,6 +71,10 @@ const OpenAIReasoningSupport _gpt56ProSupport = OpenAIReasoningSupport(
 const OpenAIReasoningSupport _deepSeekSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
 );
+const OpenAIReasoningSupport _kimiK3Support = OpenAIReasoningSupport(
+  supportedEfforts: <String>['none', 'low', 'medium', 'high', 'max'],
+  alwaysStripSampling: true,
+);
 
 String resolveApiModelIdOverride(
   Map<String, dynamic>? override,
@@ -83,6 +89,12 @@ String resolveApiModelIdOverride(
 
 bool isOpenAIGpt5FamilyModel(String modelId) {
   return RegExp(r'gpt-5(?=$|[-.])', caseSensitive: false).hasMatch(modelId);
+}
+
+bool isOpenAIKimiK3Model(String modelId) {
+  final lower = modelId.trim().toLowerCase();
+  return lower.contains('kimi-k3') ||
+      RegExp(r'(?:^|[-_/])k3(?:$|[-.])', caseSensitive: false).hasMatch(lower);
 }
 
 bool openAISupportsXhighReasoning(String modelId) {
@@ -184,9 +196,15 @@ bool openAIAllowsSamplingParams(String modelId, {required String effort}) {
       normalizedEffort == 'auto';
 }
 
+bool openAIAlwaysStripsSamplingParams(String modelId) {
+  final support = openAIReasoningSupport(modelId);
+  return support?.alwaysStripSampling ?? false;
+}
+
 OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   final normalized = modelId.trim().toLowerCase();
   if (normalized.contains('deepseek')) return _deepSeekSupport;
+  if (isOpenAIKimiK3Model(normalized)) return _kimiK3Support;
   if (!isOpenAIGpt5FamilyModel(normalized)) return null;
 
   if (_matchesModel(

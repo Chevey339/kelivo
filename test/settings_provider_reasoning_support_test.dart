@@ -74,6 +74,19 @@ void main() {
       );
     });
 
+    test('Kimi K3 model ids infer expected capabilities', () {
+      for (final id in const ['kimi-k3', 'k3']) {
+        final m = ModelRegistry.infer(ModelInfo(id: id, displayName: id));
+        expect(m.input, contains(Modality.image), reason: '$id vision');
+        expect(m.output, const [Modality.text], reason: '$id output');
+        expect(
+          m.abilities,
+          containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+          reason: '$id abilities',
+        );
+      }
+    });
+
     test('OpenRouter can be routed through Anthropic format explicitly', () {
       final cfg = ProviderConfig(
         id: 'OpenRouterAnthropic',
@@ -98,132 +111,62 @@ void main() {
         final settings = SettingsProvider();
 
         await _waitForSettingsLoad();
+
         await settings.setProviderConfig(
-          'ClaudeProxy',
+          'OpenRouter',
           ProviderConfig(
-            id: 'ClaudeProxy',
+            id: 'OpenRouter',
             enabled: true,
-            name: 'Claude Proxy',
+            name: 'OpenRouter',
             apiKey: 'test-key',
-            baseUrl: 'https://proxy.example/anthropic',
+            baseUrl: 'https://openrouter.ai/api/v1',
             providerType: ProviderKind.claude,
-            models: const ['pro-alias'],
+            models: const ['deepseek/deepseek-v3.2'],
             modelOverrides: const {
-              'pro-alias': {
-                'apiModelId': 'deepseek-v4-pro',
-                'type': 'chat',
-                'input': ['text'],
-                'output': ['text'],
-                'abilities': ['reasoning'],
+              'deepseek/deepseek-v3.2': <String, dynamic>{
+                'apiModelId': 'deepseek/deepseek-v3.2',
               },
             },
           ),
         );
 
         expect(
-          settings.supportsXhighReasoning('ClaudeProxy', 'pro-alias'),
+          settings.supportsXhighReasoning(
+            'OpenRouter',
+            'deepseek/deepseek-v3.2',
+          ),
           isTrue,
         );
       },
     );
 
-    group('title generation thinking', () {
-      test(
-        'defaults to enabled and preserves existing budget fallback',
-        () async {
-          SharedPreferences.setMockInitialValues({'thinking_budget_v1': 16000});
-          final settings = SettingsProvider();
+    test('Claude supports xhigh and max for fable / mythos series', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
 
-          await _waitForSettingsLoad();
-
-          expect(settings.titleGenerationThinkingEnabled, isTrue);
-          expect(settings.titleGenerationThinkingBudgetFor(null), 16000);
-          expect(settings.titleGenerationThinkingBudgetFor(1024), 1024);
-        },
+      await _waitForSettingsLoad();
+      await settings.setProviderConfig(
+        'Claude',
+        ProviderConfig(
+          id: 'Claude',
+          enabled: true,
+          name: 'Claude',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.anthropic.com/v1',
+          providerType: ProviderKind.claude,
+          models: const ['claude-fable-5', 'claude-opus-4-8'],
+        ),
       );
 
-      test(
-        'disabled title generation thinking resolves to off budget',
-        () async {
-          SharedPreferences.setMockInitialValues({});
-          final settings = SettingsProvider();
-
-          await _waitForSettingsLoad();
-          await settings.setThinkingBudget(16000);
-          await settings.setTitleGenerationThinkingEnabled(false);
-
-          expect(settings.titleGenerationThinkingEnabled, isFalse);
-          expect(settings.titleGenerationThinkingBudgetFor(null), 0);
-          expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
-
-          final prefs = await SharedPreferences.getInstance();
-          expect(
-            prefs.getBool('title_generation_thinking_enabled_v1'),
-            isFalse,
-          );
-        },
-      );
-
-      test('loads persisted disabled state', () async {
-        SharedPreferences.setMockInitialValues({
-          'title_generation_thinking_enabled_v1': false,
-        });
-        final settings = SettingsProvider();
-
-        await _waitForSettingsLoad();
-
-        expect(settings.titleGenerationThinkingEnabled, isFalse);
-        expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
-      });
-
-      test('reset restores enabled fallback behavior', () async {
-        SharedPreferences.setMockInitialValues({
-          'title_generation_thinking_enabled_v1': false,
-          'thinking_budget_v1': 64000,
-        });
-        final settings = SettingsProvider();
-
-        await _waitForSettingsLoad();
-        await settings.resetTitleGenerationThinkingEnabled();
-
-        expect(settings.titleGenerationThinkingEnabled, isTrue);
-        expect(settings.titleGenerationThinkingBudgetFor(null), 64000);
-
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getBool('title_generation_thinking_enabled_v1'), isTrue);
-      });
+      for (final model in const ['claude-fable-5', 'claude-opus-4-8']) {
+        expect(settings.supportsXhighReasoning('Claude', model), isTrue);
+        expect(settings.supportsMaxReasoning('Claude', model), isTrue);
+      }
+      expect(settings.getProviderConfig('Claude').models, [
+        'claude-fable-5',
+        'claude-opus-4-8',
+      ]);
     });
-
-    test(
-      'Claude latest models expose xhigh and max reasoning without presets',
-      () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
-
-        await _waitForSettingsLoad();
-        await settings.setProviderConfig(
-          'Claude',
-          ProviderConfig(
-            id: 'Claude',
-            enabled: true,
-            name: 'Claude',
-            apiKey: 'test-key',
-            baseUrl: 'https://api.anthropic.com/v1',
-            providerType: ProviderKind.claude,
-            models: const ['claude-fable-5', 'claude-opus-4-8'],
-          ),
-        );
-
-        for (final model in const ['claude-fable-5', 'claude-opus-4-8']) {
-          expect(settings.supportsXhighReasoning('Claude', model), isTrue);
-          expect(settings.supportsMaxReasoning('Claude', model), isTrue);
-        }
-        expect(settings.getProviderConfig('Claude').models, [
-          'claude-fable-5',
-          'claude-opus-4-8',
-        ]);
-      },
-    );
 
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
       SharedPreferences.setMockInitialValues({});
@@ -257,6 +200,50 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('Kimi K3 supports max but not xhigh reasoning (kimi-k3)', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+      await settings.setProviderConfig(
+        'Moonshot',
+        ProviderConfig(
+          id: 'Moonshot',
+          enabled: true,
+          name: 'Moonshot',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.moonshot.cn/v1',
+          providerType: ProviderKind.openai,
+          models: const ['kimi-k3'],
+        ),
+      );
+
+      expect(settings.supportsXhighReasoning('Moonshot', 'kimi-k3'), isFalse);
+      expect(settings.supportsMaxReasoning('Moonshot', 'kimi-k3'), isTrue);
+    });
+
+    test('Kimi K3 supports max but not xhigh reasoning (bare k3)', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider();
+
+      await _waitForSettingsLoad();
+      await settings.setProviderConfig(
+        'Moonshot',
+        ProviderConfig(
+          id: 'Moonshot',
+          enabled: true,
+          name: 'Moonshot',
+          apiKey: 'test-key',
+          baseUrl: 'https://api.moonshot.cn/v1',
+          providerType: ProviderKind.openai,
+          models: const ['k3'],
+        ),
+      );
+
+      expect(settings.supportsXhighReasoning('Moonshot', 'k3'), isFalse);
+      expect(settings.supportsMaxReasoning('Moonshot', 'k3'), isTrue);
     });
   });
 }

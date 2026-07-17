@@ -57,7 +57,10 @@ class BrandAssets {
         MapEntry(RegExp(r'minimax'), 'minimax-color.svg'),
         MapEntry(RegExp(r'xai'), 'xai.svg'),
         MapEntry(RegExp(r'juhenext'), 'juhenext.png'),
-        MapEntry(RegExp(r'kimi|moonshot|月之暗面'), 'kimi-color.svg'),
+        MapEntry(
+          RegExp(r'kimi|moonshot|月之暗面|(?:^|[-_/])k3(?:$|[-.])'),
+          'kimi-color.svg',
+        ),
         MapEntry(RegExp(r'302'), '302ai-color.svg'),
         MapEntry(RegExp(r'step|阶跃'), 'stepfun-color.svg'),
         MapEntry(RegExp(r'internlm|书生'), 'internlm-color.svg'),

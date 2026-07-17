@@ -141,6 +141,19 @@ void _removeMoonshotKimiUnsupportedSamplingParams(Map<String, dynamic> body) {
   body.remove('frequency_penalty');
 }
 
+void _sanitizeAlwaysStripSamplingParams(
+  Map<String, dynamic> body,
+  String upstreamModelId,
+) {
+  if (!openAIAlwaysStripsSamplingParams(upstreamModelId)) return;
+  body.remove('temperature');
+  body.remove('top_p');
+  body.remove('n');
+  body.remove('presence_penalty');
+  body.remove('frequency_penalty');
+  body.remove('logprobs');
+}
+
 bool _isZhipuLikeProvider({
   required String providerId,
   required String host,
@@ -1365,6 +1378,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     upstreamModelId,
     fallbackEffort: effort,
   );
+  _sanitizeAlwaysStripSamplingParams(body, upstreamModelId);
   _normalizeMoonshotKimiChatBody(
     body,
     upstreamModelId: upstreamModelId,
@@ -1887,6 +1901,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               upstreamModelId,
               fallbackEffort: effort,
             );
+            _sanitizeAlwaysStripSamplingParams(body2, upstreamModelId);
             _normalizeMoonshotKimiChatBody(
               body2,
               upstreamModelId: upstreamModelId,
@@ -2618,6 +2633,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   upstreamModelId,
                   fallbackEffort: effort,
                 );
+                _sanitizeAlwaysStripSamplingParams(body2, upstreamModelId);
 
                 final req2 = http.Request('POST', url);
                 final headers2 = <String, String>{
@@ -3349,6 +3365,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               upstreamModelId,
               fallbackEffort: effort,
             );
+            _sanitizeAlwaysStripSamplingParams(body2, upstreamModelId);
             _normalizeMoonshotKimiChatBody(
               body2,
               upstreamModelId: upstreamModelId,
@@ -3862,6 +3879,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   upstreamModelId,
                   fallbackEffort: effort,
                 );
+                _sanitizeAlwaysStripSamplingParams(body2, upstreamModelId);
                 _normalizeMoonshotKimiChatBody(
                   body2,
                   upstreamModelId: upstreamModelId,
