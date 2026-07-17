@@ -2044,5 +2044,63 @@
       "saved": { "type": "String" },
       "pct": { "type": "String" }
     }
+  },
+  "messageMoreSheetMultiAI": "启动对比",
+  "@messageMoreSheetMultiAI": {
+    "description": "Button in assistant message more sheet to trigger multi-model comparison"
+  },
+  "multiAIModeLockedToast": "多AI模式已激活，请通过对比卡片管理模型",
+  "@multiAIModeLockedToast": {
+    "description": "Toast shown when tapping model selector while multi-AI mode is locked"
+  },
+  "multiAIModelsBadge": "{count} 个模型",
+  "@multiAIModelsBadge": {
+    "description": "Badge on model selector button showing active model count in multi-AI mode",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "modelSelectorMultiSelect": "多选",
+  "@modelSelectorMultiSelect": {
+    "description": "Button in model selector to switch to multi-select mode"
+  },
+  "modelSelectorMultiConfirm": "确定（{count}）",
+  "@modelSelectorMultiConfirm": {
+    "description": "Confirm button in multi-select mode of model selector",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiAIAdoptVersion": "采纳",
+  "@multiAIAdoptVersion": {
+    "description": "在多AI比较中选择当前模型回复的按钮"
+  },
+  "multiAISelectModelsTitle": "选择模型",
+  "@multiAISelectModelsTitle": {
+    "description": "多模型选择弹窗的标题"
+  },
+  "multiAIStartComparison": "开始比较（{count} 个模型）",
+  "@multiAIStartComparison": {
+    "description": "选择模型后开始比较的按钮",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiAISelectModelHint": "请至少选择 2 个模型进行比较",
+  "@multiAISelectModelHint": {
+    "description": "选择少于2个模型时的提示文字"
+  },
+  "multiAISelectedCount": "已选 {count} 项",
+  "@multiAISelectedCount": {
+    "description": "多选模式下显示已选模型数量",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiAIDropThread": "移除",
+  "@multiAIDropThread": {
+    "description": "在多 AI 对比中移除某个模型回复的按钮提示"
   }
 }

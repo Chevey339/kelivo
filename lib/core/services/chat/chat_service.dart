@@ -926,6 +926,7 @@ class ChatService extends ChangeNotifier {
     DateTime? reasoningStartAt,
     DateTime? reasoningFinishedAt,
     String? groupId,
+    String? subgroupId,
     int? version,
   }) async {
     if (!_initialized) await init();
@@ -968,6 +969,7 @@ class ChatService extends ChangeNotifier {
       reasoningStartAt: reasoningStartAt,
       reasoningFinishedAt: reasoningFinishedAt,
       groupId: groupId,
+      subgroupId: subgroupId,
       version: version,
     );
 
@@ -1037,6 +1039,9 @@ class ChatService extends ChangeNotifier {
     int? completionTokens,
     int? cachedTokens,
     int? durationMs,
+    Object? groupId = ChatMessage.sentinel,
+    Object? subgroupId = ChatMessage.sentinel,
+    Object? version = ChatMessage.sentinel,
   }) async {
     if (!_initialized) return;
 
@@ -1058,6 +1063,9 @@ class ChatService extends ChangeNotifier {
       completionTokens: completionTokens ?? message.completionTokens,
       cachedTokens: cachedTokens ?? message.cachedTokens,
       durationMs: durationMs ?? message.durationMs,
+      groupId: groupId,
+      subgroupId: subgroupId,
+      version: version,
     );
 
     if (isTemporaryConversation(message.conversationId)) {

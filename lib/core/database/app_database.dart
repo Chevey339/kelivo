@@ -38,6 +38,7 @@ class ConversationRows extends Table {
   columns: {#conversationId, #timestamp},
 )
 @TableIndex(name: 'idx_messages_group', columns: {#groupId})
+@TableIndex(name: 'idx_messages_subgroup', columns: {#subgroupId})
 class MessageRows extends Table {
   TextColumn get id => text()();
   TextColumn get conversationId =>
@@ -55,6 +56,7 @@ class MessageRows extends Table {
   TextColumn get translation => text().nullable()();
   TextColumn get reasoningSegmentsJson => text().nullable()();
   TextColumn get groupId => text().nullable()();
+  TextColumn get subgroupId => text().nullable()();
   IntColumn get version => integer().withDefault(const Constant(0))();
   IntColumn get promptTokens => integer().nullable()();
   IntColumn get completionTokens => integer().nullable()();
@@ -220,7 +222,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -234,7 +236,18 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(cacheRows);
       }
       if (from < 3) {
-        await migrator.addColumn(assistantRows, assistantRows.memoryMode);
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.memoryMode);
+        } catch (_) {
+          // 列可能已存在（迁移重放或部分失败重试），忽略即可。
+        }
+      }
+      if (from < 4) {
+        try {
+          await migrator.addColumn(messageRows, messageRows.subgroupId);
+        } catch (_) {
+          // 列可能已存在（迁移重放或部分失败重试），忽略即可。
+        }
       }
     },
   );

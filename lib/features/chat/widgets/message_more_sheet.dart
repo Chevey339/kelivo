@@ -26,12 +26,14 @@ enum MessageMoreAction {
   deleteAllVersions,
   share,
   selectMessages,
+  multiAI,
 }
 
 Future<MessageMoreAction?> showMessageMoreSheet(
   BuildContext context,
   ChatMessage message, {
   required bool canDeleteAllVersions,
+  Set<MessageMoreAction>? hideActions,
 }) async {
   final isDesktop =
       defaultTargetPlatform == TargetPlatform.macOS ||
@@ -50,6 +52,7 @@ Future<MessageMoreAction?> showMessageMoreSheet(
         message: message,
         parentContext: context,
         canDeleteAllVersions: canDeleteAllVersions,
+        hideActions: hideActions,
       ),
     );
   }
@@ -101,7 +104,8 @@ Future<MessageMoreAction?> showMessageMoreSheet(
           };
         },
       ),
-      if (message.role != 'user')
+      if (message.role != 'user' &&
+          !(hideActions?.contains(MessageMoreAction.edit) ?? false))
         DesktopContextMenuItem(
           icon: Lucide.Pencil,
           label: l10n.messageMoreSheetEdit,
@@ -109,35 +113,49 @@ Future<MessageMoreAction?> showMessageMoreSheet(
             selected = MessageMoreAction.edit;
           },
         ),
-      DesktopContextMenuItem(
-        icon: Lucide.Share,
-        label: l10n.messageMoreSheetShare,
-        onTap: () {
-          selected = MessageMoreAction.share;
-        },
-      ),
-      DesktopContextMenuItem(
-        icon: Lucide.CheckSquare,
-        label: l10n.messageMoreSheetSelectMessages,
-        onTap: () {
-          selected = MessageMoreAction.selectMessages;
-        },
-      ),
-      DesktopContextMenuItem(
-        icon: Lucide.GitFork,
-        label: l10n.messageMoreSheetCreateBranch,
-        onTap: () {
-          selected = MessageMoreAction.fork;
-        },
-      ),
-      DesktopContextMenuItem(
-        icon: Lucide.Trash2,
-        label: l10n.messageMoreSheetDelete,
-        danger: true,
-        onTap: () {
-          selected = MessageMoreAction.deleteCurrentVersion;
-        },
-      ),
+      if (!(hideActions?.contains(MessageMoreAction.share) ?? false))
+        DesktopContextMenuItem(
+          icon: Lucide.Share,
+          label: l10n.messageMoreSheetShare,
+          onTap: () {
+            selected = MessageMoreAction.share;
+          },
+        ),
+      if (message.role != 'user' &&
+          !(hideActions?.contains(MessageMoreAction.multiAI) ?? false))
+        DesktopContextMenuItem(
+          icon: Lucide.Layers,
+          label: l10n.messageMoreSheetMultiAI,
+          onTap: () {
+            selected = MessageMoreAction.multiAI;
+          },
+        ),
+      if (!(hideActions?.contains(MessageMoreAction.selectMessages) ?? false))
+        DesktopContextMenuItem(
+          icon: Lucide.CheckSquare,
+          label: l10n.messageMoreSheetSelectMessages,
+          onTap: () {
+            selected = MessageMoreAction.selectMessages;
+          },
+        ),
+      if (!(hideActions?.contains(MessageMoreAction.fork) ?? false))
+        DesktopContextMenuItem(
+          icon: Lucide.GitFork,
+          label: l10n.messageMoreSheetCreateBranch,
+          onTap: () {
+            selected = MessageMoreAction.fork;
+          },
+        ),
+      if (!(hideActions?.contains(MessageMoreAction.deleteCurrentVersion) ??
+          false))
+        DesktopContextMenuItem(
+          icon: Lucide.Trash2,
+          label: l10n.messageMoreSheetDelete,
+          danger: true,
+          onTap: () {
+            selected = MessageMoreAction.deleteCurrentVersion;
+          },
+        ),
       if (canDeleteAllVersions)
         DesktopContextMenuItem(
           icon: Lucide.Trash,
@@ -160,10 +178,12 @@ class _MessageMoreSheet extends StatefulWidget {
     required this.message,
     required this.parentContext,
     required this.canDeleteAllVersions,
+    this.hideActions,
   });
   final ChatMessage message;
   final BuildContext parentContext;
   final bool canDeleteAllVersions;
+  final Set<MessageMoreAction>? hideActions;
 
   @override
   State<_MessageMoreSheet> createState() => _MessageMoreSheetState();
@@ -218,6 +238,8 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
       ),
     );
   }
+
+  bool _hid(MessageMoreAction a) => widget.hideActions?.contains(a) ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -308,7 +330,8 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                         }
                       },
                     ),
-                    if (widget.message.role != 'user')
+                    if (widget.message.role != 'user' &&
+                        !_hid(MessageMoreAction.edit))
                       _actionItem(
                         icon: Lucide.Pencil,
                         label: l10n.messageMoreSheetEdit,
@@ -316,29 +339,41 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
                           Navigator.of(context).pop(MessageMoreAction.edit);
                         },
                       ),
-                    _actionItem(
-                      icon: Lucide.Share,
-                      label: l10n.messageMoreSheetShare,
-                      onTap: () {
-                        Navigator.of(context).pop(MessageMoreAction.share);
-                      },
-                    ),
-                    _actionItem(
-                      icon: Lucide.CheckSquare,
-                      label: l10n.messageMoreSheetSelectMessages,
-                      onTap: () {
-                        Navigator.of(
-                          context,
-                        ).pop(MessageMoreAction.selectMessages);
-                      },
-                    ),
-                    _actionItem(
-                      icon: Lucide.GitFork,
-                      label: l10n.messageMoreSheetCreateBranch,
-                      onTap: () {
-                        Navigator.of(context).pop(MessageMoreAction.fork);
-                      },
-                    ),
+                    if (!_hid(MessageMoreAction.share))
+                      _actionItem(
+                        icon: Lucide.Share,
+                        label: l10n.messageMoreSheetShare,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.share);
+                        },
+                      ),
+                    if (widget.message.role != 'user' &&
+                        !_hid(MessageMoreAction.multiAI))
+                      _actionItem(
+                        icon: Lucide.Layers,
+                        label: l10n.messageMoreSheetMultiAI,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.multiAI);
+                        },
+                      ),
+                    if (!_hid(MessageMoreAction.selectMessages))
+                      _actionItem(
+                        icon: Lucide.CheckSquare,
+                        label: l10n.messageMoreSheetSelectMessages,
+                        onTap: () {
+                          Navigator.of(
+                            context,
+                          ).pop(MessageMoreAction.selectMessages);
+                        },
+                      ),
+                    if (!_hid(MessageMoreAction.fork))
+                      _actionItem(
+                        icon: Lucide.GitFork,
+                        label: l10n.messageMoreSheetCreateBranch,
+                        onTap: () {
+                          Navigator.of(context).pop(MessageMoreAction.fork);
+                        },
+                      ),
                     _actionItem(
                       icon: Lucide.Trash2,
                       label: l10n.messageMoreSheetDelete,

@@ -57,9 +57,15 @@ class ChatController extends ChangeNotifier {
   Map<String, List<ChatMessage>>? _groupCache;
   List<ChatMessage>? _messagesWithVisibleGroupsCache;
 
-  /// Conversation IDs that are currently generating (streaming).
-  final Set<String> _loadingConversationIds = <String>{};
-  Set<String> get loadingConversationIds => _loadingConversationIds;
+  /// Reference-counted loading state per conversation (streaming).
+  /// Each concurrent stream calls setConversationLoading(cid, true) on start
+  /// and setConversationLoading(cid, false) on completion. A conversation
+  /// is considered "loading" only while the counter is > 0.
+  final Map<String, int> _loadingConversationCounts = <String, int>{};
+
+  /// Returns the set of conversation IDs currently loading (counter > 0).
+  Set<String> get loadingConversationIds =>
+      _loadingConversationCounts.keys.toSet();
 
   /// Active stream subscriptions per conversation.
   final Map<String, StreamSubscription<dynamic>> _conversationStreams =
@@ -75,7 +81,7 @@ class ChatController extends ChangeNotifier {
   bool get isCurrentConversationLoading {
     final cid = _currentConversation?.id;
     if (cid == null) return false;
-    return _loadingConversationIds.contains(cid);
+    return (_loadingConversationCounts[cid] ?? 0) > 0;
   }
 
   /// Get the ChatService instance.
@@ -546,13 +552,20 @@ class ChatController extends ChangeNotifier {
     return false;
   }
 
-  /// Update a message in the list.
+  /// Update a message in the list and notify listeners.
   void updateMessageInList(String messageId, ChatMessage updatedMessage) {
     final index = _messages.indexWhere((m) => m.id == messageId);
     if (index != -1) {
       _messages[index] = updatedMessage;
       notifyListeners();
     }
+  }
+
+  /// Replace a message in the list without notifying listeners.
+  /// Used by callers that batch mutations and notify once at the end.
+  void replaceMessage(ChatMessage updated) {
+    final index = _messages.indexWhere((m) => m.id == updated.id);
+    if (index != -1) _messages[index] = updated;
   }
 
   /// Update a message by ID with optional new values.
@@ -663,20 +676,40 @@ class ChatController extends ChangeNotifier {
   // Loading State Management
   // ============================================================================
 
-  /// Check if a specific conversation is loading.
+  /// Check if a specific conversation is loading (counter > 0).
   bool isConversationLoading(String conversationId) {
-    return _loadingConversationIds.contains(conversationId);
+    return (_loadingConversationCounts[conversationId] ?? 0) > 0;
   }
 
-  /// Set the loading state for a conversation.
+  /// Increment (loading=true) or decrement (loading=false) the loading counter
+  /// for a conversation. Only notifies listeners when the boolean loading state
+  /// (counter > 0 vs == 0) actually changes.
   void setConversationLoading(String conversationId, bool loading) {
-    final prev = _loadingConversationIds.contains(conversationId);
+    final prevCount = _loadingConversationCounts[conversationId] ?? 0;
+    final prevLoading = prevCount > 0;
     if (loading) {
-      _loadingConversationIds.add(conversationId);
+      _loadingConversationCounts[conversationId] = prevCount + 1;
     } else {
-      _loadingConversationIds.remove(conversationId);
+      final newCount = prevCount - 1;
+      if (newCount <= 0) {
+        _loadingConversationCounts.remove(conversationId);
+      } else {
+        _loadingConversationCounts[conversationId] = newCount;
+      }
     }
-    if (prev != loading) {
+    final newCount = _loadingConversationCounts[conversationId] ?? 0;
+    final newLoading = newCount > 0;
+    if (prevLoading != newLoading) {
+      notifyListeners();
+    }
+  }
+
+  /// Force-clear the loading counter for a conversation (used for manual cancel).
+  /// Always notifies listeners.
+  void forceClearConversationLoading(String conversationId) {
+    final wasLoading = (_loadingConversationCounts[conversationId] ?? 0) > 0;
+    _loadingConversationCounts.remove(conversationId);
+    if (wasLoading) {
       notifyListeners();
     }
   }
@@ -756,12 +789,33 @@ class ChatController extends ChangeNotifier {
   /// Get messages collapsed by version (cached).
   List<ChatMessage> get collapsedMessages {
     if (_collapsedCache != null) return _collapsedCache!;
-    _collapsedCache = collapseVersions(_messagesWithVisibleGroups());
+    final raw = _messagesWithVisibleGroups();
+    final active = subgroupActiveGroupIds;
+    final filtered = active.isEmpty
+        ? raw
+        : raw.where((m) {
+            if (!active.contains(m.groupId ?? m.id)) return true;
+            // Keep the user trigger message for inline card placement
+            return m.role == 'user' && m.subgroupId == null;
+          }).toList();
+    _collapsedCache = collapseVersions(filtered);
     _collapsedIdToIndex = <String, int>{};
     for (int i = 0; i < _collapsedCache!.length; i++) {
       _collapsedIdToIndex![_collapsedCache![i].id] = i;
     }
     return _collapsedCache!;
+  }
+
+  /// GroupIds that have at least one message with subgroupId != null
+  /// (rendered as cards in Multi-AI mode, excluded from collapsed view).
+  Set<String> get subgroupActiveGroupIds {
+    final result = <String>{};
+    for (final m in _messages) {
+      if (m.subgroupId != null && m.groupId != null) {
+        result.add(m.groupId!);
+      }
+    }
+    return result;
   }
 
   List<ChatMessage> _messagesWithVisibleGroups() {

@@ -5464,6 +5464,47 @@ class AppLocalizationsZh extends AppLocalizations {
   String imageCompressionBatchResult(String saved, String pct) {
     return '全部压缩完成，共节省 $saved (-$pct%)';
   }
+
+  @override
+  String get messageMoreSheetMultiAI => '启动对比';
+
+  @override
+  String get multiAIModeLockedToast => '多AI模式已激活，请通过对比卡片管理模型';
+
+  @override
+  String multiAIModelsBadge(int count) {
+    return '$count 个模型';
+  }
+
+  @override
+  String get modelSelectorMultiSelect => '多选';
+
+  @override
+  String modelSelectorMultiConfirm(int count) {
+    return '确定（$count）';
+  }
+
+  @override
+  String get multiAIAdoptVersion => '采纳';
+
+  @override
+  String get multiAISelectModelsTitle => '选择模型';
+
+  @override
+  String multiAIStartComparison(int count) {
+    return '开始比较（$count 个模型）';
+  }
+
+  @override
+  String get multiAISelectModelHint => '请至少选择 2 个模型进行比较';
+
+  @override
+  String multiAISelectedCount(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get multiAIDropThread => '移除';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -10926,6 +10967,47 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String imageCompressionBatchResult(String saved, String pct) {
     return '全部压缩完成，共节省 $saved (-$pct%)';
   }
+
+  @override
+  String get messageMoreSheetMultiAI => '启动对比';
+
+  @override
+  String get multiAIModeLockedToast => '多AI模式已激活，请通过对比卡片管理模型';
+
+  @override
+  String multiAIModelsBadge(int count) {
+    return '$count 个模型';
+  }
+
+  @override
+  String get modelSelectorMultiSelect => '多选';
+
+  @override
+  String modelSelectorMultiConfirm(int count) {
+    return '确定（$count）';
+  }
+
+  @override
+  String get multiAIAdoptVersion => '采纳';
+
+  @override
+  String get multiAISelectModelsTitle => '选择模型';
+
+  @override
+  String multiAIStartComparison(int count) {
+    return '开始比较（$count 个模型）';
+  }
+
+  @override
+  String get multiAISelectModelHint => '请至少选择 2 个模型进行比较';
+
+  @override
+  String multiAISelectedCount(int count) {
+    return '已选 $count 项';
+  }
+
+  @override
+  String get multiAIDropThread => '移除';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16388,4 +16470,45 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String imageCompressionBatchResult(String saved, String pct) {
     return '全部壓縮完成，共節省 $saved (-$pct%)';
   }
+
+  @override
+  String get messageMoreSheetMultiAI => '啟動對比';
+
+  @override
+  String get multiAIModeLockedToast => '多AI模式已啟動，請通過對比卡片管理模型';
+
+  @override
+  String multiAIModelsBadge(int count) {
+    return '$count 個模型';
+  }
+
+  @override
+  String get modelSelectorMultiSelect => '多選';
+
+  @override
+  String modelSelectorMultiConfirm(int count) {
+    return '確定（$count）';
+  }
+
+  @override
+  String get multiAIAdoptVersion => '採納';
+
+  @override
+  String get multiAISelectModelsTitle => '選擇模型';
+
+  @override
+  String multiAIStartComparison(int count) {
+    return '開始比較（$count 個模型）';
+  }
+
+  @override
+  String get multiAISelectModelHint => '請至少選擇 2 個模型進行比較';
+
+  @override
+  String multiAISelectedCount(int count) {
+    return '已選 $count 項';
+  }
+
+  @override
+  String get multiAIDropThread => '移除';
 }

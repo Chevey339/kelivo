@@ -219,6 +219,9 @@ class ChatActions {
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
       chatController.conversationStreams;
 
+  /// Track multi-model stream messageIds per conversation (for cancel cleanup).
+  final Map<String, Set<String>> _multiAIStreamKeys = <String, Set<String>>{};
+
   void _setConversationLoading(String conversationId, bool loading) {
     chatController.setConversationLoading(conversationId, loading);
     onLoadingChanged?.call(conversationId, loading);
@@ -930,6 +933,14 @@ class ChatActions {
     // Reset file processing state on cancel
     onFileProcessingFinished?.call();
 
+    // Cancel all multi-AI streams for this conversation
+    final multiKeys = _multiAIStreamKeys.remove(cid);
+    if (multiKeys != null) {
+      for (final key in multiKeys) {
+        await _conversationStreams.remove(key)?.cancel();
+      }
+    }
+
     // Cancel active stream for current conversation only
     final sub = _conversationStreams.remove(cid);
     await sub?.cancel();
@@ -965,7 +976,7 @@ class ChatActions {
       }
 
       streamController.removeStreamingNotifier(streaming.id);
-      _setConversationLoading(cid, false);
+      chatController.forceClearConversationLoading(cid);
 
       // Use unified reasoning completion method
       await streamController.finishReasoningAndPersist(
@@ -994,7 +1005,7 @@ class ChatActions {
       );
       await _cancelIosBackgroundGeneration();
     } else {
-      _setConversationLoading(cid, false);
+      chatController.forceClearConversationLoading(cid);
     }
   }
 
@@ -1002,8 +1013,30 @@ class ChatActions {
   // Stream Execution
   // ============================================================================
 
+  /// Public wrapper for [__executeGeneration] — used by MultiAIEngine.
+  Future<void> executeStream(
+    stream_ctrl.GenerationContext ctx, {
+    String? streamKeyOverride,
+    String? requestIdOverride,
+  }) {
+    return _executeGeneration(
+      ctx,
+      streamKeyOverride: streamKeyOverride,
+      requestIdOverride: requestIdOverride,
+    );
+  }
+
   /// Execute generation with the given context.
-  Future<void> _executeGeneration(stream_ctrl.GenerationContext ctx) async {
+  /// If [streamKeyOverride] is provided, use it as the stream subscription
+  /// key instead of conversationId (for multi-model concurrent streams).
+  Future<void> _executeGeneration(
+    stream_ctrl.GenerationContext ctx, {
+    String? streamKeyOverride,
+    String? requestIdOverride,
+  }) async {
+    debugPrint(
+      '[MultiAIDebug] _executeGeneration ENTERED msgId=${ctx.assistantMessage.id} modelId=${ctx.modelId} streamKeyOverride=$streamKeyOverride',
+    );
     final state = stream_ctrl.StreamingState(ctx);
     final assistant = ctx.assistant;
     final conversationId = state.conversationId;
@@ -1022,6 +1055,9 @@ class ChatActions {
 
     try {
       await _startIosBackgroundGeneration(ctx);
+      debugPrint(
+        '[MultiAIDebug] CALLING ChatApiService.sendMessageStream modelId=${ctx.modelId} providerKey=${ctx.providerKey} apiMessages=${ctx.apiMessages.length}',
+      );
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
@@ -1037,20 +1073,28 @@ class ChatActions {
         extraHeaders: ctx.extraHeaders,
         extraBody: ctx.extraBody,
         stream: ctx.streamOutput,
-        requestId: conversationId,
+        requestId: requestIdOverride ?? conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
       );
 
-      await _conversationStreams[conversationId]?.cancel();
+      final streamKey = streamKeyOverride ?? conversationId;
+      await _conversationStreams[streamKey]?.cancel();
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
         stream: stream,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
       );
-      _conversationStreams[conversationId] = sub;
-    } catch (e) {
+      _conversationStreams[streamKey] = sub;
+      if (streamKeyOverride != null) {
+        _multiAIStreamKeys
+            .putIfAbsent(conversationId, () => <String>{})
+            .add(streamKeyOverride);
+      }
+    } catch (e, st) {
+      debugPrint('[MultiAIDebug] _executeGeneration CAUGHT: $e');
+      debugPrint('[MultiAIDebug] _executeGeneration stack: $st');
       await _handleStreamError(e, state);
     }
   }
@@ -1411,6 +1455,7 @@ class ChatActions {
     }
 
     await _conversationStreams.remove(conversationId)?.cancel();
+    await _conversationStreams.remove(messageId)?.cancel();
 
     // Ensure reasoning is finished
     final r = streamController.reasoning[messageId];
@@ -1613,6 +1658,7 @@ class ChatActions {
     );
 
     await _conversationStreams.remove(conversationId)?.cancel();
+    await _conversationStreams.remove(messageId)?.cancel();
     onStreamError?.call(errorText);
     onStreamFinished?.call();
     await _finishIosBackgroundGeneration(success: false, detail: errorText);
@@ -1648,6 +1694,7 @@ class ChatActions {
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call();
     await _conversationStreams.remove(conversationId)?.cancel();
+    await _conversationStreams.remove(messageId)?.cancel();
   }
 
   // ============================================================================

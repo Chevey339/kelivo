@@ -36,6 +36,7 @@ typedef OnDeleteAllVersions =
       ChatMessage message,
       Map<String, List<ChatMessage>> byGroup,
     );
+typedef OnMultiAI = void Function(ChatMessage message);
 typedef OnForkConversation = Future<void> Function(ChatMessage message);
 typedef OnShareMessage =
     void Function(int messageIndex, List<ChatMessage> messages);
@@ -114,11 +115,13 @@ class MessageListView extends StatefulWidget {
     this.onEditMessage,
     this.onDeleteMessage,
     this.onDeleteAllVersions,
+    this.onMultiAI,
     this.onForkConversation,
     this.onShareMessage,
     this.onSelectMessages,
     this.onSpeakMessage,
     this.suggestions = const <String>[],
+    this.afterMessageWidgets,
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
     this.onToggleSelection,
@@ -181,11 +184,15 @@ class MessageListView extends StatefulWidget {
   final OnEditMessage? onEditMessage;
   final OnDeleteMessage? onDeleteMessage;
   final OnDeleteAllVersions? onDeleteAllVersions;
+  final OnMultiAI? onMultiAI;
   final OnForkConversation? onForkConversation;
   final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
   final List<String> suggestions;
+
+  /// Inline widgets rendered after specific message items (e.g. Multi-AI card groups).
+  final Map<String, Widget>? afterMessageWidgets;
   final OnSuggestionTap? onSuggestionTap;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
@@ -613,6 +620,8 @@ class _MessageListViewState extends State<MessageListView> {
             padding: widget.dividerPadding,
             child: _buildContextDivider(context),
           ),
+        if (widget.afterMessageWidgets?.containsKey(message.id) == true)
+          widget.afterMessageWidgets![message.id]!,
       ],
     );
 
@@ -842,6 +851,8 @@ class _MessageListViewState extends State<MessageListView> {
           widget.onShareMessage?.call(index, widget.messages);
         } else if (action == MessageMoreAction.selectMessages) {
           widget.onSelectMessages?.call(index, widget.messages);
+        } else if (action == MessageMoreAction.multiAI) {
+          widget.onMultiAI?.call(message);
         }
       },
       toolParts: message.role == 'assistant'

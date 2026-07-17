@@ -197,11 +197,74 @@ _ModelProcessingResult _processModelsInBackground(_ModelProcessingData data) {
   );
 }
 
+/// Show multi-model selector (checkboxes mode).
+/// Returns selected models when confirmed, or null if cancelled.
+Future<List<ModelSelection>?> showMultiModelSelector(
+  BuildContext context, {
+  String? limitProviderKey,
+  Set<String>? preselectedKeys,
+}) async {
+  final completer = Completer<List<ModelSelection>?>();
+  if (_modelSelectorOpen) return null;
+  _modelSelectorOpen = true;
+  try {
+    final platform = defaultTargetPlatform;
+    if (platform == TargetPlatform.macOS ||
+        platform == TargetPlatform.windows ||
+        platform == TargetPlatform.linux) {
+      // Desktop: use dialog
+      final cs = Theme.of(context).colorScheme;
+      await showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: cs.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SizedBox(
+            width: 480,
+            height: 600,
+            child: _ModelSelectSheet(
+              onMultiSelectConfirm: (list) {
+                completer.complete(list);
+                Navigator.of(ctx).maybePop();
+              },
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Mobile: use bottom sheet
+      final cs = Theme.of(context).colorScheme;
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: cs.surface,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (ctx) => _ModelSelectSheet(
+          onMultiSelectConfirm: (list) {
+            completer.complete(list);
+            Navigator.of(ctx).maybePop();
+          },
+        ),
+      );
+      // Complete with null if sheet dismissed without confirm
+      if (!completer.isCompleted) completer.complete(null);
+    }
+  } finally {
+    _modelSelectorOpen = false;
+  }
+  return completer.future;
+}
+
 Future<ModelSelection?> showModelSelector(
   BuildContext context, {
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  void Function(List<ModelSelection>)? onMultiSelectConfirm,
 }) async {
   if (_modelSelectorOpen) return null;
   _modelSelectorOpen = true;
@@ -216,6 +279,7 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        onMultiSelectConfirm: onMultiSelectConfirm,
       );
     }
     final cs = Theme.of(context).colorScheme;
@@ -230,6 +294,7 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        onMultiSelectConfirm: onMultiSelectConfirm,
       ),
     );
   } finally {
@@ -240,10 +305,14 @@ Future<ModelSelection?> showModelSelector(
 Future<void> showModelSelectSheet(
   BuildContext context, {
   bool updateAssistant = true,
+  void Function(List<ModelSelection>)? onMultiSelectConfirm,
 }) async {
   final assistantProvider = context.read<AssistantProvider>();
   final settings = context.read<SettingsProvider>();
-  final sel = await showModelSelector(context);
+  final sel = await showModelSelector(
+    context,
+    onMultiSelectConfirm: onMultiSelectConfirm,
+  );
   if (sel != null) {
     if (updateAssistant) {
       // Update assistant's model instead of global default
@@ -268,10 +337,12 @@ class _ModelSelectSheet extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.onMultiSelectConfirm,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final void Function(List<ModelSelection>)? onMultiSelectConfirm;
   @override
   State<_ModelSelectSheet> createState() => _ModelSelectSheetState();
 }
@@ -310,6 +381,10 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       <String, int>{}; // 'pk::modelId' in provider sections -> index
   final Map<String, int> _favModelIndexMap =
       <String, int>{}; // 'pk::modelId' in favorites -> index
+
+  // Multi-select state
+  bool _inMultiSelectMode = false;
+  final Set<String> _multiSelected = <String>{};
 
   // Async loading state
   bool _isLoading = true;
@@ -382,6 +457,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   @override
   void initState() {
     super.initState();
+    if (widget.onMultiSelectConfirm != null) _inMultiSelectMode = true;
     _itemPositionsListener.itemPositions.addListener(
       _scheduleActiveProviderUpdate,
     );
@@ -931,6 +1007,65 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                           ),
                         ),
                       ),
+                      // Multi-select toggle row
+                      if (widget.limitProviderKey == null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+                          child: Row(
+                            children: [
+                              GestureDetector(
+                                onTap: () => setState(
+                                  () =>
+                                      _inMultiSelectMode = !_inMultiSelectMode,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: _inMultiSelectMode
+                                        ? cs.primary.withValues(alpha: 0.15)
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: _inMultiSelectMode
+                                          ? cs.primary.withValues(alpha: 0.4)
+                                          : cs.outlineVariant.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _inMultiSelectMode
+                                        ? '${l10n.modelSelectorMultiConfirm(_multiSelected.length)} ✕'
+                                        : l10n.modelSelectorMultiSelect,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: AppFontWeights.medium,
+                                      color: _inMultiSelectMode
+                                          ? cs.primary
+                                          : cs.onSurface.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_inMultiSelectMode)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: Text(
+                                    '${_multiSelected.length}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: cs.onSurface.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -943,6 +1078,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         : _buildContent(context),
                   ),
                 ),
+                // Multi-select confirm bar
+                if (_inMultiSelectMode)
+                  _buildMultiConfirmBar(context, cs, l10n),
                 // Fixed bottom tabs
                 Container(
                   color: cs.surface, // Ensure background color continuity
@@ -1084,6 +1222,60 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildMultiConfirmBar(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
+    final count = _multiSelected.length;
+    final canConfirm = count >= 2;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+        child: Row(
+          children: [
+            Text(
+              l10n.multiAISelectedCount(count),
+              style: TextStyle(
+                fontSize: 13,
+                color: cs.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+            const Spacer(),
+            IosCardPress(
+              baseColor: canConfirm ? cs.primary : cs.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              onTap: canConfirm
+                  ? () {
+                      final list = _multiSelected.map((key) {
+                        final parts = key.split('|');
+                        return ModelSelection(parts[0], parts[1]);
+                      }).toList();
+                      widget.onMultiSelectConfirm?.call(list);
+                      Navigator.of(context).maybePop();
+                    }
+                  : null,
+              child: Text(
+                canConfirm
+                    ? l10n.modelSelectorMultiConfirm(count)
+                    : l10n.multiAISelectModelHint,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: AppFontWeights.semibold,
+                  color: canConfirm
+                      ? cs.onPrimary
+                      : cs.onSurface.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1272,20 +1464,32 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           borderRadius: BorderRadius.circular(14),
           pressedBlendStrength: 0.10,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          onTap: () =>
-              Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
-          onLongPress: () async {
-            await showModelDetailSheet(
-              context,
-              providerKey: m.providerKey,
-              modelId: m.id,
-            );
-            if (mounted) {
-              _isLoading = true;
-              setState(() {});
-              await _loadModelsAsync();
-            }
-          },
+          onTap: _inMultiSelectMode
+              ? () => setState(() {
+                  final key = '${m.providerKey}|${m.id}';
+                  if (_multiSelected.contains(key)) {
+                    _multiSelected.remove(key);
+                  } else {
+                    _multiSelected.add(key);
+                  }
+                })
+              : () => Navigator.of(
+                  context,
+                ).pop(ModelSelection(m.providerKey, m.id)),
+          onLongPress: _inMultiSelectMode
+              ? null
+              : () async {
+                  await showModelDetailSheet(
+                    context,
+                    providerKey: m.providerKey,
+                    modelId: m.id,
+                  );
+                  if (mounted) {
+                    _isLoading = true;
+                    setState(() {});
+                    await _loadModelsAsync();
+                  }
+                },
           child: SizedBox(
             width: double.infinity,
             child: Row(
@@ -1649,6 +1853,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  void Function(List<ModelSelection>)? onMultiSelectConfirm,
 }) async {
   return showGeneralDialog<ModelSelection>(
     context: context,
@@ -1659,6 +1864,7 @@ Future<ModelSelection?> _showDesktopModelSelector(
       limitProviderKey: limitProviderKey,
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
+      onMultiSelectConfirm: onMultiSelectConfirm,
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -1678,10 +1884,12 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.onMultiSelectConfirm,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final void Function(List<ModelSelection>)? onMultiSelectConfirm;
   @override
   State<_DesktopModelSelectDialogBody> createState() =>
       _DesktopModelSelectDialogBodyState();
@@ -1692,6 +1900,8 @@ class _DesktopModelSelectDialogBodyState
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _loading = true;
+  bool _inMultiSelectMode = false;
+  final Set<String> _multiSelected = <String>{};
   Map<String, _ProviderGroup> _groups = const {};
   List<String> _orderedKeys = const [];
   // Flattened rows and precise index mapping for jump
@@ -2032,6 +2242,67 @@ class _DesktopModelSelectDialogBodyState
                             ),
                           ),
                         ),
+                        // Multi-select toggle
+                        if (widget.limitProviderKey == null)
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12, bottom: 4),
+                            child: Row(
+                              children: [
+                                GestureDetector(
+                                  onTap: () => setState(
+                                    () => _inMultiSelectMode =
+                                        !_inMultiSelectMode,
+                                  ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _inMultiSelectMode
+                                          ? cs.primary.withValues(alpha: 0.15)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(
+                                        color: _inMultiSelectMode
+                                            ? cs.primary.withValues(alpha: 0.4)
+                                            : cs.outlineVariant.withValues(
+                                                alpha: 0.3,
+                                              ),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _inMultiSelectMode
+                                          ? '${l10n.modelSelectorMultiConfirm(_multiSelected.length)} ✕'
+                                          : l10n.modelSelectorMultiSelect,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: AppFontWeights.medium,
+                                        color: _inMultiSelectMode
+                                            ? cs.primary
+                                            : cs.onSurface.withValues(
+                                                alpha: 0.6,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (_inMultiSelectMode)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Text(
+                                      '${_multiSelected.length}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: cs.onSurface.withValues(
+                                          alpha: 0.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         Expanded(
                           child: _loading
                               ? const Center(child: CircularProgressIndicator())
@@ -2041,6 +2312,9 @@ class _DesktopModelSelectDialogBodyState
                     ),
                   ),
                 ),
+                // Multi-select confirm bar
+                if (_inMultiSelectMode)
+                  _buildDesktopMultiConfirmBar(context, cs, l10n),
               ],
             ),
           ),
@@ -2154,6 +2428,62 @@ class _DesktopModelSelectDialogBodyState
     }
   }
 
+  Widget _buildDesktopMultiConfirmBar(
+    BuildContext context,
+    ColorScheme cs,
+    AppLocalizations l10n,
+  ) {
+    final count = _multiSelected.length;
+    final canConfirm = count >= 2;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.2)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(
+            l10n.multiAISelectedCount(count),
+            style: TextStyle(
+              fontSize: 12,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const Spacer(),
+          IosCardPress(
+            baseColor: canConfirm ? cs.primary : cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            onTap: canConfirm
+                ? () {
+                    final list = _multiSelected.map((key) {
+                      final parts = key.split('|');
+                      return ModelSelection(parts[0], parts[1]);
+                    }).toList();
+                    widget.onMultiSelectConfirm?.call(list);
+                    Navigator.of(context).maybePop();
+                  }
+                : null,
+            child: Text(
+              canConfirm
+                  ? l10n.modelSelectorMultiConfirm(count)
+                  : l10n.multiAISelectModelHint,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: AppFontWeights.semibold,
+                color: canConfirm
+                    ? cs.onPrimary
+                    : cs.onSurface.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _desktopModelTile(
     BuildContext context,
     _ModelItem m, {
@@ -2162,7 +2492,13 @@ class _DesktopModelSelectDialogBodyState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final bg = m.selected
+    final key = '${m.providerKey}|${m.id}';
+    final isMultiSelected = _multiSelected.contains(key);
+    final bg = _inMultiSelectMode
+        ? (isMultiSelected
+              ? cs.primary.withValues(alpha: 0.15)
+              : Colors.transparent)
+        : m.selected
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
@@ -2175,10 +2511,30 @@ class _DesktopModelSelectDialogBodyState
         borderRadius: BorderRadius.circular(14),
         pressedBlendStrength: 0.10,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        onTap: () =>
-            Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+        onTap: _inMultiSelectMode
+            ? () => setState(() {
+                if (isMultiSelected) {
+                  _multiSelected.remove(key);
+                } else {
+                  _multiSelected.add(key);
+                }
+              })
+            : () => Navigator.of(
+                context,
+              ).pop(ModelSelection(m.providerKey, m.id)),
         child: Row(
           children: [
+            if (_inMultiSelectMode)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Icon(
+                  isMultiSelected ? Lucide.CheckSquare : Lucide.Square,
+                  size: 16,
+                  color: isMultiSelected
+                      ? cs.primary
+                      : cs.onSurface.withValues(alpha: 0.4),
+                ),
+              ),
             _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
             const SizedBox(width: 6),
             Expanded(

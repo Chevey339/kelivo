@@ -61,9 +61,20 @@ List<ChatMessage> selectForkConversationMessages({
   required ChatMessage targetMessage,
   Map<String, int> versionSelections = const <String, int>{},
 }) {
+  // When forking from a multi-AI thread, only include messages from the same
+  // thread (subgroupId). Cross-round continuity is maintained per thread.
+  final forkSubgroupId = targetMessage.subgroupId;
+
+  // Pre-filter: keep only messages that belong to the same thread.
+  final filtered = forkSubgroupId != null
+      ? messages.where((m) {
+          return m.subgroupId == null || m.subgroupId == forkSubgroupId;
+        }).toList()
+      : messages;
+
   final Map<String, List<ChatMessage>> byGroup = <String, List<ChatMessage>>{};
   final List<String> groupOrder = <String>[];
-  for (final message in messages) {
+  for (final message in filtered) {
     final groupId = message.groupId ?? message.id;
     byGroup
         .putIfAbsent(groupId, () {
@@ -204,6 +215,23 @@ class HomeViewModel extends ChangeNotifier {
   final ChatSuggestionService _suggestionService =
       const ChatSuggestionService();
   late final ChatActions _chatActions;
+
+  /// Exposed for direct DB operations (e.g. subgroupId updates).
+  ChatService get chatService => _chatService;
+
+  /// Stream execution for MultiAIEngine.
+  Future<void> executeStream(
+    stream_ctrl.GenerationContext ctx, {
+    String? streamKeyOverride,
+    String? requestIdOverride,
+  }) {
+    return _chatActions.executeStream(
+      ctx,
+      streamKeyOverride: streamKeyOverride,
+      requestIdOverride: requestIdOverride,
+    );
+  }
+
   QueuedChatInput? _queuedInput;
   bool _isDrainingQueuedInput = false;
 
@@ -466,6 +494,7 @@ class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Start multi-AI comparison generation.
   /// Regenerate response at a specific message.
   Future<bool> regenerateAtMessage(
     ChatMessage message, {

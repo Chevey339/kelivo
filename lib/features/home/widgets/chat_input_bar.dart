@@ -106,12 +106,18 @@ class ChatInputBar extends StatefulWidget {
         SettingsProvider.defaultChatInputBackgroundOpacityLight,
     this.inputBackgroundOpacityDark =
         SettingsProvider.defaultChatInputBackgroundOpacityDark,
+    this.multiAIModelCount,
+    this.onExitMultiAI,
+    this.onMultiSelectModel,
   });
 
   final Future<ChatInputSubmissionResult> Function(ChatInputData)? onSend;
   final VoidCallback? onStop;
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
+  final int? multiAIModelCount;
+  final VoidCallback? onExitMultiAI;
+  final VoidCallback? onMultiSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;
   final VoidCallback? onOpenSearch;
@@ -1146,6 +1152,48 @@ class _ChatInputBarState extends State<ChatInputBar>
     return (images: images, docs: docs);
   }
 
+  Widget _buildMultiAIBadge(BuildContext context, int count) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: widget.onMultiSelectModel,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: cs.primaryContainer.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: cs.primary.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Lucide.Boxes, size: 14, color: cs.onPrimaryContainer),
+            const SizedBox(width: 4),
+            Text(
+              l10n.multiAIModelsBadge(count),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: AppFontWeights.semibold,
+                color: cs.onPrimaryContainer,
+              ),
+            ),
+            if (widget.onExitMultiAI != null) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: widget.onExitMultiAI,
+                child: Icon(
+                  Lucide.X,
+                  size: 14,
+                  color: cs.onPrimaryContainer.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   // Build a responsive left action bar that hides overflowing actions
   // into an anchored "+" menu using DesktopContextMenu style.
   Widget _buildResponsiveLeftActions(BuildContext context) {
@@ -1165,22 +1213,36 @@ class _ChatInputBarState extends State<ChatInputBar>
         final List<_OverflowAction> actions = [];
 
         // Model select (always present; can be hidden if overflow)
+        final modelCount = widget.multiAIModelCount;
+        final isMultiAILocked = modelCount != null && modelCount >= 2;
         actions.add(
           _OverflowAction(
-            width: (widget.modelIcon != null) ? modelButtonW : normalButtonW,
-            builder: () => _CompactIconButton(
-              tooltip: l10n.chatInputBarSelectModelTooltip,
-              icon: Lucide.Boxes,
-              modelIcon: true,
-              onTap: lockTap(widget.onSelectModel),
-              onLongPress: lockTap(widget.onLongPressSelectModel),
-              child: widget.modelIcon,
-            ),
-            menu: DesktopContextMenuItem(
-              icon: Lucide.Boxes,
-              label: l10n.chatInputBarSelectModelTooltip,
-              onTap: lockTap(widget.onSelectModel),
-            ),
+            width: isMultiAILocked
+                ? modelButtonW + 32
+                : (widget.modelIcon != null)
+                ? modelButtonW
+                : normalButtonW,
+            builder: () => isMultiAILocked
+                ? _buildMultiAIBadge(context, modelCount)
+                : _CompactIconButton(
+                    tooltip: l10n.chatInputBarSelectModelTooltip,
+                    icon: Lucide.Boxes,
+                    modelIcon: true,
+                    onTap: lockTap(widget.onSelectModel),
+                    onLongPress: lockTap(widget.onLongPressSelectModel),
+                    child: widget.modelIcon,
+                  ),
+            menu: isMultiAILocked
+                ? DesktopContextMenuItem(
+                    icon: Lucide.Boxes,
+                    label: l10n.multiAIModelsBadge(modelCount),
+                    onTap: widget.onMultiSelectModel,
+                  )
+                : DesktopContextMenuItem(
+                    icon: Lucide.Boxes,
+                    label: l10n.chatInputBarSelectModelTooltip,
+                    onTap: lockTap(widget.onSelectModel),
+                  ),
           ),
         );
 

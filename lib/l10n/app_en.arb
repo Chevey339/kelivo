@@ -2497,5 +2497,63 @@
       "saved": { "type": "String" },
       "pct": { "type": "String" }
     }
+  },
+  "messageMoreSheetMultiAI": "Start Comparison",
+  "@messageMoreSheetMultiAI": {
+    "description": "Button in assistant message more sheet to trigger multi-model comparison"
+  },
+  "multiAIModeLockedToast": "Multi-AI mode is active. Manage models from the comparison cards.",
+  "@multiAIModeLockedToast": {
+    "description": "Toast shown when tapping model selector while multi-AI mode is locked"
+  },
+  "multiAIModelsBadge": "{count} models",
+  "@multiAIModelsBadge": {
+    "description": "Badge on model selector button showing active model count in multi-AI mode",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "modelSelectorMultiSelect": "Multi-select",
+  "@modelSelectorMultiSelect": {
+    "description": "Button in model selector to switch to multi-select mode"
+  },
+  "modelSelectorMultiConfirm": "Confirm ({count})",
+  "@modelSelectorMultiConfirm": {
+    "description": "Confirm button in multi-select mode of model selector",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiAIAdoptVersion": "Adopt",
+  "@multiAIAdoptVersion": {
+    "description": "Button to adopt the currently viewed model response in multi-AI comparison"
+  },
+  "multiAISelectModelsTitle": "Select Models",
+  "@multiAISelectModelsTitle": {
+    "description": "Title for the multi-model selection sheet"
+  },
+  "multiAIStartComparison": "Start Comparison ({count} models)",
+  "@multiAIStartComparison": {
+    "description": "Button to start multi-model comparison after selecting models",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multiAISelectModelHint": "Select at least 2 models to compare",
+  "@multiAISelectModelHint": {
+    "description": "Hint text when fewer than 2 models are selected"
+  },
+  "multiAISelectedCount": "{count} selected",
+  "@multiAISelectedCount": {
+    "description": "Label showing how many models are selected in multi-select mode",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiAIDropThread": "Drop",
+  "@multiAIDropThread": {
+    "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
   }
 }

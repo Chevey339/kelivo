@@ -10453,6 +10453,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compressed all images, saved {saved} (-{pct}%)'**
   String imageCompressionBatchResult(String saved, String pct);
+
+  /// Button in assistant message more sheet to trigger multi-model comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Start Comparison'**
+  String get messageMoreSheetMultiAI;
+
+  /// Toast shown when tapping model selector while multi-AI mode is locked
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-AI mode is active. Manage models from the comparison cards.'**
+  String get multiAIModeLockedToast;
+
+  /// Badge on model selector button showing active model count in multi-AI mode
+  ///
+  /// In en, this message translates to:
+  /// **'{count} models'**
+  String multiAIModelsBadge(int count);
+
+  /// Button in model selector to switch to multi-select mode
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-select'**
+  String get modelSelectorMultiSelect;
+
+  /// Confirm button in multi-select mode of model selector
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm ({count})'**
+  String modelSelectorMultiConfirm(int count);
+
+  /// Button to adopt the currently viewed model response in multi-AI comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Adopt'**
+  String get multiAIAdoptVersion;
+
+  /// Title for the multi-model selection sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Select Models'**
+  String get multiAISelectModelsTitle;
+
+  /// Button to start multi-model comparison after selecting models
+  ///
+  /// In en, this message translates to:
+  /// **'Start Comparison ({count} models)'**
+  String multiAIStartComparison(int count);
+
+  /// Hint text when fewer than 2 models are selected
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least 2 models to compare'**
+  String get multiAISelectModelHint;
+
+  /// Label showing how many models are selected in multi-select mode
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String multiAISelectedCount(int count);
+
+  /// Tooltip for the button that removes a model thread from multi-AI comparison
+  ///
+  /// In en, this message translates to:
+  /// **'Drop'**
+  String get multiAIDropThread;
 }
 
 class _AppLocalizationsDelegate
