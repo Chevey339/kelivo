@@ -37,7 +37,9 @@ class _StatsPageState extends State<StatsPage> {
   late StatsDateRange _range;
   StatsSnapshot? _databaseSnapshot;
   String? _statsSignature;
+  String? _pendingStatsSignature;
   bool _loadingStats = false;
+  int _statsRequestId = 0;
 
   @override
   void initState() {
@@ -66,7 +68,17 @@ class _StatsPageState extends State<StatsPage> {
           onChanged: _setPreset,
           onCustom: _pickCustomRange,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 2,
+          child: widget.snapshotOverride == null && _loadingStats
+              ? LinearProgressIndicator(
+                  minHeight: 2,
+                  semanticsLabel: l10n.settingsPageCalculating,
+                )
+              : null,
+        ),
+        const SizedBox(height: 10),
         StatsSectionCard(
           title: l10n.statsPageHeatmapTitle,
           child: StatsHeatmap(days: snapshot.heatmap),
@@ -170,7 +182,9 @@ class _StatsPageState extends State<StatsPage> {
     final conversations = chatService.getAllCompleteConversations();
     final assistantNames = {
       for (final assistant in assistantProvider.assistants)
-        assistant.id: assistant.name,
+        assistant.id: assistant.name.trim().isEmpty
+            ? l10n.statsPageUnknownAssistant
+            : assistant.name.trim(),
       '_default': l10n.statsPageUnknownAssistant,
     };
     final providerNames = {
@@ -181,25 +195,40 @@ class _StatsPageState extends State<StatsPage> {
         .map(
           (conversation) =>
               '${conversation.id}:${conversation.updatedAt.microsecondsSinceEpoch}:'
+              '${conversation.createdAt.microsecondsSinceEpoch}:'
+              '${conversation.assistantId ?? '_default'}:'
               '${chatService.getMessageCount(conversation.id)}',
         )
         .join('|');
     final signature =
         '$conversationSignature|${_range.preset.name}:'
         '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
-        '${providerNames.length}:${assistantNames.length}';
-    if (!_loadingStats && _statsSignature != signature) {
+        '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}';
+    if (_statsSignature == signature &&
+        _pendingStatsSignature != null &&
+        _pendingStatsSignature != signature) {
+      _statsRequestId++;
+      _pendingStatsSignature = null;
+      _loadingStats = false;
+    } else if (_statsSignature != signature &&
+        _pendingStatsSignature != signature) {
       _loadingStats = true;
-      final rangeStart = _range.start;
-      final rangeEndExclusive = _range.end == null
+      _pendingStatsSignature = signature;
+      final requestId = ++_statsRequestId;
+      final requestedRange = _range;
+      final requestedAssistantNames = Map<String, String>.of(assistantNames);
+      final requestedProviderNames = Map<String, String>.of(providerNames);
+      final rangeStart = requestedRange.start;
+      final rangeEndExclusive = requestedRange.end == null
           ? null
-          : StatsDateRange.addCalendarDays(_range.end!, 1);
+          : StatsDateRange.addCalendarDays(requestedRange.end!, 1);
       final today = StatsDateRange.normalizeDate(now);
-      final trendStart = _range.isAllTime
+      final trendStart = requestedRange.isAllTime
           ? StatsDateRange.addCalendarDays(today, -29)
-          : (_range.start ?? StatsDateRange.addCalendarDays(today, -29));
+          : (requestedRange.start ??
+                StatsDateRange.addCalendarDays(today, -29));
       final trendEnd = StatsDateRange.addCalendarDays(
-        _range.isAllTime ? today : (_range.end ?? today),
+        requestedRange.isAllTime ? today : (requestedRange.end ?? today),
         1,
       );
       unawaited(
@@ -213,25 +242,30 @@ class _StatsPageState extends State<StatsPage> {
             )
             .then(
               (aggregate) {
-                if (!mounted) return;
+                if (!mounted || requestId != _statsRequestId) return;
                 setState(() {
                   _databaseSnapshot =
                       StatsAggregationService.buildDatabaseSnapshot(
                         now: now,
-                        range: _range,
+                        range: requestedRange,
                         aggregate: aggregate,
                         launchCount: settings.appLaunchCount,
-                        assistantNames: assistantNames,
-                        providerNames: providerNames,
+                        assistantNames: requestedAssistantNames,
+                        providerNames: requestedProviderNames,
                         unknownProviderLabel: l10n.statsPageUnknownProvider,
                         unknownTopicLabel: l10n.statsPageUnknownTopic,
                       );
                   _statsSignature = signature;
+                  _pendingStatsSignature = null;
                   _loadingStats = false;
                 });
               },
               onError: (Object _, StackTrace __) {
-                if (mounted) setState(() => _loadingStats = false);
+                if (!mounted || requestId != _statsRequestId) return;
+                setState(() {
+                  _pendingStatsSignature = null;
+                  _loadingStats = false;
+                });
               },
             ),
       );
@@ -260,6 +294,12 @@ class _StatsPageState extends State<StatsPage> {
           unknownProviderLabel: l10n.statsPageUnknownProvider,
           unknownTopicLabel: l10n.statsPageUnknownTopic,
         );
+  }
+
+  String _mapSignature(Map<String, String> values) {
+    final entries = values.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries.map((entry) => '${entry.key}=${entry.value}').join(',');
   }
 
   void _setPreset(StatsDateRangePreset preset) {

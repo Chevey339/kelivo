@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/features/stats/models/stats_models.dart';
@@ -392,6 +393,58 @@ void main() {
       expect(snapshot.assistantRank.map((e) => e.id).toList(), ['a1']);
       expect(snapshot.assistantRank.single.label, 'Active Assistant');
     });
+
+    test(
+      'database snapshot merges duplicate assistant names and hides stale ids',
+      () {
+        final snapshot = StatsAggregationService.buildDatabaseSnapshot(
+          now: now,
+          range: StatsDateRange.allTime(now),
+          aggregate: const ChatStatsAggregate(
+            conversations: 10,
+            totals: ChatStatsTotals(
+              messages: 0,
+              inputTokens: 0,
+              outputTokens: 0,
+              cachedTokens: 0,
+            ),
+            heatmap: [],
+            trend: [],
+            models: [],
+            assistants: [
+              ChatStatsRank(id: '_default', label: '_default', count: 2),
+              ChatStatsRank(id: 'default-id', label: 'default-id', count: 3),
+              ChatStatsRank(id: 'research-1', label: 'research-1', count: 1),
+              ChatStatsRank(id: 'research-2', label: 'research-2', count: 2),
+              ChatStatsRank(
+                id: '2d111bb3-de7b-4ad6-903d-e09cefd7c933',
+                label: '2d111bb3-de7b-4ad6-903d-e09cefd7c933',
+                count: 2,
+              ),
+            ],
+            topics: [],
+          ),
+          launchCount: 1,
+          unknownProviderLabel: 'Unknown provider',
+          unknownTopicLabel: 'Untitled topic',
+          assistantNames: const {
+            '_default': 'Default Assistant',
+            'default-id': 'Default Assistant',
+            'research-1': 'Research',
+            'research-2': 'Research',
+          },
+        );
+
+        expect(snapshot.assistantRank.map((item) => (item.label, item.value)), [
+          ('Default Assistant', 5),
+          ('Research', 3),
+        ]);
+        expect(
+          snapshot.assistantRank.map((item) => item.label),
+          isNot(contains('2d111bb3-de7b-4ad6-903d-e09cefd7c933')),
+        );
+      },
+    );
 
     test('uses total tokens as trend fallback for legacy messages', () {
       final conversations = [

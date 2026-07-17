@@ -14,6 +14,10 @@ class StatsAggregationService {
     Map<String, String> assistantNames = const {},
     Map<String, String> providerNames = const {},
   }) {
+    final assistantCounts = <String, int>{};
+    for (final row in aggregate.assistants) {
+      assistantCounts[row.id] = (assistantCounts[row.id] ?? 0) + row.count;
+    }
     final heatmapCounts = {
       for (final row in aggregate.heatmap) row.day: row.count,
     };
@@ -65,14 +69,11 @@ class StatsAggregationService {
             providerId: row.providerId,
           ),
       ],
-      assistantRank: [
-        for (final row in aggregate.assistants)
-          StatsRankItem(
-            id: row.id,
-            label: assistantNames[row.id] ?? row.label,
-            value: row.count,
-          ),
-      ],
+      assistantRank: _assistantRank(
+        assistantCounts,
+        assistantNames,
+        hideUnresolved: assistantNames.isNotEmpty,
+      ),
       topicRank: [
         for (final row in aggregate.topics)
           StatsRankItem(
@@ -182,7 +183,11 @@ class StatsAggregationService {
         (id) => id,
         providerFor: (id) => modelProviders[id],
       ),
-      assistantRank: _rank(assistantCounts, (id) => assistantNames[id] ?? id),
+      assistantRank: _assistantRank(
+        assistantCounts,
+        assistantNames,
+        existingAssistantIds: existingAssistantIds,
+      ),
       topicRank: _rank(topicCounts, (id) => topicLabels[id] ?? id),
     );
   }
@@ -301,5 +306,54 @@ class StatsAggregationService {
           providerId: providerFor?.call(entry.key),
         ),
     ];
+  }
+
+  static List<StatsRankItem> _assistantRank(
+    Map<String, int> counts,
+    Map<String, String> assistantNames, {
+    Set<String>? existingAssistantIds,
+    bool hideUnresolved = false,
+  }) {
+    final valuesByLabel = <String, int>{};
+    final representativeIdByLabel = <String, String>{};
+    final representativeValueByLabel = <String, int>{};
+
+    for (final entry in counts.entries) {
+      final id = entry.key;
+      final isDefault = id == '_default';
+      final isKnown = assistantNames.containsKey(id);
+      if (!isDefault &&
+          existingAssistantIds != null &&
+          !existingAssistantIds.contains(id)) {
+        continue;
+      }
+      if (!isDefault && hideUnresolved && !isKnown) continue;
+
+      final resolvedLabel = assistantNames[id]?.trim();
+      final label = resolvedLabel == null || resolvedLabel.isEmpty
+          ? id
+          : resolvedLabel;
+      valuesByLabel[label] = (valuesByLabel[label] ?? 0) + entry.value;
+      final representativeValue = representativeValueByLabel[label];
+      if (representativeValue == null || entry.value > representativeValue) {
+        representativeIdByLabel[label] = id;
+        representativeValueByLabel[label] = entry.value;
+      }
+    }
+
+    final items = [
+      for (final entry in valuesByLabel.entries)
+        StatsRankItem(
+          id: representativeIdByLabel[entry.key]!,
+          label: entry.key,
+          value: entry.value,
+        ),
+    ];
+    items.sort((a, b) {
+      final byValue = b.value.compareTo(a.value);
+      if (byValue != 0) return byValue;
+      return a.label.compareTo(b.label);
+    });
+    return items;
   }
 }
