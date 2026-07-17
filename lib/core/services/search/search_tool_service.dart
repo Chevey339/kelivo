@@ -5,7 +5,8 @@ import '../../providers/settings_provider.dart';
 
 class SearchToolService {
   static const String toolName = 'search_web';
-  static const String toolDescription = 'Search the web for information';
+  static const String toolDescription =
+      'Search the web for real-time or up-to-date information via the user\'s configured search engine. Returns results with title, URL, snippet, "index" (1-based rank) and "id" (6-char citation id). An optional "answer" summary may be included. See the system prompt for when to use this tool and how to format inline citations.';
 
   static final RegExp _schemeRe = RegExp(r'^[a-zA-Z][a-zA-Z0-9+.-]*:');
 
@@ -98,33 +99,56 @@ class SearchToolService {
     return '''
 ## search_web 工具使用说明
 
-当用户询问需要实时信息或最新数据的问题时，使用 search_web 工具进行搜索。
+search_web 是**网络搜索**工具，而非知识检索或文件搜索。**当不确定时，优先搜索，宁搜勿猜。**
+
+### 使用时机（应当搜索）
+
+| 场景 | 示例 |
+|------|------|
+| 最新新闻、事件、动态 | "今天有什么大新闻？" |
+| 实时数据（天气、股价、汇率、体育比分） | "当前比特币价格" |
+| 技术文档、API变更、库版本 | "Flutter 3.24 新特性" |
+| 产品信息、价格、可用性 | "iPhone 16 多少钱" |
+| 查证事实、验证引用 | "确认这个统计数据是否正确" |
+| 用户的明确搜索请求 | "帮我搜一下..." |
+| 超出训练时间范围的内容 | 任何涉及近期的信息 |
+
+### 不应搜索的场景
+
+| 场景 | 原因 |
+|------|------|
+| 用户询问主观意见 | "哪部电影更好看" 依赖个人判断 |
+| 简单推理或计算 | "3.14 * 7.5 等于多少" |
+| 通用常识 | "法国首都是哪里" |
+| 关于你自己（你是谁、能力范围等） | 内置知识 |
+| 用户个人信息或对话历史中的信息 | 应从对话上下文或记忆中获取 |
+| 用户明确要求不要搜索 | 尊重用户意图 |
 
 ### 引用格式
-- 搜索结果中会包含index(搜索结果序号)和id(搜索结果唯一标识符)，引用格式为：
+
+- 搜索结果中每个条目带 `index`（序号）和 `id`（唯一标识符），引用格式为：
   `具体的引用内容 [citation](index:id)`
-- **引用必须紧跟在相关内容之后**，在标点符号后面，不得延后到回复结尾
-- 正确格式：`... [citation](index:id)` `... [citation](index:id) [citation](index:id)`
+- **引用必须紧跟在相关事实之后**，在标点符号后面，不得延后到回复结尾
+- 不得将所有引用集中在回答末尾
 
-### 使用规范
-1. **使用时机**
-   - 用户询问最新新闻、事件、数据
-   - 需要查证事实信息
-   - 需要获取技术文档、API信息等
-   
-2. **引用要求**
-   - 使用搜索结果时必须标注引用来源
-   - 每个引用的事实都要紧跟 [citation](index:id) 标记
-   - 不要将所有引用集中在回答末尾
+### 回答规范
 
-3. **回答格式示例**
-   ✅ 正确：
-   - 据最新报道，该事件发生在昨天下午。[citation](1:a1b2c3)
-   - 技术文档显示该功能需要版本3.0以上。[citation](2:d4e5f6) 具体配置步骤如下...[citation](3:g7h8i9)
-   
-   ❌ 错误：
-   - 据最新报道，该事件发生在昨天下午。技术文档显示该功能需要版本3.0以上。
-     [citation](1:a1b2c3) [citation](2:d4e5f6)
+- 使用搜索结果回答时，**不要逐条罗列结果标题和链接**，应组织成自然流畅的段落。
+- 在段落叙述中，在每个事实后直接插入对应的引用标记。
+- 如果搜索结果的 `answer` 字段（AI摘要）已包含完整回答，可以直接利用该摘要并补充引用。
+- ✅ 正确示例：
+  - 据最新报道，该事件发生在昨天下午。[citation](1:a1b2c3)
+  - 技术文档显示该功能需要版本3.0以上。[citation](2:d4e5f6) 具体配置步骤如下...[citation](3:g7h8i9)
+- ❌ 错误示例：
+  - 据最新报道，该事件发生在昨天下午。技术文档显示该功能需要版本3.0以上。
+    [citation](1:a1b2c3) [citation](2:d4e5f6)
+  - 搜索结果如下：第一条...第二条......（逐条罗列是低质量回答）
+
+### 搜索技巧
+
+- 搜索 query 应使用自然语言关键词，而不是完整问句
+- 如果第一次搜索没有找到相关信息，尝试换用不同的关键词重新搜索
+- 对于需要精确信息的查询（如版本号、API参数），使用精确搜索词
 ''';
   }
 }

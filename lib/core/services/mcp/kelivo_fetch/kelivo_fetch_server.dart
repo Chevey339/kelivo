@@ -268,23 +268,26 @@ class KelivoFetchMcpServerEngine {
     return [
       {
         'name': 'fetch_html',
-        'description': 'Fetch a website and return the content as HTML',
+        'description':
+            'Fetch a web page and return the full raw HTML source. Use only when you need the raw HTML structure — parsing specific elements, extracting data from non-standard markup, or when markdown/plain-text conversion loses information. For most content extraction, prefer fetch_markdown. Do NOT use for login-walled or authenticated URLs.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_markdown',
-        'description': 'Fetch a website and return the content as Markdown',
+        'description':
+            'Fetch a web page and return the content as clean Markdown. The preferred tool for most web content retrieval — articles, documentation, blog posts, tutorials. Do NOT use for pages that are primarily data tables, JSON endpoints, or non-HTML content (use fetch_json or fetch_txt instead), or for login-walled URLs.',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_txt',
         'description':
-            'Fetch a website, return the content as plain text (no HTML)',
+            'Fetch a web page and return plain text with HTML tags, scripts, and styles stripped. Use when you only need readable text without structure — text-heavy but poorly-formatted pages, or when fetch_markdown produces noise. Do NOT use when you need document structure (use fetch_markdown) or raw HTML (use fetch_html).',
         'inputSchema': schema(),
       },
       {
         'name': 'fetch_json',
-        'description': 'Fetch a JSON file from a URL',
+        'description':
+            'Fetch a JSON document from a URL and return it as a pretty-printed JSON string. Use for REST API endpoints, JSON config files, public JSON feeds, or any JSON-based web service response. The response is validated as JSON; non-JSON responses return an error. Do NOT use for HTML, plain text, or non-JSON content.',
         'inputSchema': schema(),
       },
     ];
