@@ -39,7 +39,7 @@ Currently known to be used by the author and at least 2 other stable users with 
 
 7. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-8. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
+8. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; added Kimi K3 with max reasoning and both naming variants; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
 
 9. **Additional fixes across the repo**
    - OCR result caching now persists across restarts (SQLite-backed)

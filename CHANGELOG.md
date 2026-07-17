@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.7.1] - 2026-07-17
+
+> ⚠️ **Mobile users on 1.7.0 must update**
+>
+> 1.7.0 shipped with a critical multi-select UX regression on mobile:
+> the model picker auto-entered multi-select mode on every open, making
+> normal model switching nearly impossible. This release restores the
+> intended behavior and adds missing multi-select visual feedback.
+
+### Added
+- Kimi K3 model support with max reasoning and both naming variants (#43)
+
+### Fixed
+- Multi-AI mode: mobile no longer auto-enters multi-select on model open;
+  model tiles now show checkboxes and highlight during multi-select;
+  active model pre-selected on entering multi-select;
+  clicking current conversation no longer exits multi-AI (#41)
+- reasoning tags now stripped from auto-generated conversation titles (#42)
+
 ## [1.7.0] - 2026-07-17
 
 ### Added
