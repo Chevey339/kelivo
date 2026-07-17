@@ -38,6 +38,7 @@ class _StatsPageState extends State<StatsPage> {
   StatsSnapshot? _databaseSnapshot;
   String? _statsSignature;
   String? _pendingStatsSignature;
+  String? _failedStatsSignature;
   bool _loadingStats = false;
   int _statsRequestId = 0;
 
@@ -203,7 +204,11 @@ class _StatsPageState extends State<StatsPage> {
     final signature =
         '$conversationSignature|${_range.preset.name}:'
         '${_range.start}:${_range.end}:${settings.appLaunchCount}:'
-        '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}';
+        '${_mapSignature(providerNames)}:${_mapSignature(assistantNames)}:'
+        '${chatService.statisticsRevision}';
+    if (_failedStatsSignature != null && _failedStatsSignature != signature) {
+      _failedStatsSignature = null;
+    }
     if (_statsSignature == signature &&
         _pendingStatsSignature != null &&
         _pendingStatsSignature != signature) {
@@ -211,7 +216,8 @@ class _StatsPageState extends State<StatsPage> {
       _pendingStatsSignature = null;
       _loadingStats = false;
     } else if (_statsSignature != signature &&
-        _pendingStatsSignature != signature) {
+        _pendingStatsSignature != signature &&
+        _failedStatsSignature != signature) {
       _loadingStats = true;
       _pendingStatsSignature = signature;
       final requestId = ++_statsRequestId;
@@ -257,6 +263,7 @@ class _StatsPageState extends State<StatsPage> {
                       );
                   _statsSignature = signature;
                   _pendingStatsSignature = null;
+                  _failedStatsSignature = null;
                   _loadingStats = false;
                 });
               },
@@ -264,6 +271,7 @@ class _StatsPageState extends State<StatsPage> {
                 if (!mounted || requestId != _statsRequestId) return;
                 setState(() {
                   _pendingStatsSignature = null;
+                  _failedStatsSignature = signature;
                   _loadingStats = false;
                 });
               },

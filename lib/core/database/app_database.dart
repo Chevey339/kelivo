@@ -723,6 +723,9 @@ ON CONFLICT (revision_id, kind) DO UPDATE SET
           }
         }
       },
+      from10To11: (migrator, schema) async {
+        await migrator.alterTable(TableMigration(migrationRunRows));
+      },
     ),
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');

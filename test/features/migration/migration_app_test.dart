@@ -8,10 +8,85 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_page.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
+import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/main.dart' show MigrationApp;
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 void main() {
+  testWidgets('mobile retry does not export an already saved backup again', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final testDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_mobile_migration_retry_',
+    );
+    addTearDown(() {
+      if (testDirectory.existsSync()) {
+        testDirectory.deleteSync(recursive: true);
+      }
+    });
+    final service = _RetryMigrationService(
+      HiveToSqliteMigrationDecision(
+        needsMigration: true,
+        appDataDir: testDirectory,
+        sqliteFile: File('${testDirectory.path}/kelivo-test.sqlite'),
+        hiveFiles: const <File>[],
+      ),
+    );
+    var saveCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HiveToSqliteMigrationPage(
+          service: service,
+          mobileBackupSaver: ({required sourcePath, fileName}) async {
+            saveCalls++;
+            expect(File(sourcePath).existsSync(), isTrue);
+            expect(fileName, isNotEmpty);
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final startButton = _buttonForIcon(tester, Lucide.FolderPlus);
+    await tester.runAsync(() async {
+      startButton.onTap!();
+      await _waitUntil(
+        () =>
+            service.migrationBackupPaths.isNotEmpty &&
+            !service.temporaryBackup.existsSync(),
+      );
+    });
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(service.backupCalls, 1);
+    expect(saveCalls, 1);
+    expect(service.migrationBackupPaths, <String?>[null]);
+    expect(service.temporaryBackup.existsSync(), isFalse);
+    expect(find.byIcon(Lucide.RotateCcw), findsOneWidget);
+
+    final retryButton = _buttonForIcon(tester, Lucide.RotateCcw);
+    await tester.runAsync(() async {
+      retryButton.onTap!();
+      await _waitUntil(() => service.migrationBackupPaths.length == 2);
+    });
+    await tester.pump();
+
+    expect(service.backupCalls, 1);
+    expect(saveCalls, 1);
+    expect(service.migrationBackupPaths, <String?>[null, null]);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('real migration shell renders localized restart failures', (
     tester,
   ) async {
@@ -67,6 +142,22 @@ void main() {
   });
 }
 
+GestureDetector _buttonForIcon(WidgetTester tester, IconData icon) {
+  final button = find.ancestor(
+    of: find.byIcon(icon),
+    matching: find.byType(GestureDetector),
+  );
+  expect(button, findsOneWidget);
+  return tester.widget<GestureDetector>(button);
+}
+
+Future<void> _waitUntil(bool Function() condition) async {
+  for (var i = 0; i < 100 && !condition(); i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  expect(condition(), isTrue);
+}
+
 HiveToSqliteMigrationService _completeService() {
   return _CompleteMigrationService(
     HiveToSqliteMigrationDecision(
@@ -89,5 +180,29 @@ final class _CompleteMigrationService extends HiveToSqliteMigrationService {
       title: 'complete',
       detail: 'done',
     );
+  }
+}
+
+final class _RetryMigrationService extends HiveToSqliteMigrationService {
+  _RetryMigrationService(super.decision)
+    : temporaryBackup = File('${decision.appDataDir.path}/migration.zip');
+
+  final File temporaryBackup;
+  final List<String?> migrationBackupPaths = <String?>[];
+  int backupCalls = 0;
+
+  @override
+  Future<File> backupToTemporaryFile() async {
+    backupCalls++;
+    temporaryBackup.writeAsStringSync('temporary migration backup');
+    return temporaryBackup;
+  }
+
+  @override
+  Future<void> migrate({String? backupPath}) async {
+    migrationBackupPaths.add(backupPath);
+    if (migrationBackupPaths.length == 1) {
+      throw StateError('injected migration failure');
+    }
   }
 }

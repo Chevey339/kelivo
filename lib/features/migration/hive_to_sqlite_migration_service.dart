@@ -347,7 +347,7 @@ class HiveToSqliteMigrationService {
     return 'kelivo_migration_backup_$timestamp.zip';
   }
 
-  Future<void> migrate({required File backupFile}) async {
+  Future<void> migrate({String? backupPath}) async {
     ChatDatabaseRepository? repo;
     LazyBox<Conversation>? conversationsBox;
     LazyBox<ChatMessage>? messagesBox;
@@ -358,7 +358,7 @@ class HiveToSqliteMigrationService {
         0,
         'migrate',
         'schema',
-        backupPath: backupFile.path,
+        backupPath: backupPath,
         backupItems: _lastBackupItems,
       );
       _registerHiveAdapters();
@@ -395,7 +395,7 @@ class HiveToSqliteMigrationService {
         0.04,
         'migrate',
         'schema',
-        backupPath: backupFile.path,
+        backupPath: backupPath,
         backupItems: _lastBackupItems,
         conversations: conversations.length,
         messages: totalMessages,
@@ -452,7 +452,7 @@ class HiveToSqliteMigrationService {
             messageProgress,
             'migrate',
             'messages',
-            backupPath: backupFile.path,
+            backupPath: backupPath,
             backupItems: _lastBackupItems,
             conversations: conversations.length,
             messages: migratedMessages,
@@ -475,7 +475,7 @@ class HiveToSqliteMigrationService {
         0.94,
         'migrate',
         'tool_events',
-        backupPath: backupFile.path,
+        backupPath: backupPath,
         backupItems: _lastBackupItems,
         conversations: conversations.length,
         messages: migratedMessages,
@@ -485,7 +485,7 @@ class HiveToSqliteMigrationService {
         0.98,
         'migrate',
         'validate',
-        backupPath: backupFile.path,
+        backupPath: backupPath,
         backupItems: _lastBackupItems,
         conversations: conversations.length,
         messages: migratedMessages,
@@ -520,7 +520,7 @@ class HiveToSqliteMigrationService {
         1,
         'complete',
         'done',
-        backupPath: backupFile.path,
+        backupPath: backupPath,
         backupItems: _lastBackupItems,
         conversations: conversations.length,
         messages: totalMessages,
@@ -534,7 +534,7 @@ class HiveToSqliteMigrationService {
           progress: 0,
           title: 'failed',
           detail: 'failed',
-          backupPath: backupFile.path,
+          backupPath: backupPath,
           error: '$error',
           log: List.of(_log),
           backupItems: _lastBackupItems,

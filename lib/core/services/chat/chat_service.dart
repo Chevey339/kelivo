@@ -101,6 +101,8 @@ class ChatService extends ChangeNotifier {
   bool _initialized = false;
   Future<void>? _initFuture;
   bool get initialized => _initialized;
+  int _statisticsRevision = 0;
+  int get statisticsRevision => _statisticsRevision;
 
   String? get currentConversationId => _currentConversationId;
 
@@ -2168,9 +2170,14 @@ class ChatService extends ChangeNotifier {
     String? errorCode,
   }) async {
     if (!_initialized) return null;
-    if (isTemporaryConversation(message.conversationId) ||
-        generationRunId == null) {
+    if (isTemporaryConversation(message.conversationId)) {
       await updateStreamingCheckpointSilent(message, toolEvents);
+      return null;
+    }
+    if (generationRunId == null) {
+      await updateStreamingCheckpointSilent(message, toolEvents);
+      _statisticsRevision++;
+      notifyListeners();
       return null;
     }
     if (expectedState == null || expectedStateRevision == null) {
@@ -2192,6 +2199,8 @@ class ChatService extends ChangeNotifier {
     }
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+    _statisticsRevision++;
+    notifyListeners();
     return run;
   }
 

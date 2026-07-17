@@ -608,9 +608,7 @@ Future<_SelectedDatabaseFixture> _prepareSelectedDatabaseBundle({
   await extracted.create();
   final settings = File(p.join(extracted.path, 'settings.json'));
   await settings.writeAsString('{"theme":"new"}', flush: true);
-  final sourceDatabase = File(
-    p.join(extracted.path, 'database', 'kelivo.db'),
-  );
+  final sourceDatabase = File(p.join(extracted.path, 'database', 'kelivo.db'));
   await sourceDatabase.parent.create(recursive: true);
   await _createDatabase(sourceDatabase, conversationId: 'new');
   final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(

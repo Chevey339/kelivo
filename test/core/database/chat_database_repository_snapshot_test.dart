@@ -219,7 +219,6 @@ void main() {
       );
     });
 
-
     test('rejects a v7 database missing generation run state', () async {
       await sourceRepository.close();
       sourceClosed = true;
@@ -247,6 +246,7 @@ void main() {
     });
   });
 }
+
 Future<void> _createSnapshotFixture({
   required File databaseFile,
   required String conversationId,

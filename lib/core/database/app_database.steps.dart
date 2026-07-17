@@ -3634,6 +3634,307 @@ final class Schema10 extends i0.VersionedSchema {
   );
 }
 
+final class Schema11 extends i0.VersionedSchema {
+  Schema11({required super.database}) : super(version: 11);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    conversationRows,
+    messageRows,
+    conversationMcpServerRows,
+    toolEventRows,
+    geminiThoughtSignatureRows,
+    chatStorageMetaRows,
+    messagePartRows,
+    providerArtifactRows,
+    migrationRunRows,
+    migrationIssueRows,
+    generationRunRows,
+    idxConversationsUpdatedAt,
+    idxConversationsAssistant,
+    idxMessagesConversationOrder,
+    idxMessagesConversationTimestamp,
+    idxMessagesGroup,
+    idxMessagePartsRevisionOrdinal,
+    idxProviderArtifactsRevisionKind,
+    idxMigrationIssuesRunKind,
+    idxGenerationRunsActiveTarget,
+    idxGenerationRunsStateUpdated,
+  ];
+  late final Shape0 conversationRows = Shape0(
+    source: i0.VersionedTable(
+      entityName: 'conversation_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_38,
+        _column_7,
+        _column_8,
+        _column_39,
+        _column_10,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape1 messageRows = Shape1(
+    source: i0.VersionedTable(
+      entityName: 'message_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(id)',
+        'UNIQUE(conversation_id, message_order)',
+        'UNIQUE(conversation_id, group_id, version)',
+      ],
+      columns: [
+        _column_0,
+        _column_11,
+        _column_40,
+        _column_13,
+        _column_14,
+        _column_15,
+        _column_16,
+        _column_41,
+        _column_18,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+        _column_23,
+        _column_24,
+        _column_42,
+        _column_43,
+        _column_44,
+        _column_45,
+        _column_46,
+        _column_47,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape2 conversationMcpServerRows = Shape2(
+    source: i0.VersionedTable(
+      entityName: 'conversation_mcp_server_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(conversation_id, server_id)',
+        'UNIQUE(conversation_id, ordinal)',
+      ],
+      columns: [_column_11, _column_31, _column_48],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape3 toolEventRows = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'tool_event_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(message_id)'],
+      columns: [_column_33, _column_34],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape4 geminiThoughtSignatureRows = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'gemini_thought_signature_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(message_id)'],
+      columns: [_column_33, _column_35],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape5 chatStorageMetaRows = Shape5(
+    source: i0.VersionedTable(
+      entityName: 'chat_storage_meta_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_36, _column_37],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape10 messagePartRows = Shape10(
+    source: i0.VersionedTable(
+      entityName: 'message_part_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(revision_id, ordinal)',
+        'UNIQUE(conversation_id, revision_id, ordinal)',
+        'FOREIGN KEY(revision_id)REFERENCES message_rows(id)ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
+        'CHECK(updated_at >= created_at)',
+      ],
+      columns: [
+        _column_62,
+        _column_63,
+        _column_48,
+        _column_64,
+        _column_65,
+        _column_2,
+        _column_3,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape14 providerArtifactRows = Shape14(
+    source: i0.VersionedTable(
+      entityName: 'provider_artifact_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(revision_id, kind)',
+        'FOREIGN KEY(revision_id)REFERENCES message_rows(id)ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
+        'CHECK(updated_at >= created_at)',
+      ],
+      columns: [
+        _column_62,
+        _column_63,
+        _column_82,
+        _column_65,
+        _column_2,
+        _column_3,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape11 migrationRunRows = Shape11(
+    source: i0.VersionedTable(
+      entityName: 'migration_run_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(id)',
+        'UNIQUE(source_kind, source_hash)',
+        'CHECK(completed_at IS NULL OR completed_at >= started_at)',
+      ],
+      columns: [
+        _column_0,
+        _column_83,
+        _column_67,
+        _column_68,
+        _column_69,
+        _column_70,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape12 migrationIssueRows = Shape12(
+    source: i0.VersionedTable(
+      entityName: 'migration_issue_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY(id)'],
+      columns: [
+        _column_0,
+        _column_71,
+        _column_72,
+        _column_73,
+        _column_74,
+        _column_75,
+        _column_76,
+        _column_2,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape13 generationRunRows = Shape13(
+    source: i0.VersionedTable(
+      entityName: 'generation_run_rows',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [
+        'PRIMARY KEY(id)',
+        'FOREIGN KEY(target_revision_id)REFERENCES message_rows(id)DEFERRABLE INITIALLY DEFERRED',
+        'CHECK(updated_at >= created_at)',
+        'CHECK(terminal_at IS NULL OR terminal_at >= created_at)',
+        'CHECK((state IN (\'preparing\', \'requesting\', \'streaming\', \'waiting_tool\') AND terminal_at IS NULL)OR(state IN (\'completed\', \'failed\', \'cancelled\', \'interrupted\') AND terminal_at IS NOT NULL))',
+        'CHECK(error_code IS NULL OR(length(error_code) BETWEEN 1 AND 128 AND state IN (\'failed\', \'cancelled\', \'interrupted\')))',
+      ],
+      columns: [
+        _column_0,
+        _column_11,
+        _column_77,
+        _column_78,
+        _column_61,
+        _column_79,
+        _column_80,
+        _column_2,
+        _column_3,
+        _column_81,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index idxConversationsUpdatedAt = i1.Index(
+    'idx_conversations_updated_at',
+    'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
+  );
+  final i1.Index idxConversationsAssistant = i1.Index(
+    'idx_conversations_assistant',
+    'CREATE INDEX idx_conversations_assistant ON conversation_rows (assistant_id)',
+  );
+  final i1.Index idxMessagesConversationOrder = i1.Index(
+    'idx_messages_conversation_order',
+    'CREATE INDEX idx_messages_conversation_order ON message_rows (conversation_id, message_order, id)',
+  );
+  final i1.Index idxMessagesConversationTimestamp = i1.Index(
+    'idx_messages_conversation_timestamp',
+    'CREATE INDEX idx_messages_conversation_timestamp ON message_rows (conversation_id, timestamp, id)',
+  );
+  final i1.Index idxMessagesGroup = i1.Index(
+    'idx_messages_group',
+    'CREATE INDEX idx_messages_group ON message_rows (conversation_id, group_id, version, id)',
+  );
+  final i1.Index idxMessagePartsRevisionOrdinal = i1.Index(
+    'idx_message_parts_revision_ordinal',
+    'CREATE INDEX idx_message_parts_revision_ordinal ON message_part_rows (conversation_id, revision_id, ordinal)',
+  );
+  final i1.Index idxProviderArtifactsRevisionKind = i1.Index(
+    'idx_provider_artifacts_revision_kind',
+    'CREATE INDEX idx_provider_artifacts_revision_kind ON provider_artifact_rows (conversation_id, revision_id, kind)',
+  );
+  final i1.Index idxMigrationIssuesRunKind = i1.Index(
+    'idx_migration_issues_run_kind',
+    'CREATE INDEX idx_migration_issues_run_kind ON migration_issue_rows (migration_run_id, kind, id)',
+  );
+  final i1.Index idxGenerationRunsActiveTarget = i1.Index(
+    'idx_generation_runs_active_target',
+    'CREATE UNIQUE INDEX idx_generation_runs_active_target ON generation_run_rows (conversation_id, target_revision_id) WHERE state IN (\'preparing\', \'requesting\', \'streaming\', \'waiting_tool\')',
+  );
+  final i1.Index idxGenerationRunsStateUpdated = i1.Index(
+    'idx_generation_runs_state_updated',
+    'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
+  );
+}
+
+i1.GeneratedColumn<String> _column_83(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'source_kind',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints:
+          'NOT NULL CHECK (source_kind IN (\'hive\', \'legacy_json\'))',
+    );
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
@@ -3644,6 +3945,7 @@ i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
   required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
   required Future<void> Function(i1.Migrator m, Schema10 schema) from9To10,
+  required Future<void> Function(i1.Migrator m, Schema11 schema) from10To11,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -3692,6 +3994,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from9To10(migrator, schema);
         return 10;
+      case 10:
+        final schema = Schema11(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from10To11(migrator, schema);
+        return 11;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -3708,6 +4015,7 @@ i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
   required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
   required Future<void> Function(i1.Migrator m, Schema10 schema) from9To10,
+  required Future<void> Function(i1.Migrator m, Schema11 schema) from10To11,
 }) => i0.VersionedSchema.stepByStepHelper(
   step: migrationSteps(
     from1To2: from1To2,
@@ -3719,5 +4027,6 @@ i1.OnUpgrade stepByStep({
     from7To8: from7To8,
     from8To9: from8To9,
     from9To10: from9To10,
+    from10To11: from10To11,
   ),
 );

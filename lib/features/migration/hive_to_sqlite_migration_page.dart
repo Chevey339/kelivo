@@ -16,10 +16,18 @@ import '../../theme/app_font_weights.dart';
 import '../../utils/platform_utils.dart';
 import 'hive_to_sqlite_migration_service.dart';
 
+typedef MobileBackupSaver =
+    Future<bool> Function({required String sourcePath, String? fileName});
+
 class HiveToSqliteMigrationPage extends StatefulWidget {
-  const HiveToSqliteMigrationPage({super.key, required this.service});
+  const HiveToSqliteMigrationPage({
+    super.key,
+    required this.service,
+    this.mobileBackupSaver,
+  });
 
   final HiveToSqliteMigrationService service;
+  final MobileBackupSaver? mobileBackupSaver;
 
   @override
   State<HiveToSqliteMigrationPage> createState() =>
@@ -30,7 +38,13 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   late HiveToSqliteMigrationStatus _status;
   StreamSubscription<HiveToSqliteMigrationStatus>? _sub;
   File? _backupFile;
+  File? _temporaryBackupFile;
+  bool _savingTemporaryBackup = false;
+  bool _mobileBackupSaved = false;
   bool _busy = false;
+
+  bool get _usesMobileBackupFlow =>
+      widget.mobileBackupSaver != null || Platform.isAndroid || Platform.isIOS;
 
   @override
   void initState() {
@@ -44,6 +58,9 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   @override
   void dispose() {
     unawaited(_sub?.cancel());
+    if (!_savingTemporaryBackup) {
+      unawaited(_deleteTemporaryBackup());
+    }
     unawaited(widget.service.dispose());
     super.dispose();
   }
@@ -52,13 +69,18 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final backupFile = Platform.isAndroid || Platform.isIOS
-          ? await _createAndSaveMobileBackup()
-          : await _createDesktopBackup();
-      if (backupFile == null) return;
+      File? backupFile;
+      if (_usesMobileBackupFlow) {
+        _mobileBackupSaved = false;
+        if (!await _createAndSaveMobileBackup()) return;
+        _mobileBackupSaved = true;
+      } else {
+        backupFile = await _createDesktopBackup();
+        if (backupFile == null) return;
+      }
       if (!mounted) return;
       setState(() => _backupFile = backupFile);
-      await widget.service.migrate(backupFile: backupFile);
+      await widget.service.migrate(backupPath: backupFile?.path);
     } catch (error, stackTrace) {
       if (mounted && _status.stage != HiveToSqliteMigrationStage.failed) {
         setState(() {
@@ -77,6 +99,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         });
       }
     } finally {
+      await _deleteTemporaryBackup();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -89,9 +112,11 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     return widget.service.backupTo(Directory(path));
   }
 
-  Future<File?> _createAndSaveMobileBackup() async {
-    final backupFile = await widget.service.backupToTemporaryFile();
+  Future<bool> _createAndSaveMobileBackup() async {
+    _savingTemporaryBackup = true;
     try {
+      final backupFile = await widget.service.backupToTemporaryFile();
+      _temporaryBackupFile = backupFile;
       if (mounted) {
         setState(() {
           _status = _status.copyWith(
@@ -102,38 +127,50 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
           );
         });
       }
-      final saved = await NativeFileSave.saveFileFromPath(
+      final saveBackup =
+          widget.mobileBackupSaver ?? NativeFileSave.saveFileFromPath;
+      final saved = await saveBackup(
         sourcePath: backupFile.path,
         fileName: p.basename(backupFile.path),
       );
-      if (saved) return backupFile;
-      if (await backupFile.exists()) {
-        await backupFile.delete();
-      }
+      if (saved) return true;
       if (mounted) {
         setState(() => _status = widget.service.initialStatus());
       }
-      return null;
-    } catch (_) {
-      if (await backupFile.exists()) {
-        await backupFile.delete();
+      return false;
+    } finally {
+      _savingTemporaryBackup = false;
+      await _deleteTemporaryBackup();
+    }
+  }
+
+  Future<void> _deleteTemporaryBackup() async {
+    final file = _temporaryBackupFile;
+    if (file == null) return;
+    try {
+      if (await file.exists()) await file.delete();
+      if (identical(_temporaryBackupFile, file)) {
+        _temporaryBackupFile = null;
       }
-      rethrow;
+    } catch (error) {
+      debugPrint('Failed to delete migration temporary backup: $error');
     }
   }
 
   Future<void> _retry() async {
-    final backupFile = _backupFile;
-    if (backupFile == null || _busy) {
+    if (_busy) return;
+    final backupPath = _mobileBackupSaved ? null : _backupFile?.path;
+    if (!_mobileBackupSaved && backupPath == null) {
       await _pickBackupAndStart();
       return;
     }
     setState(() => _busy = true);
     try {
-      await widget.service.migrate(backupFile: backupFile);
+      await widget.service.migrate(backupPath: backupPath);
     } catch (_) {
       // Status stream already carries the failure details.
     } finally {
+      await _deleteTemporaryBackup();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -200,6 +237,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.intro => _IntroStep(
         key: key,
         status: _status,
+        mobileBackupFlow: _usesMobileBackupFlow,
         onStart: _busy ? null : _pickBackupAndStart,
       ),
       HiveToSqliteMigrationStage.backupReady ||
@@ -225,9 +263,15 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
 }
 
 class _IntroStep extends StatelessWidget {
-  const _IntroStep({super.key, required this.status, required this.onStart});
+  const _IntroStep({
+    super.key,
+    required this.status,
+    required this.mobileBackupFlow,
+    required this.onStart,
+  });
 
   final HiveToSqliteMigrationStatus status;
+  final bool mobileBackupFlow;
   final VoidCallback? onStart;
 
   @override
@@ -260,7 +304,7 @@ class _IntroStep extends StatelessWidget {
         const Spacer(),
         _PrimaryButton(
           icon: Lucide.FolderPlus,
-          label: Platform.isAndroid || Platform.isIOS
+          label: mobileBackupFlow
               ? l10n.migrationSaveBackupButton
               : l10n.migrationChooseFolderButton,
           onPressed: onStart,

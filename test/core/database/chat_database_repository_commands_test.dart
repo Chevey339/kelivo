@@ -115,31 +115,28 @@ void main() {
     },
   );
 
-  test(
-    'append version selects the new row in the linear group',
-    () async {
-      await repository.appendLinearMessageToConversation(
-        conversation: conversation(),
-        message: message(id: 'message-0', groupId: 'group-1'),
-      );
+  test('append version selects the new row in the linear group', () async {
+    await repository.appendLinearMessageToConversation(
+      conversation: conversation(),
+      message: message(id: 'message-0', groupId: 'group-1'),
+    );
 
-      final result = await repository.appendMessageVersion(
-        messageId: 'message-0',
-        content: 'v1',
-      );
+    final result = await repository.appendMessageVersion(
+      messageId: 'message-0',
+      content: 'v1',
+    );
 
-      expect(result?.message.version, 1);
-      final timeline = await repository.loadLinearMessageWindow(
-        conversationId: 'conversation-1',
-        fromStart: true,
-      );
-      expect(timeline.slots.single.revisionId, result!.message.id);
-      expect(
-        (await repository.getConversation('conversation-1'))?.versionSelections,
-        const {'group-1': 1},
-      );
-    },
-  );
+    expect(result?.message.version, 1);
+    final timeline = await repository.loadLinearMessageWindow(
+      conversationId: 'conversation-1',
+      fromStart: true,
+    );
+    expect(timeline.slots.single.revisionId, result!.message.id);
+    expect(
+      (await repository.getConversation('conversation-1'))?.versionSelections,
+      const {'group-1': 1},
+    );
+  });
 
   test('editing a middle user version preserves the active future', () async {
     final base = conversation();

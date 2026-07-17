@@ -8,6 +8,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
@@ -481,6 +482,64 @@ void main() {
         expect(service.getVersionSelections(fork.id), isEmpty);
       },
     );
+  });
+
+  test('final generation commit publishes one statistics revision', () async {
+    final service = createService();
+    await service.init();
+    final conversation = await service.createConversation(title: 'Stats');
+    final generation = await service.beginSendGeneration(
+      conversationId: conversation.id,
+      userContent: 'question',
+      modelId: 'model',
+      providerId: 'provider',
+    );
+    var run = await service.transitionGenerationRun(
+      id: generation.run.id,
+      expectedState: generation.run.state,
+      expectedStateRevision: generation.run.stateRevision,
+      nextState: GenerationRunState.requesting,
+    );
+    run = await service.transitionGenerationRun(
+      id: run.id,
+      expectedState: run.state,
+      expectedStateRevision: run.stateRevision,
+      nextState: GenerationRunState.streaming,
+    );
+    final completedMessage = generation.assistantMessage.copyWith(
+      content: 'answer',
+      totalTokens: 12,
+      isStreaming: false,
+      promptTokens: 3,
+      completionTokens: 9,
+    );
+    final revisionBefore = service.statisticsRevision;
+    var notifications = 0;
+    void listener() => notifications++;
+    service.addListener(listener);
+    addTearDown(() => service.removeListener(listener));
+
+    await service.finalizeGenerationRunSilent(
+      message: completedMessage,
+      toolEvents: const [],
+      generationRunId: run.id,
+      expectedState: run.state,
+      expectedStateRevision: run.stateRevision,
+      terminalState: GenerationRunState.completed,
+    );
+
+    expect(service.statisticsRevision, revisionBefore + 1);
+    expect(notifications, 1);
+    final aggregate = await service.loadStatsAggregate(
+      rangeStart: null,
+      rangeEndExclusive: null,
+      heatmapStart: DateTime.utc(2000),
+      trendStart: DateTime.utc(2000),
+      trendEndExclusive: DateTime.utc(2100),
+    );
+    expect(aggregate.totals.messages, 2);
+    expect(aggregate.totals.inputTokens, 3);
+    expect(aggregate.totals.outputTokens, 9);
   });
 
   test('business selection uses linear group versions', () async {

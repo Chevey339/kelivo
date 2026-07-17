@@ -213,7 +213,7 @@ void main() {
       everyElement(HiveToSqliteBackupItemState.done),
     );
 
-    await service.migrate(backupFile: backupFile);
+    await service.migrate(backupPath: backupFile.path);
     final firstMigrationStatus = statuses.firstWhere(
       (status) => status.stage == HiveToSqliteMigrationStage.migrating,
     );
@@ -333,7 +333,7 @@ void main() {
     final statuses = <HiveToSqliteMigrationStatus>[];
     final sub = service.statusStream.listen(statuses.add);
     addTearDown(sub.cancel);
-    await service.migrate(backupFile: File('${tempDir.path}/backup.zip'));
+    await service.migrate();
     await service.dispose();
 
     expect(
