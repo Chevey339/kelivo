@@ -219,7 +219,7 @@ void main() {
       );
     });
 
-    test('rejects a v7 database missing generation run state', () async {
+    test('rejects current schema missing generation run state', () async {
       await sourceRepository.close();
       sourceClosed = true;
       final raw = sqlite.sqlite3.open(sourceFile.path);

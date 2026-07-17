@@ -28,46 +28,54 @@ void main() {
   );
 
   test(
-    'installation gate rejects an unpublished SQLite schema without mutation',
+    'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      final directory = await Directory.systemTemp.createTemp(
-        'kelivo_reject_intermediate_schema_',
-      );
-      addTearDown(() async {
-        if (await directory.exists()) await directory.delete(recursive: true);
-      });
-      final file = File(p.join(directory.path, AppDatabase.databaseFileName));
-      final database = sqlite.sqlite3.open(file.path);
-      database.execute('CREATE TABLE intermediate_only (value TEXT);');
-      database.userVersion = AppDatabase.currentSchemaVersion - 1;
-      database.close();
-
-      await expectLater(
-        DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'database_schema_version',
-          ),
-        ),
-      );
-
-      final after = sqlite.sqlite3.open(
-        file.path,
-        mode: sqlite.OpenMode.readOnly,
-      );
-      try {
-        expect(after.userVersion, AppDatabase.currentSchemaVersion - 1);
-        expect(
-          after.select(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
-            ['intermediate_only'],
-          ),
-          hasLength(1),
+      for (
+        var schemaVersion = 1;
+        schemaVersion < AppDatabase.currentSchemaVersion;
+        schemaVersion++
+      ) {
+        final directory = await Directory.systemTemp.createTemp(
+          'kelivo_reject_schema_${schemaVersion}_',
         );
-      } finally {
-        after.close();
+        addTearDown(() async {
+          if (await directory.exists()) {
+            await directory.delete(recursive: true);
+          }
+        });
+        final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+        final database = sqlite.sqlite3.open(file.path);
+        database.execute('CREATE TABLE intermediate_only (value TEXT);');
+        database.userVersion = schemaVersion;
+        database.close();
+
+        await expectLater(
+          DatabaseInstallationGate.ensureReady(appDataDirectory: directory),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'database_schema_version',
+            ),
+          ),
+        );
+
+        final after = sqlite.sqlite3.open(
+          file.path,
+          mode: sqlite.OpenMode.readOnly,
+        );
+        try {
+          expect(after.userVersion, schemaVersion);
+          expect(
+            after.select(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
+              ['intermediate_only'],
+            ),
+            hasLength(1),
+          );
+        } finally {
+          after.close();
+        }
       }
     },
   );

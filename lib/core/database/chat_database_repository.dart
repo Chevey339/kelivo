@@ -525,46 +525,23 @@ class ChatDatabaseRepository {
   }
 
   static void _validateRawStructure(sqlite.Database database) {
-    final requiredTables = <String>{
+    if (database.userVersion != AppDatabase.currentSchemaVersion) {
+      throw StateError('database_schema_version');
+    }
+
+    const requiredTables = {
       'conversation_rows',
       'conversation_mcp_server_rows',
       'message_rows',
       'tool_event_rows',
       'gemini_thought_signature_rows',
       'chat_storage_meta_rows',
+      'message_part_rows',
+      'migration_run_rows',
+      'migration_issue_rows',
+      'generation_run_rows',
+      'provider_artifact_rows',
     };
-    final includesLegacyBranchTables =
-        database.userVersion >= AppDatabase.legacyBranchSchemaVersion &&
-        database.userVersion < AppDatabase.linearOnlySchemaVersion;
-    final includesMessageParts =
-        database.userVersion >= AppDatabase.messagePartsSchemaVersion;
-    final includesMigrationLedger =
-        database.userVersion >= AppDatabase.migrationLedgerSchemaVersion;
-    final includesGenerationRuns =
-        database.userVersion >= AppDatabase.generationRunSchemaVersion;
-    final includesProviderArtifacts =
-        database.userVersion >= AppDatabase.orderedPartsSchemaVersion;
-    final usesLinearRevisionReferences =
-        database.userVersion >= AppDatabase.linearMessagePartsSchemaVersion;
-    if (includesLegacyBranchTables) {
-      requiredTables.addAll(const {
-        'message_slot_rows',
-        'message_revision_rows',
-        'conversation_branch_rows',
-        'conversation_state_rows',
-      });
-    }
-    if (includesMessageParts) requiredTables.add('message_part_rows');
-    if (includesMigrationLedger) {
-      requiredTables.addAll(const {
-        'migration_run_rows',
-        'migration_issue_rows',
-      });
-    }
-    if (includesGenerationRuns) requiredTables.add('generation_run_rows');
-    if (includesProviderArtifacts) {
-      requiredTables.add('provider_artifact_rows');
-    }
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
     );
@@ -583,27 +560,11 @@ class ChatDatabaseRepository {
     if (!tables.containsAll(requiredTables)) {
       throw StateError('required_tables');
     }
-    _validateRawSchema(
-      database,
-      includesLegacyBranchTables: includesLegacyBranchTables,
-      includesMessageParts: includesMessageParts,
-      includesMigrationLedger: includesMigrationLedger,
-      includesGenerationRuns: includesGenerationRuns,
-      includesProviderArtifacts: includesProviderArtifacts,
-      usesLinearRevisionReferences: usesLinearRevisionReferences,
-    );
+    _validateRawSchema(database);
   }
 
-  static void _validateRawSchema(
-    sqlite.Database database, {
-    required bool includesLegacyBranchTables,
-    required bool includesMessageParts,
-    required bool includesMigrationLedger,
-    required bool includesGenerationRuns,
-    required bool includesProviderArtifacts,
-    required bool usesLinearRevisionReferences,
-  }) {
-    final expectedColumns = <String, List<String>>{
+  static void _validateRawSchema(sqlite.Database database) {
+    const expectedColumns = <String, List<String>>{
       'conversation_rows': [
         'id',
         'title',
@@ -648,41 +609,7 @@ class ChatDatabaseRepository {
       'tool_event_rows': ['message_id', 'events_json'],
       'gemini_thought_signature_rows': ['message_id', 'signature'],
       'chat_storage_meta_rows': ['key', 'value'],
-    };
-    if (includesLegacyBranchTables) {
-      expectedColumns.addAll(const {
-        'message_slot_rows': ['id', 'conversation_id', 'role', 'created_at'],
-        'message_revision_rows': [
-          'id',
-          'conversation_id',
-          'slot_id',
-          'parent_revision_id',
-          'revision_no',
-          'created_at',
-          'updated_at',
-          'finalized_at',
-          'deleted_at',
-        ],
-        'conversation_branch_rows': [
-          'id',
-          'conversation_id',
-          'parent_branch_id',
-          'forked_from_revision_id',
-          'leaf_revision_id',
-          'causality_kind',
-          'created_at',
-          'deleted_at',
-        ],
-        'conversation_state_rows': [
-          'conversation_id',
-          'active_branch_id',
-          'context_start_revision_id',
-          'state_revision',
-        ],
-      });
-    }
-    if (includesMessageParts) {
-      expectedColumns['message_part_rows'] = const [
+      'message_part_rows': [
         'conversation_id',
         'revision_id',
         'ordinal',
@@ -690,32 +617,26 @@ class ChatDatabaseRepository {
         'payload',
         'created_at',
         'updated_at',
-      ];
-    }
-    if (includesMigrationLedger) {
-      expectedColumns.addAll(const {
-        'migration_run_rows': [
-          'id',
-          'source_kind',
-          'source_hash',
-          'status',
-          'started_at',
-          'completed_at',
-        ],
-        'migration_issue_rows': [
-          'id',
-          'migration_run_id',
-          'conversation_id',
-          'source_entity_id',
-          'kind',
-          'severity',
-          'details_json',
-          'created_at',
-        ],
-      });
-    }
-    if (includesGenerationRuns) {
-      expectedColumns['generation_run_rows'] = const [
+      ],
+      'migration_run_rows': [
+        'id',
+        'source_kind',
+        'source_hash',
+        'status',
+        'started_at',
+        'completed_at',
+      ],
+      'migration_issue_rows': [
+        'id',
+        'migration_run_id',
+        'conversation_id',
+        'source_entity_id',
+        'kind',
+        'severity',
+        'details_json',
+        'created_at',
+      ],
+      'generation_run_rows': [
         'id',
         'conversation_id',
         'target_revision_id',
@@ -726,18 +647,16 @@ class ChatDatabaseRepository {
         'created_at',
         'updated_at',
         'terminal_at',
-      ];
-    }
-    if (includesProviderArtifacts) {
-      expectedColumns['provider_artifact_rows'] = const [
+      ],
+      'provider_artifact_rows': [
         'conversation_id',
         'revision_id',
         'kind',
         'payload',
         'created_at',
         'updated_at',
-      ];
-    }
+      ],
+    };
     for (final entry in expectedColumns.entries) {
       final actual = database
           .select('PRAGMA table_info(${entry.key});')
@@ -749,75 +668,23 @@ class ChatDatabaseRepository {
       }
     }
 
-    final expectedForeignKeys = <String, Set<String>>{
+    const expectedForeignKeys = <String, Set<String>>{
       'conversation_mcp_server_rows': {
         'conversation_id->conversation_rows.id:CASCADE',
       },
       'message_rows': {'conversation_id->conversation_rows.id:CASCADE'},
       'tool_event_rows': {'message_id->message_rows.id:CASCADE'},
       'gemini_thought_signature_rows': {'message_id->message_rows.id:CASCADE'},
-    };
-    if (includesLegacyBranchTables) {
-      expectedForeignKeys.addAll(const {
-        'message_slot_rows': {'conversation_id->conversation_rows.id:CASCADE'},
-        'message_revision_rows': {
-          'conversation_id->conversation_rows.id:CASCADE',
-          'conversation_id->message_slot_rows.conversation_id:NO ACTION',
-          'slot_id->message_slot_rows.id:NO ACTION',
-          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
-          'parent_revision_id->message_revision_rows.id:NO ACTION',
-        },
-        'conversation_branch_rows': {
-          'conversation_id->conversation_rows.id:CASCADE',
-          'conversation_id->conversation_branch_rows.conversation_id:NO ACTION',
-          'parent_branch_id->conversation_branch_rows.id:NO ACTION',
-          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
-          'forked_from_revision_id->message_revision_rows.id:NO ACTION',
-          'leaf_revision_id->message_revision_rows.id:NO ACTION',
-        },
-        'conversation_state_rows': {
-          'conversation_id->conversation_rows.id:CASCADE',
-          'conversation_id->conversation_branch_rows.conversation_id:NO ACTION',
-          'active_branch_id->conversation_branch_rows.id:NO ACTION',
-          'conversation_id->message_revision_rows.conversation_id:NO ACTION',
-          'context_start_revision_id->message_revision_rows.id:NO ACTION',
-        },
-      });
-    }
-    if (includesMessageParts) {
-      expectedForeignKeys['message_part_rows'] = usesLinearRevisionReferences
-          ? const {'revision_id->message_rows.id:CASCADE'}
-          : const {
-              'conversation_id->message_revision_rows.conversation_id:CASCADE',
-              'revision_id->message_revision_rows.id:CASCADE',
-            };
-    }
-    if (includesMigrationLedger) {
-      expectedForeignKeys['migration_issue_rows'] = const {
+      'message_part_rows': {'revision_id->message_rows.id:CASCADE'},
+      'migration_issue_rows': {
         'migration_run_id->migration_run_rows.id:CASCADE',
-      };
-    }
-    if (includesGenerationRuns) {
-      expectedForeignKeys['generation_run_rows'] = usesLinearRevisionReferences
-          ? const {
-              'conversation_id->conversation_rows.id:CASCADE',
-              'target_revision_id->message_rows.id:NO ACTION',
-            }
-          : const {
-              'conversation_id->conversation_rows.id:CASCADE',
-              'conversation_id->message_revision_rows.conversation_id:NO ACTION',
-              'target_revision_id->message_revision_rows.id:NO ACTION',
-            };
-    }
-    if (includesProviderArtifacts) {
-      expectedForeignKeys['provider_artifact_rows'] =
-          usesLinearRevisionReferences
-          ? const {'revision_id->message_rows.id:CASCADE'}
-          : const {
-              'conversation_id->message_revision_rows.conversation_id:CASCADE',
-              'revision_id->message_revision_rows.id:CASCADE',
-            };
-    }
+      },
+      'generation_run_rows': {
+        'conversation_id->conversation_rows.id:CASCADE',
+        'target_revision_id->message_rows.id:NO ACTION',
+      },
+      'provider_artifact_rows': {'revision_id->message_rows.id:CASCADE'},
+    };
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
           .select('PRAGMA foreign_key_list(${entry.key});')
