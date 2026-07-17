@@ -1355,13 +1355,7 @@ class DataSync {
     WebDavConfig cfg, {
     RestoreMode mode = RestoreMode.overwrite,
   }) async {
-    _lastMergeReport = mode == RestoreMode.merge
-        ? const BackupMergeReport(
-            importedConversations: 0,
-            deduplicatedConversations: 0,
-            remappedConversationIds: {},
-          )
-        : null;
+    _lastMergeReport = null;
     // Extract to temp using file-stream decoding to avoid loading the full ZIP
     // into RAM (the old approach called file.readAsBytes() which for a 600-800 MB
     // file would allocate a contiguous byte array of the same size).

@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/backup.dart';
-import '../database/chat_database_repository.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
 import '../services/chat/chat_service.dart';
@@ -26,7 +25,6 @@ class S3BackupProvider extends ChangeNotifier {
   S3Config get config => _cfg;
   bool get busy => _busy;
   String? get message => _message;
-  BackupMergeReport? get lastMergeReport => _dataSync.lastMergeReport;
 
   void updateConfig(S3Config cfg) {
     _cfg = cfg;

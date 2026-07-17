@@ -502,7 +502,7 @@
   "backupPageTestDone": "测试完成",
   "backupPageTestConnection": "测试连接",
   "backupPageRestartRequired": "需要重启应用",
-  "backupPageRestartContent": "恢复已准备好。重启 Kelivo 后将安全应用。",
+  "backupPageRestartContent": "导入成功。重启 Kelivo 后将安全应用。",
   "restartAppFailedMessage": "Kelivo 无法自动重启，请完全关闭后重新打开。",
   "backupRestoreColdRestartTitle": "还需要再重启一次",
   "backupRestoreColdRestartContent": "恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。",
@@ -533,14 +533,6 @@
   "backupPageOverwriteModeDescription": "仅替换已选组件；保留未选组件及无关本地设置",
   "backupPageMergeMode": "合并",
   "backupPageMergeModeDescription": "保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。",
-  "backupPageMergeReportSummary": "合并完成：导入 {imported} 个，跳过 {deduplicated} 个相同会话，重新映射 {remapped} 个冲突。",
-  "@backupPageMergeReportSummary": {
-    "placeholders": {
-      "imported": {"type": "int"},
-      "deduplicated": {"type": "int"},
-      "remapped": {"type": "int"}
-    }
-  },
   "backupPageRestore": "恢复",
   "backupPageBackupUploaded": "已上传备份",
   "backupPageBackup": "立即备份",

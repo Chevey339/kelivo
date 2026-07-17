@@ -3020,7 +3020,7 @@ abstract class AppLocalizations {
   /// No description provided for @backupPageRestartContent.
   ///
   /// In en, this message translates to:
-  /// **'Restore is ready. Restart Kelivo to apply it safely.'**
+  /// **'Import successful. Restart Kelivo to apply it safely.'**
   String get backupPageRestartContent;
 
   /// No description provided for @restartAppFailedMessage.
@@ -3160,16 +3160,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.'**
   String get backupPageMergeModeDescription;
-
-  /// No description provided for @backupPageMergeReportSummary.
-  ///
-  /// In en, this message translates to:
-  /// **'Merge complete: {imported} imported, {deduplicated} identical skipped, {remapped} conflicts remapped.'**
-  String backupPageMergeReportSummary(
-    int imported,
-    int deduplicated,
-    int remapped,
-  );
 
   /// No description provided for @backupPageRestore.
   ///

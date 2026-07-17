@@ -641,7 +641,7 @@
   "backupPageTestDone": "Test done",
   "backupPageTestConnection": "Test",
   "backupPageRestartRequired": "Restart Required",
-  "backupPageRestartContent": "Restore is ready. Restart Kelivo to apply it safely.",
+  "backupPageRestartContent": "Import successful. Restart Kelivo to apply it safely.",
   "restartAppFailedMessage": "Kelivo could not restart automatically. Fully close it, then open it again.",
   "backupRestoreColdRestartTitle": "One more restart is required",
   "backupRestoreColdRestartContent": "Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.",
@@ -679,14 +679,6 @@
   "backupPageOverwriteModeDescription": "Replace the selected components; keep unselected components and unrelated local settings",
   "backupPageMergeMode": "Merge",
   "backupPageMergeModeDescription": "Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.",
-  "backupPageMergeReportSummary": "Merge complete: {imported} imported, {deduplicated} identical skipped, {remapped} conflicts remapped.",
-  "@backupPageMergeReportSummary": {
-    "placeholders": {
-      "imported": {"type": "int"},
-      "deduplicated": {"type": "int"},
-      "remapped": {"type": "int"}
-    }
-  },
   "backupPageRestore": "Restore",
   "backupPageBackupUploaded": "Backup uploaded",
   "backupPageBackup": "Backup",

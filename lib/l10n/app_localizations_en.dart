@@ -1571,7 +1571,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get backupPageRestartContent =>
-      'Restore is ready. Restart Kelivo to apply it safely.';
+      'Import successful. Restart Kelivo to apply it safely.';
 
   @override
   String get restartAppFailedMessage =>
@@ -1654,15 +1654,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get backupPageMergeModeDescription =>
       'Keep local data and add backup data. Identical conversations are skipped and conflicting conversations receive new IDs.';
-
-  @override
-  String backupPageMergeReportSummary(
-    int imported,
-    int deduplicated,
-    int remapped,
-  ) {
-    return 'Merge complete: $imported imported, $deduplicated identical skipped, $remapped conflicts remapped.';
-  }
 
   @override
   String get backupPageRestore => 'Restore';

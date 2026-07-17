@@ -638,10 +638,6 @@ class _BackupPageState extends State<BackupPage> {
                                             }
                                             await showBackupRestartRequiredDialog(
                                               context,
-                                              mergeReport:
-                                                  mode == RestoreMode.merge
-                                                  ? vm.lastMergeReport
-                                                  : null,
                                             );
                                           },
                                         ),
@@ -707,9 +703,6 @@ class _BackupPageState extends State<BackupPage> {
                                     }
                                     await showBackupRestartRequiredDialog(
                                       context,
-                                      mergeReport: mode == RestoreMode.merge
-                                          ? vm.lastMergeReport
-                                          : null,
                                     );
                                   },
                                 ),
@@ -1048,10 +1041,6 @@ class _BackupPageState extends State<BackupPage> {
                                             }
                                             await showBackupRestartRequiredDialog(
                                               context,
-                                              mergeReport:
-                                                  mode == RestoreMode.merge
-                                                  ? s3Vm.lastMergeReport
-                                                  : null,
                                             );
                                           },
                                         ),
@@ -1115,9 +1104,6 @@ class _BackupPageState extends State<BackupPage> {
                                     }
                                     await showBackupRestartRequiredDialog(
                                       context,
-                                      mergeReport: mode == RestoreMode.merge
-                                          ? s3Vm.lastMergeReport
-                                          : null,
                                     );
                                   },
                                 ),
@@ -1422,10 +1408,7 @@ class _BackupPageState extends State<BackupPage> {
       return;
     }
     if (!context.mounted) return;
-    await showBackupRestartRequiredDialog(
-      context,
-      mergeReport: mode == RestoreMode.merge ? vm.lastMergeReport : null,
-    );
+    await showBackupRestartRequiredDialog(context);
   }
 
   Future<void> _showWebDavSettingsPage(

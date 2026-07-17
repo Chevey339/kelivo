@@ -704,6 +704,7 @@ void main() {
       expect(provider['name'], 'Source Provider');
       expect(provider['baseUrl'], 'https://source.example');
       expect(provider['apiKey'], 'source-api-secret');
+      expect(sync.lastMergeReport, isNull);
     });
 
     test(

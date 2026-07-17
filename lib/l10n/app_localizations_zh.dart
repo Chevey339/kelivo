@@ -1518,7 +1518,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复已准备好。重启 Kelivo 后将安全应用。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
 
   @override
   String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
@@ -1597,15 +1597,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get backupPageMergeModeDescription =>
       '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
-
-  @override
-  String backupPageMergeReportSummary(
-    int imported,
-    int deduplicated,
-    int remapped,
-  ) {
-    return '合并完成：导入 $imported 个，跳过 $deduplicated 个相同会话，重新映射 $remapped 个冲突。';
-  }
 
   @override
   String get backupPageRestore => '恢复';
@@ -7072,7 +7063,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重启应用';
 
   @override
-  String get backupPageRestartContent => '恢复已准备好。重启 Kelivo 后将安全应用。';
+  String get backupPageRestartContent => '导入成功。重启 Kelivo 后将安全应用。';
 
   @override
   String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
@@ -7151,15 +7142,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get backupPageMergeModeDescription =>
       '保留本地数据并加入备份数据；相同会话会跳过，冲突会话会重新分配 ID。';
-
-  @override
-  String backupPageMergeReportSummary(
-    int imported,
-    int deduplicated,
-    int remapped,
-  ) {
-    return '合并完成：导入 $imported 个，跳过 $deduplicated 个相同会话，重新映射 $remapped 个冲突。';
-  }
 
   @override
   String get backupPageRestore => '恢复';
@@ -12626,7 +12608,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get backupPageRestartRequired => '需要重啟應用程式';
 
   @override
-  String get backupPageRestartContent => '還原已準備完成。重新啟動 Kelivo 後將安全套用。';
+  String get backupPageRestartContent => '匯入成功。重新啟動 Kelivo 後將安全套用。';
 
   @override
   String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
@@ -12705,15 +12687,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get backupPageMergeModeDescription =>
       '保留本機資料並加入備份資料；相同對話會略過，衝突對話會重新分配 ID。';
-
-  @override
-  String backupPageMergeReportSummary(
-    int imported,
-    int deduplicated,
-    int remapped,
-  ) {
-    return '合併完成：匯入 $imported 個，略過 $deduplicated 個相同對話，重新映射 $remapped 個衝突。';
-  }
 
   @override
   String get backupPageRestore => '還原';

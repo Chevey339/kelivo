@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
-import '../../core/database/chat_database_repository.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
@@ -226,12 +225,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
       return;
     }
     if (!rootCtx.mounted) return;
-    await showBackupRestartRequiredDialog(
-      rootCtx,
-      mergeReport: mode == RestoreMode.merge
-          ? rootCtx.read<BackupProvider>().lastMergeReport
-          : null,
-    );
+    await showBackupRestartRequiredDialog(rootCtx);
   }
 
   @override
@@ -509,8 +503,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
-                                      mergeReport: () =>
-                                          backupProvider.lastMergeReport,
                                       deleteAndReload:
                                           backupProvider.deleteAndReload,
                                     );
@@ -777,8 +769,6 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                                           throw Exception(msg);
                                         }
                                       },
-                                      mergeReport: () =>
-                                          s3BackupProvider.lastMergeReport,
                                       deleteAndReload:
                                           s3BackupProvider.deleteAndReload,
                                     );
@@ -1349,7 +1339,6 @@ class _RemoteBackupsDialog extends StatefulWidget {
     required this.title,
     required this.listRemote,
     required this.restoreFromItem,
-    required this.mergeReport,
     required this.deleteAndReload,
   });
 
@@ -1357,7 +1346,6 @@ class _RemoteBackupsDialog extends StatefulWidget {
   final Future<List<BackupFileItem>> Function() listRemote;
   final Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem;
-  final BackupMergeReport? Function() mergeReport;
   final Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload;
 
@@ -1439,10 +1427,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
       if (mounted) setState(() => _loading = false);
     }
     if (!rootCtx.mounted) return;
-    await showBackupRestartRequiredDialog(
-      rootCtx,
-      mergeReport: mode == RestoreMode.merge ? widget.mergeReport() : null,
-    );
+    await showBackupRestartRequiredDialog(rootCtx);
   }
 
   @override
@@ -1597,7 +1582,6 @@ void _showRemoteBackupsDialog(
   required Future<List<BackupFileItem>> Function() listRemote,
   required Future<void> Function(BackupFileItem item, RestoreMode mode)
   restoreFromItem,
-  required BackupMergeReport? Function() mergeReport,
   required Future<List<BackupFileItem>> Function(BackupFileItem item)
   deleteAndReload,
 }) {
@@ -1607,7 +1591,6 @@ void _showRemoteBackupsDialog(
       title: title,
       listRemote: listRemote,
       restoreFromItem: restoreFromItem,
-      mergeReport: mergeReport,
       deleteAndReload: deleteAndReload,
     ),
   );
