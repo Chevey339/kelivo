@@ -96,9 +96,8 @@ class ChatInputBar extends StatefulWidget {
     this.showQuickPhraseButton = false,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
-    this.showOcrButton = false,
-    this.ocrActive = false,
-    this.onToggleOcr,
+    this.showDocumentProcessingButton = false,
+    this.onDocumentProcessing,
     this.conversationId,
     this.sendButtonTooltip,
     this.backgroundImageActive = false,
@@ -153,9 +152,8 @@ class ChatInputBar extends StatefulWidget {
   final bool showQuickPhraseButton;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
-  final bool showOcrButton;
-  final bool ocrActive;
-  final VoidCallback? onToggleOcr;
+  final bool showDocumentProcessingButton;
+  final VoidCallback? onDocumentProcessing;
   final String? conversationId;
   final String? sendButtonTooltip;
   final bool backgroundImageActive;
@@ -253,7 +251,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   }
 
   void _checkImageWarning(BuildContext context) {
-    if (widget.ocrActive || _images.isEmpty) {
+    if (_images.isEmpty) {
       _imageWarningModelKey = null;
       return;
     }
@@ -1579,20 +1577,21 @@ class _ChatInputBarState extends State<ChatInputBar>
           );
         }
 
-        if (widget.showOcrButton && widget.onToggleOcr != null) {
+        if (widget.showDocumentProcessingButton &&
+            widget.onDocumentProcessing != null) {
           actions.add(
             _OverflowAction(
               width: normalButtonW,
               builder: () => _CompactIconButton(
-                tooltip: l10n.chatInputBarOcrTooltip,
-                icon: Lucide.Eye,
-                active: widget.ocrActive,
-                onTap: lockTap(widget.onToggleOcr),
+                tooltip: l10n.documentProcessingTitle,
+                icon: Lucide.FileText,
+                active: false,
+                onTap: lockTap(widget.onDocumentProcessing),
               ),
               menu: DesktopContextMenuItem(
-                icon: Lucide.Eye,
-                label: l10n.chatInputBarOcrTooltip,
-                onTap: lockTap(widget.onToggleOcr),
+                icon: Lucide.FileText,
+                label: l10n.documentProcessingTitle,
+                onTap: lockTap(widget.onDocumentProcessing),
               ),
             ),
           );

@@ -697,6 +697,17 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
             ? _mimeFromDataUrl(p)
             : _mimeFromPath(p);
         if (isAudioMime(mime)) continue;
+        if (isOfficeDocumentMime(mime) || mime == 'application/pdf') {
+          final fileName = p.replaceAll('\\', '/').split('/').last;
+          final dataUrl = isInlineUrl
+              ? p
+              : await _encodeBase64File(p, withPrefix: true);
+          parts.add({
+            'type': 'file',
+            'file': {'filename': fileName, 'file_data': dataUrl},
+          });
+          continue;
+        }
         final bool isVideo = isVideoMime(mime);
         final String dataUrl = isInlineUrl
             ? p

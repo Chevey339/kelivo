@@ -2345,6 +2345,42 @@ class $AssistantRowsTable extends AssistantRows
         requiredDuringInsert: false,
         defaultValue: const Constant(''),
       );
+  static const VerificationMeta _docxModeMeta = const VerificationMeta(
+    'docxMode',
+  );
+  @override
+  late final GeneratedColumn<String> docxMode = GeneratedColumn<String>(
+    'docx_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('extract'),
+  );
+  static const VerificationMeta _pdfModeMeta = const VerificationMeta(
+    'pdfMode',
+  );
+  @override
+  late final GeneratedColumn<String> pdfMode = GeneratedColumn<String>(
+    'pdf_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('extract'),
+  );
+  static const VerificationMeta _otherOfficeModeMeta = const VerificationMeta(
+    'otherOfficeMode',
+  );
+  @override
+  late final GeneratedColumn<String> otherOfficeMode = GeneratedColumn<String>(
+    'other_office_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('direct'),
+  );
   static const VerificationMeta _sortOrderMeta = const VerificationMeta(
     'sortOrder',
   );
@@ -2409,6 +2445,9 @@ class $AssistantRowsTable extends AssistantRows
     enableRecentChatsReference,
     recentChatsSummaryMessageCount,
     memoryRecordPrompt,
+    docxMode,
+    pdfMode,
+    otherOfficeMode,
     sortOrder,
     createdAt,
     updatedAt,
@@ -2666,6 +2705,27 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('docx_mode')) {
+      context.handle(
+        _docxModeMeta,
+        docxMode.isAcceptableOrUnknown(data['docx_mode']!, _docxModeMeta),
+      );
+    }
+    if (data.containsKey('pdf_mode')) {
+      context.handle(
+        _pdfModeMeta,
+        pdfMode.isAcceptableOrUnknown(data['pdf_mode']!, _pdfModeMeta),
+      );
+    }
+    if (data.containsKey('other_office_mode')) {
+      context.handle(
+        _otherOfficeModeMeta,
+        otherOfficeMode.isAcceptableOrUnknown(
+          data['other_office_mode']!,
+          _otherOfficeModeMeta,
+        ),
+      );
+    }
     if (data.containsKey('sort_order')) {
       context.handle(
         _sortOrderMeta,
@@ -2815,6 +2875,18 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}memory_record_prompt'],
       )!,
+      docxMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}docx_mode'],
+      )!,
+      pdfMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pdf_mode'],
+      )!,
+      otherOfficeMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}other_office_mode'],
+      )!,
       sortOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}sort_order'],
@@ -2866,6 +2938,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final bool enableRecentChatsReference;
   final int recentChatsSummaryMessageCount;
   final String memoryRecordPrompt;
+  final String docxMode;
+  final String pdfMode;
+  final String otherOfficeMode;
   final int sortOrder;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -2899,6 +2974,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.enableRecentChatsReference,
     required this.recentChatsSummaryMessageCount,
     required this.memoryRecordPrompt,
+    required this.docxMode,
+    required this.pdfMode,
+    required this.otherOfficeMode,
     required this.sortOrder,
     required this.createdAt,
     required this.updatedAt,
@@ -2955,6 +3033,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       recentChatsSummaryMessageCount,
     );
     map['memory_record_prompt'] = Variable<String>(memoryRecordPrompt);
+    map['docx_mode'] = Variable<String>(docxMode);
+    map['pdf_mode'] = Variable<String>(pdfMode);
+    map['other_office_mode'] = Variable<String>(otherOfficeMode);
     map['sort_order'] = Variable<int>(sortOrder);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -3006,6 +3087,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       enableRecentChatsReference: Value(enableRecentChatsReference),
       recentChatsSummaryMessageCount: Value(recentChatsSummaryMessageCount),
       memoryRecordPrompt: Value(memoryRecordPrompt),
+      docxMode: Value(docxMode),
+      pdfMode: Value(pdfMode),
+      otherOfficeMode: Value(otherOfficeMode),
       sortOrder: Value(sortOrder),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -3059,6 +3143,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       memoryRecordPrompt: serializer.fromJson<String>(
         json['memoryRecordPrompt'],
       ),
+      docxMode: serializer.fromJson<String>(json['docxMode']),
+      pdfMode: serializer.fromJson<String>(json['pdfMode']),
+      otherOfficeMode: serializer.fromJson<String>(json['otherOfficeMode']),
       sortOrder: serializer.fromJson<int>(json['sortOrder']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -3101,6 +3188,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
         recentChatsSummaryMessageCount,
       ),
       'memoryRecordPrompt': serializer.toJson<String>(memoryRecordPrompt),
+      'docxMode': serializer.toJson<String>(docxMode),
+      'pdfMode': serializer.toJson<String>(pdfMode),
+      'otherOfficeMode': serializer.toJson<String>(otherOfficeMode),
       'sortOrder': serializer.toJson<int>(sortOrder),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -3137,6 +3227,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     bool? enableRecentChatsReference,
     int? recentChatsSummaryMessageCount,
     String? memoryRecordPrompt,
+    String? docxMode,
+    String? pdfMode,
+    String? otherOfficeMode,
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -3176,6 +3269,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     recentChatsSummaryMessageCount:
         recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
     memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
+    docxMode: docxMode ?? this.docxMode,
+    pdfMode: pdfMode ?? this.pdfMode,
+    otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
     sortOrder: sortOrder ?? this.sortOrder,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -3260,6 +3356,11 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       memoryRecordPrompt: data.memoryRecordPrompt.present
           ? data.memoryRecordPrompt.value
           : this.memoryRecordPrompt,
+      docxMode: data.docxMode.present ? data.docxMode.value : this.docxMode,
+      pdfMode: data.pdfMode.present ? data.pdfMode.value : this.pdfMode,
+      otherOfficeMode: data.otherOfficeMode.present
+          ? data.otherOfficeMode.value
+          : this.otherOfficeMode,
       sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
@@ -3300,6 +3401,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
             'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
           )
           ..write('memoryRecordPrompt: $memoryRecordPrompt, ')
+          ..write('docxMode: $docxMode, ')
+          ..write('pdfMode: $pdfMode, ')
+          ..write('otherOfficeMode: $otherOfficeMode, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -3338,6 +3442,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     enableRecentChatsReference,
     recentChatsSummaryMessageCount,
     memoryRecordPrompt,
+    docxMode,
+    pdfMode,
+    otherOfficeMode,
     sortOrder,
     createdAt,
     updatedAt,
@@ -3376,6 +3483,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.recentChatsSummaryMessageCount ==
               this.recentChatsSummaryMessageCount &&
           other.memoryRecordPrompt == this.memoryRecordPrompt &&
+          other.docxMode == this.docxMode &&
+          other.pdfMode == this.pdfMode &&
+          other.otherOfficeMode == this.otherOfficeMode &&
           other.sortOrder == this.sortOrder &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -3411,6 +3521,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<bool> enableRecentChatsReference;
   final Value<int> recentChatsSummaryMessageCount;
   final Value<String> memoryRecordPrompt;
+  final Value<String> docxMode;
+  final Value<String> pdfMode;
+  final Value<String> otherOfficeMode;
   final Value<int> sortOrder;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -3445,6 +3558,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.enableRecentChatsReference = const Value.absent(),
     this.recentChatsSummaryMessageCount = const Value.absent(),
     this.memoryRecordPrompt = const Value.absent(),
+    this.docxMode = const Value.absent(),
+    this.pdfMode = const Value.absent(),
+    this.otherOfficeMode = const Value.absent(),
     this.sortOrder = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -3480,6 +3596,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.enableRecentChatsReference = const Value.absent(),
     this.recentChatsSummaryMessageCount = const Value.absent(),
     this.memoryRecordPrompt = const Value.absent(),
+    this.docxMode = const Value.absent(),
+    this.pdfMode = const Value.absent(),
+    this.otherOfficeMode = const Value.absent(),
     required int sortOrder,
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -3519,6 +3638,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<bool>? enableRecentChatsReference,
     Expression<int>? recentChatsSummaryMessageCount,
     Expression<String>? memoryRecordPrompt,
+    Expression<String>? docxMode,
+    Expression<String>? pdfMode,
+    Expression<String>? otherOfficeMode,
     Expression<int>? sortOrder,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -3561,6 +3683,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
         'recent_chats_summary_message_count': recentChatsSummaryMessageCount,
       if (memoryRecordPrompt != null)
         'memory_record_prompt': memoryRecordPrompt,
+      if (docxMode != null) 'docx_mode': docxMode,
+      if (pdfMode != null) 'pdf_mode': pdfMode,
+      if (otherOfficeMode != null) 'other_office_mode': otherOfficeMode,
       if (sortOrder != null) 'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -3598,6 +3723,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<bool>? enableRecentChatsReference,
     Value<int>? recentChatsSummaryMessageCount,
     Value<String>? memoryRecordPrompt,
+    Value<String>? docxMode,
+    Value<String>? pdfMode,
+    Value<String>? otherOfficeMode,
     Value<int>? sortOrder,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -3635,6 +3763,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       recentChatsSummaryMessageCount:
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
       memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
+      docxMode: docxMode ?? this.docxMode,
+      pdfMode: pdfMode ?? this.pdfMode,
+      otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -3738,6 +3869,15 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (memoryRecordPrompt.present) {
       map['memory_record_prompt'] = Variable<String>(memoryRecordPrompt.value);
     }
+    if (docxMode.present) {
+      map['docx_mode'] = Variable<String>(docxMode.value);
+    }
+    if (pdfMode.present) {
+      map['pdf_mode'] = Variable<String>(pdfMode.value);
+    }
+    if (otherOfficeMode.present) {
+      map['other_office_mode'] = Variable<String>(otherOfficeMode.value);
+    }
     if (sortOrder.present) {
       map['sort_order'] = Variable<int>(sortOrder.value);
     }
@@ -3787,6 +3927,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
             'recentChatsSummaryMessageCount: $recentChatsSummaryMessageCount, ',
           )
           ..write('memoryRecordPrompt: $memoryRecordPrompt, ')
+          ..write('docxMode: $docxMode, ')
+          ..write('pdfMode: $pdfMode, ')
+          ..write('otherOfficeMode: $otherOfficeMode, ')
           ..write('sortOrder: $sortOrder, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
@@ -6612,6 +6755,9 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<bool> enableRecentChatsReference,
       Value<int> recentChatsSummaryMessageCount,
       Value<String> memoryRecordPrompt,
+      Value<String> docxMode,
+      Value<String> pdfMode,
+      Value<String> otherOfficeMode,
       required int sortOrder,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -6648,6 +6794,9 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<bool> enableRecentChatsReference,
       Value<int> recentChatsSummaryMessageCount,
       Value<String> memoryRecordPrompt,
+      Value<String> docxMode,
+      Value<String> pdfMode,
+      Value<String> otherOfficeMode,
       Value<int> sortOrder,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -6805,6 +6954,21 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get memoryRecordPrompt => $composableBuilder(
     column: $table.memoryRecordPrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get docxMode => $composableBuilder(
+    column: $table.docxMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pdfMode => $composableBuilder(
+    column: $table.pdfMode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get otherOfficeMode => $composableBuilder(
+    column: $table.otherOfficeMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6978,6 +7142,21 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get docxMode => $composableBuilder(
+    column: $table.docxMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pdfMode => $composableBuilder(
+    column: $table.pdfMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get otherOfficeMode => $composableBuilder(
+    column: $table.otherOfficeMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get sortOrder => $composableBuilder(
     column: $table.sortOrder,
     builder: (column) => ColumnOrderings(column),
@@ -7138,6 +7317,17 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get docxMode =>
+      $composableBuilder(column: $table.docxMode, builder: (column) => column);
+
+  GeneratedColumn<String> get pdfMode =>
+      $composableBuilder(column: $table.pdfMode, builder: (column) => column);
+
+  GeneratedColumn<String> get otherOfficeMode => $composableBuilder(
+    column: $table.otherOfficeMode,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<int> get sortOrder =>
       $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 
@@ -7209,6 +7399,9 @@ class $$AssistantRowsTableTableManager
                 Value<int> recentChatsSummaryMessageCount =
                     const Value.absent(),
                 Value<String> memoryRecordPrompt = const Value.absent(),
+                Value<String> docxMode = const Value.absent(),
+                Value<String> pdfMode = const Value.absent(),
+                Value<String> otherOfficeMode = const Value.absent(),
                 Value<int> sortOrder = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -7243,6 +7436,9 @@ class $$AssistantRowsTableTableManager
                 enableRecentChatsReference: enableRecentChatsReference,
                 recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
                 memoryRecordPrompt: memoryRecordPrompt,
+                docxMode: docxMode,
+                pdfMode: pdfMode,
+                otherOfficeMode: otherOfficeMode,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -7280,6 +7476,9 @@ class $$AssistantRowsTableTableManager
                 Value<int> recentChatsSummaryMessageCount =
                     const Value.absent(),
                 Value<String> memoryRecordPrompt = const Value.absent(),
+                Value<String> docxMode = const Value.absent(),
+                Value<String> pdfMode = const Value.absent(),
+                Value<String> otherOfficeMode = const Value.absent(),
                 required int sortOrder,
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -7314,6 +7513,9 @@ class $$AssistantRowsTableTableManager
                 enableRecentChatsReference: enableRecentChatsReference,
                 recentChatsSummaryMessageCount: recentChatsSummaryMessageCount,
                 memoryRecordPrompt: memoryRecordPrompt,
+                docxMode: docxMode,
+                pdfMode: pdfMode,
+                otherOfficeMode: otherOfficeMode,
                 sortOrder: sortOrder,
                 createdAt: createdAt,
                 updatedAt: updatedAt,

@@ -5729,4 +5729,43 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get multiAIDropThread => 'Drop';
+
+  @override
+  String get documentProcessingTitle => 'Image & Document Processing';
+
+  @override
+  String get documentProcessingImageWithoutVision =>
+      'Images without vision model';
+
+  @override
+  String get documentProcessingModeOcr => 'OCR';
+
+  @override
+  String get documentProcessingModeDiscard => 'Discard';
+
+  @override
+  String get documentProcessingOcrNotConfigured =>
+      'No OCR model configured. OCR option unavailable.';
+
+  @override
+  String get documentProcessingDocx => 'DOCX';
+
+  @override
+  String get documentProcessingModeLocalParse => 'Local Parse';
+
+  @override
+  String get documentProcessingModeDirectUpload => 'Direct Upload';
+
+  @override
+  String get documentProcessingPdf => 'PDF';
+
+  @override
+  String get documentProcessingOtherOffice => 'Other Office (PPT/XLS/DOC/…)';
+
+  @override
+  String get documentProcessingDisclaimer =>
+      'Direct upload is experimental and not part of the standard API. Currently only supported by some providers and models (check model details for File Input capability). If the API returns an error, switch to local parsing or convert the file to an image before sending.';
+
+  @override
+  String get documentProcessingResetDefault => 'Reset to Default';
 }

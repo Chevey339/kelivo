@@ -53,7 +53,7 @@ ChatMessage _message({
 
 void main() {
   group('MessageBuilderService.parseInputFromRaw', () {
-    test('默认将视频和音频文件路径纳入媒体路径供 API 使用', () {
+    test('adds video and audio paths to imagePaths by default', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
@@ -73,7 +73,7 @@ void main() {
       ]);
     });
 
-    test('编辑恢复草稿时不把视频和音频文件伪装成图片', () {
+    test('excludes video and audio from imagePaths when flag is false', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService(const {}),
         contextProvider: _FakeBuildContext(),
@@ -92,6 +92,76 @@ void main() {
       expect(input.documents.map((document) => document.fileName), [
         'clip.mp4',
         'audio.wav',
+      ]);
+    });
+
+    test(
+      'office documents never leak into imagePaths (bugfix: docx sent as png)',
+      () {
+        final service = MessageBuilderService(
+          chatService: _FakeChatService(const {}),
+          contextProvider: _FakeBuildContext(),
+        );
+
+        final input = service.parseInputFromRaw(
+          'text\n'
+          '[file:C:/tmp/report.docx|report.docx|application/vnd.openxmlformats-officedocument.wordprocessingml.document]\n'
+          '[file:C:/tmp/slides.pptx|slides.pptx|application/vnd.openxmlformats-officedocument.presentationml.presentation]\n'
+          '[file:C:/tmp/data.xlsx|data.xlsx|application/vnd.openxmlformats-officedocument.spreadsheetml.sheet]\n'
+          '[file:C:/tmp/doc.pdf|doc.pdf|application/pdf]',
+        );
+
+        expect(input.text, 'text');
+        expect(input.imagePaths, isEmpty);
+        expect(input.documents.map((d) => d.fileName), [
+          'report.docx',
+          'slides.pptx',
+          'data.xlsx',
+          'doc.pdf',
+        ]);
+      },
+    );
+
+    test('mixed: images in imagePaths, office docs in documents only', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final input = service.parseInputFromRaw(
+        'look at these\n'
+        '[image:C:/tmp/photo.jpg]\n'
+        '[image:C:/tmp/screenshot.png]\n'
+        '[file:C:/tmp/report.docx|report.docx|application/vnd.openxmlformats-officedocument.wordprocessingml.document]\n'
+        '[file:C:/tmp/doc.pdf|doc.pdf|application/pdf]',
+      );
+
+      expect(input.text, 'look at these');
+      expect(input.imagePaths, ['C:/tmp/photo.jpg', 'C:/tmp/screenshot.png']);
+      expect(input.documents.map((d) => d.fileName), [
+        'report.docx',
+        'doc.pdf',
+      ]);
+    });
+
+    test('mixed with video: video in imagePaths, office docs excluded', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final input = service.parseInputFromRaw(
+        'media\n'
+        '[image:C:/tmp/photo.png]\n'
+        '[file:C:/tmp/clip.mp4|clip.mp4|video/mp4]\n'
+        '[file:C:/tmp/report.docx|report.docx|application/vnd.openxmlformats-officedocument.wordprocessingml.document]',
+      );
+
+      expect(input.text, 'media');
+      expect(input.imagePaths, ['C:/tmp/photo.png', 'C:/tmp/clip.mp4']);
+      expect(input.documents.map((d) => d.fileName), [
+        'clip.mp4',
+        'report.docx',
       ]);
     });
   });

@@ -279,11 +279,14 @@ class MessageBuilderService {
         final mime = fileMatch.group(3)?.trim() ?? 'text/plain';
         final doc = DocumentAttachment(path: path, fileName: name, mime: mime);
         docs.add(doc);
-        // Treat media attachments as image-style attachments for downstream API builders.
+        // Video/audio attachments need to be tracked in imagePaths so downstream
+        // API builders can route them as media (addImageUrl/addVideoUrl).
+        // Office documents are NOT added here: they are handled separately via
+        // _resolveFileProcessingMode → directPaths in processUserMessagesForApi.
         final effectiveMime = _effectiveAttachmentMime(doc);
         if (includeMediaFilePathsAsImages &&
-            (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) &&
-            path.isNotEmpty) {
+            path.isNotEmpty &&
+            (isVideoMime(effectiveMime) || isAudioMime(effectiveMime))) {
           images.add(path);
         }
         idx = fileMatch.end;
@@ -301,6 +304,22 @@ class MessageBuilderService {
 
   String _effectiveAttachmentMime(DocumentAttachment attachment) {
     return resolveDocumentAttachmentMime(attachment);
+  }
+
+  /// Resolve the processing mode for a MIME type based on assistant config.
+  String _resolveFileProcessingMode(String mime, {Assistant? assistant}) {
+    final lower = mime.toLowerCase();
+    if (lower == 'application/pdf') {
+      return assistant?.pdfMode ?? 'extract';
+    }
+    if (lower ==
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      return assistant?.docxMode ?? 'extract';
+    }
+    if (isOfficeDocumentMime(lower)) {
+      return assistant?.otherOfficeMode ?? 'direct';
+    }
+    return 'extract';
   }
 
   /// Process user messages in apiMessages: extract documents, apply OCR, inject file prompts.
@@ -381,18 +400,28 @@ class MessageBuilderService {
         for (final d in parsedUser.documents)
           if (isAudioMime(_effectiveAttachmentMime(d))) d.path.trim(),
       }..removeWhere((p) => p.isEmpty);
+      // Direct-upload paths: office/pdf documents set to 'direct' mode.
+      final directPaths = <String>{
+        for (final d in parsedUser.documents)
+          if (_resolveFileProcessingMode(
+                _effectiveAttachmentMime(d),
+                assistant: assistant,
+              ) ==
+              'direct')
+            d.path.trim(),
+      }..removeWhere((p) => p.isEmpty);
 
-      final messageMediaPaths = parsedUser.imagePaths
-          .map((p) => p.trim())
-          .where(
-            (p) =>
-                p.isNotEmpty &&
-                (!ocrActive ||
-                    videoPaths.contains(p) ||
-                    audioPaths.contains(p)),
-          )
-          .toSet()
-          .toList(growable: false);
+      final messageMediaPaths = <String>{
+        for (final p in parsedUser.imagePaths.map((p) => p.trim()))
+          if (p.isNotEmpty &&
+              (!ocrActive ||
+                  videoPaths.contains(p) ||
+                  audioPaths.contains(p) ||
+                  directPaths.contains(p)))
+            p,
+        // Include direct-mode document paths as media (e.g. PDF in direct mode).
+        ...directPaths,
+      }.toList(growable: false);
       if (messageMediaPaths.isEmpty) {
         apiMessages[i].remove(internalMediaPathsKey);
       } else {
@@ -412,7 +441,8 @@ class MessageBuilderService {
             (p) =>
                 p.isNotEmpty &&
                 !videoPaths.contains(p) &&
-                !audioPaths.contains(p),
+                !audioPaths.contains(p) &&
+                !directPaths.contains(p),
           )
           .toList(growable: false);
 
@@ -432,6 +462,13 @@ class MessageBuilderService {
       final filePrompts = StringBuffer();
       for (final d in parsedUser.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
+        final mode = _resolveFileProcessingMode(
+          effectiveMime,
+          assistant: assistant,
+        );
+        // Skip non-extract modes: direct (sent as media) and discard (excluded).
+        if (mode != 'extract') continue;
+        // Video and audio are always sent as media, not extracted.
         if (isVideoMime(effectiveMime) || isAudioMime(effectiveMime)) {
           continue;
         }
@@ -455,7 +492,8 @@ class MessageBuilderService {
               (p) =>
                   p.isNotEmpty &&
                   !videoPaths.contains(p) &&
-                  !audioPaths.contains(p),
+                  !audioPaths.contains(p) &&
+                  !directPaths.contains(p),
             )
             .toSet()
             .toList();

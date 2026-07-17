@@ -53,7 +53,7 @@ class ChatInputSection extends StatelessWidget {
     this.onCancelQueuedInput,
     this.onQuickPhrase,
     this.onLongPressQuickPhrase,
-    this.onToggleOcr,
+    this.onDocumentProcessing,
     this.onOpenMiniMap,
     this.onPickCamera,
     this.onPickPhotos,
@@ -101,7 +101,7 @@ class ChatInputSection extends StatelessWidget {
   final VoidCallback? onCancelQueuedInput;
   final VoidCallback? onQuickPhrase;
   final VoidCallback? onLongPressQuickPhrase;
-  final VoidCallback? onToggleOcr;
+  final VoidCallback? onDocumentProcessing;
   final VoidCallback? onOpenMiniMap;
   final VoidCallback? onPickCamera;
   final VoidCallback? onPickPhotos;
@@ -181,14 +181,9 @@ class ChatInputSection extends StatelessWidget {
       showQuickPhraseButton: _hasQuickPhrases(context, a),
       onQuickPhrase: onQuickPhrase,
       onLongPressQuickPhrase: onLongPressQuickPhrase,
-      // OCR button: show on desktop for mobile layout, always check settings for tablet layout
-      showOcrButton: isTablet
-          ? (settings.ocrModelProvider != null && settings.ocrModelId != null)
-          : (isDesktop &&
-                settings.ocrModelProvider != null &&
-                settings.ocrModelId != null),
-      ocrActive: settings.ocrEnabled,
-      onToggleOcr: onToggleOcr,
+      // Document processing button: always visible on tablet/desktop, navigates to config panel
+      showDocumentProcessingButton: isTablet || isDesktop,
+      onDocumentProcessing: onDocumentProcessing,
       // Tablet-specific parameters
       showMiniMapButton: isTablet,
       onOpenMiniMap: isTablet ? onOpenMiniMap : null,

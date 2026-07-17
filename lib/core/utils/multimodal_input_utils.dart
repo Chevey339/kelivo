@@ -8,6 +8,18 @@ bool isAudioMime(String mime) => mime.toLowerCase().startsWith('audio/');
 
 bool isVideoMime(String mime) => mime.toLowerCase().startsWith('video/');
 
+const _officeMimePrefixes = [
+  'application/msword',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument',
+];
+
+bool isOfficeDocumentMime(String mime) {
+  final lower = mime.toLowerCase();
+  return _officeMimePrefixes.any((p) => lower.startsWith(p));
+}
+
 bool isLongCatOmniModelId(String upstreamModelId) {
   final normalized = upstreamModelId.trim().toLowerCase();
   return normalized.startsWith('longcat-flash-omni') ||
@@ -42,6 +54,19 @@ String inferMediaMimeFromSource(String source, {String fallbackMime = ''}) {
   if (lower.endsWith('.wmv')) return 'video/x-ms-wmv';
   if (lower.endsWith('.webm')) return 'video/webm';
   if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
+  // office documents
+  if (lower.endsWith('.doc')) return 'application/msword';
+  if (lower.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (lower.endsWith('.ppt')) return 'application/vnd.ms-powerpoint';
+  if (lower.endsWith('.pptx')) {
+    return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+  }
+  if (lower.endsWith('.xls')) return 'application/vnd.ms-excel';
+  if (lower.endsWith('.xlsx')) {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
   return fallbackMime;
 }
 
@@ -53,7 +78,8 @@ String resolveMediaAttachmentMime({
   final normalizedExplicit = explicitMime.trim().toLowerCase();
   if (isImageMime(normalizedExplicit) ||
       isAudioMime(normalizedExplicit) ||
-      isVideoMime(normalizedExplicit)) {
+      isVideoMime(normalizedExplicit) ||
+      isOfficeDocumentMime(normalizedExplicit)) {
     return normalizedExplicit;
   }
 

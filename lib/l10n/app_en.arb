@@ -2555,5 +2555,53 @@
   "multiAIDropThread": "Drop",
   "@multiAIDropThread": {
     "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
+  },
+  "documentProcessingTitle": "Image & Document Processing",
+  "@documentProcessingTitle": {
+    "description": "Title for the document processing configuration panel"
+  },
+  "documentProcessingImageWithoutVision": "Images without vision model",
+  "@documentProcessingImageWithoutVision": {
+    "description": "Section label for image handling when the chat model lacks vision capability"
+  },
+  "documentProcessingModeOcr": "OCR",
+  "@documentProcessingModeOcr": {
+    "description": "Option to OCR-extract text from images"
+  },
+  "documentProcessingModeDiscard": "Discard",
+  "@documentProcessingModeDiscard": {
+    "description": "Option to discard the attachment silently"
+  },
+  "documentProcessingOcrNotConfigured": "No OCR model configured. OCR option unavailable.",
+  "@documentProcessingOcrNotConfigured": {
+    "description": "Hint shown when OCR model is not configured"
+  },
+  "documentProcessingDocx": "DOCX",
+  "@documentProcessingDocx": {
+    "description": "Section label for DOCX document handling"
+  },
+  "documentProcessingModeLocalParse": "Local Parse",
+  "@documentProcessingModeLocalParse": {
+    "description": "Option to extract text locally from a file"
+  },
+  "documentProcessingModeDirectUpload": "Direct Upload",
+  "@documentProcessingModeDirectUpload": {
+    "description": "Option to upload the file directly without extraction"
+  },
+  "documentProcessingPdf": "PDF",
+  "@documentProcessingPdf": {
+    "description": "Section label for PDF document handling"
+  },
+  "documentProcessingOtherOffice": "Other Office (PPT/XLS/DOC/…)",
+  "@documentProcessingOtherOffice": {
+    "description": "Section label for other Office document handling"
+  },
+  "documentProcessingDisclaimer": "Direct upload is experimental and not part of the standard API. Currently only supported by some providers and models (check model details for File Input capability). If the API returns an error, switch to local parsing or convert the file to an image before sending.",
+  "@documentProcessingDisclaimer": {
+    "description": "Disclaimer about direct file upload not being a standard API feature"
+  },
+  "documentProcessingResetDefault": "Reset to Default",
+  "@documentProcessingResetDefault": {
+    "description": "Button to reset document processing settings to defaults"
   }
 }
