@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/backup.dart';
 import '../services/backup/data_sync.dart';
 import '../services/backup/s3_client.dart';
+import '../services/backup/temporary_restore_file.dart';
 import '../services/chat/chat_service.dart';
 
 class S3BackupProvider extends ChangeNotifier {
@@ -121,7 +122,7 @@ class S3BackupProvider extends ChangeNotifier {
     try {
       final key = _keyFromItem(item);
       final tmp = await _ensureTempDir();
-      file = File(p.join(tmp.path, item.displayName));
+      file = await createTemporaryRestoreFile(tmp);
       // Download directly to file to avoid holding entire object in memory.
       await _client.downloadToFile(_cfg, key: key, destination: file);
       await _dataSync.restoreFromLocalFile(
