@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/chat_model_target.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -121,6 +122,7 @@ class MessageGenerationService {
     required String modelId,
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    bool restrictToSearchTools = false,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -197,13 +199,16 @@ class MessageGenerationService {
     await messageBuilderService.inlineLocalImages(apiMessages);
 
     // Prepare tools
-    final toolDefs = generationController.buildToolDefinitions(
+    var toolDefs = generationController.buildToolDefinitions(
       settings,
       assistant,
       providerKey,
       modelId,
       hasBuiltInSearch,
     );
+    if (restrictToSearchTools) {
+      toolDefs = multiModelSafeToolDefinitions(toolDefs);
+    }
     final onToolCall = toolDefs.isNotEmpty
         ? generationController.buildToolCallHandler(
             settings,
@@ -220,6 +225,21 @@ class MessageGenerationService {
       hasBuiltInSearch: hasBuiltInSearch,
       lastUserImagePaths: lastUserImagePaths,
     );
+  }
+
+  /// Multi-model branches may run concurrently, so only the side-effect-free
+  /// external search function is exposed. Provider-native web search is wired
+  /// separately and remains available without appearing in this list.
+  @visibleForTesting
+  static List<Map<String, dynamic>> multiModelSafeToolDefinitions(
+    Iterable<Map<String, dynamic>> definitions,
+  ) {
+    return definitions
+        .where((definition) {
+          final function = definition['function'];
+          return function is Map && function['name'] == 'search_web';
+        })
+        .toList(growable: false);
   }
 
   /// Create user message from input data.
@@ -248,37 +268,35 @@ class MessageGenerationService {
     required String modelId,
     required String providerKey,
   }) async {
-    final userContent = buildPersistedUserMessageContent(
-      input,
-      assistant: assistant,
-    );
-    if (chatService.isTemporaryConversation(conversationId)) {
-      final userMessage = await chatService.addMessage(
-        conversationId: conversationId,
-        role: 'user',
-        content: userContent,
-      );
-      final assistantMessage = await createAssistantPlaceholder(
-        conversationId: conversationId,
-        modelId: modelId,
-        providerKey: providerKey,
-      );
-      return (
-        userMessage: userMessage,
-        assistantMessage: assistantMessage,
-        runId: null,
-      );
-    }
-    final result = await chatService.beginSendGeneration(
+    final result = await beginSendGenerationBatch(
       conversationId: conversationId,
-      userContent: userContent,
-      modelId: modelId,
-      providerId: providerKey,
+      input: input,
+      assistant: assistant,
+      targets: <ChatModelTarget>[
+        ChatModelTarget(providerKey: providerKey, modelId: modelId),
+      ],
     );
+    final primary = result.primaryTarget;
     return (
-      userMessage: result.userMessage!,
-      assistantMessage: result.assistantMessage,
-      runId: result.run.id,
+      userMessage: result.userMessage,
+      assistantMessage: primary.assistantMessage,
+      runId: primary.run?.id,
+    );
+  }
+
+  Future<ChatGenerationBatchResult> beginSendGenerationBatch({
+    required String conversationId,
+    required ChatInputData input,
+    required Assistant? assistant,
+    required List<ChatModelTarget> targets,
+  }) {
+    return chatService.beginSendGenerationBatch(
+      conversationId: conversationId,
+      userContent: buildPersistedUserMessageContent(
+        input,
+        assistant: assistant,
+      ),
+      targets: targets,
     );
   }
 

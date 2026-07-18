@@ -11,6 +11,7 @@ import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
 import '../../database/generation_run.dart';
 import '../../models/chat_message.dart';
+import '../../models/chat_model_target.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
@@ -50,6 +51,32 @@ final class LoadedTimelinePage {
 }
 
 typedef AssetContentHash = Future<String> Function(File file);
+typedef ConversationDeletedCallback =
+    Future<void> Function(String conversationId);
+
+final class ChatGenerationBatchTarget {
+  const ChatGenerationBatchTarget({
+    required this.target,
+    required this.assistantMessage,
+    required this.run,
+  });
+
+  final ChatModelTarget target;
+  final ChatMessage assistantMessage;
+  final GenerationRun? run;
+}
+
+final class ChatGenerationBatchResult {
+  ChatGenerationBatchResult({
+    required this.userMessage,
+    required List<ChatGenerationBatchTarget> targets,
+  }) : targets = List.unmodifiable(targets);
+
+  final ChatMessage userMessage;
+  final List<ChatGenerationBatchTarget> targets;
+
+  ChatGenerationBatchTarget get primaryTarget => targets.first;
+}
 
 class ChatService extends ChangeNotifier {
   ChatService({
@@ -73,9 +100,24 @@ class ChatService extends ChangeNotifier {
   late File _databaseFile;
   final ChatDatabaseGateway _databaseGateway;
   final AssetContentHash _assetContentHash;
+  ConversationDeletedCallback? _conversationDeletedCallback;
   ChatDatabaseLease? _databaseLease;
   Future<void>? _assetReferenceMaintenanceFuture;
   Future<void>? _postStartupAssetMaintenanceFuture;
+
+  void setConversationDeletedCallback(ConversationDeletedCallback? callback) {
+    _conversationDeletedCallback = callback;
+  }
+
+  Future<void> _notifyConversationDeleted(String conversationId) async {
+    final callback = _conversationDeletedCallback;
+    if (callback == null) return;
+    try {
+      await callback(conversationId);
+    } catch (error) {
+      debugPrint('[ChatService] conversation deletion callback failed: $error');
+    }
+  }
 
   String? _currentConversationId;
   final Map<String, List<ChatMessage>> _messagesCache = {};
@@ -1069,6 +1111,7 @@ class ChatService extends ChangeNotifier {
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
+    unawaited(_notifyConversationDeleted(id));
   }
 
   Future<void> deleteConversation(String id) async {
@@ -1078,6 +1121,8 @@ class ChatService extends ChangeNotifier {
         await _deleteDraftConversation(id) ||
         await _deletePersistedConversation(id);
     if (!deleted) return;
+
+    await _notifyConversationDeleted(id);
 
     // Delete orphaned files (not referenced by any remaining conversation)
     await _cleanupOrphanUploads();
@@ -1131,15 +1176,22 @@ class ChatService extends ChangeNotifier {
         .map((conversation) => conversation.id)
         .toList(growable: false);
 
-    var deleted = false;
+    final deletedConversationIds = <String>[];
     for (final conversationId in draftConversationIds) {
-      deleted = await _deleteDraftConversation(conversationId) || deleted;
+      if (await _deleteDraftConversation(conversationId)) {
+        deletedConversationIds.add(conversationId);
+      }
     }
     for (final conversationId in persistedConversationIds) {
-      deleted = await _deletePersistedConversation(conversationId) || deleted;
+      if (await _deletePersistedConversation(conversationId)) {
+        deletedConversationIds.add(conversationId);
+      }
     }
 
-    if (!deleted) return;
+    if (deletedConversationIds.isEmpty) return;
+    for (final conversationId in deletedConversationIds) {
+      await _notifyConversationDeleted(conversationId);
+    }
     await _cleanupOrphanUploads();
     notifyListeners();
   }
@@ -1454,6 +1506,10 @@ class ChatService extends ChangeNotifier {
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
     if (!_initialized) await init();
+    final previousConversationIds = <String>{
+      ..._conversationsCache.keys,
+      ..._draftConversations.keys,
+    };
 
     final nextOrderByConversation = <String, int>{};
     final orderedMessages = <({ChatMessage message, int messageOrder})>[];
@@ -1473,7 +1529,9 @@ class ChatService extends ChangeNotifier {
       geminiSignaturesByMessageId: geminiSignaturesByMessageId,
     );
 
-    await _resetAfterOverwriteRestore();
+    await _resetAfterOverwriteRestore(
+      previousConversationIds: previousConversationIds,
+    );
   }
 
   Future<ChatDatabaseSnapshotInfo> createBackupDatabaseSnapshot(
@@ -1492,8 +1550,14 @@ class ChatService extends ChangeNotifier {
 
   Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
     if (!_initialized) await init();
+    final previousConversationIds = <String>{
+      ..._conversationsCache.keys,
+      ..._draftConversations.keys,
+    };
     await _repo.replaceBackupSnapshot(snapshotFile);
-    await _resetAfterOverwriteRestore();
+    await _resetAfterOverwriteRestore(
+      previousConversationIds: previousConversationIds,
+    );
   }
 
   Future<BackupMergeReport> mergeDatabaseSnapshot(File snapshotFile) async {
@@ -1531,7 +1595,9 @@ class ChatService extends ChangeNotifier {
     return report;
   }
 
-  Future<void> _resetAfterOverwriteRestore() async {
+  Future<void> _resetAfterOverwriteRestore({
+    Set<String> previousConversationIds = const <String>{},
+  }) async {
     _messagesCache.clear();
     _draftConversations.clear();
     _temporaryConversationIds.clear();
@@ -1544,6 +1610,12 @@ class ChatService extends ChangeNotifier {
     _currentConversationId = null;
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
+    final deletedConversationIds = previousConversationIds.difference(
+      _conversationsCache.keys.toSet(),
+    );
+    for (final conversationId in deletedConversationIds) {
+      await _notifyConversationDeleted(conversationId);
+    }
     notifyListeners();
   }
 
@@ -1865,37 +1937,125 @@ class ChatService extends ChangeNotifier {
     required String providerId,
   }) async {
     if (!_initialized) await init();
+    // The legacy return type requires a persisted GenerationRun. Temporary
+    // conversations use [beginSendGenerationBatch], whose run entries are null.
     if (isTemporaryConversation(conversationId)) {
       throw StateError('temporary_generation_is_not_persisted');
     }
+    final batch = await beginSendGenerationBatch(
+      conversationId: conversationId,
+      userContent: userContent,
+      targets: <ChatModelTarget>[
+        ChatModelTarget(providerKey: providerId, modelId: modelId),
+      ],
+    );
+    final primary = batch.primaryTarget;
+    return (
+      conversation:
+          _conversationsCache[conversationId] ??
+          _draftConversations[conversationId]!,
+      userMessage: batch.userMessage,
+      assistantMessage: primary.assistantMessage,
+      run: primary.run!,
+    );
+  }
+
+  Future<ChatGenerationBatchResult> beginSendGenerationBatch({
+    required String conversationId,
+    required String userContent,
+    required List<ChatModelTarget> targets,
+  }) async {
+    if (!_initialized) await init();
+    final normalizedTargets = <ChatModelTarget>[];
+    for (final target in targets) {
+      if (!target.isValid || normalizedTargets.contains(target)) continue;
+      normalizedTargets.add(target);
+      if (normalizedTargets.length > 5) {
+        throw ArgumentError.value(targets, 'targets');
+      }
+    }
+    if (normalizedTargets.isEmpty) {
+      throw ArgumentError.value(targets, 'targets');
+    }
+
     final conversation =
         _conversationsCache[conversationId] ??
         _draftConversations[conversationId] ??
         Conversation(id: conversationId, title: _defaultConversationTitle);
-    if (_conversationsCache.containsKey(conversationId)) {
-      await _loadMessageOrder(conversationId);
-    }
     final userMessage = ChatMessage(
       role: 'user',
       content: userContent,
       conversationId: conversationId,
     );
-    final assistantMessage = ChatMessage(
-      role: 'assistant',
-      content: '',
-      conversationId: conversationId,
-      modelId: modelId,
-      providerId: providerId,
-      isStreaming: true,
-    );
-    final result = await _repo.beginSendGeneration(
+    final firstAssistantId = const Uuid().v4();
+    final assistantMessages = <ChatMessage>[
+      for (final (index, target) in normalizedTargets.indexed)
+        ChatMessage(
+          id: index == 0 ? firstAssistantId : const Uuid().v4(),
+          role: 'assistant',
+          content: '',
+          conversationId: conversationId,
+          modelId: target.modelId,
+          providerId: target.providerKey,
+          isStreaming: true,
+          groupId: firstAssistantId,
+          version: index,
+        ),
+    ];
+
+    if (isTemporaryConversation(conversationId)) {
+      _draftConversations[conversationId] = conversation;
+      conversation.messageIds.addAll(<String>[
+        userMessage.id,
+        ...assistantMessages.map((message) => message.id),
+      ]);
+      conversation.versionSelections[firstAssistantId] = 0;
+      conversation.updatedAt = DateTime.now();
+      final messages = _messagesCache.putIfAbsent(
+        conversationId,
+        () => <ChatMessage>[],
+      );
+      messages.addAll(<ChatMessage>[userMessage, ...assistantMessages]);
+      notifyListeners();
+      return ChatGenerationBatchResult(
+        userMessage: userMessage,
+        targets: <ChatGenerationBatchTarget>[
+          for (final (index, target) in normalizedTargets.indexed)
+            ChatGenerationBatchTarget(
+              target: target,
+              assistantMessage: assistantMessages[index],
+              run: null,
+            ),
+        ],
+      );
+    }
+
+    if (_conversationsCache.containsKey(conversationId)) {
+      await _loadMessageOrder(conversationId);
+    }
+    final runIds = <String>[
+      for (final _ in assistantMessages) const Uuid().v4(),
+    ];
+    final result = await _repo.beginSendGenerationBatch(
       conversation: conversation,
       userMessage: userMessage,
-      assistantMessage: assistantMessage,
-      runId: const Uuid().v4(),
+      targets: <GenerationBatchTargetInput>[
+        for (final (index, message) in assistantMessages.indexed)
+          (assistantMessage: message, runId: runIds[index]),
+      ],
     );
-    await _publishGenerationBegin(result);
-    return result;
+    await _publishGenerationBatchBegin(result);
+    return ChatGenerationBatchResult(
+      userMessage: result.userMessage,
+      targets: <ChatGenerationBatchTarget>[
+        for (final (index, target) in result.targets.indexed)
+          ChatGenerationBatchTarget(
+            target: normalizedTargets[index],
+            assistantMessage: target.assistantMessage,
+            run: target.run,
+          ),
+      ],
+    );
   }
 
   Future<GenerationBeginResult> beginRegeneration({
@@ -1949,6 +2109,33 @@ class ChatService extends ChangeNotifier {
     if (result.userMessage case final userMessage?
         when _messageCanOwnAssets(userMessage)) {
       await _synchronizeMessageAssetsBestEffort(userMessage);
+    }
+    final order = _messageOrderIds.putIfAbsent(
+      conversationId,
+      () => <String>[],
+    );
+    for (final message in messages) {
+      if (!order.contains(message.id)) order.add(message.id);
+    }
+    _messageCounts[conversationId] = order.length;
+    if (_messagesCache.containsKey(conversationId)) {
+      _messagesCache[conversationId]!.addAll(messages);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _publishGenerationBatchBegin(
+    GenerationBatchBeginResult result,
+  ) async {
+    final conversationId = result.conversation.id;
+    _draftConversations.remove(conversationId);
+    _conversationsCache[conversationId] = result.conversation;
+    final messages = <ChatMessage>[
+      result.userMessage,
+      ...result.targets.map((target) => target.assistantMessage),
+    ];
+    if (_messageCanOwnAssets(result.userMessage)) {
+      await _synchronizeMessageAssetsBestEffort(result.userMessage);
     }
     final order = _messageOrderIds.putIfAbsent(
       conversationId,
@@ -2142,6 +2329,13 @@ class ChatService extends ChangeNotifier {
     );
     _replaceCachedMessage(message);
     _toolEventsCache[message.id] = List<Map<String, dynamic>>.of(toolEvents);
+  }
+
+  Future<Map<String, GenerationRun>> loadLatestGenerationRunsForTargets(
+    Iterable<String> targetRevisionIds,
+  ) async {
+    if (!_initialized) await init();
+    return _repo.getLatestGenerationRunsForTargets(targetRevisionIds);
   }
 
   Future<GenerationRun> transitionGenerationRun({
@@ -2613,6 +2807,10 @@ class ChatService extends ChangeNotifier {
 
   Future<void> clearAllData({bool deleteUploads = true}) async {
     if (!_initialized) await init();
+    final deletedConversationIds = <String>{
+      ..._conversationsCache.keys,
+      ..._draftConversations.keys,
+    };
 
     await _repo.clearAllData();
     _messagesCache.clear();
@@ -2631,6 +2829,9 @@ class ChatService extends ChangeNotifier {
       if (await uploadDir.exists()) {
         await uploadDir.delete(recursive: true);
       }
+    }
+    for (final conversationId in deletedConversationIds) {
+      await _notifyConversationDeleted(conversationId);
     }
     notifyListeners();
   }

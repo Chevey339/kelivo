@@ -2828,6 +2828,48 @@ class AppLocalizationsEn extends AppLocalizations {
   String get defaultModelPageChatModelSubtitle => 'Global default chat model';
 
   @override
+  String get multiModelScopeTitle => 'Multi-model selection applies to';
+
+  @override
+  String get multiModelScopeSubtitle =>
+      'Keep separate model combinations for each scope';
+
+  @override
+  String get multiModelScopeAssistant => 'Current assistant';
+
+  @override
+  String get multiModelScopeConversation => 'Current conversation';
+
+  @override
+  String get multiModelScopeNextMessage => 'Next message only';
+
+  @override
+  String get multiModelSelectedAnswerUnavailable =>
+      'The selected model has no usable answer. Switch models or regenerate before sending the next message.';
+
+  @override
+  String multiModelCount(int count) {
+    return '$count models';
+  }
+
+  @override
+  String multiModelAttachmentUnsupported(String models) {
+    return 'These attachments are not supported by: $models';
+  }
+
+  @override
+  String get multiModelStatusGenerating => 'Generating';
+
+  @override
+  String get multiModelStatusFailed => 'Failed';
+
+  @override
+  String get multiModelStatusCancelled => 'Cancelled';
+
+  @override
+  String get multiModelStatusInterrupted => 'Interrupted';
+
+  @override
   String get defaultModelPageTitleModelTitle => 'Title Summary Model';
 
   @override

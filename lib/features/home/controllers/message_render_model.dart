@@ -1,4 +1,5 @@
 import '../../../core/models/chat_message.dart';
+import '../../../core/database/generation_run.dart';
 
 /// Immutable, precomputed input for one logical timeline slot.
 ///
@@ -11,6 +12,11 @@ final class MessageRenderModel {
     required this.versions,
     required this.versionCount,
     required this.selectedVersionIndex,
+    required this.selectedVersion,
+    required this.previousVersion,
+    required this.nextVersion,
+    required this.hasMultipleModelTargets,
+    required this.targetGenerationStates,
     required this.showContextDivider,
     required this.isLatestCompleteAssistant,
   });
@@ -20,6 +26,18 @@ final class MessageRenderModel {
   final List<ChatMessage> versions;
   final int versionCount;
   final int selectedVersionIndex;
+
+  /// Persisted version values are identifiers, not list indexes. These fields
+  /// keep navigation correct after a sibling revision is deleted and versions
+  /// become sparse.
+  final int selectedVersion;
+  final int? previousVersion;
+  final int? nextVersion;
+
+  /// Whether this slot contains answers from at least two provider/model
+  /// targets. Such slots use model chips instead of the legacy branch arrows.
+  final bool hasMultipleModelTargets;
+  final Map<String, GenerationRunState> targetGenerationStates;
   final bool showContextDivider;
   final bool isLatestCompleteAssistant;
 }
@@ -32,6 +50,8 @@ final class MessageRenderModelProjector {
     required Map<String, List<ChatMessage>> byGroup,
     required Map<String, int> versionSelections,
     Map<String, int> versionCounts = const <String, int>{},
+    Map<String, GenerationRunState> generationStates =
+        const <String, GenerationRunState>{},
     required int contextDividerIndex,
   }) {
     var latestCompleteAssistantIndex = -1;
@@ -52,6 +72,7 @@ final class MessageRenderModelProjector {
           selectedVersion: versionSelections[message.groupId ?? message.id],
           authoritativeVersionCount:
               versionCounts[message.groupId ?? message.id],
+          generationStates: generationStates,
           contextDividerIndex: contextDividerIndex,
           latestCompleteAssistantIndex: latestCompleteAssistantIndex,
         ),
@@ -64,6 +85,7 @@ final class MessageRenderModelProjector {
     required List<ChatMessage>? versions,
     required int? selectedVersion,
     required int? authoritativeVersionCount,
+    required Map<String, GenerationRunState> generationStates,
     required int contextDividerIndex,
     required int latestCompleteAssistantIndex,
   }) {
@@ -76,16 +98,52 @@ final class MessageRenderModelProjector {
     final versionCount = (authoritativeVersionCount ?? loadedVersionCount)
         .clamp(loadedVersionCount, 1 << 31)
         .toInt();
-    final selectedIndex = (selectedVersion ?? message.version).clamp(
-      0,
-      versionCount - 1,
+    final requestedVersion = selectedVersion ?? message.version;
+    var selectedIndex = sortedVersions.indexWhere(
+      (candidate) => candidate.version == requestedVersion,
     );
+    if (selectedIndex < 0) {
+      selectedIndex = sortedVersions.indexWhere(
+        (candidate) => candidate.id == message.id,
+      );
+    }
+    if (selectedIndex < 0) selectedIndex = 0;
+
+    // Lazy timelines can temporarily expose only the selected revision while
+    // still knowing the authoritative count. Preserve the familiar n/m label
+    // in that case; actual navigation remains bound to the loaded real values.
+    final displayIndex = sortedVersions.length == 1 && versionCount > 1
+        ? message.version.clamp(0, versionCount - 1)
+        : selectedIndex;
+    final actualSelectedVersion = sortedVersions.isEmpty
+        ? message.version
+        : sortedVersions[selectedIndex].version;
+    final modelTargets = <String>{
+      for (final candidate in sortedVersions)
+        if (candidate.role == 'assistant' &&
+            candidate.providerId != null &&
+            candidate.modelId != null)
+          '${candidate.providerId}\u0000${candidate.modelId}',
+    };
     return MessageRenderModel(
       slotId: message.groupId ?? message.id,
       message: message,
       versions: List<ChatMessage>.unmodifiable(sortedVersions),
       versionCount: versionCount,
-      selectedVersionIndex: selectedIndex,
+      selectedVersionIndex: displayIndex,
+      selectedVersion: actualSelectedVersion,
+      previousVersion: selectedIndex > 0
+          ? sortedVersions[selectedIndex - 1].version
+          : null,
+      nextVersion: selectedIndex + 1 < sortedVersions.length
+          ? sortedVersions[selectedIndex + 1].version
+          : null,
+      hasMultipleModelTargets: modelTargets.length >= 2,
+      targetGenerationStates: Map<String, GenerationRunState>.unmodifiable({
+        for (final candidate in sortedVersions)
+          if (generationStates[candidate.id] case final state?)
+            candidate.id: state,
+      }),
       showContextDivider:
           contextDividerIndex >= 0 && index == contextDividerIndex,
       isLatestCompleteAssistant: index == latestCompleteAssistantIndex,

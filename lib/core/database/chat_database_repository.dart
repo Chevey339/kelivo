@@ -65,6 +65,22 @@ typedef GenerationBeginResult = ({
   GenerationRun run,
 });
 
+typedef GenerationBatchTargetInput = ({
+  ChatMessage assistantMessage,
+  String runId,
+});
+
+typedef GenerationBatchTargetResult = ({
+  ChatMessage assistantMessage,
+  GenerationRun run,
+});
+
+typedef GenerationBatchBeginResult = ({
+  Conversation conversation,
+  ChatMessage userMessage,
+  List<GenerationBatchTargetResult> targets,
+});
+
 class BackupMergeReport {
   const BackupMergeReport({
     required this.importedConversations,
@@ -127,6 +143,10 @@ class ChatDatabaseRepository {
 
   Future<GenerationRun?> getGenerationRun(String id) =>
       GenerationRunCommands(_db).get(id);
+
+  Future<Map<String, GenerationRun>> getLatestGenerationRunsForTargets(
+    Iterable<String> targetRevisionIds,
+  ) => GenerationRunCommands(_db).latestByTargetRevisionIds(targetRevisionIds);
 
   Future<GenerationRun> transitionGenerationRun({
     required String id,
@@ -2642,11 +2662,66 @@ class ChatDatabaseRepository {
     required ChatMessage assistantMessage,
     required String runId,
   }) {
+    return beginSendGenerationBatch(
+      conversation: conversation,
+      userMessage: userMessage,
+      targets: <GenerationBatchTargetInput>[
+        (assistantMessage: assistantMessage, runId: runId),
+      ],
+    ).then((result) {
+      final target = result.targets.single;
+      return (
+        conversation: result.conversation,
+        userMessage: result.userMessage,
+        assistantMessage: target.assistantMessage,
+        run: target.run,
+      );
+    });
+  }
+
+  /// Atomically establishes a user turn and every model target in its batch.
+  /// Network requests must not start until this command succeeds.
+  Future<GenerationBatchBeginResult> beginSendGenerationBatch({
+    required Conversation conversation,
+    required ChatMessage userMessage,
+    required List<GenerationBatchTargetInput> targets,
+  }) {
+    if (targets.isEmpty || targets.length > 5) {
+      throw ArgumentError.value(targets.length, 'targets.length');
+    }
+    final messageIds = <String>{};
+    final runIds = <String>{};
     _validateGenerationBeginMessages(
       conversation: conversation,
       userMessage: userMessage,
-      assistantMessage: assistantMessage,
+      assistantMessage: targets.first.assistantMessage,
     );
+    for (final target in targets) {
+      _validateGenerationBeginMessages(
+        conversation: conversation,
+        assistantMessage: target.assistantMessage,
+      );
+      if (!messageIds.add(target.assistantMessage.id)) {
+        throw ArgumentError.value(
+          target.assistantMessage.id,
+          'targets.assistantMessage.id',
+        );
+      }
+      if (!runIds.add(target.runId)) {
+        throw ArgumentError.value(target.runId, 'targets.runId');
+      }
+    }
+    final groupId = targets.first.assistantMessage.id;
+    final normalized = <GenerationBatchTargetInput>[
+      for (final (index, target) in targets.indexed)
+        (
+          assistantMessage: target.assistantMessage.copyWith(
+            groupId: groupId,
+            version: index,
+          ),
+          runId: target.runId,
+        ),
+    ];
     return _observer.measure(
       ChatDatabaseOperation.commandAppendMessage,
       () => _db.transaction(() async {
@@ -2656,23 +2731,27 @@ class ChatDatabaseRepository {
           selectVersion: false,
           touchUpdatedAt: true,
         );
-        final persisted = await _appendLinearMessageToConversation(
-          conversation: afterUser,
-          message: assistantMessage,
-          selectVersion: false,
-          touchUpdatedAt: true,
-        );
-        final run = await GenerationRunCommands(_db).create(
-          id: runId,
-          conversationId: conversation.id,
-          targetRevisionId: assistantMessage.id,
-          createdAt: assistantMessage.timestamp,
-        );
+        var persisted = afterUser;
+        final results = <GenerationBatchTargetResult>[];
+        for (final (index, target) in normalized.indexed) {
+          persisted = await _appendLinearMessageToConversation(
+            conversation: persisted,
+            message: target.assistantMessage,
+            selectVersion: index == 0,
+            touchUpdatedAt: true,
+          );
+          final run = await GenerationRunCommands(_db).create(
+            id: target.runId,
+            conversationId: conversation.id,
+            targetRevisionId: target.assistantMessage.id,
+            createdAt: target.assistantMessage.timestamp,
+          );
+          results.add((assistantMessage: target.assistantMessage, run: run));
+        }
         return (
           conversation: persisted,
           userMessage: userMessage,
-          assistantMessage: assistantMessage,
-          run: run,
+          targets: List<GenerationBatchTargetResult>.unmodifiable(results),
         );
       }),
     );

@@ -1214,6 +1214,28 @@
   "defaultModelPageTitle": "Default Model",
   "defaultModelPageChatModelTitle": "Chat Model",
   "defaultModelPageChatModelSubtitle": "Global default chat model",
+  "multiModelScopeTitle": "Multi-model selection applies to",
+  "multiModelScopeSubtitle": "Keep separate model combinations for each scope",
+  "multiModelScopeAssistant": "Current assistant",
+  "multiModelScopeConversation": "Current conversation",
+  "multiModelScopeNextMessage": "Next message only",
+  "multiModelSelectedAnswerUnavailable": "The selected model has no usable answer. Switch models or regenerate before sending the next message.",
+  "multiModelCount": "{count} models",
+  "@multiModelCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiModelAttachmentUnsupported": "These attachments are not supported by: {models}",
+  "@multiModelAttachmentUnsupported": {
+    "placeholders": {
+      "models": { "type": "String" }
+    }
+  },
+  "multiModelStatusGenerating": "Generating",
+  "multiModelStatusFailed": "Failed",
+  "multiModelStatusCancelled": "Cancelled",
+  "multiModelStatusInterrupted": "Interrupted",
   "defaultModelPageTitleModelTitle": "Title Summary Model",
   "defaultModelPageTitleModelSubtitle": "Used for summarizing conversation titles; prefer fast & cheap models",
   "titleModelThinkingTitle": "Enable Thinking",

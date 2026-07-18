@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/models/chat_model_target.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/model/widgets/model_select_sheet.dart';
@@ -88,6 +89,7 @@ Future<void> _pumpModelSelector(
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  ValueChanged<ModelSelection?>? onResult,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -105,13 +107,14 @@ Future<void> _pumpModelSelector(
             builder: (context) {
               return TextButton(
                 key: const ValueKey('open-model-selector'),
-                onPressed: () {
-                  showModelSelector(
+                onPressed: () async {
+                  final result = await showModelSelector(
                     context,
                     limitProviderKey: limitProviderKey,
                     initialProviderKey: initialProviderKey,
                     initialModelId: initialModelId,
                   );
+                  onResult?.call(result);
                 },
                 child: const Text('open'),
               );
@@ -129,6 +132,63 @@ Future<void> _pumpModelSelector(
     await Future<void>.delayed(const Duration(milliseconds: 500));
   });
   await tester.pump(const Duration(milliseconds: 500));
+}
+
+Future<void> _pumpChatModelSelector(
+  WidgetTester tester, {
+  required SettingsProvider settings,
+  List<ChatModelTarget> initialTargets = const <ChatModelTarget>[],
+  ValueChanged<ChatModelSelectionResult?>? onResult,
+}) async {
+  await tester.pumpWidget(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+        ChangeNotifierProvider<AssistantProvider>(
+          create: (_) => AssistantProvider(),
+        ),
+      ],
+      child: MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) {
+              return TextButton(
+                key: const ValueKey('open-chat-model-selector'),
+                onPressed: () async {
+                  final result = await showChatModelSelector(
+                    context,
+                    initialTargets: initialTargets,
+                  );
+                  onResult?.call(result);
+                },
+                child: const Text('open chat'),
+              );
+            },
+          ),
+        ),
+      ),
+    ),
+  );
+
+  await tester.tap(find.byKey(const ValueKey('open-chat-model-selector')));
+  await tester.pump();
+  await tester.pump(const Duration(milliseconds: 500));
+  await tester.runAsync(() async {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+  });
+  await tester.pump(const Duration(milliseconds: 500));
+}
+
+Future<void> _tapModel(WidgetTester tester, String modelId) async {
+  final tile = find.ancestor(
+    of: find.text(modelId),
+    matching: find.byType(IosCardPress),
+  );
+  expect(tile, findsOneWidget);
+  tester.widget<IosCardPress>(tile).onTap?.call();
+  await tester.pump();
 }
 
 bool _providerTabSelected(WidgetTester tester, String providerKey) {
@@ -163,6 +223,224 @@ Future<void> _dismissModelSelector(WidgetTester tester) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets(
+    'normal selector keeps immediate single-select result and omits @ mode',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      ModelSelection? result;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await _pumpModelSelector(
+          tester,
+          settings: settings,
+          onResult: (selection) => result = selection,
+        );
+
+        expect(find.byKey(const ValueKey('model-multi-toggle')), findsNothing);
+        await _tapModel(tester, 'provider-0-model-01');
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(result?.providerKey, 'provider-0');
+        expect(result?.modelId, 'provider-0-model-01');
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'chat selector confirms two targets in click order from @ mode',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      ChatModelSelectionResult? result;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await _pumpChatModelSelector(
+          tester,
+          settings: settings,
+          onResult: (selection) => result = selection,
+        );
+
+        final toggle = find.byKey(const ValueKey('model-multi-toggle'));
+        expect(toggle, findsOneWidget);
+        await tester.tap(toggle);
+        await tester.pump();
+
+        final done = find.byKey(const ValueKey('model-multi-done'));
+        expect(tester.widget<FilledButton>(done).onPressed, isNull);
+
+        await _tapModel(tester, 'provider-0-model-02');
+        await _tapModel(tester, 'provider-0-model-00');
+
+        expect(
+          tester
+              .widget<Checkbox>(
+                find.byKey(
+                  const ValueKey(
+                    'model-multi-checkbox:provider-0::provider-0-model-02',
+                  ),
+                ),
+              )
+              .value,
+          isTrue,
+        );
+        expect(tester.widget<FilledButton>(done).onPressed, isNotNull);
+        expect(find.textContaining('2/5'), findsOneWidget);
+
+        await tester.tap(done);
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(result?.isMultiModel, isTrue);
+        expect(
+          result?.targets
+              .map((target) => '${target.providerKey}::${target.modelId}')
+              .toList(),
+          [
+            'provider-0::provider-0-model-02',
+            'provider-0::provider-0-model-00',
+          ],
+        );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'chat selector cancel discards unconfirmed multi-model edits',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      ChatModelSelectionResult? result;
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await _pumpChatModelSelector(
+          tester,
+          settings: settings,
+          onResult: (selection) => result = selection,
+        );
+
+        final toggle = find.byKey(const ValueKey('model-multi-toggle'));
+        await tester.tap(toggle);
+        await tester.pump();
+        await _tapModel(tester, 'provider-0-model-01');
+        await _tapModel(tester, 'provider-0-model-03');
+
+        await tester.tap(find.byKey(const ValueKey('model-multi-cancel')));
+        await tester.pump();
+
+        expect(result, isNull);
+        expect(find.byKey(const ValueKey('model-multi-done')), findsNothing);
+
+        await tester.tap(toggle);
+        await tester.pump();
+        for (final modelId in ['provider-0-model-01', 'provider-0-model-03']) {
+          expect(
+            tester
+                .widget<Checkbox>(
+                  find.byKey(
+                    ValueKey('model-multi-checkbox:provider-0::$modelId'),
+                  ),
+                )
+                .value,
+            isFalse,
+          );
+        }
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const ValueKey('model-multi-done')),
+              )
+              .onPressed,
+          isNull,
+        );
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+
+  testWidgets(
+    'chat selector enforces the five-target limit',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      ChatModelSelectionResult? result;
+      final initialTargets = <ChatModelTarget>[
+        for (var index = 0; index < 4; index++)
+          ChatModelTarget(
+            providerKey: 'provider-0',
+            modelId: 'provider-0-model-${index.toString().padLeft(2, '0')}',
+          ),
+        const ChatModelTarget(
+          providerKey: 'provider-1',
+          modelId: 'provider-1-model-00',
+        ),
+      ];
+      try {
+        final settings = await _settingsWithOnlyTestProviders(tester);
+        await _pumpChatModelSelector(
+          tester,
+          settings: settings,
+          initialTargets: initialTargets,
+          onResult: (selection) => result = selection,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('model-multi-toggle')));
+        await tester.pump();
+        expect(find.textContaining('5/5'), findsOneWidget);
+
+        await tester.enterText(find.byType(TextField), 'provider-1-model-01');
+        await tester.pump();
+        await _tapModel(tester, 'provider-1-model-01');
+
+        expect(
+          tester
+              .widget<Checkbox>(
+                find.byKey(
+                  const ValueKey(
+                    'model-multi-checkbox:provider-1::provider-1-model-01',
+                  ),
+                ),
+              )
+              .value,
+          isFalse,
+        );
+        expect(find.textContaining('5/5'), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('model-multi-done')));
+        await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+        expect(result?.isMultiModel, isTrue);
+        expect(result?.targets, initialTargets);
+      } finally {
+        await _dismissModelSelector(tester);
+        debugDefaultTargetPlatformOverride = null;
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
 
   testWidgets(
     'mobile model selector uses explicit initial model over global current model',

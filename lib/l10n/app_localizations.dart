@@ -5309,6 +5309,78 @@ abstract class AppLocalizations {
   /// **'Global default chat model'**
   String get defaultModelPageChatModelSubtitle;
 
+  /// No description provided for @multiModelScopeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-model selection applies to'**
+  String get multiModelScopeTitle;
+
+  /// No description provided for @multiModelScopeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep separate model combinations for each scope'**
+  String get multiModelScopeSubtitle;
+
+  /// No description provided for @multiModelScopeAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Current assistant'**
+  String get multiModelScopeAssistant;
+
+  /// No description provided for @multiModelScopeConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Current conversation'**
+  String get multiModelScopeConversation;
+
+  /// No description provided for @multiModelScopeNextMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Next message only'**
+  String get multiModelScopeNextMessage;
+
+  /// No description provided for @multiModelSelectedAnswerUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected model has no usable answer. Switch models or regenerate before sending the next message.'**
+  String get multiModelSelectedAnswerUnavailable;
+
+  /// No description provided for @multiModelCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} models'**
+  String multiModelCount(int count);
+
+  /// No description provided for @multiModelAttachmentUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'These attachments are not supported by: {models}'**
+  String multiModelAttachmentUnsupported(String models);
+
+  /// No description provided for @multiModelStatusGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Generating'**
+  String get multiModelStatusGenerating;
+
+  /// No description provided for @multiModelStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get multiModelStatusFailed;
+
+  /// No description provided for @multiModelStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get multiModelStatusCancelled;
+
+  /// No description provided for @multiModelStatusInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Interrupted'**
+  String get multiModelStatusInterrupted;
+
   /// No description provided for @defaultModelPageTitleModelTitle.
   ///
   /// In en, this message translates to:

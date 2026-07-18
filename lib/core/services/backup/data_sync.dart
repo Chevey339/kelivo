@@ -1474,6 +1474,7 @@ class DataSync {
               'assistant_tags_v1', // Ordered tag list [{id,name}]
               'assistant_tag_map_v1', // assistantId -> tagId
               'assistant_tag_collapsed_v1', // tagId -> bool
+              'chat_model_selections_v1', // ordered chat model combinations
             };
 
             for (final entry in settings.entries) {
@@ -1482,7 +1483,17 @@ class DataSync {
 
               if (mergeableKeys.contains(key)) {
                 // Special handling for mergeable configurations
-                if (key == 'assistants_v1' && existing.containsKey(key)) {
+                if (key == 'chat_model_selections_v1') {
+                  pendingSettings[key] =
+                      BackupSettingsValidator.mergeChatModelSelectionsForRestore(
+                        incomingValue: newValue as String,
+                        existingValue: existing[key] as String?,
+                        remappedConversationIds:
+                            _lastMergeReport?.remappedConversationIds ??
+                            const <String, String>{},
+                      );
+                } else if (key == 'assistants_v1' &&
+                    existing.containsKey(key)) {
                   // Merge assistants by ID with field-level rules.
                   // Preserve local avatar if already set to avoid clearing/overwriting.
                   final existingAssistants =

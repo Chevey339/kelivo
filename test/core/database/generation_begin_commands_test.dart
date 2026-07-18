@@ -113,6 +113,174 @@ void main() {
     );
   });
 
+  test(
+    'batch begin commits ordered sibling targets and runs atomically',
+    () async {
+      final result = await repository.beginSendGenerationBatch(
+        conversation: conversation,
+        userMessage: user('user-batch'),
+        targets: <GenerationBatchTargetInput>[
+          (
+            assistantMessage: assistant(
+              'answer-a',
+            ).copyWith(providerId: 'provider-a', modelId: 'model-a'),
+            runId: 'run-a',
+          ),
+          (
+            assistantMessage: assistant(
+              'answer-b',
+            ).copyWith(providerId: 'provider-b', modelId: 'model-b'),
+            runId: 'run-b',
+          ),
+          (
+            assistantMessage: assistant(
+              'answer-c',
+            ).copyWith(providerId: 'provider-c', modelId: 'model-c'),
+            runId: 'run-c',
+          ),
+        ],
+      );
+
+      expect(result.targets.map((target) => target.assistantMessage.id), [
+        'answer-a',
+        'answer-b',
+        'answer-c',
+      ]);
+      expect(
+        result.targets.map((target) => target.assistantMessage.groupId),
+        everyElement('answer-a'),
+      );
+      expect(result.targets.map((target) => target.assistantMessage.version), [
+        0,
+        1,
+        2,
+      ]);
+      expect(result.targets.map((target) => target.run.targetRevisionId), [
+        'answer-a',
+        'answer-b',
+        'answer-c',
+      ]);
+      final latestRuns = await repository.getLatestGenerationRunsForTargets([
+        'answer-a',
+        'answer-b',
+        'answer-c',
+      ]);
+      expect(
+        latestRuns.keys,
+        containsAll(<String>['answer-a', 'answer-b', 'answer-c']),
+      );
+      expect(
+        latestRuns.values.map((run) => run.state),
+        everyElement(GenerationRunState.preparing),
+      );
+      expect(result.conversation.versionSelections['answer-a'], 0);
+      expect(await repository.getMessageIds(conversation.id), [
+        'user-batch',
+        'answer-a',
+        'answer-b',
+        'answer-c',
+      ]);
+
+      await repository.setSelectedVersion(
+        conversationId: conversation.id,
+        groupId: 'answer-a',
+        version: 2,
+      );
+      final context = await repository.getSelectedContextMessages(
+        conversation.id,
+        truncateIndex: -1,
+        limit: 20,
+      );
+      expect(context.map((message) => message.id), ['user-batch', 'answer-c']);
+    },
+  );
+
+  test('batch run conflict rolls back every target in the new turn', () async {
+    await beginFirstSend();
+
+    await expectLater(
+      repository.beginSendGenerationBatch(
+        conversation: conversation,
+        userMessage: user('user-conflict'),
+        targets: <GenerationBatchTargetInput>[
+          (assistantMessage: assistant('answer-new'), runId: 'run-new'),
+          (assistantMessage: assistant('answer-conflict'), runId: 'run-1'),
+        ],
+      ),
+      throwsA(anything),
+    );
+
+    expect(await repository.getMessage('user-conflict'), isNull);
+    expect(await repository.getMessage('answer-new'), isNull);
+    expect(await repository.getMessage('answer-conflict'), isNull);
+    expect(await repository.getGenerationRun('run-new'), isNull);
+    expect(await repository.getMessageIds(conversation.id), [
+      'user-1',
+      'assistant-1',
+    ]);
+  });
+
+  test('batch siblings checkpoint and finalize independently', () async {
+    final begin = await repository.beginSendGenerationBatch(
+      conversation: conversation,
+      userMessage: user('user-parallel'),
+      targets: <GenerationBatchTargetInput>[
+        (assistantMessage: assistant('parallel-a'), runId: 'parallel-run-a'),
+        (assistantMessage: assistant('parallel-b'), runId: 'parallel-run-b'),
+      ],
+    );
+    final streamingRuns = await Future.wait(
+      begin.targets.map((target) => advanceToStreaming(target.run)),
+    );
+    final partialMessages = <ChatMessage>[
+      begin.targets[0].assistantMessage.copyWith(content: 'partial-a'),
+      begin.targets[1].assistantMessage.copyWith(content: 'partial-b'),
+    ];
+
+    await Future.wait<void>([
+      for (final (index, run) in streamingRuns.indexed)
+        repository.updateStreamingCheckpoint(
+          partialMessages[index],
+          const [],
+          generationRunId: run.id,
+          checkpointSeq: 1,
+        ),
+    ]);
+
+    final terminalRuns = await Future.wait<GenerationRun>([
+      repository.finalizeGenerationRun(
+        message: partialMessages[0].copyWith(
+          content: 'final-a',
+          isStreaming: false,
+        ),
+        toolEvents: const [],
+        generationRunId: streamingRuns[0].id,
+        expectedState: streamingRuns[0].state,
+        expectedStateRevision: streamingRuns[0].stateRevision,
+        terminalState: GenerationRunState.completed,
+        checkpointSeq: 2,
+      ),
+      repository.finalizeGenerationRun(
+        message: partialMessages[1].copyWith(isStreaming: false),
+        toolEvents: const [],
+        generationRunId: streamingRuns[1].id,
+        expectedState: streamingRuns[1].state,
+        expectedStateRevision: streamingRuns[1].stateRevision,
+        terminalState: GenerationRunState.failed,
+        checkpointSeq: 2,
+        errorCode: 'generation_failed',
+      ),
+    ]);
+
+    expect(terminalRuns.map((run) => run.state), [
+      GenerationRunState.completed,
+      GenerationRunState.failed,
+    ]);
+    expect((await repository.getMessage('parallel-a'))?.content, 'final-a');
+    expect((await repository.getMessage('parallel-b'))?.content, 'partial-b');
+    expect(await repository.getActiveStreamingIds(), isEmpty);
+  });
+
   test('run insert failure rolls back every linear send row', () async {
     final first = await beginFirstSend();
 

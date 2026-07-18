@@ -929,6 +929,28 @@
   "defaultModelPageTitle": "默认模型",
   "defaultModelPageChatModelTitle": "聊天模型",
   "defaultModelPageChatModelSubtitle": "全局默认的聊天模型",
+  "multiModelScopeTitle": "多模型选择生效范围",
+  "multiModelScopeSubtitle": "每个范围会分别保留上次使用的模型组合",
+  "multiModelScopeAssistant": "跟随当前助手",
+  "multiModelScopeConversation": "仅当前会话",
+  "multiModelScopeNextMessage": "仅下一条消息",
+  "multiModelSelectedAnswerUnavailable": "当前选中的模型没有可用回答，请切换模型或重新生成后再发送下一条消息。",
+  "multiModelCount": "{count} 个模型",
+  "@multiModelCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "multiModelAttachmentUnsupported": "以下模型不支持这些附件：{models}",
+  "@multiModelAttachmentUnsupported": {
+    "placeholders": {
+      "models": { "type": "String" }
+    }
+  },
+  "multiModelStatusGenerating": "生成中",
+  "multiModelStatusFailed": "失败",
+  "multiModelStatusCancelled": "已取消",
+  "multiModelStatusInterrupted": "已中断",
   "defaultModelPageTitleModelTitle": "标题总结模型",
   "defaultModelPageTitleModelSubtitle": "用于总结对话标题的模型，推荐使用快速且便宜的模型",
   "titleModelThinkingTitle": "是否开启思考",

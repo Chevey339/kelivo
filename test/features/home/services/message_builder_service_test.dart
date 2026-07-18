@@ -41,6 +41,8 @@ ChatMessage _message({
   required String role,
   required String content,
   String? reasoningText,
+  String? groupId,
+  int version = 0,
 }) {
   return ChatMessage(
     id: id,
@@ -48,6 +50,8 @@ ChatMessage _message({
     content: content,
     conversationId: 'conversation-1',
     reasoningText: reasoningText,
+    groupId: groupId,
+    version: version,
   );
 }
 
@@ -93,6 +97,43 @@ void main() {
         'clip.mp4',
         'audio.wav',
       ]);
+    });
+  });
+
+  group('MessageBuilderService.collapseVersions', () {
+    test('按真实 version 选择稀疏 sibling 而不是把 version 当列表下标', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService(const {}),
+        contextProvider: _FakeBuildContext(),
+      );
+      final version2 = _message(
+        id: 'a2',
+        role: 'assistant',
+        content: 'version 2',
+        groupId: 'answer',
+        version: 2,
+      );
+      final version7 = _message(
+        id: 'a7',
+        role: 'assistant',
+        content: 'version 7',
+        groupId: 'answer',
+        version: 7,
+      );
+      final version11 = _message(
+        id: 'a11',
+        role: 'assistant',
+        content: 'version 11',
+        groupId: 'answer',
+        version: 11,
+      );
+
+      final collapsed = service.collapseVersions(
+        [version11, version2, version7],
+        const {'answer': 7},
+      );
+
+      expect(collapsed, [version7]);
     });
   });
 
