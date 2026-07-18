@@ -456,6 +456,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDefaultAssistant => '默认助手';
 
   @override
+  String get svgSaveFile => '下载 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已保存';
+
+  @override
+  String get svgSaveFailed => '保存失败';
+
+  @override
+  String get svgSaveDialogTitle => '保存 SVG';
+
+  @override
   String get mermaidExportPng => '导出 PNG';
 
   @override
@@ -5959,6 +5971,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get homePageDefaultAssistant => '默认助手';
 
   @override
+  String get svgSaveFile => '下载 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已保存';
+
+  @override
+  String get svgSaveFailed => '保存失败';
+
+  @override
+  String get svgSaveDialogTitle => '保存 SVG';
+
+  @override
   String get mermaidExportPng => '导出 PNG';
 
   @override
@@ -11460,6 +11484,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePageDefaultAssistant => '預設助理';
+
+  @override
+  String get svgSaveFile => '下載 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已儲存';
+
+  @override
+  String get svgSaveFailed => '儲存失敗';
+
+  @override
+  String get svgSaveDialogTitle => '儲存 SVG';
 
   @override
   String get mermaidExportPng => '匯出 PNG';

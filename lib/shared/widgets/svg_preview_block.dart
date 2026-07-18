@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:Cuplivo/l10n/app_localizations.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -16,9 +18,14 @@ import 'tabbed_preview_block.dart';
 enum _SvgTab { image, code }
 
 class SvgPreviewBlock extends StatefulWidget {
-  const SvgPreviewBlock({super.key, required this.code});
+  const SvgPreviewBlock({
+    super.key,
+    required this.code,
+    this.streaming = false,
+  });
 
   final String code;
+  final bool streaming;
 
   @override
   State<SvgPreviewBlock> createState() => _SvgPreviewBlockState();
@@ -26,28 +33,63 @@ class SvgPreviewBlock extends StatefulWidget {
 
 class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
   static const double _previewHeight = 406;
+  static const int _maxSvgCodeUnits = 1024 * 1024; // 1 MB equivalent
+  static const Duration _streamingRenderDelay = Duration(milliseconds: 360);
+  static const Duration _settledRenderDelay = Duration(milliseconds: 220);
 
   _SvgTab _selectedTab = _SvgTab.image;
   late final ScrollController _codeScrollController;
+  Timer? _renderDebounce;
+  bool _renderReady = false;
 
   @override
   void initState() {
     super.initState();
     _codeScrollController = ScrollController();
+    _selectedTab = widget.streaming ? _SvgTab.code : _SvgTab.image;
+    if (!widget.streaming) _scheduleRender();
   }
 
   @override
   void didUpdateWidget(covariant SvgPreviewBlock oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.code != widget.code) {
+    final streamingJustEnded = oldWidget.streaming && !widget.streaming;
+    if (streamingJustEnded) {
+      // Streaming just ended — auto-switch to image and render once
       _selectedTab = _SvgTab.image;
+      _renderReady = false;
+      _scheduleRender();
+    } else if (!widget.streaming && oldWidget.code != widget.code) {
+      // Non-streaming code change (e.g. edited message) — re-render
+      _selectedTab = _SvgTab.image;
+      _renderReady = false;
+      _scheduleRender();
+    } else if (widget.streaming &&
+        _selectedTab == _SvgTab.image &&
+        oldWidget.code != widget.code) {
+      // User switched to Image tab during streaming — keep deferring render
+      // until streaming stops, to avoid isolate storm from repeated SvgPicture.string()
+      _renderReady = false;
+      _scheduleRender();
     }
   }
 
   @override
   void dispose() {
+    _renderDebounce?.cancel();
     _codeScrollController.dispose();
     super.dispose();
+  }
+
+  void _scheduleRender() {
+    _renderDebounce?.cancel();
+    final delay = widget.streaming
+        ? _streamingRenderDelay
+        : _settledRenderDelay;
+    _renderDebounce = Timer(delay, () {
+      if (!mounted) return;
+      setState(() => _renderReady = true);
+    });
   }
 
   @override
@@ -107,6 +149,7 @@ class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
                                 colors: colors,
                                 onTap: () {
                                   setState(() => _selectedTab = _SvgTab.image);
+                                  if (!_renderReady) _scheduleRender();
                                 },
                               ),
                               PreviewTabButton(
@@ -135,6 +178,13 @@ class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
                           label: l10n.shareProviderSheetCopyButton,
                           colors: colors,
                           onTap: () => _copySvgCode(context),
+                        ),
+                        const SizedBox(width: 4),
+                        PreviewTextAction(
+                          icon: Lucide.Download,
+                          label: l10n.svgSaveFile,
+                          colors: colors,
+                          onTap: () => _saveSvgFile(context),
                         ),
                         const SizedBox(width: 4),
                         PreviewTextAction(
@@ -185,6 +235,22 @@ class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
       );
     }
 
+    if (widget.code.length > _maxSvgCodeUnits) {
+      return Padding(
+        key: const ValueKey('svg-image-oversized'),
+        padding: const EdgeInsets.all(8),
+        child: PreviewErrorView(colors: colors),
+      );
+    }
+
+    if (!_renderReady) {
+      return Padding(
+        key: const ValueKey('svg-image-loading'),
+        padding: const EdgeInsets.all(8),
+        child: PreviewLoadingView(colors: colors),
+      );
+    }
+
     return Padding(
       key: const ValueKey('svg-image-body'),
       padding: const EdgeInsets.all(8),
@@ -192,6 +258,8 @@ class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
         widget.code,
         fit: BoxFit.contain,
         placeholderBuilder: (context) => PreviewLoadingView(colors: colors),
+        errorBuilder: (context, error, stackTrace) =>
+            PreviewErrorView(colors: colors),
       ),
     );
   }
@@ -243,6 +311,35 @@ class _SvgPreviewBlockState extends State<SvgPreviewBlock> {
       message: l10n.chatMessageWidgetCopiedToClipboard,
       type: NotificationType.success,
     );
+  }
+
+  Future<void> _saveSvgFile(BuildContext context) async {
+    final l10n = AppLocalizations.of(context)!;
+    final suggested = 'diagram_${DateTime.now().millisecondsSinceEpoch}.svg';
+    try {
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.svgSaveDialogTitle,
+        fileName: suggested,
+        type: FileType.custom,
+        allowedExtensions: const ['svg'],
+      );
+      if (savePath == null || savePath.isEmpty) return;
+      await File(savePath).parent.create(recursive: true);
+      await File(savePath).writeAsString(widget.code);
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.svgSaveSuccess,
+        type: NotificationType.success,
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.svgSaveFailed,
+        type: NotificationType.error,
+      );
+    }
   }
 
   Future<void> _openInBrowser(BuildContext context) async {

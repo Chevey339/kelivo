@@ -460,6 +460,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homePageDefaultAssistant => 'Default Assistant';
 
   @override
+  String get svgSaveFile => 'Download SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG saved';
+
+  @override
+  String get svgSaveFailed => 'Save failed';
+
+  @override
+  String get svgSaveDialogTitle => 'Save SVG';
+
+  @override
   String get mermaidExportPng => 'Export PNG';
 
   @override

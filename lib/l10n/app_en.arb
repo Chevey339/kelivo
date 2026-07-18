@@ -230,6 +230,10 @@
     }
   },
   "homePageDefaultAssistant": "Default Assistant",
+  "svgSaveFile": "Download SVG",
+  "svgSaveSuccess": "SVG saved",
+  "svgSaveFailed": "Save failed",
+  "svgSaveDialogTitle": "Save SVG",
   "mermaidExportPng": "Export PNG",
   "mermaidExportFailed": "Export failed",
   "mermaidImageTab": "Image",
