@@ -100,6 +100,7 @@ class _DisplaySettingsBody extends StatelessWidget {
               _SettingsCard(
                 title: l10n.displaySettingsPageBehaviorStartupTitle,
                 children: const [
+                  _MultiModelScopeSection(),
                   _ToggleRowAutoSwitchTopicsDesktop(),
                   _RowDivider(),
                   _ToggleRowAutoCollapseThinking(),
@@ -2174,6 +2175,75 @@ class _ToggleRowAutoCollapseThinking extends StatelessWidget {
       value: sp.autoCollapseThinking,
       onChanged: (v) =>
           context.read<SettingsProvider>().setAutoCollapseThinking(v),
+    );
+  }
+}
+
+class _MultiModelScopeSection extends StatelessWidget {
+  const _MultiModelScopeSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final selection = context.watch<ChatModelSelectionProvider?>();
+    if (selection == null) return const SizedBox.shrink();
+
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    String label(MultiModelSelectionScope value) => switch (value) {
+      MultiModelSelectionScope.assistant => l10n.multiModelScopeAssistant,
+      MultiModelSelectionScope.conversation => l10n.multiModelScopeConversation,
+      MultiModelSelectionScope.nextMessage => l10n.multiModelScopeNextMessage,
+    };
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.multiModelScopeTitle,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: AppFontWeights.semibold,
+                        color: cs.onSurface.withValues(alpha: 0.9),
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      l10n.multiModelScopeSubtitle,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 16),
+              SegmentedButton<MultiModelSelectionScope>(
+                segments: [
+                  for (final value in MultiModelSelectionScope.values)
+                    ButtonSegment<MultiModelSelectionScope>(
+                      value: value,
+                      label: Text(label(value)),
+                    ),
+                ],
+                selected: <MultiModelSelectionScope>{selection.scope},
+                showSelectedIcon: false,
+                onSelectionChanged: (values) =>
+                    selection.setScope(values.single),
+              ),
+            ],
+          ),
+        ),
+        const _RowDivider(),
+      ],
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import '../../../core/database/generation_run.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -50,6 +51,12 @@ class ChatController extends ChangeNotifier {
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
   Map<String, int> get versionSelections => _versionSelections;
+  final Map<String, GenerationRunState> _generationStatesByMessageId =
+      <String, GenerationRunState>{};
+  Map<String, GenerationRunState> get generationStatesByMessageId =>
+      Map<String, GenerationRunState>.unmodifiable(
+        _generationStatesByMessageId,
+      );
 
   /// Cached collapsed messages (invalidated on notifyListeners).
   List<ChatMessage>? _collapsedCache;
@@ -62,11 +69,12 @@ class ChatController extends ChangeNotifier {
   final Set<String> _loadingConversationIds = <String>{};
   Set<String> get loadingConversationIds => _loadingConversationIds;
 
-  /// Active stream subscriptions per conversation.
-  final Map<String, StreamSubscription<dynamic>> _conversationStreams =
+  /// Active stream subscriptions keyed by assistant message ID. Multiple
+  /// models in one conversation can therefore stream independently.
+  final Map<String, StreamSubscription<dynamic>> _generationStreams =
       <String, StreamSubscription<dynamic>>{};
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
-      _conversationStreams;
+      _generationStreams;
 
   // ============================================================================
   // Getters
@@ -77,6 +85,25 @@ class ChatController extends ChangeNotifier {
     final cid = _currentConversation?.id;
     if (cid == null) return false;
     return _loadingConversationIds.contains(cid);
+  }
+
+  /// Whether the answer currently selected in the active multi-model group is
+  /// still generating. Sibling activity alone does not make the stop action
+  /// targetable.
+  bool get isSelectedAnswerStreaming {
+    for (final message in _messages.reversed) {
+      if (message.role != 'assistant') continue;
+      final groupId = message.groupId ?? message.id;
+      final siblings = groupedMessages[groupId] ?? <ChatMessage>[message];
+      if (!siblings.any((sibling) => sibling.isStreaming)) continue;
+      final selectedVersion =
+          _versionSelections[groupId] ?? siblings.first.version;
+      for (final sibling in siblings) {
+        if (sibling.version == selectedVersion) return sibling.isStreaming;
+      }
+      return false;
+    }
+    return false;
   }
 
   /// Get the ChatService instance.
@@ -104,6 +131,7 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
     _versionSelections = <String, int>{};
+    _generationStatesByMessageId.clear();
     notifyListeners();
   }
 
@@ -114,9 +142,10 @@ class ChatController extends ChangeNotifier {
       _loadedStartIndex = 0;
       _totalMessageCount = 0;
       _versionSelections = <String, int>{};
+      _generationStatesByMessageId.clear();
     } else {
-      await _loadInitialMessageWindow(conversation.id);
       _loadVersionSelections();
+      await _loadInitialMessageWindow(conversation.id);
     }
     notifyListeners();
   }
@@ -161,6 +190,7 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
     _versionSelections = <String, int>{};
+    _generationStatesByMessageId.clear();
     notifyListeners();
     return conversation;
   }
@@ -173,8 +203,8 @@ class ChatController extends ChangeNotifier {
     final convo = _chatService.getConversation(id);
     if (convo != null) {
       _currentConversation = convo;
-      await _loadInitialMessageWindow(id);
       _loadVersionSelections();
+      await _loadInitialMessageWindow(id);
       notifyListeners();
     }
   }
@@ -191,6 +221,7 @@ class ChatController extends ChangeNotifier {
     _loadedStartIndex = 0;
     _totalMessageCount = 0;
     _versionSelections = <String, int>{};
+    _generationStatesByMessageId.clear();
   }
 
   Future<void> _loadInitialMessageWindow(String conversationId) async {
@@ -204,6 +235,7 @@ class ChatController extends ChangeNotifier {
   }
 
   void _replaceWindow(LoadedTimelinePage? page) {
+    _generationStatesByMessageId.clear();
     if (page == null) {
       _messages = <ChatMessage>[];
       _loadedStartIndex = 0;
@@ -304,6 +336,7 @@ class ChatController extends ChangeNotifier {
       limit: ChatService.defaultLoadedWindowMax,
     );
     _replaceWindow(page);
+    _loadVersionSelections();
     await _preloadVisibleGroupData();
     notifyListeners();
     return _messages.isNotEmpty;
@@ -453,6 +486,22 @@ class ChatController extends ChangeNotifier {
       _chatService.loadMessagesForGroups(conversation.id, groupIds),
       _chatService.loadFirstMessageIndicesForGroups(conversation.id, groupIds),
     ]);
+    final targetIds = <String>{
+      for (final message in _chatService.getMessagesForGroups(
+        conversation.id,
+        groupIds,
+      ))
+        message.id,
+    };
+    final runs = await _chatService.loadLatestGenerationRunsForTargets(
+      targetIds,
+    );
+    for (final id in targetIds) {
+      _generationStatesByMessageId.remove(id);
+    }
+    for (final entry in runs.entries) {
+      _generationStatesByMessageId[entry.key] = entry.value.state;
+    }
     invalidateCache();
   }
 
@@ -555,6 +604,7 @@ class ChatController extends ChangeNotifier {
       limit: ChatService.defaultLoadedWindowMax,
     );
     _replaceWindow(page);
+    _loadVersionSelections();
     await _preloadVisibleGroupData();
     notifyListeners();
     return true;
@@ -604,12 +654,25 @@ class ChatController extends ChangeNotifier {
   /// Publishes a terminal generation snapshot and always closes the timeline's
   /// generation lifecycle, even when the message is outside the loaded window.
   bool publishTerminalMessage(ChatMessage message) {
+    final belongsToCurrentConversation =
+        _currentConversation?.id == message.conversationId;
     final terminalMessage = message.isStreaming
         ? message.copyWith(isStreaming: false)
         : message;
     final replaced = replaceMessageSnapshot(terminalMessage);
     publishGenerationState(message.conversationId, isGenerating: false);
-    return replaced;
+    return replaced || belongsToCurrentConversation;
+  }
+
+  void setGenerationState(
+    String messageId,
+    GenerationRunState state, {
+    bool notify = false,
+  }) {
+    if (_generationStatesByMessageId[messageId] == state) return;
+    _generationStatesByMessageId[messageId] = state;
+    invalidateCache();
+    if (notify) notifyListeners();
   }
 
   /// Update a message by ID with optional new values.
@@ -696,31 +759,31 @@ class ChatController extends ChangeNotifier {
   // Stream Subscription Management
   // ============================================================================
 
-  /// Get the stream subscription for a conversation.
-  StreamSubscription<dynamic>? getStreamSubscription(String conversationId) {
-    return _conversationStreams[conversationId];
+  /// Get the stream subscription for a generated assistant message.
+  StreamSubscription<dynamic>? getStreamSubscription(String messageId) {
+    return _generationStreams[messageId];
   }
 
-  /// Set a stream subscription for a conversation.
+  /// Set a stream subscription for a generated assistant message.
   void setStreamSubscription(
-    String conversationId,
+    String messageId,
     StreamSubscription<dynamic> subscription,
   ) {
-    _conversationStreams[conversationId] = subscription;
+    _generationStreams[messageId] = subscription;
   }
 
   /// Cancel and remove a stream subscription.
-  Future<void> cancelStreamSubscription(String conversationId) async {
-    final sub = _conversationStreams.remove(conversationId);
+  Future<void> cancelStreamSubscription(String messageId) async {
+    final sub = _generationStreams.remove(messageId);
     await sub?.cancel();
   }
 
   /// Cancel all stream subscriptions.
   Future<void> cancelAllStreams() async {
-    for (final sub in _conversationStreams.values) {
+    for (final sub in _generationStreams.values) {
       await sub.cancel();
     }
-    _conversationStreams.clear();
+    _generationStreams.clear();
   }
 
   // ============================================================================
@@ -915,6 +978,7 @@ class ChatController extends ChangeNotifier {
         for (final entry in groupedMessages.entries)
           entry.key: entry.value.length,
       },
+      generationStates: _generationStatesByMessageId,
       contextDividerIndex: _collapsedContextDividerIndex(),
     );
   }

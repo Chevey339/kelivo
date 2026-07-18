@@ -38,6 +38,26 @@ final class GenerationRunCommands {
     return row == null ? null : _map(row);
   }
 
+  Future<Map<String, GenerationRun>> latestByTargetRevisionIds(
+    Iterable<String> targetRevisionIds,
+  ) async {
+    final ids = targetRevisionIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return const <String, GenerationRun>{};
+    final rows =
+        await (_db.select(_db.generationRunRows)
+              ..where((run) => run.targetRevisionId.isIn(ids))
+              ..orderBy([
+                (run) => OrderingTerm.desc(run.updatedAt),
+                (run) => OrderingTerm.desc(run.createdAt),
+              ]))
+            .get();
+    final result = <String, GenerationRun>{};
+    for (final row in rows) {
+      result.putIfAbsent(row.targetRevisionId, () => _map(row));
+    }
+    return Map<String, GenerationRun>.unmodifiable(result);
+  }
+
   Future<GenerationRun> transition({
     required String id,
     required GenerationRunState expectedState,

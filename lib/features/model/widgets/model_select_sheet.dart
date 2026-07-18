@@ -7,6 +7,8 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../../core/providers/chat_model_selection_provider.dart';
+import '../../../core/models/chat_model_target.dart';
 import '../../../icons/lucide_adapter.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'model_detail_sheet.dart';
@@ -26,6 +28,43 @@ class ModelSelection {
   final String providerKey;
   final String modelId;
   ModelSelection(this.providerKey, this.modelId);
+}
+
+/// Result returned only by the chat entry point. A normal row tap contains one
+/// target and keeps the legacy immediate-selection behavior; confirming the
+/// @ mode contains an ordered multi-target combination.
+final class ChatModelSelectionResult {
+  const ChatModelSelectionResult({
+    required this.targets,
+    required this.isMultiModel,
+  });
+
+  final List<ChatModelTarget> targets;
+  final bool isMultiModel;
+}
+
+final class _MultiModelSelectionResult {
+  const _MultiModelSelectionResult(this.selections);
+
+  final List<ModelSelection> selections;
+}
+
+String _selectionKey(String providerKey, String modelId) =>
+    '$providerKey::$modelId';
+
+List<ModelSelection> _deduplicateSelections(
+  Iterable<ModelSelection> selections,
+) {
+  final seen = <String>{};
+  final result = <ModelSelection>[];
+  for (final selection in selections) {
+    if (!seen.add(_selectionKey(selection.providerKey, selection.modelId))) {
+      continue;
+    }
+    result.add(selection);
+    if (result.length == ChatModelSelectionProvider.maximumTargets) break;
+  }
+  return result;
 }
 
 // Prevent re-entrant model selector dialogs
@@ -203,6 +242,65 @@ Future<ModelSelection?> showModelSelector(
   String? initialProviderKey,
   String? initialModelId,
 }) async {
+  final result = await _showModelSelectorInternal(
+    context,
+    limitProviderKey: limitProviderKey,
+    initialProviderKey: initialProviderKey,
+    initialModelId: initialModelId,
+  );
+  return result is ModelSelection ? result : null;
+}
+
+Future<ChatModelSelectionResult?> showChatModelSelector(
+  BuildContext context, {
+  String? initialProviderKey,
+  String? initialModelId,
+  List<ChatModelTarget> initialTargets = const <ChatModelTarget>[],
+}) async {
+  final result = await _showModelSelectorInternal(
+    context,
+    initialProviderKey: initialProviderKey,
+    initialModelId: initialModelId,
+    allowMultiSelect: true,
+    initialMultiSelections: [
+      for (final target in initialTargets)
+        ModelSelection(target.providerKey, target.modelId),
+    ],
+  );
+  if (result is ModelSelection) {
+    return ChatModelSelectionResult(
+      targets: <ChatModelTarget>[
+        ChatModelTarget(
+          providerKey: result.providerKey,
+          modelId: result.modelId,
+        ),
+      ],
+      isMultiModel: false,
+    );
+  }
+  if (result is _MultiModelSelectionResult) {
+    return ChatModelSelectionResult(
+      targets: List<ChatModelTarget>.unmodifiable([
+        for (final selection in result.selections)
+          ChatModelTarget(
+            providerKey: selection.providerKey,
+            modelId: selection.modelId,
+          ),
+      ]),
+      isMultiModel: true,
+    );
+  }
+  return null;
+}
+
+Future<Object?> _showModelSelectorInternal(
+  BuildContext context, {
+  String? limitProviderKey,
+  String? initialProviderKey,
+  String? initialModelId,
+  bool allowMultiSelect = false,
+  List<ModelSelection> initialMultiSelections = const <ModelSelection>[],
+}) async {
   if (_modelSelectorOpen) return null;
   _modelSelectorOpen = true;
   try {
@@ -216,10 +314,12 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        allowMultiSelect: allowMultiSelect,
+        initialMultiSelections: initialMultiSelections,
       );
     }
     final cs = Theme.of(context).colorScheme;
-    return await showModalBottomSheet<ModelSelection>(
+    return await showModalBottomSheet<Object>(
       context: context,
       isScrollControlled: true,
       backgroundColor: cs.surface,
@@ -230,6 +330,8 @@ Future<ModelSelection?> showModelSelector(
         limitProviderKey: limitProviderKey,
         initialProviderKey: initialProviderKey,
         initialModelId: initialModelId,
+        allowMultiSelect: allowMultiSelect,
+        initialMultiSelections: initialMultiSelections,
       ),
     );
   } finally {
@@ -240,26 +342,64 @@ Future<ModelSelection?> showModelSelector(
 Future<void> showModelSelectSheet(
   BuildContext context, {
   bool updateAssistant = true,
+  String? conversationId,
 }) async {
   final assistantProvider = context.read<AssistantProvider>();
   final settings = context.read<SettingsProvider>();
-  final sel = await showModelSelector(context);
-  if (sel != null) {
+  final multiSelection = context.read<ChatModelSelectionProvider>();
+  await multiSelection.ready;
+  await multiSelection.pruneTargets((target) {
+    final config = settings.getProviderConfig(target.providerKey);
+    return config.enabled && config.models.contains(target.modelId);
+  });
+  if (!context.mounted) return;
+  final assistant = assistantProvider.currentAssistant;
+  final initialProvider =
+      assistant?.chatModelProvider ?? settings.currentModelProvider;
+  final initialModel = assistant?.chatModelId ?? settings.currentModelId;
+  final configured = multiSelection.targetsForScope(
+    assistantId: assistant?.id,
+    conversationId: conversationId,
+  );
+  final fallbackTargets = initialProvider != null && initialModel != null
+      ? <ChatModelTarget>[
+          ChatModelTarget(providerKey: initialProvider, modelId: initialModel),
+        ]
+      : const <ChatModelTarget>[];
+  final sel = await showChatModelSelector(
+    context,
+    initialProviderKey: initialProvider,
+    initialModelId: initialModel,
+    initialTargets: configured.isNotEmpty ? configured : fallbackTargets,
+  );
+  if (sel != null && sel.targets.isNotEmpty) {
+    if (sel.isMultiModel) {
+      await multiSelection.setTargets(
+        targets: sel.targets,
+        assistantId: assistant?.id,
+        conversationId: conversationId,
+      );
+      return;
+    }
+    final selected = sel.targets.single;
     if (updateAssistant) {
       // Update assistant's model instead of global default
-      final assistant = assistantProvider.currentAssistant;
       if (assistant != null) {
         await assistantProvider.updateAssistant(
           assistant.copyWith(
-            chatModelProvider: sel.providerKey,
-            chatModelId: sel.modelId,
+            chatModelProvider: selected.providerKey,
+            chatModelId: selected.modelId,
           ),
         );
       }
     } else {
       // Only update global default when explicitly requested (e.g., from settings)
-      await settings.setCurrentModel(sel.providerKey, sel.modelId);
+      await settings.setCurrentModel(selected.providerKey, selected.modelId);
     }
+    await multiSelection.clearActiveOverride(
+      assistantId: assistant?.id,
+      conversationId: conversationId,
+    );
   }
 }
 
@@ -268,10 +408,14 @@ class _ModelSelectSheet extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.allowMultiSelect = false,
+    this.initialMultiSelections = const <ModelSelection>[],
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final bool allowMultiSelect;
+  final List<ModelSelection> initialMultiSelections;
   @override
   State<_ModelSelectSheet> createState() => _ModelSelectSheetState();
 }
@@ -316,6 +460,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   Map<String, _ProviderGroup> _groups = {};
   List<String> _orderedKeys = [];
   bool _autoScrolled = false; // ensure we only auto-scroll once per open
+  bool _multiMode = false;
+  late List<ModelSelection> _multiSelections;
 
   dynamic _sanitizeJsonValue(dynamic value) {
     if (value == null || value is num || value is bool || value is String) {
@@ -382,6 +528,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
   @override
   void initState() {
     super.initState();
+    _multiSelections = _deduplicateSelections(widget.initialMultiSelections);
     _itemPositionsListener.itemPositions.addListener(
       _scheduleActiveProviderUpdate,
     );
@@ -391,6 +538,87 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         _loadModelsAsync();
       }
     });
+  }
+
+  bool _isMultiSelected(_ModelItem model) => _multiSelections.any(
+    (selection) =>
+        selection.providerKey == model.providerKey &&
+        selection.modelId == model.id,
+  );
+
+  void _enterMultiMode() {
+    if (_multiMode) return;
+    if (_multiSelections.isEmpty &&
+        widget.initialProviderKey != null &&
+        widget.initialModelId != null) {
+      _multiSelections.add(
+        ModelSelection(widget.initialProviderKey!, widget.initialModelId!),
+      );
+    }
+    setState(() => _multiMode = true);
+  }
+
+  void _cancelMultiMode() {
+    setState(() {
+      _multiMode = false;
+      _multiSelections = _deduplicateSelections(widget.initialMultiSelections);
+    });
+  }
+
+  void _toggleMultiModel(_ModelItem model) {
+    final existing = _multiSelections.indexWhere(
+      (selection) =>
+          selection.providerKey == model.providerKey &&
+          selection.modelId == model.id,
+    );
+    setState(() {
+      if (existing >= 0) {
+        _multiSelections.removeAt(existing);
+      } else if (_multiSelections.length <
+          ChatModelSelectionProvider.maximumTargets) {
+        _multiSelections.add(ModelSelection(model.providerKey, model.id));
+      }
+    });
+  }
+
+  void _confirmMultiMode() {
+    if (_multiSelections.length < ChatModelSelectionProvider.minimumTargets) {
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pop(_MultiModelSelectionResult(List.unmodifiable(_multiSelections)));
+  }
+
+  Widget _buildMultiActions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+        child: Row(
+          children: [
+            TextButton(
+              key: const ValueKey('model-multi-cancel'),
+              onPressed: _cancelMultiMode,
+              child: Text(l10n.homePageCancel),
+            ),
+            const Spacer(),
+            FilledButton.tonal(
+              key: const ValueKey('model-multi-done'),
+              onPressed:
+                  _multiSelections.length >=
+                      ChatModelSelectionProvider.minimumTargets
+                  ? _confirmMultiMode
+                  : null,
+              child: Text(
+                '${l10n.homePageDone} ${_multiSelections.length}/${ChatModelSelectionProvider.maximumTargets}',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadModelsAsync() async {
@@ -863,29 +1091,61 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                             ),
                             // Use IconButton for reliable alignment at the far right
                             suffixIcon:
-                                (widget.limitProviderKey == null &&
-                                    context
-                                        .watch<SettingsProvider>()
-                                        .pinnedModels
-                                        .isNotEmpty)
-                                ? ExcludeSemantics(
-                                    child: IconButton(
-                                      icon: Icon(
-                                        Lucide.Bookmark,
-                                        size: 18,
-                                        color: cs.onSurface.withValues(
-                                          alpha: _isLoading ? 0.35 : 0.7,
+                                widget.allowMultiSelect ||
+                                    (widget.limitProviderKey == null &&
+                                        context
+                                            .watch<SettingsProvider>()
+                                            .pinnedModels
+                                            .isNotEmpty)
+                                ? Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (widget.allowMultiSelect)
+                                        IconButton(
+                                          key: const ValueKey(
+                                            'model-multi-toggle',
+                                          ),
+                                          icon: Icon(
+                                            Icons.alternate_email,
+                                            size: 19,
+                                            color: _multiMode
+                                                ? cs.primary
+                                                : cs.onSurface.withValues(
+                                                    alpha: _isLoading
+                                                        ? 0.35
+                                                        : 0.75,
+                                                  ),
+                                          ),
+                                          onPressed: _isLoading
+                                              ? null
+                                              : _enterMultiMode,
+                                          tooltip: '@',
                                         ),
-                                      ),
-                                      onPressed: _isLoading
-                                          ? null
-                                          : _jumpToFavorites,
-                                      splashColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      tooltip:
-                                          l10n.modelSelectSheetFavoritesSection,
-                                    ),
+                                      if (widget.limitProviderKey == null &&
+                                          context
+                                              .watch<SettingsProvider>()
+                                              .pinnedModels
+                                              .isNotEmpty)
+                                        ExcludeSemantics(
+                                          child: IconButton(
+                                            icon: Icon(
+                                              Lucide.Bookmark,
+                                              size: 18,
+                                              color: cs.onSurface.withValues(
+                                                alpha: _isLoading ? 0.35 : 0.7,
+                                              ),
+                                            ),
+                                            onPressed: _isLoading
+                                                ? null
+                                                : _jumpToFavorites,
+                                            splashColor: Colors.transparent,
+                                            highlightColor: Colors.transparent,
+                                            hoverColor: Colors.transparent,
+                                            tooltip: l10n
+                                                .modelSelectSheetFavoritesSection,
+                                          ),
+                                        ),
+                                    ],
                                   )
                                 : null,
                             suffixIconConstraints: const BoxConstraints(
@@ -943,6 +1203,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                         : _buildContent(context),
                   ),
                 ),
+                if (_multiMode) _buildMultiActions(context),
                 // Fixed bottom tabs
                 Container(
                   color: cs.surface, // Ensure background color continuity
@@ -1259,7 +1520,8 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final cs = Theme.of(context).colorScheme;
     final settings = context.read<SettingsProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = m.selected
+    final multiSelected = _isMultiSelected(m);
+    final bg = (_multiMode ? multiSelected : m.selected)
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
@@ -1272,8 +1534,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           borderRadius: BorderRadius.circular(14),
           pressedBlendStrength: 0.10,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          onTap: () =>
-              Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+          onTap: _multiMode
+              ? () => _toggleMultiModel(m)
+              : () => Navigator.of(
+                  context,
+                ).pop(ModelSelection(m.providerKey, m.id)),
           onLongPress: () async {
             await showModelDetailSheet(
               context,
@@ -1290,6 +1555,17 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
             width: double.infinity,
             child: Row(
               children: [
+                if (_multiMode) ...[
+                  Checkbox(
+                    key: ValueKey<String>(
+                      'model-multi-checkbox:${m.providerKey}::${m.id}',
+                    ),
+                    value: multiSelected,
+                    onChanged: (_) => _toggleMultiModel(m),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(width: 2),
+                ],
                 _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
                 const SizedBox(width: 10),
                 Expanded(
@@ -1644,13 +1920,15 @@ class _BrandAvatar extends StatelessWidget {
 
 // ===== Desktop dialog implementation =====
 
-Future<ModelSelection?> _showDesktopModelSelector(
+Future<Object?> _showDesktopModelSelector(
   BuildContext context, {
   String? limitProviderKey,
   String? initialProviderKey,
   String? initialModelId,
+  bool allowMultiSelect = false,
+  List<ModelSelection> initialMultiSelections = const <ModelSelection>[],
 }) async {
-  return showGeneralDialog<ModelSelection>(
+  return showGeneralDialog<Object>(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'model-select-desktop',
@@ -1659,6 +1937,8 @@ Future<ModelSelection?> _showDesktopModelSelector(
       limitProviderKey: limitProviderKey,
       initialProviderKey: initialProviderKey,
       initialModelId: initialModelId,
+      allowMultiSelect: allowMultiSelect,
+      initialMultiSelections: initialMultiSelections,
     ),
     transitionBuilder: (ctx, anim, _, child) {
       final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
@@ -1678,10 +1958,14 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
     this.limitProviderKey,
     this.initialProviderKey,
     this.initialModelId,
+    this.allowMultiSelect = false,
+    this.initialMultiSelections = const <ModelSelection>[],
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
+  final bool allowMultiSelect;
+  final List<ModelSelection> initialMultiSelections;
   @override
   State<_DesktopModelSelectDialogBody> createState() =>
       _DesktopModelSelectDialogBodyState();
@@ -1706,12 +1990,93 @@ class _DesktopModelSelectDialogBodyState
   final Map<String, int> _favModelIndexMap =
       <String, int>{}; // 'pk::modelId' in favorites -> index
   bool _autoScrolled = false; // auto-scroll once when dialog opens
+  bool _multiMode = false;
+  late List<ModelSelection> _multiSelections;
 
   @override
   void initState() {
     super.initState();
+    _multiSelections = _deduplicateSelections(widget.initialMultiSelections);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusSearchField());
     Future.microtask(_loadModels);
+  }
+
+  bool _isMultiSelected(_ModelItem model) => _multiSelections.any(
+    (selection) =>
+        selection.providerKey == model.providerKey &&
+        selection.modelId == model.id,
+  );
+
+  void _enterMultiMode() {
+    if (_multiMode) return;
+    if (_multiSelections.isEmpty &&
+        widget.initialProviderKey != null &&
+        widget.initialModelId != null) {
+      _multiSelections.add(
+        ModelSelection(widget.initialProviderKey!, widget.initialModelId!),
+      );
+    }
+    setState(() => _multiMode = true);
+  }
+
+  void _cancelMultiMode() {
+    setState(() {
+      _multiMode = false;
+      _multiSelections = _deduplicateSelections(widget.initialMultiSelections);
+    });
+  }
+
+  void _toggleMultiModel(_ModelItem model) {
+    final existing = _multiSelections.indexWhere(
+      (selection) =>
+          selection.providerKey == model.providerKey &&
+          selection.modelId == model.id,
+    );
+    setState(() {
+      if (existing >= 0) {
+        _multiSelections.removeAt(existing);
+      } else if (_multiSelections.length <
+          ChatModelSelectionProvider.maximumTargets) {
+        _multiSelections.add(ModelSelection(model.providerKey, model.id));
+      }
+    });
+  }
+
+  void _confirmMultiMode() {
+    if (_multiSelections.length < ChatModelSelectionProvider.minimumTargets) {
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pop(_MultiModelSelectionResult(List.unmodifiable(_multiSelections)));
+  }
+
+  Widget _buildMultiActions(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Row(
+        children: [
+          TextButton(
+            key: const ValueKey('model-multi-cancel'),
+            onPressed: _cancelMultiMode,
+            child: Text(l10n.homePageCancel),
+          ),
+          const Spacer(),
+          FilledButton.tonal(
+            key: const ValueKey('model-multi-done'),
+            onPressed:
+                _multiSelections.length >=
+                    ChatModelSelectionProvider.minimumTargets
+                ? _confirmMultiMode
+                : null,
+            child: Text(
+              '${l10n.homePageDone} ${_multiSelections.length}/${ChatModelSelectionProvider.maximumTargets}',
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1987,24 +2352,54 @@ class _DesktopModelSelectDialogBodyState
                                 color: cs.onSurface.withValues(alpha: 0.7),
                               ),
                               suffixIcon:
-                                  (widget.limitProviderKey == null &&
-                                      context
-                                          .watch<SettingsProvider>()
-                                          .pinnedModels
-                                          .isNotEmpty)
-                                  ? Tooltip(
-                                      message:
-                                          l10n.modelSelectSheetFavoritesSection,
-                                      child: IconButton(
-                                        icon: Icon(
-                                          Lucide.Bookmark,
-                                          size: 16,
-                                          color: cs.onSurface.withValues(
-                                            alpha: 0.7,
+                                  widget.allowMultiSelect ||
+                                      (widget.limitProviderKey == null &&
+                                          context
+                                              .watch<SettingsProvider>()
+                                              .pinnedModels
+                                              .isNotEmpty)
+                                  ? Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (widget.allowMultiSelect)
+                                          IconButton(
+                                            key: const ValueKey(
+                                              'model-multi-toggle',
+                                            ),
+                                            icon: Icon(
+                                              Icons.alternate_email,
+                                              size: 18,
+                                              color: _multiMode
+                                                  ? cs.primary
+                                                  : cs.onSurface.withValues(
+                                                      alpha: 0.75,
+                                                    ),
+                                            ),
+                                            onPressed: _loading
+                                                ? null
+                                                : _enterMultiMode,
+                                            tooltip: '@',
                                           ),
-                                        ),
-                                        onPressed: _jumpToFavorites,
-                                      ),
+                                        if (widget.limitProviderKey == null &&
+                                            context
+                                                .watch<SettingsProvider>()
+                                                .pinnedModels
+                                                .isNotEmpty)
+                                          Tooltip(
+                                            message: l10n
+                                                .modelSelectSheetFavoritesSection,
+                                            child: IconButton(
+                                              icon: Icon(
+                                                Lucide.Bookmark,
+                                                size: 16,
+                                                color: cs.onSurface.withValues(
+                                                  alpha: 0.7,
+                                                ),
+                                              ),
+                                              onPressed: _jumpToFavorites,
+                                            ),
+                                          ),
+                                      ],
                                     )
                                   : null,
                               border: OutlineInputBorder(
@@ -2037,6 +2432,7 @@ class _DesktopModelSelectDialogBodyState
                               ? const Center(child: CircularProgressIndicator())
                               : _buildList(context),
                         ),
+                        if (_multiMode) _buildMultiActions(context),
                       ],
                     ),
                   ),
@@ -2162,7 +2558,8 @@ class _DesktopModelSelectDialogBodyState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final bg = m.selected
+    final multiSelected = _isMultiSelected(m);
+    final bg = (_multiMode ? multiSelected : m.selected)
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
@@ -2175,10 +2572,24 @@ class _DesktopModelSelectDialogBodyState
         borderRadius: BorderRadius.circular(14),
         pressedBlendStrength: 0.10,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        onTap: () =>
-            Navigator.of(context).pop(ModelSelection(m.providerKey, m.id)),
+        onTap: _multiMode
+            ? () => _toggleMultiModel(m)
+            : () => Navigator.of(
+                context,
+              ).pop(ModelSelection(m.providerKey, m.id)),
         child: Row(
           children: [
+            if (_multiMode) ...[
+              Checkbox(
+                key: ValueKey<String>(
+                  'model-multi-checkbox:${m.providerKey}::${m.id}',
+                ),
+                value: multiSelected,
+                onChanged: (_) => _toggleMultiModel(m),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 2),
+            ],
             _BrandAvatar(name: m.id, assetOverride: m.asset, size: 18),
             const SizedBox(width: 6),
             Expanded(

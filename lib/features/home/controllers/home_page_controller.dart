@@ -273,6 +273,9 @@ class HomePageController extends ChangeNotifier {
     return loadingConversationIds.contains(cid);
   }
 
+  bool get canStopCurrentGeneration =>
+      _chatController.isSelectedAnswerStreaming;
+
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
 
   ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
@@ -445,9 +448,17 @@ class HomePageController extends ChangeNotifier {
   }
 
   String _localizeGenerationError(AppLocalizations l10n, String error) {
+    const incompatiblePrefix = 'multi_model_attachment_unsupported:';
+    if (error.startsWith(incompatiblePrefix)) {
+      return l10n.multiModelAttachmentUnsupported(
+        error.substring(incompatiblePrefix.length),
+      );
+    }
     switch (error) {
       case 'audio_attachment_unsupported':
         return l10n.homePageAudioAttachmentUnsupported;
+      case 'selected_model_answer_unavailable':
+        return l10n.multiModelSelectedAnswerUnavailable;
       default:
         return '${l10n.generationInterrupted}: $error';
     }
@@ -553,7 +564,9 @@ class HomePageController extends ChangeNotifier {
           }
           break;
         case ChatAction.switchModel:
-          unawaited(showModelSelectSheet(ctx));
+          unawaited(
+            showModelSelectSheet(ctx, conversationId: currentConversation?.id),
+          );
           break;
         case ChatAction.enterGlobalSearch:
           enterGlobalSearchMode(preserveQuery: true);

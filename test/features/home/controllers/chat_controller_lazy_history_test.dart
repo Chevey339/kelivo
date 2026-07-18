@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/chat_controller.dart';
 
@@ -241,6 +242,11 @@ class _FakeLazyChatService extends ChatService {
     String conversationId,
     Iterable<String> groupIds,
   ) async => getFirstMessageIndicesForGroups(conversationId, groupIds);
+
+  @override
+  Future<Map<String, GenerationRun>> loadLatestGenerationRunsForTargets(
+    Iterable<String> targetRevisionIds,
+  ) async => const <String, GenerationRun>{};
 
   @override
   List<ChatMessage> getMessagesForGroups(
@@ -744,6 +750,7 @@ void main() {
         expect(controller.loadedStartIndex, 61);
         expect(controller.collapsedMessages.last.id, 'final-v0');
         expect(controller.collapsedMessages.length, 40);
+        expect(controller.groupedMessages['final-group'], finalVersions);
       },
     );
 
@@ -936,6 +943,99 @@ void main() {
       ]);
       expect(controller.totalMessageCount, 102);
     });
+
+    test('atomic batch append reloads the persisted default version', () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      final user = chatService.appendPersistedMessage(_message(100));
+      final first = chatService.appendPersistedMessage(
+        ChatMessage(
+          id: 'batch-answer-a',
+          role: 'assistant',
+          content: 'answer a',
+          conversationId: conversation.id,
+          groupId: 'batch-answer-a',
+          version: 0,
+          providerId: 'provider-a',
+          modelId: 'model-a',
+        ),
+      );
+      final second = chatService.appendPersistedMessage(
+        ChatMessage(
+          id: 'batch-answer-b',
+          role: 'assistant',
+          content: 'answer b',
+          conversationId: conversation.id,
+          groupId: 'batch-answer-a',
+          version: 1,
+          providerId: 'provider-b',
+          modelId: 'model-b',
+        ),
+      );
+      chatService.versionSelections = const {'batch-answer-a': 0};
+
+      await controller.appendPersistedTailMessages([user, first, second]);
+
+      expect(controller.versionSelections['batch-answer-a'], 0);
+      expect(controller.groupedMessages['batch-answer-a'], [first, second]);
+      expect(
+        controller.collapsedMessages
+            .singleWhere(
+              (message) => (message.groupId ?? message.id) == 'batch-answer-a',
+            )
+            .id,
+        first.id,
+      );
+    });
+
+    test(
+      'terminal sibling outside the selected window requests a UI refresh',
+      () async {
+        final selected = ChatMessage(
+          id: 'answer-a',
+          role: 'assistant',
+          content: 'answer a',
+          conversationId: conversation.id,
+          groupId: 'answer-a',
+          version: 0,
+          providerId: 'provider-a',
+          modelId: 'model-a',
+        );
+        final sibling = ChatMessage(
+          id: 'answer-b',
+          role: 'assistant',
+          content: '',
+          conversationId: conversation.id,
+          groupId: 'answer-a',
+          version: 1,
+          providerId: 'provider-b',
+          modelId: 'model-b',
+          isStreaming: true,
+        );
+        messages = <ChatMessage>[selected, sibling];
+        conversation = Conversation(
+          id: conversation.id,
+          title: conversation.title,
+          messageIds: <String>[selected.id, sibling.id],
+          versionSelections: const <String, int>{'answer-a': 0},
+        );
+        chatService = _FakeLazyChatService(messages)
+          ..versionSelections = const <String, int>{'answer-a': 0};
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+
+        expect(
+          controller.messages.any((message) => message.id == sibling.id),
+          isFalse,
+        );
+        expect(
+          controller.publishTerminalMessage(
+            sibling.copyWith(content: 'answer b', isStreaming: false),
+          ),
+          isTrue,
+        );
+      },
+    );
 
     test(
       'mini map source includes all messages without expanding chat window',

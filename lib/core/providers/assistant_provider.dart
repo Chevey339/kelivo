@@ -14,6 +14,8 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
 
+typedef AssistantDeletedCallback = Future<void> Function(String assistantId);
+
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
@@ -22,6 +24,7 @@ class AssistantProvider extends ChangeNotifier {
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
   final ChatService? chatService;
+  AssistantDeletedCallback? _assistantDeletedCallback;
 
   List<Assistant> get assistants => List.unmodifiable(_assistants);
   String? get currentAssistantId => _currentAssistantId;
@@ -36,6 +39,22 @@ class AssistantProvider extends ChangeNotifier {
 
   AssistantProvider({this.chatService}) {
     _load();
+  }
+
+  void setAssistantDeletedCallback(AssistantDeletedCallback? callback) {
+    _assistantDeletedCallback = callback;
+  }
+
+  Future<void> _notifyAssistantDeleted(String assistantId) async {
+    final callback = _assistantDeletedCallback;
+    if (callback == null) return;
+    try {
+      await callback(assistantId);
+    } catch (error) {
+      debugPrint(
+        '[AssistantProvider] assistant deletion callback failed: $error',
+      );
+    }
   }
 
   Future<void> _load() async {
@@ -520,6 +539,7 @@ class AssistantProvider extends ChangeNotifier {
     } else {
       await prefs.remove(_currentAssistantKey);
     }
+    await _notifyAssistantDeleted(id);
     notifyListeners();
     return true;
   }

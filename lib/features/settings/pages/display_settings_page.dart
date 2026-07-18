@@ -9,6 +9,8 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:syncfusion_flutter_sliders/sliders.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
 import '../../../core/providers/settings_provider.dart';
+import '../../../core/providers/chat_model_selection_provider.dart';
+import '../../../core/models/chat_model_target.dart';
 import 'theme_settings_page.dart';
 import '../../../theme/palettes.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1720,6 +1722,72 @@ Future<void> _showMobileMessageNavModeSheet(BuildContext context) async {
   await context.read<SettingsProvider>().setMobileMessageNavButtonsMode(choice);
 }
 
+String _multiModelScopeLabel(
+  AppLocalizations l10n,
+  MultiModelSelectionScope scope,
+) => switch (scope) {
+  MultiModelSelectionScope.assistant => l10n.multiModelScopeAssistant,
+  MultiModelSelectionScope.conversation => l10n.multiModelScopeConversation,
+  MultiModelSelectionScope.nextMessage => l10n.multiModelScopeNextMessage,
+};
+
+Future<void> _showMultiModelScopeSheet(
+  BuildContext context,
+  MultiModelSelectionScope currentScope,
+) async {
+  final cs = Theme.of(context).colorScheme;
+  final l10n = AppLocalizations.of(context)!;
+  final choice = await showModalBottomSheet<MultiModelSelectionScope>(
+    context: context,
+    backgroundColor: cs.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.multiModelScopeTitle,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: AppFontWeights.semibold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.multiModelScopeSubtitle,
+                    style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            for (final scope in MultiModelSelectionScope.values) ...[
+              _sheetOption(
+                ctx,
+                label: _multiModelScopeLabel(l10n, scope),
+                onTap: () => Navigator.of(ctx).pop(scope),
+              ),
+              if (scope != MultiModelSelectionScope.values.last)
+                _sheetDividerNoIcon(ctx),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
+  if (choice == null || choice == currentScope || !context.mounted) return;
+  await context.read<ChatModelSelectionProvider>().setScope(choice);
+}
+
 // --- Subpages ---
 
 class ChatItemDisplaySettingsPage extends StatelessWidget {
@@ -2088,6 +2156,7 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final sp = context.watch<SettingsProvider>();
+    final multiModelSelection = context.watch<ChatModelSelectionProvider?>();
     return Scaffold(
       appBar: AppBar(
         leading: Tooltip(
@@ -2106,6 +2175,22 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
         children: [
           _iosSectionCard(
             children: [
+              if (multiModelSelection != null) ...[
+                _iosNavRow(
+                  context,
+                  icon: Lucide.MessagesSquare,
+                  label: l10n.multiModelScopeTitle,
+                  detailText: _multiModelScopeLabel(
+                    l10n,
+                    multiModelSelection.scope,
+                  ),
+                  onTap: () => _showMultiModelScopeSheet(
+                    context,
+                    multiModelSelection.scope,
+                  ),
+                ),
+                _iosDivider(context),
+              ],
               _iosSwitchRow(
                 context,
                 icon: Lucide.Brain,

@@ -9,6 +9,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/database/generation_run.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -772,6 +773,8 @@ class _MessageListViewState extends State<MessageListView> {
     final gid = model.slotId;
     final selectedIdx = model.selectedVersionIndex;
     final total = model.versionCount;
+    final usesModelTargetSelector = model.hasMultipleModelTargets;
+    final selectedGenerationState = model.targetGenerationStates[message.id];
     final messageSuggestions =
         !widget.selecting &&
             model.isLatestCompleteAssistant &&
@@ -835,6 +838,8 @@ class _MessageListViewState extends State<MessageListView> {
                               gid: gid,
                               selectedIdx: selectedIdx,
                               total: total,
+                              hideLegacyVersionSwitcher:
+                                  usesModelTargetSelector,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -851,6 +856,8 @@ class _MessageListViewState extends State<MessageListView> {
                               gid: gid,
                               selectedIdx: selectedIdx,
                               total: total,
+                              hideLegacyVersionSwitcher:
+                                  usesModelTargetSelector,
                               isProcessingFiles: isProcessingFiles,
                               suggestions: messageSuggestions,
                               presentation: presentation,
@@ -876,6 +883,19 @@ class _MessageListViewState extends State<MessageListView> {
             ),
           ],
         ),
+        if (usesModelTargetSelector &&
+            selectedGenerationState != null &&
+            selectedGenerationState.isTerminal &&
+            selectedGenerationState != GenerationRunState.completed)
+          _GenerationStatusBadge(state: selectedGenerationState),
+        if (usesModelTargetSelector && message.role == 'assistant')
+          _ModelAnswerSelector(
+            groupId: gid,
+            versions: model.versions,
+            selectedVersion: model.selectedVersion,
+            generationStates: model.targetGenerationStates,
+            onSelected: widget.onVersionChange,
+          ),
         if (model.showContextDivider)
           Padding(
             padding: widget.dividerPadding,
@@ -939,6 +959,7 @@ class _MessageListViewState extends State<MessageListView> {
     required String gid,
     required int selectedIdx,
     required int total,
+    required bool hideLegacyVersionSwitcher,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -990,6 +1011,7 @@ class _MessageListViewState extends State<MessageListView> {
             gid: gid,
             selectedIdx: selectedIdx,
             total: total,
+            hideLegacyVersionSwitcher: hideLegacyVersionSwitcher,
             isProcessingFiles: isProcessingFiles,
             suggestions: suggestions,
             presentation: presentation,
@@ -1013,6 +1035,7 @@ class _MessageListViewState extends State<MessageListView> {
     required String gid,
     required int selectedIdx,
     required int total,
+    required bool hideLegacyVersionSwitcher,
     required bool isProcessingFiles,
     required List<String> suggestions,
     required _MessagePresentation presentation,
@@ -1022,12 +1045,22 @@ class _MessageListViewState extends State<MessageListView> {
       message: message,
       enableStreamingTextMotion: enableStreamingTextMotion,
       versionIndex: selectedIdx,
-      versionCount: total > 0 ? total : 1,
-      onPrevVersion: (selectedIdx > 0)
-          ? () => widget.onVersionChange?.call(gid, selectedIdx - 1)
+      versionCount: hideLegacyVersionSwitcher ? 1 : (total > 0 ? total : 1),
+      onPrevVersion:
+          (!hideLegacyVersionSwitcher &&
+              modelForVersion(message, gid)?.previousVersion != null)
+          ? () => widget.onVersionChange?.call(
+              gid,
+              modelForVersion(message, gid)!.previousVersion!,
+            )
           : null,
-      onNextVersion: (selectedIdx < total - 1)
-          ? () => widget.onVersionChange?.call(gid, selectedIdx + 1)
+      onNextVersion:
+          (!hideLegacyVersionSwitcher &&
+              modelForVersion(message, gid)?.nextVersion != null)
+          ? () => widget.onVersionChange?.call(
+              gid,
+              modelForVersion(message, gid)!.nextVersion!,
+            )
           : null,
       modelIcon:
           (!useAssistAvatar &&
@@ -1158,6 +1191,262 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+    );
+  }
+
+  MessageRenderModel? modelForVersion(ChatMessage message, String groupId) {
+    for (final model in _effectiveRenderModels) {
+      if (model.slotId == groupId && model.message.id == message.id) {
+        return model;
+      }
+    }
+    for (final model in _effectiveRenderModels) {
+      if (model.slotId == groupId) return model;
+    }
+    return null;
+  }
+}
+
+class _ModelAnswerSelector extends StatelessWidget {
+  const _ModelAnswerSelector({
+    required this.groupId,
+    required this.versions,
+    required this.selectedVersion,
+    required this.generationStates,
+    required this.onSelected,
+  });
+
+  final String groupId;
+  final List<ChatMessage> versions;
+  final int selectedVersion;
+  final Map<String, GenerationRunState> generationStates;
+  final OnVersionChange? onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final assistantVersions =
+        versions
+            .where(
+              (message) =>
+                  message.role == 'assistant' &&
+                  message.providerId != null &&
+                  message.modelId != null,
+            )
+            .toList(growable: false)
+          ..sort((left, right) => left.version.compareTo(right.version));
+    if (assistantVersions.length < 2) return const SizedBox.shrink();
+
+    final providersByModel = <String, Set<String>>{};
+    final targetTotals = <String, int>{};
+    for (final message in assistantVersions) {
+      providersByModel
+          .putIfAbsent(message.modelId!, () => <String>{})
+          .add(message.providerId!);
+      final key = '${message.providerId}\u0000${message.modelId}';
+      targetTotals[key] = (targetTotals[key] ?? 0) + 1;
+    }
+    final targetOccurrences = <String, int>{};
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: SizedBox(
+        width: double.infinity,
+        height: 36,
+        child: SingleChildScrollView(
+          key: ValueKey<String>('model-answer-selector:$groupId'),
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final message in assistantVersions) ...[
+                Builder(
+                  builder: (context) {
+                    final targetKey =
+                        '${message.providerId}\u0000${message.modelId}';
+                    final occurrence = (targetOccurrences[targetKey] ?? 0) + 1;
+                    targetOccurrences[targetKey] = occurrence;
+                    final disambiguateProvider =
+                        (providersByModel[message.modelId!]?.length ?? 0) > 1;
+                    final repeatTarget = (targetTotals[targetKey] ?? 0) > 1;
+                    final label = StringBuffer(message.modelId!)
+                      ..write(
+                        disambiguateProvider ? ' · ${message.providerId}' : '',
+                      )
+                      ..write(repeatTarget ? ' $occurrence' : '');
+                    final isSelected = message.version == selectedVersion;
+                    final generationState = generationStates[message.id];
+                    final isGenerating =
+                        message.isStreaming ||
+                        (generationState != null &&
+                            !generationState.isTerminal);
+                    final hasNoUsableBody =
+                        !message.isStreaming && message.content.trim().isEmpty;
+                    final statusLabel = switch (generationState) {
+                      GenerationRunState.preparing ||
+                      GenerationRunState.requesting ||
+                      GenerationRunState.streaming ||
+                      GenerationRunState.waitingTool =>
+                        l10n.multiModelStatusGenerating,
+                      GenerationRunState.failed => l10n.multiModelStatusFailed,
+                      GenerationRunState.cancelled =>
+                        l10n.multiModelStatusCancelled,
+                      GenerationRunState.interrupted =>
+                        l10n.multiModelStatusInterrupted,
+                      GenerationRunState.completed || null => null,
+                    };
+
+                    return Semantics(
+                      button: true,
+                      selected: isSelected,
+                      label: statusLabel == null
+                          ? label.toString()
+                          : '${label.toString()}, $statusLabel',
+                      child: Material(
+                        color: isSelected
+                            ? cs.primaryContainer
+                            : cs.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InkWell(
+                          key: ValueKey<String>(
+                            'model-answer:${message.version}',
+                          ),
+                          borderRadius: BorderRadius.circular(18),
+                          onTap: onSelected == null
+                              ? null
+                              : () => onSelected!(groupId, message.version),
+                          child: Container(
+                            height: 32,
+                            padding: const EdgeInsets.symmetric(horizontal: 9),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: isSelected
+                                    ? cs.primary.withValues(alpha: 0.55)
+                                    : cs.outlineVariant.withValues(alpha: 0.45),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                CurrentModelIcon(
+                                  providerKey: message.providerId,
+                                  modelId: message.modelId,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  label.toString(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: isSelected
+                                        ? cs.onPrimaryContainer
+                                        : cs.onSurfaceVariant,
+                                  ),
+                                ),
+                                if (isGenerating) ...[
+                                  const SizedBox(width: 7),
+                                  SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.8,
+                                      color: isSelected
+                                          ? cs.primary
+                                          : cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ] else if (generationState ==
+                                        GenerationRunState.cancelled ||
+                                    generationState ==
+                                        GenerationRunState.interrupted) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    generationState ==
+                                            GenerationRunState.cancelled
+                                        ? Icons.stop_circle_outlined
+                                        : Icons.pause_circle_outline,
+                                    size: 14,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ] else if (generationState ==
+                                        GenerationRunState.failed ||
+                                    hasNoUsableBody) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 14,
+                                    color: cs.error,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GenerationStatusBadge extends StatelessWidget {
+  const _GenerationStatusBadge({required this.state});
+
+  final GenerationRunState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final (icon, label, color) = switch (state) {
+      GenerationRunState.failed => (
+        Icons.error_outline,
+        l10n.multiModelStatusFailed,
+        cs.error,
+      ),
+      GenerationRunState.cancelled => (
+        Icons.stop_circle_outlined,
+        l10n.multiModelStatusCancelled,
+        cs.onSurfaceVariant,
+      ),
+      GenerationRunState.interrupted => (
+        Icons.pause_circle_outline,
+        l10n.multiModelStatusInterrupted,
+        cs.onSurfaceVariant,
+      ),
+      _ => (
+        Icons.info_outline,
+        l10n.multiModelStatusGenerating,
+        cs.onSurfaceVariant,
+      ),
+    };
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      child: Semantics(
+        key: ValueKey<String>('model-answer-status:${state.databaseValue}'),
+        label: label,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 5),
+            Text(label, style: TextStyle(fontSize: 12, color: color)),
+          ],
+        ),
+      ),
     );
   }
 }

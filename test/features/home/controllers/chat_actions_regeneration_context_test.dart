@@ -9,6 +9,8 @@ ChatMessage _message({
   required String role,
   required String groupId,
   required int version,
+  String? providerId,
+  String? modelId,
 }) {
   return ChatMessage(
     id: id,
@@ -17,6 +19,8 @@ ChatMessage _message({
     conversationId: 'conversation-1',
     groupId: groupId,
     version: version,
+    providerId: providerId,
+    modelId: modelId,
   );
 }
 
@@ -79,6 +83,61 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  group('ChatActions.resolveRegenerationModelTarget', () {
+    test('assistant retry keeps the model shown on that reply', () {
+      final target = ChatActions.resolveRegenerationModelTarget(
+        message: _message(
+          id: 'grok-answer',
+          role: 'assistant',
+          groupId: 'answer',
+          version: 2,
+          providerId: 'axonhub-gpt',
+          modelId: 'grok-4.5',
+        ),
+        fallbackProviderKey: 'google',
+        fallbackModelId: 'gemini-3.5-flash',
+      );
+
+      expect(target.providerKey, 'axonhub-gpt');
+      expect(target.modelId, 'grok-4.5');
+    });
+
+    test('complete reply metadata works without a current model fallback', () {
+      final target = ChatActions.resolveRegenerationModelTarget(
+        message: _message(
+          id: 'grok-answer',
+          role: 'assistant',
+          groupId: 'answer',
+          version: 2,
+          providerId: 'axonhub-gpt',
+          modelId: 'grok-4.5',
+        ),
+        fallbackProviderKey: null,
+        fallbackModelId: null,
+      );
+
+      expect(target.providerKey, 'axonhub-gpt');
+      expect(target.modelId, 'grok-4.5');
+    });
+
+    test('messages without a complete target use the current model pair', () {
+      final target = ChatActions.resolveRegenerationModelTarget(
+        message: _message(
+          id: 'legacy-answer',
+          role: 'assistant',
+          groupId: 'answer',
+          version: 0,
+          providerId: 'legacy-provider',
+        ),
+        fallbackProviderKey: 'openai',
+        fallbackModelId: 'gpt-5.6',
+      );
+
+      expect(target.providerKey, 'openai');
+      expect(target.modelId, 'gpt-5.6');
+    });
   });
 
   group('ChatActions.buildRegenerationMessages', () {

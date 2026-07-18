@@ -6,6 +6,8 @@ ChatMessage _message({
   required String id,
   required String conversationId,
   bool isStreaming = true,
+  String? groupId,
+  int version = 0,
 }) {
   return ChatMessage(
     id: id,
@@ -13,6 +15,8 @@ ChatMessage _message({
     content: id,
     conversationId: conversationId,
     isStreaming: isStreaming,
+    groupId: groupId,
+    version: version,
   );
 }
 
@@ -23,7 +27,7 @@ void main() {
       final active = _message(id: 'off-window', conversationId: 'chat');
       store.put(active);
 
-      final target = store.cancellationTarget('chat', const []);
+      final target = store.cancellationTarget('chat', const [], const {});
 
       expect(target?.id, 'off-window');
     });
@@ -34,7 +38,7 @@ void main() {
         _message(id: 'other', conversationId: 'other-chat'),
         _message(id: 'finished', conversationId: 'chat', isStreaming: false),
         _message(id: 'expected', conversationId: 'chat'),
-      ]);
+      ], const {});
 
       expect(target?.id, 'expected');
     });
@@ -62,6 +66,51 @@ void main() {
       store.removeIfMatches(preparing);
 
       expect(store.isActive(preparing), isFalse);
+    });
+
+    test('同会话多 generation 按当前选择的真实版本取消', () {
+      final store = ActiveStreamingMessageStore();
+      final first = _message(
+        id: 'first',
+        conversationId: 'chat',
+        groupId: 'answer',
+        version: 2,
+      );
+      final second = _message(
+        id: 'second',
+        conversationId: 'chat',
+        groupId: 'answer',
+        version: 7,
+      );
+      store
+        ..put(first)
+        ..put(second);
+
+      expect(store.activeMessages('chat').map((message) => message.id), [
+        'first',
+        'second',
+      ]);
+      expect(
+        store.cancellationTarget('chat', const [], const {'answer': 2})?.id,
+        'first',
+      );
+      expect(
+        store.cancellationTarget('chat', const [], const {'answer': 7})?.id,
+        'second',
+      );
+
+      store.removeIfMatches(second);
+
+      expect(store.hasActiveConversation('chat'), isTrue);
+      expect(
+        store.cancellationTarget('chat', const [], const {'answer': 7}),
+        isNull,
+        reason: '已终态的选中版本不能误停仍在生成的 sibling',
+      );
+      expect(
+        store.cancellationTarget('chat', const [], const {'answer': 2})?.id,
+        'first',
+      );
     });
   });
 }
