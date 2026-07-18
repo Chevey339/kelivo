@@ -12,24 +12,40 @@ Future<SettingsProvider> _settingsForClaudeModel(
   WidgetTester tester,
   String modelId,
 ) async {
+  return _settingsForModel(
+    tester,
+    providerId: 'Claude',
+    providerType: ProviderKind.claude,
+    baseUrl: 'https://api.anthropic.com/v1',
+    modelId: modelId,
+  );
+}
+
+Future<SettingsProvider> _settingsForModel(
+  WidgetTester tester, {
+  required String providerId,
+  required ProviderKind providerType,
+  required String baseUrl,
+  required String modelId,
+}) async {
   SharedPreferences.setMockInitialValues({});
   final settings = SettingsProvider();
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 
   await settings.setProviderConfig(
-    'Claude',
+    providerId,
     ProviderConfig(
-      id: 'Claude',
+      id: providerId,
       enabled: true,
-      name: 'Claude',
+      name: providerId,
       apiKey: 'test-key',
-      baseUrl: 'https://api.anthropic.com/v1',
-      providerType: ProviderKind.claude,
+      baseUrl: baseUrl,
+      providerType: providerType,
       models: <String>[modelId],
     ),
   );
-  await settings.setCurrentModel('Claude', modelId);
+  await settings.setCurrentModel(providerId, modelId);
   return settings;
 }
 
@@ -101,6 +117,27 @@ void main() {
 
       expect(find.text('Extreme Reasoning'), findsNothing);
       expect(find.text('Maximum Reasoning'), findsNothing);
+    });
+
+    testWidgets('shows max reasoning for GPT-5.6 models', (tester) async {
+      final settings = await _settingsForModel(
+        tester,
+        providerId: 'OpenAI',
+        providerType: ProviderKind.openai,
+        baseUrl: 'https://api.openai.com/v1',
+        modelId: 'gpt-5.6-luna',
+      );
+      await _pumpSheetLauncher(tester, settings: settings);
+
+      await _openSheet(tester);
+
+      expect(find.text('Extreme Reasoning'), findsOneWidget);
+      expect(find.text('Maximum Reasoning'), findsOneWidget);
+
+      await tester.tap(find.text('Maximum Reasoning'));
+      await tester.pumpAndSettle();
+
+      expect(settings.thinkingBudget, 128000);
     });
   });
 }

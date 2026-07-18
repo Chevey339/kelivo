@@ -216,6 +216,22 @@ void main() {
       },
     );
 
+    test('maps GPT-5.6 maximum reasoning to max effort', () async {
+      final maximumBody = await _captureGenerateTextBody(
+        providerId: 'OpenAICompatTest',
+        modelId: 'gpt-5.6-sol',
+        thinkingBudget: 128000,
+      );
+      final xhighBody = await _captureGenerateTextBody(
+        providerId: 'OpenAICompatTest',
+        modelId: 'gpt-5.6-terra',
+        thinkingBudget: 64000,
+      );
+
+      expect(maximumBody['reasoning_effort'], 'max');
+      expect(xhighBody['reasoning_effort'], 'xhigh');
+    });
+
     test(
       'maps DashScope reasoning knobs for non-streaming text generation',
       () async {

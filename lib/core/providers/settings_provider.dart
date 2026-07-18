@@ -436,6 +436,11 @@ class SettingsProvider extends ChangeNotifier {
     );
     switch (kind) {
       case ProviderKind.openai:
+        final modelForCheck = resolveOpenAIUpstreamModelId(
+          providerKey,
+          modelId,
+        );
+        return openAISupportsMaxReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
       case ProviderKind.claude:
