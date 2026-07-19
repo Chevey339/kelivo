@@ -53,11 +53,14 @@ Cuplivo 与大多数个人定制 / 单功能 Fork 不同，旨在添加多特性
 
 8. **模型能力支持** — 适配 GPT-5.6（sol/luna/terra），最高支持 xhigh/max 推理档位；新增 Kimi K3（max reasoning + 双命名变体）；同时拓展了 Qwen 3.5–3.7、Doubao seed-2 等模型家族的能力探测，确保功能可用性更准确。
 
-9. **仓库其他修复项**
+9. **PDF/Office 文件附件** — 支持直接上传 PDF、Word、Excel、PowerPoint 文档作为附件，并提供文档处理配置选项。
+
+10. **仓库其他修复项**
    - OCR 结果缓存重启后不再丢失（SQLite 持久化）
    - `fetch_markdown` 工具输出现会清理 `<script>` 和 `<style>` 标签，减少不必要的 token 消耗
    - Gemini 缓存 Token 的准确统计
    - 优化标题生成逻辑（首次失败自动重试）
+   - 修复大尺寸 base64 图片导致正则表达式栈溢出的问题
    - 其他多项稳定性改进
 
 

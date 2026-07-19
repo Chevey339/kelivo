@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.9.0] - 2026-07-19
+
+> ⚠️ **Image generation users must update**
+>
+> Since 1.4.1 switched image responses to base64 (`prefer b64_json`),
+> the regex-based image-reference scanner hits catastrophic backtracking
+> on large base64 payloads, causing a stack overflow on the second turn
+> of any image-generation conversation. 1.9.0 replaces the regex with
+> linear indexOf scanning.
+
+### Added
+- PDF/Office file attachments: upload PDF, Word, Excel, and PowerPoint documents directly, with document processing configuration (#26)
+
+### Fixed
+- Multi-AI retry matrix: context truncation, version selection timing, and guard toasts (#54)
+- MCP: skip heartbeat reconnect on rate-limit errors (429 / -32106) (#53)
+- Large base64 images no longer cause regex stack overflow — replaced with indexOf scanning (#55)
+
 ## [1.8.0] - 2026-07-19
 
 ### Added

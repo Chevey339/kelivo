@@ -53,11 +53,14 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 
 8. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; added Kimi K3 with max reasoning and both naming variants; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
 
-9. **Additional fixes across the repo**
+9. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+
+10. **Additional fixes across the repo**
    - OCR result caching now persists across restarts (SQLite-backed)
    - `fetch_markdown` tool output now strips `<script>` and `<style>` tags to reduce excessive token consumption
    - Accurate Gemini cached-token reporting
    - Optimized title generation logic (auto-retry on first failure)
+   - Large base64 images no longer cause regex stack overflow
    - Various other stability improvements
 
 ## ⚠️ Note
