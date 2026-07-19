@@ -278,16 +278,33 @@ List<_ImageRef> _extractOpenAIImageRefs(dynamic content) {
   final raw = (content ?? '').toString();
   if (raw.isEmpty) return const <_ImageRef>[];
   final refs = <_ImageRef>[];
-  final markdownImage = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
-  final customImage = RegExp(r'\[image:(.+?)\]');
-  for (final match in markdownImage.allMatches(raw)) {
-    final source = (match.group(1) ?? '').trim();
+
+  int searchFrom = 0;
+  while (true) {
+    final imgStart = raw.indexOf('![', searchFrom);
+    if (imgStart < 0) break;
+    final altEnd = raw.indexOf('](', imgStart + 2);
+    if (altEnd < 0) break;
+    final srcStart = altEnd + 2;
+    final srcEnd = raw.indexOf(')', srcStart);
+    if (srcEnd < 0) break;
+    final source = raw.substring(srcStart, srcEnd).trim();
     if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+    searchFrom = srcEnd + 1;
   }
-  for (final match in customImage.allMatches(raw)) {
-    final source = (match.group(1) ?? '').trim();
+
+  searchFrom = 0;
+  while (true) {
+    final tagStart = raw.indexOf('[image:', searchFrom);
+    if (tagStart < 0) break;
+    final srcStart = tagStart + 7;
+    final srcEnd = raw.indexOf(']', srcStart);
+    if (srcEnd < 0) break;
+    final source = raw.substring(srcStart, srcEnd).trim();
     if (source.isNotEmpty) refs.add(_imageRefFromSource(source));
+    searchFrom = srcEnd + 1;
   }
+
   return refs;
 }
 
