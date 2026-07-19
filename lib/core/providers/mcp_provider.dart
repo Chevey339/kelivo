@@ -934,6 +934,8 @@ class McpProvider extends ChangeNotifier {
         // Add a soft timeout to avoid piling up
         await fut.timeout(const Duration(seconds: 6));
       } catch (e) {
+        // Rate-limited? Server is alive — skip this tick, don't reconnect.
+        if (_isRateLimitError(e)) return;
         // debugPrint('[MCP/Heartbeat] liveness check failed id=$id');
         // Consider connection lost; mark error and try auto-reconnect
         _status[id] = McpStatus.error;
@@ -950,6 +952,14 @@ class McpProvider extends ChangeNotifier {
 
   void _stopHeartbeat(String id) {
     _heartbeats.remove(id)?.cancel();
+  }
+
+  /// Returns true if the error indicates rate-limiting (429, MCP -32106).
+  /// Rate-limited responses prove the server is alive — skip heartbeat retry.
+  bool _isRateLimitError(Object e) {
+    if (e is mcp.McpError && e.code == -32106) return true;
+    final msg = e.toString().toLowerCase();
+    return msg.contains('429') || msg.contains('rate limit');
   }
 
   McpToolConfig? _toolConfig(String serverId, String toolName) {
