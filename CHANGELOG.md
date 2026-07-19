@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.0] - 2026-07-19
+
+### Added
+- Multi-AI synthesize mode: after comparing model responses, fork the conversation and let an AI summarize, fuse, or comment on all outputs — like a more flexible OpenRouter Fusion (#52)
+
 ## [1.7.2] - 2026-07-19
 
 > ⚠️ **SVG preview users on 1.7.0–1.7.1 must update**

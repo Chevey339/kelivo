@@ -36,7 +36,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
    - *Note*: Periodic full snapshots are still recommended.
 
-3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses in the same view side by side, so you can pick the best result.
+3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
    - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
