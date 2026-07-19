@@ -9,6 +9,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/models/backup.dart';
@@ -37,6 +38,13 @@ Future<Map<String, dynamic>> _readBackupSettings(File backup) async {
   final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
   final entry = archive.findFile('settings.json');
   if (entry == null) throw StateError('settings.json');
+  return jsonDecode(utf8.decode(entry.readBytes()!)) as Map<String, dynamic>;
+}
+
+Future<Map<String, dynamic>> _readBackupManifest(File backup) async {
+  final archive = ZipDecoder().decodeBytes(await backup.readAsBytes());
+  final entry = archive.findFile('manifest.json');
+  if (entry == null) throw StateError('manifest.json');
   return jsonDecode(utf8.decode(entry.readBytes()!)) as Map<String, dynamic>;
 }
 
@@ -122,6 +130,7 @@ void main() {
             );
 
         final settings = await _readBackupSettings(backup);
+        final manifest = await _readBackupManifest(backup);
         final providers =
             jsonDecode(settings['provider_configs_v1'] as String) as Map;
         expect(settings['providers_order_v1'], ['second', 'first']);
@@ -139,6 +148,9 @@ void main() {
         expect(settings, isNot(contains('flutter_log_enabled_v1')));
         expect(settings, isNot(contains('restore_transient_v1')));
         expect(settings, isNot(contains('pinned_chat_ids')));
+        final rowIds = manifest['businessEntityRowIds'] as Map;
+        expect(rowIds['assistants_v1'], ['assistant-1']);
+        expect(rowIds['assistant_tags_v1'], isEmpty);
       } finally {
         await DataSync.cleanupTemporaryBackupFile(backup);
         await database.close();
@@ -224,6 +236,86 @@ void main() {
         }
       },
     );
+
+    for (final mode in const [RestoreMode.overwrite, RestoreMode.merge]) {
+      test(
+        'settings-only ${mode.name} keeps idless tag identity used by relationships',
+        () async {
+          final sourceDatabase = AppDatabase.open(
+            file: File('${root.path}/idless-${mode.name}-source.sqlite'),
+          );
+          final sourceRepository = BusinessRepository(sourceDatabase);
+          File? backup;
+          late String sourceTagRowId;
+          try {
+            await BusinessRestoreService(sourceRepository).overwrite({
+              'assistant_tags_v1': jsonEncode([
+                {'name': 'Before rename'},
+              ]),
+            });
+            final original = (await sourceRepository.readEntities(
+              BusinessEntityKind.assistantTag,
+            )).single;
+            sourceTagRowId = original.id;
+            await sourceRepository.synchronizeEntities(
+              BusinessEntityKind.assistantTag,
+              [
+                original.copyWith(
+                  payload: jsonEncode({'name': 'After rename'}),
+                ),
+              ],
+            );
+            await sourceRepository.setPreference(
+              'assistant_tag_map_v1',
+              jsonEncode({'assistant-a': sourceTagRowId}),
+            );
+            backup =
+                await DataSync(
+                  chatService: ChatService(),
+                  businessRepository: sourceRepository,
+                ).prepareBackupFile(
+                  const WebDavConfig(includeChats: false, includeFiles: false),
+                );
+          } finally {
+            await sourceDatabase.close();
+          }
+
+          final targetDatabase = AppDatabase.open(
+            file: File('${root.path}/idless-${mode.name}-target.sqlite'),
+          );
+          final targetRepository = BusinessRepository(targetDatabase);
+          try {
+            await DataSync(
+              chatService: ChatService(),
+              businessRepository: targetRepository,
+            ).restoreFromLocalFile(
+              backup,
+              const WebDavConfig(includeChats: false, includeFiles: false),
+              mode: mode,
+            );
+
+            final restoredTag = (await targetRepository.readEntities(
+              BusinessEntityKind.assistantTag,
+            )).single;
+            final restored = await BusinessRestoreService(
+              targetRepository,
+            ).exportSettings();
+            final tagPayload =
+                (jsonDecode(restored['assistant_tags_v1'] as String) as List)
+                        .single
+                    as Map;
+            final tagMap =
+                jsonDecode(restored['assistant_tag_map_v1'] as String) as Map;
+            expect(restoredTag.id, sourceTagRowId);
+            expect(tagPayload, {'name': 'After rename'});
+            expect(tagMap['assistant-a'], restoredTag.id);
+          } finally {
+            await DataSync.cleanupTemporaryBackupFile(backup);
+            await targetDatabase.close();
+          }
+        },
+      );
+    }
 
     test(
       'settings-only merge is one live DB transaction and touches no chat, asset, or workspace',

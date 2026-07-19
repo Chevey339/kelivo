@@ -6,10 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_data.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 Future<String> _sha256(File file) async =>
     (await sha256.bind(file.openRead()).first).toString();
@@ -72,6 +75,7 @@ void main() {
               },
             }),
             'providers_order_v1': ['portable-provider'],
+            'instruction_injections_v1': jsonEncode(const <Object>[]),
             'portable_only_v1': ['a', 'b'],
             'flutter_log_enabled_v1': true,
           }),
@@ -150,8 +154,9 @@ void main() {
         ).copy(p.join(root.path, 'inspection.sqlite'));
         final inspectionDatabase = AppDatabase.open(file: inspectionFile);
         try {
+          final inspectionRepository = BusinessRepository(inspectionDatabase);
           final exported = await BusinessRestoreService(
-            BusinessRepository(inspectionDatabase),
+            inspectionRepository,
           ).exportSettings();
           final providers =
               jsonDecode(exported['provider_configs_v1'] as String) as Map;
@@ -161,8 +166,127 @@ void main() {
             'portable-secret',
           );
           expect(exported['portable_only_v1'], ['a', 'b']);
+          expect(
+            await InstructionInjectionStore(
+              BusinessPreferences(inspectionRepository),
+            ).getAll(),
+            isEmpty,
+          );
           expect(exported, isNot(contains('snapshot_only_v1')));
           expect(exported, isNot(contains('flutter_log_enabled_v1')));
+        } finally {
+          await inspectionDatabase.close();
+        }
+      },
+    );
+
+    test(
+      'staging preserves idless tag row identity used by relationships',
+      () async {
+        final extracted = Directory(p.join(root.path, 'idless-extracted'));
+        final databaseFile = File(
+          p.join(extracted.path, 'database', 'kelivo.db'),
+        );
+        await databaseFile.parent.create(recursive: true);
+        final database = AppDatabase.open(file: databaseFile);
+        try {
+          await BusinessRestoreService(
+            BusinessRepository(database),
+          ).overwrite({'snapshot_only_v1': true});
+        } finally {
+          await database.close();
+        }
+        final databaseInfo =
+            await ChatDatabaseRepository.prepareSnapshotForRestore(
+              databaseFile,
+            );
+
+        const tagRowId = 'stable-idless-tag-row';
+        final settingsFile = File(p.join(extracted.path, 'settings.json'));
+        await settingsFile.writeAsString(
+          jsonEncode({
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'After rename'},
+            ]),
+            'assistant_tag_map_v1': jsonEncode({'assistant-a': tagRowId}),
+          }),
+          flush: true,
+        );
+        final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+        await manifestFile.writeAsString(
+          jsonEncode({
+            'format': 'kelivo-backup',
+            'formatVersion': 2,
+            'payloadKind': 'sqlite',
+            'createdAtUtc': '2026-07-18T00:00:00.000Z',
+            'appVersion': 'test',
+            'includeChats': true,
+            'includeFiles': false,
+            'secretsIncluded': true,
+            'businessEntityRowIds': {
+              for (final kind in BusinessEntityKind.values)
+                if (kind != BusinessEntityKind.provider)
+                  kind.sourceKey: kind == BusinessEntityKind.assistantTag
+                      ? [tagRowId]
+                      : <String>[],
+            },
+            'database': {
+              'entry': 'database/kelivo.db',
+              'schemaVersion': databaseInfo.schemaVersion,
+              'conversationCount': databaseInfo.conversationCount,
+              'messageCount': databaseInfo.messageCount,
+            },
+            'entries': {
+              'settings.json': {
+                'bytes': await settingsFile.length(),
+                'sha256': await _sha256(settingsFile),
+              },
+              'database/kelivo.db': {
+                'bytes': await databaseFile.length(),
+                'sha256': await _sha256(databaseFile),
+              },
+            },
+          }),
+          flush: true,
+        );
+
+        final staged = await RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _sha256(manifestFile),
+        );
+        final candidateManifest =
+            jsonDecode(
+                  await File(
+                    p.join(staged.payloadDirectory.path, 'manifest.json'),
+                  ).readAsString(),
+                )
+                as Map<String, dynamic>;
+        expect(candidateManifest, isNot(contains('businessEntityRowIds')));
+
+        final inspectionFile = await File(
+          p.join(staged.payloadDirectory.path, 'database', 'kelivo.db'),
+        ).copy(p.join(root.path, 'idless-inspection.sqlite'));
+        final inspectionDatabase = AppDatabase.open(file: inspectionFile);
+        try {
+          final inspectionRepository = BusinessRepository(inspectionDatabase);
+          final restoredTag = (await inspectionRepository.readEntities(
+            BusinessEntityKind.assistantTag,
+          )).single;
+          final restored = await BusinessRestoreService(
+            inspectionRepository,
+          ).exportSettings();
+          final tagPayload =
+              (jsonDecode(restored['assistant_tags_v1'] as String) as List)
+                      .single
+                  as Map;
+          final tagMap =
+              jsonDecode(restored['assistant_tag_map_v1'] as String) as Map;
+          expect(restoredTag.id, tagRowId);
+          expect(tagPayload, {'name': 'After rename'});
+          expect(tagMap['assistant-a'], restoredTag.id);
         } finally {
           await inspectionDatabase.close();
         }

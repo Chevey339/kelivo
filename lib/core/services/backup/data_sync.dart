@@ -14,6 +14,7 @@ import 'package:xml/xml.dart';
 
 import '../../database/business_repository.dart';
 import '../../database/business_restore_service.dart';
+import '../../database/business_settings_router.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
@@ -36,6 +37,7 @@ typedef _VersionedBackupInfo = ({
   bool includeChats,
   bool includeFiles,
   bool secretsIncluded,
+  Map<String, Object?>? businessEntityRowIds,
   String normalizedManifestSha256,
 });
 
@@ -187,11 +189,11 @@ class DataSync {
     try {
       // --- Step 1: Prepare temp files that need ChatService (main isolate) ---
       // settings.json
-      final settingsJson = await _exportSettingsJson();
+      final businessExport = await _exportBusinessSettings();
       final settingsFile = await _writeTempText(
         workDir,
         '_bk_settings.json',
-        settingsJson,
+        businessExport.settingsJson,
       );
       settingsTmp = settingsFile;
 
@@ -233,6 +235,7 @@ class DataSync {
           includeChats: cfg.includeChats,
           includeFiles: includeFiles,
           appVersion: appVersion,
+          businessEntityRowIds: businessExport.entityRowIds,
           uploadDirPath: uploadDirPath,
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
@@ -324,6 +327,7 @@ class DataSync {
     required bool includeChats,
     required bool includeFiles,
     required String appVersion,
+    required Map<String, List<String>> businessEntityRowIds,
     required String uploadDirPath,
     required String avatarsDirPath,
     required String imagesDirPath,
@@ -391,6 +395,7 @@ class DataSync {
         includeChats: includeChats,
         includeFiles: includeFiles,
         appVersion: appVersion,
+        businessEntityRowIds: businessEntityRowIds,
       );
       final manifestFile = File(manifestPath)
         ..writeAsStringSync(manifestJson, flush: true);
@@ -892,6 +897,7 @@ class DataSync {
     required bool includeChats,
     required bool includeFiles,
     required String appVersion,
+    required Map<String, List<String>> businessEntityRowIds,
   }) {
     return jsonEncode({
       'format': _backupFormat,
@@ -902,6 +908,7 @@ class DataSync {
       'includeChats': includeChats,
       'includeFiles': includeFiles,
       'secretsIncluded': true,
+      'businessEntityRowIds': businessEntityRowIds,
       if (snapshotInfo != null)
         'database': {
           'entry': _databaseEntryName,
@@ -947,6 +954,7 @@ class DataSync {
         manifest['secretsIncluded'] != true) {
       throw const FormatException('manifest_fields');
     }
+    final businessEntityRowIds = _parseBusinessEntityRowIds(manifest);
 
     final rawEntries = manifest['entries'];
     if (rawEntries is! Map) {
@@ -1067,8 +1075,30 @@ class DataSync {
       includeChats: includeChats,
       includeFiles: includeFiles,
       secretsIncluded: true,
+      businessEntityRowIds: businessEntityRowIds,
       normalizedManifestSha256: normalizedManifestSha256,
     );
+  }
+
+  static Map<String, Object?>? _parseBusinessEntityRowIds(
+    Map<String, dynamic> manifest,
+  ) {
+    if (!manifest.containsKey('businessEntityRowIds')) return null;
+    final raw = manifest['businessEntityRowIds'];
+    if (raw is! Map || raw.keys.any((key) => key is! String)) {
+      throw const FormatException('manifest_business_entity_row_ids');
+    }
+    final result = <String, Object?>{};
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is! List || value.any((item) => item is! String)) {
+        throw const FormatException('manifest_business_entity_row_ids');
+      }
+      result[entry.key as String] = List<String>.unmodifiable(
+        value.cast<String>(),
+      );
+    }
+    return Map<String, Object?>.unmodifiable(result);
   }
 
   static Map<String, dynamic> _readSettingsJsonSync(String path) {
@@ -1370,12 +1400,17 @@ class DataSync {
     }
   }
 
-  Future<String> _exportSettingsJson() async {
-    final settings = await BusinessRestoreService(
-      businessRepository,
-    ).exportSettings();
+  Future<({String settingsJson, Map<String, List<String>> entityRowIds})>
+  _exportBusinessSettings() async {
+    final exported = BusinessSettingsRouter.exportSnapshotWithRowIds(
+      await businessRepository.readSnapshot(),
+    );
+    final settings = Map<String, Object>.from(exported.settings);
     settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
-    return jsonEncode(settings);
+    return (
+      settingsJson: jsonEncode(settings),
+      entityRowIds: exported.entityRowIds,
+    );
   }
 
   Future<void> _restoreFromBackupFile(
@@ -1426,13 +1461,30 @@ class DataSync {
       BackupSettingsValidator.normalizeAndValidate(settings);
       final businessRestore = BusinessRestoreService(businessRepository);
       if (versionedBackup != null) {
+        final preserveExplicitEmptyInstructionList =
+            versionedBackup.businessEntityRowIds == null;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
         final restoreChats = cfg.includeChats && includeChats;
         final restoreFiles = cfg.includeFiles && includeFiles;
+        if (mode == RestoreMode.merge && restoreChats) {
+          // Chat merge commits independently, so reject a mismatched business
+          // payload before either live domain is changed.
+          BusinessSettingsRouter.normalizeAndRoute(
+            settings,
+            preserveExplicitEmptyInstructionList:
+                preserveExplicitEmptyInstructionList,
+            entityRowIds: versionedBackup.businessEntityRowIds,
+          );
+        }
         if (mode == RestoreMode.overwrite) {
           if (!restoreChats) {
-            await businessRestore.overwrite(settings);
+            await businessRestore.overwrite(
+              settings,
+              preserveExplicitEmptyInstructionList:
+                  preserveExplicitEmptyInstructionList,
+              entityRowIds: versionedBackup.businessEntityRowIds,
+            );
             return;
           }
           final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
@@ -1456,7 +1508,12 @@ class DataSync {
             File(p.join(extractDir.path, _databaseEntryName)),
           );
         }
-        await businessRestore.merge(settings);
+        await businessRestore.merge(
+          settings,
+          preserveExplicitEmptyInstructionList:
+              preserveExplicitEmptyInstructionList,
+          entityRowIds: versionedBackup.businessEntityRowIds,
+        );
         if (!restoreChats) {
           return;
         }
@@ -1489,11 +1546,13 @@ class DataSync {
           await businessRestore.overwrite(
             settings,
             preserveExplicitEmptyInstructionList: true,
+            assumePreV3EmbeddingMigrationWhenVersionMissing: true,
           );
         } else {
           await businessRestore.merge(
             settings,
             preserveExplicitEmptyInstructionList: true,
+            assumePreV3EmbeddingMigrationWhenVersionMissing: true,
           );
         }
         if (!restoreChats) {

@@ -12,6 +12,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
@@ -23,6 +24,7 @@ import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 bool _containsContiguousBytes(List<int> source, List<int> pattern) {
   for (var start = 0; start <= source.length - pattern.length; start++) {
@@ -230,6 +232,7 @@ Future<File> _createSqliteBackupFixture({
   bool secretsIncluded = true,
   bool includeFiles = false,
   String? assetContent,
+  Object? businessEntityRowIds,
 }) async {
   if (assetContent != null && !includeFiles) {
     throw ArgumentError.value(assetContent, 'assetContent');
@@ -302,6 +305,8 @@ Future<File> _createSqliteBackupFixture({
       'includeChats': true,
       'includeFiles': includeFiles,
       'secretsIncluded': secretsIncluded,
+      if (businessEntityRowIds != null)
+        'businessEntityRowIds': businessEntityRowIds,
       'database': {
         'entry': 'database/kelivo.db',
         'schemaVersion': snapshotInfo.schemaVersion,
@@ -657,6 +662,48 @@ void main() {
         expect(
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,
+        );
+      },
+    );
+
+    test(
+      'rejects malformed business entity row ids before changing live data',
+      () async {
+        final backupFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'malformed_business_row_ids',
+          settings: const {'incoming': 'value'},
+          businessEntityRowIds: const {
+            'assistant_tags_v1': ['valid', 42],
+          },
+        );
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
+            backupFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'manifest_business_entity_row_ids',
+            ),
+          ),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
         );
       },
     );
@@ -1018,6 +1065,71 @@ void main() {
     );
 
     test(
+      'versioned settings-only overwrite preserves an explicitly empty instruction list',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'empty_instructions_overwrite',
+          settings: {'instruction_injections_v1': jsonEncode(const <Object>[])},
+        );
+
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        expect(
+          await InstructionInjectionStore(
+            BusinessPreferences(businessRepository),
+          ).getAll(),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'versioned settings-only merge preserves an explicitly empty instruction list',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'empty_instructions_merge',
+          settings: {'instruction_injections_v1': jsonEncode(const <Object>[])},
+        );
+        await BusinessRestoreService(businessRepository).overwrite({
+          'instruction_injections_v1': jsonEncode([
+            {'id': 'local', 'title': 'Local', 'prompt': 'Keep'},
+          ]),
+        });
+
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.merge,
+        );
+
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(
+          jsonDecode(restored['instruction_injections_v1']! as String),
+          isEmpty,
+        );
+        expect(
+          await InstructionInjectionStore(
+            BusinessPreferences(businessRepository),
+          ).getAll(),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
       'rejects a linked same-volume staging root before live writes',
       () async {
         await BusinessRestoreService(
@@ -1265,6 +1377,53 @@ void main() {
         expect(
           await BusinessRestoreService(businessRepository).exportSettings(),
           before,
+        );
+        expect(chatService.getConversation(existing.id), isNotNull);
+        expect(chatService.getConversation('fixture-conversation'), isNull);
+      },
+    );
+
+    test(
+      'validates business row identities before merging versioned chats',
+      () async {
+        final fixture = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'invalid_business_identity_before_chat_merge',
+          settings: {
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'Imported tag'},
+            ]),
+          },
+          businessEntityRowIds: const {
+            'assistant_tags_v1': <String>['row-a', 'row-b'],
+          },
+        );
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final businessBefore = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+        final existing = await chatService.createConversation(title: 'Local');
+
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(
+            fixture,
+            const WebDavConfig(includeChats: true, includeFiles: false),
+            mode: RestoreMode.merge,
+          ),
+          throwsA(isA<FormatException>()),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          businessBefore,
         );
         expect(chatService.getConversation(existing.id), isNotNull);
         expect(chatService.getConversation('fixture-conversation'), isNull);
@@ -2393,7 +2552,21 @@ void main() {
             'global_proxy_password_v1': 'legacy-proxy-secret',
             'instruction_injections_v1': jsonEncode(const <Object>[]),
             'provider_configs_v1': jsonEncode({
-              'openai': {'id': 'openai', 'apiKey': 'legacy-api-secret'},
+              'openai': {
+                'id': 'openai',
+                'apiKey': 'legacy-api-secret',
+                'modelOverrides': {
+                  'legacy-embedding': {
+                    'type': 'embedding',
+                    'abilities': ['vision'],
+                    'output': ['text'],
+                    'builtInTools': ['search'],
+                    'built_in_tools': ['search'],
+                    'tools': ['search'],
+                    'dimensions': 1536,
+                  },
+                },
+              },
             }),
           }),
         );
@@ -2421,7 +2594,22 @@ void main() {
         ).exportSettings();
         expect(restored['restored_setting'], 'new');
         expect(restored['global_proxy_password_v1'], 'legacy-proxy-secret');
-        expect(restored['provider_configs_v1'], contains('legacy-api-secret'));
+        final providers =
+            jsonDecode(restored['provider_configs_v1'] as String) as Map;
+        final provider = providers['openai'] as Map;
+        expect(provider['apiKey'], 'legacy-api-secret');
+        final embedding =
+            (provider['modelOverrides'] as Map)['legacy-embedding'] as Map;
+        expect(embedding['dimensions'], 1536);
+        for (final field in const [
+          'abilities',
+          'output',
+          'builtInTools',
+          'built_in_tools',
+          'tools',
+        ]) {
+          expect(embedding, isNot(contains(field)), reason: field);
+        }
         expect(
           jsonDecode(
             restored['instruction_injections_active_ids_by_assistant_v1']!

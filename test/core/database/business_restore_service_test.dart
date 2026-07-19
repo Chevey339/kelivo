@@ -5,8 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
+import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 void main() {
@@ -156,6 +158,82 @@ END;
       expect(exported['theme_mode_v1'], 'dark');
     },
   );
+
+  test('merge preserves unrelated local id-less entity identities', () async {
+    await service.overwrite({
+      'assistant_tags_v1': jsonEncode([
+        {'name': 'Original tag'},
+      ]),
+    });
+    final originalId = (await repository.readEntities(
+      BusinessEntityKind.assistantTag,
+    )).single.id;
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+    final runtimeTags =
+        (jsonDecode(preferences.getString('assistant_tags_v1')!) as List)
+            .cast<Map>()
+            .map((item) => item.cast<String, dynamic>())
+            .toList();
+    runtimeTags.single['name'] = 'Renamed tag';
+    await preferences.setString('assistant_tags_v1', jsonEncode(runtimeTags));
+    await repository.setPreference(
+      'assistant_tag_map_v1',
+      jsonEncode({'assistant-a': originalId}),
+    );
+
+    await service.merge({'theme_mode_v1': 'dark'});
+
+    final rows = await repository.readEntities(BusinessEntityKind.assistantTag);
+    expect(rows.single.id, originalId);
+    expect(jsonDecode(rows.single.payload), {'name': 'Renamed tag'});
+    expect(
+      jsonDecode(
+        await repository.getPreference('assistant_tag_map_v1') as String,
+      ),
+      {'assistant-a': originalId},
+    );
+  });
+
+  test('merge preserves imported portable row identities', () async {
+    final seeded = BusinessSettingsRouter.normalizeAndRoute({
+      'assistant_tags_v1': jsonEncode([
+        {'name': 'Original tag'},
+      ]),
+    });
+    final sourceRow = seeded.entities[BusinessEntityKind.assistantTag]!.single;
+    final portable = BusinessSettingsRouter.exportSnapshotWithRowIds(
+      BusinessSnapshot(
+        entities: {
+          ...seeded.entities,
+          BusinessEntityKind.assistantTag: [
+            sourceRow.copyWith(
+              payload: jsonEncode({'name': 'Renamed before backup'}),
+            ),
+          ],
+        },
+        preferences: {
+          'assistant_tag_map_v1': jsonEncode({'assistant-a': sourceRow.id}),
+        },
+      ),
+    );
+
+    await service.merge(portable.settings, entityRowIds: portable.entityRowIds);
+
+    final restored = await repository.readEntities(
+      BusinessEntityKind.assistantTag,
+    );
+    expect(restored.single.id, sourceRow.id);
+    expect(jsonDecode(restored.single.payload), {
+      'name': 'Renamed before backup',
+    });
+    expect(
+      jsonDecode(
+        await repository.getPreference('assistant_tag_map_v1') as String,
+      ),
+      {'assistant-a': sourceRow.id},
+    );
+  });
 
   test('database failure rolls back every merged business key', () async {
     await service.overwrite({

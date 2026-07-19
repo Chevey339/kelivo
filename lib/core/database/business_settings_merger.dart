@@ -8,6 +8,14 @@ final class BusinessSettingsMerger {
 
   static const _activeIdsByAssistantKey =
       'instruction_injections_active_ids_by_assistant_v1';
+  static const _providerOrderKey = 'providers_order_v1';
+  static const _pinnedModelsKey = 'pinned_models_v1';
+  static const _relationshipMapKeys = <String>{
+    'provider_group_map_v1',
+    'provider_group_collapsed_v1',
+    'assistant_tag_map_v1',
+    'assistant_tag_collapsed_v1',
+  };
 
   static Map<String, Object> merge(
     Map<String, Object?> existing,
@@ -15,108 +23,141 @@ final class BusinessSettingsMerger {
     bool preserveExplicitEmptyInstructionList = false,
   }) {
     final existingSnapshot = BusinessSettingsRouter.normalizeAndRoute(existing);
+    if (incoming.containsKey(_pinnedModelsKey) &&
+        existing.containsKey(_pinnedModelsKey) &&
+        !existingSnapshot.preferences.containsKey(_pinnedModelsKey)) {
+      throw const FormatException(_pinnedModelsKey);
+    }
     final incomingSnapshot = BusinessSettingsRouter.normalizeAndRoute(
       incoming,
       preserveExplicitEmptyInstructionList:
           preserveExplicitEmptyInstructionList,
     );
-    final current = BusinessSettingsRouter.exportSnapshot(existingSnapshot);
-    final normalizedIncoming = BusinessSettingsRouter.exportSnapshot(
-      incomingSnapshot,
-    );
-    final incomingKeys = <String>{...incoming.keys};
-    if (normalizedIncoming.containsKey(_activeIdsByAssistantKey)) {
-      incomingKeys.add(_activeIdsByAssistantKey);
-    }
-
-    for (final key in incomingKeys) {
-      final disposition = BusinessKeyRegistry.classify(key);
-      if (disposition == BusinessKeyDisposition.localOnly ||
-          disposition == BusinessKeyDisposition.discarded) {
-        continue;
-      }
-      final imported = normalizedIncoming[key];
-      if (imported == null) {
-        if (key == 'pinned_models_v1') throw FormatException(key);
-        continue;
-      }
-      switch (key) {
-        case 'assistants_v1':
-          current[key] = _mergeAssistants(
-            _entityRows(existingSnapshot, key),
-            _entityRows(incomingSnapshot, key),
-          );
-        case 'assistant_memories_v1':
-          current[key] = _mergeAssistantMemories(
-            current[key] as String,
-            imported as String,
-          );
-        case 'provider_configs_v1':
-          current[key] = _mergeProviderConfigs(
-            current[key] as String,
-            imported as String,
-          );
-        case 'pinned_models_v1':
-          current[key] = _mergeStringLists(
-            existing.containsKey(key) ? current[key] : const <String>[],
-            imported,
-            key,
-          );
-        case 'mcp_servers_v1':
-        case 'provider_groups_v1':
-        case 'assistant_tags_v1':
-          current[key] = _mergeJsonListById(
-            _entityRows(existingSnapshot, key),
-            _entityRows(incomingSnapshot, key),
-          );
-        case 'provider_group_map_v1':
-        case 'provider_group_collapsed_v1':
-        case 'assistant_tag_map_v1':
-        case 'assistant_tag_collapsed_v1':
-          current[key] = _mergeJsonMapsPreferExisting(
-            current[key] as String?,
-            imported as String,
-          );
-        case 'providers_order_v1':
-        case 'search_services_v1':
-          current[key] = imported;
-        default:
-          current[key] = imported;
-      }
-    }
-
     return BusinessSettingsRouter.exportSnapshot(
-      BusinessSettingsRouter.normalizeAndRoute(current),
+      mergeSnapshots(
+        existingSnapshot,
+        incomingSnapshot,
+        incomingKeys: incoming.keys.toSet(),
+      ),
     );
   }
 
-  static String _mergeAssistants(
+  static BusinessSnapshot mergeSnapshots(
+    BusinessSnapshot existing,
+    BusinessSnapshot incoming, {
+    required Set<String> incomingKeys,
+  }) {
+    final effectiveIncomingKeys = <String>{...incomingKeys};
+    if (incoming.preferences.containsKey(_activeIdsByAssistantKey)) {
+      effectiveIncomingKeys.add(_activeIdsByAssistantKey);
+    }
+
+    final entities = <BusinessEntityKind, List<BusinessEntityValue>>{
+      for (final kind in BusinessEntityKind.values)
+        kind: existing.entities[kind]!,
+    };
+    for (final kind in BusinessEntityKind.values) {
+      if (!effectiveIncomingKeys.contains(kind.sourceKey)) continue;
+      final localRows = existing.entities[kind]!;
+      final importedRows = incoming.entities[kind]!;
+      entities[kind] = switch (kind) {
+        BusinessEntityKind.assistant => _mergeAssistants(
+          localRows,
+          importedRows,
+        ),
+        BusinessEntityKind.provider => _mergeProviders(
+          localRows,
+          importedRows,
+          preferIncomingOrder: effectiveIncomingKeys.contains(
+            _providerOrderKey,
+          ),
+        ),
+        BusinessEntityKind.providerGroup ||
+        BusinessEntityKind.mcpServer ||
+        BusinessEntityKind.assistantTag => _mergeEntityRowsById(
+          localRows,
+          importedRows,
+        ),
+        BusinessEntityKind.assistantMemory => _mergeAssistantMemories(
+          localRows,
+          importedRows,
+        ),
+        _ => _reorderRows(importedRows),
+      };
+    }
+    if (effectiveIncomingKeys.contains(_providerOrderKey) &&
+        !effectiveIncomingKeys.contains(
+          BusinessEntityKind.provider.sourceKey,
+        )) {
+      entities[BusinessEntityKind.provider] = _mergeProviders(
+        existing.entities[BusinessEntityKind.provider]!,
+        incoming.entities[BusinessEntityKind.provider]!,
+        preferIncomingOrder: true,
+      );
+    }
+
+    final preferences = Map<String, Object>.from(existing.preferences);
+    for (final key in effectiveIncomingKeys) {
+      final disposition = BusinessKeyRegistry.classify(key);
+      if (disposition == BusinessKeyDisposition.entity ||
+          disposition == BusinessKeyDisposition.providerOrder ||
+          disposition == BusinessKeyDisposition.localOnly ||
+          disposition == BusinessKeyDisposition.discarded) {
+        continue;
+      }
+      final imported = incoming.preferences[key];
+      if (imported == null) {
+        if (key == _pinnedModelsKey) throw FormatException(key);
+        continue;
+      }
+      if (key == _pinnedModelsKey) {
+        preferences[key] = _mergeStringLists(
+          existing.preferences.containsKey(key)
+              ? preferences[key]
+              : const <String>[],
+          imported,
+          key,
+        );
+      } else if (_relationshipMapKeys.contains(key)) {
+        preferences[key] = _mergeJsonMapsPreferExisting(
+          preferences[key] as String?,
+          imported as String,
+        );
+      } else {
+        preferences[key] = imported;
+      }
+    }
+
+    return BusinessSnapshot(entities: entities, preferences: preferences);
+  }
+
+  static List<BusinessEntityValue> _mergeAssistants(
     List<BusinessEntityValue> existing,
     List<BusinessEntityValue> incoming,
   ) {
-    final byId = <String, Map<String, dynamic>>{};
-    final order = <String>[];
-    for (final row in existing) {
-      final id = row.id;
-      if (byId.containsKey(id)) continue;
-      byId[id] = _jsonMap(row.payload, 'assistants_v1');
-      order.add(id);
+    final mergedRows = <BusinessEntityValue>[];
+    final indexById = <String, int>{};
+    for (final row in _orderedRows(existing)) {
+      if (indexById.containsKey(row.id)) continue;
+      indexById[row.id] = mergedRows.length;
+      mergedRows.add(row);
     }
-    for (final row in incoming) {
-      final id = row.id;
-      final assistant = _jsonMap(row.payload, 'assistants_v1');
-      final local = byId[id];
-      if (local == null) {
-        byId[id] = assistant;
-        order.add(id);
+    for (final row in _orderedRows(incoming)) {
+      final localIndex = indexById[row.id];
+      if (localIndex == null) {
+        indexById[row.id] = mergedRows.length;
+        mergedRows.add(row);
         continue;
       }
+      final localRow = mergedRows[localIndex];
+      final local = _jsonMap(localRow.payload, 'assistants_v1');
+      final assistant = _jsonMap(row.payload, 'assistants_v1');
       final merged = <String, dynamic>{...local, ...assistant};
       _preserveLocalAsset(local, assistant, merged, 'avatar');
       _preserveLocalAsset(local, assistant, merged, 'background');
-      byId[id] = merged;
+      mergedRows[localIndex] = localRow.copyWith(payload: jsonEncode(merged));
     }
-    return jsonEncode([for (final id in order) byId[id]]);
+    return _assignSortOrders(mergedRows);
   }
 
   static void _preserveLocalAsset(
@@ -136,10 +177,25 @@ final class BusinessSettingsMerger {
         : incomingValue;
   }
 
-  static String _mergeProviderConfigs(String existingRaw, String incomingRaw) {
-    final existing = _jsonObjectMap(existingRaw, 'provider_configs_v1');
-    final incoming = _jsonObjectMap(incomingRaw, 'provider_configs_v1');
-    return jsonEncode(<String, dynamic>{...existing, ...incoming});
+  static List<BusinessEntityValue> _mergeProviders(
+    List<BusinessEntityValue> existing,
+    List<BusinessEntityValue> incoming, {
+    required bool preferIncomingOrder,
+  }) {
+    final localRows = _orderedRows(existing);
+    final importedRows = _orderedRows(incoming);
+    final selected = <String, BusinessEntityValue>{
+      for (final row in localRows) row.id: row,
+      for (final row in importedRows) row.id: row,
+    };
+    final orderedIds = <String>[];
+    final seen = <String>{};
+    final primary = preferIncomingOrder ? importedRows : localRows;
+    final secondary = preferIncomingOrder ? localRows : importedRows;
+    for (final row in <BusinessEntityValue>[...primary, ...secondary]) {
+      if (seen.add(row.id)) orderedIds.add(row.id);
+    }
+    return _assignSortOrders([for (final id in orderedIds) selected[id]!]);
   }
 
   static List<String> _mergeStringLists(
@@ -163,30 +219,41 @@ final class BusinessSettingsMerger {
     ];
   }
 
-  static String _mergeJsonListById(
+  static List<BusinessEntityValue> _mergeEntityRowsById(
     List<BusinessEntityValue> existing,
     List<BusinessEntityValue> incoming,
   ) {
-    final byId = <String, Map<String, dynamic>>{};
-    final order = <String>[];
-    for (final row in <BusinessEntityValue>[...existing, ...incoming]) {
-      final id = row.id;
-      if (byId.containsKey(id)) continue;
-      byId[id] = _jsonMap(row.payload, 'json_list');
-      order.add(id);
+    final merged = <BusinessEntityValue>[];
+    final seen = <String>{};
+    for (final row in <BusinessEntityValue>[
+      ..._orderedRows(existing),
+      ..._orderedRows(incoming),
+    ]) {
+      if (seen.add(row.id)) merged.add(row);
     }
-    return jsonEncode([for (final id in order) byId[id]]);
+    return _assignSortOrders(merged);
   }
 
-  static List<BusinessEntityValue> _entityRows(
-    BusinessSnapshot snapshot,
-    String key,
-  ) {
-    final kind = BusinessEntityKind.values.singleWhere(
-      (candidate) => candidate.sourceKey == key,
-    );
-    return snapshot.entities[kind]!;
-  }
+  static List<BusinessEntityValue> _reorderRows(
+    List<BusinessEntityValue> rows,
+  ) => _assignSortOrders(_orderedRows(rows));
+
+  static List<BusinessEntityValue> _orderedRows(
+    List<BusinessEntityValue> rows,
+  ) => List<BusinessEntityValue>.of(rows)
+    ..sort((left, right) {
+      final byOrder = left.sortOrder.compareTo(right.sortOrder);
+      return byOrder != 0 ? byOrder : left.id.compareTo(right.id);
+    });
+
+  static List<BusinessEntityValue> _assignSortOrders(
+    List<BusinessEntityValue> rows,
+  ) => [
+    for (var index = 0; index < rows.length; index++)
+      rows[index].sortOrder == index
+          ? rows[index]
+          : rows[index].copyWith(sortOrder: index),
+  ];
 
   static String _mergeJsonMapsPreferExisting(
     String? existingRaw,
@@ -199,44 +266,45 @@ final class BusinessSettingsMerger {
     return jsonEncode(<String, dynamic>{...incoming, ...existing});
   }
 
-  static String _mergeAssistantMemories(
-    String existingRaw,
-    String incomingRaw,
+  static List<BusinessEntityValue> _mergeAssistantMemories(
+    List<BusinessEntityValue> existing,
+    List<BusinessEntityValue> incoming,
   ) {
-    final existing = _jsonObjectList(existingRaw, 'assistant_memories_v1');
-    final incoming = _jsonObjectList(incomingRaw, 'assistant_memories_v1');
-    final merged = <Map<String, dynamic>>[];
+    final merged = <BusinessEntityValue>[];
     final contentKeys = <String>{};
     final usedIds = <int>{};
     var maxId = 0;
 
-    for (final item in existing) {
+    for (final row in _orderedRows(existing)) {
+      final item = _jsonMap(row.payload, 'assistant_memories_v1');
       final id = (item['id'] as num?)?.toInt() ?? 0;
       if (id > 0) usedIds.add(id);
       if (id > maxId) maxId = id;
       final key = _memoryContentKey(item);
       if (key != null) contentKeys.add(key);
-      merged.add(item);
+      merged.add(row);
     }
-    for (final original in incoming) {
-      final item = Map<String, dynamic>.from(original);
+    for (final row in _orderedRows(incoming)) {
+      final item = _jsonMap(row.payload, 'assistant_memories_v1');
       final contentKey = _memoryContentKey(item);
       if (contentKey != null && contentKeys.contains(contentKey)) continue;
       var id = (item['id'] as num?)?.toInt() ?? 0;
+      var selected = row;
       if (id <= 0 || usedIds.contains(id)) {
         do {
           maxId++;
         } while (usedIds.contains(maxId));
         id = maxId;
         item['id'] = id;
+        selected = row.copyWith(id: '$id', payload: jsonEncode(item));
       } else if (id > maxId) {
         maxId = id;
       }
       usedIds.add(id);
       if (contentKey != null) contentKeys.add(contentKey);
-      merged.add(item);
+      merged.add(selected);
     }
-    return jsonEncode(merged);
+    return _assignSortOrders(merged);
   }
 
   static String? _memoryContentKey(Map<String, dynamic> memory) {
@@ -244,28 +312,6 @@ final class BusinessSettingsMerger {
     final content = (memory['content'] ?? '').toString().trim();
     if (assistantId.isEmpty || content.isEmpty) return null;
     return '$assistantId\n$content';
-  }
-
-  static List<Map<String, dynamic>> _jsonObjectList(String raw, String key) {
-    final decoded = _decode(raw, key);
-    if (decoded is! List || decoded.any((item) => item is! Map)) {
-      throw FormatException(key);
-    }
-    return decoded
-        .cast<Map>()
-        .map(
-          (item) =>
-              item.map((field, value) => MapEntry(field.toString(), value)),
-        )
-        .toList(growable: false);
-  }
-
-  static Map<String, dynamic> _jsonObjectMap(String raw, String key) {
-    final decoded = _jsonMap(raw, key);
-    if (decoded.values.any((value) => value is! Map)) {
-      throw FormatException(key);
-    }
-    return decoded;
   }
 
   static Map<String, dynamic> _jsonMap(String raw, String key) {

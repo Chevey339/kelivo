@@ -6,6 +6,18 @@ import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
 import 'package:Kelivo/core/models/assistant_memory.dart';
 
+Map<String, Object?> _completeEntityRowIds({
+  String? sourceKey,
+  List<String> rowIds = const <String>[],
+}) {
+  final result = <String, Object?>{
+    for (final kind in BusinessEntityKind.values)
+      if (kind != BusinessEntityKind.provider) kind.sourceKey: const <String>[],
+  };
+  if (sourceKey != null) result[sourceKey] = rowIds;
+  return result;
+}
+
 void main() {
   group('BusinessSettingsRouter', () {
     test(
@@ -127,6 +139,197 @@ void main() {
       expect(runtimeRows[1], {'content': 'hello', 'id': firstRows[1].id});
     });
 
+    test(
+      'portable row identities survive id-less tag edits and reordering',
+      () {
+        final seeded = BusinessSettingsRouter.normalizeAndRoute({
+          'assistant_tags_v1': jsonEncode([
+            {'name': 'First'},
+            {'name': 'Second'},
+          ]),
+        });
+        final seededRows = seeded.entities[BusinessEntityKind.assistantTag]!;
+        final firstId = seededRows[0].id;
+        final secondId = seededRows[1].id;
+        final edited = BusinessSnapshot(
+          entities: {
+            ...seeded.entities,
+            BusinessEntityKind.assistantTag: [
+              seededRows[1].copyWith(
+                sortOrder: 0,
+                payload: jsonEncode({'name': 'Second renamed'}),
+              ),
+              seededRows[0].copyWith(sortOrder: 1),
+            ],
+          },
+          preferences: {
+            ...seeded.preferences,
+            'assistant_tag_map_v1': jsonEncode({'assistant-1': firstId}),
+          },
+        );
+
+        final portable = BusinessSettingsRouter.exportSnapshotWithRowIds(
+          edited,
+        );
+        final publishedTags =
+            jsonDecode(portable.settings['assistant_tags_v1']! as String)
+                as List<dynamic>;
+
+        expect(publishedTags, [
+          {'name': 'Second renamed'},
+          {'name': 'First'},
+        ]);
+        expect(
+          publishedTags.cast<Map<String, dynamic>>(),
+          everyElement(isNot(contains('id'))),
+        );
+        expect(portable.entityRowIds['assistant_tags_v1'], [secondId, firstId]);
+
+        final restored = BusinessSettingsRouter.normalizeAndRoute(
+          portable.settings,
+          entityRowIds: portable.entityRowIds,
+        );
+        final restoredIds = restored.entities[BusinessEntityKind.assistantTag]!
+            .map((row) => row.id)
+            .toList();
+        final restoredTagMap =
+            jsonDecode(restored.preferences['assistant_tag_map_v1']! as String)
+                as Map<String, dynamic>;
+
+        expect(restoredIds, [secondId, firstId]);
+        expect(restoredTagMap['assistant-1'], firstId);
+        expect(restoredIds, contains(restoredTagMap['assistant-1']));
+      },
+    );
+
+    test('rejects unknown portable row identity keys', () {
+      final entityRowIds = _completeEntityRowIds()
+        ..['unknown_entities_v1'] = const <String>[];
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'assistant_tags_v1': jsonEncode(const <Object>[]),
+        }, entityRowIds: entityRowIds),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects incomplete portable row identity maps', () {
+      final portable = BusinessSettingsRouter.exportSnapshotWithRowIds(
+        BusinessSettingsRouter.normalizeAndRoute(const {}),
+      );
+      final incomplete = Map<String, Object?>.from(portable.entityRowIds)
+        ..remove('assistant_tags_v1');
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute(
+          portable.settings,
+          entityRowIds: incomplete,
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('row identity maps only require entity keys present in settings', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute(
+        {
+          'assistant_tags_v1': jsonEncode([
+            {'name': 'Tag'},
+          ]),
+        },
+        entityRowIds: const {
+          'assistant_tags_v1': <String>['portable-tag-row'],
+        },
+      );
+
+      expect(
+        snapshot.entities[BusinessEntityKind.assistantTag]!.single.id,
+        'portable-tag-row',
+      );
+    });
+
+    test('rejects non-string portable row identities', () {
+      final entityRowIds = _completeEntityRowIds()
+        ..['assistant_tags_v1'] = <Object>[1];
+
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'assistant_tags_v1': jsonEncode([
+            {'name': 'Tag'},
+          ]),
+        }, entityRowIds: entityRowIds),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects portable row identity length mismatches', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute(
+          {
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'Only'},
+            ]),
+          },
+          entityRowIds: _completeEntityRowIds(
+            sourceKey: 'assistant_tags_v1',
+            rowIds: const <String>['row-1', 'row-2'],
+          ),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects empty portable row identities', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute(
+          {
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'Tag'},
+            ]),
+          },
+          entityRowIds: _completeEntityRowIds(
+            sourceKey: 'assistant_tags_v1',
+            rowIds: const <String>['   '],
+          ),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects duplicate portable row identities', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute(
+          {
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'First'},
+              {'name': 'Second'},
+            ]),
+          },
+          entityRowIds: _completeEntityRowIds(
+            sourceKey: 'assistant_tags_v1',
+            rowIds: const <String>['same-row', 'same-row'],
+          ),
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects row identities that disagree with explicit payload ids', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute(
+          {
+            'assistant_tags_v1': jsonEncode([
+              {'id': 'payload-id', 'name': 'Tag'},
+            ]),
+          },
+          entityRowIds: _completeEntityRowIds(
+            sourceKey: 'assistant_tags_v1',
+            rowIds: const <String>['different-row-id'],
+          ),
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('projects distinct numeric ids for id-less memories at runtime', () {
       final snapshot = BusinessSettingsRouter.normalizeAndRoute({
         'assistant_memories_v1': jsonEncode([
@@ -219,6 +422,63 @@ void main() {
       });
       expect(exported, isNot(contains('migrations_version_v1')));
       expect(exported, isNot(contains('provider_configs_backup_v1')));
+    });
+
+    test('embedding cleanup is limited to the one-time pre-v3 migration', () {
+      final dirtyOverride = <String, Object?>{
+        'type': 'embedding',
+        'input': <String>['text'],
+        'abilities': <String>['tool'],
+        'output': <String>['text'],
+        'builtInTools': <String>['search'],
+        'built_in_tools': <String>['search'],
+        'tools': <String>['search'],
+      };
+      Map<String, Object?> source({int? version}) => {
+        'provider_configs_v1': jsonEncode({
+          'provider-a': {
+            'modelOverrides': {'embedding-model': dirtyOverride},
+          },
+        }),
+        if (version != null) 'migrations_version_v1': version,
+      };
+      Map<String, dynamic> embeddingOverride(BusinessSnapshot snapshot) {
+        final providers =
+            jsonDecode(
+                  BusinessSettingsRouter.exportSnapshot(
+                        snapshot,
+                      )['provider_configs_v1']!
+                      as String,
+                )
+                as Map<String, dynamic>;
+        return ((providers['provider-a']
+                    as Map<String, dynamic>)['modelOverrides']
+                as Map<String, dynamic>)['embedding-model']
+            as Map<String, dynamic>;
+      }
+
+      expect(
+        embeddingOverride(
+          BusinessSettingsRouter.normalizeAndRoute(source(version: 3)),
+        ),
+        dirtyOverride,
+      );
+      expect(
+        embeddingOverride(BusinessSettingsRouter.normalizeAndRoute(source())),
+        dirtyOverride,
+      );
+      expect(
+        embeddingOverride(
+          BusinessSettingsRouter.normalizeAndRoute(
+            source(),
+            assumePreV3EmbeddingMigrationWhenVersionMissing: true,
+          ),
+        ),
+        {
+          'type': 'embedding',
+          'input': ['text'],
+        },
+      );
     });
 
     test('normalizes legacy activation and assistant search exactly once', () {

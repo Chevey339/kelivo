@@ -179,8 +179,16 @@ final class BusinessSettingsRouter {
   static BusinessSnapshot normalizeAndRoute(
     Map<String, Object?> source, {
     bool preserveExplicitEmptyInstructionList = false,
+    Map<String, Object?>? entityRowIds,
+    bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) {
     final normalized = Map<String, Object?>.from(source);
+    final rowIdsByKind = _rowIdsByKind(entityRowIds, source);
+    final rawMigrationVersion = normalized['migrations_version_v1'];
+    final shouldNormalizeLegacyEmbeddingOverrides = rawMigrationVersion is int
+        ? rawMigrationVersion < 3
+        : rawMigrationVersion == null &&
+              assumePreV3EmbeddingMigrationWhenVersionMissing;
     _normalizeStringList(normalized, _providerOrderKey);
     _normalizeStringList(normalized, _legacyPinnedModelsKey);
     _normalizeInstructionActivation(
@@ -191,8 +199,12 @@ final class BusinessSettingsRouter {
     final entities = <BusinessEntityKind, List<BusinessEntityValue>>{};
     for (final kind in BusinessEntityKind.values) {
       entities[kind] = kind == BusinessEntityKind.provider
-          ? _routeProviders(normalized)
-          : _routeList(kind, normalized);
+          ? _routeProviders(
+              normalized,
+              normalizeLegacyEmbeddingOverrides:
+                  shouldNormalizeLegacyEmbeddingOverrides,
+            )
+          : _routeList(kind, normalized, rowIdsByKind[kind]);
     }
 
     final preferences = <String, Object>{};
@@ -235,6 +247,19 @@ final class BusinessSettingsRouter {
     return result;
   }
 
+  static BusinessSettingsExport exportSnapshotWithRowIds(
+    BusinessSnapshot snapshot,
+  ) {
+    final entityRowIds = <String, List<String>>{};
+    for (final kind in BusinessEntityKind.values) {
+      if (kind == BusinessEntityKind.provider) continue;
+      final rows = List<BusinessEntityValue>.of(snapshot.entities[kind]!)
+        ..sort(_compareRows);
+      entityRowIds[kind.sourceKey] = rows.map((row) => row.id).toList();
+    }
+    return (settings: exportSnapshot(snapshot), entityRowIds: entityRowIds);
+  }
+
   /// Builds the legacy key-value-compatible view consumed by runtime
   /// providers. Stable row ids are projected into list payloads that came
   /// from legacy data without an id; assistant memories use deterministic
@@ -272,8 +297,9 @@ final class BusinessSettingsRouter {
   }
 
   static List<BusinessEntityValue> _routeProviders(
-    Map<String, Object?> source,
-  ) {
+    Map<String, Object?> source, {
+    required bool normalizeLegacyEmbeddingOverrides,
+  }) {
     final key = BusinessEntityKind.provider.sourceKey;
     final raw = source[key];
     if (raw == null) return const <BusinessEntityValue>[];
@@ -285,7 +311,9 @@ final class BusinessSettingsRouter {
       final payload = (entry.value as Map).map(
         (field, value) => MapEntry(field.toString(), value),
       );
-      _normalizeLegacyEmbeddingOverrides(payload);
+      if (normalizeLegacyEmbeddingOverrides) {
+        _normalizeLegacyEmbeddingOverrides(payload);
+      }
       _validateEntityPayload(BusinessEntityKind.provider, payload);
       providers[entry.key.toString()] = payload;
     }
@@ -316,11 +344,20 @@ final class BusinessSettingsRouter {
   static List<BusinessEntityValue> _routeList(
     BusinessEntityKind kind,
     Map<String, Object?> source,
+    List<String>? entityRowIds,
   ) {
     final raw = source[kind.sourceKey];
-    if (raw == null) return const <BusinessEntityValue>[];
+    if (raw == null) {
+      if (entityRowIds != null && entityRowIds.isNotEmpty) {
+        throw FormatException(kind.sourceKey);
+      }
+      return const <BusinessEntityValue>[];
+    }
     final decoded = _decodeJson(raw, kind.sourceKey);
     if (decoded is! List) throw FormatException(kind.sourceKey);
+    if (entityRowIds != null && entityRowIds.length != decoded.length) {
+      throw FormatException(kind.sourceKey);
+    }
     final legacySearchEnabled = source[_searchEnabledKey];
     if (legacySearchEnabled != null && legacySearchEnabled is! bool) {
       throw const FormatException(_searchEnabledKey);
@@ -332,6 +369,7 @@ final class BusinessSettingsRouter {
           decoded[index],
           index,
           legacySearchEnabled: legacySearchEnabled as bool?,
+          rowId: entityRowIds?[index],
         ),
     ];
   }
@@ -341,6 +379,7 @@ final class BusinessSettingsRouter {
     Object? raw,
     int index, {
     required bool? legacySearchEnabled,
+    String? rowId,
   }) {
     if (raw is! Map) throw FormatException(kind.sourceKey);
     final payload = raw.map((key, value) => MapEntry(key.toString(), value));
@@ -351,9 +390,13 @@ final class BusinessSettingsRouter {
     }
     _validateEntityPayload(kind, payload);
     final rawId = payload['id'];
-    final id = rawId == null || rawId.toString().trim().isEmpty
-        ? _stableGeneratedId(kind.sourceKey, index, payload)
-        : rawId.toString();
+    final hasPayloadId = rawId != null && rawId.toString().trim().isNotEmpty;
+    if (hasPayloadId && rowId != null && rowId != rawId.toString()) {
+      throw FormatException(kind.sourceKey);
+    }
+    final id = hasPayloadId
+        ? rawId.toString()
+        : rowId ?? _stableGeneratedId(kind.sourceKey, index, payload);
     String? assistantId;
     if (kind == BusinessEntityKind.assistantMemory) {
       final rawAssistantId = payload['assistantId'];
@@ -896,6 +939,40 @@ final class BusinessSettingsRouter {
       for (final value in values)
         if (value.trim().isNotEmpty && seen.add(value.trim())) value.trim(),
     ];
+  }
+
+  static Map<BusinessEntityKind, List<String>> _rowIdsByKind(
+    Map<String, Object?>? raw,
+    Map<String, Object?> source,
+  ) {
+    if (raw == null) return const {};
+    final kindByKey = <String, BusinessEntityKind>{
+      for (final kind in BusinessEntityKind.values)
+        if (kind != BusinessEntityKind.provider) kind.sourceKey: kind,
+    };
+    final result = <BusinessEntityKind, List<String>>{};
+    for (final entry in raw.entries) {
+      final kind = kindByKey[entry.key];
+      if (kind == null) throw FormatException(entry.key);
+      final value = entry.value;
+      if (value is! List || value.any((id) => id is! String)) {
+        throw FormatException(entry.key);
+      }
+      final ids = List<String>.unmodifiable(value.cast<String>());
+      if (ids.any((id) => id.trim().isEmpty)) {
+        throw FormatException(entry.key);
+      }
+      if (ids.toSet().length != ids.length) {
+        throw FormatException(entry.key);
+      }
+      result[kind] = ids;
+    }
+    for (final entry in kindByKey.entries) {
+      if (source.containsKey(entry.key) && !result.containsKey(entry.value)) {
+        throw const FormatException('businessEntityRowIds');
+      }
+    }
+    return result;
   }
 
   static String _stableGeneratedId(

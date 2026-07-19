@@ -65,6 +65,7 @@ final class BusinessMigrationEngine {
     final routed = BusinessSettingsRouter.normalizeAndRoute(
       legacy,
       preserveExplicitEmptyInstructionList: true,
+      assumePreV3EmbeddingMigrationWhenVersionMissing: true,
     );
     await repository.replaceSnapshotForMigration(
       routed,

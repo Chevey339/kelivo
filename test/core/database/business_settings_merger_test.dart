@@ -2,9 +2,163 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_settings_merger.dart';
 
 void main() {
+  test('snapshot merge preserves unrelated local row identities', () {
+    final localTag = BusinessEntityValue(
+      id: 'generated_original_tag',
+      sortOrder: 0,
+      payload: jsonEncode({'name': 'Renamed tag'}),
+    );
+    final existing = BusinessSnapshot(
+      entities: {
+        BusinessEntityKind.assistantTag: [localTag],
+      },
+      preferences: {
+        'assistant_tag_map_v1': jsonEncode({'assistant-a': localTag.id}),
+        'theme_mode_v1': 'light',
+      },
+    );
+    final incoming = BusinessSnapshot(
+      entities: const {},
+      preferences: const {'theme_mode_v1': 'dark'},
+    );
+
+    final merged = BusinessSettingsMerger.mergeSnapshots(
+      existing,
+      incoming,
+      incomingKeys: const {'theme_mode_v1'},
+    );
+
+    expect(
+      merged.entities[BusinessEntityKind.assistantTag]!.single,
+      same(localTag),
+    );
+    expect(jsonDecode(merged.preferences['assistant_tag_map_v1']! as String), {
+      'assistant-a': localTag.id,
+    });
+    expect(merged.preferences['theme_mode_v1'], 'dark');
+  });
+
+  test('snapshot merge preserves incoming id-less entity row identity', () {
+    final incomingTag = BusinessEntityValue(
+      id: 'generated_incoming_tag',
+      sortOrder: 0,
+      payload: jsonEncode({'name': 'Imported tag'}),
+    );
+    final incoming = BusinessSnapshot(
+      entities: {
+        BusinessEntityKind.assistantTag: [incomingTag],
+      },
+      preferences: const {},
+    );
+
+    final merged = BusinessSettingsMerger.mergeSnapshots(
+      BusinessSnapshot(entities: const {}, preferences: const {}),
+      incoming,
+      incomingKeys: const {'assistant_tags_v1'},
+    );
+
+    final mergedTag = merged.entities[BusinessEntityKind.assistantTag]!.single;
+    expect(mergedTag, same(incomingTag));
+    expect(mergedTag.id, incomingTag.id);
+    expect(jsonDecode(mergedTag.payload), isNot(contains('id')));
+  });
+
+  test(
+    'snapshot merge preserves selected rows and aligns reassigned memories',
+    () {
+      final localAssistant = BusinessEntityValue(
+        id: 'assistant-a',
+        sortOrder: 0,
+        payload: jsonEncode({
+          'id': 'assistant-a',
+          'name': 'Local',
+          'avatar': '/local/avatar.png',
+          'background': '/local/background.png',
+        }),
+      );
+      final importedAssistant = BusinessEntityValue(
+        id: 'assistant-a',
+        sortOrder: 0,
+        payload: jsonEncode({
+          'id': 'assistant-a',
+          'name': 'Imported',
+          'avatar': '/imported/avatar.png',
+          'background': null,
+        }),
+      );
+      final localMemory = BusinessEntityValue(
+        id: '1',
+        sortOrder: 0,
+        payload: jsonEncode({
+          'id': 1,
+          'assistantId': 'assistant-a',
+          'content': 'Local memory',
+        }),
+        assistantId: 'assistant-a',
+      );
+      final importedMemory = BusinessEntityValue(
+        id: '1',
+        sortOrder: 0,
+        payload: jsonEncode({
+          'id': 1,
+          'assistantId': 'assistant-b',
+          'content': 'Imported memory',
+        }),
+        assistantId: 'assistant-b',
+      );
+      final importedWorldBook = BusinessEntityValue(
+        id: 'generated_world_book',
+        sortOrder: 0,
+        payload: jsonEncode({'name': 'Imported world book'}),
+      );
+
+      final merged = BusinessSettingsMerger.mergeSnapshots(
+        BusinessSnapshot(
+          entities: {
+            BusinessEntityKind.assistant: [localAssistant],
+            BusinessEntityKind.assistantMemory: [localMemory],
+          },
+          preferences: const {},
+        ),
+        BusinessSnapshot(
+          entities: {
+            BusinessEntityKind.assistant: [importedAssistant],
+            BusinessEntityKind.assistantMemory: [importedMemory],
+            BusinessEntityKind.worldBook: [importedWorldBook],
+          },
+          preferences: const {},
+        ),
+        incomingKeys: const {
+          'assistants_v1',
+          'assistant_memories_v1',
+          'world_books_v1',
+        },
+      );
+
+      final assistant = merged.entities[BusinessEntityKind.assistant]!.single;
+      expect(assistant.id, localAssistant.id);
+      expect(jsonDecode(assistant.payload), {
+        'id': 'assistant-a',
+        'name': 'Imported',
+        'avatar': '/local/avatar.png',
+        'background': '/local/background.png',
+      });
+      final memories = merged.entities[BusinessEntityKind.assistantMemory]!;
+      expect(memories.first, same(localMemory));
+      expect(memories.last.id, '2');
+      expect(memories.last.assistantId, importedMemory.assistantId);
+      expect(jsonDecode(memories.last.payload)['id'], 2);
+      expect(
+        merged.entities[BusinessEntityKind.worldBook]!.single,
+        same(importedWorldBook),
+      );
+    },
+  );
+
   test('merges frozen special keys and overwrites ordinary keys', () {
     final existing = <String, Object?>{
       'assistants_v1': jsonEncode([

@@ -86,7 +86,7 @@ void main() {
   );
 
   test(
-    'cleans pre-v3 embedding overrides before retiring migration keys',
+    'cleans pre-v3 embedding overrides when the legacy version is missing',
     () async {
       final legacy = FakeLegacyBusinessPreferences({
         'provider_configs_v1': jsonEncode({
@@ -102,7 +102,6 @@ void main() {
             },
           },
         }),
-        'migrations_version_v1': 1,
         'provider_configs_backup_v1': 'obsolete backup',
       });
 

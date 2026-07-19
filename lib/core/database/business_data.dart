@@ -1,3 +1,10 @@
+typedef BusinessEntityRowIds = Map<String, List<String>>;
+
+typedef BusinessSettingsExport = ({
+  Map<String, Object> settings,
+  BusinessEntityRowIds entityRowIds,
+});
+
 enum BusinessEntityKind {
   assistant(sourceKey: 'assistants_v1', tableName: 'assistant_rows'),
   provider(sourceKey: 'provider_configs_v1', tableName: 'provider_rows'),

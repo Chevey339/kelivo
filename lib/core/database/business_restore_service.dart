@@ -13,11 +13,16 @@ final class BusinessRestoreService {
   Future<void> overwrite(
     Map<String, Object?> imported, {
     bool preserveExplicitEmptyInstructionList = false,
+    Map<String, Object?>? entityRowIds,
+    bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) async {
     final replacement = BusinessSettingsRouter.normalizeAndRoute(
       imported,
       preserveExplicitEmptyInstructionList:
           preserveExplicitEmptyInstructionList,
+      entityRowIds: entityRowIds,
+      assumePreV3EmbeddingMigrationWhenVersionMissing:
+          assumePreV3EmbeddingMigrationWhenVersionMissing,
     );
     await _repository.replaceSnapshot(replacement, writeReceipt: true);
   }
@@ -25,24 +30,26 @@ final class BusinessRestoreService {
   Future<void> merge(
     Map<String, Object?> imported, {
     bool preserveExplicitEmptyInstructionList = false,
+    Map<String, Object?>? entityRowIds,
+    bool assumePreV3EmbeddingMigrationWhenVersionMissing = false,
   }) async {
-    // Validate and normalize before opening the write transaction. The merger
-    // repeats canonicalization against the transaction's current snapshot so
-    // concurrent business writes cannot be lost between read and commit.
-    BusinessSettingsRouter.normalizeAndRoute(
+    // Validate and normalize before opening the write transaction. The
+    // transaction then merges those immutable imported rows with its current
+    // snapshot, preserving both sides' database identities.
+    final incoming = BusinessSettingsRouter.normalizeAndRoute(
       imported,
       preserveExplicitEmptyInstructionList:
           preserveExplicitEmptyInstructionList,
+      entityRowIds: entityRowIds,
+      assumePreV3EmbeddingMigrationWhenVersionMissing:
+          assumePreV3EmbeddingMigrationWhenVersionMissing,
     );
     await _repository.transformSnapshot((current) {
-      final currentSettings = BusinessSettingsRouter.exportSnapshot(current);
-      final merged = BusinessSettingsMerger.merge(
-        currentSettings,
-        imported,
-        preserveExplicitEmptyInstructionList:
-            preserveExplicitEmptyInstructionList,
+      return BusinessSettingsMerger.mergeSnapshots(
+        current,
+        incoming,
+        incomingKeys: imported.keys.toSet(),
       );
-      return BusinessSettingsRouter.normalizeAndRoute(merged);
     }, writeReceipt: true);
   }
 }

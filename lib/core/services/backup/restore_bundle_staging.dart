@@ -131,6 +131,7 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_manifest_fields');
       }
       final manifest = decodedManifest;
+      final businessEntityRowIds = _parseBusinessEntityRowIds(manifest);
       final declaredEntries = _parseDeclaredEntries(
         manifest,
         includeChats: declaredIncludeChats,
@@ -170,6 +171,8 @@ final class RestoreBundleStaging {
       final databaseInfo = await _replaceCandidateBusinessSettings(
         databaseFile: stagedDatabaseFile,
         settings: settings,
+        entityRowIds: businessEntityRowIds,
+        preserveExplicitEmptyInstructionList: businessEntityRowIds == null,
         expectedDatabaseInfo: declaredDatabaseInfo,
         durability: resolvedDurability,
       );
@@ -216,6 +219,7 @@ final class RestoreBundleStaging {
       manifest['includeChats'] = true;
       manifest['includeFiles'] = includeFiles;
       manifest.remove('secretsIncluded');
+      manifest.remove('businessEntityRowIds');
       manifest['database'] = {
         'entry': _databaseEntry,
         'schemaVersion': databaseInfo.schemaVersion,
@@ -751,6 +755,8 @@ final class RestoreBundleStaging {
   static Future<ChatDatabaseSnapshotInfo> _replaceCandidateBusinessSettings({
     required File databaseFile,
     required Map<String, dynamic> settings,
+    required Map<String, Object?>? entityRowIds,
+    required bool preserveExplicitEmptyInstructionList,
     required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
     required RestoreDurability durability,
   }) async {
@@ -761,9 +767,12 @@ final class RestoreBundleStaging {
     }
     final database = AppDatabase.open(file: databaseFile);
     try {
-      await BusinessRestoreService(
-        BusinessRepository(database),
-      ).overwrite(settings);
+      await BusinessRestoreService(BusinessRepository(database)).overwrite(
+        settings,
+        entityRowIds: entityRowIds,
+        preserveExplicitEmptyInstructionList:
+            preserveExplicitEmptyInstructionList,
+      );
     } finally {
       await database.close();
     }
@@ -777,6 +786,27 @@ final class RestoreBundleStaging {
     await durability.syncFile(databaseFile, fullBarrier: true);
     await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
     return databaseInfo;
+  }
+
+  static Map<String, Object?>? _parseBusinessEntityRowIds(
+    Map<String, dynamic> manifest,
+  ) {
+    if (!manifest.containsKey('businessEntityRowIds')) return null;
+    final raw = manifest['businessEntityRowIds'];
+    if (raw is! Map || raw.keys.any((key) => key is! String)) {
+      throw const FormatException('restore_staging_business_entity_row_ids');
+    }
+    final result = <String, Object?>{};
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is! List || value.any((item) => item is! String)) {
+        throw const FormatException('restore_staging_business_entity_row_ids');
+      }
+      result[entry.key as String] = List<String>.unmodifiable(
+        value.cast<String>(),
+      );
+    }
+    return Map<String, Object?>.unmodifiable(result);
   }
 
   static ChatDatabaseSnapshotInfo? _parseDatabaseInfo(

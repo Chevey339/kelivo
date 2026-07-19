@@ -135,6 +135,38 @@ void main() {
     },
   );
 
+  test(
+    'runtime provider writes preserve v3 embedding override fields',
+    () async {
+      final preferences = BusinessPreferences(repository);
+      await preferences.load();
+      final providerConfigs = jsonEncode({
+        'provider-a': {
+          'modelOverrides': {
+            'embedding-model': {
+              'type': 'embedding',
+              'abilities': ['tool'],
+              'output': ['text'],
+              'builtInTools': ['search'],
+              'built_in_tools': ['search'],
+              'tools': ['search'],
+              'input': ['text'],
+            },
+          },
+        },
+      });
+
+      await preferences.setString('provider_configs_v1', providerConfigs);
+
+      final reloaded = BusinessPreferences(repository);
+      await reloaded.load();
+      expect(
+        jsonDecode(reloaded.getString('provider_configs_v1')!),
+        jsonDecode(providerConfigs),
+      );
+    },
+  );
+
   test('runtime ids preserve row identity without entering payloads', () async {
     await repository.replaceSnapshot(
       BusinessSettingsRouter.normalizeAndRoute({
