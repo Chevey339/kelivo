@@ -946,6 +946,30 @@ abstract class AppLocalizations {
   /// **'Default Assistant'**
   String get homePageDefaultAssistant;
 
+  /// No description provided for @svgSaveFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Download SVG'**
+  String get svgSaveFile;
+
+  /// No description provided for @svgSaveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'SVG saved'**
+  String get svgSaveSuccess;
+
+  /// No description provided for @svgSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed'**
+  String get svgSaveFailed;
+
+  /// No description provided for @svgSaveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Save SVG'**
+  String get svgSaveDialogTitle;
+
   /// No description provided for @mermaidExportPng.
   ///
   /// In en, this message translates to:
