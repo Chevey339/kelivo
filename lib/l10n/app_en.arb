@@ -2607,6 +2607,7 @@
   "documentProcessingResetDefault": "Reset to Default",
   "@documentProcessingResetDefault": {
     "description": "Button to reset document processing settings to defaults"
+  },
   "multiAIConversationMode": "Conversation Mode",
   "@multiAIConversationMode": {
     "description": "Label for the conversation mode switch row in multi-AI card group"

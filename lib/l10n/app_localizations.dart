@@ -10615,6 +10615,7 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset to Default'**
   String get documentProcessingResetDefault;
+
   /// Label for the conversation mode switch row in multi-AI card group
   ///
   /// In en, this message translates to:

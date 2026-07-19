@@ -2154,6 +2154,7 @@
   "documentProcessingResetDefault": "重設為預設",
   "@documentProcessingResetDefault": {
     "description": "將文檔處理設置重設為預設值"
+  },
   "multiAIConversationMode": "對話模式",
   "@multiAIConversationMode": {
     "description": "多 AI 卡片組中的對話模式切換行標籤"

@@ -5554,6 +5554,8 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get documentProcessingResetDefault => '重置为默认';
+
+  @override
   String get multiAIConversationMode => '对话模式';
 
   @override
@@ -11146,6 +11148,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get documentProcessingResetDefault => '重置为默认';
+
+  @override
   String get multiAIConversationMode => '对话模式';
 
   @override
@@ -16738,6 +16742,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get documentProcessingResetDefault => '重設為預設';
+
+  @override
   String get multiAIConversationMode => '對話模式';
 
   @override

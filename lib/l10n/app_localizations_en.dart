@@ -5780,6 +5780,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get documentProcessingResetDefault => 'Reset to Default';
+
+  @override
   String get multiAIConversationMode => 'Conversation Mode';
 
   @override
