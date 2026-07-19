@@ -1,7 +1,7 @@
 name: Flutter Multi-Platform Build Stable 3.44
 
 env:
-  FLUTTER_VERSION: '3.44.1'  # 当前 stable 3.44.1 / Dart 3.12.1
+  FLUTTER_VERSION: '3.44.6'  # 当前 stable 3.44.6 / Dart 3.12.x
 
 on:
   # 手动触发
