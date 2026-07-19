@@ -84,19 +84,25 @@ class MarkdownMediaSanitizer {
   // Replace Markdown image links pointing to local file paths with inline base64 data URLs.
   // Example: "![image](/data/user/0/.../images/xxx.png)" -> "![image](data:image/png;base64,...)"
   static Future<String> inlineLocalImagesToBase64(String markdown) async {
-    // Quick check: contains a Markdown image and looks like a local path
     if (!(markdown.contains('![') && markdown.contains(']('))) return markdown;
-
-    final re = RegExp(r'!\[[^\]]*\]\(([^)]+)\)', multiLine: true);
-    final matches = re.allMatches(markdown).toList();
-    if (matches.isEmpty) return markdown;
 
     final sb = StringBuffer();
     int last = 0;
-    for (final m in matches) {
-      sb.write(markdown.substring(last, m.start));
-      final url = (m.group(1) ?? '').trim();
-      // Only convert local file paths; skip http(s) and existing data URLs
+    int searchFrom = 0;
+
+    while (true) {
+      final imgStart = markdown.indexOf('![', searchFrom);
+      if (imgStart < 0) break;
+      final altEnd = markdown.indexOf('](', imgStart + 2);
+      if (altEnd < 0) break;
+      final srcStart = altEnd + 2;
+      final srcEnd = markdown.indexOf(')', srcStart);
+      if (srcEnd < 0) break;
+      final matchEnd = srcEnd + 1;
+
+      sb.write(markdown.substring(last, imgStart));
+      final url = markdown.substring(srcStart, srcEnd).trim();
+
       final isRemote = url.startsWith('http://') || url.startsWith('https://');
       final isData = url.startsWith('data:');
       final isFileUri = url.startsWith('file://');
@@ -105,26 +111,23 @@ class MarkdownMediaSanitizer {
           (isFileUri || url.startsWith('/') || url.contains(':'));
 
       if (!isLikelyLocalPath) {
-        // Keep original
-        sb.write(markdown.substring(m.start, m.end));
-        last = m.end;
+        sb.write(markdown.substring(imgStart, matchEnd));
+        last = matchEnd;
+        searchFrom = matchEnd;
         continue;
       }
 
       try {
-        // Normalize file path
         var path = url;
         if (isFileUri) {
           path = url.replaceFirst('file://', '');
         }
-        // Read bytes and encode
-        final fixed =
-            path; // Caller may already pass sandbox-fixed paths; avoid depending on Flutter layer here
+        final fixed = path;
         final f = File(fixed);
         if (!f.existsSync()) {
-          // Fallback to original if missing
-          sb.write(markdown.substring(m.start, m.end));
-          last = m.end;
+          sb.write(markdown.substring(imgStart, matchEnd));
+          last = matchEnd;
+          searchFrom = matchEnd;
           continue;
         }
         final bytes = await f.readAsBytes();
@@ -132,15 +135,16 @@ class MarkdownMediaSanitizer {
         final mime = _guessMimeFromPath(fixed);
         final dataUrl = 'data:$mime;base64,$b64';
         final replaced = markdown
-            .substring(m.start, m.end)
+            .substring(imgStart, matchEnd)
             .replaceFirst(url, dataUrl);
         sb.write(replaced);
       } catch (_) {
-        // On failure, keep original
-        sb.write(markdown.substring(m.start, m.end));
+        sb.write(markdown.substring(imgStart, matchEnd));
       }
-      last = m.end;
+      last = matchEnd;
+      searchFrom = matchEnd;
     }
+
     sb.write(markdown.substring(last));
     return sb.toString();
   }

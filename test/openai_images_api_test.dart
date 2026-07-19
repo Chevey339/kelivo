@@ -796,5 +796,54 @@ void main() {
       expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
       expect(chunks.last.isDone, isTrue);
     });
+
+    test(
+      'does not stack overflow when assistant image is a large base64 data URL',
+      () async {
+        late Uri requestUri;
+        late String contentType;
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          requestUri = request.uri;
+          contentType = request.headers.contentType?.mimeType ?? '';
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'data': [
+                {'url': 'https://example.com/large-edit.png'},
+              ],
+            }),
+          );
+          await request.response.close();
+        });
+
+        final largeB64 = base64Encode(List.filled(2 * 1024 * 1024, 65));
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _openAiConfig(_baseUrl(server)),
+          modelId: 'gpt-image-2',
+          messages: [
+            {'role': 'user', 'content': 'draw a cat'},
+            {
+              'role': 'assistant',
+              'content': '![image](data:image/png;base64,$largeB64)',
+            },
+            {'role': 'user', 'content': 'make it bigger'},
+          ],
+        ).toList();
+
+        expect(requestUri.path, '/v1/images/edits');
+        expect(contentType, 'multipart/form-data');
+        expect(
+          chunks.single.content,
+          '![image](https://example.com/large-edit.png)',
+        );
+      },
+    );
   });
 }
