@@ -250,6 +250,7 @@ class McpProvider extends ChangeNotifier {
   final Map<String, McpStatus> _status = {}; // id -> status
   final Map<String, String> _errors = {}; // id -> last error
   List<McpServerConfig> _servers = [];
+  Future<void> _serverMutationTail = Future<void>.value();
   // Reconnect bookkeeping to avoid duplicate concurrent retries
   final Set<String> _reconnecting = <String>{};
   // Heartbeat timers for live-connection health checks
@@ -259,7 +260,7 @@ class McpProvider extends ChangeNotifier {
       McpStdioCommandResolver();
 
   McpProvider({required this.preferences}) {
-    _load();
+    unawaited(_serializeServerMutation(_load));
   }
 
   List<McpServerConfig> get servers => List.unmodifiable(_servers);
@@ -335,6 +336,15 @@ class McpProvider extends ChangeNotifier {
       _prefsKey,
       jsonEncode(servers.map((e) => e.toJson()).toList()),
     );
+  }
+
+  Future<T> _serializeServerMutation<T>(Future<T> Function() operation) {
+    final result = _serverMutationTail.then((_) => operation());
+    _serverMutationTail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
   }
 
   Future<void> _persistTimeout(Duration timeout) async {
@@ -588,30 +598,32 @@ class McpProvider extends ChangeNotifier {
       throw FormatException('No valid MCP servers found in JSON');
     }
 
-    await _persistServers(next);
+    await _serializeServerMutation(() async {
+      await _persistServers(next);
 
-    // Disconnect all current
-    for (final s in _servers) {
-      try {
-        await disconnect(s.id);
-      } catch (_) {}
-    }
+      // Disconnect all current
+      for (final s in _servers) {
+        try {
+          await disconnect(s.id);
+        } catch (_) {}
+      }
 
-    // Replace and reset statuses
-    _servers = next;
-    _status.clear();
-    _errors.clear();
-    for (final s in _servers) {
-      _status[s.id] = McpStatus.idle;
-    }
+      // Replace and reset statuses
+      _servers = next;
+      _status.clear();
+      _errors.clear();
+      for (final s in _servers) {
+        _status[s.id] = McpStatus.idle;
+      }
 
-    notifyListeners();
+      notifyListeners();
 
-    // Auto-connect enabled servers
-    for (final s in _servers.where((e) => e.enabled)) {
-      // fire and forget
-      unawaited(connect(s.id));
-    }
+      // Auto-connect enabled servers
+      for (final s in _servers.where((e) => e.enabled)) {
+        // fire and forget
+        unawaited(connect(s.id));
+      }
+    });
   }
 
   McpServerConfig? getById(String id) {
@@ -647,52 +659,95 @@ class McpProvider extends ChangeNotifier {
           ? workingDirectory!.trim()
           : null,
     );
-    final next = <McpServerConfig>[..._servers, cfg];
-    await _persistServers(next);
-    _servers = next;
-    _status[id] = McpStatus.idle;
-    notifyListeners();
-    if (enabled) {
-      unawaited(connect(id));
-    }
+    await _serializeServerMutation(() async {
+      final next = <McpServerConfig>[..._servers, cfg];
+      await _persistServers(next);
+      _servers = next;
+      _status[id] = McpStatus.idle;
+      notifyListeners();
+      if (enabled) {
+        unawaited(connect(id));
+      }
+    });
     return id;
   }
 
-  Future<void> updateServer(McpServerConfig updated) async {
-    final idx = _servers.indexWhere((e) => e.id == updated.id);
-    if (idx < 0) return;
-    final next = List<McpServerConfig>.of(_servers)..[idx] = updated;
-    await _persistServers(next);
-    _servers = next;
-    notifyListeners();
-    if (!updated.enabled) {
-      await disconnect(updated.id);
-    } else {
-      // Always reconnect after saving to apply changes (url/transport/name)
-      await disconnect(updated.id);
-      unawaited(connect(updated.id));
-    }
+  Future<void> updateServer(McpServerConfig updated) =>
+      _updateServer(updated, preserveLatestTools: false);
+
+  Future<void> updateServerMetadata(McpServerConfig updated) =>
+      _updateServer(updated, preserveLatestTools: true);
+
+  Future<void> _updateServer(
+    McpServerConfig updated, {
+    required bool preserveLatestTools,
+  }) async {
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == updated.id);
+      if (idx < 0) return;
+      final next = List<McpServerConfig>.of(_servers)
+        ..[idx] = preserveLatestTools
+            ? updated.copyWith(tools: _servers[idx].tools)
+            : updated;
+      await _persistServers(next);
+      _servers = next;
+      notifyListeners();
+      if (!updated.enabled) {
+        await disconnect(updated.id);
+      } else {
+        // Always reconnect after saving to apply changes (url/transport/name)
+        await disconnect(updated.id);
+        unawaited(connect(updated.id));
+      }
+    });
   }
 
   Future<void> removeServer(String id) async {
-    final next = _servers.where((e) => e.id != id).toList(growable: false);
-    await _persistServers(next);
-    await disconnect(id);
-    _servers = next;
-    _status.remove(id);
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      final next = _servers.where((e) => e.id != id).toList(growable: false);
+      await _persistServers(next);
+      await disconnect(id);
+      _servers = next;
+      _status.remove(id);
+      notifyListeners();
+    });
   }
 
   Future<void> reorderServers(int oldIndex, int newIndex) async {
     if (oldIndex == newIndex) return;
     if (oldIndex < 0 || oldIndex >= _servers.length) return;
     if (newIndex < 0 || newIndex >= _servers.length) return;
-    final next = List<McpServerConfig>.of(_servers);
-    final moved = next.removeAt(oldIndex);
-    next.insert(newIndex, moved);
-    await _persistServers(next);
-    _servers = next;
-    notifyListeners();
+    final intended = List<McpServerConfig>.of(_servers);
+    final moved = intended.removeAt(oldIndex);
+    intended.insert(newIndex, moved);
+    final predecessorId = newIndex > 0 ? intended[newIndex - 1].id : null;
+    final successorId = newIndex + 1 < intended.length
+        ? intended[newIndex + 1].id
+        : null;
+    await _serializeServerMutation(() async {
+      final currentOldIndex = _servers.indexWhere(
+        (server) => server.id == moved.id,
+      );
+      if (currentOldIndex < 0) return;
+      final next = List<McpServerConfig>.of(_servers);
+      final current = next.removeAt(currentOldIndex);
+      var insertionIndex = successorId == null
+          ? -1
+          : next.indexWhere((server) => server.id == successorId);
+      if (insertionIndex < 0 && predecessorId != null) {
+        final predecessorIndex = next.indexWhere(
+          (server) => server.id == predecessorId,
+        );
+        if (predecessorIndex >= 0) insertionIndex = predecessorIndex + 1;
+      }
+      if (insertionIndex < 0) {
+        insertionIndex = newIndex.clamp(0, next.length);
+      }
+      next.insert(insertionIndex, current);
+      await _persistServers(next);
+      _servers = next;
+      notifyListeners();
+    });
   }
 
   Future<void> setToolEnabled(
@@ -700,17 +755,19 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     bool enabled,
   ) async {
-    final idx = _servers.indexWhere((e) => e.id == serverId);
-    if (idx < 0) return;
-    final server = _servers[idx];
-    final tools = server.tools
-        .map((t) => t.name == toolName ? t.copyWith(enabled: enabled) : t)
-        .toList();
-    final next = List<McpServerConfig>.of(_servers)
-      ..[idx] = server.copyWith(tools: tools);
-    await _persistServers(next);
-    _servers = next;
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == serverId);
+      if (idx < 0) return;
+      final server = _servers[idx];
+      final tools = server.tools
+          .map((t) => t.name == toolName ? t.copyWith(enabled: enabled) : t)
+          .toList();
+      final next = List<McpServerConfig>.of(_servers)
+        ..[idx] = server.copyWith(tools: tools);
+      await _persistServers(next);
+      _servers = next;
+      notifyListeners();
+    });
   }
 
   /// Set whether a tool requires user approval before execution.
@@ -719,20 +776,23 @@ class McpProvider extends ChangeNotifier {
     String toolName,
     bool needsApproval,
   ) async {
-    final idx = _servers.indexWhere((e) => e.id == serverId);
-    if (idx < 0) return;
-    final server = _servers[idx];
-    final tools = server.tools
-        .map(
-          (t) =>
-              t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
-        )
-        .toList();
-    final next = List<McpServerConfig>.of(_servers)
-      ..[idx] = server.copyWith(tools: tools);
-    await _persistServers(next);
-    _servers = next;
-    notifyListeners();
+    await _serializeServerMutation(() async {
+      final idx = _servers.indexWhere((e) => e.id == serverId);
+      if (idx < 0) return;
+      final server = _servers[idx];
+      final tools = server.tools
+          .map(
+            (t) => t.name == toolName
+                ? t.copyWith(needsApproval: needsApproval)
+                : t,
+          )
+          .toList();
+      final next = List<McpServerConfig>.of(_servers)
+        ..[idx] = server.copyWith(tools: tools);
+      await _persistServers(next);
+      _servers = next;
+      notifyListeners();
+    });
   }
 
   /// Check if a tool (by name) requires approval across all connected servers.
@@ -1257,68 +1317,71 @@ class McpProvider extends ChangeNotifier {
       // debugPrint('[MCP/Tools] listTools() ...');
       final tools = await client.listTools();
       // debugPrint('[MCP/Tools] listTools() returned ${tools.length} tools');
-      // Preserve enabled state from existing config
-      final idx = _servers.indexWhere((e) => e.id == id);
-      if (idx < 0) return;
-      final existing = _servers[idx].tools;
-      final existingMap = {for (final t in existing) t.name: t};
+      await _serializeServerMutation(() async {
+        if (!identical(_clients[id], client)) return;
+        // Preserve enabled state from the latest config.
+        final idx = _servers.indexWhere((e) => e.id == id);
+        if (idx < 0) return;
+        final existing = _servers[idx].tools;
+        final existingMap = {for (final t in existing) t.name: t};
 
-      List<McpToolConfig> merged = [];
-      for (final t in tools) {
-        final prior = existingMap[t.name];
-        // Extract params from inputSchema if present
-        final params = <McpParamSpec>[];
-        Map<String, dynamic>? schemaJson;
-        try {
-          final js = t.inputSchema;
-          schemaJson = js;
-          final props =
-              (js['properties'] as Map?)?.cast<String, dynamic>() ??
-              const <String, dynamic>{};
-          final req =
-              (js['required'] as List?)?.map((e) => e.toString()).toSet() ??
-              const <String>{};
-          props.forEach((key, val) {
-            String? ty;
-            dynamic defVal;
-            try {
-              final v = (val as Map).cast<String, dynamic>();
-              final ttype = v['type'];
-              if (ttype is String) {
-                ty = ttype;
-              } else if (ttype is List) {
-                ty = ttype.map((e) => e.toString()).join('|');
-              }
-              defVal = v['default'];
-            } catch (_) {}
-            params.add(
-              McpParamSpec(
-                name: key,
-                required: req.contains(key),
-                type: ty,
-                defaultValue: defVal,
-              ),
-            );
-          });
-        } catch (_) {}
+        List<McpToolConfig> merged = [];
+        for (final t in tools) {
+          final prior = existingMap[t.name];
+          // Extract params from inputSchema if present
+          final params = <McpParamSpec>[];
+          Map<String, dynamic>? schemaJson;
+          try {
+            final js = t.inputSchema;
+            schemaJson = js;
+            final props =
+                (js['properties'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
+            final req =
+                (js['required'] as List?)?.map((e) => e.toString()).toSet() ??
+                const <String>{};
+            props.forEach((key, val) {
+              String? ty;
+              dynamic defVal;
+              try {
+                final v = (val as Map).cast<String, dynamic>();
+                final ttype = v['type'];
+                if (ttype is String) {
+                  ty = ttype;
+                } else if (ttype is List) {
+                  ty = ttype.map((e) => e.toString()).join('|');
+                }
+                defVal = v['default'];
+              } catch (_) {}
+              params.add(
+                McpParamSpec(
+                  name: key,
+                  required: req.contains(key),
+                  type: ty,
+                  defaultValue: defVal,
+                ),
+              );
+            });
+          } catch (_) {}
 
-        merged.add(
-          McpToolConfig(
-            enabled: prior?.enabled ?? true,
-            name: t.name,
-            description: t.description,
-            params: params,
-            schema: schemaJson,
-            needsApproval: prior?.needsApproval ?? false,
-          ),
-        );
-      }
+          merged.add(
+            McpToolConfig(
+              enabled: prior?.enabled ?? true,
+              name: t.name,
+              description: t.description,
+              params: params,
+              schema: schemaJson,
+              needsApproval: prior?.needsApproval ?? false,
+            ),
+          );
+        }
 
-      final next = List<McpServerConfig>.of(_servers)
-        ..[idx] = _servers[idx].copyWith(tools: merged);
-      await _persistServers(next);
-      _servers = next;
-      notifyListeners();
+        final next = List<McpServerConfig>.of(_servers)
+          ..[idx] = _servers[idx].copyWith(tools: merged);
+        await _persistServers(next);
+        _servers = next;
+        notifyListeners();
+      });
     } catch (e) {
       // debugPrint('[MCP/Tools] listTools() failed for id=$id');
       // ignore tool refresh errors; status stays connected

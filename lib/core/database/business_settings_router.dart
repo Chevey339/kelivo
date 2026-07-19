@@ -156,6 +156,10 @@ final class BusinessSettingsRouter {
   BusinessSettingsRouter._();
 
   static const _providerOrderKey = 'providers_order_v1';
+  // Storage-only row for an ordered key that has no persisted config. The
+  // invalid `enabled` type prevents collision with a routed Provider payload.
+  static const _providerOrderOnlyPayload =
+      '{"enabled":"__kelivo_provider_order_only__"}';
   static const _legacyPinnedModelsKey = 'pinned_models_v1';
   static const _instructionInjectionsKey = 'instruction_injections_v1';
   static const _legacyActiveIdKey = 'instruction_injections_active_id_v1';
@@ -231,7 +235,9 @@ final class BusinessSettingsRouter {
       if (kind == BusinessEntityKind.provider) {
         final providers = <String, Object?>{};
         for (final row in rows) {
-          providers[row.id] = _decodePayload(row.payload, kind.sourceKey);
+          if (!isProviderOrderOnlyRow(row)) {
+            providers[row.id] = _decodePayload(row.payload, kind.sourceKey);
+          }
         }
         result[kind.sourceKey] = jsonEncode(providers);
         result[_providerOrderKey] = rows.map((row) => row.id).toList();
@@ -301,30 +307,31 @@ final class BusinessSettingsRouter {
     required bool normalizeLegacyEmbeddingOverrides,
   }) {
     final key = BusinessEntityKind.provider.sourceKey;
-    final raw = source[key];
-    if (raw == null) return const <BusinessEntityValue>[];
-    final decoded = _decodeJson(raw, key);
-    if (decoded is! Map) throw FormatException(key);
-    final providers = <String, Map<String, dynamic>>{};
-    for (final entry in decoded.entries) {
-      if (entry.value is! Map) throw FormatException(key);
-      final payload = (entry.value as Map).map(
-        (field, value) => MapEntry(field.toString(), value),
-      );
-      if (normalizeLegacyEmbeddingOverrides) {
-        _normalizeLegacyEmbeddingOverrides(payload);
-      }
-      _validateEntityPayload(BusinessEntityKind.provider, payload);
-      providers[entry.key.toString()] = payload;
-    }
     final rawOrder = source[_providerOrderKey];
     final order = rawOrder == null
         ? const <String>[]
         : _stringList(rawOrder, _providerOrderKey);
+    final raw = source[key];
+    final providers = <String, Map<String, dynamic>>{};
+    if (raw != null) {
+      final decoded = _decodeJson(raw, key);
+      if (decoded is! Map) throw FormatException(key);
+      for (final entry in decoded.entries) {
+        if (entry.value is! Map) throw FormatException(key);
+        final payload = (entry.value as Map).map(
+          (field, value) => MapEntry(field.toString(), value),
+        );
+        if (normalizeLegacyEmbeddingOverrides) {
+          _normalizeLegacyEmbeddingOverrides(payload);
+        }
+        _validateEntityPayload(BusinessEntityKind.provider, payload);
+        providers[entry.key.toString()] = payload;
+      }
+    }
     final orderedKeys = <String>[];
     final seen = <String>{};
     for (final providerKey in order) {
-      if (providers.containsKey(providerKey) && seen.add(providerKey)) {
+      if (providerKey.isNotEmpty && seen.add(providerKey)) {
         orderedKeys.add(providerKey);
       }
     }
@@ -336,10 +343,15 @@ final class BusinessSettingsRouter {
         BusinessEntityValue(
           id: orderedKeys[index],
           sortOrder: index,
-          payload: jsonEncode(providers[orderedKeys[index]]),
+          payload: providers.containsKey(orderedKeys[index])
+              ? jsonEncode(providers[orderedKeys[index]])
+              : _providerOrderOnlyPayload,
         ),
     ];
   }
+
+  static bool isProviderOrderOnlyRow(BusinessEntityValue row) =>
+      row.payload == _providerOrderOnlyPayload;
 
   static List<BusinessEntityValue> _routeList(
     BusinessEntityKind kind,

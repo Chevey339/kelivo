@@ -28,6 +28,7 @@ final class BusinessPreferences {
   Future<void>? _loadFuture;
   Future<void> _writeTail = Future<void>.value();
   bool _isLoaded = false;
+  bool _writesBlockedForRestore = false;
 
   bool get isLoaded => _isLoaded;
 
@@ -48,6 +49,23 @@ final class BusinessPreferences {
       _isLoaded = true;
     } finally {
       _loadFuture = null;
+    }
+  }
+
+  /// Drains accepted writes, runs one live restore, and keeps this process
+  /// read-only after a successful commit. Restore callers already require a
+  /// cold restart, so late background writes must not overwrite restored data.
+  Future<T> runWithRestoreWriteFence<T>(Future<T> Function() operation) async {
+    if (_writesBlockedForRestore) {
+      throw StateError('business_preferences_restore_fence');
+    }
+    _writesBlockedForRestore = true;
+    await _writeTail;
+    try {
+      return await operation();
+    } catch (_) {
+      _writesBlockedForRestore = false;
+      rethrow;
     }
   }
 
@@ -133,6 +151,9 @@ final class BusinessPreferences {
   }
 
   Future<T> _serialize<T>(Future<T> Function() operation) {
+    if (_writesBlockedForRestore) {
+      return Future<T>.error(StateError('business_preferences_restore_fence'));
+    }
     final result = _writeTail.then((_) => operation());
     _writeTail = result.then<void>(
       (_) {},

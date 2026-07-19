@@ -36,10 +36,12 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required BackupReminderProvider reminder,
   required BusinessRepository businessRepository,
+  required BusinessPreferences businessPreferences,
 }) {
   return MultiProvider(
     providers: [
       Provider<BusinessRepository>.value(value: businessRepository),
+      Provider<BusinessPreferences>.value(value: businessPreferences),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -69,6 +71,7 @@ void main() {
           settings: settings,
           reminder: reminder,
           businessRepository: business.repository,
+          businessPreferences: business.preferences,
         ),
       );
       await tester.pump();
@@ -94,6 +97,7 @@ void main() {
           settings: settings,
           reminder: reminder,
           businessRepository: business.repository,
+          businessPreferences: business.preferences,
         ),
       );
       await tester.pump();

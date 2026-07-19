@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:xml/xml.dart';
 
 import '../../database/business_repository.dart';
+import '../../database/business_preferences.dart';
 import '../../database/business_restore_service.dart';
 import '../../database/business_settings_router.dart';
 import '../../database/chat_database_repository.dart';
@@ -57,10 +58,42 @@ class DataSync {
 
   final ChatService chatService;
   final BusinessRepository businessRepository;
+  final BusinessPreferences? businessPreferences;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
 
-  DataSync({required this.chatService, required this.businessRepository});
+  DataSync({
+    required this.chatService,
+    required this.businessRepository,
+    this.businessPreferences,
+  });
+
+  Future<T> _runLiveBusinessRestore<T>(Future<T> Function() operation) {
+    final preferences = businessPreferences;
+    return preferences == null
+        ? operation()
+        : preferences.runWithRestoreWriteFence(operation);
+  }
+
+  static Future<void> _prepareRestoreBundle({
+    required String appDataPath,
+    required String extractedPath,
+    required String sourceManifestSha256,
+    required bool includeChats,
+    required bool includeFiles,
+    required bool restoreChats,
+    required bool restoreFiles,
+  }) => Isolate.run(() async {
+    await RestoreBundlePreparation.prepare(
+      appDataDirectory: Directory(appDataPath),
+      extractedDirectory: Directory(extractedPath),
+      sourceManifestSha256: sourceManifestSha256,
+      bundleIncludesChats: includeChats,
+      bundleIncludesFiles: includeFiles,
+      restoreChats: restoreChats,
+      restoreFiles: restoreFiles,
+    );
+  });
 
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
@@ -1460,9 +1493,10 @@ class DataSync {
       );
       BackupSettingsValidator.normalizeAndValidate(settings);
       final businessRestore = BusinessRestoreService(businessRepository);
+      Future<void> Function()? pendingBusinessRestore;
       if (versionedBackup != null) {
-        final preserveExplicitEmptyInstructionList =
-            versionedBackup.businessEntityRowIds == null;
+        final entityRowIds = versionedBackup.businessEntityRowIds;
+        final preserveExplicitEmptyInstructionList = entityRowIds == null;
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
         final restoreChats = cfg.includeChats && includeChats;
@@ -1474,33 +1508,33 @@ class DataSync {
             settings,
             preserveExplicitEmptyInstructionList:
                 preserveExplicitEmptyInstructionList,
-            entityRowIds: versionedBackup.businessEntityRowIds,
+            entityRowIds: entityRowIds,
           );
         }
         if (mode == RestoreMode.overwrite) {
           if (!restoreChats) {
-            await businessRestore.overwrite(
-              settings,
-              preserveExplicitEmptyInstructionList:
-                  preserveExplicitEmptyInstructionList,
-              entityRowIds: versionedBackup.businessEntityRowIds,
+            await _runLiveBusinessRestore(
+              () => businessRestore.overwrite(
+                settings,
+                preserveExplicitEmptyInstructionList:
+                    preserveExplicitEmptyInstructionList,
+                entityRowIds: entityRowIds,
+              ),
             );
             return;
           }
           final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
           final extractedPath = extractDir.path;
           final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
-          await Isolate.run(() async {
-            await RestoreBundlePreparation.prepare(
-              appDataDirectory: Directory(appDataPath),
-              extractedDirectory: Directory(extractedPath),
-              sourceManifestSha256: sourceManifestSha256,
-              bundleIncludesChats: includeChats,
-              bundleIncludesFiles: includeFiles,
-              restoreChats: restoreChats,
-              restoreFiles: restoreFiles,
-            );
-          });
+          await _prepareRestoreBundle(
+            appDataPath: appDataPath,
+            extractedPath: extractedPath,
+            sourceManifestSha256: sourceManifestSha256,
+            includeChats: includeChats,
+            includeFiles: includeFiles,
+            restoreChats: restoreChats,
+            restoreFiles: restoreFiles,
+          );
           return;
         }
         if (restoreChats) {
@@ -1508,13 +1542,14 @@ class DataSync {
             File(p.join(extractDir.path, _databaseEntryName)),
           );
         }
-        await businessRestore.merge(
+        pendingBusinessRestore = () => businessRestore.merge(
           settings,
           preserveExplicitEmptyInstructionList:
               preserveExplicitEmptyInstructionList,
-          entityRowIds: versionedBackup.businessEntityRowIds,
+          entityRowIds: entityRowIds,
         );
         if (!restoreChats) {
+          await _runLiveBusinessRestore(pendingBusinessRestore);
           return;
         }
       }
@@ -1542,22 +1577,26 @@ class DataSync {
       }
 
       if (versionedBackup == null) {
-        if (mode == RestoreMode.overwrite) {
-          await businessRestore.overwrite(
-            settings,
-            preserveExplicitEmptyInstructionList: true,
-            assumePreV3EmbeddingMigrationWhenVersionMissing: true,
-          );
-        } else {
-          await businessRestore.merge(
-            settings,
-            preserveExplicitEmptyInstructionList: true,
-            assumePreV3EmbeddingMigrationWhenVersionMissing: true,
-          );
-        }
-        if (!restoreChats) {
-          return;
-        }
+        // Chat and file restoration can commit independently. Reject the
+        // complete legacy business payload before changing either domain,
+        // then persist business data last so a later failure cannot strand
+        // the post-restore write fence without a restart prompt.
+        BusinessSettingsRouter.normalizeAndRoute(
+          settings,
+          preserveExplicitEmptyInstructionList: true,
+          assumePreV3EmbeddingMigrationWhenVersionMissing: true,
+        );
+        pendingBusinessRestore = mode == RestoreMode.overwrite
+            ? () => businessRestore.overwrite(
+                settings,
+                preserveExplicitEmptyInstructionList: true,
+                assumePreV3EmbeddingMigrationWhenVersionMissing: true,
+              )
+            : () => businessRestore.merge(
+                settings,
+                preserveExplicitEmptyInstructionList: true,
+                assumePreV3EmbeddingMigrationWhenVersionMissing: true,
+              );
       }
 
       // Restore chats
@@ -1789,6 +1828,10 @@ class DataSync {
             }
           }
         }
+      }
+      final restoreBusiness = pendingBusinessRestore;
+      if (restoreBusiness != null) {
+        await _runLiveBusinessRestore(restoreBusiness);
       }
     } finally {
       await _deleteDirectoryQuietly(extractDir);

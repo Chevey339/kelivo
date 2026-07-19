@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/database/business_preferences.dart';
 import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
 import '../../../core/providers/backup_provider.dart';
@@ -233,6 +234,7 @@ class _BackupPageState extends State<BackupPage> {
           create: (_) => BackupProvider(
             chatService: context.read<ChatService>(),
             businessRepository: context.read<BusinessRepository>(),
+            businessPreferences: context.read<BusinessPreferences>(),
             initialConfig: settings.webDavConfig,
           ),
         ),
@@ -240,6 +242,7 @@ class _BackupPageState extends State<BackupPage> {
           create: (_) => S3BackupProvider(
             chatService: context.read<ChatService>(),
             businessRepository: context.read<BusinessRepository>(),
+            businessPreferences: context.read<BusinessPreferences>(),
             initialConfig: settings.s3Config,
           ),
         ),

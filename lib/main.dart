@@ -392,6 +392,7 @@ class MyApp extends StatelessWidget {
           create: (ctx) => BackupProvider(
             chatService: ctx.read<ChatService>(),
             businessRepository: databaseLease.businessRepository,
+            businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
@@ -399,6 +400,7 @@ class MyApp extends StatelessWidget {
           create: (ctx) => S3BackupProvider(
             chatService: ctx.read<ChatService>(),
             businessRepository: databaseLease.businessRepository,
+            businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),

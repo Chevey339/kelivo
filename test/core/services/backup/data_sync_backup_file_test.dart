@@ -1783,7 +1783,7 @@ void main() {
     );
 
     test(
-      'legacy settings-only overwrite and merge preserve managed files',
+      'legacy settings-only overwrite and merge restore selected files',
       () async {
         final sourceDir = Directory('${root.path}/source_fonts');
         await sourceDir.create(recursive: true);
@@ -1813,7 +1813,7 @@ void main() {
         );
 
         expect(await existingFile.exists(), isTrue);
-        expect(await File('${fontsDir.path}/custom.ttf').exists(), isFalse);
+        expect(await File('${fontsDir.path}/custom.ttf').exists(), isTrue);
         expect(
           await Directory('${root.path}/.kelivo_restore').exists(),
           isFalse,
@@ -1825,8 +1825,8 @@ void main() {
           mode: RestoreMode.overwrite,
         );
 
-        expect(await existingFile.exists(), isTrue);
-        expect(await File('${fontsDir.path}/custom.ttf').exists(), isFalse);
+        expect(await existingFile.exists(), isFalse);
+        expect(await File('${fontsDir.path}/custom.ttf').exists(), isTrue);
         expect(
           await Directory('${root.path}/.kelivo_restore').exists(),
           isFalse,
@@ -2348,9 +2348,11 @@ void main() {
           await request.response.close();
         });
 
+        final businessPreferences = BusinessPreferences(businessRepository);
         final provider = BackupProvider(
           chatService: _FailingRestoreChatService(),
           businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
           initialConfig: const WebDavConfig(
             includeChats: true,
             includeFiles: false,
@@ -2377,6 +2379,10 @@ void main() {
         );
         expect(provider.busy, isFalse);
         expect(provider.message, contains('chat replacement failed'));
+        await expectLater(
+          businessPreferences.setString('after_failed_restore', 'writable'),
+          completes,
+        );
       },
     );
 
@@ -3025,9 +3031,12 @@ void main() {
             lastModified: null,
           );
 
-          await sync.restoreFromWebDav(
-            const WebDavConfig(includeChats: false, includeFiles: true),
-            item,
+          await expectLater(
+            sync.restoreFromWebDav(
+              const WebDavConfig(includeChats: false, includeFiles: true),
+              item,
+            ),
+            throwsA(anything),
           );
         }
 

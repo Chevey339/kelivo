@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/instruction_injection.dart';
@@ -303,6 +304,110 @@ void main() {
         throwsA(anything),
       );
       expect(restored.servers, orderedEquals(beforeFailedWrite));
+    },
+  );
+
+  test(
+    'concurrent MCP snapshot mutations preserve every intended update',
+    () async {
+      final fixture = await BusinessPreferencesTestHarness.create();
+      addTearDown(fixture.dispose);
+
+      final first = await fixture.open();
+      await first.preferences.setString(
+        'mcp_servers_v1',
+        jsonEncode(<Map<String, dynamic>>[
+          McpServerConfig(
+            id: 'kelivo_fetch',
+            enabled: false,
+            name: '@kelivo/fetch',
+            transport: McpTransportType.inmemory,
+          ).toJson(),
+          McpServerConfig(
+            id: 'docs',
+            enabled: false,
+            name: 'Docs',
+            transport: McpTransportType.http,
+            url: 'https://docs.example.test/mcp',
+            tools: <McpToolConfig>[
+              McpToolConfig(enabled: true, name: 'lookup'),
+            ],
+          ).toJson(),
+        ]),
+      );
+      final provider = McpProvider(preferences: first.preferences);
+      addTearDown(provider.dispose);
+      await _waitUntil(() => provider.servers.length == 2);
+
+      final searchAdd = provider.addServer(
+        enabled: false,
+        name: 'Search',
+        transport: McpTransportType.http,
+        url: 'https://search.example.test/mcp',
+      );
+      final archiveAdd = provider.addServer(
+        enabled: false,
+        name: 'Archive',
+        transport: McpTransportType.http,
+        url: 'https://archive.example.test/mcp',
+      );
+      final ids = await Future.wait(<Future<String>>[searchAdd, archiveAdd]);
+
+      expect(provider.getById(ids[0])?.name, 'Search');
+      expect(provider.getById(ids[1])?.name, 'Archive');
+
+      final logsId = await provider.addServer(
+        enabled: false,
+        name: 'Logs',
+        transport: McpTransportType.http,
+        url: 'https://logs.example.test/mcp',
+      );
+      await provider.updateServer(
+        provider
+            .getById('docs')!
+            .copyWith(
+              tools: <McpToolConfig>[
+                McpToolConfig(enabled: true, name: 'lookup'),
+                McpToolConfig(enabled: true, name: 'search'),
+              ],
+            ),
+      );
+      expect(provider.getById('docs')?.tools, hasLength(2));
+      final staleRename = provider.getById('docs')!.copyWith(name: 'Docs v2');
+      await provider.setToolEnabled('docs', 'lookup', false);
+      await provider.updateServerMetadata(staleRename);
+
+      expect(provider.getById('docs')?.name, 'Docs v2');
+      expect(
+        provider
+            .getById('docs')
+            ?.tools
+            .singleWhere((tool) => tool.name == 'lookup')
+            .enabled,
+        isFalse,
+      );
+
+      await Future.wait(<Future<void>>[
+        provider.removeServer('docs'),
+        provider.reorderServers(4, 2),
+      ]);
+      expect(provider.servers.map((server) => server.id), <String>[
+        'kelivo_fetch',
+        logsId,
+        ids[0],
+        ids[1],
+      ]);
+
+      await first.close();
+      final reopened = await fixture.open();
+      final restored = McpProvider(preferences: reopened.preferences);
+      addTearDown(restored.dispose);
+      await _waitUntil(() => restored.servers.length == 4);
+
+      expect(restored.getById(ids[0])?.name, 'Search');
+      expect(restored.getById(ids[1])?.name, 'Archive');
+      expect(restored.getById(logsId)?.name, 'Logs');
+      await reopened.close();
     },
   );
 }

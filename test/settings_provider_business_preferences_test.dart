@@ -87,6 +87,40 @@ void main() {
   });
 
   test(
+    'migrated order-only provider state survives startup seeding and reload',
+    () async {
+      const legacyOrder = <String>[
+        'Gemini',
+        'OpenAI',
+        'SiliconFlow',
+        'OpenRouter',
+        'KelivoIN',
+        'Tensdaq',
+        'DeepSeek',
+        'AIhubmix',
+        'Aliyun',
+        'Zhipu AI',
+        'Claude',
+        'Grok',
+        'ByteDance',
+      ];
+      await repository.replaceSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute({
+          'providers_order_v1': legacyOrder,
+        }),
+      );
+
+      final settings = SettingsProvider(BusinessPreferences(repository));
+      await settings.loaded;
+      expect(settings.providersOrder, legacyOrder);
+
+      final reloaded = SettingsProvider(BusinessPreferences(repository));
+      await reloaded.loaded;
+      expect(reloaded.providersOrder, legacyOrder);
+    },
+  );
+
+  test(
     'persists representative settings and restores them on cold reload',
     () async {
       final settings = SettingsProvider(BusinessPreferences(repository));

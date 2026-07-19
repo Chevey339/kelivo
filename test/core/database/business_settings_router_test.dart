@@ -70,8 +70,8 @@ void main() {
               'proxyPassword': 'proxy-secret',
             },
           }),
-          // The orphan is normalized away; the provider omitted from the order
-          // is appended using the source map's insertion order.
+          // The order-only entry is retained; the configured provider omitted
+          // from the order is appended using the source map's insertion order.
           'providers_order_v1': <String>['first', 'orphan'],
           'theme_mode_v1': 'dark',
           'use_dynamic_color_v1': false,
@@ -86,7 +86,11 @@ void main() {
         final snapshot = BusinessSettingsRouter.normalizeAndRoute(source);
         final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
 
-        expect(exported['providers_order_v1'], <String>['first', 'late']);
+        expect(exported['providers_order_v1'], <String>[
+          'first',
+          'orphan',
+          'late',
+        ]);
         expect(
           (jsonDecode(exported['provider_configs_v1']! as String) as Map).keys,
           <String>['first', 'late'],
@@ -97,7 +101,11 @@ void main() {
         expect(exported['pinned_chat_ids'], isNull);
 
         final providers = snapshot.entities[BusinessEntityKind.provider]!;
-        expect(providers.map((row) => row.id), <String>['first', 'late']);
+        expect(providers.map((row) => row.id), <String>[
+          'first',
+          'orphan',
+          'late',
+        ]);
         expect(jsonDecode(providers.first.payload)['apiKey'], 'first-secret');
         expect(
           jsonDecode(providers.first.payload)['proxyPassword'],
@@ -105,6 +113,38 @@ void main() {
         );
       },
     );
+
+    test('preserves provider order when configs were never persisted', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'providers_order_v1': <String>['Gemini', 'OpenAI'],
+      });
+
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+
+      expect(exported['providers_order_v1'], <String>['Gemini', 'OpenAI']);
+      expect(jsonDecode(exported['provider_configs_v1']! as String), isEmpty);
+    });
+
+    test('round-trips order-only entries beside persisted configs', () {
+      final first = BusinessSettingsRouter.exportSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute({
+          'provider_configs_v1': jsonEncode({
+            'OpenAI': {'apiKey': 'secret'},
+          }),
+          'providers_order_v1': <String>['Gemini', 'OpenAI'],
+        }),
+      );
+
+      final second = BusinessSettingsRouter.exportSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute(first),
+      );
+
+      expect(first['providers_order_v1'], <String>['Gemini', 'OpenAI']);
+      expect(second['providers_order_v1'], <String>['Gemini', 'OpenAI']);
+      expect(jsonDecode(second['provider_configs_v1']! as String), {
+        'OpenAI': {'apiKey': 'secret'},
+      });
+    });
 
     test('generates deterministic row ids without mutating payloads', () {
       final source = <String, Object?>{

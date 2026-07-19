@@ -90,6 +90,42 @@ void main() {
     },
   );
 
+  test('successful restore fence rejects late business writes', () async {
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+
+    await preferences.runWithRestoreWriteFence(() async {
+      await repository.setPreference('theme_mode_v1', 'restored');
+    });
+
+    await expectLater(
+      preferences.setString('theme_mode_v1', 'stale'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          'business_preferences_restore_fence',
+        ),
+      ),
+    );
+    expect(await repository.getPreference('theme_mode_v1'), 'restored');
+  });
+
+  test('failed restore fence reopens business writes', () async {
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+
+    await expectLater(
+      preferences.runWithRestoreWriteFence<void>(
+        () => throw StateError('restore failed'),
+      ),
+      throwsStateError,
+    );
+
+    await preferences.setString('theme_mode_v1', 'local');
+    expect(await repository.getPreference('theme_mode_v1'), 'local');
+  });
+
   test(
     'synchronizes entity values and provider order across a cold reload',
     () async {

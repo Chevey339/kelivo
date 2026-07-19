@@ -67,6 +67,29 @@ void main() {
     expect(jsonDecode(mergedTag.payload), isNot(contains('id')));
   });
 
+  test('provider order-only merge reorders without replacing configs', () {
+    final merged = BusinessSettingsMerger.merge(
+      {
+        'provider_configs_v1': jsonEncode({
+          'local': {'apiKey': 'local-secret'},
+          'shared': {'apiKey': 'shared-secret'},
+        }),
+        'providers_order_v1': <String>['local', 'shared'],
+      },
+      {
+        'providers_order_v1': <String>['shared', 'local'],
+      },
+    );
+
+    final providers =
+        jsonDecode(merged['provider_configs_v1']! as String)
+            as Map<String, dynamic>;
+    expect(merged['providers_order_v1'], <String>['shared', 'local']);
+    expect(providers.keys, <String>['shared', 'local']);
+    expect(providers['shared']['apiKey'], 'shared-secret');
+    expect(providers['local']['apiKey'], 'local-secret');
+  });
+
   test(
     'snapshot merge preserves selected rows and aligns reassigned memories',
     () {

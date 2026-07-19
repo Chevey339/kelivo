@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_data.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/models/backup.dart';
@@ -167,9 +168,19 @@ void main() {
         File? backup;
         late Map<String, Object> expectedSettings;
         try {
-          await BusinessRestoreService(
-            sourceRepository,
-          ).overwrite(_businessFixture(secret: 'restored-secret'));
+          await BusinessRestoreService(sourceRepository).overwrite({
+            ..._businessFixture(secret: 'restored-secret'),
+            'mcp_servers_v1': jsonEncode([
+              {
+                'id': 'restored-mcp',
+                'enabled': false,
+                'name': 'Restored MCP',
+                'transport': 'http',
+                'url': 'https://restored.example.test/mcp',
+                'tools': <Object?>[],
+              },
+            ]),
+          });
           expectedSettings = await BusinessRestoreService(
             sourceRepository,
           ).exportSettings();
@@ -199,6 +210,8 @@ void main() {
             'providers_order_v1': ['old'],
             'old_only_key_v1': true,
           });
+          final businessPreferences = BusinessPreferences(targetRepository);
+          await businessPreferences.load();
           final now = DateTime.now().microsecondsSinceEpoch;
           await targetDatabase.customStatement(
             'INSERT INTO conversation_rows '
@@ -212,9 +225,33 @@ void main() {
           await DataSync(
             chatService: ChatService(),
             businessRepository: targetRepository,
+            businessPreferences: businessPreferences,
           ).restoreFromLocalFile(
             backup,
             const WebDavConfig(includeChats: false, includeFiles: true),
+          );
+
+          await expectLater(
+            businessPreferences.setString(
+              'mcp_servers_v1',
+              jsonEncode([
+                {
+                  'id': 'stale-mcp',
+                  'enabled': false,
+                  'name': 'Stale MCP',
+                  'transport': 'http',
+                  'url': 'https://stale.example.test/mcp',
+                  'tools': <Object?>[],
+                },
+              ]),
+            ),
+            throwsA(
+              isA<StateError>().having(
+                (error) => error.message,
+                'message',
+                'business_preferences_restore_fence',
+              ),
+            ),
           );
 
           expect(

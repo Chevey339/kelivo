@@ -186,8 +186,16 @@ final class BusinessSettingsMerger {
     final importedRows = _orderedRows(incoming);
     final selected = <String, BusinessEntityValue>{
       for (final row in localRows) row.id: row,
-      for (final row in importedRows) row.id: row,
     };
+    for (final row in importedRows) {
+      final local = selected[row.id];
+      if (BusinessSettingsRouter.isProviderOrderOnlyRow(row) &&
+          local != null &&
+          !BusinessSettingsRouter.isProviderOrderOnlyRow(local)) {
+        continue;
+      }
+      selected[row.id] = row;
+    }
     final orderedIds = <String>[];
     final seen = <String>{};
     final primary = preferIncomingOrder ? importedRows : localRows;

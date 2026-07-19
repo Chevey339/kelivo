@@ -369,7 +369,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     // Built-in: only toggle enabled
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
-      await mcp.updateServer(old.copyWith(enabled: _enabled));
+      await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
       if (mounted) Navigator.of(context).pop();
       return;
     }
@@ -391,7 +391,7 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     };
     if (isEdit) {
       final old = mcp.getById(widget.serverId!)!;
-      await mcp.updateServer(
+      await mcp.updateServerMetadata(
         old.copyWith(
           enabled: _enabled,
           name: name,

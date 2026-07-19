@@ -30,10 +30,12 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required BackupReminderProvider reminder,
   required BusinessRepository businessRepository,
+  required BusinessPreferences businessPreferences,
 }) {
   return MultiProvider(
     providers: [
       Provider<BusinessRepository>.value(value: businessRepository),
+      Provider<BusinessPreferences>.value(value: businessPreferences),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>(create: (_) => ChatService()),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -50,12 +52,14 @@ Widget _buildDesktopHarness({
   required SettingsProvider settings,
   required BackupReminderProvider reminder,
   required BusinessRepository businessRepository,
+  required BusinessPreferences businessPreferences,
 }) {
   final chatService = ChatService();
 
   return MultiProvider(
     providers: [
       Provider<BusinessRepository>.value(value: businessRepository),
+      Provider<BusinessPreferences>.value(value: businessPreferences),
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<ChatService>.value(value: chatService),
       ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
@@ -63,6 +67,7 @@ Widget _buildDesktopHarness({
         create: (_) => BackupProvider(
           chatService: chatService,
           businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
           initialConfig: settings.webDavConfig,
         ),
       ),
@@ -70,6 +75,7 @@ Widget _buildDesktopHarness({
         create: (_) => S3BackupProvider(
           chatService: chatService,
           businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
           initialConfig: settings.s3Config,
         ),
       ),
@@ -94,6 +100,7 @@ Future<void> _pumpBackupPage(
       settings: settings,
       reminder: reminder,
       businessRepository: business.repository,
+      businessPreferences: business.preferences,
     ),
   );
   await tester.pump();
@@ -111,6 +118,7 @@ Future<void> _pumpDesktopBackupPane(
       settings: settings,
       reminder: reminder,
       businessRepository: business.repository,
+      businessPreferences: business.preferences,
     ),
   );
   await tester.pump();
