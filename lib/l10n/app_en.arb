@@ -2667,5 +2667,65 @@
   "multiAIRetryBlockedUnresolvedComparison": "Please adopt or drop the comparison results before retrying.",
   "@multiAIRetryBlockedUnresolvedComparison": {
     "description": "Toast shown when retry is blocked due to active or unresolved multi-AI comparison state"
+  },
+  "assistantEditPageProactiveLetterTab": "Their Letter",
+  "@assistantEditPageProactiveLetterTab": {
+    "description": "Tab label for proactive care / their letter settings"
+  },
+  "assistantEditProactiveCareEnableTitle": "Proactive Care",
+  "@assistantEditProactiveCareEnableTitle": {
+    "description": "Title for the proactive care enable switch"
+  },
+  "assistantEditProactiveCareNextMessageTimeTitle": "Next proactive message time",
+  "@assistantEditProactiveCareNextMessageTimeTitle": {
+    "description": "Label for the next proactive message time row"
+  },
+  "assistantEditProactiveCareNextMessageTimeUnset": "Not set",
+  "@assistantEditProactiveCareNextMessageTimeUnset": {
+    "description": "Shown when no proactive message time is set"
+  },
+  "assistantEditProactiveCarePromptTitle": "Proactive care prompt",
+  "@assistantEditProactiveCarePromptTitle": {
+    "description": "Title for the proactive care prompt editor"
+  },
+  "assistantEditProactiveCarePromptHint": "Prompt used when the assistant proactively sends a message",
+  "@assistantEditProactiveCarePromptHint": {
+    "description": "Hint text for the proactive care prompt field"
+  },
+  "assistantEditProactiveCarePromptDefault": "It is time to proactively message the user. Stay in character, consider the conversation context and the current time, and write one natural, caring message to the user. Output only the message itself.",
+  "@assistantEditProactiveCarePromptDefault": {
+    "description": "Default proactive care prompt"
+  },
+  "assistantEditProactiveCareDecisionPromptTitle": "Decision time instruction prompt",
+  "@assistantEditProactiveCareDecisionPromptTitle": {
+    "description": "Title for the decision prompt editor"
+  },
+  "assistantEditProactiveCareDecisionPromptDefault": "You are in the \"proactive message time decision\" phase. Take on the assistant's role and decide when to message the user next.\n\n[Feature description]\n- Proactive messaging: the assistant sends a message at the scheduled time without waiting for the user to ask.\n- First check the next scheduled message time. Keep it if it still fits; otherwise change it.\n- As the assistant, using context and the time of your last reply, consider:\n1. If the user has not messaged you, when would you reach out?\n2. Match timing to personality: clingy or warm personalities message sooner; aloof personalities later.\n3. If context mentions reminders, supervision, or care, message sooner at a fitting time.\n4. If you were sleeping or busy, message when you would wake up or finish.\n5. You may invent a situational event and schedule the message for when it would happen.",
+  "@assistantEditProactiveCareDecisionPromptDefault": {
+    "description": "Default decision prompt for proactive care timing"
+  },
+  "assistantEditProactiveCareDateTimePickerTitle": "Choose date and time",
+  "@assistantEditProactiveCareDateTimePickerTitle": {
+    "description": "Title for the date/time picker bottom sheet"
+  },
+  "assistantEditProactiveCareExactAlarmPermissionDenied": "Exact alarm permission not granted. Proactive care cannot wake the app on time. Please allow \"Alarms & reminders\" in system settings.",
+  "@assistantEditProactiveCareExactAlarmPermissionDenied": {
+    "description": "Warning when exact alarm permission is denied"
+  },
+  "assistantEditProactiveCareNotificationPermissionDenied": "Notification permission not granted. Proactive care messages cannot notify you. Please enable notifications in system settings.",
+  "@assistantEditProactiveCareNotificationPermissionDenied": {
+    "description": "Warning when notification permission is denied"
+  },
+  "defaultModelPageProactiveCareModelTitle": "Ta's Letter Decision Model",
+  "@defaultModelPageProactiveCareModelTitle": {
+    "description": "Title for the proactive care decision model card"
+  },
+  "defaultModelPageProactiveCareModelSubtitle": "Model used to decide when the assistant should proactively message",
+  "@defaultModelPageProactiveCareModelSubtitle": {
+    "description": "Subtitle for the proactive care decision model card"
+  },
+  "proactiveCareFailedNotificationBody": "Couldn't generate the proactive care message. Open the app to check the model settings and network.",
+  "@proactiveCareFailedNotificationBody": {
+    "description": "Notification body when proactive care message generation fails"
   }
 }

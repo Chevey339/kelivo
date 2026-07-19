@@ -2214,5 +2214,65 @@
   "multiAIRetryBlockedUnresolvedComparison": "請先採納或丟棄對比結果，再進行重試。",
   "@multiAIRetryBlockedUnresolvedComparison": {
     "description": "Toast shown when retry is blocked due to active or unresolved multi-AI comparison state"
+  },
+  "assistantEditPageProactiveLetterTab": "Ta的來信",
+  "@assistantEditPageProactiveLetterTab": {
+    "description": "主動關懷/Ta的來信設定頁籤標籤"
+  },
+  "assistantEditProactiveCareEnableTitle": "主動關懷",
+  "@assistantEditProactiveCareEnableTitle": {
+    "description": "主動關懷開關標題"
+  },
+  "assistantEditProactiveCareNextMessageTimeTitle": "下次助手主動發訊息時間",
+  "@assistantEditProactiveCareNextMessageTimeTitle": {
+    "description": "下次主動發訊息時間標籤"
+  },
+  "assistantEditProactiveCareNextMessageTimeUnset": "未設定",
+  "@assistantEditProactiveCareNextMessageTimeUnset": {
+    "description": "未設定主動發訊息時間時顯示"
+  },
+  "assistantEditProactiveCarePromptTitle": "主動關懷提示詞",
+  "@assistantEditProactiveCarePromptTitle": {
+    "description": "主動關懷提示詞編輯器標題"
+  },
+  "assistantEditProactiveCarePromptHint": "助手主動發訊息時使用的提示詞",
+  "@assistantEditProactiveCarePromptHint": {
+    "description": "主動關懷提示詞輸入框提示"
+  },
+  "assistantEditProactiveCarePromptDefault": "現在到了你主動給使用者發訊息的時間。請保持你的角色設定，結合上下文與目前時間，主動給使用者發一條自然、貼心的訊息。只輸出訊息內容本身。",
+  "@assistantEditProactiveCarePromptDefault": {
+    "description": "預設主動關懷提示詞"
+  },
+  "assistantEditProactiveCareDecisionPromptTitle": "決策時間功能說明提示詞",
+  "@assistantEditProactiveCareDecisionPromptTitle": {
+    "description": "決策提示詞編輯器標題"
+  },
+  "assistantEditProactiveCareDecisionPromptDefault": "你現在在\"主動發訊息時間決策\"。你需要代入助手的角色，判斷下次什麼時候給使用者發訊息。\n【功能說明】\n- 主動發訊息功能：助手會在設定的時間主動給使用者發送一條訊息，無需使用者提問。\n- 請你先看一下下次發訊息的時間，如果你認為目前設定的時間無需改變，則保持原時間。反之，則修改\n- 請你代入助手的角色，根據上下文，以及助手最後一次回覆使用者訊息的時間，從以下幾方面考慮:\n1.使用者沒有給你發訊息，你希望什麼時候主動找使用者\n2.請根據助手設定的性格決定時間；如果助手是依賴使用者的性格或熱情的性格，就早些給使用者發訊息；反之，高冷性格就晚些發\n3.如果上下文提到了助手要提醒/監督/關心使用者，就早些按符合助手設定的時間主動給使用者發訊息\n4.如果上文提到助手睡覺/在忙等等，就按助手起床/忙完的時間給使用者發訊息\n5.你也可以根據上下文製造一些突發事件，按你製造的突發事件的時間給使用者發訊息）",
+  "@assistantEditProactiveCareDecisionPromptDefault": {
+    "description": "預設決策時間提示詞"
+  },
+  "assistantEditProactiveCareDateTimePickerTitle": "選擇日期和時間",
+  "@assistantEditProactiveCareDateTimePickerTitle": {
+    "description": "日期時間選擇器標題"
+  },
+  "assistantEditProactiveCareExactAlarmPermissionDenied": "未授予精確鬧鐘權限，主動關懷無法按時喚醒應用程式，請在系統設定中允許「鬧鐘和提醒」。",
+  "@assistantEditProactiveCareExactAlarmPermissionDenied": {
+    "description": "精確鬧鐘權限被拒絕時的警告"
+  },
+  "assistantEditProactiveCareNotificationPermissionDenied": "未授予通知權限，主動關懷訊息將無法通知你，請在系統設定中開啟通知。",
+  "@assistantEditProactiveCareNotificationPermissionDenied": {
+    "description": "通知權限被拒絕時的警告"
+  },
+  "defaultModelPageProactiveCareModelTitle": "Ta的來信決策模型",
+  "@defaultModelPageProactiveCareModelTitle": {
+    "description": "主動關懷決策模型卡片標題"
+  },
+  "defaultModelPageProactiveCareModelSubtitle": "用於決定助手何時主動發訊息的模型",
+  "@defaultModelPageProactiveCareModelSubtitle": {
+    "description": "主動關懷決策模型卡片副標題"
+  },
+  "proactiveCareFailedNotificationBody": "主動關懷訊息生成失敗，請開啟應用程式檢查模型配置與網路。",
+  "@proactiveCareFailedNotificationBody": {
+    "description": "主動關懷訊息生成失敗時的通知內容"
   }
 }

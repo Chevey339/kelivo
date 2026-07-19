@@ -14,9 +14,10 @@ import '../models/preset_message.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
+import '../services/proactive_care_alarm_service.dart';
 
 class AssistantProvider extends ChangeNotifier {
-  static const String _assistantsKey = 'assistants_v1';
+  static const String assistantsPrefsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
 
@@ -55,7 +56,7 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> loadFromPrefs() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_assistantsKey);
+    final raw = prefs.getString(assistantsPrefsKey);
     if (raw != null && raw.isNotEmpty) {
       final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
       final migrated = _decodeAssistantsWithLegacySearch(
@@ -100,7 +101,7 @@ class AssistantProvider extends ChangeNotifier {
     SharedPreferences prefs,
     ChatDatabaseRepository? repo,
   ) async {
-    final raw = prefs.getString(_assistantsKey);
+    final raw = prefs.getString(assistantsPrefsKey);
     if (raw == null || raw.isEmpty) return;
 
     final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
@@ -147,11 +148,11 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       try {
         await repo.putAssistants(_assistants);
-        await prefs.remove(_assistantsKey);
+        await prefs.remove(assistantsPrefsKey);
         await prefs.remove(_legacySearchEnabledKey);
       } catch (_) {}
     } else if (changed) {
-      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+      await prefs.setString(assistantsPrefsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -351,10 +352,10 @@ class AssistantProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (repo != null) {
       await repo.putAssistants(_assistants);
-      await prefs.remove(_assistantsKey);
+      await prefs.remove(assistantsPrefsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
-      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+      await prefs.setString(assistantsPrefsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -363,7 +364,7 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       await repo.putAssistant(a, sortOrder: sortOrder);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_assistantsKey);
+      await prefs.remove(assistantsPrefsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
       await _persist();
@@ -375,7 +376,7 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       await repo.deleteAssistant(id);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_assistantsKey);
+      await prefs.remove(assistantsPrefsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
       await _persist();
@@ -560,6 +561,24 @@ class AssistantProvider extends ChangeNotifier {
     _assistants[idx] = next;
     await _persistSingle(next, sortOrder: idx);
     notifyListeners();
+    _syncProactiveCareAlarm(updated, next);
+  }
+
+  /// Schedule or cancel the proactive care alarm when relevant fields change.
+  void _syncProactiveCareAlarm(Assistant prev, Assistant next) {
+    if (!Platform.isAndroid || !ProactiveCareAlarmService.isSupported) return;
+    final wasEnabled = prev.enableProactiveCare;
+    final isEnabled = next.enableProactiveCare;
+    final timeChanged =
+        prev.proactiveCareNextMessageAt != next.proactiveCareNextMessageAt;
+    if (!isEnabled && wasEnabled) {
+      ProactiveCareAlarmService.cancelAlarm(next.id);
+    } else if (isEnabled && (!wasEnabled || timeChanged)) {
+      final at = next.proactiveCareNextMessageAt;
+      if (at != null) {
+        ProactiveCareAlarmService.scheduleAlarm(next.id, at);
+      }
+    }
   }
 
   Future<void> setSearchEnabledForCurrentAssistant(bool enabled) async {
@@ -593,6 +612,10 @@ class AssistantProvider extends ChangeNotifier {
     if (_assistants.length <= 1) return false;
 
     await chatService?.deleteConversationsForAssistant(id);
+    // Cancel any pending proactive care alarm for this assistant.
+    if (Platform.isAndroid && ProactiveCareAlarmService.isSupported) {
+      ProactiveCareAlarmService.cancelAlarm(id);
+    }
 
     final removingCurrent = _assistants[idx].id == _currentAssistantId;
     _assistants.removeAt(idx);

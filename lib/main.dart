@@ -45,6 +45,7 @@ import 'dart:io'
     show Platform; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/proactive_care_alarm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
@@ -272,6 +273,13 @@ class MyApp extends StatelessWidget {
                         await NotificationService.ensureInitialized();
                         await NotificationService.ensureAndroidNotificationsPermission();
                       }
+                      // Initialize proactive care alarms (reschedule any pending)
+                      try {
+                        if (Platform.isAndroid &&
+                            ProactiveCareAlarmService.isSupported) {
+                          await ProactiveCareAlarmService.initialize();
+                        }
+                      } catch (_) {}
                     }
                   }
                 } catch (_) {}

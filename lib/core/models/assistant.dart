@@ -75,6 +75,11 @@ Do **not** store sensitive information, including:
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
   final List<AssistantRegex> regexRules;
+  // Proactive care ("Ta的来信")
+  final bool enableProactiveCare;
+  final DateTime? proactiveCareNextMessageAt;
+  final String proactiveCarePrompt;
+  final String proactiveCareDecisionPrompt;
   // File processing configuration (per assistant)
   // Values: 'extract' (parse locally / OCR), 'direct' (upload raw file), 'discard'
   final String docxMode;
@@ -113,6 +118,10 @@ Do **not** store sensitive information, including:
     this.memoryRecordPrompt = defaultMemoryRecordPrompt,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
+    this.enableProactiveCare = false,
+    this.proactiveCareNextMessageAt,
+    this.proactiveCarePrompt = '',
+    this.proactiveCareDecisionPrompt = '',
     this.docxMode = 'extract',
     this.pdfMode = 'extract',
     this.otherOfficeMode = 'direct',
@@ -151,6 +160,11 @@ Do **not** store sensitive information, including:
     String? memoryRecordPrompt,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
+    bool? enableProactiveCare,
+    DateTime? proactiveCareNextMessageAt,
+    String? proactiveCarePrompt,
+    String? proactiveCareDecisionPrompt,
+    bool clearProactiveCareNextMessageAt = false,
     String? docxMode,
     String? pdfMode,
     String? otherOfficeMode,
@@ -200,6 +214,13 @@ Do **not** store sensitive information, including:
       memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
+      enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
+      proactiveCareNextMessageAt: clearProactiveCareNextMessageAt
+          ? null
+          : (proactiveCareNextMessageAt ?? this.proactiveCareNextMessageAt),
+      proactiveCarePrompt: proactiveCarePrompt ?? this.proactiveCarePrompt,
+      proactiveCareDecisionPrompt:
+          proactiveCareDecisionPrompt ?? this.proactiveCareDecisionPrompt,
       docxMode: docxMode ?? this.docxMode,
       pdfMode: pdfMode ?? this.pdfMode,
       otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
@@ -238,6 +259,10 @@ Do **not** store sensitive information, including:
     'memoryRecordPrompt': memoryRecordPrompt,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
+    'enableProactiveCare': enableProactiveCare,
+    'proactiveCareNextMessageAt': proactiveCareNextMessageAt?.toIso8601String(),
+    'proactiveCarePrompt': proactiveCarePrompt,
+    'proactiveCareDecisionPrompt': proactiveCareDecisionPrompt,
     'docxMode': docxMode,
     'pdfMode': pdfMode,
     'otherOfficeMode': otherOfficeMode,
@@ -328,6 +353,15 @@ Do **not** store sensitive information, including:
       }
       return const <AssistantRegex>[];
     })(),
+    enableProactiveCare: json['enableProactiveCare'] as bool? ?? false,
+    proactiveCareNextMessageAt: (() {
+      final raw = json['proactiveCareNextMessageAt'];
+      if (raw is! String || raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    })(),
+    proactiveCarePrompt: (json['proactiveCarePrompt'] as String?) ?? '',
+    proactiveCareDecisionPrompt:
+        (json['proactiveCareDecisionPrompt'] as String?) ?? '',
     docxMode: (json['docxMode'] as String?) ?? 'extract',
     pdfMode: (json['pdfMode'] as String?) ?? 'extract',
     otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',

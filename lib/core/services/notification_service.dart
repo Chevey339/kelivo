@@ -6,12 +6,20 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   static bool _inited = false;
   static const AndroidNotificationChannel _channel = AndroidNotificationChannel(
-    'kelivo_bg_chat_v2',
+    'cuplivo_bg_chat_v2',
     'Chat Background',
     description: 'Notifications for chat generation status',
     importance: Importance.high,
     playSound: true,
   );
+  static const AndroidNotificationChannel _proactiveCareChannel =
+      AndroidNotificationChannel(
+        'cuplivo_proactive_care',
+        'Proactive Care',
+        description: 'Proactive care messages from assistants',
+        importance: Importance.high,
+        playSound: true,
+      );
 
   static Future<void> ensureInitialized() async {
     if (!Platform.isAndroid) return;
@@ -25,14 +33,14 @@ class NotificationService {
     );
     await _plugin.initialize(init);
 
-    // Create channel
+    // Create channels
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
         >();
     if (android != null) {
       await android.createNotificationChannel(_channel);
-      // Runtime notification permission (Android 13+) should be requested by app UI if needed
+      await android.createNotificationChannel(_proactiveCareChannel);
     }
     _inited = true;
   }
@@ -57,6 +65,46 @@ class NotificationService {
     }
   }
 
+  /// Shows a proactive care notification on behalf of an assistant.
+  ///
+  /// [id] should be stable per assistant (e.g. derived from the assistant id)
+  /// so a newer notification replaces the previous one instead of piling up.
+  /// [title] is the assistant name, [body] the message text (the LLM reply),
+  /// and [largeIconPath] an optional local image file shown as the
+  /// notification's large icon.
+  static Future<void> showProactiveCare({
+    required int id,
+    required String title,
+    required String body,
+    String? largeIconPath,
+  }) async {
+    if (!Platform.isAndroid) return;
+    await ensureInitialized();
+    await _plugin.show(
+      id,
+      title,
+      body,
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _proactiveCareChannel.id,
+          _proactiveCareChannel.name,
+          channelDescription: _proactiveCareChannel.description,
+          importance: Importance.max,
+          priority: Priority.max,
+          playSound: true,
+          enableVibration: true,
+          category: AndroidNotificationCategory.message,
+          visibility: NotificationVisibility.public,
+          ticker: 'Cuplivo',
+          largeIcon: largeIconPath == null
+              ? null
+              : FilePathAndroidBitmap(largeIconPath),
+          styleInformation: BigTextStyleInformation(body),
+        ),
+      ),
+    );
+  }
+
   static Future<void> showChatCompleted({String? title, String? body}) async {
     if (!Platform.isAndroid) return;
     await ensureInitialized();
@@ -75,7 +123,7 @@ class NotificationService {
           enableVibration: true,
           category: AndroidNotificationCategory.message,
           visibility: NotificationVisibility.public,
-          ticker: 'Kelivo',
+          ticker: 'Cuplivo',
           styleInformation: const DefaultStyleInformation(true, true),
         ),
       ),

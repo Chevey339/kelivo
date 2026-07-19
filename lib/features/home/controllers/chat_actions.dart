@@ -114,6 +114,9 @@ class ChatActions {
   /// Called when a successful assistant reply is finalized.
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
+  /// Called after an assistant reply to maybe update proactive care timing.
+  void Function(String conversationId)? onMaybeUpdateProactiveCare;
+
   /// Called when file processing starts.
   VoidCallback? onFileProcessingStarted;
 
@@ -1561,6 +1564,7 @@ class ChatActions {
 
     _setConversationLoading(conversationId, false);
     onAssistantMessageFinished?.call(finalizedMessage);
+    onMaybeUpdateProactiveCare?.call(conversationId);
 
     // Use unified reasoning completion method
     await streamController.finishReasoningAndPersist(
