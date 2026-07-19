@@ -681,6 +681,14 @@ class MultiAIEngine extends ChangeNotifier {
 
   /// Drop a thread: clear subgroupId on ALL its messages across all rounds.
   Future<void> dropThread(String threadId) async {
+    // Capture anchor info BEFORE clearing messages — _computeAnchors filters
+    // out anchors with < 2 threads, so after clearing one thread's messages
+    // the anchor becomes invisible and auto-adopt would fail.
+    final capturedAnchor = latestAnchorId;
+    final capturedAnchorMsgs = capturedAnchor != null
+        ? getMessagesForAnchor(capturedAnchor)
+        : null;
+
     var matchCount = 0;
     final totalSubgroup = _chatController.messages
         .where((m) => m.subgroupId != null)
@@ -708,16 +716,14 @@ class MultiAIEngine extends ChangeNotifier {
     if (remaining == 1) {
       // Auto-adopt: resolve the remaining thread.
       final remainingTid = _threadIds[0];
-      final anchor = latestAnchorId;
       debugPrint(
-        '[MultiAI][dropThread] auto-adopt remainingTid=$remainingTid anchor=$anchor',
+        '[MultiAI][dropThread] auto-adopt remainingTid=$remainingTid anchor=$capturedAnchor',
       );
-      if (anchor != null) {
-        final msgs = getMessagesForAnchor(anchor);
-        final threadMsgs = msgs[remainingTid] ?? [];
+      if (capturedAnchor != null && capturedAnchorMsgs != null) {
+        final threadMsgs = capturedAnchorMsgs[remainingTid] ?? [];
         if (threadMsgs.isNotEmpty) {
           await resolveThread(
-            anchorId: anchor,
+            anchorId: capturedAnchor,
             threadId: remainingTid,
             version: threadMsgs.last.version,
           );
