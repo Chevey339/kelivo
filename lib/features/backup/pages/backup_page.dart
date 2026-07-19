@@ -1216,6 +1216,7 @@ class _BackupPageState extends State<BackupPage> {
                   if (!context.mounted) return;
                   await showDialog(
                     context: context,
+                    barrierDismissible: false,
                     builder: (dctx) => AlertDialog(
                       title: Text(l10n.backupPageRestartRequired),
                       content: Text(
@@ -1286,6 +1287,7 @@ class _BackupPageState extends State<BackupPage> {
                   if (!context.mounted) return;
                   await showDialog(
                     context: context,
+                    barrierDismissible: false,
                     builder: (dctx) => AlertDialog(
                       title: Text(l10n.backupPageRestartRequired),
                       content: Text(

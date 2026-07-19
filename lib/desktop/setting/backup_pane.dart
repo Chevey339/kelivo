@@ -924,6 +924,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     if (!rootCtx.mounted) return;
                     await showDialog(
                       context: rootCtx,
+                      barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
                         shape: RoundedRectangleBorder(
@@ -951,6 +952,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     if (!rootCtx.mounted) return;
                     await showDialog(
                       context: rootCtx,
+                      barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
                         shape: RoundedRectangleBorder(
