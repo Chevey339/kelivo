@@ -460,6 +460,19 @@ Future<Map<String, dynamic>?> _buildLongCatOmniAttachmentPart(
     };
   }
 
+  if (isOfficeDocumentMime(mime) || mime == 'application/pdf') {
+    final fileName = normalized.replaceAll('\\', '/').split('/').last;
+    final data = isRemoteUrl
+        ? normalized
+        : isDataUrl
+        ? _stripDataUrlPrefix(normalized)
+        : await _encodeBase64File(normalized, withPrefix: false);
+    return {
+      'type': 'file',
+      'file': {'filename': fileName, 'file_data': data},
+    };
+  }
+
   final imageData = <String>[
     isRemoteUrl
         ? normalized
@@ -576,10 +589,18 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   List<String>? userMediaPaths,
   required bool canImageInput,
 }) async {
+  int lastUserIndex = -1;
+  for (int i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]['role'] ?? '').toString() == 'user') {
+      lastUserIndex = i;
+      break;
+    }
+  }
+
   final out = <Map<String, dynamic>>[];
   for (int i = 0; i < messages.length; i++) {
     final m = messages[i];
-    final isLast = i == messages.length - 1;
+    final isLastUser = i == lastUserIndex;
     final originalContent = m['content'];
     final raw = originalContent is List
         ? ChatApiService._textFromContentParts(originalContent)
@@ -588,6 +609,12 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
     outMsg['role'] = role;
+    final internalMediaPaths =
+        (m[multimodalInternalMediaPathsKey] as List?)
+            ?.map((e) => e.toString().trim())
+            .where((e) => e.isNotEmpty)
+            .toList(growable: false) ??
+        const <String>[];
 
     if (originalContent is List) {
       outMsg['content'] = canImageInput ? originalContent : raw;
@@ -612,13 +639,15 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
 
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final hasCustomImages = raw.contains('[image:');
-    final hasAttachedImages =
+    final hasAnyMediaAttachments =
         canImageInput &&
-        isLast &&
-        (userMediaPaths?.isNotEmpty == true) &&
-        (role == 'user');
+        (role == 'user') &&
+        (internalMediaPaths.isNotEmpty ||
+            (isLastUser && userMediaPaths?.isNotEmpty == true));
 
-    if (!hasMarkdownImages && !hasCustomImages && !hasAttachedImages) {
+    if (!hasMarkdownImages &&
+        !hasCustomImages &&
+        !hasAnyMediaAttachments) {
       outMsg['content'] = raw;
       out.add(outMsg);
       continue;
@@ -688,8 +717,12 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       }
       addImageUrl(url);
     }
-    if (hasAttachedImages) {
-      for (final p in userMediaPaths!) {
+    if (hasAnyMediaAttachments) {
+      final allMediaPaths = <String>[
+        ...internalMediaPaths,
+        if (isLastUser && userMediaPaths != null) ...userMediaPaths,
+      ];
+      for (final p in allMediaPaths) {
         final normalized = normalizeSrc(p);
         if (!seenSources.add(normalized)) continue;
         final bool isInlineUrl = p.startsWith('http') || p.startsWith('data:');

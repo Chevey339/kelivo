@@ -55,6 +55,7 @@ String inferMediaMimeFromSource(String source, {String fallbackMime = ''}) {
   if (lower.endsWith('.webm')) return 'video/webm';
   if (lower.endsWith('.3gp') || lower.endsWith('.3gpp')) return 'video/3gpp';
   // office documents
+  if (lower.endsWith('.pdf')) return 'application/pdf';
   if (lower.endsWith('.doc')) return 'application/msword';
   if (lower.endsWith('.docx')) {
     return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';

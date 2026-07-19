@@ -245,7 +245,14 @@ class AppDatabase extends _$AppDatabase {
         try {
           await migrator.addColumn(assistantRows, assistantRows.memoryMode);
         } catch (_) {
-          // 列可能已存在（迁移重放或部分失败重试），忽略即可。
+          // The column may already exist (due to migration replay or partial failure retry); simply ignore it.
+        }
+      }
+      if (from < 4) {
+        try {
+          await migrator.addColumn(messageRows, messageRows.subgroupId);
+        } catch (_) {
+          // The column may already exist (due to migration replay or partial failure retry); simply ignore it.
         }
       }
       if (from < 5) {

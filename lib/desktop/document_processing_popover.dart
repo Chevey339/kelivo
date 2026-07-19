@@ -145,7 +145,7 @@ class _DocumentProcessingPopoverState extends State<_DocumentProcessingPopover>
                           top: Radius.circular(14),
                         ),
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 480),
+                          constraints: const BoxConstraints(maxHeight: 520),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [

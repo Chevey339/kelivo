@@ -256,6 +256,12 @@ class _ChatInputBarState extends State<ChatInputBar>
       return;
     }
     final settings = context.watch<SettingsProvider>();
+    // If OCR is enabled, images will be OCR-processed instead of being
+    // sent to the vision model — no "images will be ignored" warning needed.
+    if (settings.ocrEnabled) {
+      _imageWarningModelKey = null;
+      return;
+    }
     final ap = context.watch<AssistantProvider>();
     final a = ap.currentAssistant;
     final providerKey = a?.chatModelProvider ?? settings.currentModelProvider;
