@@ -9,13 +9,24 @@
   [阅读简体中文文档](README_ZH_CN.md)快速查看特性
 </div>
 
-## Compatibility
+## 🔗 Compatibility
 
-Cuplivo is a community fork of [Kelivo](https://github.com/Chevey339/kelivo) and maintains full data compatibility. Configure WebDAV or S3, restore backup files exported from Kelivo, and pick up where you left off — no data loss, no reconfiguration needed. The UI has not undergone major changes either, so existing users will feel right at home.
+Cuplivo is a community fork of Kelivo with strong compatibility focus:
 
-Currently known to be used by the author and at least 2 other stable users with no issues reported. Cuplivo can be installed alongside Kelivo without uninstalling the original — your data is doubly protected.
+- **Backup zip format fully compatible.** Configure WebDAV or S3 (or local export/import), restore backup files exported from Kelivo, and pick up where you left off — no reconfiguration needed.
+- **Package name changed to avoid conflicts.** Many developers worry that their custom changes will conflict with future Kelivo updates; but installing Cuplivo **does not require uninstalling and will not overwrite** Kelivo — your data is doubly protected.
+- **Verified by real users.** Currently known to be used by the author and at least 5 other stable users with no issues reported.
+- **UI inherits Kelivo's style.** No major changes overall; existing users will feel right at home.
 
-## New Features
+### 🧪 Stability
+
+This fork is positioned as a **"new feature proving ground"**: it may adopt features the community finds useful, most verified through lightweight self-testing, aiming to provide a more out-of-the-box experience for users seeking the latest capabilities. Basic availability and stability are maintained (no P0 bugs; no data corruption or crash-on-launch bugs encountered so far), but releases are more frequent with lighter review. New features may carry P1/P2-level bugs, though feedback will be addressed promptly.
+
+We are aware that the upstream Kelivo repository is undergoing a major data storage refactoring. In the near term, this fork plans only to maintain compatibility with the new-format `.zip` exports from upstream. Most defensive data-integrity changes made here may not be adopted upstream — **please keep your own backups.**
+
+## ✨ New Features
+
+Unlike most personal-customization or single-feature forks, Cuplivo aims to add multiple features for a broader audience to try out.
 
 1. **SQLite storage** — Replaced Hive with SQLite for improved reliability. Assistant storage (SharedPreferences) has also been migrated to SQLite, expanding database coverage.
    - *In practice*: Data loss incidents are expected to drop by roughly 90%.
@@ -48,7 +59,7 @@ Currently known to be used by the author and at least 2 other stable users with 
    - Optimized title generation logic (auto-retry on first failure)
    - Various other stability improvements
 
-## Note
+## ⚠️ Note
 
 Cuplivo is a community fork and has not been fully separated from the upstream project. Donation QR codes and community groups (Discord, QQ) still point to the original author. Some references may retain the original name during the transition.
 
