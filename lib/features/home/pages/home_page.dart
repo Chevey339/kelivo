@@ -32,6 +32,7 @@ import '../../../desktop/mini_map_popover.dart';
 import '../../../desktop/quick_phrase_popover.dart';
 import '../../../desktop/instruction_injection_popover.dart';
 import '../../../desktop/world_book_popover.dart';
+import '../../../desktop/document_processing_popover.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
@@ -48,6 +49,7 @@ import '../widgets/chat_input_bar.dart';
 import '../widgets/mini_map_sheet.dart';
 import '../widgets/instruction_injection_sheet.dart';
 import '../widgets/world_book_sheet.dart';
+import '../widgets/document_processing_sheet.dart';
 import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
@@ -1320,10 +1322,7 @@ class _HomePageState extends State<HomePage>
           context,
         ).push(MaterialPageRoute(builder: (_) => const QuickPhrasesPage()));
       },
-      onToggleOcr: () async {
-        final sp = context.read<SettingsProvider>();
-        await sp.setOcrEnabled(!sp.ocrEnabled);
-      },
+      onDocumentProcessing: () => _openDocumentProcessingPopover(),
       onOpenMiniMap: _openMiniMap,
       onPickCamera: _controller.onPickCamera,
       onPickPhotos: _controller.onPickPhotos,
@@ -1577,6 +1576,21 @@ class _HomePageState extends State<HomePage>
     }
   }
 
+  Future<void> _openDocumentProcessingPopover() async {
+    final isDesktop = PlatformUtils.isDesktop;
+    final assistantId = context.read<AssistantProvider>().currentAssistantId;
+
+    if (isDesktop) {
+      await showDesktopDocumentProcessingPopover(
+        context,
+        anchorKey: _inputBarKey,
+        assistantId: assistantId,
+      );
+    } else {
+      await showDocumentProcessingSheet(context, assistantId: assistantId);
+    }
+  }
+
   Future<void> _showLearningPromptSheet() async {
     await showLearningPromptSheet(context);
   }
@@ -1613,6 +1627,10 @@ class _HomePageState extends State<HomePage>
               _showContextManagementSheet();
             },
             assistantId: assistantId,
+            onDocumentProcessing: () {
+              Navigator.of(ctx).maybePop();
+              _openDocumentProcessingPopover();
+            },
           ),
         );
       },

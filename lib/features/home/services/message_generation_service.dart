@@ -552,7 +552,9 @@ class MessageGenerationService {
             fallbackMime: 'image/png',
           );
           if (isAudioMime(mime)) return includeAudio;
-          return isImageMime(mime) || isVideoMime(mime);
+          return isImageMime(mime) ||
+              isVideoMime(mime) ||
+              isOfficeDocumentMime(mime);
         })
         .toList(growable: false);
   }
@@ -581,6 +583,7 @@ class MessageGenerationService {
       for (final d in input.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) ||
+            isOfficeDocumentMime(effectiveMime) ||
             (includeAudio && isAudioMime(effectiveMime))) {
           currentMediaPaths.add(d.path);
         }

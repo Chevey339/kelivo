@@ -268,6 +268,12 @@ class FileUploadService {
           'mdx',
           'yml',
           'yaml',
+          // office documents (direct file upload)
+          'doc',
+          'ppt',
+          'pptx',
+          'xls',
+          'xlsx',
         ],
       );
       if (res == null || res.files.isEmpty) return;

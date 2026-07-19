@@ -10544,6 +10544,78 @@ abstract class AppLocalizations {
   /// **'Drop'**
   String get multiAIDropThread;
 
+  /// Title for the document processing configuration panel
+  ///
+  /// In en, this message translates to:
+  /// **'Image & Document Processing'**
+  String get documentProcessingTitle;
+
+  /// Section label for image handling when the chat model lacks vision capability
+  ///
+  /// In en, this message translates to:
+  /// **'Images without vision model'**
+  String get documentProcessingImageWithoutVision;
+
+  /// Option to OCR-extract text from images
+  ///
+  /// In en, this message translates to:
+  /// **'OCR'**
+  String get documentProcessingModeOcr;
+
+  /// Option to discard the attachment silently
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get documentProcessingModeDiscard;
+
+  /// Hint shown when OCR model is not configured
+  ///
+  /// In en, this message translates to:
+  /// **'No OCR model configured. OCR option unavailable.'**
+  String get documentProcessingOcrNotConfigured;
+
+  /// Section label for DOCX document handling
+  ///
+  /// In en, this message translates to:
+  /// **'DOCX'**
+  String get documentProcessingDocx;
+
+  /// Option to extract text locally from a file
+  ///
+  /// In en, this message translates to:
+  /// **'Local Parse'**
+  String get documentProcessingModeLocalParse;
+
+  /// Option to upload the file directly without extraction
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Upload'**
+  String get documentProcessingModeDirectUpload;
+
+  /// Section label for PDF document handling
+  ///
+  /// In en, this message translates to:
+  /// **'PDF'**
+  String get documentProcessingPdf;
+
+  /// Section label for other Office document handling
+  ///
+  /// In en, this message translates to:
+  /// **'Other Office (PPT/XLS/DOC/…)'**
+  String get documentProcessingOtherOffice;
+
+  /// Disclaimer about direct file upload not being a standard API feature
+  ///
+  /// In en, this message translates to:
+  /// **'Direct upload is experimental and not part of the standard API. Currently only supported by some providers and models (check model details for File Input capability). If the API returns an error, switch to local parsing or convert the file to an image before sending.'**
+  String get documentProcessingDisclaimer;
+
+  /// Button to reset document processing settings to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to Default'**
+  String get documentProcessingResetDefault;
+
   /// Label for the conversation mode switch row in multi-AI card group
   ///
   /// In en, this message translates to:

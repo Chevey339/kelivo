@@ -121,6 +121,12 @@ class AssistantRows extends Table {
       integer().withDefault(const Constant(5))();
   TextColumn get memoryRecordPrompt => text().withDefault(const Constant(''))();
 
+  // --- File Processing ---
+  TextColumn get docxMode => text().withDefault(const Constant('extract'))();
+  TextColumn get pdfMode => text().withDefault(const Constant('extract'))();
+  TextColumn get otherOfficeMode =>
+      text().withDefault(const Constant('direct'))();
+
   // --- Sort & Timestamp ---
   IntColumn get sortOrder => integer()();
   DateTimeColumn get createdAt => dateTime()();
@@ -222,7 +228,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -239,15 +245,29 @@ class AppDatabase extends _$AppDatabase {
         try {
           await migrator.addColumn(assistantRows, assistantRows.memoryMode);
         } catch (_) {
-          // 列可能已存在（迁移重放或部分失败重试），忽略即可。
+          // The column may already exist (due to migration replay or partial failure retry); simply ignore it.
         }
       }
       if (from < 4) {
         try {
           await migrator.addColumn(messageRows, messageRows.subgroupId);
         } catch (_) {
-          // 列可能已存在（迁移重放或部分失败重试），忽略即可。
+          // The column may already exist (due to migration replay or partial failure retry); simply ignore it.
         }
+      }
+      if (from < 5) {
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.docxMode);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.pdfMode);
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.otherOfficeMode,
+          );
+        } catch (_) {}
       }
     },
   );

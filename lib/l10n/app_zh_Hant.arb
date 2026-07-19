@@ -2107,6 +2107,54 @@
   "@multiAIDropThread": {
     "description": "在多 AI 對比中移除某個模型回覆的按鈕提示"
   },
+  "documentProcessingTitle": "圖片與文檔解析",
+  "@documentProcessingTitle": {
+    "description": "文檔處理配置面板標題"
+  },
+  "documentProcessingImageWithoutVision": "無視覺模型時的圖片處理",
+  "@documentProcessingImageWithoutVision": {
+    "description": "當聊天模型不具備視覺能力時圖片的處理方式"
+  },
+  "documentProcessingModeOcr": "OCR 文字識別",
+  "@documentProcessingModeOcr": {
+    "description": "對圖片執行 OCR 提取文字"
+  },
+  "documentProcessingModeDiscard": "捨棄",
+  "@documentProcessingModeDiscard": {
+    "description": "靜默捨棄附件"
+  },
+  "documentProcessingOcrNotConfigured": "尚未配置 OCR 模型，OCR 選項不可用",
+  "@documentProcessingOcrNotConfigured": {
+    "description": "未配置 OCR 模型時顯示的提示"
+  },
+  "documentProcessingDocx": "DOCX 處理",
+  "@documentProcessingDocx": {
+    "description": "DOCX 文檔處理方式"
+  },
+  "documentProcessingModeLocalParse": "本地解析",
+  "@documentProcessingModeLocalParse": {
+    "description": "從文件中提取文本"
+  },
+  "documentProcessingModeDirectUpload": "直接上傳",
+  "@documentProcessingModeDirectUpload": {
+    "description": "直接上傳文件而不做文本提取"
+  },
+  "documentProcessingPdf": "PDF 處理",
+  "@documentProcessingPdf": {
+    "description": "PDF 文檔處理方式"
+  },
+  "documentProcessingOtherOffice": "其他 Office 文檔 (PPT/XLS/DOC/…)",
+  "@documentProcessingOtherOffice": {
+    "description": "其他 Office 文檔處理方式"
+  },
+  "documentProcessingDisclaimer": "直接上傳為實驗性功能，非標準 API 行為，目前僅部分供應商和模型支持（可在模型詳情頁查看是否標註 File Input 能力）。若接口返回 400/422 等錯誤，請切換為本地解析或將文件轉為圖片後發送。",
+  "@documentProcessingDisclaimer": {
+    "description": "關於文件直傳為非標準 API 功能的免責聲明"
+  },
+  "documentProcessingResetDefault": "重設為預設",
+  "@documentProcessingResetDefault": {
+    "description": "將文檔處理設置重設為預設值"
+  },
   "multiAIConversationMode": "對話模式",
   "@multiAIConversationMode": {
     "description": "多 AI 卡片組中的對話模式切換行標籤"

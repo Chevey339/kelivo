@@ -75,6 +75,11 @@ Do **not** store sensitive information, including:
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
   final List<AssistantRegex> regexRules;
+  // File processing configuration (per assistant)
+  // Values: 'extract' (parse locally / OCR), 'direct' (upload raw file), 'discard'
+  final String docxMode;
+  final String pdfMode;
+  final String otherOfficeMode;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -108,6 +113,9 @@ Do **not** store sensitive information, including:
     this.memoryRecordPrompt = defaultMemoryRecordPrompt,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
+    this.docxMode = 'extract',
+    this.pdfMode = 'extract',
+    this.otherOfficeMode = 'direct',
     DateTime? createdAt,
     DateTime? updatedAt,
   }) : createdAt = createdAt ?? DateTime.now(),
@@ -143,6 +151,9 @@ Do **not** store sensitive information, including:
     String? memoryRecordPrompt,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
+    String? docxMode,
+    String? pdfMode,
+    String? otherOfficeMode,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearChatModel = false,
@@ -189,6 +200,9 @@ Do **not** store sensitive information, including:
       memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
+      docxMode: docxMode ?? this.docxMode,
+      pdfMode: pdfMode ?? this.pdfMode,
+      otherOfficeMode: otherOfficeMode ?? this.otherOfficeMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -224,6 +238,9 @@ Do **not** store sensitive information, including:
     'memoryRecordPrompt': memoryRecordPrompt,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
+    'docxMode': docxMode,
+    'pdfMode': pdfMode,
+    'otherOfficeMode': otherOfficeMode,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -311,6 +328,9 @@ Do **not** store sensitive information, including:
       }
       return const <AssistantRegex>[];
     })(),
+    docxMode: (json['docxMode'] as String?) ?? 'extract',
+    pdfMode: (json['pdfMode'] as String?) ?? 'extract',
+    otherOfficeMode: (json['otherOfficeMode'] as String?) ?? 'direct',
     createdAt: json['createdAt'] != null
         ? DateTime.parse(json['createdAt'] as String)
         : DateTime.now(),
