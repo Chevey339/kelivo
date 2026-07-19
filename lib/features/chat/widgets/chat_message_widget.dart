@@ -36,6 +36,7 @@ import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/version_switcher.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -1505,11 +1506,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     ],
                     if (showVersionSwitcher) ...[
                       if (showUserActions) const SizedBox(width: 6),
-                      _BranchSelector(
+                      VersionSwitcher(
                         index: widget.versionIndex ?? 0,
                         total: widget.versionCount ?? 1,
                         onPrev: widget.onPrevVersion,
                         onNext: widget.onNextVersion,
+                        fontWeight: AppFontWeights.medium,
                       ),
                     ],
                   ],
@@ -2639,11 +2641,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                         ),
                         if ((widget.versionCount ?? 1) > 1) ...[
                           const SizedBox(width: 6),
-                          _BranchSelector(
+                          VersionSwitcher(
                             index: widget.versionIndex ?? 0,
                             total: widget.versionCount ?? 1,
                             onPrev: widget.onPrevVersion,
                             onNext: widget.onNextVersion,
+                            fontWeight: AppFontWeights.medium,
                           ),
                         ],
                         if (widget.showTokenStats &&
@@ -3116,76 +3119,6 @@ class _MenuItem extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _BranchSelector extends StatelessWidget {
-  const _BranchSelector({
-    required this.index,
-    required this.total,
-    this.onPrev,
-    this.onNext,
-  });
-  final int index; // zero-based
-  final int total;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final canPrev = index > 0;
-    final canNext = index < total - 1;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: Center(
-            child: IosIconButton(
-              size: 16,
-              enabled: canPrev,
-              color: cs.onSurface,
-              icon: Lucide.ChevronLeft,
-              onTap: canPrev ? onPrev : null,
-            ),
-          ),
-        ),
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: Center(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                '${index + 1}/$total',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurface.withValues(alpha: 0.8),
-                  fontWeight: AppFontWeights.medium,
-                ),
-                maxLines: 1,
-                softWrap: false,
-              ),
-            ),
-          ),
-        ),
-        SizedBox(
-          width: 28,
-          height: 28,
-          child: Center(
-            child: IosIconButton(
-              size: 16,
-              enabled: canNext,
-              color: cs.onSurface,
-              icon: Lucide.ChevronRight,
-              onTap: canNext ? onNext : null,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
