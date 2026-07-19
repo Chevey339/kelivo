@@ -329,7 +329,7 @@ class MultiAIEngine extends ChangeNotifier {
     return userMessage.id;
   }
 
-  /// Start a round from an existing assistant message ("也让其他AI回答").
+  /// Start a round from an existing assistant message.
   /// Finds the preceding user message as anchor, creates N new threads.
   Future<String> startRoundFromHistory({
     required ChatMessage triggerMessage,
@@ -341,9 +341,8 @@ class MultiAIEngine extends ChangeNotifier {
   }) async {
     if (_models.length < 2 || _threadIds.isEmpty) return '';
 
-    final roundGroupId = const Uuid().v4();
+    final roundGroupId = triggerMessage.groupId ?? triggerMessage.id;
 
-    // Find preceding user message (walk backwards from trigger)
     final triggerIdx = _chatController.messages.indexWhere(
       (m) => m.id == triggerMessage.id,
     );
@@ -361,6 +360,45 @@ class MultiAIEngine extends ChangeNotifier {
     final completeMessages = _chatController.messagesForCompleteHistoryContext(
       conversation,
     );
+    final anchorIdx = completeMessages.indexWhere(
+      (m) => m.id == precedingUserId,
+    );
+    final truncated = anchorIdx >= 0
+        ? completeMessages.sublist(0, anchorIdx + 1)
+        : completeMessages;
+
+    await _executeThreads(
+      conversation: conversation,
+      settings: settings,
+      assistant: assistant,
+      approvalService: approvalService,
+      askUserService: askUserService,
+      completeMessages: truncated,
+      roundGroupId: roundGroupId,
+    );
+
+    _chatController.notifyListeners();
+    return precedingUserId;
+  }
+
+  /// Start a round anchored on an existing user message that has no assistant
+  /// response yet (e.g. send was cancelled). Creates N threads directly.
+  Future<String> startRoundFromUserMessage({
+    required ChatMessage userMessage,
+    required Conversation conversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
+  }) async {
+    if (_models.length < 2 || _threadIds.isEmpty) return '';
+    if (userMessage.role != 'user') return '';
+
+    final roundGroupId = const Uuid().v4();
+
+    final completeMessages = _chatController.messagesForCompleteHistoryContext(
+      conversation,
+    );
 
     await _executeThreads(
       conversation: conversation,
@@ -373,7 +411,7 @@ class MultiAIEngine extends ChangeNotifier {
     );
 
     _chatController.notifyListeners();
-    return precedingUserId;
+    return userMessage.id;
   }
 
   // ============================================================================
@@ -483,6 +521,9 @@ class MultiAIEngine extends ChangeNotifier {
     if (insertAfterIdx < 0) return;
     _chatController.messages.insert(insertAfterIdx + 1, newMessage);
 
+    final gid = newMessage.groupId ?? newMessage.id;
+    _chatController.versionSelections[gid] = newMessage.version;
+
     _streamController.markStreamingStarted(newMessage.id);
     _chatController.notifyListeners();
     _streamController.toolParts.remove(newMessage.id);
@@ -573,10 +614,13 @@ class MultiAIEngine extends ChangeNotifier {
 
     if (newMessages.isEmpty) return;
 
+    for (final newMsg in newMessages) {
+      final gid = newMsg.groupId ?? newMsg.id;
+      _chatController.versionSelections[gid] = newMsg.version;
+    }
+
     _chatController.notifyListeners();
 
-    // Execute streams for all new messages — iterate by _threadIds to ensure
-    // model/thread association is consistent regardless of Map iteration order.
     for (int i = 0; i < _threadIds.length; i++) {
       final threadId = _threadIds[i];
       final newMsg = newMsgByThread[threadId];
@@ -603,13 +647,6 @@ class MultiAIEngine extends ChangeNotifier {
         allowImagesApiRouting: true,
         generateTitleOnFinish: false,
       );
-    }
-
-    // Point versionSelections to the new versions so collapseVersions
-    // picks them for API context on subsequent rounds.
-    for (final newMsg in newMessages) {
-      final gid = newMsg.groupId ?? newMsg.id;
-      _chatController.versionSelections[gid] = newMsg.version;
     }
 
     _chatController.notifyListeners();

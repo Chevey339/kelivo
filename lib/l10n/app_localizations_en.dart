@@ -5791,4 +5791,8 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get multiAISynthesizeCommentPrompt =>
       'Please comment on the different opinions across models.';
+
+  @override
+  String get multiAIRetryBlockedUnresolvedComparison =>
+      'Please adopt or drop the comparison results before retrying.';
 }
