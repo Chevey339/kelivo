@@ -8,7 +8,7 @@ import '../../chat/widgets/chat_message_widget.dart'
     show ChatMessageWidget, ReasoningSegment;
 import '../../chat/widgets/message_more_sheet.dart'
     show showMessageMoreSheet, MessageMoreAction;
-
+import '../services/multi_ai_engine.dart' show MultiAIMode;
 import '../controllers/home_page_controller.dart';
 
 /// Card container for a single multi-AI round (anchor).
@@ -42,9 +42,6 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
 
   @override
   void dispose() {
-    for (final sgId in widget.subgroupedMessages.keys) {
-      _SingleModelCardState.clearSelection(sgId);
-    }
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -62,17 +59,64 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
         ? (subgroups.length / 2).ceil()
         : subgroups.length;
 
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.65,
-      child: PageView.builder(
-        controller: _pageCtrl,
-        itemCount: pageCount,
-        itemBuilder: (context, pageIndex) {
-          if (_isDesktop) {
-            return _buildDesktopPage(subgroups, pageIndex);
-          }
-          return _buildMobileCard(subgroups, pageIndex);
-        },
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.65,
+          child: PageView.builder(
+            controller: _pageCtrl,
+            itemCount: pageCount,
+            itemBuilder: (context, pageIndex) {
+              if (_isDesktop) {
+                return _buildDesktopPage(subgroups, pageIndex);
+              }
+              return _buildMobileCard(subgroups, pageIndex);
+            },
+          ),
+        ),
+        if (widget.isLatestRound) _buildModeSwitchRow(context),
+      ],
+    );
+  }
+
+  Widget _buildModeSwitchRow(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
+    final engine = widget.controller.multiAIEngine;
+    final isContinue = engine.mode == MultiAIMode.continue_;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Row(
+        children: [
+          Text(
+            l10n.multiAIConversationMode,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: AppFontWeights.medium,
+              color: cs.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          const Spacer(),
+          _ModeButton(
+            label: l10n.multiAIContinue,
+            tooltip: l10n.multiAIContinueHint,
+            active: isContinue,
+            onTap: () {
+              engine.setMode(MultiAIMode.continue_);
+            },
+          ),
+          const SizedBox(width: 8),
+          _ModeButton(
+            label: l10n.multiAISynthesize,
+            tooltip: l10n.multiAISynthesizeHint,
+            active: !isContinue,
+            onTap: () {
+              widget.controller.switchToSynthesizeMode();
+            },
+          ),
+        ],
       ),
     );
   }
@@ -146,26 +190,22 @@ class _SingleModelCard extends StatefulWidget {
 }
 
 class _SingleModelCardState extends State<_SingleModelCard> {
-  static final Map<String, int> _selectedIdxByThread = {};
-
   int get _selectedIdx {
-    final stored = _selectedIdxByThread[widget.subgroupId];
-    if (stored != null && stored >= 0 && stored < widget.versions.length) {
-      return stored;
-    }
-    return widget.versions.length - 1;
+    final engine = widget.controller.multiAIEngine;
+    final versions = widget.versions;
+    final stored = engine.getSelectedVersion(
+      widget.subgroupId,
+      versions.length - 1,
+    );
+    return stored;
   }
 
   ChatMessage get _currentMessage => widget.versions[_selectedIdx];
 
   void _selectVersion(int idx) {
     if (idx < 0 || idx >= widget.versions.length) return;
-    _selectedIdxByThread[widget.subgroupId] = idx;
+    widget.controller.multiAIEngine.setSelectedVersion(widget.subgroupId, idx);
     setState(() {});
-  }
-
-  static void clearSelection(String subgroupId) {
-    _selectedIdxByThread.remove(subgroupId);
   }
 
   @override
@@ -174,16 +214,17 @@ class _SingleModelCardState extends State<_SingleModelCard> {
     final oldLen = oldWidget.versions.length;
     final newLen = widget.versions.length;
     final subgId = widget.subgroupId;
+    final engine = widget.controller.multiAIEngine;
 
     if (newLen > oldLen) {
-      _selectedIdxByThread[subgId] = newLen - 1;
+      engine.setSelectedVersion(subgId, newLen - 1);
       setState(() {});
     } else if (newLen < oldLen) {
       final stillExists = widget.versions.any(
         (v) => v.id == oldWidget.versions[_selectedIdx].id,
       );
       if (!stillExists) {
-        _selectedIdxByThread[subgId] = newLen - 1;
+        engine.setSelectedVersion(subgId, newLen - 1);
         setState(() {});
       }
     }
@@ -397,6 +438,78 @@ class _SingleModelCardState extends State<_SingleModelCard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ModeButton extends StatefulWidget {
+  const _ModeButton({
+    required this.label,
+    required this.tooltip,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final String tooltip;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  State<_ModeButton> createState() => _ModeButtonState();
+}
+
+class _ModeButtonState extends State<_ModeButton> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Tooltip(
+      message: widget.tooltip,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: widget.onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedScale(
+          scale: _pressed ? 0.97 : 1.0,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: widget.active
+                  ? cs.primary.withValues(alpha: isDark ? 0.22 : 0.12)
+                  : (isDark ? Colors.white10 : const Color(0xFFF2F3F5)),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: widget.active
+                    ? cs.primary.withValues(alpha: isDark ? 0.4 : 0.25)
+                    : cs.outlineVariant.withValues(alpha: 0.2),
+                width: widget.active ? 1.2 : 0.6,
+              ),
+            ),
+            child: Text(
+              widget.label,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: widget.active
+                    ? AppFontWeights.semibold
+                    : AppFontWeights.regular,
+                color: widget.active
+                    ? cs.primary
+                    : cs.onSurface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

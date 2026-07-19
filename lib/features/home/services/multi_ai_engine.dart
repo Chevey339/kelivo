@@ -26,6 +26,15 @@ import '../services/tool_approval_service.dart';
 ///     tracked in _anchorThreads — a runtime-only map, not stored on messages.
 // ignore_for_file: prefer_initializing_formals
 
+/// Mode for multi-AI conversation.
+enum MultiAIMode {
+  /// Each model continues independently with its own thread context.
+  continue_,
+
+  /// Synthesize all rounds into a single response via one model.
+  synthesize,
+}
+
 class MultiAIEngine extends ChangeNotifier {
   MultiAIEngine({
     required ChatService chatService,
@@ -48,6 +57,8 @@ class MultiAIEngine extends ChangeNotifier {
   bool _isActive = false;
   List<ModelSelection> _models = [];
   List<String> _threadIds = [];
+  MultiAIMode _mode = MultiAIMode.continue_;
+  final Map<String, int> _selectedVersionByThread = {};
 
   // ============================================================================
   // Getters — all round/anchorship is computed from message list order
@@ -56,6 +67,27 @@ class MultiAIEngine extends ChangeNotifier {
   bool get isActive => _isActive;
   List<ModelSelection> get models => List<ModelSelection>.unmodifiable(_models);
   Set<String> get threadIds => Set<String>.unmodifiable(_threadIds);
+  MultiAIMode get mode => _mode;
+
+  /// The currently displayed version index per thread (card view state).
+  Map<String, int> get selectedVersionByThread => _selectedVersionByThread;
+
+  /// Get the selected version for a thread, falling back to [maxVersion].
+  int getSelectedVersion(String threadId, int maxVersion) {
+    final v = _selectedVersionByThread[threadId];
+    if (v != null && v >= 0 && v <= maxVersion) return v;
+    return maxVersion;
+  }
+
+  /// Set the selected version for a thread (called from card UI).
+  void setSelectedVersion(String threadId, int version) {
+    _selectedVersionByThread[threadId] = version;
+  }
+
+  /// Clear all version selections.
+  void clearSelectedVersions() {
+    _selectedVersionByThread.clear();
+  }
 
   Set<String> get subgroupActiveGroupIds =>
       _chatController.subgroupActiveGroupIds;
@@ -123,6 +155,7 @@ class MultiAIEngine extends ChangeNotifier {
     _threadIds =
         existingThreadIds ??
         List<String>.generate(models.length, (_) => const Uuid().v4());
+    _mode = MultiAIMode.continue_;
     notifyListeners();
   }
 
@@ -130,6 +163,7 @@ class MultiAIEngine extends ChangeNotifier {
     _isActive = false;
     _models = [];
     _threadIds = [];
+    _selectedVersionByThread.clear();
     _chatController.invalidateCache();
     notifyListeners();
   }
@@ -532,10 +566,7 @@ class MultiAIEngine extends ChangeNotifier {
         (m) => m.id == latest.id,
       );
       if (insertAfterIdx < 0) continue;
-      _chatController.messages.insert(
-        insertAfterIdx + 1 + newMessages.length,
-        newMsg,
-      );
+      _chatController.messages.insert(insertAfterIdx + 1, newMsg);
       newMessages.add(newMsg);
       newMsgByThread[threadId] = newMsg;
     }
@@ -572,6 +603,13 @@ class MultiAIEngine extends ChangeNotifier {
         allowImagesApiRouting: true,
         generateTitleOnFinish: false,
       );
+    }
+
+    // Point versionSelections to the new versions so collapseVersions
+    // picks them for API context on subsequent rounds.
+    for (final newMsg in newMessages) {
+      final gid = newMsg.groupId ?? newMsg.id;
+      _chatController.versionSelections[gid] = newMsg.version;
     }
 
     _chatController.notifyListeners();
@@ -735,6 +773,122 @@ class MultiAIEngine extends ChangeNotifier {
       exit();
     } else {
       _chatController.invalidateCache();
+      notifyListeners();
+    }
+  }
+
+  // ============================================================================
+  // Synthesize mode
+  // ============================================================================
+
+  /// Serialize multi-AI conversation rounds to XML.
+  ///
+  /// Linear scan over [messages]: when a user message is followed by
+  /// subgroup messages, emit a `<user>` / `<assistants>` pair.
+  /// Each thread takes its currently displayed version from
+  /// [selectedVersionByThread].
+  ///
+  /// Model labels: "Model 1", "Model 2", ... per [_models] order.
+  String multiRoundsToXML(
+    List<ChatMessage> messages,
+    Map<String, int> selectedVersionByThread,
+  ) {
+    final buf = StringBuffer();
+    buf.writeln('<rounds>');
+
+    String? currentUserContent;
+    final assistants = <String, ChatMessage>{};
+
+    for (final m in messages) {
+      if (m.role == 'user') {
+        _flushRound(buf, currentUserContent, assistants);
+        currentUserContent = m.content;
+        assistants.clear();
+      } else if (m.subgroupId != null) {
+        final threadId = m.subgroupId!;
+        final selectedVer = selectedVersionByThread[threadId];
+        if (selectedVer != null && m.version == selectedVer) {
+          assistants[threadId] = m;
+        } else if (!assistants.containsKey(threadId)) {
+          assistants[threadId] = m;
+        }
+      }
+    }
+    _flushRound(buf, currentUserContent, assistants);
+
+    buf.write('</rounds>');
+    return buf.toString();
+  }
+
+  void _flushRound(
+    StringBuffer buf,
+    String? userContent,
+    Map<String, ChatMessage> assistants,
+  ) {
+    if (userContent == null || assistants.isEmpty) return;
+    buf.writeln('  <user>${_xmlEscape(userContent)}</user>');
+    buf.writeln('  <assistants>');
+    var idx = 0;
+    for (final tid in _threadIds) {
+      final msg = assistants[tid];
+      if (msg == null) continue;
+      idx++;
+      final model = _models.length >= idx ? _models[idx - 1] : null;
+      buf.writeln(
+        '    <model name="Model $idx"'
+        ' provider="${_xmlEscape(model?.providerKey ?? '')}"'
+        ' id="${_xmlEscape(model?.modelId ?? '')}">',
+      );
+      buf.writeln(_xmlEscape(msg.content));
+      buf.writeln('    </model>');
+    }
+    buf.writeln('  </assistants>');
+  }
+
+  static String _xmlEscape(String s) {
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+  }
+
+  /// Select messages before the first multi-AI anchor.
+  ///
+  /// Returns all messages up to (but not including) the first user message
+  /// that has ≥2 subgroup responses following it.
+  static List<ChatMessage> selectMessagesBeforeMultiAI(
+    List<ChatMessage> messages,
+  ) {
+    final anchors = _computeAnchors(messages);
+    if (anchors.isEmpty) return List.of(messages);
+
+    final firstAnchorId = anchors.keys.first;
+    final result = <ChatMessage>[];
+    for (final m in messages) {
+      if (m.id == firstAnchorId) break;
+      if (m.subgroupId != null) continue;
+      result.add(m);
+    }
+    return result;
+  }
+
+  /// Switch the engine's conversation mode.
+  ///
+  /// continue_ → synthesize: caller must handle model selector restriction
+  ///   and task type selection beforehand.
+  ///
+  /// synthesize → continue_: recovers engine state from persisted subgroup
+  ///   messages via [recoverFromMessages].
+  Future<void> setMode(MultiAIMode newMode) async {
+    if (newMode == _mode) return;
+
+    if (newMode == MultiAIMode.synthesize) {
+      _mode = newMode;
+      notifyListeners();
+    } else {
+      _mode = newMode;
+      recoverFromMessages(_chatController.messages);
       notifyListeners();
     }
   }
