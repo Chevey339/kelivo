@@ -32,60 +32,91 @@ class MultiAICardGroup extends StatefulWidget {
 
 class _MultiAICardGroupState extends State<MultiAICardGroup> {
   late PageController _pageCtrl;
-  int _activePage = 0;
 
   @override
   void initState() {
     super.initState();
-    _pageCtrl = PageController(viewportFraction: _viewportFraction)
-      ..addListener(_onPageChanged);
+    _pageCtrl = PageController(viewportFraction: _viewportFraction);
   }
 
   @override
   void dispose() {
-    _pageCtrl.removeListener(_onPageChanged);
     _pageCtrl.dispose();
     super.dispose();
   }
 
-  void _onPageChanged() {
-    final page = _pageCtrl.page?.round() ?? 0;
-    if (page != _activePage) setState(() => _activePage = page);
-  }
+  bool get _isDesktop => PlatformUtils.isDesktop;
 
-  double get _viewportFraction => PlatformUtils.isDesktop ? 0.5 : 0.85;
+  double get _viewportFraction => _isDesktop ? 1.0 : 0.85;
 
   @override
   Widget build(BuildContext context) {
     final subgroups = widget.subgroupedMessages.keys.toList();
     if (subgroups.isEmpty) return const SizedBox.shrink();
 
+    final pageCount = _isDesktop
+        ? (subgroups.length / 2).ceil()
+        : subgroups.length;
+
     return SizedBox(
       height: MediaQuery.sizeOf(context).height * 0.65,
       child: PageView.builder(
         controller: _pageCtrl,
-        itemCount: subgroups.length,
-        itemBuilder: (context, index) {
-          final sgId = subgroups[index];
-          final versions = widget.subgroupedMessages[sgId] ?? [];
-          final latest = versions.isNotEmpty ? versions.last : null;
-          if (latest == null) return const SizedBox.shrink();
-
-          return Padding(
-            padding: EdgeInsets.only(
-              right: index < subgroups.length - 1 ? 8 : 0,
-              left: index > 0 ? 8 : 0,
-            ),
-            child: _SingleModelCard(
-              message: latest,
-              anchorUserMessageId: widget.anchorUserMessageId,
-              controller: widget.controller,
-              showActions: widget.isLatestRound,
-              subgroupId: sgId,
-            ),
-          );
+        itemCount: pageCount,
+        itemBuilder: (context, pageIndex) {
+          if (_isDesktop) {
+            return _buildDesktopPage(subgroups, pageIndex);
+          }
+          return _buildMobileCard(subgroups, pageIndex);
         },
       ),
+    );
+  }
+
+  Widget _buildDesktopPage(List<String> subgroups, int pageIndex) {
+    final i1 = pageIndex * 2;
+    final i2 = i1 + 1;
+    final hasSecond = i2 < subgroups.length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(child: _buildCardForSubgroup(subgroups[i1])),
+          if (hasSecond) ...[
+            const SizedBox(width: 8),
+            Expanded(child: _buildCardForSubgroup(subgroups[i2])),
+          ] else
+            const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCard(List<String> subgroups, int index) {
+    final sgId = subgroups[index];
+    final card = _buildCardForSubgroup(sgId);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        right: index < subgroups.length - 1 ? 8 : 0,
+        left: index > 0 ? 8 : 0,
+      ),
+      child: card,
+    );
+  }
+
+  Widget _buildCardForSubgroup(String sgId) {
+    final versions = widget.subgroupedMessages[sgId] ?? [];
+    final latest = versions.isNotEmpty ? versions.last : null;
+    if (latest == null) return const SizedBox.shrink();
+
+    return _SingleModelCard(
+      message: latest,
+      anchorUserMessageId: widget.anchorUserMessageId,
+      controller: widget.controller,
+      showActions: widget.isLatestRound,
+      subgroupId: sgId,
     );
   }
 }
