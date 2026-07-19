@@ -6,25 +6,26 @@ import 'business_settings_router.dart';
 final class BusinessSettingsMerger {
   BusinessSettingsMerger._();
 
-  static const _legacyActivationKeys = <String>{
-    'instruction_injections_active_id_v1',
-    'instruction_injections_active_ids_v1',
-  };
   static const _activeIdsByAssistantKey =
       'instruction_injections_active_ids_by_assistant_v1';
 
   static Map<String, Object> merge(
     Map<String, Object?> existing,
-    Map<String, Object?> incoming,
-  ) {
+    Map<String, Object?> incoming, {
+    bool preserveExplicitEmptyInstructionList = false,
+  }) {
     final existingSnapshot = BusinessSettingsRouter.normalizeAndRoute(existing);
-    final incomingSnapshot = BusinessSettingsRouter.normalizeAndRoute(incoming);
+    final incomingSnapshot = BusinessSettingsRouter.normalizeAndRoute(
+      incoming,
+      preserveExplicitEmptyInstructionList:
+          preserveExplicitEmptyInstructionList,
+    );
     final current = BusinessSettingsRouter.exportSnapshot(existingSnapshot);
     final normalizedIncoming = BusinessSettingsRouter.exportSnapshot(
       incomingSnapshot,
     );
     final incomingKeys = <String>{...incoming.keys};
-    if (incomingKeys.any(_legacyActivationKeys.contains)) {
+    if (normalizedIncoming.containsKey(_activeIdsByAssistantKey)) {
       incomingKeys.add(_activeIdsByAssistantKey);
     }
 
@@ -35,7 +36,10 @@ final class BusinessSettingsMerger {
         continue;
       }
       final imported = normalizedIncoming[key];
-      if (imported == null) continue;
+      if (imported == null) {
+        if (key == 'pinned_models_v1') throw FormatException(key);
+        continue;
+      }
       switch (key) {
         case 'assistants_v1':
           current[key] = _mergeAssistants(
@@ -53,7 +57,11 @@ final class BusinessSettingsMerger {
             imported as String,
           );
         case 'pinned_models_v1':
-          current[key] = _mergeStringLists(current[key], imported, key);
+          current[key] = _mergeStringLists(
+            existing.containsKey(key) ? current[key] : const <String>[],
+            imported,
+            key,
+          );
         case 'mcp_servers_v1':
         case 'provider_groups_v1':
         case 'assistant_tags_v1':

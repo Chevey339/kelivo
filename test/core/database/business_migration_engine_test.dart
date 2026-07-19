@@ -6,8 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/business_data.dart';
 import 'package:Kelivo/core/database/business_migration_engine.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_settings_router.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 void main() {
   late AppDatabase database;
@@ -82,6 +84,67 @@ void main() {
       expect(legacy.values, isEmpty);
     },
   );
+
+  test(
+    'cleans pre-v3 embedding overrides before retiring migration keys',
+    () async {
+      final legacy = FakeLegacyBusinessPreferences({
+        'provider_configs_v1': jsonEncode({
+          'provider-a': {
+            'modelOverrides': {
+              'embedding-model': {
+                'type': 'embedding',
+                'abilities': ['tool'],
+                'output': ['text'],
+                'tools': ['search'],
+                'input': ['text'],
+              },
+            },
+          },
+        }),
+        'migrations_version_v1': 1,
+        'provider_configs_backup_v1': 'obsolete backup',
+      });
+
+      await BusinessMigrationEngine(
+        repository: repository,
+        legacyPreferences: legacy,
+      ).run();
+
+      final exported = BusinessSettingsRouter.exportSnapshot(
+        await repository.readSnapshot(),
+      );
+      final providers =
+          jsonDecode(exported['provider_configs_v1']! as String)
+              as Map<String, dynamic>;
+      expect(
+        (providers['provider-a'] as Map<String, dynamic>)['modelOverrides'],
+        {
+          'embedding-model': {
+            'type': 'embedding',
+            'input': ['text'],
+          },
+        },
+      );
+      expect(exported, isNot(contains('migrations_version_v1')));
+      expect(exported, isNot(contains('provider_configs_backup_v1')));
+      expect(legacy.values, isEmpty);
+    },
+  );
+
+  test('preserves an explicitly empty legacy instruction list', () async {
+    final legacy = FakeLegacyBusinessPreferences({
+      'instruction_injections_v1': jsonEncode(const <Object>[]),
+    });
+
+    await BusinessMigrationEngine(
+      repository: repository,
+      legacyPreferences: legacy,
+    ).run();
+
+    final store = InstructionInjectionStore(BusinessPreferences(repository));
+    expect(await store.getAll(), isEmpty);
+  });
 
   test(
     'cleanup interruption is retryable without repeating migration',

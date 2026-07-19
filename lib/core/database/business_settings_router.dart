@@ -157,18 +157,36 @@ final class BusinessSettingsRouter {
 
   static const _providerOrderKey = 'providers_order_v1';
   static const _legacyPinnedModelsKey = 'pinned_models_v1';
+  static const _instructionInjectionsKey = 'instruction_injections_v1';
   static const _legacyActiveIdKey = 'instruction_injections_active_id_v1';
   static const _legacyActiveIdsKey = 'instruction_injections_active_ids_v1';
   static const _activeIdsByAssistantKey =
       'instruction_injections_active_ids_by_assistant_v1';
   static const _searchEnabledKey = 'search_enabled_v1';
   static const _globalAssistantKey = '__global__';
+  static const _embeddingTypes = <String>{'embedding', 'embeddings'};
+  static const _embeddingChatOnlyFields = <String>{
+    'abilities',
+    'output',
+    'builtInTools',
+    'built_in_tools',
+    'tools',
+  };
 
-  static BusinessSnapshot normalizeAndRoute(Map<String, Object?> source) {
+  /// Preserve an empty instruction list only at legacy input boundaries.
+  /// Canonical SQLite exports always contain every entity key, so their `[]`
+  /// cannot by itself distinguish an uninitialized table from a user clear.
+  static BusinessSnapshot normalizeAndRoute(
+    Map<String, Object?> source, {
+    bool preserveExplicitEmptyInstructionList = false,
+  }) {
     final normalized = Map<String, Object?>.from(source);
     _normalizeStringList(normalized, _providerOrderKey);
     _normalizeStringList(normalized, _legacyPinnedModelsKey);
-    _normalizeInstructionActivation(normalized);
+    _normalizeInstructionActivation(
+      normalized,
+      preserveExplicitEmptyList: preserveExplicitEmptyInstructionList,
+    );
 
     final entities = <BusinessEntityKind, List<BusinessEntityValue>>{};
     for (final kind in BusinessEntityKind.values) {
@@ -219,19 +237,19 @@ final class BusinessSettingsRouter {
 
   /// Builds the legacy key-value-compatible view consumed by runtime
   /// providers. Stable row ids are projected into list payloads that came
-  /// from legacy data without a string `id`, while assistant memories retain
-  /// their missing numeric id so the runtime decoder keeps its `0` default.
+  /// from legacy data without an id; assistant memories use deterministic
+  /// negative ids so they stay outside the persisted positive-id space.
   /// [exportSnapshot] deliberately preserves the published payload byte shape
   /// used by backup validation.
   static Map<String, Object> exportRuntimeSnapshot(BusinessSnapshot snapshot) {
     final result = exportSnapshot(snapshot);
     for (final kind in BusinessEntityKind.values) {
-      if (kind == BusinessEntityKind.provider ||
-          kind == BusinessEntityKind.assistantMemory) {
-        continue;
-      }
+      if (kind == BusinessEntityKind.provider) continue;
       final rows = List<BusinessEntityValue>.of(snapshot.entities[kind]!)
         ..sort(_compareRows);
+      final projectedMemoryIds = kind == BusinessEntityKind.assistantMemory
+          ? _projectMemoryIds(rows)
+          : const <String, int>{};
       result[kind.sourceKey] = jsonEncode([
         for (final row in rows)
           () {
@@ -242,7 +260,9 @@ final class BusinessSettingsRouter {
             );
             final rawId = payload['id'];
             if (rawId == null || rawId.toString().trim().isEmpty) {
-              payload['id'] = row.id;
+              payload['id'] = kind == BusinessEntityKind.assistantMemory
+                  ? projectedMemoryIds[row.id]!
+                  : row.id;
             }
             return payload;
           }(),
@@ -265,6 +285,7 @@ final class BusinessSettingsRouter {
       final payload = (entry.value as Map).map(
         (field, value) => MapEntry(field.toString(), value),
       );
+      _normalizeLegacyEmbeddingOverrides(payload);
       _validateEntityPayload(BusinessEntityKind.provider, payload);
       providers[entry.key.toString()] = payload;
     }
@@ -778,20 +799,31 @@ final class BusinessSettingsRouter {
     values[key] = _stringList(raw, key);
   }
 
-  static void _normalizeInstructionActivation(Map<String, Object?> values) {
+  static void _normalizeInstructionActivation(
+    Map<String, Object?> values, {
+    required bool preserveExplicitEmptyList,
+  }) {
+    final rawItems = preserveExplicitEmptyList
+        ? values[_instructionInjectionsKey]
+        : null;
+    var explicitlyEmptyItems = false;
+    if (rawItems != null) {
+      final decodedItems = _decodeJson(rawItems, _instructionInjectionsKey);
+      explicitlyEmptyItems = decodedItems is List && decodedItems.isEmpty;
+    }
     final finalRaw = values[_activeIdsByAssistantKey];
+    Map<String, List<String>>? normalized;
     if (finalRaw != null) {
       final decoded = _decodeJson(finalRaw, _activeIdsByAssistantKey);
       if (decoded is! Map) {
         throw const FormatException(_activeIdsByAssistantKey);
       }
-      final normalized = <String, List<String>>{};
+      normalized = <String, List<String>>{};
       for (final entry in decoded.entries) {
         normalized[entry.key.toString()] = _deduplicateStrings(
           _stringList(entry.value, _activeIdsByAssistantKey),
         );
       }
-      values[_activeIdsByAssistantKey] = jsonEncode(normalized);
     } else {
       List<String> legacy = const <String>[];
       final legacyIdsRaw = values[_legacyActiveIdsKey];
@@ -812,10 +844,15 @@ final class BusinessSettingsRouter {
         }
       }
       if (legacy.isNotEmpty) {
-        values[_activeIdsByAssistantKey] = jsonEncode({
-          _globalAssistantKey: legacy,
-        });
+        normalized = <String, List<String>>{_globalAssistantKey: legacy};
       }
+    }
+    if (explicitlyEmptyItems) {
+      (normalized ??= <String, List<String>>{})[_globalAssistantKey] =
+          const <String>[];
+    }
+    if (normalized != null) {
+      values[_activeIdsByAssistantKey] = jsonEncode(normalized);
     }
     values.remove(_legacyActiveIdKey);
     values.remove(_legacyActiveIdsKey);
@@ -870,6 +907,67 @@ final class BusinessSettingsRouter {
       utf8.encode('$sourceKey\u0000$index\u0000${jsonEncode(payload)}'),
     );
     return 'generated_${digest.toString().substring(0, 32)}';
+  }
+
+  static void _normalizeLegacyEmbeddingOverrides(
+    Map<String, Object?> provider,
+  ) {
+    final rawOverrides = provider['modelOverrides'];
+    if (rawOverrides is! Map) return;
+    final normalized = <String, Object?>{};
+    for (final entry in rawOverrides.entries) {
+      final rawOverride = entry.value;
+      if (rawOverride is! Map) {
+        normalized[entry.key.toString()] = rawOverride;
+        continue;
+      }
+      final override = rawOverride.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      final type = (override['type'] ?? override['t'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      if (_embeddingTypes.contains(type)) {
+        for (final field in _embeddingChatOnlyFields) {
+          override.remove(field);
+        }
+      }
+      normalized[entry.key.toString()] = override;
+    }
+    provider['modelOverrides'] = normalized;
+  }
+
+  static Map<String, int> _projectMemoryIds(List<BusinessEntityValue> rows) {
+    final used = <int>{};
+    final missing = <BusinessEntityValue>[];
+    for (final row in rows) {
+      final payload =
+          _decodePayload(
+                row.payload,
+                BusinessEntityKind.assistantMemory.sourceKey,
+              )!
+              as Map;
+      final rawId = payload['id'];
+      if (rawId is num) {
+        used.add(rawId.toInt());
+      } else {
+        missing.add(row);
+      }
+    }
+    missing.sort((left, right) => left.id.compareTo(right.id));
+    final projected = <String, int>{};
+    for (final row in missing) {
+      final digest = sha256.convert(utf8.encode(row.id)).toString();
+      // Keep runtime-only identities outside MemoryStore's positive ID space.
+      var candidate =
+          -((int.parse(digest.substring(0, 8), radix: 16) & 0x3fffffff) + 1);
+      while (!used.add(candidate)) {
+        candidate = candidate == -0x40000000 ? -1 : candidate - 1;
+      }
+      projected[row.id] = candidate;
+    }
+    return projected;
   }
 
   static int _compareRows(BusinessEntityValue left, BusinessEntityValue right) {

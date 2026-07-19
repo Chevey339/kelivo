@@ -2391,6 +2391,7 @@ void main() {
           jsonEncode({
             'restored_setting': 'new',
             'global_proxy_password_v1': 'legacy-proxy-secret',
+            'instruction_injections_v1': jsonEncode(const <Object>[]),
             'provider_configs_v1': jsonEncode({
               'openai': {'id': 'openai', 'apiKey': 'legacy-api-secret'},
             }),
@@ -2421,6 +2422,13 @@ void main() {
         expect(restored['restored_setting'], 'new');
         expect(restored['global_proxy_password_v1'], 'legacy-proxy-secret');
         expect(restored['provider_configs_v1'], contains('legacy-api-secret'));
+        expect(
+          jsonDecode(
+            restored['instruction_injections_active_ids_by_assistant_v1']!
+                as String,
+          ),
+          {'__global__': <Object>[]},
+        );
         expect(
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,

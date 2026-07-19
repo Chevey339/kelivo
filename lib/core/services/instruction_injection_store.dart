@@ -54,6 +54,8 @@ class InstructionInjectionStore {
             )
             .toList(growable: true);
         if (items.isNotEmpty) return items;
+        final activeIds = await _loadActiveIdsMap();
+        if (activeIds[_defaultAssistantKey]?.isEmpty ?? false) return items;
       } catch (_) {
         return const <InstructionInjection>[];
       }
@@ -81,8 +83,13 @@ class InstructionInjectionStore {
     return <InstructionInjection>[item];
   }
 
-  Future<void> save(List<InstructionInjection> items) {
-    return _preferences.setString(
+  Future<void> save(List<InstructionInjection> items) async {
+    if (items.isEmpty) {
+      final activeIds = await _loadActiveIdsMap();
+      activeIds[_defaultAssistantKey] = const <String>[];
+      await _persistActiveIdsMap(activeIds);
+    }
+    await _preferences.setString(
       _itemsKey,
       jsonEncode(items.map((item) => item.toJson()).toList(growable: false)),
     );
@@ -127,7 +134,9 @@ class InstructionInjectionStore {
 
   Future<void> clear() async {
     await save(const <InstructionInjection>[]);
-    await _preferences.remove(_activeIdsByAssistantKey);
+    await _persistActiveIdsMap(const <String, List<String>>{
+      _defaultAssistantKey: <String>[],
+    });
   }
 
   Future<void> reorder({required int oldIndex, required int newIndex}) async {

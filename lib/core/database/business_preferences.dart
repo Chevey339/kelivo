@@ -1,8 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'business_data.dart';
 import 'business_repository.dart';
 import 'business_settings_router.dart';
+
+typedef _SyntheticEntityIdentity = ({
+  String rowId,
+  bool hadPayloadId,
+  Object? payloadId,
+});
 
 /// An in-memory key-value view over business data in SQLite.
 ///
@@ -16,6 +23,8 @@ final class BusinessPreferences {
 
   final BusinessRepository _repository;
   Map<String, Object> _values = <String, Object>{};
+  final Map<BusinessEntityKind, Map<String, _SyntheticEntityIdentity>>
+  _syntheticIdentities = {};
   Future<void>? _loadFuture;
   Future<void> _writeTail = Future<void>.value();
   bool _isLoaded = false;
@@ -35,9 +44,7 @@ final class BusinessPreferences {
   Future<void> _loadFromRepository() async {
     try {
       final snapshot = await _repository.readSnapshot();
-      _values = Map<String, Object>.from(
-        BusinessSettingsRouter.exportRuntimeSnapshot(snapshot),
-      );
+      _applyRuntimeSnapshot(snapshot);
       _isLoaded = true;
     } finally {
       _loadFuture = null;
@@ -83,7 +90,7 @@ final class BusinessPreferences {
         final next = Map<String, Object>.from(_values)..remove(key);
         final routed = BusinessSettingsRouter.normalizeAndRoute(next);
         await _repository.synchronizeEntities(kind, routed.entities[kind]!);
-        _applyCanonicalEntity(kind, routed);
+        _applyRuntimeEntity(kind, routed);
       } else {
         _validatePreferenceKey(key);
         await _repository.removePreference(key);
@@ -99,9 +106,23 @@ final class BusinessPreferences {
       final kind = _entityKindForKey(key);
       if (kind != null) {
         final next = Map<String, Object>.from(_values)..[key] = value;
-        final routed = BusinessSettingsRouter.normalizeAndRoute(next);
+        var routed = BusinessSettingsRouter.normalizeAndRoute(next);
+        if (kind != BusinessEntityKind.provider && key == kind.sourceKey) {
+          final rows = _restoreSyntheticIdentities(
+            kind,
+            value,
+            routed.entities[kind]!,
+          );
+          routed = BusinessSnapshot(
+            entities: <BusinessEntityKind, List<BusinessEntityValue>>{
+              ...routed.entities,
+              kind: rows,
+            },
+            preferences: routed.preferences,
+          );
+        }
         await _repository.synchronizeEntities(kind, routed.entities[kind]!);
-        _applyCanonicalEntity(kind, routed);
+        _applyRuntimeEntity(kind, routed);
       } else {
         _validatePreferenceKey(key);
         await _repository.setPreference(key, value);
@@ -128,12 +149,101 @@ final class BusinessPreferences {
     return null;
   }
 
-  void _applyCanonicalEntity(BusinessEntityKind kind, BusinessSnapshot routed) {
-    final canonical = BusinessSettingsRouter.exportSnapshot(routed);
-    _values[kind.sourceKey] = canonical[kind.sourceKey]!;
-    if (kind == BusinessEntityKind.provider) {
-      _values[_providersOrderKey] = canonical[_providersOrderKey]!;
+  void _applyRuntimeSnapshot(BusinessSnapshot snapshot) {
+    final runtime = BusinessSettingsRouter.exportRuntimeSnapshot(snapshot);
+    _values = Map<String, Object>.from(runtime);
+    _syntheticIdentities.clear();
+    for (final kind in BusinessEntityKind.values) {
+      _rememberSyntheticIdentities(kind, snapshot, runtime[kind.sourceKey]);
     }
+  }
+
+  void _applyRuntimeEntity(BusinessEntityKind kind, BusinessSnapshot routed) {
+    final runtime = BusinessSettingsRouter.exportRuntimeSnapshot(routed);
+    _values[kind.sourceKey] = runtime[kind.sourceKey]!;
+    if (kind == BusinessEntityKind.provider) {
+      _values[_providersOrderKey] = runtime[_providersOrderKey]!;
+    }
+    _rememberSyntheticIdentities(kind, routed, runtime[kind.sourceKey]);
+  }
+
+  List<BusinessEntityValue> _restoreSyntheticIdentities(
+    BusinessEntityKind kind,
+    Object value,
+    List<BusinessEntityValue> rows,
+  ) {
+    final identities = _syntheticIdentities[kind];
+    if (identities == null || identities.isEmpty || value is! String) {
+      return rows;
+    }
+    final decoded = jsonDecode(value);
+    if (decoded is! List || decoded.length != rows.length) return rows;
+    return <BusinessEntityValue>[
+      for (var index = 0; index < rows.length; index++)
+        () {
+          final item = decoded[index];
+          if (item is! Map || !item.containsKey('id')) return rows[index];
+          final identity = identities[_identityToken(item['id'])];
+          if (identity == null) return rows[index];
+          final payload = (jsonDecode(rows[index].payload) as Map).map(
+            (key, fieldValue) => MapEntry(key.toString(), fieldValue),
+          );
+          if (identity.hadPayloadId) {
+            payload['id'] = identity.payloadId;
+          } else {
+            payload.remove('id');
+          }
+          return rows[index].copyWith(
+            id: identity.rowId,
+            payload: jsonEncode(payload),
+          );
+        }(),
+    ];
+  }
+
+  void _rememberSyntheticIdentities(
+    BusinessEntityKind kind,
+    BusinessSnapshot snapshot,
+    Object? runtimeValue,
+  ) {
+    if (kind == BusinessEntityKind.provider || runtimeValue is! String) {
+      _syntheticIdentities.remove(kind);
+      return;
+    }
+    final rows = List<BusinessEntityValue>.of(snapshot.entities[kind]!)
+      ..sort(_compareRows);
+    final runtimeItems = jsonDecode(runtimeValue);
+    if (runtimeItems is! List || runtimeItems.length != rows.length) {
+      _syntheticIdentities.remove(kind);
+      return;
+    }
+    final identities = <String, _SyntheticEntityIdentity>{};
+    for (var index = 0; index < rows.length; index++) {
+      final payload = (jsonDecode(rows[index].payload) as Map).map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      final rawId = payload['id'];
+      if (rawId != null && rawId.toString().trim().isNotEmpty) continue;
+      final runtimeItem = runtimeItems[index];
+      if (runtimeItem is! Map || !runtimeItem.containsKey('id')) continue;
+      identities[_identityToken(runtimeItem['id'])] = (
+        rowId: rows[index].id,
+        hadPayloadId: payload.containsKey('id'),
+        payloadId: rawId,
+      );
+    }
+    if (identities.isEmpty) {
+      _syntheticIdentities.remove(kind);
+    } else {
+      _syntheticIdentities[kind] = identities;
+    }
+  }
+
+  static String _identityToken(Object? value) => jsonEncode(value);
+
+  static int _compareRows(BusinessEntityValue left, BusinessEntityValue right) {
+    final byOrder = left.sortOrder.compareTo(right.sortOrder);
+    return byOrder != 0 ? byOrder : left.id.compareTo(right.id);
   }
 
   static void _validatePreferenceKey(String key) {

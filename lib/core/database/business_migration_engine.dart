@@ -62,7 +62,10 @@ final class BusinessMigrationEngine {
     }
 
     final hasBusinessData = cleanupKeys.isNotEmpty;
-    final routed = BusinessSettingsRouter.normalizeAndRoute(legacy);
+    final routed = BusinessSettingsRouter.normalizeAndRoute(
+      legacy,
+      preserveExplicitEmptyInstructionList: true,
+    );
     await repository.replaceSnapshotForMigration(
       routed,
       validatePersisted: (stored) {

@@ -4,8 +4,10 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/database/business_restore_service.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 void main() {
   late AppDatabase database;
@@ -82,6 +84,15 @@ void main() {
     );
 
     expect(await service.exportSettings(), before);
+  });
+
+  test('overwrite preserves an explicitly empty instruction list', () async {
+    await service.overwrite({
+      'instruction_injections_v1': jsonEncode(const <Object>[]),
+    }, preserveExplicitEmptyInstructionList: true);
+
+    final store = InstructionInjectionStore(BusinessPreferences(repository));
+    expect(await store.getAll(), isEmpty);
   });
 
   test(

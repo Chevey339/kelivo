@@ -130,6 +130,10 @@ class HiveToSqliteMigrationService {
   static const _messageBatchSize = 128;
   static const _settingsBackupName = 'settings.json';
   static const _chatsBackupName = 'chats.json';
+  static const _legacyBusinessKeysNeededForRecovery = <String>{
+    'instruction_injections_active_id_v1',
+    'instruction_injections_active_ids_v1',
+  };
   static const _backupPreparationShare = 0.15;
   static const _backupFileShare = 1 - _backupPreparationShare;
   static const _backupDirectories =
@@ -877,7 +881,10 @@ class HiveToSqliteMigrationService {
     final prefs = await SharedPreferences.getInstance();
     final map = <String, Object>{};
     for (final key in prefs.getKeys()) {
-      if (BackupSettingsValidator.shouldIgnore(key)) continue;
+      if (BackupSettingsValidator.shouldIgnore(key) &&
+          !_legacyBusinessKeysNeededForRecovery.contains(key)) {
+        continue;
+      }
       final value = prefs.get(key);
       if (value != null) map[key] = value;
     }

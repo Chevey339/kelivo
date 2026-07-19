@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive_io.dart';
@@ -271,6 +272,46 @@ void main() {
       'gemini-signature',
     );
   });
+
+  for (final legacyActivation in <String, Object>{
+    'instruction_injections_active_id_v1': 'learning-mode',
+    'instruction_injections_active_ids_v1': '["learning-mode","review"]',
+  }.entries) {
+    test(
+      'disaster backup preserves ${legacyActivation.key} for restoration',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          legacyActivation.key: legacyActivation.value,
+        });
+        _registerHiveAdapters();
+        Hive.init(tempDir.path);
+        await Hive.openBox<Conversation>('conversations');
+        await Hive.close();
+
+        final decision = await HiveToSqliteMigrationService.check();
+        expect(decision.needsMigration, isTrue);
+        final service = HiveToSqliteMigrationService(decision);
+        addTearDown(service.dispose);
+
+        final backupRoot = Directory('${tempDir.path}/backup-target');
+        final backupFile = await service.backupTo(backupRoot);
+        final inputStream = InputFileStream(backupFile.path);
+        final archive = ZipDecoder().decodeStream(inputStream);
+        addTearDown(inputStream.closeSync);
+        addTearDown(archive.clearSync);
+
+        final settingsEntry = archive.findFile('settings.json');
+        expect(settingsEntry, isNotNull);
+        final settings =
+            jsonDecode(String.fromCharCodes(settingsEntry!.readBytes()!))
+                as Map<String, dynamic>;
+        expect(
+          settings,
+          containsPair(legacyActivation.key, legacyActivation.value),
+        );
+      },
+    );
+  }
 
   test('migrates chat data across multiple message batches', () async {
     const messageCount = 130;

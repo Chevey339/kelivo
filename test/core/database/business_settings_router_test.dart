@@ -127,29 +127,98 @@ void main() {
       expect(runtimeRows[1], {'content': 'hello', 'id': firstRows[1].id});
     });
 
-    test('keeps missing assistant memory ids numeric at runtime', () {
+    test('projects distinct numeric ids for id-less memories at runtime', () {
       final snapshot = BusinessSettingsRouter.normalizeAndRoute({
         'assistant_memories_v1': jsonEncode([
           {'assistantId': 'assistant-1', 'content': 'Remember this'},
+          {'assistantId': 'assistant-1', 'content': 'Remember that'},
         ]),
       });
-      final row = snapshot.entities[BusinessEntityKind.assistantMemory]!.single;
+      final rows = snapshot.entities[BusinessEntityKind.assistantMemory]!;
 
-      expect(jsonDecode(row.payload), isNot(contains('id')));
+      expect(rows, hasLength(2));
+      expect(
+        rows.map((row) => jsonDecode(row.payload)),
+        everyElement(isNot(contains('id'))),
+      );
       final published = BusinessSettingsRouter.exportSnapshot(snapshot);
       expect(
-        (jsonDecode(published['assistant_memories_v1']! as String) as List)
-            .single,
-        isNot(contains('id')),
+        jsonDecode(published['assistant_memories_v1']! as String) as List,
+        everyElement(isNot(contains('id'))),
       );
 
       final runtime = BusinessSettingsRouter.exportRuntimeSnapshot(snapshot);
-      final runtimePayload = Map<String, dynamic>.from(
-        (jsonDecode(runtime['assistant_memories_v1']! as String) as List).single
-            as Map,
-      );
-      expect(runtimePayload, isNot(contains('id')));
-      expect(AssistantMemory.fromJson(runtimePayload).id, 0);
+      final runtimePayloads =
+          (jsonDecode(runtime['assistant_memories_v1']! as String) as List)
+              .cast<Map>()
+              .map((payload) => payload.cast<String, dynamic>())
+              .toList();
+      final ids = runtimePayloads
+          .map((payload) => AssistantMemory.fromJson(payload).id)
+          .toList();
+      expect(ids, everyElement(lessThan(0)));
+      expect(ids.toSet(), hasLength(2));
+    });
+
+    test('normalizes legacy embedding overrides before discarding version', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'provider_configs_v1': jsonEncode({
+          'legacy': {
+            'name': 'Legacy',
+            'modelOverrides': {
+              'embedding-a': {
+                'type': 'embedding',
+                'input': ['text'],
+                'abilities': ['tool'],
+                'output': ['text'],
+                'builtInTools': ['search'],
+                'built_in_tools': ['search'],
+                'tools': ['search'],
+                'dimensions': 1536,
+              },
+              'embedding-b': {
+                't': 'embeddings',
+                'output': ['text'],
+                'name': 'Embedding B',
+              },
+              'chat-a': {
+                'type': 'chat',
+                'abilities': ['tool'],
+                'output': ['text'],
+                'tools': ['search'],
+              },
+            },
+          },
+        }),
+        'migrations_version_v1': 1,
+        'provider_configs_backup_v1': 'legacy backup',
+      });
+
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      final providers =
+          jsonDecode(exported['provider_configs_v1']! as String)
+              as Map<String, dynamic>;
+      final overrides =
+          (providers['legacy'] as Map<String, dynamic>)['modelOverrides']
+              as Map<String, dynamic>;
+
+      expect(overrides['embedding-a'], {
+        'type': 'embedding',
+        'input': ['text'],
+        'dimensions': 1536,
+      });
+      expect(overrides['embedding-b'], {
+        't': 'embeddings',
+        'name': 'Embedding B',
+      });
+      expect(overrides['chat-a'], {
+        'type': 'chat',
+        'abilities': ['tool'],
+        'output': ['text'],
+        'tools': ['search'],
+      });
+      expect(exported, isNot(contains('migrations_version_v1')));
+      expect(exported, isNot(contains('provider_configs_backup_v1')));
     });
 
     test('normalizes legacy activation and assistant search exactly once', () {

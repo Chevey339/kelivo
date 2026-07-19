@@ -1486,9 +1486,15 @@ class DataSync {
 
       if (versionedBackup == null) {
         if (mode == RestoreMode.overwrite) {
-          await businessRestore.overwrite(settings);
+          await businessRestore.overwrite(
+            settings,
+            preserveExplicitEmptyInstructionList: true,
+          );
         } else {
-          await businessRestore.merge(settings);
+          await businessRestore.merge(
+            settings,
+            preserveExplicitEmptyInstructionList: true,
+          );
         }
         if (!restoreChats) {
           return;

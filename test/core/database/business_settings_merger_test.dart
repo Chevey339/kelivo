@@ -207,6 +207,52 @@ void main() {
     expect(merged['theme_mode_v1'], 'dark');
   });
 
+  test('merges pinned models into an empty target snapshot', () {
+    final merged = BusinessSettingsMerger.merge(const {}, {
+      'pinned_models_v1': <String>['provider/model'],
+    });
+
+    expect(merged['pinned_models_v1'], <String>['provider/model']);
+  });
+
+  test('merge preserves an explicitly empty instruction list', () {
+    final merged = BusinessSettingsMerger.merge(
+      {
+        'instruction_injections_active_ids_by_assistant_v1': jsonEncode({
+          '__global__': <String>['old-id'],
+        }),
+      },
+      {'instruction_injections_v1': jsonEncode(const <Object>[])},
+      preserveExplicitEmptyInstructionList: true,
+    );
+
+    expect(jsonDecode(merged['instruction_injections_v1']! as String), isEmpty);
+    expect(
+      jsonDecode(
+        merged['instruction_injections_active_ids_by_assistant_v1']! as String,
+      ),
+      {'__global__': <Object>[]},
+    );
+  });
+
+  test('rejects present but invalid pinned model lists', () {
+    expect(
+      () => BusinessSettingsMerger.merge(
+        const {'pinned_models_v1': null},
+        const {
+          'pinned_models_v1': <String>['provider/model'],
+        },
+      ),
+      throwsFormatException,
+    );
+    expect(
+      () => BusinessSettingsMerger.merge(const {}, const {
+        'pinned_models_v1': null,
+      }),
+      throwsFormatException,
+    );
+  });
+
   test('ignores local-only and discarded imported keys', () {
     final merged = BusinessSettingsMerger.merge(
       {'theme_mode_v1': 'light'},
