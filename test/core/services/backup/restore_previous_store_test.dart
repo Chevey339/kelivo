@@ -5,32 +5,20 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_builder.dart';
+import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_store.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
-import 'package:Kelivo/core/services/backup/restore_settings_transition.dart';
 
 const _runId = '0123456789abcdef0123456789abcdef';
 const _candidateHash =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-RestoreReceipt _receipt({bool chats = false, bool files = false}) {
+RestoreReceipt _receipt({bool files = false}) {
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: DateTime.utc(2026, 7, 9),
-    restoreChats: chats,
     restoreFiles: files,
     candidateManifestSha256: _candidateHash,
-  );
-}
-
-RestoreSettingsTransition _transition() {
-  return RestoreSettingsTransition.build(
-    currentSettings: const {
-      'theme': 'dark',
-      'provider_api_key_v1': 'old-secret',
-    },
-    candidateSettings: const {'theme': 'light'},
-    secretsIncluded: true,
   );
 }
 
@@ -51,12 +39,11 @@ void main() {
       if (await appData.exists()) await appData.delete(recursive: true);
     });
 
-    test('publishes settings first and canonical manifest last', () async {
+    test('publishes the canonical manifest as the sole control file', () async {
       final receipt = _receipt();
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appData,
         preparedReceipt: receipt,
-        settingsTransition: _transition(),
       );
       final recording = _RecordingDurability(RestorePlatformDurability());
       final store = RestorePreviousStore(
@@ -72,22 +59,21 @@ void main() {
       expect(persisted.plan.checksum, bundle.plan.checksum);
       expect(persisted.manifestSha256, hasLength(64));
       expect(
-        recording.events.indexOf('sync:settings.json.tmp:false'),
-        lessThan(recording.events.indexOf('rename:settings.json.tmp')),
-      );
-      expect(
-        recording.events.indexOf('rename:settings.json.tmp'),
-        lessThan(recording.events.indexOf('sync:manifest.json.tmp:true')),
-      );
-      expect(
         recording.events.indexOf('sync:manifest.json.tmp:true'),
         lessThan(recording.events.indexOf('rename:manifest.json.tmp')),
+      );
+      expect(
+        await store.pendingDirectory
+            .list(followLinks: false)
+            .map((entity) => p.basename(entity.path))
+            .toList(),
+        ['manifest.json'],
       );
       if (!Platform.isWindows) {
         expect((await store.pendingDirectory.stat()).mode & 0x1ff, 0x1c0);
         expect(
           (await File(
-                p.join(store.pendingDirectory.path, 'settings.json'),
+                p.join(store.pendingDirectory.path, 'manifest.json'),
               ).stat()).mode &
               0x1ff,
           0x180,
@@ -96,13 +82,12 @@ void main() {
     });
 
     test(
-      'resumes after settings publication and rejects snapshot drift',
+      'rejects a retired settings control file in a partial previous bundle',
       () async {
         final receipt = _receipt();
         final bundle = await RestorePreviousBuilder.build(
           appDataDirectory: appData,
           preparedReceipt: receipt,
-          settingsTransition: _transition(),
         );
         final store = RestorePreviousStore(runDirectory: runDirectory);
         await store.persistPending(bundle: bundle, preparedReceipt: receipt);
@@ -111,29 +96,22 @@ void main() {
         );
         await manifest.delete();
 
-        final resumed = await store.persistPending(
-          bundle: bundle,
-          preparedReceipt: receipt,
-        );
-
-        expect(resumed.plan.checksum, bundle.plan.checksum);
         final settings = File(
           p.join(store.pendingDirectory.path, 'settings.json'),
         );
         await settings.writeAsString('{}', flush: true);
         await expectLater(
-          store.readPending(preparedReceipt: receipt),
-          throwsFormatException,
+          store.persistPending(bundle: bundle, preparedReceipt: receipt),
+          throwsA(isA<StateError>()),
         );
       },
     );
 
-    test('promotes a complete settings-only previous idempotently', () async {
+    test('promotes a complete database-only previous idempotently', () async {
       final receipt = _receipt();
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appData,
         preparedReceipt: receipt,
-        settingsTransition: _transition(),
       );
       final store = RestorePreviousStore(runDirectory: runDirectory);
       await store.persistPending(bundle: bundle, preparedReceipt: receipt);
@@ -155,11 +133,10 @@ void main() {
         await upload.parent.create();
         await upload.writeAsString('asset', flush: true);
         await Directory(p.join(appData.path, 'images')).create();
-        final receipt = _receipt(chats: true, files: true);
+        final receipt = _receipt(files: true);
         final bundle = await RestorePreviousBuilder.build(
           appDataDirectory: appData,
           preparedReceipt: receipt,
-          settingsTransition: _transition(),
         );
         final store = RestorePreviousStore(runDirectory: runDirectory);
         await store.persistPending(bundle: bundle, preparedReceipt: receipt);
@@ -184,7 +161,7 @@ void main() {
 
         final promoted = await store.promotePending(preparedReceipt: receipt);
 
-        expect(promoted.plan.database, isNotNull);
+        expect(promoted.plan.database.state, RestorePreviousDatabaseState.file);
         expect(promoted.plan.assets?.entries.keys, ['upload/item']);
       },
     );
@@ -194,7 +171,6 @@ void main() {
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appData,
         preparedReceipt: receipt,
-        settingsTransition: _transition(),
       );
       final store = RestorePreviousStore(runDirectory: runDirectory);
       await store.persistPending(bundle: bundle, preparedReceipt: receipt);

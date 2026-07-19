@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/features/settings/pages/tts_services_page.dart';
@@ -49,8 +50,8 @@ void main() {
   testWidgets('mobile add network TTS opens a full page editor', (
     tester,
   ) async {
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final tts = TtsProvider(preferences: createBusinessTestPreferences());
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(
@@ -90,8 +91,8 @@ void main() {
   testWidgets('mobile TTS settings button opens playback settings', (
     tester,
   ) async {
-    final settings = SettingsProvider();
-    final tts = TtsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    final tts = TtsProvider(preferences: createBusinessTestPreferences());
     addTearDown(tts.dispose);
 
     await tester.pumpWidget(

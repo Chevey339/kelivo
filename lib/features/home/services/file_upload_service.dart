@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/file_import_helper.dart';
@@ -24,15 +23,18 @@ import '../widgets/chat_input_bar.dart';
 /// - 桌面拖放处理
 /// - 文件复制到应用目录
 class FileUploadService {
-  FileUploadService({required this.getContext, required this.mediaController});
+  FileUploadService({
+    required this.getContext,
+    required this.mediaController,
+    required this.isImageCropperEnabled,
+  });
 
   /// 媒体控制器，用于添加图片和文件到输入栏
   final ChatInputBarController mediaController;
 
   /// Context provider callback to avoid storing stale context
   final BuildContext Function() getContext;
-
-  static const String _imageCropperEnabledKey = 'image_cropper_enabled_v1';
+  final bool Function() isImageCropperEnabled;
 
   /// 复制选中的文件到应用上传目录
   ///
@@ -155,9 +157,7 @@ class FileUploadService {
   }
 
   Future<List<XFile>> _maybeCropImages(List<XFile> files) async {
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool(_imageCropperEnabledKey) ?? false;
-    if (!enabled) return files;
+    if (!isImageCropperEnabled()) return files;
 
     final context = getContext();
     if (!context.mounted) return files;

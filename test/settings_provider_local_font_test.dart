@@ -1,9 +1,9 @@
+import "support/business_test_harness.dart";
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
@@ -27,12 +27,6 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$path/tmp';
-}
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
 }
 
 Future<File> _fixtureFontFile() async {
@@ -64,15 +58,15 @@ void main() {
     });
 
     test('local font import stores managed copy path', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
-      await _waitForSettingsLoad();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
 
       final sourceFile = await _fixtureFontFile();
 
       await settings.setAppFontFromLocal(path: sourceFile.path);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       final storedPath = prefs.getString('display_app_font_local_path_v1');
       expect(storedPath, isNotNull);
       expect(storedPath, startsWith('${tempDir.path}/fonts/'));
@@ -82,13 +76,13 @@ void main() {
     });
 
     test('replacing local font removes previous managed copy', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
-      await _waitForSettingsLoad();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
       final sourceFile = await _fixtureFontFile();
 
       await settings.setAppFontFromLocal(path: sourceFile.path);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       final firstPath = prefs.getString('display_app_font_local_path_v1');
       expect(firstPath, isNotNull);
       expect(await File(firstPath!).exists(), isTrue);
@@ -104,31 +98,35 @@ void main() {
     test(
       'clearing one font keeps managed copy still referenced by code font',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
-        await _waitForSettingsLoad();
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
+        await settings.loaded;
         final sourceFile = await _fixtureFontFile();
 
         await settings.setAppFontFromLocal(path: sourceFile.path);
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = harness.preferences;
         final appPath = prefs.getString('display_app_font_local_path_v1');
         expect(appPath, isNotNull);
         final sharedPath = appPath!;
         final appFamily = prefs.getString('display_app_font_family_v1')!;
         final appAlias = prefs.getString('display_app_font_local_alias_v1')!;
 
-        SharedPreferences.setMockInitialValues({
-          'display_app_font_family_v1': appFamily,
-          'display_app_font_is_google_v1': false,
-          'display_app_font_local_path_v1': sharedPath,
-          'display_app_font_local_alias_v1': appAlias,
-          'display_code_font_family_v1': 'kelivo_local_code_123',
-          'display_code_font_is_google_v1': false,
-          'display_code_font_local_path_v1': sharedPath,
-          'display_code_font_local_alias_v1': 'kelivo_local_code_123',
-        });
-        final sharedSettings = SettingsProvider();
-        await _waitForSettingsLoad();
+        await prefs.setString('display_app_font_family_v1', appFamily);
+        await prefs.setBool('display_app_font_is_google_v1', false);
+        await prefs.setString('display_app_font_local_path_v1', sharedPath);
+        await prefs.setString('display_app_font_local_alias_v1', appAlias);
+        await prefs.setString(
+          'display_code_font_family_v1',
+          'kelivo_local_code_123',
+        );
+        await prefs.setBool('display_code_font_is_google_v1', false);
+        await prefs.setString('display_code_font_local_path_v1', sharedPath);
+        await prefs.setString(
+          'display_code_font_local_alias_v1',
+          'kelivo_local_code_123',
+        );
+        final sharedSettings = SettingsProvider(harness.preferences);
+        await sharedSettings.loaded;
 
         await sharedSettings.clearAppFont();
 
@@ -137,15 +135,15 @@ void main() {
     );
 
     test('failed local font registration removes imported copy', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
-      await _waitForSettingsLoad();
+      final harness = await createBusinessTestHarness();
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
       final invalidFont = File('${tempDir.path}/invalid.ttf');
       await invalidFont.writeAsString('not a font');
 
       await settings.setAppFontFromLocal(path: invalidFont.path);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(prefs.getString('display_app_font_local_path_v1'), isNull);
       final fontsDir = Directory('${tempDir.path}/fonts');
       final entries = await fontsDir.exists()
@@ -155,20 +153,21 @@ void main() {
     });
 
     test('invalid persisted local font does not expose stale alias', () async {
-      SharedPreferences.setMockInitialValues({
-        'display_app_font_family_v1': 'kelivo_local_app_123',
-        'display_app_font_is_google_v1': false,
-        'display_app_font_local_path_v1':
-            '/var/mobile/Containers/Data/Application/OLD/Documents/fonts/missing.ttf',
-        'display_app_font_local_alias_v1': 'kelivo_local_app_123',
-      });
-
-      final settings = SettingsProvider();
-      await _waitForSettingsLoad();
+      final harness = await createBusinessTestHarness(
+        initial: {
+          'display_app_font_family_v1': 'kelivo_local_app_123',
+          'display_app_font_is_google_v1': false,
+          'display_app_font_local_path_v1':
+              '/var/mobile/Containers/Data/Application/OLD/Documents/fonts/missing.ttf',
+          'display_app_font_local_alias_v1': 'kelivo_local_app_123',
+        },
+      );
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
 
       expect(settings.appFontLocalAlias, isNull);
       expect(settings.appFontFamily, isNull);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(prefs.getString('display_app_font_local_alias_v1'), isNull);
       expect(prefs.getString('display_app_font_local_path_v1'), isNull);
     });
@@ -182,20 +181,21 @@ void main() {
       await currentFont.writeAsBytes(await sourceFile.readAsBytes());
       await SandboxPathResolver.init();
 
-      SharedPreferences.setMockInitialValues({
-        'display_app_font_family_v1': 'kelivo_local_app_123',
-        'display_app_font_is_google_v1': false,
-        'display_app_font_local_path_v1':
-            '/var/mobile/Containers/Data/Application/OLD/Documents/fonts/SFNS.ttf',
-        'display_app_font_local_alias_v1': 'kelivo_local_app_123',
-      });
-
-      final settings = SettingsProvider();
-      await _waitForSettingsLoad();
+      final harness = await createBusinessTestHarness(
+        initial: {
+          'display_app_font_family_v1': 'kelivo_local_app_123',
+          'display_app_font_is_google_v1': false,
+          'display_app_font_local_path_v1':
+              '/var/mobile/Containers/Data/Application/OLD/Documents/fonts/SFNS.ttf',
+          'display_app_font_local_alias_v1': 'kelivo_local_app_123',
+        },
+      );
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
 
       expect(settings.appFontLocalAlias, isNotEmpty);
       expect(settings.appFontFamily, settings.appFontLocalAlias);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(
         prefs.getString('display_app_font_local_path_v1'),
         currentFont.path,

@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -34,7 +35,7 @@ void main() {
       ];
       service.injectSearchPrompt(
         disabledMessages,
-        SettingsProvider(),
+        SettingsProvider(createBusinessTestPreferences()),
         const Assistant(id: 'assistant-a', name: 'A'),
         false,
       );
@@ -44,7 +45,7 @@ void main() {
       ];
       service.injectSearchPrompt(
         enabledMessages,
-        SettingsProvider(),
+        SettingsProvider(createBusinessTestPreferences()),
         const Assistant(id: 'assistant-b', name: 'B', searchEnabled: true),
         false,
       );
@@ -61,7 +62,7 @@ void main() {
       tester,
     ) async {
       SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(createBusinessTestPreferences());
 
       late List<Map<String, dynamic>> disabledTools;
       late List<Map<String, dynamic>> enabledTools;
@@ -69,9 +70,14 @@ void main() {
         MultiProvider(
           providers: [
             ChangeNotifierProvider<AssistantProvider>(
-              create: (_) => AssistantProvider(),
+              create: (_) => AssistantProvider(
+                preferences: createBusinessTestPreferences(),
+              ),
             ),
-            ChangeNotifierProvider<McpProvider>(create: (_) => McpProvider()),
+            ChangeNotifierProvider<McpProvider>(
+              create: (_) =>
+                  McpProvider(preferences: createBusinessTestPreferences()),
+            ),
             ChangeNotifierProvider<McpToolService>(
               create: (_) => McpToolService(),
             ),

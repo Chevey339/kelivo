@@ -1,5 +1,7 @@
 # Kelivo 聊天数据库与消息系统 v2 重构进度
 
+> **2026-07-18 后续基线：** 本文中的 schema 11 是未发布的聊天专用候选版本。业务数据 SQLite 收口后，聊天表原样并入统一 **Schema 1**；正式兼容边界只接受全新 Schema 1 或已发布 Hive + SharedPreferences 升级，`user_version` 2～11 与未来版本均原地 fail-closed。实现与验收以 [业务数据 SQLite 迁移方案](./business-data-sqlite-migration-plan.md) 为准；下文保留为历史实施证据。
+>
 > - 方案基线：[chat-database-v2-refactoring-plan.md](./chat-database-v2-refactoring-plan.md)
 > - 追踪基线：分支 `sql`，本轮实现基线 `f7e11373`
 > - 最后更新：2026-07-13（**Phase 8 / PERF-01～04 已完成**）

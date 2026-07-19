@@ -1,3 +1,4 @@
+import "support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/desktop/desktop_settings_page.dart';
@@ -41,7 +42,8 @@ Widget _harness(
     providers: [
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
       ChangeNotifierProvider<AssistantProvider>(
-        create: (_) => AssistantProvider(),
+        create: (_) =>
+            AssistantProvider(preferences: createBusinessTestPreferences()),
       ),
     ],
     child: MaterialApp(
@@ -56,7 +58,7 @@ Widget _harness(
 
 Future<SettingsProvider> _buildSettings(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues(const {});
-  final settings = SettingsProvider();
+  final settings = SettingsProvider(createBusinessTestPreferences());
   await tester.runAsync(_waitForSettingsLoad);
   await settings.setProviderConfig('ProviderA', _providerConfig('ProviderA'));
   await settings.setProviderConfig('ProviderB', _providerConfig('ProviderB'));

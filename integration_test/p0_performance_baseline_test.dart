@@ -14,6 +14,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../test/support/business_test_harness.dart';
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
@@ -113,7 +115,7 @@ void main() {
 
 Widget _markdownSurface(ValueListenable<String> markdown) {
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(createBusinessTestPreferences()),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -141,7 +143,7 @@ Widget _rendererStressSurface(Uint8List png) {
   }
   code.writeln('```');
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(createBusinessTestPreferences()),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

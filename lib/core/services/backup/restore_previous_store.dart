@@ -14,13 +14,11 @@ final class PersistedRestorePrevious {
   PersistedRestorePrevious({
     required this.directory,
     required this.plan,
-    required List<int> settingsSnapshotBytes,
     required this.manifestSha256,
-  }) : settingsSnapshotBytes = List.unmodifiable(settingsSnapshotBytes);
+  });
 
   final Directory directory;
   final RestorePreviousPlan plan;
-  final List<int> settingsSnapshotBytes;
   final String manifestSha256;
 }
 
@@ -43,7 +41,6 @@ final class RestorePreviousStore {
   static const pendingDirectoryName = 'previous.pending';
   static const previousDirectoryName = 'previous';
   static const manifestFileName = 'manifest.json';
-  static const settingsFileName = 'settings.json';
   static const _maximumControlBytes = 16 * 1024 * 1024;
 
   final Directory runDirectory;
@@ -60,7 +57,6 @@ final class RestorePreviousStore {
     required RestoreReceipt preparedReceipt,
   }) async {
     bundle.plan.validatePreparedReceipt(preparedReceipt);
-    bundle.plan.settings.validateSnapshotBytes(bundle.settingsSnapshotBytes);
     await _requireRunDirectory();
     if (await FileSystemEntity.type(
           previousDirectory.path,
@@ -99,11 +95,6 @@ final class RestorePreviousStore {
     }
 
     await _requirePartialControlTopology();
-    await _publishControlFile(
-      targetName: settingsFileName,
-      bytes: bundle.settingsSnapshotBytes,
-      fullBarrier: false,
-    );
     final manifestBytes = utf8.encode(jsonEncode(bundle.plan.toJson()));
     if (manifestBytes.length > _maximumControlBytes) {
       throw StateError('restore_previous_manifest_size');
@@ -175,9 +166,6 @@ final class RestorePreviousStore {
       directory: previous.directory,
       expected: previous.plan,
     );
-    previous.plan.settings.validateSnapshotBytes(
-      previous.settingsSnapshotBytes,
-    );
   }
 
   Future<void> validateControlOnlyAfterRollback(
@@ -189,7 +177,6 @@ final class RestorePreviousStore {
     }
     final expected = <String, FileSystemEntityType>{
       manifestFileName: FileSystemEntityType.file,
-      settingsFileName: FileSystemEntityType.file,
     };
     final found = <String>{};
     await for (final entity in previous.directory.list(followLinks: false)) {
@@ -211,13 +198,6 @@ final class RestorePreviousStore {
     if (sha256.convert(manifestBytes).toString() != previous.manifestSha256) {
       throw StateError('restore_previous_rollback_manifest');
     }
-    final settingsBytes = await _readBounded(
-      File(p.join(previous.directory.path, settingsFileName)),
-    );
-    if (!_sameBytes(settingsBytes, previous.settingsSnapshotBytes)) {
-      throw StateError('restore_previous_rollback_settings');
-    }
-    previous.plan.settings.validateSnapshotBytes(settingsBytes);
   }
 
   Future<PersistedRestorePrevious> _readDirectory({
@@ -229,7 +209,6 @@ final class RestorePreviousStore {
       throw StateError('restore_previous_directory');
     }
     final manifestFile = File(p.join(directory.path, manifestFileName));
-    final settingsFile = File(p.join(directory.path, settingsFileName));
     final manifestBytes = await _readBounded(manifestFile);
     final dynamic decoded;
     try {
@@ -248,12 +227,9 @@ final class RestorePreviousStore {
     if (!_sameBytes(canonical, manifestBytes)) {
       throw const FormatException('restore_previous_manifest_canonical');
     }
-    final settingsBytes = await _readBounded(settingsFile);
-    plan.settings.validateSnapshotBytes(settingsBytes);
     return PersistedRestorePrevious(
       directory: directory,
       plan: plan,
-      settingsSnapshotBytes: settingsBytes,
       manifestSha256: sha256.convert(manifestBytes).toString(),
     );
   }
@@ -266,11 +242,7 @@ final class RestorePreviousStore {
   }
 
   Future<void> _requirePartialControlTopology() async {
-    const allowed = {
-      settingsFileName,
-      '$settingsFileName.tmp',
-      '$manifestFileName.tmp',
-    };
+    const allowed = {'$manifestFileName.tmp'};
     await for (final entity in pendingDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -333,8 +305,7 @@ final class RestorePreviousStore {
   ) async {
     final expected = <String, FileSystemEntityType>{
       manifestFileName: FileSystemEntityType.file,
-      settingsFileName: FileSystemEntityType.file,
-      if (plan.database?.state == RestorePreviousDatabaseState.file)
+      if (plan.database.state == RestorePreviousDatabaseState.file)
         'database': FileSystemEntityType.directory,
       if (plan.assets != null)
         for (final root in RestorePreviousAssetsPlan.rootNames)
@@ -385,11 +356,7 @@ final class RestorePreviousStore {
     PersistedRestorePrevious persisted,
     RestorePreviousBundle expected,
   ) {
-    if (persisted.plan.checksum != expected.plan.checksum ||
-        !_sameBytes(
-          persisted.settingsSnapshotBytes,
-          expected.settingsSnapshotBytes,
-        )) {
+    if (persisted.plan.checksum != expected.plan.checksum) {
       throw StateError('restore_previous_bundle_collision');
     }
   }

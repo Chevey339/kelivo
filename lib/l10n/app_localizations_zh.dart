@@ -1524,16 +1524,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
 
   @override
-  String get backupRestoreColdRestartTitle => '还需要再重启一次';
-
-  @override
-  String get backupRestoreColdRestartContent =>
-      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
-
-  @override
-  String get backupRestoreColdRestartButton => '重启 Kelivo';
-
-  @override
   String get backupRestoreRolledBackTitle => '恢复已回滚';
 
   @override
@@ -7069,16 +7059,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get restartAppFailedMessage => 'Kelivo 无法自动重启，请完全关闭后重新打开。';
 
   @override
-  String get backupRestoreColdRestartTitle => '还需要再重启一次';
-
-  @override
-  String get backupRestoreColdRestartContent =>
-      '恢复已进入可恢复终态。请再重启一次 Kelivo，以便从新进程复验设置；确认前不会打开聊天数据。';
-
-  @override
-  String get backupRestoreColdRestartButton => '重启 Kelivo';
-
-  @override
   String get backupRestoreRolledBackTitle => '恢复已回滚';
 
   @override
@@ -12612,16 +12592,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get restartAppFailedMessage => 'Kelivo 無法自動重新啟動，請完全關閉後再重新開啟。';
-
-  @override
-  String get backupRestoreColdRestartTitle => '還需要再重新啟動一次';
-
-  @override
-  String get backupRestoreColdRestartContent =>
-      '還原已進入可恢復終態。請再重新啟動一次 Kelivo，以便從新程序重新驗證設定；確認前不會開啟聊天資料。';
-
-  @override
-  String get backupRestoreColdRestartButton => '重新啟動 Kelivo';
 
   @override
   String get backupRestoreRolledBackTitle => '已保留原有資料';

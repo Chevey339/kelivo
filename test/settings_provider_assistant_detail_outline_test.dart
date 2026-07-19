@@ -1,47 +1,41 @@
+import "support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider assistant detail outline toggle', () {
     test('defaults to disabled to preserve the current tab layout', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.mobileAssistantDetailOutlineEnabled, isFalse);
     });
 
     test('loads persisted enabled value', () async {
-      SharedPreferences.setMockInitialValues({
-        'mobile_assistant_detail_outline_enabled_v1': true,
-      });
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(
+        initial: {'mobile_assistant_detail_outline_enabled_v1': true},
+      );
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.mobileAssistantDetailOutlineEnabled, isTrue);
     });
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setMobileAssistantDetailOutlineEnabled(true);
 
       expect(settings.mobileAssistantDetailOutlineEnabled, isTrue);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(
         prefs.getBool('mobile_assistant_detail_outline_enabled_v1'),
         isTrue,

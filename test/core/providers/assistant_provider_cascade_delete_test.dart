@@ -5,11 +5,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/search/services/global_session_search_service.dart';
+
+import '../../support/business_preferences_test_harness.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -30,6 +31,7 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 Future<AssistantProvider> _createLoadedAssistantProvider({
+  required BusinessPreferencesTestSession session,
   required ChatService chatService,
   List<Map<String, Object?>> assistants = const [
     {'id': 'assistant-delete', 'name': 'Delete Me'},
@@ -37,12 +39,16 @@ Future<AssistantProvider> _createLoadedAssistantProvider({
   ],
   String currentAssistantId = 'assistant-delete',
 }) async {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': jsonEncode(assistants),
-    'current_assistant_id_v1': currentAssistantId,
-  });
+  await session.preferences.setString('assistants_v1', jsonEncode(assistants));
+  await session.preferences.setString(
+    'current_assistant_id_v1',
+    currentAssistantId,
+  );
 
-  final provider = AssistantProvider(chatService: chatService);
+  final provider = AssistantProvider(
+    preferences: session.preferences,
+    chatService: chatService,
+  );
   for (var i = 0; i < 25; i++) {
     if (provider.assistants.length == assistants.length) return provider;
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -54,6 +60,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late BusinessPreferencesTestHarness harness;
+  late BusinessPreferencesTestSession session;
   final services = <ChatService>[];
 
   setUp(() async {
@@ -61,6 +69,8 @@ void main() {
       'kelivo_assistant_cascade_test_',
     );
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+    harness = await BusinessPreferencesTestHarness.create();
+    session = await harness.open();
   });
 
   tearDown(() async {
@@ -69,6 +79,7 @@ void main() {
     }
     services.clear();
     await Hive.close();
+    await harness.dispose();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -87,6 +98,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
         );
 
@@ -145,6 +157,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
         );
 
@@ -215,6 +228,7 @@ void main() {
         final chatService = createService();
         await chatService.init();
         final provider = await _createLoadedAssistantProvider(
+          session: session,
           chatService: chatService,
           assistants: const [
             {'id': 'only-assistant', 'name': 'Only Assistant'},

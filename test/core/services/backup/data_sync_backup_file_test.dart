@@ -10,10 +10,11 @@ import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// ignore: depend_on_referenced_packages
-import 'package:shared_preferences_platform_interface/shared_preferences_platform_interface.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -23,8 +24,7 @@ import 'package:Kelivo/core/services/backup/data_sync.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
-
-import 'restore_cold_process_test_helper.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
 
 bool _containsContiguousBytes(List<int> source, List<int> pattern) {
   for (var start = 0; start <= source.length - pattern.length; start++) {
@@ -56,28 +56,6 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 
   @override
   Future<String?> getTemporaryPath() async => '$root/tmp';
-}
-
-class _FailingRemovePreferencesStore extends InMemorySharedPreferencesStore {
-  _FailingRemovePreferencesStore(super.data) : super.withData();
-
-  @override
-  Future<bool> remove(String key) async => false;
-}
-
-class _FailingNthSetPreferencesStore extends InMemorySharedPreferencesStore {
-  _FailingNthSetPreferencesStore(super.data, {required this.failOnCall})
-    : super.withData();
-
-  final int failOnCall;
-  var _setCalls = 0;
-
-  @override
-  Future<bool> setValue(String valueType, String key, Object value) async {
-    _setCalls++;
-    if (_setCalls == failOnCall) return false;
-    return super.setValue(valueType, key, value);
-  }
 }
 
 class _FailingRestoreChatService extends ChatService {
@@ -186,6 +164,24 @@ Future<String> _fileSha256(File file) async {
   return (await sha256.bind(file.openRead()).first).toString();
 }
 
+Future<String> _readSnapshotMessageContent(String snapshotPath) async {
+  final repository = ChatDatabaseRepository.open(file: File(snapshotPath));
+  try {
+    await repository.ensureReady();
+    await repository.validateIntegrity();
+    if (await repository.getConversation('snapshot-conversation') == null) {
+      throw StateError('snapshot-conversation');
+    }
+    return (await repository.getMessagesRange(
+      'snapshot-conversation',
+      start: 0,
+      limit: 1,
+    )).single.content;
+  } finally {
+    await repository.close();
+  }
+}
+
 Future<Directory> _singleRestoreRunDirectory(Directory appDataDirectory) async {
   final workspace = Directory(
     '${appDataDirectory.path}${Platform.pathSeparator}.kelivo_restore',
@@ -236,6 +232,7 @@ Future<File> _createSqliteBackupFixture({
   bool secretsIncluded = true,
   bool includeFiles = false,
   String? assetContent,
+  Object? businessEntityRowIds,
 }) async {
   if (assetContent != null && !includeFiles) {
     throw ArgumentError.value(assetContent, 'assetContent');
@@ -308,6 +305,8 @@ Future<File> _createSqliteBackupFixture({
       'includeChats': true,
       'includeFiles': includeFiles,
       'secretsIncluded': secretsIncluded,
+      if (businessEntityRowIds != null)
+        'businessEntityRowIds': businessEntityRowIds,
       'database': {
         'entry': 'database/kelivo.db',
         'schemaVersion': snapshotInfo.schemaVersion,
@@ -332,25 +331,16 @@ Future<File> _createSqliteBackupFixture({
 
 Future<RestoreReceipt?> _recoverAcrossColdRestart({
   required Directory appDataDirectory,
-  SharedPreferences? preferences,
-}) async {
-  for (var attempt = 0; attempt < 3; attempt++) {
-    try {
-      return await RestoreStartupGate.recoverAndRequireBusinessReady(
-        appDataDirectory: appDataDirectory,
-        preferences: preferences,
-      );
-    } on RestoreColdRestartRequired {
-      await simulateRestoreColdProcessBoundary(appDataDirectory);
-    }
-  }
-  throw StateError('restore_test_cold_restart_limit');
-}
+}) => RestoreStartupGate.recoverAndRequireBusinessReady(
+  appDataDirectory: appDataDirectory,
+);
 
 void main() {
   group('DataSync backup file', () {
     late Directory root;
     late File validSettingsFile;
+    late AppDatabase businessDatabase;
+    late BusinessRepository businessRepository;
 
     setUp(() async {
       root = await Directory.systemTemp.createTemp('kelivo_data_sync_test_');
@@ -363,11 +353,19 @@ void main() {
         buildSignature: 'test',
       );
       SharedPreferences.setMockInitialValues({'backup_test_key': 'value'});
+      businessDatabase = AppDatabase.open(
+        file: File('${root.path}/business_test.sqlite'),
+      );
+      businessRepository = BusinessRepository(businessDatabase);
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'backup_test_key': 'value'});
       validSettingsFile = File('${root.path}/valid_settings.json');
       await validSettingsFile.writeAsString('{}');
     });
 
     tearDown(() async {
+      await businessDatabase.close();
       if (await root.exists()) {
         await root.delete(recursive: true);
       }
@@ -392,7 +390,10 @@ void main() {
         await File('${tmpDir.path}/kelivo_backup_old.zip').writeAsString('old');
         await File('${tmpDir.path}/_bk_chats.json').writeAsString('{}');
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: true),
         );
@@ -464,7 +465,7 @@ void main() {
     test(
       'normal backup includes credentials and declares that in manifest',
       () async {
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'safe_setting_v1': 'safe-value',
           'global_proxy_password_v1': 'normal-backup-proxy-secret',
           'provider_configs_v1': jsonEncode({
@@ -476,7 +477,10 @@ void main() {
             },
           }),
         });
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
 
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
@@ -521,9 +525,9 @@ void main() {
     );
 
     test(
-      'credential backup restores saved secrets and preserves unrelated ones',
+      'settings-only overwrite restores saved secrets and replaces unrelated business settings',
       () async {
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'global_proxy_enabled_v1': true,
           'global_proxy_host_v1': 'source.example',
           'provider_configs_v1': jsonEncode({
@@ -535,13 +539,16 @@ void main() {
             },
           }),
         });
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'global_proxy_enabled_v1': false,
           'global_proxy_host_v1': 'target.example',
           'global_proxy_password_v1': 'target-proxy-secret',
@@ -553,11 +560,12 @@ void main() {
               'baseUrl': 'https://target.example',
             },
           }),
-          'provider_configs_backup_v1': jsonEncode({
-            'old': {'apiKey': 'target-provider-backup-secret'},
-          }),
           'search_services_v1': jsonEncode([
-            {'id': 'old-search', 'apiKey': 'target-search-secret'},
+            {
+              'id': 'old-search',
+              'type': 'tavily',
+              'apiKey': 'target-search-secret',
+            },
           ]),
           'tts_services_v1': jsonEncode([
             {'id': 'old-tts', 'apiKey': 'target-tts-secret'},
@@ -585,41 +593,32 @@ void main() {
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getBool('global_proxy_enabled_v1'), isFalse);
-        expect(prefs.getString('global_proxy_host_v1'), 'target.example');
-        expect(
-          prefs.getString('global_proxy_password_v1'),
-          'target-proxy-secret',
-        );
-
-        await _recoverAcrossColdRestart(
-          appDataDirectory: root,
-          preferences: prefs,
-        );
-        await prefs.reload();
-        expect(prefs.getBool('global_proxy_enabled_v1'), isTrue);
-        expect(prefs.getString('global_proxy_host_v1'), 'source.example');
-        expect(
-          prefs.getString('global_proxy_password_v1'),
-          'target-proxy-secret',
-        );
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(restored['global_proxy_enabled_v1'], isTrue);
+        expect(restored['global_proxy_host_v1'], 'source.example');
+        expect(restored, isNot(contains('global_proxy_password_v1')));
         final providers =
-            jsonDecode(prefs.getString('provider_configs_v1')!) as Map;
+            jsonDecode(restored['provider_configs_v1'] as String) as Map;
         final provider = providers['openai'] as Map;
         expect(provider['name'], 'Source Provider');
         expect(provider['apiKey'], 'source-api-secret');
         for (final key in [
-          'provider_configs_backup_v1',
           'search_services_v1',
           'tts_services_v1',
           'mcp_servers_v1',
           'assistants_v1',
-          'webdav_config_v1',
-          's3_config_v1',
         ]) {
-          expect(prefs.containsKey(key), isTrue, reason: key);
+          expect(jsonDecode(restored[key] as String), isEmpty, reason: key);
         }
+        for (final key in ['webdav_config_v1', 's3_config_v1']) {
+          expect(restored, isNot(contains(key)), reason: key);
+        }
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
       },
     );
 
@@ -632,12 +631,18 @@ void main() {
           settings: const {'global_proxy_password_v1': 'source-proxy-secret'},
           secretsIncluded: false,
         );
-        SharedPreferences.setMockInitialValues({
-          'global_proxy_password_v1': 'target-proxy-secret',
-        });
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'global_proxy_password_v1': 'target-proxy-secret'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
 
         await expectLater(
-          DataSync(chatService: ChatService()).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
             backupFile,
             const WebDavConfig(includeChats: true, includeFiles: false),
           ),
@@ -650,10 +655,9 @@ void main() {
           ),
         );
 
-        final preferences = await SharedPreferences.getInstance();
         expect(
-          preferences.getString('global_proxy_password_v1'),
-          'target-proxy-secret',
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
         );
         expect(
           await RestoreStartupGate.inspect(appDataDirectory: root),
@@ -662,8 +666,50 @@ void main() {
       },
     );
 
+    test(
+      'rejects malformed business entity row ids before changing live data',
+      () async {
+        final backupFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'malformed_business_row_ids',
+          settings: const {'incoming': 'value'},
+          businessEntityRowIds: const {
+            'assistant_tags_v1': ['valid', 42],
+          },
+        );
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
+            backupFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'manifest_business_entity_row_ids',
+            ),
+          ),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
+      },
+    );
+
     test('complete settings merge applies source credentials', () async {
-      SharedPreferences.setMockInitialValues({
+      await BusinessRestoreService(businessRepository).overwrite({
         'provider_configs_v1': jsonEncode({
           'openai': {
             'id': 'openai',
@@ -673,7 +719,10 @@ void main() {
           },
         }),
       });
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      );
       final backupFile = await sync.prepareBackupFile(
         const WebDavConfig(includeChats: false, includeFiles: false),
       );
@@ -687,9 +736,9 @@ void main() {
           'baseUrl': 'https://target.example',
         },
       });
-      SharedPreferences.setMockInitialValues({
-        'provider_configs_v1': targetProviders,
-      });
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'provider_configs_v1': targetProviders});
 
       await sync.restoreFromLocalFile(
         backupFile,
@@ -697,9 +746,11 @@ void main() {
         mode: RestoreMode.merge,
       );
 
-      final prefs = await SharedPreferences.getInstance();
+      final restored = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
       final providers =
-          jsonDecode(prefs.getString('provider_configs_v1')!) as Map;
+          jsonDecode(restored['provider_configs_v1'] as String) as Map;
       final provider = providers['openai'] as Map;
       expect(provider['name'], 'Source Provider');
       expect(provider['baseUrl'], 'https://source.example');
@@ -708,25 +759,29 @@ void main() {
     });
 
     test(
-      'credential backup does not remove unrelated credential settings',
+      'settings-only restore never reads or writes residual preferences',
       () async {
-        SharedPreferences.setMockInitialValues({'source_setting': 'source'});
-        final sync = DataSync(chatService: ChatService());
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'source_setting': 'source'});
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
         final backupFile = await sync.prepareBackupFile(
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
         addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
 
         final targetSearchServices = jsonEncode([
-          {'id': 'target', 'apiKey': 'target-search-secret'},
+          {'id': 'target', 'type': 'tavily', 'apiKey': 'target-search-secret'},
         ]);
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'search_services_v1': targetSearchServices});
         SharedPreferences.setMockInitialValues({
           'search_services_v1': targetSearchServices,
         });
-        SharedPreferencesStorePlatform.instance =
-            _FailingRemovePreferencesStore({
-              'flutter.search_services_v1': targetSearchServices,
-            });
 
         await sync.restoreFromLocalFile(
           backupFile,
@@ -736,28 +791,15 @@ void main() {
         final prefs = await SharedPreferences.getInstance();
         await prefs.reload();
         expect(prefs.getString('search_services_v1'), targetSearchServices);
-        expect(prefs.getString('source_setting'), isNull);
-
-        final result = await _recoverAcrossColdRestart(
-          appDataDirectory: root,
-          preferences: prefs,
-        );
-        expect(result?.state, RestoreReceiptState.committed);
-
-        await prefs.reload();
-        expect(prefs.getString('search_services_v1'), targetSearchServices);
-        expect(prefs.getString('source_setting'), 'source');
+        expect(prefs.containsKey('source_setting'), isFalse);
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(restored['source_setting'], 'source');
+        expect(jsonDecode(restored['search_services_v1'] as String), isEmpty);
         expect(
           await RestoreStartupGate.inspect(appDataDirectory: root),
           isNull,
-        );
-        expect(
-          (await RestoreReceiptStore(
-            appDataDirectory: root,
-            runId: result!.runId,
-            archived: true,
-          ).readLatest())?.state,
-          RestoreReceiptState.committed,
         );
       },
     );
@@ -782,8 +824,11 @@ void main() {
         ],
       );
 
-      final backupFile = await DataSync(chatService: chatService)
-          .prepareBackupFile(
+      final backupFile =
+          await DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).prepareBackupFile(
             const WebDavConfig(includeChats: true, includeFiles: false),
           );
       addTearDown(() => DataSync.cleanupTemporaryBackupFile(backupFile));
@@ -802,24 +847,8 @@ void main() {
         final snapshotFile = File('${root.path}/archived.sqlite');
         await snapshotFile.writeAsBytes(databaseEntry!.readBytes()!);
         final archivedHash = await _fileSha256(snapshotFile);
-        final archivedContent = await Isolate.run(() async {
-          final repository = ChatDatabaseRepository.open(file: snapshotFile);
-          try {
-            await repository.ensureReady();
-            await repository.validateIntegrity();
-            if (await repository.getConversation('snapshot-conversation') ==
-                null) {
-              throw StateError('snapshot-conversation');
-            }
-            return (await repository.getMessagesRange(
-              'snapshot-conversation',
-              start: 0,
-              limit: 1,
-            )).single.content;
-          } finally {
-            await repository.close();
-          }
-        });
+        final snapshotPath = snapshotFile.path;
+        final archivedContent = await _readSnapshotMessageContent(snapshotPath);
         expect(archivedContent, 'snapshot content');
 
         final manifest =
@@ -919,7 +948,10 @@ void main() {
       addTearDown(chatService.close);
       final existing = await chatService.createConversation(title: 'Existing');
 
-      await DataSync(chatService: chatService).restoreFromLocalFile(
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
@@ -928,7 +960,9 @@ void main() {
       expect(chatService.getConversation('restored-conversation'), isNull);
 
       await chatService.close();
-      await _recoverAcrossColdRestart(appDataDirectory: root);
+      final terminal = await _recoverAcrossColdRestart(appDataDirectory: root);
+      expect(terminal?.state, RestoreReceiptState.committed);
+      expect(await _recoverAcrossColdRestart(appDataDirectory: root), isNull);
       await chatService.init();
 
       expect(chatService.getConversation(existing.id), isNull);
@@ -958,7 +992,10 @@ void main() {
       );
       final chatService = _RecordingSnapshotPathChatService();
 
-      await DataSync(chatService: chatService).restoreFromLocalFile(
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
@@ -994,8 +1031,11 @@ void main() {
     });
 
     test(
-      'does not retain unselected SQLite or assets in the candidate',
+      'settings-only restore creates no candidate or asset writes',
       () async {
+        final liveAsset = File('${root.path}/upload/live.txt');
+        await liveAsset.parent.create(recursive: true);
+        await liveAsset.writeAsString('keep-live');
         final zipFile = await _createSqliteBackupFixture(
           root: root,
           prefix: 'selected_candidate_only',
@@ -1004,45 +1044,100 @@ void main() {
           assetContent: 'private unselected asset',
         );
 
-        await DataSync(chatService: ChatService()).restoreFromLocalFile(
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
         );
 
-        final runDirectory = await _singleRestoreRunDirectory(root);
-        final candidate = Directory(p.join(runDirectory.path, 'candidate'));
-        final manifest =
-            jsonDecode(
-                  await File(
-                    p.join(candidate.path, 'manifest.json'),
-                  ).readAsString(),
-                )
-                as Map<String, dynamic>;
-        expect(manifest['payloadKind'], 'settings-only');
-        expect(manifest['includeChats'], isFalse);
-        expect(manifest['includeFiles'], isFalse);
-        expect(manifest['database'], isNull);
-        expect((manifest['entries'] as Map<String, dynamic>).keys, [
-          'settings.json',
-        ]);
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(restored['theme'], 'dark');
+        expect(await liveAsset.readAsString(), 'keep-live');
         expect(
-          await Directory(p.join(candidate.path, 'database')).exists(),
+          await Directory('${root.path}/.kelivo_restore').exists(),
           isFalse,
         );
-        for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
-          expect(
-            await Directory(p.join(candidate.path, rootName)).exists(),
-            isFalse,
-            reason: rootName,
-          );
-        }
+      },
+    );
+
+    test(
+      'versioned settings-only overwrite preserves an explicitly empty instruction list',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'empty_instructions_overwrite',
+          settings: {'instruction_injections_v1': jsonEncode(const <Object>[])},
+        );
+
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        );
+
+        expect(
+          await InstructionInjectionStore(
+            BusinessPreferences(businessRepository),
+          ).getAll(),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'versioned settings-only merge preserves an explicitly empty instruction list',
+      () async {
+        final zipFile = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'empty_instructions_merge',
+          settings: {'instruction_injections_v1': jsonEncode(const <Object>[])},
+        );
+        await BusinessRestoreService(businessRepository).overwrite({
+          'instruction_injections_v1': jsonEncode([
+            {'id': 'local', 'title': 'Local', 'prompt': 'Keep'},
+          ]),
+        });
+
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+          mode: RestoreMode.merge,
+        );
+
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(
+          jsonDecode(restored['instruction_injections_v1']! as String),
+          isEmpty,
+        );
+        expect(
+          await InstructionInjectionStore(
+            BusinessPreferences(businessRepository),
+          ).getAll(),
+          isEmpty,
+        );
       },
     );
 
     test(
       'rejects a linked same-volume staging root before live writes',
       () async {
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final outside = Directory('${root.path}/outside_staging');
         await outside.create(recursive: true);
         await Link('${root.path}/.kelivo_restore').create(outside.path);
@@ -1053,15 +1148,20 @@ void main() {
         );
 
         await expectLater(
-          DataSync(chatService: ChatService()).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
             zipFile,
-            const WebDavConfig(includeChats: false, includeFiles: false),
+            const WebDavConfig(includeChats: true, includeFiles: false),
           ),
           throwsStateError,
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'local');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
       },
       skip: Platform.isWindows
           ? 'Creating a symbolic link requires elevated Windows privileges.'
@@ -1081,9 +1181,12 @@ void main() {
         includeFiles: true,
       );
 
-      await DataSync(chatService: ChatService()).restoreFromLocalFile(
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(
         zipFile,
-        const WebDavConfig(includeChats: false, includeFiles: true),
+        const WebDavConfig(includeChats: true, includeFiles: true),
       );
 
       for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
@@ -1094,7 +1197,8 @@ void main() {
         );
       }
 
-      await _recoverAcrossColdRestart(appDataDirectory: root);
+      final terminal = await _recoverAcrossColdRestart(appDataDirectory: root);
+      expect(terminal?.state, RestoreReceiptState.committed);
 
       for (final rootName in const ['upload', 'images', 'avatars', 'fonts']) {
         final directory = Directory('${root.path}/$rootName');
@@ -1112,7 +1216,10 @@ void main() {
         assetContent: 'selected asset',
       );
 
-      await DataSync(chatService: ChatService()).restoreFromLocalFile(
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      ).restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: true, includeFiles: true),
       );
@@ -1132,11 +1239,11 @@ void main() {
       expect(manifest['database'], isA<Map<String, dynamic>>());
       expect(
         (manifest['entries'] as Map<String, dynamic>).keys,
-        containsAll([
-          'settings.json',
-          'database/kelivo.db',
-          'upload/fixture.txt',
-        ]),
+        containsAll(['database/kelivo.db', 'upload/fixture.txt']),
+      );
+      expect(
+        (manifest['entries'] as Map<String, dynamic>),
+        isNot(contains('settings.json')),
       );
       expect(
         await File(p.join(candidate.path, 'database', 'kelivo.db')).exists(),
@@ -1153,11 +1260,14 @@ void main() {
     test(
       'versioned preparation does not call the open live database service',
       () async {
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'preserved_setting': 'local',
           'target_only_setting': 'keep',
           'global_proxy_password_v1': 'local-secret',
         });
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final zipFile = await _createSqliteBackupFixture(
           root: root,
           prefix: 'settings_rollback',
@@ -1170,17 +1280,18 @@ void main() {
         );
 
         await DataSync(
+          businessRepository: businessRepository,
           chatService: _FailingSnapshotRestoreChatService(),
         ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         );
 
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
         final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'local');
-        expect(prefs.getString('target_only_setting'), 'keep');
-        expect(prefs.getString('incoming_only_setting'), isNull);
-        expect(prefs.getString('global_proxy_password_v1'), 'local-secret');
         expect(prefs.getString('written_during_restore'), isNull);
         final pending = await RestoreStartupGate.inspect(
           appDataDirectory: root,
@@ -1189,15 +1300,22 @@ void main() {
       },
     );
 
-    test('rolls back a partial versioned settings write', () async {
-      SharedPreferences.setMockInitialValues({
+    test('rolls back a failed versioned settings transaction', () async {
+      await BusinessRestoreService(businessRepository).overwrite({
         'preserved_setting': 'local',
         'target_only_setting': 'keep',
       });
-      SharedPreferencesStorePlatform.instance = _FailingNthSetPreferencesStore({
-        'flutter.preserved_setting': 'local',
-        'flutter.target_only_setting': 'keep',
-      }, failOnCall: 2);
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      await businessDatabase.customStatement('''
+        CREATE TRIGGER fail_incoming_setting
+        BEFORE INSERT ON preference_rows
+        WHEN NEW.key = 'incoming_only_setting'
+        BEGIN
+          SELECT RAISE(ABORT, 'forced settings failure');
+        END;
+      ''');
       final zipFile = await _createSqliteBackupFixture(
         root: root,
         prefix: 'partial_settings_rollback',
@@ -1207,36 +1325,22 @@ void main() {
         },
       );
 
-      await DataSync(chatService: ChatService()).restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: false, includeFiles: false),
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: false),
+        ),
+        throwsA(anything),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.reload();
-      expect(prefs.getString('preserved_setting'), 'local');
-      expect(prefs.getString('target_only_setting'), 'keep');
-      expect(prefs.getString('incoming_only_setting'), isNull);
-
-      final result = await _recoverAcrossColdRestart(
-        appDataDirectory: root,
-        preferences: prefs,
-      );
-      expect(result?.state, RestoreReceiptState.rolledBack);
-
-      await prefs.reload();
-      expect(prefs.getString('preserved_setting'), 'local');
-      expect(prefs.getString('target_only_setting'), 'keep');
-      expect(prefs.getString('incoming_only_setting'), isNull);
-      expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
       expect(
-        (await RestoreReceiptStore(
-          appDataDirectory: root,
-          runId: result!.runId,
-          archived: true,
-        ).readLatest())?.state,
-        RestoreReceiptState.rolledBack,
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
       );
+      expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
     });
 
     test(
@@ -1248,22 +1352,79 @@ void main() {
           settings: const {'preserved_setting': 'imported'},
           databaseSha256: List.filled(64, '0').join(),
         );
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final chatService = ChatService();
         await chatService.init();
         addTearDown(chatService.close);
         final existing = await chatService.createConversation(title: 'Local');
 
         await expectLater(
-          DataSync(chatService: chatService).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(
             fixture,
             const WebDavConfig(includeChats: true, includeFiles: false),
           ),
           throwsA(isA<FormatException>()),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'local');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
+        expect(chatService.getConversation(existing.id), isNotNull);
+        expect(chatService.getConversation('fixture-conversation'), isNull);
+      },
+    );
+
+    test(
+      'validates business row identities before merging versioned chats',
+      () async {
+        final fixture = await _createSqliteBackupFixture(
+          root: root,
+          prefix: 'invalid_business_identity_before_chat_merge',
+          settings: {
+            'assistant_tags_v1': jsonEncode([
+              {'name': 'Imported tag'},
+            ]),
+          },
+          businessEntityRowIds: const {
+            'assistant_tags_v1': <String>['row-a', 'row-b'],
+          },
+        );
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final businessBefore = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        final chatService = ChatService();
+        await chatService.init();
+        addTearDown(chatService.close);
+        final existing = await chatService.createConversation(title: 'Local');
+
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(
+            fixture,
+            const WebDavConfig(includeChats: true, includeFiles: false),
+            mode: RestoreMode.merge,
+          ),
+          throwsA(isA<FormatException>()),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          businessBefore,
+        );
         expect(chatService.getConversation(existing.id), isNotNull);
         expect(chatService.getConversation('fixture-conversation'), isNull);
       },
@@ -1313,21 +1474,31 @@ void main() {
         encoder.addFileSync(chatsFile, 'chats.json');
         encoder.closeSync();
 
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final chatService = ChatService();
         await chatService.init();
         addTearDown(chatService.close);
 
         await expectLater(
-          DataSync(chatService: chatService).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(
             zipFile,
             const WebDavConfig(includeChats: true, includeFiles: false),
           ),
           throwsA(isA<FormatException>()),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'local');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
         expect(chatService.getConversation('legacy-fallback'), isNull);
       },
     );
@@ -1347,19 +1518,70 @@ void main() {
       encoder.addFileSync(firstSettings, 'settings.json');
       encoder.addFileSync(secondSettings, 'SETTINGS.JSON');
       encoder.closeSync();
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'local'});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
 
       await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
         ),
         throwsA(isA<FormatException>()),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'local');
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
+
+    test(
+      'rejects oversized settings before extraction or JSON parsing',
+      () async {
+        const maximumSettingsBytes = 16 * 1024 * 1024;
+        final settingsFile = File('${root.path}/oversized_settings.json');
+        await settingsFile.writeAsString(
+          jsonEncode({'oversized_future_key': 'x' * maximumSettingsBytes}),
+        );
+        final zipFile = File('${root.path}/oversized_settings.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(settingsFile, 'settings.json');
+        encoder.closeSync();
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+
+        await expectLater(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
+            zipFile,
+            const WebDavConfig(includeChats: false, includeFiles: false),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'settings_size',
+            ),
+          ),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
+      },
+    );
 
     test(
       'stops extraction when expanded bytes exceed the ZIP header',
@@ -1374,18 +1596,28 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
         await _overwriteCentralDirectoryUncompressedSize(zipFile, 1);
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'local'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
 
         await expectLater(
-          DataSync(chatService: ChatService()).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
             zipFile,
             const WebDavConfig(includeChats: false, includeFiles: false),
           ),
           throwsA(isA<FormatException>()),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'local');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
       },
     );
 
@@ -1410,18 +1642,28 @@ void main() {
       encoder.addFileSync(manifestFile, 'manifest.json');
       encoder.closeSync();
       await _overwriteCentralDirectoryUncompressedSize(zipFile, 1);
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'local'});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
 
       await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
         ),
         throwsA(isA<FormatException>()),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'local');
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test('rejects a SQLite payload without a manifest', () async {
@@ -1437,18 +1679,28 @@ void main() {
       encoder.addFileSync(settingsFile, 'settings.json');
       encoder.addFileSync(databaseFile, 'database/kelivo.db');
       encoder.closeSync();
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'local'});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
 
       await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         ),
         throwsA(isA<FormatException>()),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'local');
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test('merges SQLite snapshot without clobbering local data', () async {
@@ -1457,21 +1709,28 @@ void main() {
         prefix: 'merge_rejected',
         settings: const {'preserved_setting': 'imported'},
       );
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'local'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'local'});
       final chatService = ChatService();
       await chatService.init();
       addTearDown(chatService.close);
       final existing = await chatService.createConversation(title: 'Local');
 
-      final sync = DataSync(chatService: chatService);
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
       await sync.restoreFromLocalFile(
         fixture,
         const WebDavConfig(includeChats: true, includeFiles: false),
         mode: RestoreMode.merge,
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'local');
+      final restored = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      expect(restored['preserved_setting'], 'imported');
       expect(chatService.getConversation(existing.id), isNotNull);
       expect(chatService.getConversation('fixture-conversation'), isNotNull);
       expect(sync.lastMergeReport?.importedConversations, 1);
@@ -1480,11 +1739,20 @@ void main() {
     test(
       'merge settings rolls back every key when a later write fails',
       () async {
-        SharedPreferences.setMockInitialValues({'local_setting': 'keep'});
-        SharedPreferencesStorePlatform.instance =
-            _FailingNthSetPreferencesStore({
-              'flutter.local_setting': 'keep',
-            }, failOnCall: 2);
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'local_setting': 'keep'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        await businessDatabase.customStatement('''
+          CREATE TRIGGER fail_merged_setting
+          BEFORE INSERT ON preference_rows
+          WHEN NEW.key = 'incoming_b'
+          BEGIN
+            SELECT RAISE(ABORT, 'forced merge failure');
+          END;
+        ''');
         final settingsFile = File('${root.path}/atomic_merge_settings.json');
         await settingsFile.writeAsString(
           jsonEncode({'incoming_a': 'first', 'incoming_b': 'second'}),
@@ -1496,70 +1764,80 @@ void main() {
         encoder.closeSync();
 
         await expectLater(
-          DataSync(chatService: ChatService()).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: ChatService(),
+          ).restoreFromLocalFile(
             zipFile,
             const WebDavConfig(includeChats: false, includeFiles: false),
             mode: RestoreMode.merge,
           ),
-          throwsA(isA<StateError>()),
+          throwsA(anything),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.reload();
-        expect(prefs.getString('local_setting'), 'keep');
-        expect(prefs.getString('incoming_a'), isNull);
-        expect(prefs.getString('incoming_b'), isNull);
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
       },
     );
 
-    test('restores managed font files in overwrite and merge modes', () async {
-      final sourceDir = Directory('${root.path}/source_fonts');
-      await sourceDir.create(recursive: true);
-      final sourceFile = File('${sourceDir.path}/custom.ttf');
-      await sourceFile.writeAsBytes(List<int>.filled(128, 5));
+    test(
+      'legacy settings-only overwrite and merge restore selected files',
+      () async {
+        final sourceDir = Directory('${root.path}/source_fonts');
+        await sourceDir.create(recursive: true);
+        final sourceFile = File('${sourceDir.path}/custom.ttf');
+        await sourceFile.writeAsBytes(List<int>.filled(128, 5));
 
-      final zipFile = File('${root.path}/fonts_backup.zip');
-      final encoder = ZipFileEncoder();
-      encoder.create(zipFile.path);
-      encoder.addFileSync(validSettingsFile, 'settings.json');
-      encoder.addFileSync(sourceFile, 'fonts/custom.ttf');
-      encoder.closeSync();
+        final zipFile = File('${root.path}/fonts_backup.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(validSettingsFile, 'settings.json');
+        encoder.addFileSync(sourceFile, 'fonts/custom.ttf');
+        encoder.closeSync();
 
-      final fontsDir = Directory('${root.path}/fonts');
-      await fontsDir.create(recursive: true);
-      final existingFile = File('${fontsDir.path}/existing.ttf');
-      await existingFile.writeAsBytes(List<int>.filled(64, 3));
+        final fontsDir = Directory('${root.path}/fonts');
+        await fontsDir.create(recursive: true);
+        final existingFile = File('${fontsDir.path}/existing.ttf');
+        await existingFile.writeAsBytes(List<int>.filled(64, 3));
 
-      final sync = DataSync(chatService: ChatService());
-      await sync.restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: false, includeFiles: true),
-        mode: RestoreMode.merge,
-      );
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.merge,
+        );
 
-      expect(await existingFile.exists(), isTrue);
-      expect(
-        await File('${fontsDir.path}/custom.ttf').readAsBytes(),
-        List<int>.filled(128, 5),
-      );
+        expect(await existingFile.exists(), isTrue);
+        expect(await File('${fontsDir.path}/custom.ttf').exists(), isTrue);
+        expect(
+          await Directory('${root.path}/.kelivo_restore').exists(),
+          isFalse,
+        );
 
-      await sync.restoreFromLocalFile(
-        zipFile,
-        const WebDavConfig(includeChats: false, includeFiles: true),
-        mode: RestoreMode.overwrite,
-      );
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: false, includeFiles: true),
+          mode: RestoreMode.overwrite,
+        );
 
-      expect(await existingFile.exists(), isFalse);
-      expect(
-        await File('${fontsDir.path}/custom.ttf').readAsBytes(),
-        List<int>.filled(128, 5),
-      );
-    });
+        expect(await existingFile.exists(), isFalse);
+        expect(await File('${fontsDir.path}/custom.ttf').exists(), isTrue);
+        expect(
+          await Directory('${root.path}/.kelivo_restore').exists(),
+          isFalse,
+        );
+      },
+    );
 
     test(
       'merge restore imports assistant memories and mcp servers without clobbering local entries',
       () async {
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'assistant_memories_v1': jsonEncode([
             {'id': 1, 'assistantId': 'local', 'content': 'keep local'},
             {'id': 2, 'assistantId': 'dup', 'content': 'same memory'},
@@ -1619,16 +1897,21 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
         await sync.restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
           mode: RestoreMode.merge,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final memories =
-            jsonDecode(prefs.getString('assistant_memories_v1')!) as List;
+            jsonDecode(restored['assistant_memories_v1'] as String) as List;
         expect(memories, hasLength(4));
         expect(
           memories.where(
@@ -1657,7 +1940,8 @@ void main() {
           isTrue,
         );
 
-        final servers = jsonDecode(prefs.getString('mcp_servers_v1')!) as List;
+        final servers =
+            jsonDecode(restored['mcp_servers_v1'] as String) as List;
         expect(servers, hasLength(3));
         expect(
           servers
@@ -1679,7 +1963,7 @@ void main() {
     test(
       'normalizes legacy JSON string lists before merging settings',
       () async {
-        SharedPreferences.setMockInitialValues({
+        await BusinessRestoreService(businessRepository).overwrite({
           'pinned_models_v1': <String>['local-model'],
         });
         final settingsFile = File('${root.path}/legacy_list_settings.json');
@@ -1694,15 +1978,20 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        await DataSync(chatService: ChatService()).restoreFromLocalFile(
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
           mode: RestoreMode.merge,
         );
 
-        final prefs = await SharedPreferences.getInstance();
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         expect(
-          prefs.getStringList('pinned_models_v1'),
+          restored['pinned_models_v1'],
           containsAllInOrder(const ['local-model', 'remote-model']),
         );
       },
@@ -1712,9 +2001,12 @@ void main() {
       final existingAssistants = jsonEncode([
         {'id': 'local', 'name': 'Local'},
       ]);
-      SharedPreferences.setMockInitialValues({
-        'assistants_v1': existingAssistants,
-      });
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'assistants_v1': existingAssistants});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
 
       final settingsFile = File('${root.path}/invalid_merged_settings.json');
       await settingsFile.writeAsString(
@@ -1729,7 +2021,10 @@ void main() {
       encoder.addFileSync(settingsFile, 'settings.json');
       encoder.closeSync();
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      );
 
       await expectLater(
         sync.restoreFromLocalFile(
@@ -1739,15 +2034,21 @@ void main() {
         ),
         throwsA(isA<FormatException>()),
       );
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('new_setting_before_failure'), isNull);
-      expect(prefs.getString('assistants_v1'), existingAssistants);
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test(
       'rejects malformed structured settings before overwrite writes',
       () async {
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'old'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'old'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final settingsFile = File(
           '${root.path}/invalid_overwrite_settings.json',
         );
@@ -1763,7 +2064,10 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -1772,14 +2076,17 @@ void main() {
           ),
           throwsA(isA<FormatException>()),
         );
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'old');
-        expect(prefs.getString('assistants_v1'), isNull);
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
       },
     );
 
     test('rejects malformed first-time merged structured settings', () async {
-      SharedPreferences.setMockInitialValues({});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
       final settingsFile = File(
         '${root.path}/invalid_new_merged_settings.json',
       );
@@ -1795,7 +2102,10 @@ void main() {
       encoder.addFileSync(settingsFile, 'settings.json');
       encoder.closeSync();
 
-      final sync = DataSync(chatService: ChatService());
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: ChatService(),
+      );
 
       await expectLater(
         sync.restoreFromLocalFile(
@@ -1805,13 +2115,19 @@ void main() {
         ),
         throwsA(isA<FormatException>()),
       );
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('new_setting_before_failure'), isNull);
-      expect(prefs.getString('assistants_v1'), isNull);
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test('rejects non-object entries in structured setting lists', () async {
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'old'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'old'});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
       final settingsFile = File('${root.path}/invalid_assistant_entries.json');
       await settingsFile.writeAsString(
         jsonEncode({
@@ -1826,18 +2142,25 @@ void main() {
       encoder.closeSync();
 
       await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
         ),
         throwsA(isA<FormatException>()),
       );
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'old');
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test('rejects non-object provider configuration values', () async {
-      SharedPreferences.setMockInitialValues({});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
       final settingsFile = File('${root.path}/invalid_provider_configs.json');
       await settingsFile.writeAsString(
         jsonEncode({
@@ -1851,14 +2174,19 @@ void main() {
       encoder.closeSync();
 
       await expectLater(
-        DataSync(chatService: ChatService()).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: false, includeFiles: false),
         ),
         throwsA(isA<FormatException>()),
       );
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('provider_configs_v1'), isNull);
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test(
@@ -1883,7 +2211,10 @@ void main() {
         encoder.closeSync();
 
         final chatService = _FailingRestoreChatService();
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -1914,7 +2245,10 @@ void main() {
         encoder.addFileSync(settingsFile, 'settings.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -1962,7 +2296,10 @@ void main() {
         encoder.addFileSync(chatsFile, 'chats.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: _FailingArtifactChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: _FailingArtifactChatService(),
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -2011,8 +2348,11 @@ void main() {
           await request.response.close();
         });
 
+        final businessPreferences = BusinessPreferences(businessRepository);
         final provider = BackupProvider(
           chatService: _FailingRestoreChatService(),
+          businessRepository: businessRepository,
+          businessPreferences: businessPreferences,
           initialConfig: const WebDavConfig(
             includeChats: true,
             includeFiles: false,
@@ -2039,11 +2379,20 @@ void main() {
         );
         expect(provider.busy, isFalse);
         expect(provider.message, contains('chat replacement failed'));
+        await expectLater(
+          businessPreferences.setString('after_failed_restore', 'writable'),
+          completes,
+        );
       },
     );
 
     test('rejects malformed chat payload before clearing live chats', () async {
-      SharedPreferences.setMockInitialValues({'preserved_setting': 'old'});
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'old'});
+      final before = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
       final settingsFile = File('${root.path}/malformed_chat_settings.json');
       await settingsFile.writeAsString(
         jsonEncode({'preserved_setting': 'new'}),
@@ -2059,7 +2408,10 @@ void main() {
       encoder.closeSync();
 
       final chatService = _RecordingClearChatService();
-      final sync = DataSync(chatService: chatService);
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
 
       await expectLater(
         sync.restoreFromLocalFile(
@@ -2069,8 +2421,10 @@ void main() {
         throwsA(isA<FormatException>()),
       );
       expect(chatService.cleared, isFalse);
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('preserved_setting'), 'old');
+      expect(
+        await BusinessRestoreService(businessRepository).exportSettings(),
+        before,
+      );
     });
 
     test('rejects an unsupported future chat backup version', () async {
@@ -2091,7 +2445,10 @@ void main() {
       final chatService = _RecordingClearChatService();
 
       await expectLater(
-        DataSync(chatService: chatService).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         ),
@@ -2134,7 +2491,10 @@ void main() {
       final chatService = _RecordingClearChatService();
 
       await expectLater(
-        DataSync(chatService: chatService).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         ),
@@ -2146,7 +2506,12 @@ void main() {
     test(
       'rejects a missing settings payload before changing live data',
       () async {
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'old'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'old'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final chatsFile = File('${root.path}/preflight_chats.json');
         await chatsFile.writeAsString(
           jsonEncode({
@@ -2161,7 +2526,10 @@ void main() {
         encoder.addFileSync(chatsFile, 'chats.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: ChatService());
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -2170,22 +2538,41 @@ void main() {
           ),
           throwsA(isA<FormatException>()),
         );
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'old');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
       },
     );
 
     test(
       'restores a legacy settings-only backup without clearing chats',
       () async {
-        SharedPreferences.setMockInitialValues({'restored_setting': 'old'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'restored_setting': 'old'});
         final settingsFile = File('${root.path}/settings_only.json');
         await settingsFile.writeAsString(
           jsonEncode({
             'restored_setting': 'new',
             'global_proxy_password_v1': 'legacy-proxy-secret',
+            'instruction_injections_v1': jsonEncode(const <Object>[]),
             'provider_configs_v1': jsonEncode({
-              'openai': {'id': 'openai', 'apiKey': 'legacy-api-secret'},
+              'openai': {
+                'id': 'openai',
+                'apiKey': 'legacy-api-secret',
+                'modelOverrides': {
+                  'legacy-embedding': {
+                    'type': 'embedding',
+                    'abilities': ['vision'],
+                    'output': ['text'],
+                    'builtInTools': ['search'],
+                    'built_in_tools': ['search'],
+                    'tools': ['search'],
+                    'dimensions': 1536,
+                  },
+                },
+              },
             }),
           }),
         );
@@ -2197,7 +2584,10 @@ void main() {
         encoder.closeSync();
 
         final chatService = _RecordingClearChatService();
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
 
         await sync.restoreFromLocalFile(
           zipFile,
@@ -2205,15 +2595,37 @@ void main() {
         );
 
         expect(chatService.cleared, isFalse);
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('restored_setting'), 'new');
+        final restored = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(restored['restored_setting'], 'new');
+        expect(restored['global_proxy_password_v1'], 'legacy-proxy-secret');
+        final providers =
+            jsonDecode(restored['provider_configs_v1'] as String) as Map;
+        final provider = providers['openai'] as Map;
+        expect(provider['apiKey'], 'legacy-api-secret');
+        final embedding =
+            (provider['modelOverrides'] as Map)['legacy-embedding'] as Map;
+        expect(embedding['dimensions'], 1536);
+        for (final field in const [
+          'abilities',
+          'output',
+          'builtInTools',
+          'built_in_tools',
+          'tools',
+        ]) {
+          expect(embedding, isNot(contains(field)), reason: field);
+        }
         expect(
-          prefs.getString('global_proxy_password_v1'),
-          'legacy-proxy-secret',
+          jsonDecode(
+            restored['instruction_injections_active_ids_by_assistant_v1']!
+                as String,
+          ),
+          {'__global__': <Object>[]},
         );
         expect(
-          prefs.getString('provider_configs_v1'),
-          contains('legacy-api-secret'),
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
         );
       },
     );
@@ -2241,7 +2653,10 @@ void main() {
       final chatService = ChatService();
       await chatService.init();
       addTearDown(chatService.close);
-      final sync = DataSync(chatService: chatService);
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
 
       await sync.restoreFromLocalFile(
         zipFile,
@@ -2304,7 +2719,10 @@ void main() {
       encoder.addFileSync(chatsFile, 'chats.json');
       encoder.closeSync();
 
-      await DataSync(chatService: chatService).restoreFromLocalFile(
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
         zipFile,
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
@@ -2348,7 +2766,10 @@ void main() {
           Directory('${root.path}/tmp'),
         );
 
-        await DataSync(chatService: chatService).restoreFromLocalFile(
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         );
@@ -2360,7 +2781,12 @@ void main() {
     test(
       'rejects an invalid chat candidate without changing live data',
       () async {
-        SharedPreferences.setMockInitialValues({'preserved_setting': 'old'});
+        await BusinessRestoreService(
+          businessRepository,
+        ).overwrite({'preserved_setting': 'old'});
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
         final chatService = ChatService();
         await chatService.init();
         addTearDown(chatService.close);
@@ -2393,7 +2819,10 @@ void main() {
         encoder.addFileSync(chatsFile, 'chats.json');
         encoder.closeSync();
 
-        final sync = DataSync(chatService: chatService);
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
 
         await expectLater(
           sync.restoreFromLocalFile(
@@ -2402,8 +2831,10 @@ void main() {
           ),
           throwsA(anything),
         );
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('preserved_setting'), 'old');
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
         expect(chatService.getConversation(existingConversation.id), isNotNull);
       },
     );
@@ -2431,7 +2862,10 @@ void main() {
       final chatService = _RecordingClearChatService();
 
       await expectLater(
-        DataSync(chatService: chatService).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         ),
@@ -2484,7 +2918,10 @@ void main() {
         final chatService = _RecordingClearChatService();
 
         await expectLater(
-          DataSync(chatService: chatService).restoreFromLocalFile(
+          DataSync(
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ).restoreFromLocalFile(
             zipFile,
             const WebDavConfig(includeChats: true, includeFiles: false),
           ),
@@ -2524,7 +2961,10 @@ void main() {
       final chatService = _RecordingClearChatService();
 
       await expectLater(
-        DataSync(chatService: chatService).restoreFromLocalFile(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
         ),
@@ -2539,65 +2979,71 @@ void main() {
       expect(chatService.replaced, isFalse);
     });
 
-    test('WebDAV restore ignores untrusted display names', () async {
-      final sourceDir = Directory('${root.path}/source_upload');
-      await sourceDir.create(recursive: true);
-      final sourceFile = File('${sourceDir.path}/file.txt');
-      await sourceFile.writeAsString('payload');
+    test(
+      'WebDAV settings-only restore ignores untrusted display names',
+      () async {
+        final sourceDir = Directory('${root.path}/source_upload');
+        await sourceDir.create(recursive: true);
+        final sourceFile = File('${sourceDir.path}/file.txt');
+        await sourceFile.writeAsString('payload');
 
-      final zipFile = File('${root.path}/restore_source.zip');
-      final encoder = ZipFileEncoder();
-      encoder.create(zipFile.path);
-      encoder.addFileSync(validSettingsFile, 'settings.json');
-      encoder.addFileSync(sourceFile, 'upload/file.txt');
-      encoder.closeSync();
+        final zipFile = File('${root.path}/restore_source.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(validSettingsFile, 'settings.json');
+        encoder.addFileSync(sourceFile, 'upload/file.txt');
+        encoder.closeSync();
 
-      await File('${root.path}/upload').writeAsString('not a directory');
+        await File('${root.path}/upload').writeAsString('not a directory');
 
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      server.listen((request) async {
-        request.response.statusCode = HttpStatus.ok;
-        await request.response.addStream(zipFile.openRead());
-        await request.response.close();
-      });
+        server.listen((request) async {
+          request.response.statusCode = HttpStatus.ok;
+          await request.response.addStream(zipFile.openRead());
+          await request.response.close();
+        });
 
-      final sync = DataSync(chatService: ChatService());
-      final tmpDir = Directory('${root.path}/tmp');
-      final relativeSentinel = File('${root.path}/webdav_relative.zip');
-      final absoluteSentinel = File('${root.path}/webdav_absolute.zip');
-      await relativeSentinel.writeAsString('keep relative');
-      await absoluteSentinel.writeAsString('keep absolute');
-      final remoteNames = <String>[
-        '../webdav_relative.zip',
-        absoluteSentinel.path,
-      ];
-
-      for (var i = 0; i < remoteNames.length; i++) {
-        final item = BackupFileItem(
-          href: Uri.parse(
-            'http://127.0.0.1:${server.port}/restore_source_$i.zip',
-          ),
-          displayName: remoteNames[i],
-          size: await zipFile.length(),
-          lastModified: null,
+        final sync = DataSync(
+          businessRepository: businessRepository,
+          chatService: ChatService(),
         );
+        final tmpDir = Directory('${root.path}/tmp');
+        final relativeSentinel = File('${root.path}/webdav_relative.zip');
+        final absoluteSentinel = File('${root.path}/webdav_absolute.zip');
+        await relativeSentinel.writeAsString('keep relative');
+        await absoluteSentinel.writeAsString('keep absolute');
+        final remoteNames = <String>[
+          '../webdav_relative.zip',
+          absoluteSentinel.path,
+        ];
 
-        await expectLater(
-          sync.restoreFromWebDav(
-            const WebDavConfig(includeChats: false, includeFiles: true),
-            item,
-          ),
-          throwsA(anything),
-        );
-      }
+        for (var i = 0; i < remoteNames.length; i++) {
+          final item = BackupFileItem(
+            href: Uri.parse(
+              'http://127.0.0.1:${server.port}/restore_source_$i.zip',
+            ),
+            displayName: remoteNames[i],
+            size: await zipFile.length(),
+            lastModified: null,
+          );
 
-      expect(await relativeSentinel.readAsString(), 'keep relative');
-      expect(await absoluteSentinel.readAsString(), 'keep absolute');
-      expect(await tmpDir.list().toList(), isEmpty);
-    });
+          await expectLater(
+            sync.restoreFromWebDav(
+              const WebDavConfig(includeChats: false, includeFiles: true),
+              item,
+            ),
+            throwsA(anything),
+          );
+        }
+
+        expect(await relativeSentinel.readAsString(), 'keep relative');
+        expect(await absoluteSentinel.readAsString(), 'keep absolute');
+        expect(await tmpDir.list().toList(), isEmpty);
+      },
+    );
   });
 }

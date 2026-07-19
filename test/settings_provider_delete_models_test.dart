@@ -1,13 +1,7 @@
+import "support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 ProviderConfig _configWithModels() {
   return ProviderConfig(
@@ -30,10 +24,10 @@ void main() {
 
   group('SettingsProvider model deletion', () {
     test('deleteModels removes selected models and their overrides', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setProviderConfig('TestProvider', _configWithModels());
 
       final deleted = await settings.deleteModels('TestProvider', const {
@@ -48,10 +42,10 @@ void main() {
     });
 
     test('deleteModels does nothing for empty selection', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setProviderConfig('TestProvider', _configWithModels());
 
       final deleted = await settings.deleteModels(
@@ -66,10 +60,10 @@ void main() {
     });
 
     test('deleteModels clears selections for deleted models only', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setProviderConfig('TestProvider', _configWithModels());
       await settings.setCurrentModel('TestProvider', 'remove-a');
       await settings.setTitleModel('TestProvider', 'keep');
@@ -88,10 +82,10 @@ void main() {
     test(
       'deleteModels clears orphan overrides when every model is removed',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
         await settings.setProviderConfig(
           'TestProvider',
           _configWithModels().copyWith(

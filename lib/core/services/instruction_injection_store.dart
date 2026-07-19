@@ -1,22 +1,22 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../database/business_preferences.dart';
 import '../models/instruction_injection.dart';
 import 'learning_mode_store.dart';
 
 class InstructionInjectionStore {
+  InstructionInjectionStore(this._preferences);
+
   static const String _itemsKey = 'instruction_injections_v1';
-  static const String _activeIdKey = 'instruction_injections_active_id_v1';
-  static const String _activeIdsKey = 'instruction_injections_active_ids_v1';
   static const String _activeIdsByAssistantKey =
       'instruction_injections_active_ids_by_assistant_v1';
+  static const String _learningModeEnabledKey = 'learning_mode_enabled_v1';
+  static const String _learningModePromptKey = 'learning_mode_prompt_v1';
   static const String _defaultAssistantKey = '__global__';
 
-  static List<InstructionInjection>? _cache;
-  static String? _activeIdCache;
-  static Map<String, List<String>>? _activeIdsByAssistantCache;
+  final BusinessPreferences _preferences;
 
   static String assistantKey(String? assistantId) {
     final id = (assistantId ?? '').trim();
@@ -32,154 +32,114 @@ class InstructionInjectionStore {
   }
 
   static Map<String, List<String>> _cloneActiveIdsMap(
-    Map<String, List<String>> src,
+    Map<String, List<String>> source,
   ) {
-    return {for (final e in src.entries) e.key: List<String>.from(e.value)};
+    return {
+      for (final entry in source.entries)
+        entry.key: List<String>.from(entry.value),
+    };
   }
 
-  static Future<List<InstructionInjection>> getAll() async {
-    if (_cache != null) return List<InstructionInjection>.from(_cache!);
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_itemsKey);
-    if (json == null || json.isEmpty) {
-      // Seed with a default "Learning Mode" card using existing learning mode prompt/settings.
-      final seeded = await _seedDefaultFromLearningMode(prefs);
-      _cache = seeded;
-      return List<InstructionInjection>.from(seeded);
+  Future<List<InstructionInjection>> getAll() async {
+    await _preferences.load();
+    final raw = _preferences.getString(_itemsKey);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final values = jsonDecode(raw) as List;
+        final items = values
+            .map(
+              (value) => InstructionInjection.fromJson(
+                (value as Map).cast<String, dynamic>(),
+              ),
+            )
+            .toList(growable: true);
+        if (items.isNotEmpty) return items;
+        final activeIds = await _loadActiveIdsMap();
+        if (activeIds[_defaultAssistantKey]?.isEmpty ?? false) return items;
+      } catch (_) {
+        return const <InstructionInjection>[];
+      }
     }
-    try {
-      final list = jsonDecode(json) as List;
-      _cache = list
-          .map(
-            (e) => InstructionInjection.fromJson(
-              (e as Map).cast<String, dynamic>(),
-            ),
-          )
-          .toList(growable: true);
-      return List<InstructionInjection>.from(_cache!);
-    } catch (_) {
-      _cache = const <InstructionInjection>[];
-      return const <InstructionInjection>[];
-    }
+    return _seedDefaultFromLearningMode();
   }
 
-  static Future<List<InstructionInjection>> _seedDefaultFromLearningMode(
-    SharedPreferences prefs,
-  ) async {
-    // Use existing learning mode prompt and enabled flag to create a default card.
-    String prompt;
-    bool enabled;
-    try {
-      prompt = await LearningModeStore.getPrompt();
-    } catch (_) {
-      prompt = LearningModeStore.defaultPrompt;
-    }
-    try {
-      enabled = await LearningModeStore.isEnabled();
-    } catch (_) {
-      enabled = false;
-    }
-    final id = const Uuid().v4();
-    final item = InstructionInjection(id: id, title: '', prompt: prompt);
-    final list = <InstructionInjection>[item];
-    final encoded = jsonEncode(
-      list.map((e) => e.toJson()).toList(growable: false),
+  Future<List<InstructionInjection>> _seedDefaultFromLearningMode() async {
+    final rawPrompt = _preferences.getString(_learningModePromptKey);
+    final prompt = rawPrompt == null || rawPrompt.trim().isEmpty
+        ? LearningModeStore.defaultPrompt
+        : rawPrompt;
+    final enabled = _preferences.getBool(_learningModeEnabledKey) ?? false;
+    final item = InstructionInjection(
+      id: const Uuid().v4(),
+      title: '',
+      prompt: prompt,
     );
-    await prefs.setString(_itemsKey, encoded);
-    _cache = list;
+    await save(<InstructionInjection>[item]);
     if (enabled) {
-      final active = <String>[id];
-      _activeIdCache = id;
-      _activeIdsByAssistantCache = <String, List<String>>{
-        _defaultAssistantKey: active,
-      };
-      await prefs.setString(_activeIdKey, id);
-      try {
-        await prefs.setString(_activeIdsKey, jsonEncode(active));
-      } catch (_) {}
-      try {
-        await prefs.setString(
-          _activeIdsByAssistantKey,
-          jsonEncode(<String, List<String>>{_defaultAssistantKey: active}),
-        );
-      } catch (_) {}
+      await _persistActiveIdsMap(<String, List<String>>{
+        _defaultAssistantKey: <String>[item.id],
+      });
     }
-    return list;
+    return <InstructionInjection>[item];
   }
 
-  static Future<void> save(List<InstructionInjection> items) async {
-    _cache = List<InstructionInjection>.from(items);
-    final prefs = await SharedPreferences.getInstance();
-    final json = jsonEncode(
-      items.map((e) => e.toJson()).toList(growable: false),
+  Future<void> save(List<InstructionInjection> items) async {
+    if (items.isEmpty) {
+      final activeIds = await _loadActiveIdsMap();
+      activeIds[_defaultAssistantKey] = const <String>[];
+      await _persistActiveIdsMap(activeIds);
+    }
+    await _preferences.setString(
+      _itemsKey,
+      jsonEncode(items.map((item) => item.toJson()).toList(growable: false)),
     );
-    await prefs.setString(_itemsKey, json);
   }
 
-  static Future<void> add(InstructionInjection item) async {
+  Future<void> add(InstructionInjection item) async {
     final all = await getAll();
     all.add(item);
     await save(all);
   }
 
-  static Future<void> addMany(List<InstructionInjection> items) async {
+  Future<void> addMany(List<InstructionInjection> items) async {
     if (items.isEmpty) return;
     final all = await getAll();
     all.addAll(items);
     await save(all);
   }
 
-  static Future<void> update(InstructionInjection item) async {
+  Future<void> update(InstructionInjection item) async {
     final all = await getAll();
-    final index = all.indexWhere((e) => e.id == item.id);
-    if (index != -1) {
-      all[index] = item;
-      await save(all);
-    }
-  }
-
-  static Future<void> delete(String id) async {
-    final all = await getAll();
-    all.removeWhere((e) => e.id == id);
+    final index = all.indexWhere((existing) => existing.id == item.id);
+    if (index == -1) return;
+    all[index] = item;
     await save(all);
-    final prefs = await SharedPreferences.getInstance();
-    if (_activeIdCache == id) {
-      _activeIdCache = null;
-      await prefs.remove(_activeIdKey);
+  }
+
+  Future<void> delete(String id) async {
+    final all = await getAll();
+    all.removeWhere((item) => item.id == id);
+    await save(all);
+
+    final map = await _loadActiveIdsMap();
+    var removed = false;
+    final next = <String, List<String>>{};
+    for (final entry in map.entries) {
+      final filtered = entry.value.where((value) => value != id).toList();
+      if (filtered.length != entry.value.length) removed = true;
+      next[entry.key] = filtered;
     }
-    // Remove from per-assistant active maps
-    try {
-      final map = await _loadActiveIdsMap();
-      bool removed = false;
-      final next = <String, List<String>>{};
-      for (final entry in map.entries) {
-        final filtered = entry.value
-            .where((e) => e != id)
-            .toList(growable: false);
-        if (filtered.length != entry.value.length) removed = true;
-        next[entry.key] = filtered;
-      }
-      if (removed) {
-        await _persistActiveIdsMap(next);
-      }
-    } catch (_) {}
+    if (removed) await _persistActiveIdsMap(next);
   }
 
-  static Future<void> clear() async {
-    _cache = const <InstructionInjection>[];
-    _activeIdCache = null;
-    _activeIdsByAssistantCache = const <String, List<String>>{};
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_itemsKey);
-    await prefs.remove(_activeIdKey);
-    await prefs.remove(_activeIdsKey);
-    await prefs.remove(_activeIdsByAssistantKey);
+  Future<void> clear() async {
+    await save(const <InstructionInjection>[]);
+    await _persistActiveIdsMap(const <String, List<String>>{
+      _defaultAssistantKey: <String>[],
+    });
   }
 
-  static Future<void> reorder({
-    required int oldIndex,
-    required int newIndex,
-  }) async {
+  Future<void> reorder({required int oldIndex, required int newIndex}) async {
     final list = await getAll();
     if (oldIndex < 0 || oldIndex >= list.length) return;
     if (newIndex < 0 || newIndex >= list.length) return;
@@ -188,48 +148,37 @@ class InstructionInjectionStore {
     await save(list);
   }
 
-  static Future<String?> getActiveId({String? assistantId}) async {
+  Future<String?> getActiveId({String? assistantId}) async {
     final ids = await getActiveIds(assistantId: assistantId);
-    if (ids.isEmpty) return null;
-    return ids.first;
+    return ids.isEmpty ? null : ids.first;
   }
 
-  static Future<void> setActiveId(String? id, {String? assistantId}) async {
-    if (id == null || id.isEmpty) {
-      await setActiveIds(const <String>[], assistantId: assistantId);
-      return;
-    }
-    await setActiveIds(<String>[id], assistantId: assistantId);
+  Future<void> setActiveId(String? id, {String? assistantId}) async {
+    await setActiveIds(
+      id == null || id.isEmpty ? const <String>[] : <String>[id],
+      assistantId: assistantId,
+    );
   }
 
-  static Future<List<String>> getActiveIds({String? assistantId}) async {
+  Future<List<String>> getActiveIds({String? assistantId}) async {
     final map = await _loadActiveIdsMap();
     final key = assistantKey(assistantId);
-    if (map.containsKey(key)) {
-      return List<String>.from(map[key]!);
-    }
+    if (map.containsKey(key)) return List<String>.from(map[key]!);
     final fallback = map[_defaultAssistantKey];
-    if (fallback != null) return List<String>.from(fallback);
-    return const <String>[];
+    return fallback == null ? const <String>[] : List<String>.from(fallback);
   }
 
-  static Future<Map<String, List<String>>> getActiveIdsByAssistant() async {
-    final map = await _loadActiveIdsMap();
-    return _cloneActiveIdsMap(map);
+  Future<Map<String, List<String>>> getActiveIdsByAssistant() async {
+    return _cloneActiveIdsMap(await _loadActiveIdsMap());
   }
 
-  static Future<void> setActiveIds(
-    List<String> ids, {
-    String? assistantId,
-  }) async {
-    final key = assistantKey(assistantId);
-    final clean = _cleanIds(ids);
+  Future<void> setActiveIds(List<String> ids, {String? assistantId}) async {
     final map = await _loadActiveIdsMap();
-    map[key] = clean;
+    map[assistantKey(assistantId)] = _cleanIds(ids);
     await _persistActiveIdsMap(map);
   }
 
-  static Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
+  Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
     final next = <String, List<String>>{};
     map.forEach((key, value) {
       next[key] = _cleanIds(value).toList(growable: false);
@@ -237,96 +186,41 @@ class InstructionInjectionStore {
     await _persistActiveIdsMap(next);
   }
 
-  static Future<InstructionInjection?> getActive({String? assistantId}) async {
+  Future<InstructionInjection?> getActive({String? assistantId}) async {
     final list = await getActives(assistantId: assistantId);
-    if (list.isEmpty) return null;
-    return list.first;
+    return list.isEmpty ? null : list.first;
   }
 
-  static Future<List<InstructionInjection>> getActives({
-    String? assistantId,
-  }) async {
+  Future<List<InstructionInjection>> getActives({String? assistantId}) async {
     final ids = await getActiveIds(assistantId: assistantId);
     if (ids.isEmpty) return const <InstructionInjection>[];
-    final all = await getAll();
-    if (all.isEmpty) return const <InstructionInjection>[];
-    final map = <String, InstructionInjection>{for (final e in all) e.id: e};
-    final result = <InstructionInjection>[];
-    for (final id in ids) {
-      final item = map[id];
-      if (item != null) result.add(item);
-    }
-    return result;
+    final byId = <String, InstructionInjection>{
+      for (final item in await getAll()) item.id: item,
+    };
+    return [
+      for (final id in ids)
+        if (byId[id] case final item?) item,
+    ];
   }
 
-  static Future<Map<String, List<String>>> _loadActiveIdsMap() async {
-    if (_activeIdsByAssistantCache != null) {
-      return _cloneActiveIdsMap(_activeIdsByAssistantCache!);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_activeIdsByAssistantKey);
-    Map<String, List<String>> map = <String, List<String>>{};
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw) as Map;
-        decoded.forEach((key, value) {
-          final list = (value is List) ? value : const [];
-          map[key.toString()] = _cleanIds(list);
-        });
-      } catch (_) {
-        map = <String, List<String>>{};
-      }
-    }
-    if (map.isEmpty) {
-      // Migrate from legacy global keys
-      try {
-        final legacy = await _loadLegacyActiveIds(prefs);
-        if (legacy.isNotEmpty) {
-          map[_defaultAssistantKey] = legacy;
-        }
-      } catch (_) {}
-    }
-    _activeIdsByAssistantCache = map;
-    return _cloneActiveIdsMap(map);
-  }
-
-  static Future<List<String>> _loadLegacyActiveIds(
-    SharedPreferences prefs,
-  ) async {
-    final json = prefs.getString(_activeIdsKey);
-    if (json != null && json.isNotEmpty) {
-      try {
-        final list = (jsonDecode(json) as List)
-            .map((e) => e.toString())
-            .toList();
-        return _cleanIds(list);
-      } catch (_) {}
-    }
-    final legacy = prefs.getString(_activeIdKey);
-    if (legacy != null && legacy.isNotEmpty) {
-      return _cleanIds(<String>[legacy]);
-    }
-    return const <String>[];
-  }
-
-  static Future<void> _persistActiveIdsMap(
-    Map<String, List<String>> map,
-  ) async {
-    _activeIdsByAssistantCache = _cloneActiveIdsMap(map);
-    final prefs = await SharedPreferences.getInstance();
+  Future<Map<String, List<String>>> _loadActiveIdsMap() async {
+    await _preferences.load();
+    final raw = _preferences.getString(_activeIdsByAssistantKey);
+    if (raw == null || raw.isEmpty) return <String, List<String>>{};
     try {
-      await prefs.setString(_activeIdsByAssistantKey, jsonEncode(map));
-    } catch (_) {}
-    final defaultList = map[_defaultAssistantKey] ?? const <String>[];
-    _activeIdCache = defaultList.isNotEmpty ? defaultList.first : null;
-    if (defaultList.isEmpty) {
-      await prefs.remove(_activeIdKey);
-      await prefs.remove(_activeIdsKey);
-    } else {
-      await prefs.setString(_activeIdKey, defaultList.first);
-      try {
-        await prefs.setString(_activeIdsKey, jsonEncode(defaultList));
-      } catch (_) {}
+      final decoded = jsonDecode(raw) as Map;
+      return {
+        for (final entry in decoded.entries)
+          entry.key.toString(): _cleanIds(
+            entry.value is List ? entry.value as List : const <dynamic>[],
+          ),
+      };
+    } catch (_) {
+      return <String, List<String>>{};
     }
+  }
+
+  Future<void> _persistActiveIdsMap(Map<String, List<String>> map) {
+    return _preferences.setString(_activeIdsByAssistantKey, jsonEncode(map));
   }
 }

@@ -8,8 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../database/business_preferences.dart';
 import '../services/tts/network_tts.dart';
 import '../services/tts/tts_playback_models.dart';
 import '../services/tts/tts_text_chunker.dart';
@@ -29,6 +29,7 @@ class TtsProvider extends ChangeNotifier {
   static const int _networkPrefetchCount = 3;
   static const Duration _seekStep = Duration(seconds: 15);
 
+  final BusinessPreferences preferences;
   late FlutterTts _tts;
   final AudioPlayer _player = AudioPlayer();
 
@@ -82,20 +83,22 @@ class TtsProvider extends ChangeNotifier {
   TtsPlaybackState get playbackState => _playbackState;
   Duration get seekStep => _seekStep;
 
-  TtsProvider() {
+  TtsProvider({required this.preferences}) {
     _init();
   }
 
   Future<void> _init() async {
     try {
       _tts = FlutterTts();
-      final prefs = await SharedPreferences.getInstance();
-      _speechRate = (prefs.getDouble(_rateKey) ?? 0.5)
+      await preferences.load();
+      _speechRate = (preferences.getDouble(_rateKey) ?? 0.5)
           .clamp(0.1, 1.0)
           .toDouble();
-      _pitch = (prefs.getDouble(_pitchKey) ?? 1.0).clamp(0.5, 2.0).toDouble();
-      _engineId = prefs.getString(_engineKey);
-      _languageTag = prefs.getString(_langKey);
+      _pitch = (preferences.getDouble(_pitchKey) ?? 1.0)
+          .clamp(0.5, 2.0)
+          .toDouble();
+      _engineId = preferences.getString(_engineKey);
+      _languageTag = preferences.getString(_langKey);
       _playbackState = _playbackState.copyWith(
         speed: TtsPlaybackSpeed.normalize(_speechRate * 2),
       );
@@ -312,8 +315,7 @@ class TtsProvider extends ChangeNotifier {
       await _tts.setSpeechRate(_speechRate);
     } catch (_) {}
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_rateKey, _speechRate);
+    await preferences.setDouble(_rateKey, _speechRate);
   }
 
   Future<void> setPitch(double v) async {
@@ -324,8 +326,7 @@ class TtsProvider extends ChangeNotifier {
       await _tts.setPitch(_pitch);
     } catch (_) {}
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_pitchKey, _pitch);
+    await preferences.setDouble(_pitchKey, _pitch);
   }
 
   Future<List<String>> listEngines() async {
@@ -346,8 +347,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setEngineId(String id) async {
     _engineId = id;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_engineKey, id);
+    await preferences.setString(_engineKey, id);
     try {
       await _tts.setEngine(id);
     } catch (_) {}
@@ -357,8 +357,7 @@ class TtsProvider extends ChangeNotifier {
 
   Future<void> setLanguageTag(String tag) async {
     _languageTag = tag;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_langKey, tag);
+    await preferences.setString(_langKey, tag);
     try {
       await _tts.setLanguage(tag);
     } catch (_) {}
@@ -978,10 +977,10 @@ class TtsProvider extends ChangeNotifier {
 
   Future<TtsServiceOptions?> _getSelectedNetworkService() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final selected = prefs.getInt('tts_selected_v1') ?? -1;
+      await preferences.load();
+      final selected = preferences.getInt('tts_selected_v1') ?? -1;
       if (selected < 0) return null;
-      final jsonStr = prefs.getString('tts_services_v1') ?? '';
+      final jsonStr = preferences.getString('tts_services_v1') ?? '';
       if (jsonStr.isEmpty) return null;
       final list = jsonDecode(jsonStr) as List;
       if (selected >= list.length) return null;

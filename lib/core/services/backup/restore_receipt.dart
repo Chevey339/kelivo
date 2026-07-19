@@ -8,7 +8,7 @@ import 'restore_bundle_staging.dart';
 import 'restore_durability.dart';
 import 'restore_workspace_lock.dart';
 
-enum RestoreComponent { settings, database, assets }
+enum RestoreComponent { database, assets }
 
 const restoreWorkspaceRootName = RestoreWorkspaceLock.workspaceRootName;
 
@@ -22,11 +22,7 @@ enum RestoreReceiptState {
   rolledBack,
 }
 
-const _componentOrder = [
-  RestoreComponent.settings,
-  RestoreComponent.database,
-  RestoreComponent.assets,
-];
+const _componentOrder = [RestoreComponent.database, RestoreComponent.assets];
 final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
 final _sha256Pattern = RegExp(r'^[a-f0-9]{64}$');
 final _receiptFilePattern = RegExp(r'^receipt_([0-9]{16})\.json$');
@@ -49,7 +45,7 @@ final class RestoreReceipt {
   });
 
   static const format = 'kelivo.restore-receipt';
-  static const formatVersion = 1;
+  static const formatVersion = 2;
   static const candidateManifestPath = 'candidate/manifest.json';
   static const previousManifestPath = 'previous/manifest.json';
 
@@ -65,7 +61,6 @@ final class RestoreReceipt {
   factory RestoreReceipt.prepared({
     required String runId,
     required DateTime createdAtUtc,
-    required bool restoreChats,
     required bool restoreFiles,
     required String candidateManifestSha256,
   }) {
@@ -80,8 +75,7 @@ final class RestoreReceipt {
       state: RestoreReceiptState.prepared,
       previousChecksum: null,
       selectedComponents: Set.unmodifiable({
-        RestoreComponent.settings,
-        if (restoreChats) RestoreComponent.database,
+        RestoreComponent.database,
         if (restoreFiles) RestoreComponent.assets,
       }),
       createdAtUtc: createdAtUtc,
@@ -170,7 +164,7 @@ final class RestoreReceipt {
       }
       final canonicalComponents = _orderedComponentNames(components);
       if (!_sameStrings(rawComponents.cast<String>(), canonicalComponents) ||
-          !components.contains(RestoreComponent.settings)) {
+          !components.contains(RestoreComponent.database)) {
         throw const FormatException('restore_receipt_components');
       }
 

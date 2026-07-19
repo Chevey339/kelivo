@@ -1,9 +1,9 @@
+import "../../../support/business_test_harness.dart";
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -19,16 +19,20 @@ import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/ios_tactile.dart';
 
-SettingsProvider _createSettings(ChatMessageBackgroundStyle style) {
+Future<SettingsProvider> _createSettings(
+  ChatMessageBackgroundStyle style,
+) async {
   final rawStyle = switch (style) {
     ChatMessageBackgroundStyle.frosted => 'frosted',
     ChatMessageBackgroundStyle.solid => 'solid',
     ChatMessageBackgroundStyle.defaultStyle => 'default',
   };
-  SharedPreferences.setMockInitialValues({
-    'display_chat_message_background_style_v1': rawStyle,
-  });
-  return SettingsProvider();
+  final harness = await createBusinessTestHarness(
+    initial: {'display_chat_message_background_style_v1': rawStyle},
+  );
+  final settings = SettingsProvider(harness.preferences);
+  await settings.loaded;
+  return settings;
 }
 
 Widget _buildHarness({
@@ -44,7 +48,10 @@ Widget _buildHarness({
       if (ttsProvider != null)
         ChangeNotifierProvider<TtsProvider>.value(value: ttsProvider)
       else
-        ChangeNotifierProvider(create: (_) => TtsProvider()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              TtsProvider(preferences: createBusinessTestPreferences()),
+        ),
       ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ChangeNotifierProvider<AskUserInteractionService>.value(
         value: askUserService ?? AskUserInteractionService(),
@@ -72,6 +79,8 @@ Finder _findNetworkImage(String url) {
 }
 
 class _RecordingTtsProvider extends TtsProvider {
+  _RecordingTtsProvider() : super(preferences: createBusinessTestPreferences());
+
   final spokenTexts = <String>[];
 
   @override
@@ -90,7 +99,9 @@ void main() {
     testWidgets('search citations render source capsule with favicon stack', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -164,7 +175,9 @@ void main() {
     testWidgets('search citations summarize all search results in one reply', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -212,7 +225,7 @@ void main() {
     testWidgets(
       'search citation capsule uses latest streaming result for the same id',
       (tester) async {
-        final settings = _createSettings(
+        final settings = await _createSettings(
           ChatMessageBackgroundStyle.defaultStyle,
         );
         final controller = home_stream.StreamController(
@@ -318,7 +331,9 @@ void main() {
     testWidgets('search citation capsule falls back when source url is invalid', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -352,7 +367,9 @@ void main() {
     testWidgets('thinking/tool timeline card uses blur in frosted mode', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.frosted);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.frosted,
+      );
       await settings.setCollapseThinkingSteps(true);
 
       await tester.pumpWidget(
@@ -403,7 +420,7 @@ void main() {
     testWidgets('thinking/tool timeline card does not use blur in solid mode', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.solid);
+      final settings = await _createSettings(ChatMessageBackgroundStyle.solid);
 
       await tester.pumpWidget(
         _buildHarness(
@@ -445,7 +462,9 @@ void main() {
     });
 
     testWidgets('tool message card uses blur in frosted mode', (tester) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.frosted);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.frosted,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -476,7 +495,7 @@ void main() {
     testWidgets('tool message card does not use blur in solid mode', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.solid);
+      final settings = await _createSettings(ChatMessageBackgroundStyle.solid);
 
       await tester.pumpWidget(
         _buildHarness(
@@ -507,7 +526,9 @@ void main() {
     testWidgets(
       'translation card uses blur and neutral header in frosted mode',
       (tester) async {
-        final settings = _createSettings(ChatMessageBackgroundStyle.frosted);
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.frosted,
+        );
 
         await tester.pumpWidget(
           _buildHarness(
@@ -536,7 +557,7 @@ void main() {
     );
 
     testWidgets('translation card removes blur in solid mode', (tester) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.solid);
+      final settings = await _createSettings(ChatMessageBackgroundStyle.solid);
 
       await tester.pumpWidget(
         _buildHarness(
@@ -566,7 +587,9 @@ void main() {
     testWidgets('local tool cards use local tool names and icons', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -660,7 +683,9 @@ void main() {
     testWidgets('two-line tool timeline keeps connector gap around icon', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
       const query =
           'Kelivo Flutter chat message thinking tool timeline connector wraps';
 
@@ -735,7 +760,9 @@ void main() {
     testWidgets('text to speech replay button speaks the tool text', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
       final ttsProvider = _RecordingTtsProvider();
       addTearDown(ttsProvider.dispose);
 
@@ -775,7 +802,9 @@ void main() {
     testWidgets('text to speech tool card opens details for long text', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -815,7 +844,9 @@ void main() {
     testWidgets('unclosed think tag remains visible as assistant content', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -839,7 +870,7 @@ void main() {
     testWidgets(
       'structured reasoning keeps literal think block in assistant content',
       (tester) async {
-        final settings = _createSettings(
+        final settings = await _createSettings(
           ChatMessageBackgroundStyle.defaultStyle,
         );
 
@@ -874,7 +905,9 @@ void main() {
     testWidgets('closed legacy think block renders as thinking card', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -901,7 +934,9 @@ void main() {
     });
 
     testWidgets('ask user card submits selected answer', (tester) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
       final askUserService = AskUserInteractionService();
       final answerFuture = askUserService.requestAnswer(
         toolCallId: 'ask-1',
@@ -986,7 +1021,9 @@ void main() {
     testWidgets('answered ask user card stays expanded and can collapse', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -1035,7 +1072,9 @@ void main() {
     });
 
     testWidgets('ask user card can submit skipped answer', (tester) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
       final askUserService = AskUserInteractionService();
       final answerFuture = askUserService.requestAnswer(
         toolCallId: 'ask-skip',
@@ -1099,7 +1138,9 @@ void main() {
     testWidgets('restored pending ask user card submits recovered answer', (
       tester,
     ) async {
-      final settings = _createSettings(ChatMessageBackgroundStyle.defaultStyle);
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
       ToolUIPart? submittedPart;
       AskUserResult? submittedResult;
 

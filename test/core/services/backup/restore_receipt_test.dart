@@ -6,6 +6,8 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
@@ -17,7 +19,6 @@ RestoreReceipt _preparedReceipt({String hashCharacter = 'a'}) {
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: DateTime.utc(2026, 7, 9, 12),
-    restoreChats: true,
     restoreFiles: false,
     candidateManifestSha256: _hash(hashCharacter),
   );
@@ -30,7 +31,6 @@ RestoreReceipt _preparedReceiptForManifest(
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: createdAtUtc ?? DateTime.utc(2026, 7, 9, 12),
-    restoreChats: false,
     restoreFiles: false,
     candidateManifestSha256: candidateManifestSha256,
   );
@@ -42,23 +42,45 @@ Future<String> _writeCandidateManifest(RestoreReceiptStore store) async {
   await File(
     p.join(store.workspaceRoot.path, RestoreWorkspaceLock.activeRunFileName),
   ).writeAsString(_runId, flush: true);
-  final settings = File(p.join(candidate.path, 'settings.json'));
-  await settings.writeAsString('{"theme":"dark"}', flush: true);
+  final database = File(p.join(candidate.path, 'database', 'kelivo.db'));
+  await database.parent.create(recursive: true);
+  final repository = ChatDatabaseRepository.open(file: database);
+  try {
+    await repository.ensureReady();
+    await repository.putMigrationBatch(
+      conversations: [Conversation(id: 'candidate', title: 'candidate')],
+      messages: const [],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    await repository.markMigrationComplete();
+    await repository.checkpoint();
+  } finally {
+    await repository.close();
+  }
+  final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+    database,
+  );
   final manifest = File(p.join(candidate.path, 'manifest.json'));
   await manifest.writeAsString(
     jsonEncode({
       'format': 'kelivo-backup',
       'formatVersion': 2,
-      'payloadKind': 'settings-only',
+      'payloadKind': 'sqlite',
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': 'test',
-      'includeChats': false,
+      'includeChats': true,
       'includeFiles': false,
-      'secretsIncluded': true,
+      'database': {
+        'entry': 'database/kelivo.db',
+        'schemaVersion': databaseInfo.schemaVersion,
+        'conversationCount': databaseInfo.conversationCount,
+        'messageCount': databaseInfo.messageCount,
+      },
       'entries': {
-        'settings.json': {
-          'bytes': await settings.length(),
-          'sha256': (await sha256.bind(settings.openRead()).first).toString(),
+        'database/kelivo.db': {
+          'bytes': await database.length(),
+          'sha256': (await sha256.bind(database.openRead()).first).toString(),
         },
       },
     }),
@@ -85,13 +107,21 @@ void main() {
       expect(decoded.state, RestoreReceiptState.prepared);
       expect(decoded.runId, _runId);
       expect(decoded.createdAtUtc, DateTime.utc(2026, 7, 9, 12));
-      expect(decoded.selectedComponents, {
-        RestoreComponent.settings,
-        RestoreComponent.database,
-      });
+      expect(decoded.selectedComponents, {RestoreComponent.database});
       expect(decoded.previousChecksum, isNull);
       expect(decoded.previousManifestSha256, isNull);
       expect(decoded.candidateManifestSha256, _hash('a'));
+    });
+
+    test('rejects an unpublished three-leg receipt', () {
+      final legacy = Map<String, dynamic>.from(_preparedReceipt().toJson())
+        ..['formatVersion'] = 1
+        ..['selectedComponents'] = ['settings', 'database'];
+
+      expect(
+        () => RestoreReceipt.fromJson(legacy),
+        throwsA(isA<FormatException>()),
+      );
     });
 
     test('rejects checksum tampering and unknown fields', () {
@@ -115,7 +145,6 @@ void main() {
         () => RestoreReceipt.prepared(
           runId: '../escape',
           createdAtUtc: DateTime.utc(2026, 7, 9),
-          restoreChats: true,
           restoreFiles: true,
           candidateManifestSha256: _hash('a'),
         ),
@@ -209,32 +238,15 @@ void main() {
       }
       final asset = File(p.join(candidate.path, 'upload', 'extra.txt'));
       await asset.writeAsString('not selected', flush: true);
-      final settings = File(p.join(candidate.path, 'settings.json'));
       final manifest = File(p.join(candidate.path, 'manifest.json'));
-      await manifest.writeAsString(
-        jsonEncode({
-          'format': 'kelivo-backup',
-          'formatVersion': 2,
-          'payloadKind': 'settings-only',
-          'createdAtUtc': '2026-07-09T00:00:00.000Z',
-          'appVersion': 'test',
-          'includeChats': false,
-          'includeFiles': true,
-          'secretsIncluded': true,
-          'entries': {
-            'settings.json': {
-              'bytes': await settings.length(),
-              'sha256': (await sha256.bind(settings.openRead()).first)
-                  .toString(),
-            },
-            'upload/extra.txt': {
-              'bytes': await asset.length(),
-              'sha256': (await sha256.bind(asset.openRead()).first).toString(),
-            },
-          },
-        }),
-        flush: true,
-      );
+      final decoded = (jsonDecode(await manifest.readAsString()) as Map)
+          .cast<String, dynamic>();
+      decoded['includeFiles'] = true;
+      (decoded['entries'] as Map)['upload/extra.txt'] = {
+        'bytes': await asset.length(),
+        'sha256': (await sha256.bind(asset.openRead()).first).toString(),
+      };
+      await manifest.writeAsString(jsonEncode(decoded), flush: true);
       candidateManifestSha256 = (await sha256.bind(manifest.openRead()).first)
           .toString();
 
@@ -566,12 +578,12 @@ void main() {
       'rejects an incomplete candidate with a valid manifest hash',
       () async {
         await File(
-          p.join(store.runDirectory.path, 'candidate', 'settings.json'),
+          p.join(store.runDirectory.path, 'candidate', 'database', 'kelivo.db'),
         ).delete();
 
         await expectLater(
           store.publish(prepared()),
-          throwsA(isA<FormatException>()),
+          throwsA(anyOf(isA<FormatException>(), isA<FileSystemException>())),
         );
 
         expect(await store.receiptDirectory.exists(), isFalse);
@@ -597,16 +609,15 @@ void main() {
       },
     );
 
-    test('rejects a selected component absent from the candidate', () async {
-      final receipt = RestoreReceipt.prepared(
-        runId: _runId,
-        createdAtUtc: DateTime.utc(2026, 7, 9, 12),
-        restoreChats: true,
-        restoreFiles: false,
-        candidateManifestSha256: candidateManifestSha256,
-      );
+    test('rejects a retired settings staging file', () async {
+      await File(
+        p.join(store.runDirectory.path, 'candidate', 'settings.json'),
+      ).writeAsString('{}', flush: true);
 
-      await expectLater(store.publish(receipt), throwsStateError);
+      await expectLater(
+        store.publish(prepared()),
+        throwsA(isA<FormatException>()),
+      );
 
       expect(await store.receiptDirectory.exists(), isFalse);
     });

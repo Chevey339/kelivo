@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -8,12 +9,6 @@ import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
-
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   SharedPreferences.setMockInitialValues(const {});
@@ -22,7 +17,8 @@ void main() {
     SettingsProvider? settings,
     String? currentConversationId,
   }) {
-    final settingsProvider = settings ?? SettingsProvider();
+    final settingsProvider =
+        settings ?? SettingsProvider(createBusinessTestPreferences());
     return StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
@@ -139,7 +135,7 @@ void main() {
   });
 
   test('StreamingState resumes from existing assistant content', () {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final state = buildStreamingStateWithContent(settings, '先确认一下。');
 
     expect(state.fullContentRaw, '先确认一下。');
@@ -183,11 +179,11 @@ void main() {
   );
 
   test('streaming reasoning honors disabled auto-collapse setting', () async {
-    SharedPreferences.setMockInitialValues({
-      'display_auto_collapse_thinking_v1': false,
-    });
-    final settings = SettingsProvider();
-    await _waitForSettingsLoad();
+    final harness = await createBusinessTestHarness(
+      initial: {'display_auto_collapse_thinking_v1': false},
+    );
+    final settings = SettingsProvider(harness.preferences);
+    await settings.loaded;
     final controller = buildController(settings: settings);
     final state = buildStreamingState(settings);
 
@@ -382,7 +378,7 @@ void main() {
   test(
     'handleToolResultsChunk keeps latest completed result for the same non-empty id',
     () async {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(createBusinessTestPreferences());
       final controller = buildController(
         settings: settings,
         currentConversationId: 'conversation-1',
@@ -497,7 +493,7 @@ void main() {
   testWidgets('stream UI output is buffered until the smooth ticker fires', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final updates = <String>[];
     var listUpdateCount = 0;
     var tickCount = 0;
@@ -545,7 +541,7 @@ void main() {
   testWidgets('stream UI output adapts pick count to large backlog', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
@@ -585,7 +581,7 @@ void main() {
   testWidgets('stream UI output does not repeat an unchanged full frame', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
@@ -624,7 +620,7 @@ void main() {
   testWidgets('stream UI output handles a one-character final backlog', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
@@ -664,7 +660,7 @@ void main() {
   testWidgets('cleanup flushes final stream content immediately', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
       chatService: ChatService(),
       onStateChanged: () {},
@@ -707,7 +703,7 @@ void main() {
   testWidgets('cleanup flushes pending content into the list callback', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     final smoothController = StreamController(
       chatService: ChatService(),
       onStateChanged: () {},

@@ -1,23 +1,17 @@
+import "support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider iOS background generation settings', () {
     test('defaults all iOS background options to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.iosBackgroundGenerationEnabled, isFalse);
       expect(settings.iosBackgroundTaskRefreshEnabled, isFalse);
@@ -26,15 +20,17 @@ void main() {
     });
 
     test('loads persisted enabled values', () async {
-      SharedPreferences.setMockInitialValues({
-        'ios_background_generation_enabled_v1': true,
-        'ios_background_task_refresh_enabled_v1': true,
-        'ios_live_activity_enabled_v1': true,
-        'ios_background_notifications_enabled_v1': true,
-      });
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(
+        initial: {
+          'ios_background_generation_enabled_v1': true,
+          'ios_background_task_refresh_enabled_v1': true,
+          'ios_live_activity_enabled_v1': true,
+          'ios_background_notifications_enabled_v1': true,
+        },
+      );
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.iosBackgroundGenerationEnabled, isTrue);
       expect(settings.iosBackgroundTaskRefreshEnabled, isTrue);
@@ -43,16 +39,16 @@ void main() {
     });
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setIosBackgroundGenerationEnabled(true);
       await settings.setIosBackgroundTaskRefreshEnabled(true);
       await settings.setIosLiveActivityEnabled(true);
       await settings.setIosBackgroundNotificationsEnabled(true);
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(settings.iosBackgroundGenerationEnabled, isTrue);
       expect(settings.iosBackgroundTaskRefreshEnabled, isTrue);
       expect(settings.iosLiveActivityEnabled, isTrue);

@@ -1,0 +1,267 @@
+import 'dart:convert';
+
+import 'package:drift/native.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_preferences.dart';
+import 'package:Kelivo/core/database/business_data.dart';
+import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/business_restore_service.dart';
+import 'package:Kelivo/core/database/business_settings_router.dart';
+import 'package:Kelivo/core/services/instruction_injection_store.dart';
+
+void main() {
+  late AppDatabase database;
+  late BusinessRepository repository;
+  late BusinessRestoreService service;
+
+  setUp(() async {
+    database = AppDatabase(NativeDatabase.memory());
+    repository = BusinessRepository(database);
+    service = BusinessRestoreService(repository);
+    await database.customSelect('SELECT 1;').getSingle();
+  });
+
+  tearDown(() => database.close());
+
+  test(
+    'overwrite validates then atomically replaces only business data',
+    () async {
+      await service.overwrite({
+        'assistants_v1': jsonEncode([
+          {'id': 'old', 'name': 'Old'},
+        ]),
+        'theme_mode_v1': 'light',
+      });
+      await database.customStatement(
+        'INSERT INTO chat_storage_meta_rows (key, value) VALUES (?, ?);',
+        ['unrelated_chat_meta', 'preserved'],
+      );
+
+      await service.overwrite({
+        'assistants_v1': jsonEncode([
+          {'id': 'new', 'name': 'New'},
+        ]),
+        'theme_mode_v1': 'dark',
+        'plugin_future_key_v1': <String>['a', 'b'],
+        'flutter_log_enabled_v1': true,
+        'pinned_chat_ids': <String>['ignored'],
+      });
+
+      final exported = await service.exportSettings();
+      expect(jsonDecode(exported['assistants_v1']! as String), [
+        {'id': 'new', 'name': 'New'},
+      ]);
+      expect(exported['theme_mode_v1'], 'dark');
+      expect(exported['plugin_future_key_v1'], <String>['a', 'b']);
+      expect(exported, isNot(contains('flutter_log_enabled_v1')));
+      expect(exported, isNot(contains('pinned_chat_ids')));
+      expect(await repository.hasMigrationReceipt(), isTrue);
+      final chatMeta = await database
+          .customSelect('SELECT value FROM chat_storage_meta_rows;')
+          .get();
+      expect(
+        chatMeta.any((row) => row.read<String>('value') == 'preserved'),
+        isTrue,
+      );
+    },
+  );
+
+  test('invalid overwrite leaves the complete old snapshot intact', () async {
+    await service.overwrite({
+      'assistants_v1': jsonEncode([
+        {'id': 'old', 'name': 'Old'},
+      ]),
+      'theme_mode_v1': 'light',
+    });
+    final before = await service.exportSettings();
+
+    await expectLater(
+      service.overwrite({
+        'assistants_v1': jsonEncode({'invalid': true}),
+        'theme_mode_v1': 'dark',
+      }),
+      throwsA(isA<FormatException>()),
+    );
+
+    expect(await service.exportSettings(), before);
+  });
+
+  test('overwrite preserves an explicitly empty instruction list', () async {
+    await service.overwrite({
+      'instruction_injections_v1': jsonEncode(const <Object>[]),
+    }, preserveExplicitEmptyInstructionList: true);
+
+    final store = InstructionInjectionStore(BusinessPreferences(repository));
+    expect(await store.getAll(), isEmpty);
+  });
+
+  test(
+    'database failure rolls back the complete overwrite transaction',
+    () async {
+      await service.overwrite({
+        'assistants_v1': jsonEncode([
+          {'id': 'old', 'name': 'Old'},
+        ]),
+        'theme_mode_v1': 'light',
+      });
+      final before = await service.exportSettings();
+      await database.customStatement('''
+CREATE TRIGGER fail_restored_assistant
+BEFORE INSERT ON assistant_rows
+WHEN NEW.id = 'fail'
+BEGIN
+  SELECT RAISE(ABORT, 'injected_restore_failure');
+END;
+''');
+
+      await expectLater(
+        service.overwrite({
+          'assistants_v1': jsonEncode([
+            {'id': 'fail', 'name': 'New'},
+          ]),
+          'theme_mode_v1': 'dark',
+        }),
+        throwsA(anything),
+      );
+
+      expect(await service.exportSettings(), before);
+    },
+  );
+
+  test(
+    'merge applies frozen key rules in one repository transaction',
+    () async {
+      await service.overwrite({
+        'provider_configs_v1': jsonEncode({
+          'local': {'id': 'local', 'apiKey': 'local'},
+        }),
+        'providers_order_v1': <String>['local'],
+        'theme_mode_v1': 'light',
+      });
+
+      await service.merge({
+        'provider_configs_v1': jsonEncode({
+          'incoming': {'id': 'incoming', 'apiKey': 'secret'},
+        }),
+        'providers_order_v1': <String>['incoming'],
+        'theme_mode_v1': 'dark',
+      });
+
+      final exported = await service.exportSettings();
+      expect(exported['providers_order_v1'], <String>['incoming', 'local']);
+      expect(jsonDecode(exported['provider_configs_v1']! as String), {
+        'incoming': {'id': 'incoming', 'apiKey': 'secret'},
+        'local': {'id': 'local', 'apiKey': 'local'},
+      });
+      expect(exported['theme_mode_v1'], 'dark');
+    },
+  );
+
+  test('merge preserves unrelated local id-less entity identities', () async {
+    await service.overwrite({
+      'assistant_tags_v1': jsonEncode([
+        {'name': 'Original tag'},
+      ]),
+    });
+    final originalId = (await repository.readEntities(
+      BusinessEntityKind.assistantTag,
+    )).single.id;
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+    final runtimeTags =
+        (jsonDecode(preferences.getString('assistant_tags_v1')!) as List)
+            .cast<Map>()
+            .map((item) => item.cast<String, dynamic>())
+            .toList();
+    runtimeTags.single['name'] = 'Renamed tag';
+    await preferences.setString('assistant_tags_v1', jsonEncode(runtimeTags));
+    await repository.setPreference(
+      'assistant_tag_map_v1',
+      jsonEncode({'assistant-a': originalId}),
+    );
+
+    await service.merge({'theme_mode_v1': 'dark'});
+
+    final rows = await repository.readEntities(BusinessEntityKind.assistantTag);
+    expect(rows.single.id, originalId);
+    expect(jsonDecode(rows.single.payload), {'name': 'Renamed tag'});
+    expect(
+      jsonDecode(
+        await repository.getPreference('assistant_tag_map_v1') as String,
+      ),
+      {'assistant-a': originalId},
+    );
+  });
+
+  test('merge preserves imported portable row identities', () async {
+    final seeded = BusinessSettingsRouter.normalizeAndRoute({
+      'assistant_tags_v1': jsonEncode([
+        {'name': 'Original tag'},
+      ]),
+    });
+    final sourceRow = seeded.entities[BusinessEntityKind.assistantTag]!.single;
+    final portable = BusinessSettingsRouter.exportSnapshotWithRowIds(
+      BusinessSnapshot(
+        entities: {
+          ...seeded.entities,
+          BusinessEntityKind.assistantTag: [
+            sourceRow.copyWith(
+              payload: jsonEncode({'name': 'Renamed before backup'}),
+            ),
+          ],
+        },
+        preferences: {
+          'assistant_tag_map_v1': jsonEncode({'assistant-a': sourceRow.id}),
+        },
+      ),
+    );
+
+    await service.merge(portable.settings, entityRowIds: portable.entityRowIds);
+
+    final restored = await repository.readEntities(
+      BusinessEntityKind.assistantTag,
+    );
+    expect(restored.single.id, sourceRow.id);
+    expect(jsonDecode(restored.single.payload), {
+      'name': 'Renamed before backup',
+    });
+    expect(
+      jsonDecode(
+        await repository.getPreference('assistant_tag_map_v1') as String,
+      ),
+      {'assistant-a': sourceRow.id},
+    );
+  });
+
+  test('database failure rolls back every merged business key', () async {
+    await service.overwrite({
+      'assistants_v1': jsonEncode([
+        {'id': 'local', 'name': 'Local'},
+      ]),
+      'theme_mode_v1': 'light',
+    });
+    final before = await service.exportSettings();
+    await database.customStatement('''
+CREATE TRIGGER fail_merged_assistant
+BEFORE INSERT ON assistant_rows
+WHEN NEW.id = 'incoming'
+BEGIN
+  SELECT RAISE(ABORT, 'injected_merge_failure');
+END;
+''');
+
+    await expectLater(
+      service.merge({
+        'assistants_v1': jsonEncode([
+          {'id': 'incoming', 'name': 'Incoming'},
+        ]),
+        'theme_mode_v1': 'dark',
+      }),
+      throwsA(anything),
+    );
+
+    expect(await service.exportSettings(), before);
+  });
+}

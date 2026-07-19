@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/settings/pages/display_settings_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
@@ -17,7 +18,7 @@ void main() {
   testWidgets('input background opacity sheet shows light and dark controls', (
     tester,
   ) async {
-    final settings = SettingsProvider();
+    final settings = SettingsProvider(createBusinessTestPreferences());
     addTearDown(settings.dispose);
 
     await tester.pumpWidget(

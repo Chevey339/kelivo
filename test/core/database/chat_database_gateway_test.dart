@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:Kelivo/core/database/chat_database_gateway.dart';
 import 'package:Kelivo/core/database/chat_database_observer.dart';
+import 'package:Kelivo/core/database/business_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,7 +32,27 @@ void main() {
 
       expect(leases[1].repository, same(leases.first.repository));
       expect(leases[2].repository, same(leases.first.repository));
+      expect(leases.first.chatRepository, same(leases.first.repository));
+      expect(
+        leases[1].businessRepository,
+        same(leases.first.businessRepository),
+      );
       await leases.first.repository.getConversationCount();
+
+      await leases.first.businessRepository.upsertEntity(
+        BusinessEntityKind.assistant,
+        const BusinessEntityValue(
+          id: 'assistant-1',
+          sortOrder: 0,
+          payload: '{"id":"assistant-1"}',
+        ),
+      );
+      expect(
+        await leases[2].businessRepository.readEntities(
+          BusinessEntityKind.assistant,
+        ),
+        hasLength(1),
+      );
 
       await leases.first.release();
       await leases[1].repository.getConversationCount();

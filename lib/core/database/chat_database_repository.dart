@@ -8,6 +8,8 @@ import 'package:sqlite3/sqlite3.dart' as sqlite;
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
 import 'app_database.dart';
+import 'business_data.dart';
+import 'business_repository.dart';
 import 'chat_database_observer.dart';
 import 'generation_run.dart';
 import 'generation_run_commands.dart';
@@ -19,6 +21,11 @@ typedef ChatDatabaseSnapshotInfo = ({
 });
 
 typedef InstalledChatDatabaseInfo = ({int schemaVersion, String? databaseId});
+
+typedef ParsedChatImportBatch = ({
+  Conversation conversation,
+  List<ChatMessage> messages,
+});
 
 final class LinearMessageWindowSlot {
   const LinearMessageWindowSlot({
@@ -541,6 +548,18 @@ class ChatDatabaseRepository {
       'migration_issue_rows',
       'generation_run_rows',
       'provider_artifact_rows',
+      'assistant_rows',
+      'provider_rows',
+      'provider_group_rows',
+      'mcp_server_rows',
+      'world_book_rows',
+      'assistant_memory_rows',
+      'quick_phrase_rows',
+      'search_service_rows',
+      'tts_service_rows',
+      'instruction_injection_rows',
+      'assistant_tag_rows',
+      'preference_rows',
     };
     final tableRows = database.select(
       "SELECT name FROM sqlite_master WHERE type = 'table';",
@@ -656,16 +675,106 @@ class ChatDatabaseRepository {
         'created_at',
         'updated_at',
       ],
+      'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
+      'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'mcp_server_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'world_book_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'assistant_memory_rows': [
+        'id',
+        'sort_order',
+        'assistant_id',
+        'payload',
+        'updated_at',
+      ],
+      'quick_phrase_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'search_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'tts_service_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'instruction_injection_rows': [
+        'id',
+        'sort_order',
+        'payload',
+        'updated_at',
+      ],
+      'assistant_tag_rows': ['id', 'sort_order', 'payload', 'updated_at'],
+      'preference_rows': ['key', 'value', 'updated_at'],
     };
     for (final entry in expectedColumns.entries) {
-      final actual = database
-          .select('PRAGMA table_info(${entry.key});')
+      final tableInfo = database.select('PRAGMA table_info(${entry.key});');
+      final actual = tableInfo
           .map((row) => row['name'])
           .whereType<String>()
           .toList(growable: false);
       if (!_sameOrderedStrings(actual, entry.value)) {
         throw StateError('table_schema:${entry.key}');
       }
+    }
+
+    const businessPrimaryKeys = <String, List<String>>{
+      'assistant_rows': ['id'],
+      'provider_rows': ['provider_key'],
+      'provider_group_rows': ['id'],
+      'mcp_server_rows': ['id'],
+      'world_book_rows': ['id'],
+      'assistant_memory_rows': ['id'],
+      'quick_phrase_rows': ['id'],
+      'search_service_rows': ['id'],
+      'tts_service_rows': ['id'],
+      'instruction_injection_rows': ['id'],
+      'assistant_tag_rows': ['id'],
+      'preference_rows': ['key'],
+    };
+    for (final entry in businessPrimaryKeys.entries) {
+      final primaryRows =
+          database
+              .select('PRAGMA table_info(${entry.key});')
+              .where((row) => (row['pk'] as int? ?? 0) > 0)
+              .toList()
+            ..sort(
+              (left, right) =>
+                  (left['pk'] as int).compareTo(right['pk'] as int),
+            );
+      final actual = primaryRows
+          .map((row) => row['name'])
+          .whereType<String>()
+          .toList(growable: false);
+      if (!_sameOrderedStrings(actual, entry.value)) {
+        throw StateError('primary_key_schema:${entry.key}');
+      }
+      if (entry.key != 'preference_rows') {
+        final schemaRow = database.select(
+          "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
+          [entry.key],
+        ).single;
+        final normalizedSql = (schemaRow['sql'] as String? ?? '')
+            .replaceAll(RegExp(r'[\s"]'), '')
+            .toLowerCase();
+        if (!normalizedSql.contains('check(sort_order>=0)')) {
+          throw StateError('check_schema:${entry.key}');
+        }
+      }
+    }
+
+    const memoryIndexName = 'idx_assistant_memories_assistant';
+    final memoryIndexRows = database.select(
+      'PRAGMA index_list(assistant_memory_rows);',
+    );
+    final memoryIndex = memoryIndexRows.where(
+      (row) => row['name'] == memoryIndexName,
+    );
+    if (memoryIndex.length != 1 || memoryIndex.single['unique'] != 0) {
+      throw StateError('index_schema:$memoryIndexName');
+    }
+    final memoryIndexColumns = database
+        .select('PRAGMA index_info($memoryIndexName);')
+        .map((row) => row['name'])
+        .whereType<String>()
+        .toList(growable: false);
+    if (!_sameOrderedStrings(memoryIndexColumns, const [
+      'assistant_id',
+      'id',
+    ])) {
+      throw StateError('index_schema:$memoryIndexName');
     }
 
     const expectedForeignKeys = <String, Set<String>>{
@@ -684,6 +793,18 @@ class ChatDatabaseRepository {
         'target_revision_id->message_rows.id:NO ACTION',
       },
       'provider_artifact_rows': {'revision_id->message_rows.id:CASCADE'},
+      'assistant_rows': <String>{},
+      'provider_rows': <String>{},
+      'provider_group_rows': <String>{},
+      'mcp_server_rows': <String>{},
+      'world_book_rows': <String>{},
+      'assistant_memory_rows': <String>{},
+      'quick_phrase_rows': <String>{},
+      'search_service_rows': <String>{},
+      'tts_service_rows': <String>{},
+      'instruction_injection_rows': <String>{},
+      'assistant_tag_rows': <String>{},
+      'preference_rows': <String>{},
     };
     for (final entry in expectedForeignKeys.entries) {
       final actual = database
@@ -3136,6 +3257,91 @@ class ChatDatabaseRepository {
         messages: messages,
         toolEventsByMessageId: toolEventsByMessageId,
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+      );
+    });
+  }
+
+  /// Commits a fully parsed external import together with its business-data
+  /// patch. Nothing is written unless both repositories share this exact
+  /// [AppDatabase] instance.
+  Future<void> commitParsedImport({
+    required BusinessRepository businessRepository,
+    required bool overwrite,
+    required List<ParsedChatImportBatch> conversationBatches,
+    required Map<String, List<ChatMessage>> messagesToAppend,
+    required BusinessSnapshot Function(BusinessSnapshot current)
+    transformBusiness,
+  }) async {
+    if (!businessRepository.sharesDatabaseIdentity(_db)) {
+      throw StateError('chat_business_database_mismatch');
+    }
+    if (overwrite && messagesToAppend.isNotEmpty) {
+      throw ArgumentError.value(messagesToAppend, 'messagesToAppend');
+    }
+    for (final batch in conversationBatches) {
+      for (final message in batch.messages) {
+        if (message.conversationId != batch.conversation.id) {
+          throw ArgumentError.value(
+            message.conversationId,
+            'message.conversationId',
+          );
+        }
+      }
+    }
+    for (final entry in messagesToAppend.entries) {
+      for (final message in entry.value) {
+        if (message.conversationId != entry.key) {
+          throw ArgumentError.value(
+            message.conversationId,
+            'message.conversationId',
+          );
+        }
+      }
+    }
+
+    await _db.transaction(() async {
+      if (overwrite) await _clearChatRows();
+
+      final conversations = <Conversation>[];
+      final messages = <({ChatMessage message, int messageOrder})>[];
+      for (final batch in conversationBatches) {
+        conversations.add(
+          batch.conversation.copyWith(
+            messageIds: batch.messages
+                .map((message) => message.id)
+                .toList(growable: false),
+          ),
+        );
+        for (final (messageOrder, message) in batch.messages.indexed) {
+          messages.add((message: message, messageOrder: messageOrder));
+        }
+      }
+      await _writeBackupData(
+        conversations: conversations,
+        messages: messages,
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      for (final entry in messagesToAppend.entries) {
+        final current = await getConversation(entry.key);
+        if (current == null) {
+          throw StateError('chat_import_conversation_missing');
+        }
+        var conversation = current;
+        for (final message in entry.value) {
+          conversation = await _appendLinearMessageToConversation(
+            conversation: conversation,
+            message: message,
+            selectVersion: false,
+            touchUpdatedAt: false,
+          );
+        }
+      }
+
+      await businessRepository.transformSnapshot(
+        transformBusiness,
+        writeReceipt: true,
       );
     });
   }

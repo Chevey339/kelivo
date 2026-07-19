@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../../database/app_database.dart';
+import '../../database/business_data.dart';
+import '../../database/business_repository.dart';
 import '../../database/chat_database_gateway.dart';
 import '../../database/chat_database_repository.dart';
 import '../../database/generation_run.dart';
@@ -54,8 +56,12 @@ typedef AssetContentHash = Future<String> Function(File file);
 class ChatService extends ChangeNotifier {
   ChatService({
     ChatDatabaseGateway? databaseGateway,
+    ChatDatabaseRepository? existingRepository,
     AssetContentHash? assetContentHash,
   }) : _databaseGateway = databaseGateway ?? ChatDatabaseGateway.instance,
+       // Public injection name intentionally omits the private-field prefix.
+       // ignore: prefer_initializing_formals
+       _existingRepository = existingRepository,
        _assetContentHash = assetContentHash ?? _hashAssetFile;
 
   static const int defaultInitialMessageMin = 2;
@@ -72,6 +78,7 @@ class ChatService extends ChangeNotifier {
   late ChatDatabaseRepository _repo;
   late File _databaseFile;
   final ChatDatabaseGateway _databaseGateway;
+  final ChatDatabaseRepository? _existingRepository;
   final AssetContentHash _assetContentHash;
   ChatDatabaseLease? _databaseLease;
   Future<void>? _assetReferenceMaintenanceFuture;
@@ -127,9 +134,16 @@ class ChatService extends ChangeNotifier {
       await appDataDir.create(recursive: true);
     }
     _databaseFile = File(p.join(appDataDir.path, AppDatabase.databaseFileName));
-    final lease = await _databaseGateway.acquire(_databaseFile);
-    _databaseLease = lease;
-    _repo = lease.repository;
+    final existingRepository = _existingRepository;
+    final ChatDatabaseLease? lease;
+    if (existingRepository == null) {
+      lease = await _databaseGateway.acquire(_databaseFile);
+      _databaseLease = lease;
+      _repo = lease.repository;
+    } else {
+      lease = null;
+      _repo = existingRepository;
+    }
     try {
       // Versioned and transactional: normal launches return before scanning rows.
       await _migrateSandboxPaths();
@@ -159,7 +173,7 @@ class ChatService extends ChangeNotifier {
       unawaited(postStartupMaintenance);
     } catch (_) {
       _databaseLease = null;
-      await lease.release();
+      await lease?.release();
       rethrow;
     }
   }
@@ -1447,6 +1461,37 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Publishes a fully parsed external import. Chat rows and the associated
+  /// business patch commit in one transaction; caches and files change only
+  /// after that transaction succeeds.
+  Future<void> commitParsedImport({
+    required BusinessRepository businessRepository,
+    required bool overwrite,
+    required List<ParsedChatImportBatch> conversationBatches,
+    required Map<String, List<ChatMessage>> messagesToAppend,
+    required BusinessSnapshot Function(BusinessSnapshot current)
+    transformBusiness,
+  }) async {
+    if (!_initialized) await init();
+    await _repo.commitParsedImport(
+      businessRepository: businessRepository,
+      overwrite: overwrite,
+      conversationBatches: conversationBatches,
+      messagesToAppend: messagesToAppend,
+      transformBusiness: transformBusiness,
+    );
+
+    if (overwrite) {
+      await _resetAfterOverwriteRestore();
+      await _deleteUploadDirectory();
+      return;
+    }
+    _messagesCache.clear();
+    await _backfillAssetReferencesForCurrentRoot();
+    await _loadConversationsCache();
+    notifyListeners();
+  }
+
   Future<void> replaceAllDataFromBackup({
     required List<Conversation> conversations,
     required List<ChatMessage> messages,
@@ -2626,13 +2671,13 @@ class ChatService extends ChangeNotifier {
     _messageCounts.clear();
     _messageOrderIds.clear();
     _currentConversationId = null;
-    if (deleteUploads) {
-      final uploadDir = await AppDirectories.getUploadDirectory();
-      if (await uploadDir.exists()) {
-        await uploadDir.delete(recursive: true);
-      }
-    }
+    if (deleteUploads) await _deleteUploadDirectory();
     notifyListeners();
+  }
+
+  Future<void> _deleteUploadDirectory() async {
+    final uploadDir = await AppDirectories.getUploadDirectory();
+    if (await uploadDir.exists()) await uploadDir.delete(recursive: true);
   }
 
   // Uploads stats: count and total size of files under app documents/upload

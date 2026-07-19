@@ -1,23 +1,17 @@
+import "support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider desktop message navigation buttons mode', () {
     test('defaults to scroll visibility', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(
         settings.desktopMessageNavButtonsMode,
@@ -35,12 +29,12 @@ void main() {
       };
 
       for (final entry in cases.entries) {
-        SharedPreferences.setMockInitialValues({
-          'display_desktop_message_nav_buttons_mode_v1': entry.key,
-        });
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(
+          initial: {'display_desktop_message_nav_buttons_mode_v1': entry.key},
+        );
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
 
         expect(settings.desktopMessageNavButtonsMode, entry.value);
       }
@@ -49,12 +43,12 @@ void main() {
     test(
       'maps legacy disabled toggle to never when new key is absent',
       () async {
-        SharedPreferences.setMockInitialValues({
-          'display_show_message_nav_v1': false,
-        });
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(
+          initial: {'display_show_message_nav_v1': false},
+        );
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
 
         expect(
           settings.desktopMessageNavButtonsMode,
@@ -64,10 +58,10 @@ void main() {
     );
 
     test('persists mode changes to preferences', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setDesktopMessageNavButtonsMode(
         DesktopMessageNavButtonsMode.scrollAndHover,
       );
@@ -76,7 +70,7 @@ void main() {
         settings.desktopMessageNavButtonsMode,
         DesktopMessageNavButtonsMode.scrollAndHover,
       );
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(
         prefs.getString('display_desktop_message_nav_buttons_mode_v1'),
         'scrollAndHover',

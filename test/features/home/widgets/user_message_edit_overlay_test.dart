@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/home/widgets/user_message_edit_overlay.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
@@ -21,7 +22,7 @@ void main() {
     VoidCallback? onPreviewTap,
   }) {
     return ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => SettingsProvider(createBusinessTestPreferences()),
       child: MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

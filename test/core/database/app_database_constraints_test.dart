@@ -168,6 +168,52 @@ void main() {
     expect(message.timestamp.microsecondsSinceEpoch, 1783784523123456);
   });
 
+  test('business entity ordering rejects negative positions', () async {
+    await expectLater(
+      database
+          .into(database.assistantRows)
+          .insert(
+            AssistantRowsCompanion.insert(
+              id: 'assistant-1',
+              sortOrder: -1,
+              payload: '{"id":"assistant-1"}',
+              updatedAt: DateTime.utc(2026, 7, 18),
+            ),
+          ),
+      throwsA(isA<SqliteException>()),
+    );
+  });
+
+  test(
+    'assistant memory keeps weak references and uses its projection index',
+    () async {
+      await database
+          .into(database.assistantMemoryRows)
+          .insert(
+            AssistantMemoryRowsCompanion.insert(
+              id: 'memory-1',
+              sortOrder: 0,
+              assistantId: 'missing-assistant',
+              payload: '{"id":1,"assistantId":"missing-assistant"}',
+              updatedAt: DateTime.utc(2026, 7, 18),
+            ),
+          );
+
+      final plan = await database
+          .customSelect(
+            'EXPLAIN QUERY PLAN SELECT id FROM assistant_memory_rows '
+            'WHERE assistant_id = ? ORDER BY id;',
+            variables: const [Variable<String>('missing-assistant')],
+          )
+          .get();
+
+      expect(
+        plan.map((row) => row.read<String>('detail')).join('\n'),
+        contains('idx_assistant_memories_assistant'),
+      );
+    },
+  );
+
   test('critical list and revision queries use stable indexes', () async {
     await insertConversation();
     await insertMessage();

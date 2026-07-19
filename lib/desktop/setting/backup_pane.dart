@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../icons/lucide_adapter.dart' as lucide;
 import '../../l10n/app_localizations.dart';
+import '../../core/database/business_repository.dart';
 import '../../core/models/backup.dart';
 import '../../core/providers/backup_provider.dart';
 import '../../core/providers/backup_reminder_provider.dart';
@@ -912,18 +913,18 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   );
                   if (mode == null) return;
                   if (!context.mounted) return;
-                  final settings = context.read<SettingsProvider>();
                   final chat = context.read<ChatService>();
                   try {
                     await CherryImporter.importFromCherryStudio(
                       file: f,
                       mode: mode,
-                      settings: settings,
+                      businessRepository: context.read<BusinessRepository>(),
                       chatService: chat,
                     );
                     if (!rootCtx.mounted) return;
                     await showDialog(
                       context: rootCtx,
+                      barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
                         shape: RoundedRectangleBorder(
@@ -951,6 +952,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                     if (!rootCtx.mounted) return;
                     await showDialog(
                       context: rootCtx,
+                      barrierDismissible: false,
                       builder: (dctx) => AlertDialog(
                         backgroundColor: cs.surface,
                         shape: RoundedRectangleBorder(
@@ -993,13 +995,12 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
                   );
                   if (mode == null) return;
                   if (!context.mounted) return;
-                  final settings = context.read<SettingsProvider>();
                   final chat = context.read<ChatService>();
                   try {
                     final res = await ChatboxImporter.importFromChatbox(
                       file: f,
                       mode: mode,
-                      settings: settings,
+                      businessRepository: context.read<BusinessRepository>(),
                       chatService: chat,
                     );
                     if (!rootCtx.mounted) return;

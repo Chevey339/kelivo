@@ -1,19 +1,18 @@
 import 'dart:convert';
 
-import 'package:shared_preferences/shared_preferences.dart';
-
+import '../database/business_preferences.dart';
 import '../models/world_book.dart';
 
 class WorldBookStore {
+  WorldBookStore(this._preferences);
+
   static const String _itemsKey = 'world_books_v1';
   static const String _activeIdsByAssistantKey =
       'world_books_active_ids_by_assistant_v1';
   static const String _collapsedBooksKey = 'world_books_collapsed_v1';
   static const String _defaultAssistantKey = '__global__';
 
-  static List<WorldBook>? _cache;
-  static Map<String, List<String>>? _activeIdsByAssistantCache;
-  static Map<String, bool>? _collapsedBooksCache;
+  final BusinessPreferences _preferences;
 
   static String assistantKey(String? assistantId) {
     final id = (assistantId ?? '').trim();
@@ -38,43 +37,35 @@ class WorldBookStore {
     return {for (final e in src.entries) e.key: e.value};
   }
 
-  static Future<List<WorldBook>> getAll() async {
-    if (_cache != null) return List<WorldBook>.from(_cache!);
-    final prefs = await SharedPreferences.getInstance();
-    final json = prefs.getString(_itemsKey);
-    if (json == null || json.isEmpty) {
-      _cache = const <WorldBook>[];
-      return const <WorldBook>[];
-    }
+  Future<List<WorldBook>> getAll() async {
+    await _preferences.load();
+    final raw = _preferences.getString(_itemsKey);
+    if (raw == null || raw.isEmpty) return const <WorldBook>[];
     try {
-      final list = jsonDecode(json) as List;
-      _cache = list
+      final list = jsonDecode(raw) as List;
+      return list
           .whereType<Map>()
           .map((e) => WorldBook.fromJson(e.cast<String, dynamic>()))
           .toList(growable: true);
-      return List<WorldBook>.from(_cache!);
     } catch (_) {
-      _cache = const <WorldBook>[];
       return const <WorldBook>[];
     }
   }
 
-  static Future<void> save(List<WorldBook> items) async {
-    _cache = List<WorldBook>.from(items);
-    final prefs = await SharedPreferences.getInstance();
-    final json = jsonEncode(
-      items.map((e) => e.toJson()).toList(growable: false),
+  Future<void> save(List<WorldBook> items) async {
+    await _preferences.setString(
+      _itemsKey,
+      jsonEncode(items.map((e) => e.toJson()).toList(growable: false)),
     );
-    await prefs.setString(_itemsKey, json);
   }
 
-  static Future<void> add(WorldBook item) async {
+  Future<void> add(WorldBook item) async {
     final all = await getAll();
     all.add(item);
     await save(all);
   }
 
-  static Future<void> update(WorldBook item) async {
+  Future<void> update(WorldBook item) async {
     final all = await getAll();
     final index = all.indexWhere((e) => e.id == item.id);
     if (index != -1) {
@@ -83,48 +74,36 @@ class WorldBookStore {
     }
   }
 
-  static Future<void> delete(String id) async {
+  Future<void> delete(String id) async {
     final all = await getAll();
     all.removeWhere((e) => e.id == id);
     await save(all);
 
-    // Remove from active map
-    try {
-      final map = await _loadActiveIdsMap();
-      bool removed = false;
-      final next = <String, List<String>>{};
-      for (final entry in map.entries) {
-        final filtered = entry.value
-            .where((e) => e != id)
-            .toList(growable: false);
-        if (filtered.length != entry.value.length) removed = true;
-        next[entry.key] = filtered;
-      }
-      if (removed) await _persistActiveIdsMap(next);
-    } catch (_) {}
+    final activeMap = await _loadActiveIdsMap();
+    var activeChanged = false;
+    final nextActiveMap = <String, List<String>>{};
+    for (final entry in activeMap.entries) {
+      final filtered = entry.value
+          .where((e) => e != id)
+          .toList(growable: false);
+      if (filtered.length != entry.value.length) activeChanged = true;
+      nextActiveMap[entry.key] = filtered;
+    }
+    if (activeChanged) await _persistActiveIdsMap(nextActiveMap);
 
-    try {
-      final collapsed = await _loadCollapsedBooksMap();
-      if (collapsed.remove(id) != null) {
-        await _persistCollapsedBooksMap(collapsed);
-      }
-    } catch (_) {}
+    final collapsed = await _loadCollapsedBooksMap();
+    if (collapsed.remove(id) != null) {
+      await _persistCollapsedBooksMap(collapsed);
+    }
   }
 
-  static Future<void> clear() async {
-    _cache = const <WorldBook>[];
-    _activeIdsByAssistantCache = const <String, List<String>>{};
-    _collapsedBooksCache = const <String, bool>{};
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_itemsKey);
-    await prefs.remove(_activeIdsByAssistantKey);
-    await prefs.remove(_collapsedBooksKey);
+  Future<void> clear() async {
+    await save(const <WorldBook>[]);
+    await _preferences.remove(_activeIdsByAssistantKey);
+    await _preferences.remove(_collapsedBooksKey);
   }
 
-  static Future<void> reorder({
-    required int oldIndex,
-    required int newIndex,
-  }) async {
+  Future<void> reorder({required int oldIndex, required int newIndex}) async {
     final list = await getAll();
     if (list.isEmpty) return;
     if (oldIndex < 0 || oldIndex >= list.length) return;
@@ -134,34 +113,25 @@ class WorldBookStore {
     await save(list);
   }
 
-  static Future<List<String>> getActiveIds({String? assistantId}) async {
+  Future<List<String>> getActiveIds({String? assistantId}) async {
     final map = await _loadActiveIdsMap();
     final key = assistantKey(assistantId);
-    if (map.containsKey(key)) {
-      return List<String>.from(map[key]!);
-    }
+    if (map.containsKey(key)) return List<String>.from(map[key]!);
     final fallback = map[_defaultAssistantKey];
-    if (fallback != null) return List<String>.from(fallback);
-    return const <String>[];
+    return fallback == null ? const <String>[] : List<String>.from(fallback);
   }
 
-  static Future<Map<String, List<String>>> getActiveIdsByAssistant() async {
-    final map = await _loadActiveIdsMap();
-    return _cloneActiveIdsMap(map);
+  Future<Map<String, List<String>>> getActiveIdsByAssistant() async {
+    return _cloneActiveIdsMap(await _loadActiveIdsMap());
   }
 
-  static Future<void> setActiveIds(
-    List<String> ids, {
-    String? assistantId,
-  }) async {
-    final key = assistantKey(assistantId);
-    final clean = _cleanIds(ids);
+  Future<void> setActiveIds(List<String> ids, {String? assistantId}) async {
     final map = await _loadActiveIdsMap();
-    map[key] = clean;
+    map[assistantKey(assistantId)] = _cleanIds(ids);
     await _persistActiveIdsMap(map);
   }
 
-  static Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
+  Future<void> setActiveIdsMap(Map<String, List<String>> map) async {
     final next = <String, List<String>>{};
     map.forEach((key, value) {
       next[key] = _cleanIds(value).toList(growable: false);
@@ -169,12 +139,11 @@ class WorldBookStore {
     await _persistActiveIdsMap(next);
   }
 
-  static Future<Map<String, bool>> getCollapsedBooksMap() async {
-    final map = await _loadCollapsedBooksMap();
-    return _cloneCollapsedBooksMap(map);
+  Future<Map<String, bool>> getCollapsedBooksMap() async {
+    return _cloneCollapsedBooksMap(await _loadCollapsedBooksMap());
   }
 
-  static Future<void> setCollapsed(String bookId, bool collapsed) async {
+  Future<void> setCollapsed(String bookId, bool collapsed) async {
     final id = bookId.trim();
     if (id.isEmpty) return;
     final map = await _loadCollapsedBooksMap();
@@ -182,77 +151,57 @@ class WorldBookStore {
     await _persistCollapsedBooksMap(map);
   }
 
-  static Future<void> setCollapsedMap(Map<String, bool> map) async {
+  Future<void> setCollapsedMap(Map<String, bool> map) async {
     final next = <String, bool>{};
     map.forEach((key, value) {
       final id = key.trim();
-      if (id.isEmpty) return;
-      next[id] = value;
+      if (id.isNotEmpty) next[id] = value;
     });
     await _persistCollapsedBooksMap(next);
   }
 
-  static Future<Map<String, List<String>>> _loadActiveIdsMap() async {
-    if (_activeIdsByAssistantCache != null) {
-      return _cloneActiveIdsMap(_activeIdsByAssistantCache!);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_activeIdsByAssistantKey);
-    Map<String, List<String>> map = <String, List<String>>{};
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw) as Map;
-        decoded.forEach((key, value) {
-          final list = (value is List) ? value : const [];
-          map[key.toString()] = _cleanIds(list);
-        });
-      } catch (_) {
-        map = <String, List<String>>{};
-      }
-    }
-    _activeIdsByAssistantCache = map;
-    return _cloneActiveIdsMap(map);
-  }
-
-  static Future<Map<String, bool>> _loadCollapsedBooksMap() async {
-    if (_collapsedBooksCache != null) {
-      return _cloneCollapsedBooksMap(_collapsedBooksCache!);
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_collapsedBooksKey);
-    Map<String, bool> map = <String, bool>{};
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw) as Map;
-        decoded.forEach((key, value) {
-          final id = key.toString().trim();
-          if (id.isEmpty) return;
-          final collapsed = value is bool ? value : value.toString() == 'true';
-          map[id] = collapsed;
-        });
-      } catch (_) {
-        map = <String, bool>{};
-      }
-    }
-    _collapsedBooksCache = map;
-    return _cloneCollapsedBooksMap(map);
-  }
-
-  static Future<void> _persistActiveIdsMap(
-    Map<String, List<String>> map,
-  ) async {
-    _activeIdsByAssistantCache = _cloneActiveIdsMap(map);
-    final prefs = await SharedPreferences.getInstance();
+  Future<Map<String, List<String>>> _loadActiveIdsMap() async {
+    await _preferences.load();
+    final raw = _preferences.getString(_activeIdsByAssistantKey);
+    if (raw == null || raw.isEmpty) return <String, List<String>>{};
     try {
-      await prefs.setString(_activeIdsByAssistantKey, jsonEncode(map));
-    } catch (_) {}
+      final decoded = jsonDecode(raw) as Map;
+      return {
+        for (final entry in decoded.entries)
+          entry.key.toString(): _cleanIds(
+            entry.value is List ? entry.value as List : const <dynamic>[],
+          ),
+      };
+    } catch (_) {
+      return <String, List<String>>{};
+    }
   }
 
-  static Future<void> _persistCollapsedBooksMap(Map<String, bool> map) async {
-    _collapsedBooksCache = _cloneCollapsedBooksMap(map);
-    final prefs = await SharedPreferences.getInstance();
+  Future<Map<String, bool>> _loadCollapsedBooksMap() async {
+    await _preferences.load();
+    final raw = _preferences.getString(_collapsedBooksKey);
+    if (raw == null || raw.isEmpty) return <String, bool>{};
     try {
-      await prefs.setString(_collapsedBooksKey, jsonEncode(map));
-    } catch (_) {}
+      final decoded = jsonDecode(raw) as Map;
+      final result = <String, bool>{};
+      for (final entry in decoded.entries) {
+        final id = entry.key.toString().trim();
+        if (id.isEmpty) continue;
+        result[id] = entry.value is bool
+            ? entry.value as bool
+            : entry.value.toString() == 'true';
+      }
+      return result;
+    } catch (_) {
+      return <String, bool>{};
+    }
+  }
+
+  Future<void> _persistActiveIdsMap(Map<String, List<String>> map) {
+    return _preferences.setString(_activeIdsByAssistantKey, jsonEncode(map));
+  }
+
+  Future<void> _persistCollapsedBooksMap(Map<String, bool> map) {
+    return _preferences.setString(_collapsedBooksKey, jsonEncode(map));
   }
 }

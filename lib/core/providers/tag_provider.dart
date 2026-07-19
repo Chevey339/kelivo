@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:uuid/uuid.dart';
+import '../database/business_preferences.dart';
 import '../models/assistant_tag.dart';
 
 /// Manages assistant group tags, assignments, order and collapse state.
@@ -12,6 +12,7 @@ class TagProvider extends ChangeNotifier {
   static const String _collapsedKey =
       'assistant_tag_collapsed_v1'; // tagId -> bool
 
+  final BusinessPreferences preferences;
   final List<AssistantTag> _tags = <AssistantTag>[];
   final Map<String, String> _assignment = <String, String>{};
   final Map<String, bool> _collapsed = <String, bool>{};
@@ -20,19 +21,19 @@ class TagProvider extends ChangeNotifier {
   Map<String, String> get assignment => Map.unmodifiable(_assignment);
   bool isCollapsed(String tagId) => _collapsed[tagId] ?? false;
 
-  TagProvider() {
+  TagProvider({required this.preferences}) {
     _load();
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final rawTags = prefs.getString(_tagsKey);
+    await preferences.load();
+    final rawTags = preferences.getString(_tagsKey);
     if (rawTags != null && rawTags.isNotEmpty) {
       _tags
         ..clear()
         ..addAll(AssistantTag.decodeList(rawTags));
     }
-    final rawMap = prefs.getString(_assignKey);
+    final rawMap = preferences.getString(_assignKey);
     if (rawMap != null && rawMap.isNotEmpty) {
       try {
         final m = jsonDecode(rawMap) as Map<String, dynamic>;
@@ -41,7 +42,7 @@ class TagProvider extends ChangeNotifier {
           ..addAll(m.map((k, v) => MapEntry(k, v.toString())));
       } catch (_) {}
     }
-    final rawCol = prefs.getString(_collapsedKey);
+    final rawCol = preferences.getString(_collapsedKey);
     if (rawCol != null && rawCol.isNotEmpty) {
       try {
         final m = jsonDecode(rawCol) as Map<String, dynamic>;
@@ -58,18 +59,15 @@ class TagProvider extends ChangeNotifier {
   }
 
   Future<void> _persistTags() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tagsKey, AssistantTag.encodeList(_tags));
+    await preferences.setString(_tagsKey, AssistantTag.encodeList(_tags));
   }
 
   Future<void> _persistAssignment() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_assignKey, jsonEncode(_assignment));
+    await preferences.setString(_assignKey, jsonEncode(_assignment));
   }
 
   Future<void> _persistCollapsed() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_collapsedKey, jsonEncode(_collapsed));
+    await preferences.setString(_collapsedKey, jsonEncode(_collapsed));
   }
 
   String? tagOfAssistant(String assistantId) => _assignment[assistantId];

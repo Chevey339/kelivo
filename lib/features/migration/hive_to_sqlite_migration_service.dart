@@ -7,12 +7,13 @@ import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/database/app_database.dart';
 import '../../core/database/chat_database_repository.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/conversation.dart';
-import '../../core/services/backup/data_sync.dart' as backup_sync;
+import '../../core/services/backup/backup_settings_validator.dart';
 import '../../core/services/database_v2_rollout_ledger.dart';
 import '../../utils/app_directories.dart';
 
@@ -129,6 +130,10 @@ class HiveToSqliteMigrationService {
   static const _messageBatchSize = 128;
   static const _settingsBackupName = 'settings.json';
   static const _chatsBackupName = 'chats.json';
+  static const _legacyBusinessKeysNeededForRecovery = <String>{
+    'instruction_injections_active_id_v1',
+    'instruction_injections_active_ids_v1',
+  };
   static const _backupPreparationShare = 0.15;
   static const _backupFileShare = 1 - _backupPreparationShare;
   static const _backupDirectories =
@@ -873,8 +878,16 @@ class HiveToSqliteMigrationService {
   }
 
   Future<String> _exportSettingsJson() async {
-    final prefs = await backup_sync.SharedPreferencesAsync.instance;
-    final map = await prefs.snapshot();
+    final prefs = await SharedPreferences.getInstance();
+    final map = <String, Object>{};
+    for (final key in prefs.getKeys()) {
+      if (BackupSettingsValidator.shouldIgnore(key) &&
+          !_legacyBusinessKeysNeededForRecovery.contains(key)) {
+        continue;
+      }
+      final value = prefs.get(key);
+      if (value != null) map[key] = value;
+    }
     return jsonEncode(map);
   }
 

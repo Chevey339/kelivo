@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'restore_bundle_staging.dart';
 import 'restore_business_lease.dart';
@@ -9,17 +8,7 @@ import 'restore_cutover_executor.dart';
 import 'restore_durability.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
-import 'restore_settings_cold_ack.dart';
-import 'restore_settings_store.dart';
 import 'restore_workspace_lock.dart';
-
-/// A terminal restore is active but its settings still need proof from a new
-/// process. Business persistence must remain unopened when this is thrown.
-final class RestoreColdRestartRequired implements Exception {
-  const RestoreColdRestartRequired(this.state);
-
-  final RestoreReceiptState state;
-}
 
 final class PendingRestoreRun {
   const PendingRestoreRun({
@@ -50,9 +39,6 @@ final class RestoreStartupGate {
     RestoreWorkspaceLock.discardingRunFileName,
     RestoreWorkspaceLock.archivingRunFileName,
   };
-  static final _coldAckTemporaryPattern = RegExp(
-    r'^settings_cold_ack\.json\.[0-9]+_[0-9]+_[0-9]+\.tmp$',
-  );
 
   static Future<PendingRestoreRun?> inspect({
     required Directory appDataDirectory,
@@ -230,7 +216,6 @@ final class RestoreStartupGate {
 
   static Future<RestoreReceipt?> recoverAndRequireBusinessReady({
     required Directory appDataDirectory,
-    SharedPreferences? preferences,
     RestoreBusinessLease? businessLease,
     RestoreDurability? durability,
   }) async {
@@ -290,57 +275,14 @@ final class RestoreStartupGate {
         final executor = RestoreCutoverExecutor(
           appDataDirectory: appDataDirectory,
           runId: pending.runId,
-          preferences: preferences ?? await SharedPreferences.getInstance(),
           workspaceLock: workspaceLock,
           durability: resolvedDurability,
           archived: pending.runInCompletedDirectory,
         );
-        final coldAckStore = RestoreSettingsColdAckStore(
-          runDirectory: executor.receiptStore.runDirectory,
-          durability: resolvedDurability,
-        );
         if (pending.receipt.state == RestoreReceiptState.committed ||
             pending.receipt.state == RestoreReceiptState.rolledBack) {
-          final expected = _coldAckExpected(pending.receipt);
-          final coldAck = await coldAckStore.read();
-          if (coldAck == null) {
-            final terminal = await executor
-                .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
-            await coldAckStore.writeOrReplace(
-              terminalReceiptChecksum: terminal.checksum,
-              expected: expected,
-              leaseInstanceId: effectiveBusinessLease.instanceId,
-              processId: effectiveBusinessLease.processId,
-            );
-            throw RestoreColdRestartRequired(terminal.state);
-          }
-          if (coldAck.terminalReceiptChecksum != pending.receipt.checksum ||
-              coldAck.expected != expected) {
-            throw StateError('restore_startup_cold_ack_binding');
-          }
-          if (coldAck.processId == effectiveBusinessLease.processId ||
-              coldAck.leaseInstanceId == effectiveBusinessLease.instanceId) {
-            throw RestoreColdRestartRequired(pending.receipt.state);
-          }
-          final settingsReadback = await executor
-              .inspectTerminalSettingsWhileWorkspaceLocked(pending.receipt);
-          if (settingsReadback ==
-              RestoreSettingsReadback.recoverableNeedsWrite) {
-            final terminal = await executor
-                .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
-            await coldAckStore.writeOrReplace(
-              terminalReceiptChecksum: terminal.checksum,
-              expected: expected,
-              leaseInstanceId: effectiveBusinessLease.instanceId,
-              processId: effectiveBusinessLease.processId,
-            );
-            throw RestoreColdRestartRequired(terminal.state);
-          }
           final terminal = await executor
-              .revalidateTerminalWhileWorkspaceLocked(
-                pending.receipt,
-                repairSettings: false,
-              );
+              .revalidateTerminalWhileWorkspaceLocked(pending.receipt);
           await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
             runId: pending.runId,
             observedMarkerFileName: pending.markerFileName,
@@ -357,33 +299,15 @@ final class RestoreStartupGate {
         final terminal = await executor.revalidateTerminalWhileWorkspaceLocked(
           result,
         );
-        await coldAckStore.writeOrReplace(
-          terminalReceiptChecksum: terminal.checksum,
-          expected: _coldAckExpected(terminal),
-          leaseInstanceId: effectiveBusinessLease.instanceId,
-          processId: effectiveBusinessLease.processId,
+        await workspaceLock.archiveTerminalRunWhileWorkspaceLocked(
+          runId: pending.runId,
+          observedMarkerFileName: RestoreWorkspaceLock.publishingRunFileName,
         );
-        throw RestoreColdRestartRequired(terminal.state);
+        return terminal;
       });
     } finally {
       await ownedBusinessLease?.close();
     }
-  }
-
-  static RestoreSettingsColdAckExpected _coldAckExpected(
-    RestoreReceipt receipt,
-  ) {
-    return switch (receipt.state) {
-      RestoreReceiptState.committed => RestoreSettingsColdAckExpected.target,
-      RestoreReceiptState.rolledBack => RestoreSettingsColdAckExpected.before,
-      RestoreReceiptState.prepared ||
-      RestoreReceiptState.oldRenamed ||
-      RestoreReceiptState.newInstalled ||
-      RestoreReceiptState.verified ||
-      RestoreReceiptState.rollingBack => throw StateError(
-        'restore_startup_cold_ack_state',
-      ),
-    };
   }
 
   static Future<String> _readRunId(File markerFile) async {
@@ -405,9 +329,6 @@ final class RestoreStartupGate {
     var foundReceipts = false;
     var foundPreviousPending = false;
     var foundPrevious = false;
-    final terminal =
-        receipt.state == RestoreReceiptState.committed ||
-        receipt.state == RestoreReceiptState.rolledBack;
     await for (final entity in runDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -433,12 +354,6 @@ final class RestoreStartupGate {
           type == FileSystemEntityType.directory &&
           !foundPrevious) {
         foundPrevious = true;
-        continue;
-      }
-      if (terminal &&
-          type == FileSystemEntityType.file &&
-          (name == RestoreSettingsColdAckStore.fileName ||
-              _coldAckTemporaryPattern.hasMatch(name))) {
         continue;
       }
       throw StateError('restore_startup_run_entry');

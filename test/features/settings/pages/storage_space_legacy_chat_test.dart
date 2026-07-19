@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -85,7 +86,7 @@ void main() {
     try {
       await tester.pumpWidget(
         ChangeNotifierProvider(
-          create: (_) => SettingsProvider(),
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
           child: const MaterialApp(
             locale: Locale('en'),
             supportedLocales: AppLocalizations.supportedLocales,

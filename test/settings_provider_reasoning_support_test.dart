@@ -1,14 +1,10 @@
+import "support/business_test_harness.dart";
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/model_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -41,12 +37,18 @@ void main() {
     });
 
     test('built-in provider order does not add Kimi preset', () async {
-      SharedPreferences.setMockInitialValues({
-        'providers_order_v1': <String>['OpenAI', 'Zhipu AI', 'Grok'],
-      });
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(
+        initial: {
+          'providers_order_v1': <String>['OpenAI', 'Zhipu AI', 'Grok'],
+          'provider_configs_v1': jsonEncode({
+            for (final id in const ['OpenAI', 'Zhipu AI', 'Grok'])
+              id: ProviderConfig.defaultsFor(id).toJson(),
+          }),
+        },
+      );
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.providersOrder, isNot(contains('Kimi')));
       expect(settings.providersOrder.take(3), ['OpenAI', 'Zhipu AI', 'Grok']);
@@ -94,10 +96,10 @@ void main() {
     test(
       'Claude provider resolves apiModelId before DeepSeek xhigh check',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
         await settings.setProviderConfig(
           'ClaudeProxy',
           ProviderConfig(
@@ -131,10 +133,12 @@ void main() {
       test(
         'defaults to enabled and preserves existing budget fallback',
         () async {
-          SharedPreferences.setMockInitialValues({'thinking_budget_v1': 16000});
-          final settings = SettingsProvider();
+          final harness = await createBusinessTestHarness(
+            initial: {'thinking_budget_v1': 16000},
+          );
+          final settings = SettingsProvider(harness.preferences);
 
-          await _waitForSettingsLoad();
+          await settings.loaded;
 
           expect(settings.titleGenerationThinkingEnabled, isTrue);
           expect(settings.titleGenerationThinkingBudgetFor(null), 16000);
@@ -145,10 +149,10 @@ void main() {
       test(
         'disabled title generation thinking resolves to off budget',
         () async {
-          SharedPreferences.setMockInitialValues({});
-          final settings = SettingsProvider();
+          final harness = await createBusinessTestHarness(initial: {});
+          final settings = SettingsProvider(harness.preferences);
 
-          await _waitForSettingsLoad();
+          await settings.loaded;
           await settings.setThinkingBudget(16000);
           await settings.setTitleGenerationThinkingEnabled(false);
 
@@ -156,7 +160,7 @@ void main() {
           expect(settings.titleGenerationThinkingBudgetFor(null), 0);
           expect(settings.titleGenerationThinkingBudgetFor(1024), 0);
 
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = harness.preferences;
           expect(
             prefs.getBool('title_generation_thinking_enabled_v1'),
             isFalse,
@@ -165,31 +169,33 @@ void main() {
       );
 
       test('loads persisted disabled state', () async {
-        SharedPreferences.setMockInitialValues({
-          'title_generation_thinking_enabled_v1': false,
-        });
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(
+          initial: {'title_generation_thinking_enabled_v1': false},
+        );
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
 
         expect(settings.titleGenerationThinkingEnabled, isFalse);
         expect(settings.titleGenerationThinkingBudgetFor(32000), 0);
       });
 
       test('reset restores enabled fallback behavior', () async {
-        SharedPreferences.setMockInitialValues({
-          'title_generation_thinking_enabled_v1': false,
-          'thinking_budget_v1': 64000,
-        });
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(
+          initial: {
+            'title_generation_thinking_enabled_v1': false,
+            'thinking_budget_v1': 64000,
+          },
+        );
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
         await settings.resetTitleGenerationThinkingEnabled();
 
         expect(settings.titleGenerationThinkingEnabled, isTrue);
         expect(settings.titleGenerationThinkingBudgetFor(null), 64000);
 
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = harness.preferences;
         expect(prefs.getBool('title_generation_thinking_enabled_v1'), isTrue);
       });
     });
@@ -197,10 +203,10 @@ void main() {
     test(
       'Claude latest models expose xhigh and max reasoning without presets',
       () async {
-        SharedPreferences.setMockInitialValues({});
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(initial: {});
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
         await settings.setProviderConfig(
           'Claude',
           ProviderConfig(
@@ -226,10 +232,10 @@ void main() {
     );
 
     test('OpenRouter Anthropic format exposes Claude max reasoning', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setProviderConfig(
         'OpenRouterAnthropic',
         ProviderConfig(

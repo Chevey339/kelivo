@@ -30,11 +30,7 @@ void main() {
   test(
     'installation gate rejects every unpublished SQLite schema without mutation',
     () async {
-      for (
-        var schemaVersion = 1;
-        schemaVersion < AppDatabase.currentSchemaVersion;
-        schemaVersion++
-      ) {
+      for (final schemaVersion in <int>[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 42]) {
         final directory = await Directory.systemTemp.createTemp(
           'kelivo_reject_schema_${schemaVersion}_',
         );
@@ -77,6 +73,37 @@ void main() {
           after.close();
         }
       }
+    },
+  );
+
+  test(
+    'installed schema 1 is rejected when a business table is missing',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'kelivo_missing_business_table_',
+      );
+      addTearDown(() async {
+        if (await directory.exists()) await directory.delete(recursive: true);
+      });
+      final file = File(p.join(directory.path, AppDatabase.databaseFileName));
+      final database = AppDatabase.open(file: file);
+      await database.customSelect('SELECT 1;').getSingle();
+      await database.close();
+
+      final raw = sqlite.sqlite3.open(file.path);
+      raw.execute('DROP TABLE preference_rows;');
+      raw.close();
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(file),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'required_tables',
+          ),
+        ),
+      );
     },
   );
 }

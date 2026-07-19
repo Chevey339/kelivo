@@ -2,12 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../database/business_repository.dart';
+import '../../database/business_settings_router.dart';
 import '../../models/api_keys.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
-import '../../providers/settings_provider.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import 'cherry_direct_backup_reader.dart';
@@ -30,7 +30,7 @@ class CherryImportResult {
 class CherryImporter {
   CherryImporter._();
 
-  // Persisted keys used by SettingsProvider/AssistantProvider
+  // Published backup keys used by the business settings router.
   static const String _providersKey = 'provider_configs_v1';
   static const String _providersOrderKey = 'providers_order_v1';
   static const String _assistantsKey = 'assistants_v1';
@@ -38,7 +38,7 @@ class CherryImporter {
   static Future<CherryImportResult> importFromCherryStudio({
     required File file,
     required RestoreMode mode,
-    required SettingsProvider settings,
+    required BusinessRepository businessRepository,
     required ChatService chatService,
   }) async {
     // 1) Load JSON from ZIP/BAK (best-effort)
@@ -187,15 +187,15 @@ class CherryImporter {
       }
     }
 
-    // 5) Import providers into Settings (SharedPreferences)
-    final importedProviders = await _importProviders(
-      cherryProviders,
-      settings,
-      mode,
+    // 5) Parse business data before opening the single write transaction.
+    final importedProviders = _parseProviders(cherryProviders);
+    final importedAssistants = _parseAssistants(cherryAssistants);
+    await _importBusinessData(
+      businessRepository: businessRepository,
+      mode: mode,
+      providers: importedProviders,
+      assistants: importedAssistants,
     );
-
-    // 6) Import assistants (persist to SharedPreferences, restart recommended)
-    final importedAssistants = await _importAssistants(cherryAssistants, mode);
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
     if (!chatService.initialized) {
@@ -292,8 +292,8 @@ class CherryImporter {
     );
 
     return CherryImportResult(
-      providers: importedProviders,
-      assistants: importedAssistants,
+      providers: importedProviders.length,
+      assistants: importedAssistants.length,
       conversations: convCountAndMsgCount.$1,
       messages: convCountAndMsgCount.$2,
       files: pathsByFileId.length + convCountAndMsgCount.$3,
@@ -354,11 +354,9 @@ class CherryImporter {
     throw Exception('Unable to read Cherry backup file');
   }
 
-  static Future<int> _importProviders(
+  static Map<String, Map<String, dynamic>> _parseProviders(
     List<dynamic> cherryProviders,
-    SettingsProvider settings,
-    RestoreMode mode,
-  ) async {
+  ) {
     // Build imported map id -> ProviderConfig JSON-like
     final imported = <String, Map<String, dynamic>>{};
 
@@ -465,66 +463,12 @@ class CherryImporter {
       imported[id] = map;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-
-    if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_providersKey, jsonEncode(imported));
-      await prefs.setStringList(_providersOrderKey, imported.keys.toList());
-      return imported.length;
-    }
-
-    // merge mode: merge into existing providers without removing any
-    Map<String, dynamic> current = const <String, dynamic>{};
-    try {
-      final raw = prefs.getString(_providersKey);
-      if (raw != null && raw.isNotEmpty) {
-        current = jsonDecode(raw) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    final merged = <String, dynamic>{}..addAll(current);
-    for (final entry in imported.entries) {
-      if (!merged.containsKey(entry.key)) {
-        merged[entry.key] = entry.value;
-      } else {
-        // Update with non-empty fields from imported
-        final cur = (merged[entry.key] as Map).map(
-          (k, v) => MapEntry(k.toString(), v),
-        );
-        final inc = entry.value;
-        final next = Map<String, dynamic>.from(cur);
-        void putIfNotEmpty(String k) {
-          final v = inc[k];
-          if (v == null) return;
-          if (v is String && v.trim().isEmpty) return;
-          next[k] = v;
-        }
-
-        for (final k in inc.keys) {
-          putIfNotEmpty(k);
-        }
-        merged[entry.key] = next;
-      }
-    }
-
-    await prefs.setString(_providersKey, jsonEncode(merged));
-
-    // Merge providers order: append new ids at end, keep existing order
-    final existedOrder =
-        prefs.getStringList(_providersOrderKey) ?? const <String>[];
-    final orderSet = existedOrder.toList();
-    for (final id in imported.keys) {
-      if (!orderSet.contains(id)) orderSet.add(id);
-    }
-    await prefs.setStringList(_providersOrderKey, orderSet);
-
-    return imported.length;
+    return imported;
   }
 
-  static Future<int> _importAssistants(
+  static List<Map<String, dynamic>> _parseAssistants(
     List<dynamic> cherryAssistants,
-    RestoreMode mode,
-  ) async {
+  ) {
     // Map to our Assistant JSON list (as stored by Assistant.encodeList)
     final out = <Map<String, dynamic>>[];
     for (final a in cherryAssistants) {
@@ -576,44 +520,106 @@ class CherryImporter {
       out.add(json);
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    if (mode == RestoreMode.overwrite) {
-      await prefs.setString(_assistantsKey, jsonEncode(out));
-      return out.length;
-    }
+    return out;
+  }
 
-    // merge: merge by id; update systemPrompt if provided, keep other local values
-    List<dynamic> existing = const <dynamic>[];
-    try {
-      final raw = prefs.getString(_assistantsKey);
-      if (raw != null && raw.isNotEmpty) {
-        existing = jsonDecode(raw) as List<dynamic>;
+  static Future<void> _importBusinessData({
+    required BusinessRepository businessRepository,
+    required RestoreMode mode,
+    required Map<String, Map<String, dynamic>> providers,
+    required List<Map<String, dynamic>> assistants,
+  }) {
+    return businessRepository.transformSnapshot((current) {
+      final settings = BusinessSettingsRouter.exportSnapshot(current);
+      if (mode == RestoreMode.overwrite) {
+        settings[_providersKey] = jsonEncode(providers);
+        settings[_providersOrderKey] = providers.keys.toList();
+        settings[_assistantsKey] = jsonEncode(assistants);
+        return BusinessSettingsRouter.normalizeAndRoute(settings);
       }
-    } catch (_) {}
-    final byId = <String, Map<String, dynamic>>{
-      for (final e in existing)
-        if (e is Map && e['id'] != null)
-          e['id'].toString(): e.map((k, v) => MapEntry(k.toString(), v)),
-    };
-    for (final a in out) {
-      final id = a['id'] as String;
-      if (!byId.containsKey(id)) {
-        byId[id] = a;
-      } else {
-        final local = byId[id]!;
-        // Update prompt if incoming has non-empty
-        final incPrompt = (a['systemPrompt'] as String?)?.trim() ?? '';
-        if (incPrompt.isNotEmpty) local['systemPrompt'] = incPrompt;
-        // Update model fields if provided
-        if (a['chatModelProvider'] != null) {
-          local['chatModelProvider'] = a['chatModelProvider'];
+
+      final currentProviders = _jsonObjectMap(
+        settings[_providersKey],
+        _providersKey,
+      );
+      for (final entry in providers.entries) {
+        final local = currentProviders[entry.key];
+        if (local is! Map) {
+          currentProviders[entry.key] = entry.value;
+          continue;
         }
-        if (a['chatModelId'] != null) local['chatModelId'] = a['chatModelId'];
+        final next = local.map((key, value) => MapEntry(key.toString(), value));
+        for (final importedField in entry.value.entries) {
+          final value = importedField.value;
+          if (value == null || (value is String && value.trim().isEmpty)) {
+            continue;
+          }
+          next[importedField.key] = value;
+        }
+        currentProviders[entry.key] = next;
       }
+      settings[_providersKey] = jsonEncode(currentProviders);
+
+      final order = List<String>.from(
+        (settings[_providersOrderKey] as List).cast<String>(),
+      );
+      for (final providerId in providers.keys) {
+        if (!order.contains(providerId)) order.add(providerId);
+      }
+      settings[_providersOrderKey] = order;
+
+      final currentAssistants = _jsonObjectList(
+        settings[_assistantsKey],
+        _assistantsKey,
+      );
+      final assistantsById = <String, Map<String, dynamic>>{
+        for (final assistant in currentAssistants)
+          if (assistant['id'] != null) assistant['id'].toString(): assistant,
+      };
+      for (final assistant in assistants) {
+        final id = assistant['id'] as String;
+        final local = assistantsById[id];
+        if (local == null) {
+          assistantsById[id] = assistant;
+          continue;
+        }
+        final prompt = (assistant['systemPrompt'] as String?)?.trim() ?? '';
+        if (prompt.isNotEmpty) local['systemPrompt'] = prompt;
+        if (assistant['chatModelProvider'] != null) {
+          local['chatModelProvider'] = assistant['chatModelProvider'];
+        }
+        if (assistant['chatModelId'] != null) {
+          local['chatModelId'] = assistant['chatModelId'];
+        }
+      }
+      settings[_assistantsKey] = jsonEncode(assistantsById.values.toList());
+      return BusinessSettingsRouter.normalizeAndRoute(settings);
+    }, writeReceipt: true);
+  }
+
+  static Map<String, dynamic> _jsonObjectMap(Object? raw, String key) {
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map || decoded.values.any((value) => value is! Map)) {
+      throw FormatException(key);
     }
-    final merged = byId.values.toList();
-    await prefs.setString(_assistantsKey, jsonEncode(merged));
-    return out.length;
+    return decoded.map((field, value) => MapEntry(field.toString(), value));
+  }
+
+  static List<Map<String, dynamic>> _jsonObjectList(Object? raw, String key) {
+    if (raw is! String) throw FormatException(key);
+    final decoded = jsonDecode(raw);
+    if (decoded is! List || decoded.any((value) => value is! Map)) {
+      throw FormatException(key);
+    }
+    return decoded
+        .cast<Map>()
+        .map(
+          (value) => value.map(
+            (field, fieldValue) => MapEntry(field.toString(), fieldValue),
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// Decode a DOS date/time packed value (from ZIP entry's lastModTime) into

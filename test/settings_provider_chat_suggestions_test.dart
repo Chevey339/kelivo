@@ -1,23 +1,17 @@
+import "support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
-
-Future<void> _waitForSettingsLoad() async {
-  for (var i = 0; i < 25; i++) {
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('SettingsProvider chat suggestions', () {
     test('defaults suggestion model to disabled', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.suggestionModelProvider, isNull);
       expect(settings.suggestionModelId, isNull);
@@ -29,10 +23,10 @@ void main() {
     });
 
     test('persists selected suggestion model and prompt', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
       await settings.setSuggestionModel('OpenAI', 'gpt-test');
       await settings.setSuggestionPrompt('Custom {content} {locale}');
 
@@ -41,7 +35,7 @@ void main() {
       expect(settings.suggestionModelKey, 'OpenAI::gpt-test');
       expect(settings.suggestionPrompt, 'Custom {content} {locale}');
 
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(prefs.getString('suggestion_model_v1'), 'OpenAI::gpt-test');
       expect(
         prefs.getString('suggestion_prompt_v1'),
@@ -50,45 +44,45 @@ void main() {
     });
 
     test('defaults suggestion tap to auto-send', () async {
-      SharedPreferences.setMockInitialValues({});
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.insertSuggestionOnTapOnly, isFalse);
     });
 
     test('loads and persists insert-only suggestion tap mode', () async {
-      SharedPreferences.setMockInitialValues({
-        'suggestion_insert_on_tap_only_v1': true,
-      });
-      final settings = SettingsProvider();
+      final harness = await createBusinessTestHarness(
+        initial: {'suggestion_insert_on_tap_only_v1': true},
+      );
+      final settings = SettingsProvider(harness.preferences);
 
-      await _waitForSettingsLoad();
+      await settings.loaded;
 
       expect(settings.insertSuggestionOnTapOnly, isTrue);
 
       await settings.setInsertSuggestionOnTapOnly(false);
 
       expect(settings.insertSuggestionOnTapOnly, isFalse);
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = harness.preferences;
       expect(prefs.getBool('suggestion_insert_on_tap_only_v1'), isFalse);
     });
 
     test(
       'clears suggestion model when provider selection is cleared',
       () async {
-        SharedPreferences.setMockInitialValues({
-          'suggestion_model_v1': 'OpenAI::gpt-test',
-        });
-        final settings = SettingsProvider();
+        final harness = await createBusinessTestHarness(
+          initial: {'suggestion_model_v1': 'OpenAI::gpt-test'},
+        );
+        final settings = SettingsProvider(harness.preferences);
 
-        await _waitForSettingsLoad();
+        await settings.loaded;
         await settings.clearSelectionsForProvider('OpenAI');
 
         expect(settings.suggestionModelProvider, isNull);
         expect(settings.suggestionModelId, isNull);
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = harness.preferences;
         expect(prefs.getString('suggestion_model_v1'), isNull);
       },
     );

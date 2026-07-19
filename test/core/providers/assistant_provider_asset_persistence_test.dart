@@ -6,9 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/providers/assistant_provider.dart';
+
+import '../../support/business_preferences_test_harness.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -29,14 +30,16 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 }
 
 Future<AssistantProvider> _loadedProvider({
+  required BusinessPreferencesTestSession session,
   required List<Map<String, Object?>> assistants,
 }) async {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': jsonEncode(assistants),
-    'current_assistant_id_v1': assistants.first['id'].toString(),
-  });
+  await session.preferences.setString('assistants_v1', jsonEncode(assistants));
+  await session.preferences.setString(
+    'current_assistant_id_v1',
+    assistants.first['id'].toString(),
+  );
 
-  final provider = AssistantProvider();
+  final provider = AssistantProvider(preferences: session.preferences);
   for (var i = 0; i < 25; i++) {
     if (provider.assistants.length == assistants.length) return provider;
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -49,6 +52,8 @@ void main() {
 
   late Directory tempDir;
   late PathProviderPlatform previousPathProvider;
+  late BusinessPreferencesTestHarness harness;
+  late BusinessPreferencesTestSession session;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp(
@@ -56,10 +61,13 @@ void main() {
     );
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+    harness = await BusinessPreferencesTestHarness.create();
+    session = await harness.open();
   });
 
   tearDown(() async {
     PathProviderPlatform.instance = previousPathProvider;
+    await harness.dispose();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -69,6 +77,7 @@ void main() {
     'copies local assistant avatar and background into managed backup directories',
     () async {
       final provider = await _loadedProvider(
+        session: session,
         assistants: const [
           {'id': 'assistant-a', 'name': 'Assistant A'},
         ],
@@ -108,8 +117,8 @@ void main() {
       expect(await File(avatarPath).readAsBytes(), const [1, 2, 3]);
       expect(await File(backgroundPath).readAsBytes(), const [4, 5, 6]);
 
-      final prefs = await SharedPreferences.getInstance();
-      final stored = jsonDecode(prefs.getString('assistants_v1')!) as List;
+      final stored =
+          jsonDecode(session.preferences.getString('assistants_v1')!) as List;
       final storedAssistant = stored.single as Map;
       expect(storedAssistant['avatar'], updated.avatar);
       expect(storedAssistant['background'], updated.background);

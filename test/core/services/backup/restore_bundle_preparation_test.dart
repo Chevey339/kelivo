@@ -5,12 +5,15 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
 Future<({Directory directory, String manifestSha256})> _createBundle(
   Directory root, {
+  bool includeDatabase = true,
   bool includeFiles = false,
 }) async {
   final directory = Directory(p.join(root.path, 'extracted'));
@@ -23,6 +26,24 @@ Future<({Directory directory, String manifestSha256})> _createBundle(
       'sha256': (await sha256.bind(settings.openRead()).first).toString(),
     },
   };
+  final database = File(p.join(directory.path, 'database', 'kelivo.db'));
+  ChatDatabaseSnapshotInfo? databaseInfo;
+  if (includeDatabase) {
+    await database.parent.create(recursive: true);
+    final appDatabase = AppDatabase.open(file: database);
+    try {
+      await appDatabase.customSelect('SELECT 1;').get();
+    } finally {
+      await appDatabase.close();
+    }
+    databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+      database,
+    );
+    entries['database/kelivo.db'] = {
+      'bytes': await database.length(),
+      'sha256': (await sha256.bind(database.openRead()).first).toString(),
+    };
+  }
   if (includeFiles) {
     final asset = File(p.join(directory.path, 'upload', 'note.txt'));
     await asset.parent.create();
@@ -37,12 +58,19 @@ Future<({Directory directory, String manifestSha256})> _createBundle(
     jsonEncode({
       'format': 'kelivo-backup',
       'formatVersion': 2,
-      'payloadKind': 'settings-only',
+      'payloadKind': includeDatabase ? 'sqlite' : 'settings-only',
       'createdAtUtc': '2026-07-09T00:00:00.000Z',
       'appVersion': 'test',
-      'includeChats': false,
+      'includeChats': includeDatabase,
       'includeFiles': includeFiles,
       'secretsIncluded': true,
+      if (includeDatabase)
+        'database': {
+          'entry': 'database/kelivo.db',
+          'schemaVersion': databaseInfo!.schemaVersion,
+          'conversationCount': databaseInfo.conversationCount,
+          'messageCount': databaseInfo.messageCount,
+        },
       'entries': entries,
     }),
     flush: true,
@@ -74,7 +102,7 @@ void main() {
         appDataDirectory: root,
         extractedDirectory: bundle.directory,
         sourceManifestSha256: bundle.manifestSha256,
-        bundleIncludesChats: false,
+        bundleIncludesChats: true,
         bundleIncludesFiles: false,
         restoreChats: true,
         restoreFiles: true,
@@ -82,7 +110,7 @@ void main() {
       );
 
       expect(prepared.receipt.state, RestoreReceiptState.prepared);
-      expect(prepared.receipt.selectedComponents, {RestoreComponent.settings});
+      expect(prepared.receipt.selectedComponents, {RestoreComponent.database});
       expect(await prepared.candidateDirectory.exists(), isTrue);
       final store = RestoreReceiptStore(
         appDataDirectory: root,
@@ -98,14 +126,14 @@ void main() {
         appDataDirectory: root,
         extractedDirectory: bundle.directory,
         sourceManifestSha256: bundle.manifestSha256,
-        bundleIncludesChats: false,
+        bundleIncludesChats: true,
         bundleIncludesFiles: true,
         restoreChats: true,
         restoreFiles: false,
         createdAtUtc: DateTime.utc(2026, 7, 9, 12),
       );
 
-      expect(prepared.receipt.selectedComponents, {RestoreComponent.settings});
+      expect(prepared.receipt.selectedComponents, {RestoreComponent.database});
       expect(
         await File(
           p.join(prepared.candidateDirectory.path, 'upload', 'note.txt'),
@@ -129,7 +157,7 @@ void main() {
               as Map<String, dynamic>;
       expect(candidateManifest['includeFiles'], isFalse);
       expect((candidateManifest['entries'] as Map<String, dynamic>).keys, [
-        'settings.json',
+        'database/kelivo.db',
       ]);
     });
 
@@ -140,53 +168,64 @@ void main() {
         appDataDirectory: root,
         extractedDirectory: bundle.directory,
         sourceManifestSha256: bundle.manifestSha256,
-        bundleIncludesChats: false,
+        bundleIncludesChats: true,
         bundleIncludesFiles: true,
-        restoreChats: false,
+        restoreChats: true,
         restoreFiles: true,
         createdAtUtc: DateTime.utc(2026, 7, 9, 12),
       );
 
       expect(prepared.receipt.selectedComponents, {
-        RestoreComponent.settings,
+        RestoreComponent.database,
         RestoreComponent.assets,
       });
     });
 
-    test('cleans its run when receipt construction fails', () async {
-      final bundle = await _createBundle(root);
+    test(
+      'settings-only preparation is rejected without publishing a run',
+      () async {
+        final bundle = await _createBundle(root, includeDatabase: false);
 
-      await expectLater(
-        RestoreBundlePreparation.prepare(
-          appDataDirectory: root,
-          extractedDirectory: bundle.directory,
-          sourceManifestSha256: bundle.manifestSha256,
-          bundleIncludesChats: false,
-          bundleIncludesFiles: false,
-          restoreChats: false,
-          restoreFiles: false,
-          createdAtUtc: DateTime(2026, 7, 9, 12),
-        ),
-        throwsArgumentError,
-      );
+        await expectLater(
+          RestoreBundlePreparation.prepare(
+            appDataDirectory: root,
+            extractedDirectory: bundle.directory,
+            sourceManifestSha256: bundle.manifestSha256,
+            bundleIncludesChats: false,
+            bundleIncludesFiles: false,
+            restoreChats: false,
+            restoreFiles: false,
+            createdAtUtc: DateTime(2026, 7, 9, 12),
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'message',
+              'restore_preparation_database_required',
+            ),
+          ),
+        );
 
-      final workspaceRoot = Directory(
-        p.join(root.path, RestoreWorkspaceLock.workspaceRootName),
-      );
-      expect(
-        await workspaceRoot
-            .list(followLinks: false)
-            .where((entry) => p.basename(entry.path).startsWith('run_'))
-            .toList(),
-        isEmpty,
-      );
-      expect(
-        await File(
-          p.join(workspaceRoot.path, RestoreWorkspaceLock.activeRunFileName),
-        ).exists(),
-        isFalse,
-      );
-    });
+        final workspaceRoot = Directory(
+          p.join(root.path, RestoreWorkspaceLock.workspaceRootName),
+        );
+        if (await workspaceRoot.exists()) {
+          expect(
+            await workspaceRoot
+                .list(followLinks: false)
+                .where((entry) => p.basename(entry.path).startsWith('run_'))
+                .toList(),
+            isEmpty,
+          );
+        }
+        expect(
+          await File(
+            p.join(workspaceRoot.path, RestoreWorkspaceLock.activeRunFileName),
+          ).exists(),
+          isFalse,
+        );
+      },
+    );
 
     test('admits at most one concurrent prepared bundle', () async {
       final bundle = await _createBundle(root);
@@ -197,9 +236,9 @@ void main() {
             appDataDirectory: root,
             extractedDirectory: bundle.directory,
             sourceManifestSha256: bundle.manifestSha256,
-            bundleIncludesChats: false,
+            bundleIncludesChats: true,
             bundleIncludesFiles: false,
-            restoreChats: false,
+            restoreChats: true,
             restoreFiles: false,
             createdAtUtc: DateTime.utc(2026, 7, 9, 12),
           );

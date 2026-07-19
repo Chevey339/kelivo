@@ -8,27 +8,17 @@ import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_builder.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_plan.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
-import 'package:Kelivo/core/services/backup/restore_settings_transition.dart';
 
 const _runId = '0123456789abcdef0123456789abcdef';
 const _candidateHash =
     'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
-RestoreReceipt _receipt({bool chats = false, bool files = false}) {
+RestoreReceipt _receipt({bool files = false}) {
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: DateTime.utc(2026, 7, 9),
-    restoreChats: chats,
     restoreFiles: files,
     candidateManifestSha256: _candidateHash,
-  );
-}
-
-RestoreSettingsTransition _transition() {
-  return RestoreSettingsTransition.build(
-    currentSettings: const {'theme': 'dark'},
-    candidateSettings: const {'theme': 'light'},
-    secretsIncluded: true,
   );
 }
 
@@ -59,14 +49,13 @@ void main() {
 
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: root,
-        preparedReceipt: _receipt(chats: true, files: true),
-        settingsTransition: _transition(),
+        preparedReceipt: _receipt(files: true),
       );
 
-      expect(bundle.plan.database?.state, RestorePreviousDatabaseState.file);
-      expect(bundle.plan.database?.descriptor?.bytes, 4);
+      expect(bundle.plan.database.state, RestorePreviousDatabaseState.file);
+      expect(bundle.plan.database.descriptor?.bytes, 4);
       expect(
-        bundle.plan.database?.descriptor?.sha256,
+        bundle.plan.database.descriptor?.sha256,
         sha256.convert([1, 2, 3, 4]).toString(),
       );
       expect(bundle.plan.assets?.rootStates, const {
@@ -80,12 +69,6 @@ void main() {
         'upload/nested/note.txt',
       ]);
       expect(bundle.plan.assets?.entries['upload/nested/note.txt']?.bytes, 4);
-      expect(
-        bundle.plan.settings.validateSnapshotBytes(
-          bundle.settingsSnapshotBytes,
-        ),
-        {'theme': 'dark'},
-      );
       await expectLater(
         RestorePreviousBuilder.validateLive(
           appDataDirectory: root,
@@ -98,26 +81,23 @@ void main() {
     test('preserves a selected missing database distinctly', () async {
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: root,
-        preparedReceipt: _receipt(chats: true),
-        settingsTransition: _transition(),
+        preparedReceipt: _receipt(),
       );
 
-      expect(bundle.plan.database?.state, RestorePreviousDatabaseState.missing);
+      expect(bundle.plan.database.state, RestorePreviousDatabaseState.missing);
       expect(bundle.plan.assets, isNull);
     });
 
-    test('does not inspect unselected database or assets', () async {
-      await File(p.join(root.path, 'kelivo.db-wal')).writeAsBytes([1]);
+    test('does not inspect unselected assets', () async {
       await File(p.join(root.path, 'upload')).writeAsBytes([2]);
 
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: root,
         preparedReceipt: _receipt(),
-        settingsTransition: _transition(),
       );
 
-      expect(bundle.plan.selectedComponents, {RestoreComponent.settings});
-      expect(bundle.plan.database, isNull);
+      expect(bundle.plan.selectedComponents, {RestoreComponent.database});
+      expect(bundle.plan.database.state, RestorePreviousDatabaseState.missing);
       expect(bundle.plan.assets, isNull);
     });
 
@@ -128,8 +108,7 @@ void main() {
       await expectLater(
         RestorePreviousBuilder.build(
           appDataDirectory: root,
-          preparedReceipt: _receipt(chats: true),
-          settingsTransition: _transition(),
+          preparedReceipt: _receipt(),
         ),
         throwsA(
           isA<StateError>().having(
@@ -148,7 +127,6 @@ void main() {
         RestorePreviousBuilder.build(
           appDataDirectory: root,
           preparedReceipt: _receipt(files: true),
-          settingsTransition: _transition(),
         ),
         throwsA(isA<StateError>()),
       );
@@ -162,7 +140,6 @@ void main() {
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: root,
         preparedReceipt: _receipt(files: true),
-        settingsTransition: _transition(),
       );
 
       expect(
@@ -183,7 +160,6 @@ void main() {
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: root,
         preparedReceipt: _receipt(files: true),
-        settingsTransition: _transition(),
       );
 
       await asset.writeAsString('new!', flush: true);
@@ -267,7 +243,6 @@ void main() {
           RestorePreviousBuilder.build(
             appDataDirectory: root,
             preparedReceipt: _receipt(files: true),
-            settingsTransition: _transition(),
           ),
           throwsA(isA<StateError>()),
         );

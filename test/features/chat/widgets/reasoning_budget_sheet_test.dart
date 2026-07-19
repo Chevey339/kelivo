@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,7 @@ Future<SettingsProvider> _settingsForClaudeModel(
   String modelId,
 ) async {
   SharedPreferences.setMockInitialValues({});
-  final settings = SettingsProvider();
+  final settings = SettingsProvider(createBusinessTestPreferences());
   await tester.pump(const Duration(milliseconds: 300));
   await tester.pump();
 
@@ -42,7 +43,8 @@ Future<void> _pumpSheetLauncher(
       providers: [
         ChangeNotifierProvider<SettingsProvider>.value(value: settings),
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) =>
+              AssistantProvider(preferences: createBusinessTestPreferences()),
         ),
       ],
       child: MaterialApp(

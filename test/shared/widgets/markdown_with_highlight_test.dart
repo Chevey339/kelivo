@@ -1,5 +1,7 @@
+import "../../support/business_test_harness.dart";
 import 'dart:async';
 
+import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/shared/widgets/markdown_with_highlight.dart';
 import 'package:Kelivo/shared/widgets/export_capture_scope.dart';
@@ -17,7 +19,6 @@ import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Finder _findMathWidget() {
   return find.byType(Math);
@@ -267,15 +268,16 @@ Widget _markdownHarness(
   String text, {
   double? width,
   bool streaming = false,
-  Map<String, Object>? preferences,
+  BusinessPreferences? businessPreferences,
   void Function(String id)? onCitationTap,
   ThemeData? theme,
   ThemeData? darkTheme,
   ThemeMode? themeMode,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(
+      businessPreferences ?? createBusinessTestPreferences(),
+    ),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -313,11 +315,12 @@ void _overrideMarkdownTablePlatform(TargetPlatform platform) {
 Widget _streamingMarkdownHarness(
   ValueListenable<String> text, {
   double? width,
-  Map<String, Object>? preferences,
+  BusinessPreferences? businessPreferences,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(
+      businessPreferences ?? createBusinessTestPreferences(),
+    ),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -344,13 +347,11 @@ Widget _streamingMarkdownHarness(
 
 Widget _settingsHarness({
   required Widget child,
-  Map<String, Object>? preferences,
   required void Function(SettingsProvider settings) onSettingsReady,
 }) {
-  SharedPreferences.setMockInitialValues(preferences ?? {});
   return ChangeNotifierProvider(
     create: (_) {
-      final settings = SettingsProvider();
+      final settings = SettingsProvider(createBusinessTestPreferences());
       onSettingsReady(settings);
       return settings;
     },
@@ -1959,6 +1960,9 @@ A-->B
   testWidgets('MarkdownWithCodeHighlight applies app font to table text', (
     tester,
   ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_app_font_family_v1': 'Courier'},
+    );
     await tester.pumpWidget(
       _markdownHarness(
         '''
@@ -1967,7 +1971,7 @@ A-->B
 | Alpha | Beta |
 ''',
         width: 360,
-        preferences: const {'display_app_font_family_v1': 'Courier'},
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pump();
@@ -2150,10 +2154,13 @@ A-->B
   testWidgets('MarkdownWithCodeHighlight keeps dollar math switch scoped', (
     tester,
   ) async {
+    final harness = await createBusinessTestHarness(
+      initial: const {'display_enable_dollar_latex_v1': false},
+    );
     await tester.pumpWidget(
       _markdownHarness(
         r'Inline $a+b$ and \(c+d\)',
-        preferences: const {'display_enable_dollar_latex_v1': false},
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pump();
@@ -2821,20 +2828,20 @@ void main() {}
   testWidgets(
     'MarkdownWithCodeHighlight toggles auto-collapsed code block from header',
     (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
       await tester.pumpWidget(
-        _markdownHarness(
-          '''
+        _markdownHarness('''
 ```dart
 line1
 line2
 line3
 ```
-''',
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
-        ),
+''', businessPreferences: harness.preferences),
       );
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
@@ -2866,20 +2873,20 @@ line3
   testWidgets(
     'MarkdownWithCodeHighlight shows collapsed code tail fade when hidden lines exist',
     (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
       await tester.pumpWidget(
-        _markdownHarness(
-          '''
+        _markdownHarness('''
 ```dart
 fade1
 fade2
 fade3
 ```
-''',
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
-        ),
+''', businessPreferences: harness.preferences),
       );
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
@@ -2988,14 +2995,17 @@ alpha2
 alpha3
 ```
 ''');
+    final harness = await createBusinessTestHarness(
+      initial: const {
+        'display_auto_collapse_code_block_v1': true,
+        'display_auto_collapse_code_block_lines_v1': 2,
+      },
+    );
 
     await tester.pumpWidget(
       _streamingMarkdownHarness(
         streamText,
-        preferences: const {
-          'display_auto_collapse_code_block_v1': true,
-          'display_auto_collapse_code_block_lines_v1': 2,
-        },
+        businessPreferences: harness.preferences,
       ),
     );
     await tester.pumpAndSettle();
@@ -3051,14 +3061,17 @@ press2
 press3
 ```
 ''');
+      final harness = await createBusinessTestHarness(
+        initial: const {
+          'display_auto_collapse_code_block_v1': true,
+          'display_auto_collapse_code_block_lines_v1': 2,
+        },
+      );
 
       await tester.pumpWidget(
         _streamingMarkdownHarness(
           streamText,
-          preferences: const {
-            'display_auto_collapse_code_block_v1': true,
-            'display_auto_collapse_code_block_lines_v1': 2,
-          },
+          businessPreferences: harness.preferences,
         ),
       );
       await tester.pumpAndSettle();

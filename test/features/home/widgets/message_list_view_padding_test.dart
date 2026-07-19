@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'dart:ui';
 
 import 'package:Kelivo/core/models/chat_message.dart';
@@ -259,9 +260,17 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            ),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -333,9 +342,17 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            ),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -413,9 +430,17 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            ),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -507,9 +532,17 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            ),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -604,9 +637,17 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider.value(value: SettingsProvider()),
-          ChangeNotifierProvider.value(value: AssistantProvider()),
-          ChangeNotifierProvider.value(value: TtsProvider()),
+          ChangeNotifierProvider.value(
+            value: SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider.value(
+            value: AssistantProvider(
+              preferences: createBusinessTestPreferences(),
+            ),
+          ),
+          ChangeNotifierProvider.value(
+            value: TtsProvider(preferences: createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider.value(value: AskUserInteractionService()),
           ChangeNotifierProvider.value(value: ToolApprovalService()),
         ],
@@ -798,10 +839,21 @@ class _PrependingMessageListHarnessState
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => SettingsProvider()),
-        ChangeNotifierProvider(create: (_) => AssistantProvider()),
-        ChangeNotifierProvider(create: (_) => TtsProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              AssistantProvider(preferences: createBusinessTestPreferences()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              TtsProvider(preferences: createBusinessTestPreferences()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              UserProvider(preferences: createBusinessTestPreferences()),
+        ),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
       ],

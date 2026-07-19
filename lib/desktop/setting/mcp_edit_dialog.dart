@@ -114,7 +114,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
     // Built-in server: only allow toggling enabled, no other changes
     if (isEdit && _transport == McpTransportType.inmemory) {
       final old = mcp.getById(widget.serverId!)!;
-      await mcp.updateServer(old.copyWith(enabled: _enabled));
+      await mcp.updateServerMetadata(old.copyWith(enabled: _enabled));
       if (mounted) Navigator.of(context).maybePop();
       return;
     }
@@ -156,7 +156,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       if (isEdit) {
         final old = mcp.getById(widget.serverId!)!;
         final clearing = cwd.isEmpty;
-        await mcp.updateServer(
+        await mcp.updateServerMetadata(
           old.copyWith(
             enabled: _enabled,
             name: name,
@@ -193,7 +193,7 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       }
       if (isEdit) {
         final old = mcp.getById(widget.serverId!)!;
-        await mcp.updateServer(
+        await mcp.updateServerMetadata(
           old.copyWith(
             enabled: _enabled,
             name: name,
