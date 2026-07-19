@@ -35,6 +35,7 @@ import '../../../desktop/world_book_popover.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
+import '../../chat/widgets/message_more_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
 import '../../model/widgets/model_select_sheet.dart';
@@ -51,6 +52,7 @@ import '../widgets/learning_prompt_sheet.dart';
 import '../widgets/scroll_nav_buttons.dart';
 import '../widgets/message_list_view.dart';
 import '../widgets/multi_ai_comparison_view.dart';
+import '../services/multi_ai_engine.dart' show MultiAIMode;
 import '../widgets/chat_input_section.dart';
 import '../widgets/chat_input_overlay_layout.dart';
 import '../widgets/chat_selection_app_bar.dart';
@@ -1179,6 +1181,13 @@ class _HomePageState extends State<HomePage>
       onLoadMoreBefore: _controller.loadMoreBefore,
       hasMoreAfter: _controller.chatController.hasMoreAfter,
       onLoadMoreAfter: _controller.loadMoreAfter,
+      hideMoreActions: () {
+        final hide = <MessageMoreAction>{};
+        if (!_controller.canStartMultiAIComparison) {
+          hide.add(MessageMoreAction.multiAI);
+        }
+        return hide;
+      },
       onVersionChange: (groupId, version) async {
         await _controller.setSelectedVersion(groupId, version);
       },
@@ -1246,7 +1255,10 @@ class _HomePageState extends State<HomePage>
       onMore: _toggleTools,
       onSelectModel: () => showModelSelectSheet(
         context,
-        onMultiSelectConfirm: _controller.enterMultiAIMode,
+        onMultiSelectConfirm:
+            _controller.multiAIEngine.mode == MultiAIMode.synthesize
+            ? null
+            : _controller.enterMultiAIMode,
       ),
       onLongPressSelectModel: () {
         Navigator.of(
@@ -1322,7 +1334,9 @@ class _HomePageState extends State<HomePage>
       onClearContext: _controller.clearContext,
       onCompressContext: _handleDesktopCompressContext,
       backgroundImageActive: _assistantBackgroundActive(context),
-      multiAIModelCount: _controller.multiAIEngine.isActive
+      multiAIModelCount:
+          _controller.multiAIEngine.isActive &&
+              _controller.multiAIEngine.mode == MultiAIMode.continue_
           ? _controller.multiAIEngine.models.length
           : null,
       onExitMultiAI:

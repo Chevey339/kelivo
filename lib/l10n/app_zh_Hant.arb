@@ -2106,5 +2106,61 @@
   "multiAIDropThread": "移除",
   "@multiAIDropThread": {
     "description": "在多 AI 對比中移除某個模型回覆的按鈕提示"
+  },
+  "multiAIConversationMode": "對話模式",
+  "@multiAIConversationMode": {
+    "description": "多 AI 卡片組中的對話模式切換行標籤"
+  },
+  "multiAIContinue": "繼續",
+  "@multiAIContinue": {
+    "description": "多 AI 對話中繼續模式的按鈕標籤"
+  },
+  "multiAIContinueHint": "繼續多模型對話，每個模型繼承原有上下文",
+  "@multiAIContinueHint": {
+    "description": "繼續模式按鈕的提示"
+  },
+  "multiAISynthesize": "合成",
+  "@multiAISynthesize": {
+    "description": "多 AI 對話中合成模式的按鈕標籤"
+  },
+  "multiAISynthesizeHint": "將多模型對話合成為一個回覆",
+  "@multiAISynthesizeHint": {
+    "description": "合成模式按鈕的提示"
+  },
+  "multiAISynthesizeTaskSummarize": "總結",
+  "@multiAISynthesizeTaskSummarize": {
+    "description": "總結合成任務標籤"
+  },
+  "multiAISynthesizeTaskSummarizeDesc": "總結對話，聚焦各模型回覆的異同",
+  "@multiAISynthesizeTaskSummarizeDesc": {
+    "description": "總結合成任務描述"
+  },
+  "multiAISynthesizeTaskFuse": "融合",
+  "@multiAISynthesizeTaskFuse": {
+    "description": "融合合成任務標籤"
+  },
+  "multiAISynthesizeTaskFuseDesc": "綜合各模型觀點，給出一個最佳回覆",
+  "@multiAISynthesizeTaskFuseDesc": {
+    "description": "融合合成任務描述"
+  },
+  "multiAISynthesizeTaskComment": "點評",
+  "@multiAISynthesizeTaskComment": {
+    "description": "點評合成任務標籤"
+  },
+  "multiAISynthesizeTaskCommentDesc": "點評不同模型的觀點分歧",
+  "@multiAISynthesizeTaskCommentDesc": {
+    "description": "點評合成任務描述"
+  },
+  "multiAISynthesizeSummarizePrompt": "請總結以下對話，聚焦各助手回覆的異同之處。",
+  "@multiAISynthesizeSummarizePrompt": {
+    "description": "總結合成任務的默認提示詞"
+  },
+  "multiAISynthesizeFusePrompt": "請總結以下對話，並基於各方回覆給出一個綜合性的回答。",
+  "@multiAISynthesizeFusePrompt": {
+    "description": "融合合成任務的默認提示詞"
+  },
+  "multiAISynthesizeCommentPrompt": "請點評各模型的不同觀點。",
+  "@multiAISynthesizeCommentPrompt": {
+    "description": "點評合成任務的默認提示詞"
   }
 }

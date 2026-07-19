@@ -2559,5 +2559,61 @@
   "multiAIDropThread": "Drop",
   "@multiAIDropThread": {
     "description": "Tooltip for the button that removes a model thread from multi-AI comparison"
+  },
+  "multiAIConversationMode": "Conversation Mode",
+  "@multiAIConversationMode": {
+    "description": "Label for the conversation mode switch row in multi-AI card group"
+  },
+  "multiAIContinue": "Continue",
+  "@multiAIContinue": {
+    "description": "Button label for continue mode in multi-AI conversation"
+  },
+  "multiAIContinueHint": "Continue multi-model conversation, each model inherits its own context",
+  "@multiAIContinueHint": {
+    "description": "Tooltip for continue mode button"
+  },
+  "multiAISynthesize": "Synthesize",
+  "@multiAISynthesize": {
+    "description": "Button label for synthesize mode in multi-AI conversation"
+  },
+  "multiAISynthesizeHint": "Synthesize multi-model conversation into a single response",
+  "@multiAISynthesizeHint": {
+    "description": "Tooltip for synthesize mode button"
+  },
+  "multiAISynthesizeTaskSummarize": "Summarize",
+  "@multiAISynthesizeTaskSummarize": {
+    "description": "Label for the summarize synthesis task"
+  },
+  "multiAISynthesizeTaskSummarizeDesc": "Summarize the conversation, focusing on similarities and differences between model responses",
+  "@multiAISynthesizeTaskSummarizeDesc": {
+    "description": "Description for the summarize synthesis task"
+  },
+  "multiAISynthesizeTaskFuse": "Fuse",
+  "@multiAISynthesizeTaskFuse": {
+    "description": "Label for the fuse synthesis task"
+  },
+  "multiAISynthesizeTaskFuseDesc": "Combine all model perspectives into a single best response",
+  "@multiAISynthesizeTaskFuseDesc": {
+    "description": "Description for the fuse synthesis task"
+  },
+  "multiAISynthesizeTaskComment": "Comment",
+  "@multiAISynthesizeTaskComment": {
+    "description": "Label for the comment synthesis task"
+  },
+  "multiAISynthesizeTaskCommentDesc": "Comment on the different opinions across models",
+  "@multiAISynthesizeTaskCommentDesc": {
+    "description": "Description for the comment synthesis task"
+  },
+  "multiAISynthesizeSummarizePrompt": "Please summarize the conversation, focused on the similarities and differences of the responses of assistants.",
+  "@multiAISynthesizeSummarizePrompt": {
+    "description": "Default prompt for the summarize synthesis task"
+  },
+  "multiAISynthesizeFusePrompt": "Please summarize the conversation and then provide a single response that fits the user's prompt based on previous responses.",
+  "@multiAISynthesizeFusePrompt": {
+    "description": "Default prompt for the fuse synthesis task"
+  },
+  "multiAISynthesizeCommentPrompt": "Please comment on the different opinions across models.",
+  "@multiAISynthesizeCommentPrompt": {
+    "description": "Default prompt for the comment synthesis task"
   }
 }

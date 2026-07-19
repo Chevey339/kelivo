@@ -10543,6 +10543,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drop'**
   String get multiAIDropThread;
+
+  /// Label for the conversation mode switch row in multi-AI card group
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation Mode'**
+  String get multiAIConversationMode;
+
+  /// Button label for continue mode in multi-AI conversation
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get multiAIContinue;
+
+  /// Tooltip for continue mode button
+  ///
+  /// In en, this message translates to:
+  /// **'Continue multi-model conversation, each model inherits its own context'**
+  String get multiAIContinueHint;
+
+  /// Button label for synthesize mode in multi-AI conversation
+  ///
+  /// In en, this message translates to:
+  /// **'Synthesize'**
+  String get multiAISynthesize;
+
+  /// Tooltip for synthesize mode button
+  ///
+  /// In en, this message translates to:
+  /// **'Synthesize multi-model conversation into a single response'**
+  String get multiAISynthesizeHint;
+
+  /// Label for the summarize synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize'**
+  String get multiAISynthesizeTaskSummarize;
+
+  /// Description for the summarize synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Summarize the conversation, focusing on similarities and differences between model responses'**
+  String get multiAISynthesizeTaskSummarizeDesc;
+
+  /// Label for the fuse synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Fuse'**
+  String get multiAISynthesizeTaskFuse;
+
+  /// Description for the fuse synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Combine all model perspectives into a single best response'**
+  String get multiAISynthesizeTaskFuseDesc;
+
+  /// Label for the comment synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Comment'**
+  String get multiAISynthesizeTaskComment;
+
+  /// Description for the comment synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Comment on the different opinions across models'**
+  String get multiAISynthesizeTaskCommentDesc;
+
+  /// Default prompt for the summarize synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Please summarize the conversation, focused on the similarities and differences of the responses of assistants.'**
+  String get multiAISynthesizeSummarizePrompt;
+
+  /// Default prompt for the fuse synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Please summarize the conversation and then provide a single response that fits the user\'s prompt based on previous responses.'**
+  String get multiAISynthesizeFusePrompt;
+
+  /// Default prompt for the comment synthesis task
+  ///
+  /// In en, this message translates to:
+  /// **'Please comment on the different opinions across models.'**
+  String get multiAISynthesizeCommentPrompt;
 }
 
 class _AppLocalizationsDelegate

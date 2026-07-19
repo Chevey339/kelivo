@@ -133,6 +133,7 @@ class MessageListView extends StatefulWidget {
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
+    this.hideMoreActions,
   });
 
   final ScrollController scrollController;
@@ -189,10 +190,6 @@ class MessageListView extends StatefulWidget {
   final OnShareMessage? onShareMessage;
   final OnSelectMessages? onSelectMessages;
   final OnSpeakMessage? onSpeakMessage;
-  final List<String> suggestions;
-
-  /// Inline widgets rendered after specific message items (e.g. Multi-AI card groups).
-  final Map<String, Widget>? afterMessageWidgets;
   final OnSuggestionTap? onSuggestionTap;
   final OnRecoveredAskUserAnswer? onRecoveredAskUserAnswer;
   final void Function(String messageId, bool selected)? onToggleSelection;
@@ -200,6 +197,15 @@ class MessageListView extends StatefulWidget {
   final void Function(String messageId)? onToggleTranslation;
   final void Function(String messageId, int segmentIndex)?
   onToggleReasoningSegment;
+
+  /// Actions to hide from the message more sheet, computed by caller.
+  final Set<MessageMoreAction> Function()? hideMoreActions;
+
+  final List<String> suggestions;
+
+  /// Inline widgets rendered after specific message items (e.g. Multi-AI card groups).
+  final Map<String, Widget>? afterMessageWidgets;
+
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
   final bool Function()? onLoadMoreBefore;
@@ -834,10 +840,12 @@ class _MessageListViewState extends State<MessageListView> {
           ? () => widget.onDeleteMessage?.call(message, widget.byGroup)
           : null,
       onMore: () async {
+        final hide = widget.hideMoreActions?.call();
         final action = await showMessageMoreSheet(
           context,
           message,
           canDeleteAllVersions: total > 1,
+          hideActions: hide,
         );
         if (action == MessageMoreAction.deleteCurrentVersion) {
           await widget.onDeleteMessage?.call(message, widget.byGroup);

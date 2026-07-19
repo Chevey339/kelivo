@@ -38,6 +38,9 @@ import 'home_view_model.dart';
 import '../services/message_builder_service.dart';
 import '../services/message_generation_service.dart';
 import '../services/multi_ai_engine.dart';
+import '../widgets/synthesize_task_selector.dart'
+    show showSynthesizeTaskSelector;
+import '../models/synthesize_task.dart' show synthesizeTasks;
 import '../services/message_pipeline.dart';
 import '../services/ask_user_interaction_service.dart';
 import '../services/ocr_service.dart';
@@ -677,7 +680,10 @@ class HomePageController extends ChangeNotifier {
     }
 
     ChatInputSubmissionResult result;
-    if (multiAIEngine.isActive) {
+    if (multiAIEngine.isActive &&
+        multiAIEngine.mode == MultiAIMode.synthesize) {
+      result = await _sendSynthesize(input);
+    } else if (multiAIEngine.isActive) {
       if (!_context.mounted) return ChatInputSubmissionResult.rejected;
       final settings = _context.read<SettingsProvider>();
       final assistant = _context.read<AssistantProvider>().currentAssistant;
@@ -694,6 +700,48 @@ class HomePageController extends ChangeNotifier {
       result = await _viewModel.sendMessage(input);
     }
     if (result != ChatInputSubmissionResult.rejected) {
+      notifyListeners();
+    }
+    return result;
+  }
+
+  Future<ChatInputSubmissionResult> _sendSynthesize(ChatInputData input) async {
+    if (currentConversation == null) return ChatInputSubmissionResult.rejected;
+
+    final allMsgs = _chatController.allMessagesForCurrentConversationContext();
+    final contextMsgs = MultiAIEngine.selectMessagesBeforeMultiAI(allMsgs);
+
+    // Fork new conversation with messages before first multi-AI anchor
+    final newConvo = await _chatService.forkConversation(
+      title: _titleForLocale(_context),
+      assistantId: currentConversation!.assistantId,
+      sourceMessages: contextMsgs,
+    );
+
+    // Switch to new conversation
+    _chatService.setCurrentConversation(newConvo.id);
+    _chatController.setCurrentConversation(newConvo);
+    _viewModel.restoreMessageUiState();
+
+    // Generate XML from all messages with current version selections
+    final xml = multiAIEngine.multiRoundsToXML(
+      allMsgs,
+      multiAIEngine.selectedVersionByThread,
+    );
+    final fullContent = '${input.text}\n\n$xml';
+
+    // Send as normal single-model message
+    final syntheticInput = ChatInputData(
+      text: fullContent,
+      imagePaths: input.imagePaths,
+      documents: input.documents,
+      allowImagesApiRouting: input.allowImagesApiRouting,
+    );
+    final result = await _viewModel.sendMessage(syntheticInput);
+    if (result != ChatInputSubmissionResult.rejected) {
+      // Reset engine to continue mode so the original conversation's
+      // mode switch row shows "继续" as active when user switches back.
+      await multiAIEngine.setMode(MultiAIMode.continue_);
       notifyListeners();
     }
     return result;
@@ -789,6 +837,50 @@ class HomePageController extends ChangeNotifier {
 
     // Restrict retry ability when multi-AI rounds are active.
     if (!_isRetryableInMultiAI(message)) return;
+
+    // Multi-AI active but no rounds started yet: convert regenerate of a
+    // legacy assistant message into a startRoundFromHistory call.
+    if (multiAIEngine.isActive &&
+        _chatController.subgroupActiveGroupIds.isEmpty &&
+        message.role == 'assistant') {
+      _tagTriggerMessageForMultiAI(message);
+      final settings = _context.read<SettingsProvider>();
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      final anchorId = await multiAIEngine.startRoundFromHistory(
+        triggerMessage: message,
+        conversation: currentConversation!,
+        settings: settings,
+        assistant: assistant,
+      );
+      if (anchorId.isNotEmpty) {
+        // startRoundFromHistory already creates N placeholder messages
+      }
+      notifyListeners();
+      return;
+    }
+
+    // User message retry, multi-AI active but no rounds yet: delegate to
+    // the next assistant message so it triggers a startRoundFromHistory
+    // call with all pre-selected models.
+    if (message.role == 'user' &&
+        multiAIEngine.isActive &&
+        _chatController.subgroupActiveGroupIds.isEmpty) {
+      final nextAssistant = _findNextAssistantAfter(message);
+      if (nextAssistant != null) {
+        _tagTriggerMessageForMultiAI(nextAssistant);
+        final settings = _context.read<SettingsProvider>();
+        final assistant = _context.read<AssistantProvider>().currentAssistant;
+        await multiAIEngine.startRoundFromHistory(
+          triggerMessage: nextAssistant,
+          conversation: currentConversation!,
+          settings: settings,
+          assistant: assistant,
+        );
+        notifyListeners();
+        return;
+      }
+      // No assistant below → fall through to normal single-model regenerate
+    }
 
     // User message retry in multi-select mode: create version+1 for every
     // thread in the following round.
@@ -1714,6 +1806,50 @@ class HomePageController extends ChangeNotifier {
   /// Get current multi-AI model selections for input bar badge.
   List<ModelSelection> get multiAIModelSelections => multiAIEngine.models;
 
+  /// Whether the "启动对比" action should be visible on the message more sheet.
+  bool get canStartMultiAIComparison =>
+      multiAIEngine.isActive &&
+      multiAIEngine.models.length >= 2 &&
+      _chatController.subgroupActiveGroupIds.isEmpty;
+
+  /// Tag a trigger assistant message with its matching subgroupId from the
+  /// engine's model list. If the trigger's model matches a pre-selected model,
+  /// the message gets tagged so it becomes part of the multi-AI round.
+  /// Otherwise it's left untouched (stays as a regular assistant message).
+  Future<void> _tagTriggerMessageForMultiAI(ChatMessage triggerMessage) async {
+    final threadIds = multiAIEngine.threadIds.toList();
+    final triggerKey = '${triggerMessage.providerId}|${triggerMessage.modelId}';
+    final modelIdx = multiAIEngine.models.indexWhere(
+      (m) => '${m.providerKey}|${m.modelId}' == triggerKey,
+    );
+    if (modelIdx < 0) return;
+    final tid = threadIds[modelIdx];
+    final idx = _chatController.messages.indexWhere(
+      (m) => m.id == triggerMessage.id,
+    );
+    if (idx == -1) return;
+    final updated = triggerMessage.copyWith(subgroupId: tid);
+    _chatController.messages[idx] = updated;
+    await _chatService.updateMessage(
+      triggerMessage.id,
+      subgroupId: tid,
+      content: updated.content,
+      totalTokens: updated.totalTokens,
+      isStreaming: updated.isStreaming,
+    );
+  }
+
+  /// Find the first assistant message immediately after [target].
+  ChatMessage? _findNextAssistantAfter(ChatMessage target) {
+    final msgs = _chatController.messages;
+    int idx = msgs.indexWhere((m) => m.id == target.id);
+    if (idx < 0) return null;
+    for (int i = idx + 1; i < msgs.length; i++) {
+      if (msgs[i].role == 'assistant') return msgs[i];
+    }
+    return null;
+  }
+
   /// Handle "启动对比" (Start Comparison) action from assistant message more
   /// sheet. Requires multi-select mode already active with ≥2 models and zero
   /// existing subgroup messages in the conversation.
@@ -1724,33 +1860,7 @@ class HomePageController extends ChangeNotifier {
     // Prevent starting comparison after multi-AI rounds have begun.
     if (_chatController.subgroupActiveGroupIds.isNotEmpty) return;
 
-    final threadIds = multiAIEngine.threadIds.toList();
-    final triggerKey = '${triggerMessage.providerId}|${triggerMessage.modelId}';
-    final modelIdx = multiAIEngine.models.indexWhere(
-      (m) => '${m.providerKey}|${m.modelId}' == triggerKey,
-    );
-
-    if (modelIdx >= 0) {
-      // Reuse the trigger message: its AI is in the pre-selected model list.
-      final tid = threadIds[modelIdx];
-      final idx = _chatController.messages.indexWhere(
-        (m) => m.id == triggerMessage.id,
-      );
-      if (idx != -1) {
-        final updated = triggerMessage.copyWith(subgroupId: tid);
-        _chatController.messages[idx] = updated;
-        await _chatService.updateMessage(
-          triggerMessage.id,
-          subgroupId: tid,
-          content: updated.content,
-          totalTokens: updated.totalTokens,
-          isStreaming: updated.isStreaming,
-        );
-      }
-    }
-    // If trigger message's model is NOT in the pre-selected list, leave it
-    // untouched (no subgroupId). The message stays as a regular assistant
-    // message.
+    await _tagTriggerMessageForMultiAI(triggerMessage);
 
     _chatController.invalidateCache();
     notifyListeners();
@@ -1770,6 +1880,46 @@ class HomePageController extends ChangeNotifier {
             notifyListeners();
           }),
     );
+  }
+
+  /// Switch the multi-AI engine to synthesize mode.
+  ///
+  /// Shows a task type selector (bottom sheet / dialog), switches to
+  /// single-select on the model selector, pre-fills the chat input with the
+  /// chosen prompt, and calls [MultiAIEngine.setMode].
+  Future<void> switchToSynthesizeMode() async {
+    final engine = multiAIEngine;
+    if (engine.mode == MultiAIMode.synthesize) return;
+
+    // Show task type selector
+    final taskType = await showSynthesizeTaskSelector(_context);
+    if (taskType == null) return; // user cancelled
+
+    // Switch engine mode
+    await engine.setMode(MultiAIMode.synthesize);
+
+    // Pre-fill prompt
+    if (!_context.mounted) return;
+    final l10n = AppLocalizations.of(_context)!;
+    final task = synthesizeTasks.firstWhere((t) => t.type == taskType);
+    final prompt = _resolveSynthesizePrompt(l10n, task.defaultPromptKey);
+    _inputController.text = prompt;
+    _inputController.selection = TextSelection.collapsed(offset: prompt.length);
+
+    notifyListeners();
+  }
+
+  String _resolveSynthesizePrompt(AppLocalizations l10n, String key) {
+    switch (key) {
+      case 'multiAISynthesizeSummarizePrompt':
+        return l10n.multiAISynthesizeSummarizePrompt;
+      case 'multiAISynthesizeFusePrompt':
+        return l10n.multiAISynthesizeFusePrompt;
+      case 'multiAISynthesizeCommentPrompt':
+        return l10n.multiAISynthesizeCommentPrompt;
+      default:
+        return key;
+    }
   }
 
   /// Enter multi-AI mode with pre-selected models (from model selector multi-select).
