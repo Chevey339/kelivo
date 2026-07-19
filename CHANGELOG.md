@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.2] - 2026-07-19
+
+> ⚠️ **SVG preview users on 1.7.0–1.7.1 must update**
+>
+> Previous releases crash when LLM streams SVG code blocks: flutter_svg's
+> isolate parser spawns repeated `compute(encodeSvg)` on partial / invalid
+> XML chunks during streaming output, causing an isolate storm. 1.7.2 adds
+> streaming debounce (360 ms alive / 220 ms settled), auto-switches to Code
+> tab during streaming, enforces a 1 MB size limit, and adds an error
+> fallback. SVG preview users should upgrade immediately to avoid random
+> app kills.
+
+### Added
+- Desktop comparison view now shows 2 model columns per page instead of
+  single-card swiping (#50)
+
+### Fixed
+- SVG preview isolate storm crash during LLM streaming (#46)
+- Thread anchor lost on `dropThread` causing auto-adopt failure (#51)
+
 ## [1.7.1] - 2026-07-17
 
 > ⚠️ **Mobile users on 1.7.0 must update**

@@ -37,6 +37,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
    - *Note*: Periodic full snapshots are still recommended.
 
 3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses in the same view side by side, so you can pick the best result.
+   - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
 4. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
