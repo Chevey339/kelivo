@@ -835,55 +835,69 @@ class HomePageController extends ChangeNotifier {
   }) async {
     if (currentConversation == null) return;
 
-    // Restrict retry ability when multi-AI rounds are active.
-    if (!_isRetryableInMultiAI(message)) return;
+    final l10n = AppLocalizations.of(_context)!;
 
-    // Multi-AI active but no rounds started yet: convert regenerate of a
-    // legacy assistant message into a startRoundFromHistory call.
+    if (!multiAIEngine.isActive &&
+        _chatController.subgroupActiveGroupIds.isNotEmpty) {
+      showAppSnackBar(
+        _context,
+        message: l10n.multiAIRetryBlockedUnresolvedComparison,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
+    if (!_isRetryableInMultiAI(message)) {
+      showAppSnackBar(
+        _context,
+        message: l10n.multiAIRetryBlockedUnresolvedComparison,
+        type: NotificationType.warning,
+      );
+      return;
+    }
+
     if (multiAIEngine.isActive &&
         _chatController.subgroupActiveGroupIds.isEmpty &&
         message.role == 'assistant') {
       _tagTriggerMessageForMultiAI(message);
       final settings = _context.read<SettingsProvider>();
       final assistant = _context.read<AssistantProvider>().currentAssistant;
-      final anchorId = await multiAIEngine.startRoundFromHistory(
+      await multiAIEngine.startRoundFromHistory(
         triggerMessage: message,
         conversation: currentConversation!,
         settings: settings,
         assistant: assistant,
       );
-      if (anchorId.isNotEmpty) {
-        // startRoundFromHistory already creates N placeholder messages
-      }
       notifyListeners();
       return;
     }
 
-    // User message retry, multi-AI active but no rounds yet: delegate to
-    // the next assistant message so it triggers a startRoundFromHistory
-    // call with all pre-selected models.
     if (message.role == 'user' &&
         multiAIEngine.isActive &&
         _chatController.subgroupActiveGroupIds.isEmpty) {
       final nextAssistant = _findNextAssistantAfter(message);
+      final settings = _context.read<SettingsProvider>();
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
       if (nextAssistant != null) {
         _tagTriggerMessageForMultiAI(nextAssistant);
-        final settings = _context.read<SettingsProvider>();
-        final assistant = _context.read<AssistantProvider>().currentAssistant;
         await multiAIEngine.startRoundFromHistory(
           triggerMessage: nextAssistant,
           conversation: currentConversation!,
           settings: settings,
           assistant: assistant,
         );
-        notifyListeners();
-        return;
+      } else {
+        await multiAIEngine.startRoundFromUserMessage(
+          userMessage: message,
+          conversation: currentConversation!,
+          settings: settings,
+          assistant: assistant,
+        );
       }
-      // No assistant below → fall through to normal single-model regenerate
+      notifyListeners();
+      return;
     }
 
-    // User message retry in multi-select mode: create version+1 for every
-    // thread in the following round.
     if (message.role == 'user' &&
         multiAIEngine.isActive &&
         _chatController.subgroupActiveGroupIds.isNotEmpty) {

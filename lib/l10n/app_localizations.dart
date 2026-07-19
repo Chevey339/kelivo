@@ -10627,6 +10627,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please comment on the different opinions across models.'**
   String get multiAISynthesizeCommentPrompt;
+
+  /// Toast shown when retry is blocked due to active or unresolved multi-AI comparison state
+  ///
+  /// In en, this message translates to:
+  /// **'Please adopt or drop the comparison results before retrying.'**
+  String get multiAIRetryBlockedUnresolvedComparison;
 }
 
 class _AppLocalizationsDelegate

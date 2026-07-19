@@ -5559,6 +5559,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get multiAISynthesizeCommentPrompt => '请点评各模型的不同观点。';
+
+  @override
+  String get multiAIRetryBlockedUnresolvedComparison => '请先采纳或丢弃对比结果，再进行重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11116,6 +11119,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get multiAISynthesizeCommentPrompt => '请点评各模型的不同观点。';
+
+  @override
+  String get multiAIRetryBlockedUnresolvedComparison => '请先采纳或丢弃对比结果，再进行重试。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16673,4 +16679,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get multiAISynthesizeCommentPrompt => '請點評各模型的不同觀點。';
+
+  @override
+  String get multiAIRetryBlockedUnresolvedComparison => '請先採納或丟棄對比結果，再進行重試。';
 }

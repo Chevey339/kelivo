@@ -2615,5 +2615,9 @@
   "multiAISynthesizeCommentPrompt": "Please comment on the different opinions across models.",
   "@multiAISynthesizeCommentPrompt": {
     "description": "Default prompt for the comment synthesis task"
+  },
+  "multiAIRetryBlockedUnresolvedComparison": "Please adopt or drop the comparison results before retrying.",
+  "@multiAIRetryBlockedUnresolvedComparison": {
+    "description": "Toast shown when retry is blocked due to active or unresolved multi-AI comparison state"
   }
 }

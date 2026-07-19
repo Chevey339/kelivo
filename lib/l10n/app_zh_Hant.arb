@@ -2162,5 +2162,9 @@
   "multiAISynthesizeCommentPrompt": "請點評各模型的不同觀點。",
   "@multiAISynthesizeCommentPrompt": {
     "description": "點評合成任務的默認提示詞"
+  },
+  "multiAIRetryBlockedUnresolvedComparison": "請先採納或丟棄對比結果，再進行重試。",
+  "@multiAIRetryBlockedUnresolvedComparison": {
+    "description": "Toast shown when retry is blocked due to active or unresolved multi-AI comparison state"
   }
 }
