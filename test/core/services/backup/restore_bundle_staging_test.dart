@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart' show SqliteException;
 
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
@@ -19,7 +21,8 @@ Future<String> _manifestSha256(Directory extracted) async {
 
 Future<Directory> _createExtractedBundle(
   Directory root, {
-  bool includeDatabase = false,
+  bool includeDatabase = true,
+  bool validDatabase = true,
   bool includeFiles = false,
   bool includeSettings = true,
 }) async {
@@ -30,9 +33,22 @@ Future<Directory> _createExtractedBundle(
     await settings.writeAsString(jsonEncode({'theme': 'dark'}), flush: true);
   }
   final database = File(p.join(extracted.path, 'database', 'kelivo.db'));
+  ChatDatabaseSnapshotInfo? databaseInfo;
   if (includeDatabase) {
     await database.parent.create(recursive: true);
-    await database.writeAsBytes([1, 2, 3, 4], flush: true);
+    if (validDatabase) {
+      final appDatabase = AppDatabase.open(file: database);
+      try {
+        await appDatabase.customSelect('SELECT 1;').get();
+      } finally {
+        await appDatabase.close();
+      }
+      databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+        database,
+      );
+    } else {
+      await database.writeAsBytes([1, 2, 3, 4], flush: true);
+    }
   }
   await File(p.join(extracted.path, 'manifest.json')).writeAsString(
     jsonEncode({
@@ -47,9 +63,9 @@ Future<Directory> _createExtractedBundle(
       if (includeDatabase)
         'database': {
           'entry': 'database/kelivo.db',
-          'schemaVersion': 1,
-          'conversationCount': 0,
-          'messageCount': 0,
+          'schemaVersion': databaseInfo?.schemaVersion ?? 1,
+          'conversationCount': databaseInfo?.conversationCount ?? 0,
+          'messageCount': databaseInfo?.messageCount ?? 0,
         },
       'entries': {
         'settings.json': includeSettings
@@ -89,7 +105,7 @@ void main() {
       final staged = await RestoreBundleStaging.create(
         appDataDirectory: root,
         extractedDirectory: extracted,
-        includeChats: false,
+        includeChats: true,
         includeFiles: false,
         sourceManifestSha256: await _manifestSha256(extracted),
       );
@@ -108,10 +124,15 @@ void main() {
         candidateDirectory: staged.payloadDirectory,
         expectedManifestSha256: staged.candidateManifestSha256,
       );
-      expect(validated.secretsIncluded, isTrue);
-      expect(validated.settings, {'theme': 'dark'});
-      expect(validated.entries.keys, ['settings.json']);
-      expect(validated.databaseInfo, isNull);
+      expect(validated.includeChats, isTrue);
+      expect(validated.entries.keys, ['database/kelivo.db']);
+      expect(validated.databaseInfo, isNotNull);
+      expect(
+        await File(
+          p.join(staged.payloadDirectory.path, 'settings.json'),
+        ).exists(),
+        isFalse,
+      );
       expect(
         await root
             .list(recursive: true, followLinks: false)
@@ -133,7 +154,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -168,7 +189,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -187,7 +208,7 @@ void main() {
           return await RestoreBundleStaging.create(
             appDataDirectory: root,
             extractedDirectory: extracted,
-            includeChats: false,
+            includeChats: true,
             includeFiles: false,
             sourceManifestSha256: manifestSha256,
           );
@@ -224,7 +245,7 @@ void main() {
             await RestoreBundleStaging.create(
               appDataDirectory: Directory(appDataPath),
               extractedDirectory: Directory(extractedPath),
-              includeChats: false,
+              includeChats: true,
               includeFiles: false,
               sourceManifestSha256: manifestSha256,
             );
@@ -254,7 +275,7 @@ void main() {
       final staged = await RestoreBundleStaging.create(
         appDataDirectory: root,
         extractedDirectory: extracted,
-        includeChats: false,
+        includeChats: true,
         includeFiles: false,
         sourceManifestSha256: await _manifestSha256(extracted),
       );
@@ -272,7 +293,7 @@ void main() {
       final staged = await RestoreBundleStaging.create(
         appDataDirectory: root,
         extractedDirectory: extracted,
-        includeChats: false,
+        includeChats: true,
         includeFiles: false,
         sourceManifestSha256: await _manifestSha256(extracted),
       );
@@ -320,7 +341,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -340,7 +361,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: frozenManifestSha256,
         ),
@@ -359,7 +380,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -380,7 +401,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: true,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -401,7 +422,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -431,7 +452,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -461,7 +482,7 @@ void main() {
         RestoreBundleStaging.create(
           appDataDirectory: root,
           extractedDirectory: extracted,
-          includeChats: false,
+          includeChats: true,
           includeFiles: false,
           sourceManifestSha256: await _manifestSha256(extracted),
         ),
@@ -491,7 +512,7 @@ void main() {
       final staged = await RestoreBundleStaging.create(
         appDataDirectory: root,
         extractedDirectory: extracted,
-        includeChats: false,
+        includeChats: true,
         includeFiles: true,
         sourceManifestSha256: await _manifestSha256(extracted),
       );
@@ -511,7 +532,7 @@ void main() {
       final staged = await RestoreBundleStaging.create(
         appDataDirectory: root,
         extractedDirectory: extracted,
-        includeChats: false,
+        includeChats: true,
         includeFiles: true,
         sourceManifestSha256: await _manifestSha256(extracted),
       );
@@ -534,6 +555,7 @@ void main() {
         final extracted = await _createExtractedBundle(
           root,
           includeDatabase: true,
+          validDatabase: false,
         );
 
         await expectLater(

@@ -1,10 +1,16 @@
 import 'package:flutter/foundation.dart';
+import '../database/business_preferences.dart';
 import '../models/quick_phrase.dart';
 import '../services/quick_phrase_store.dart';
 
 class QuickPhraseProvider with ChangeNotifier {
+  QuickPhraseProvider({required BusinessPreferences preferences})
+    : _store = QuickPhraseStore(preferences);
+
+  final QuickPhraseStore _store;
   List<QuickPhrase> _phrases = [];
   bool _initialized = false;
+  Future<void>? _initializationFuture;
 
   List<QuickPhrase> get phrases => List.unmodifiable(_phrases);
 
@@ -15,15 +21,23 @@ class QuickPhraseProvider with ChangeNotifier {
       .where((p) => !p.isGlobal && p.assistantId == assistantId)
       .toList();
 
-  Future<void> initialize() async {
-    if (_initialized) return;
-    await loadAll();
-    _initialized = true;
+  Future<void> initialize() {
+    if (_initialized) return Future<void>.value();
+    return _initializationFuture ??= _initialize();
+  }
+
+  Future<void> _initialize() async {
+    try {
+      await loadAll();
+      _initialized = true;
+    } finally {
+      _initializationFuture = null;
+    }
   }
 
   Future<void> loadAll() async {
     try {
-      _phrases = await QuickPhraseStore.getAll();
+      _phrases = await _store.getAll();
       notifyListeners();
     } catch (e) {
       debugPrint('Failed to load quick phrases: $e');
@@ -33,22 +47,22 @@ class QuickPhraseProvider with ChangeNotifier {
   }
 
   Future<void> add(QuickPhrase phrase) async {
-    await QuickPhraseStore.add(phrase);
+    await _store.add(phrase);
     await loadAll();
   }
 
   Future<void> update(QuickPhrase phrase) async {
-    await QuickPhraseStore.update(phrase);
+    await _store.update(phrase);
     await loadAll();
   }
 
   Future<void> delete(String id) async {
-    await QuickPhraseStore.delete(id);
+    await _store.delete(id);
     await loadAll();
   }
 
   Future<void> clear() async {
-    await QuickPhraseStore.clear();
+    await _store.clear();
     _phrases = [];
     notifyListeners();
   }
@@ -110,7 +124,7 @@ class QuickPhraseProvider with ChangeNotifier {
       assistantId: assistantId,
     );
     notifyListeners();
-    await QuickPhraseStore.save(_phrases);
+    await _store.save(_phrases);
   }
 
   // Backward/alternate API name for clarity
@@ -126,6 +140,6 @@ class QuickPhraseProvider with ChangeNotifier {
       assistantId: assistantId,
     );
     notifyListeners();
-    await QuickPhraseStore.save(_phrases);
+    await _store.save(_phrases);
   }
 }

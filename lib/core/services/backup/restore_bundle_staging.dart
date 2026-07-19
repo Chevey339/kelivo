@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
+import '../../database/app_database.dart';
+import '../../database/business_repository.dart';
+import '../../database/business_restore_service.dart';
 import '../../database/chat_database_repository.dart';
 import 'backup_settings_validator.dart';
 import 'restore_durability.dart';
@@ -18,24 +21,14 @@ final class ValidatedRestoreCandidate {
   ValidatedRestoreCandidate({
     required this.includeChats,
     required this.includeFiles,
-    required this.secretsIncluded,
     required this.manifestSha256,
-    required Map<String, dynamic> settings,
     required Map<String, ValidatedRestoreEntry> entries,
     required this.databaseInfo,
-  }) : settings = Map.unmodifiable({
-         for (final entry in settings.entries)
-           entry.key: entry.value is List
-               ? List<String>.unmodifiable((entry.value as List).cast<String>())
-               : entry.value,
-       }),
-       entries = Map.unmodifiable(entries);
+  }) : entries = Map.unmodifiable(entries);
 
   final bool includeChats;
   final bool includeFiles;
-  final bool secretsIncluded;
   final String manifestSha256;
-  final Map<String, dynamic> settings;
   final Map<String, ValidatedRestoreEntry> entries;
   final ChatDatabaseSnapshotInfo? databaseInfo;
 }
@@ -83,7 +76,8 @@ final class RestoreBundleStaging {
   }) async {
     final declaredIncludeChats = sourceIncludesChats ?? includeChats;
     final declaredIncludeFiles = sourceIncludesFiles ?? includeFiles;
-    if ((includeChats && !declaredIncludeChats) ||
+    if (!includeChats ||
+        !declaredIncludeChats ||
         (includeFiles && !declaredIncludeFiles)) {
       throw const FormatException('restore_staging_selection');
     }
@@ -132,38 +126,57 @@ final class RestoreBundleStaging {
           decodedManifest['entries'] is! Map) {
         throw const FormatException('restore_staging_manifest');
       }
+      if (decodedManifest['payloadKind'] != 'sqlite' ||
+          decodedManifest['secretsIncluded'] != true) {
+        throw const FormatException('restore_staging_manifest_fields');
+      }
       final manifest = decodedManifest;
       final declaredEntries = _parseDeclaredEntries(
         manifest,
         includeChats: declaredIncludeChats,
         includeFiles: declaredIncludeFiles,
       );
+      final declaredDatabaseInfo = _parseDatabaseInfo(
+        manifest['database'],
+        includeChats: true,
+        payloadKind: 'sqlite',
+      )!;
 
       const settingsEntry = 'settings.json';
-      stagedEntries[settingsEntry] = await _copyVerified(
-        File(p.join(extractedDirectory.path, settingsEntry)),
-        File(p.join(payloadDirectory.path, settingsEntry)),
+      final sourceSettingsFile = File(
+        p.join(extractedDirectory.path, settingsEntry),
+      );
+      await _verifySourceDescriptor(
+        sourceSettingsFile,
         settingsEntry,
         declaredEntries[settingsEntry]!,
+      );
+      final settings = await _validateSettings(sourceSettingsFile);
+
+      final stagedDatabaseFile = File(
+        p.joinAll([payloadDirectory.path, ..._databaseEntry.split('/')]),
+      );
+      stagedEntries[_databaseEntry] = await _copyVerified(
+        File(
+          p.joinAll([extractedDirectory.path, ..._databaseEntry.split('/')]),
+        ),
+        stagedDatabaseFile,
+        _databaseEntry,
+        declaredEntries[_databaseEntry]!,
         payloadDirectory,
         resolvedDurability,
       );
 
-      if (includeChats) {
-        stagedEntries[_databaseEntry] = await _copyVerified(
-          File(
-            p.joinAll([extractedDirectory.path, ..._databaseEntry.split('/')]),
-          ),
-          File(
-            p.joinAll([payloadDirectory.path, ..._databaseEntry.split('/')]),
-          ),
-          _databaseEntry,
-          declaredEntries[_databaseEntry]!,
-          payloadDirectory,
-          resolvedDurability,
-        );
-      }
-
+      final databaseInfo = await _replaceCandidateBusinessSettings(
+        databaseFile: stagedDatabaseFile,
+        settings: settings,
+        expectedDatabaseInfo: declaredDatabaseInfo,
+        durability: resolvedDurability,
+      );
+      stagedEntries[_databaseEntry] = (
+        bytes: await stagedDatabaseFile.length(),
+        sha256: await _sha256(stagedDatabaseFile),
+      );
       if (includeFiles) {
         for (final rootName in _assetRoots) {
           await _ensureDurableDirectory(
@@ -188,8 +201,7 @@ final class RestoreBundleStaging {
       }
 
       final expectedEntryNames = <String>{
-        settingsEntry,
-        if (includeChats) _databaseEntry,
+        _databaseEntry,
         if (includeFiles)
           ...declaredEntries.keys.where(
             (name) => _assetRoots.any((root) => name.startsWith('$root/')),
@@ -200,10 +212,16 @@ final class RestoreBundleStaging {
         throw const FormatException('restore_staging_entries');
       }
       final sortedEntryNames = stagedEntries.keys.toList()..sort();
-      manifest['payloadKind'] = includeChats ? 'sqlite' : 'settings-only';
-      manifest['includeChats'] = includeChats;
+      manifest['payloadKind'] = 'sqlite';
+      manifest['includeChats'] = true;
       manifest['includeFiles'] = includeFiles;
-      if (!includeChats) manifest.remove('database');
+      manifest.remove('secretsIncluded');
+      manifest['database'] = {
+        'entry': _databaseEntry,
+        'schemaVersion': databaseInfo.schemaVersion,
+        'conversationCount': databaseInfo.conversationCount,
+        'messageCount': databaseInfo.messageCount,
+      };
       manifest['entries'] = {
         for (final entryName in sortedEntryNames)
           entryName: {
@@ -229,8 +247,7 @@ final class RestoreBundleStaging {
         candidateDirectory: payloadDirectory,
         expectedManifestSha256: sha256.convert(stagedManifestBytes).toString(),
       );
-      if (validated.includeChats != includeChats ||
-          validated.includeFiles != includeFiles) {
+      if (!validated.includeChats || validated.includeFiles != includeFiles) {
         throw const FormatException('restore_staging_candidate_selection');
       }
 
@@ -311,12 +328,11 @@ final class RestoreBundleStaging {
     final payloadKind = manifest['payloadKind'];
     if (manifest['format'] != _backupFormat ||
         manifest['formatVersion'] != _backupFormatVersion ||
-        includeChats is! bool ||
+        includeChats != true ||
         includeFiles is! bool ||
-        payloadKind is! String ||
+        payloadKind != 'sqlite' ||
         manifest['createdAtUtc'] is! String ||
-        manifest['appVersion'] is! String ||
-        manifest['secretsIncluded'] != true) {
+        manifest['appVersion'] is! String) {
       throw const FormatException('restore_staging_manifest_fields');
     }
     final expectedFields = <String>{
@@ -327,35 +343,27 @@ final class RestoreBundleStaging {
       'appVersion',
       'includeChats',
       'includeFiles',
-      'secretsIncluded',
-      if (includeChats) 'database',
+      'database',
       'entries',
     };
     if (manifest.length != expectedFields.length ||
         !manifest.keys.toSet().containsAll(expectedFields)) {
       throw const FormatException('restore_staging_manifest_fields');
     }
-    final declaredEntries = _parseDeclaredEntries(
+    final declaredEntries = _parseCandidateEntries(
       manifest,
-      includeChats: includeChats,
       includeFiles: includeFiles,
     );
     final databaseInfo = _parseDatabaseInfo(
       manifest['database'],
-      includeChats: includeChats,
-      payloadKind: payloadKind,
+      includeChats: true,
+      payloadKind: 'sqlite',
     );
 
-    final settings = await _validateSettings(
-      File(p.join(candidateDirectory.path, 'settings.json')),
-    );
-    const secretsIncluded = true;
     return ValidatedRestoreCandidate(
-      includeChats: includeChats,
+      includeChats: true,
       includeFiles: includeFiles,
-      secretsIncluded: secretsIncluded,
       manifestSha256: manifestSha256,
-      settings: settings,
       entries: declaredEntries,
       databaseInfo: databaseInfo,
     );
@@ -563,15 +571,11 @@ final class RestoreBundleStaging {
     Directory payloadDirectory,
     RestoreDurability durability,
   ) async {
-    if (await FileSystemEntity.type(source.path, followLinks: false) !=
-        FileSystemEntityType.file) {
-      throw FormatException('restore_staging_source:$entryName');
-    }
-    final sourceBytes = await source.length();
-    final sourceSha256 = await _sha256(source);
-    if (sourceBytes != expected.bytes || sourceSha256 != expected.sha256) {
-      throw FormatException('restore_staging_descriptor:$entryName');
-    }
+    final sourceDescriptor = await _verifySourceDescriptor(
+      source,
+      entryName,
+      expected,
+    );
     await _ensureDurableDirectory(
       directory: target.parent,
       boundary: payloadDirectory,
@@ -587,10 +591,30 @@ final class RestoreBundleStaging {
     await durability.syncDirectory(target.parent);
     final targetBytes = await target.length();
     final targetSha256 = await _sha256(target);
-    if (targetBytes != sourceBytes || targetSha256 != sourceSha256) {
+    if (targetBytes != sourceDescriptor.bytes ||
+        targetSha256 != sourceDescriptor.sha256) {
       throw StateError('restore_staging_copy:$entryName');
     }
     return (bytes: targetBytes, sha256: targetSha256);
+  }
+
+  static Future<_StagedRestoreEntry> _verifySourceDescriptor(
+    File source,
+    String entryName,
+    _StagedRestoreEntry expected,
+  ) async {
+    if (await FileSystemEntity.type(source.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      throw FormatException('restore_staging_source:$entryName');
+    }
+    final actual = (
+      bytes: await source.length(),
+      sha256: await _sha256(source),
+    );
+    if (actual != expected) {
+      throw FormatException('restore_staging_descriptor:$entryName');
+    }
+    return actual;
   }
 
   static Future<void> _ensureDurableDirectory({
@@ -638,6 +662,41 @@ final class RestoreBundleStaging {
     required bool includeChats,
     required bool includeFiles,
   }) {
+    final entries = _parseEntryDescriptors(manifest, allowSettings: true);
+    final hasDatabase = entries.containsKey(_databaseEntry);
+    final hasAssets = entries.keys.any(
+      (name) => _assetRoots.any((root) => name.startsWith('$root/')),
+    );
+    final settingsBytes = entries['settings.json']?.bytes;
+    if (settingsBytes == null ||
+        settingsBytes <= 0 ||
+        settingsBytes > _maximumSettingsBytes ||
+        hasDatabase != includeChats ||
+        (!includeFiles && hasAssets)) {
+      throw const FormatException('restore_staging_entries');
+    }
+    return entries;
+  }
+
+  static Map<String, _StagedRestoreEntry> _parseCandidateEntries(
+    Map<String, dynamic> manifest, {
+    required bool includeFiles,
+  }) {
+    final entries = _parseEntryDescriptors(manifest, allowSettings: false);
+    final hasDatabase = entries.containsKey(_databaseEntry);
+    final hasAssets = entries.keys.any(
+      (name) => _assetRoots.any((root) => name.startsWith('$root/')),
+    );
+    if (!hasDatabase || (!includeFiles && hasAssets)) {
+      throw const FormatException('restore_staging_entries');
+    }
+    return entries;
+  }
+
+  static Map<String, _StagedRestoreEntry> _parseEntryDescriptors(
+    Map<String, dynamic> manifest, {
+    required bool allowSettings,
+  }) {
     final rawEntries = manifest['entries'];
     if (rawEntries is! Map) {
       throw const FormatException('restore_staging_entries');
@@ -657,7 +716,7 @@ final class RestoreBundleStaging {
       final bytes = metadata['bytes'];
       final digest = metadata['sha256'];
       final knownName =
-          name == 'settings.json' ||
+          (allowSettings && name == 'settings.json') ||
           name == _databaseEntry ||
           _assetRoots.any((root) => name.startsWith('$root/'));
       if (!_isCanonicalEntryName(name) ||
@@ -674,18 +733,6 @@ final class RestoreBundleStaging {
       }
       entries[name] = (bytes: bytes, sha256: digest);
     }
-    final hasDatabase = entries.containsKey(_databaseEntry);
-    final hasAssets = entries.keys.any(
-      (name) => _assetRoots.any((root) => name.startsWith('$root/')),
-    );
-    final settingsBytes = entries['settings.json']?.bytes;
-    if (settingsBytes == null ||
-        settingsBytes <= 0 ||
-        settingsBytes > _maximumSettingsBytes ||
-        hasDatabase != includeChats ||
-        (!includeFiles && hasAssets)) {
-      throw const FormatException('restore_staging_entries');
-    }
     return entries;
   }
 
@@ -699,6 +746,37 @@ final class RestoreBundleStaging {
     );
     BackupSettingsValidator.normalizeAndValidate(settings);
     return settings;
+  }
+
+  static Future<ChatDatabaseSnapshotInfo> _replaceCandidateBusinessSettings({
+    required File databaseFile,
+    required Map<String, dynamic> settings,
+    required ChatDatabaseSnapshotInfo expectedDatabaseInfo,
+    required RestoreDurability durability,
+  }) async {
+    final sourceDatabaseInfo =
+        await ChatDatabaseRepository.inspectPreparedSnapshot(databaseFile);
+    if (sourceDatabaseInfo != expectedDatabaseInfo) {
+      throw const FormatException('restore_staging_database');
+    }
+    final database = AppDatabase.open(file: databaseFile);
+    try {
+      await BusinessRestoreService(
+        BusinessRepository(database),
+      ).overwrite(settings);
+    } finally {
+      await database.close();
+    }
+    final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+      databaseFile,
+    );
+    if (databaseInfo != sourceDatabaseInfo) {
+      throw const FormatException('restore_staging_database');
+    }
+    await durability.restrictFile(databaseFile);
+    await durability.syncFile(databaseFile, fullBarrier: true);
+    await durability.syncDirectory(databaseFile.parent, fullBarrier: true);
+    return databaseInfo;
   }
 
   static ChatDatabaseSnapshotInfo? _parseDatabaseInfo(

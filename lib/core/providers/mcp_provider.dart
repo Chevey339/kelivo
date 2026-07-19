@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:mcp_client/mcp_client.dart' as mcp;
+import '../database/business_preferences.dart';
 import '../services/mcp/kelivo_fetch/kelivo_fetch_server.dart';
 import '../services/mcp/stdio_command_resolver.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 /// Transport type: SSE, Streamable HTTP, and STDIO (desktop-only).
@@ -245,6 +245,7 @@ class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
 
+  final BusinessPreferences preferences;
   final Map<String, mcp.Client> _clients = {};
   final Map<String, McpStatus> _status = {}; // id -> status
   final Map<String, String> _errors = {}; // id -> last error
@@ -257,7 +258,7 @@ class McpProvider extends ChangeNotifier {
   final McpStdioCommandResolver _stdioCommandResolver =
       McpStdioCommandResolver();
 
-  McpProvider() {
+  McpProvider({required this.preferences}) {
     _load();
   }
 
@@ -274,12 +275,12 @@ class McpProvider extends ChangeNotifier {
   int get requestTimeoutSeconds => _requestTimeout.inSeconds;
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final timeoutMs = prefs.getInt(_prefsTimeoutKey);
+    await preferences.load();
+    final timeoutMs = preferences.getInt(_prefsTimeoutKey);
     if (timeoutMs != null && timeoutMs > 0) {
       _requestTimeout = Duration(milliseconds: timeoutMs);
     }
-    final raw = prefs.getString(_prefsKey);
+    final raw = preferences.getString(_prefsKey);
     if (raw != null && raw.isNotEmpty) {
       try {
         final list = (jsonDecode(raw) as List)
@@ -292,7 +293,12 @@ class McpProvider extends ChangeNotifier {
       } catch (_) {}
     }
     // Ensure built-in @kelivo/fetch is present by default
-    _ensureBuiltinFetchServerPresent();
+    final builtin = _builtinFetchServerIfMissing();
+    if (builtin != null) {
+      final next = <McpServerConfig>[..._servers, builtin];
+      await _persistServers(next);
+      _servers = next;
+    }
     // initialize statuses
     for (final s in _servers) {
       _status[s.id] = McpStatus.idle;
@@ -307,36 +313,32 @@ class McpProvider extends ChangeNotifier {
     }
   }
 
-  void _ensureBuiltinFetchServerPresent() {
+  McpServerConfig? _builtinFetchServerIfMissing() {
     final exists = _servers.any(
       (s) =>
           s.transport == McpTransportType.inmemory ||
           s.name == '@kelivo/fetch' ||
           s.id == 'kelivo_fetch',
     );
-    if (exists) return;
-    final cfg = McpServerConfig(
+    if (exists) return null;
+    return McpServerConfig(
       id: 'kelivo_fetch',
       enabled: true,
       name: '@kelivo/fetch',
       transport: McpTransportType.inmemory,
       tools: const <McpToolConfig>[], // will refresh on connect
     );
-    _servers = [..._servers, cfg];
   }
 
-  Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
+  Future<void> _persistServers(List<McpServerConfig> servers) async {
+    await preferences.setString(
       _prefsKey,
-      jsonEncode(_servers.map((e) => e.toJson()).toList()),
+      jsonEncode(servers.map((e) => e.toJson()).toList()),
     );
-    await prefs.setInt(_prefsTimeoutKey, _requestTimeout.inMilliseconds);
   }
 
-  Future<void> _persistTimeout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefsTimeoutKey, _requestTimeout.inMilliseconds);
+  Future<void> _persistTimeout(Duration timeout) async {
+    await preferences.setInt(_prefsTimeoutKey, timeout.inMilliseconds);
   }
 
   /// Export current MCP servers as a user-friendly JSON structure.
@@ -586,6 +588,8 @@ class McpProvider extends ChangeNotifier {
       throw FormatException('No valid MCP servers found in JSON');
     }
 
+    await _persistServers(next);
+
     // Disconnect all current
     for (final s in _servers) {
       try {
@@ -601,7 +605,6 @@ class McpProvider extends ChangeNotifier {
       _status[s.id] = McpStatus.idle;
     }
 
-    await _persist();
     notifyListeners();
 
     // Auto-connect enabled servers
@@ -644,9 +647,10 @@ class McpProvider extends ChangeNotifier {
           ? workingDirectory!.trim()
           : null,
     );
-    _servers = [..._servers, cfg];
+    final next = <McpServerConfig>[..._servers, cfg];
+    await _persistServers(next);
+    _servers = next;
     _status[id] = McpStatus.idle;
-    await _persist();
     notifyListeners();
     if (enabled) {
       unawaited(connect(id));
@@ -657,8 +661,9 @@ class McpProvider extends ChangeNotifier {
   Future<void> updateServer(McpServerConfig updated) async {
     final idx = _servers.indexWhere((e) => e.id == updated.id);
     if (idx < 0) return;
-    _servers = List<McpServerConfig>.of(_servers)..[idx] = updated;
-    await _persist();
+    final next = List<McpServerConfig>.of(_servers)..[idx] = updated;
+    await _persistServers(next);
+    _servers = next;
     notifyListeners();
     if (!updated.enabled) {
       await disconnect(updated.id);
@@ -670,10 +675,11 @@ class McpProvider extends ChangeNotifier {
   }
 
   Future<void> removeServer(String id) async {
+    final next = _servers.where((e) => e.id != id).toList(growable: false);
+    await _persistServers(next);
     await disconnect(id);
-    _servers = _servers.where((e) => e.id != id).toList(growable: false);
+    _servers = next;
     _status.remove(id);
-    await _persist();
     notifyListeners();
   }
 
@@ -681,10 +687,12 @@ class McpProvider extends ChangeNotifier {
     if (oldIndex == newIndex) return;
     if (oldIndex < 0 || oldIndex >= _servers.length) return;
     if (newIndex < 0 || newIndex >= _servers.length) return;
-    final moved = _servers.removeAt(oldIndex);
-    _servers.insert(newIndex, moved);
+    final next = List<McpServerConfig>.of(_servers);
+    final moved = next.removeAt(oldIndex);
+    next.insert(newIndex, moved);
+    await _persistServers(next);
+    _servers = next;
     notifyListeners();
-    await _persist();
   }
 
   Future<void> setToolEnabled(
@@ -698,8 +706,10 @@ class McpProvider extends ChangeNotifier {
     final tools = server.tools
         .map((t) => t.name == toolName ? t.copyWith(enabled: enabled) : t)
         .toList();
-    _servers[idx] = server.copyWith(tools: tools);
-    await _persist();
+    final next = List<McpServerConfig>.of(_servers)
+      ..[idx] = server.copyWith(tools: tools);
+    await _persistServers(next);
+    _servers = next;
     notifyListeners();
   }
 
@@ -718,8 +728,10 @@ class McpProvider extends ChangeNotifier {
               t.name == toolName ? t.copyWith(needsApproval: needsApproval) : t,
         )
         .toList();
-    _servers[idx] = server.copyWith(tools: tools);
-    await _persist();
+    final next = List<McpServerConfig>.of(_servers)
+      ..[idx] = server.copyWith(tools: tools);
+    await _persistServers(next);
+    _servers = next;
     notifyListeners();
   }
 
@@ -868,8 +880,8 @@ class McpProvider extends ChangeNotifier {
   }) async {
     if (duration.inMilliseconds <= 0) return;
     if (duration == _requestTimeout) return;
+    await _persistTimeout(duration);
     _requestTimeout = duration;
-    await _persistTimeout();
     notifyListeners();
     if (reconnectActive) {
       for (final id in _clients.keys.toList()) {
@@ -1302,8 +1314,10 @@ class McpProvider extends ChangeNotifier {
         );
       }
 
-      _servers[idx] = _servers[idx].copyWith(tools: merged);
-      await _persist();
+      final next = List<McpServerConfig>.of(_servers)
+        ..[idx] = _servers[idx].copyWith(tools: merged);
+      await _persistServers(next);
+      _servers = next;
       notifyListeners();
     } catch (e) {
       // debugPrint('[MCP/Tools] listTools() failed for id=$id');

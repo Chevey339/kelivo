@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'restore_durability.dart';
-import 'restore_settings_cold_ack.dart';
 
 final class RestoreWorkspaceLock {
   RestoreWorkspaceLock({
@@ -38,9 +37,6 @@ final class RestoreWorkspaceLock {
   );
   static final _receiptTempPattern = RegExp(
     r'^receipt_[0-9]{16}\.json\.[0-9]+_[0-9]+\.tmp$',
-  );
-  static final _coldAckTempPattern = RegExp(
-    r'^settings_cold_ack\.json\.[0-9]+_[0-9]+_[0-9]+\.tmp$',
   );
   static final _localTails = <String, Future<void>>{};
 
@@ -345,7 +341,6 @@ final class RestoreWorkspaceLock {
     Directory? candidateDirectory;
     Directory? receiptDirectory;
     final previousDirectories = <String>{};
-    var hasColdAckEvidence = false;
     await for (final entity in runDirectory.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
@@ -366,12 +361,6 @@ final class RestoreWorkspaceLock {
           previousDirectories.add(name)) {
         continue;
       }
-      if ((name == RestoreSettingsColdAckStore.fileName ||
-              _coldAckTempPattern.hasMatch(name)) &&
-          type == FileSystemEntityType.file) {
-        hasColdAckEvidence = true;
-        continue;
-      }
       throw StateError('restore_workspace_unpublished_run_entry');
     }
 
@@ -379,9 +368,6 @@ final class RestoreWorkspaceLock {
         receiptDirectory != null &&
         await _containsFinalReceiptOrValidInitialTemps(receiptDirectory);
     if (hasFinalReceipt) return true;
-    if (hasColdAckEvidence) {
-      throw StateError('restore_workspace_unpublished_cold_ack');
-    }
     if (previousDirectories.isNotEmpty) {
       throw StateError('restore_workspace_unpublished_previous');
     }
@@ -423,8 +409,7 @@ final class RestoreWorkspaceLock {
     await for (final entity in candidate.list(followLinks: false)) {
       final name = p.basename(entity.path);
       final type = await FileSystemEntity.type(entity.path, followLinks: false);
-      if ((name == 'settings.json' || name == 'manifest.json') &&
-          type == FileSystemEntityType.file) {
+      if (name == 'manifest.json' && type == FileSystemEntityType.file) {
         continue;
       }
       if (name == 'database' && type == FileSystemEntityType.directory) {

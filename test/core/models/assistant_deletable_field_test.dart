@@ -1,7 +1,7 @@
+import "../../support/business_test_harness.dart";
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -13,11 +13,13 @@ Future<AssistantProvider> _createProviderWithLoadedAssistants(
   List<Map<String, Object?>> assistants, {
   String? currentAssistantId,
 }) async {
-  SharedPreferences.setMockInitialValues({
-    _assistantsKey: jsonEncode(assistants),
-    if (currentAssistantId != null) _currentAssistantKey: currentAssistantId,
-  });
-  final provider = AssistantProvider();
+  final harness = await createBusinessTestHarness(
+    initial: {
+      _assistantsKey: jsonEncode(assistants),
+      if (currentAssistantId != null) _currentAssistantKey: currentAssistantId,
+    },
+  );
+  final provider = AssistantProvider(preferences: harness.preferences);
   for (var i = 0; i < 25; i++) {
     if (provider.assistants.length == assistants.length) return provider;
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -53,8 +55,10 @@ void main() {
       expect(await provider.deleteAssistant('legacy-default'), isTrue);
       expect(provider.currentAssistantId, 'regular');
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString(_assistantsKey), isNot(contains('deletable')));
+      expect(
+        provider.preferences.getString(_assistantsKey),
+        isNot(contains('deletable')),
+      );
     });
 
     test(

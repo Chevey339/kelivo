@@ -15,34 +15,22 @@ const _hashC =
 const _runId = '0123456789abcdef0123456789abcdef';
 const _otherRunId = 'ffffffffffffffffffffffffffffffff';
 
-RestorePreviousSettingsPlan _settingsPlan() {
-  return RestorePreviousSettingsPlan(
-    snapshot: const RestoreFileDescriptor(bytes: 18, sha256: _hashA),
-    beforeFingerprint: _hashB,
-    targetFingerprint: _hashC,
-    touchedKeys: {'theme', 'provider_api_key'},
-    missingKeys: {'provider_api_key'},
-  );
-}
-
 RestoreReceipt _preparedReceipt({
-  bool restoreChats = false,
   bool restoreFiles = false,
   String candidateManifestSha256 = _hashB,
 }) {
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: DateTime.utc(2026, 7, 9, 12),
-    restoreChats: restoreChats,
     restoreFiles: restoreFiles,
     candidateManifestSha256: candidateManifestSha256,
   );
 }
 
-RestorePreviousPlan _settingsOnlyPlan() {
+RestorePreviousPlan _databaseOnlyPlan() {
   return RestorePreviousPlan.forPreparedReceipt(
     receipt: _preparedReceipt(),
-    settings: _settingsPlan(),
+    database: RestorePreviousDatabasePlan.missing(),
   );
 }
 
@@ -56,8 +44,8 @@ Map<String, dynamic> _withChecksum(Map<String, dynamic> source) {
 
 void main() {
   group('RestorePreviousPlan', () {
-    test('round trips a canonical settings-only plan', () {
-      final plan = _settingsOnlyPlan();
+    test('round trips the canonical database-only plan', () {
+      final plan = _databaseOnlyPlan();
 
       final restored = RestorePreviousPlan.fromJson(
         plan.toJson(),
@@ -65,19 +53,19 @@ void main() {
       );
 
       expect(restored.runId, _runId);
-      expect(restored.selectedComponents, {RestoreComponent.settings});
-      expect(restored.settings.touchedKeys, {'provider_api_key', 'theme'});
-      expect(restored.settings.missingKeys, {'provider_api_key'});
-      expect(restored.database, isNull);
+      expect(restored.selectedComponents, {RestoreComponent.database});
+      expect(restored.database.state, RestorePreviousDatabaseState.missing);
       expect(restored.assets, isNull);
+      expect(restored.toJson(), isNot(contains('settings')));
       expect(restored.checksum, plan.checksum);
     });
 
-    test('preserves missing, empty, and populated previous objects', () {
+    test('preserves missing asset roots and a populated database', () {
       final plan = RestorePreviousPlan.forPreparedReceipt(
-        receipt: _preparedReceipt(restoreChats: true, restoreFiles: true),
-        settings: _settingsPlan(),
-        database: RestorePreviousDatabasePlan.missing(),
+        receipt: _preparedReceipt(restoreFiles: true),
+        database: RestorePreviousDatabasePlan.file(
+          const RestoreFileDescriptor(bytes: 7, sha256: _hashA),
+        ),
         assets: RestorePreviousAssetsPlan(
           rootStates: const {
             'upload': RestorePreviousAssetRootState.directory,
@@ -93,17 +81,11 @@ void main() {
 
       final restored = RestorePreviousPlan.fromJson(
         plan.toJson(),
-        preparedReceipt: _preparedReceipt(
-          restoreChats: true,
-          restoreFiles: true,
-        ),
+        preparedReceipt: _preparedReceipt(restoreFiles: true),
       );
 
-      expect(restored.database?.state, RestorePreviousDatabaseState.missing);
-      expect(
-        restored.assets?.rootStates['images'],
-        RestorePreviousAssetRootState.directory,
-      );
+      expect(restored.database.state, RestorePreviousDatabaseState.file);
+      expect(restored.database.descriptor?.bytes, 7);
       expect(
         restored.assets?.rootStates['avatars'],
         RestorePreviousAssetRootState.missing,
@@ -111,8 +93,8 @@ void main() {
       expect(restored.assets?.entries.keys, ['upload/note.txt']);
     });
 
-    test('rejects checksum changes and unknown fields', () {
-      final json = _settingsOnlyPlan().toJson();
+    test('rejects checksum changes, unknown fields, and three-leg plans', () {
+      final json = _databaseOnlyPlan().toJson();
 
       expect(
         () => RestorePreviousPlan.fromJson({
@@ -129,32 +111,42 @@ void main() {
         throwsFormatException,
       );
       expect(
-        () => RestorePreviousPlan.fromJson({
-          ...json,
-          'formatVersion': 1.0,
-        }, preparedReceipt: _preparedReceipt()),
+        () => RestorePreviousPlan.fromJson(
+          _withChecksum({
+            ...json,
+            'formatVersion': 1,
+            'selectedComponents': ['settings', 'database'],
+            'settings': const <String, dynamic>{},
+          }),
+          preparedReceipt: _preparedReceipt(),
+        ),
         throwsFormatException,
       );
     });
 
-    test('rejects payloads inconsistent with selected components', () {
+    test('rejects plans inconsistent with the selected components', () {
       expect(
         () => RestorePreviousPlan.forPreparedReceipt(
-          receipt: _preparedReceipt(restoreChats: true),
-          settings: _settingsPlan(),
+          receipt: _preparedReceipt(restoreFiles: true),
+          database: RestorePreviousDatabasePlan.missing(),
         ),
         throwsArgumentError,
       );
-
-      final json = _settingsOnlyPlan().toJson();
-      final selected = (json['selectedComponents'] as List).cast<String>()
-        ..add('database');
       expect(
-        () => RestorePreviousPlan.fromJson(
-          _withChecksum({...json, 'selectedComponents': selected}),
-          preparedReceipt: _preparedReceipt(),
+        () => RestorePreviousPlan.forPreparedReceipt(
+          receipt: _preparedReceipt(),
+          database: RestorePreviousDatabasePlan.missing(),
+          assets: RestorePreviousAssetsPlan(
+            rootStates: const {
+              'upload': RestorePreviousAssetRootState.missing,
+              'images': RestorePreviousAssetRootState.missing,
+              'avatars': RestorePreviousAssetRootState.missing,
+              'fonts': RestorePreviousAssetRootState.missing,
+            },
+            entries: const {},
+          ),
         ),
-        throwsFormatException,
+        throwsArgumentError,
       );
     });
 
@@ -162,7 +154,7 @@ void main() {
       final receipt = _preparedReceipt();
       final plan = RestorePreviousPlan.forPreparedReceipt(
         receipt: receipt,
-        settings: _settingsPlan(),
+        database: RestorePreviousDatabasePlan.missing(),
       );
 
       expect(() => plan.validatePreparedReceipt(receipt), returnsNormally);
@@ -174,62 +166,7 @@ void main() {
       );
     });
 
-    test('verifies settings snapshot bytes, keys, and fingerprints', () {
-      final beforeValues = <String, dynamic>{'theme': 'dark'};
-      final targetValues = <String, dynamic>{'theme': 'light'};
-      final touchedKeys = {'theme', 'provider_api_key'};
-      final bytes = utf8.encode(jsonEncode(beforeValues));
-      final settings = RestorePreviousSettingsPlan(
-        snapshot: RestoreFileDescriptor(
-          bytes: bytes.length,
-          sha256: sha256.convert(bytes).toString(),
-        ),
-        beforeFingerprint: RestorePreviousSettingsPlan.fingerprintProjection(
-          beforeValues,
-          touchedKeys,
-        ),
-        targetFingerprint: RestorePreviousSettingsPlan.fingerprintProjection(
-          targetValues,
-          touchedKeys,
-        ),
-        touchedKeys: touchedKeys,
-        missingKeys: {'provider_api_key'},
-      );
-
-      expect(settings.validateSnapshotBytes(bytes), beforeValues);
-      expect(
-        () => settings.validateTargetProjection(targetValues),
-        returnsNormally,
-      );
-      expect(
-        () => settings.validateSnapshotBytes(utf8.encode('{}')),
-        throwsFormatException,
-      );
-      final emptyBytes = utf8.encode('{}');
-      final missingRequiredValue = RestorePreviousSettingsPlan(
-        snapshot: RestoreFileDescriptor(
-          bytes: emptyBytes.length,
-          sha256: sha256.convert(emptyBytes).toString(),
-        ),
-        beforeFingerprint: RestorePreviousSettingsPlan.fingerprintProjection(
-          {},
-          touchedKeys,
-        ),
-        targetFingerprint: settings.targetFingerprint,
-        touchedKeys: touchedKeys,
-        missingKeys: {'provider_api_key'},
-      );
-      expect(
-        () => missingRequiredValue.validateSnapshotBytes(emptyBytes),
-        throwsFormatException,
-      );
-      expect(
-        () => settings.validateTargetProjection({'theme': 'changed'}),
-        throwsFormatException,
-      );
-    });
-
-    test('rejects unsafe assets and invalid settings tombstones', () {
+    test('rejects unsafe assets and invalid database descriptors', () {
       expect(
         () => RestorePreviousAssetsPlan(
           rootStates: const {
@@ -245,12 +182,8 @@ void main() {
         throwsArgumentError,
       );
       expect(
-        () => RestorePreviousSettingsPlan(
-          snapshot: const RestoreFileDescriptor(bytes: 2, sha256: _hashA),
-          beforeFingerprint: _hashB,
-          targetFingerprint: _hashC,
-          touchedKeys: {'theme'},
-          missingKeys: {'not_touched'},
+        () => RestorePreviousDatabasePlan.file(
+          const RestoreFileDescriptor(bytes: -1, sha256: _hashA),
         ),
         throwsArgumentError,
       );

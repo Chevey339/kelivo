@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/database/business_repository.dart';
 import '../../../core/models/backup.dart';
 import '../../../core/providers/backup_provider.dart';
 import '../../../core/providers/backup_reminder_provider.dart';
@@ -231,12 +232,14 @@ class _BackupPageState extends State<BackupPage> {
         ChangeNotifierProvider(
           create: (_) => BackupProvider(
             chatService: context.read<ChatService>(),
+            businessRepository: context.read<BusinessRepository>(),
             initialConfig: settings.webDavConfig,
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => S3BackupProvider(
             chatService: context.read<ChatService>(),
+            businessRepository: context.read<BusinessRepository>(),
             initialConfig: settings.s3Config,
           ),
         ),
@@ -1198,14 +1201,13 @@ class _BackupPageState extends State<BackupPage> {
 
               await _runWithImportingOverlay(context, () async {
                 try {
-                  final settings = context.read<SettingsProvider>();
                   final cs = context.read<ChatService>();
                   final file = File(path);
                   // Defer import to service
                   final res = await CherryImporter.importFromCherryStudio(
                     file: file,
                     mode: mode,
-                    settings: settings,
+                    businessRepository: context.read<BusinessRepository>(),
                     chatService: cs,
                   );
                   if (!context.mounted) return;
@@ -1271,12 +1273,11 @@ class _BackupPageState extends State<BackupPage> {
               await _runWithImportingOverlay(context, () async {
                 try {
                   final cs = context.read<ChatService>();
-                  final settings = context.read<SettingsProvider>();
                   final file = File(path);
                   final res = await ChatboxImporter.importFromChatbox(
                     file: file,
                     mode: mode,
-                    settings: settings,
+                    businessRepository: context.read<BusinessRepository>(),
                     chatService: cs,
                   );
                   if (!context.mounted) return;

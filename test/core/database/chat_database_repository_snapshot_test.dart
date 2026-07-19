@@ -244,6 +244,68 @@ void main() {
         ),
       );
     });
+
+    test(
+      'rejects a same-version business table without its primary key',
+      () async {
+        await sourceRepository.close();
+        sourceClosed = true;
+        final raw = sqlite.sqlite3.open(sourceFile.path);
+        try {
+          raw.execute('ALTER TABLE provider_rows RENAME TO provider_rows_old;');
+          raw.execute('''
+CREATE TABLE provider_rows (
+  provider_key TEXT NOT NULL,
+  sort_order INTEGER NOT NULL CHECK(sort_order >= 0),
+  payload TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+''');
+          raw.execute('DROP TABLE provider_rows_old;');
+        } finally {
+          raw.close();
+        }
+
+        expect(
+          () => ChatDatabaseRepository.inspectInstalledDatabase(
+            sourceFile,
+            validateContents: true,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'primary_key_schema:provider_rows',
+            ),
+          ),
+        );
+      },
+    );
+
+    test('rejects a same-version database missing the memory index', () async {
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('DROP INDEX idx_assistant_memories_assistant;');
+      } finally {
+        raw.close();
+      }
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(
+          sourceFile,
+          validateContents: true,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'index_schema:idx_assistant_memories_assistant',
+          ),
+        ),
+      );
+    });
   });
 }
 

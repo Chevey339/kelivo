@@ -3029,24 +3029,6 @@ abstract class AppLocalizations {
   /// **'Kelivo could not restart automatically. Fully close it, then open it again.'**
   String get restartAppFailedMessage;
 
-  /// No description provided for @backupRestoreColdRestartTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'One more restart is required'**
-  String get backupRestoreColdRestartTitle;
-
-  /// No description provided for @backupRestoreColdRestartContent.
-  ///
-  /// In en, this message translates to:
-  /// **'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.'**
-  String get backupRestoreColdRestartContent;
-
-  /// No description provided for @backupRestoreColdRestartButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Restart Kelivo'**
-  String get backupRestoreColdRestartButton;
-
   /// No description provided for @backupRestoreRolledBackTitle.
   ///
   /// In en, this message translates to:

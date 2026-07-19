@@ -47,18 +47,7 @@ void main() {
 
 Future<int> _verifySchemaMigration(Directory root) async {
   final file = File(p.join(root.path, 'migration.sqlite'));
-  var repository = ChatDatabaseRepository.open(file: file);
-  try {
-    await repository.ensureReady();
-  } finally {
-    await repository.close();
-  }
-
-  final raw = sqlite.sqlite3.open(file.path);
-  raw.userVersion = AppDatabase.currentSchemaVersion - 1;
-  raw.close();
-
-  repository = ChatDatabaseRepository.open(file: file);
+  final repository = ChatDatabaseRepository.open(file: file);
   try {
     await repository.ensureReady();
     await repository.validateConnectionContract();
@@ -71,6 +60,29 @@ Future<int> _verifySchemaMigration(Directory root) async {
     validateContents: true,
   );
   expect(info.schemaVersion, AppDatabase.currentSchemaVersion);
+
+  final rejectedFile = File(p.join(root.path, 'rejected.sqlite'));
+  final rejected = sqlite.sqlite3.open(rejectedFile.path);
+  rejected.execute('CREATE TABLE rejection_sentinel (value TEXT);');
+  rejected.userVersion = 2;
+  rejected.close();
+  await expectLater(
+    ChatDatabaseRepository.migrateInstalledDatabase(rejectedFile),
+    throwsA(isA<StateError>()),
+  );
+  final unchanged = sqlite.sqlite3.open(
+    rejectedFile.path,
+    mode: sqlite.OpenMode.readOnly,
+  );
+  expect(unchanged.userVersion, 2);
+  expect(
+    unchanged.select(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?;",
+      ['rejection_sentinel'],
+    ),
+    hasLength(1),
+  );
+  unchanged.close();
   return info.schemaVersion;
 }
 

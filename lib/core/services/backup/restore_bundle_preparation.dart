@@ -49,6 +49,9 @@ final class RestoreBundlePreparation {
     var publicationStarted = false;
     try {
       final selectedChats = restoreChats && bundleIncludesChats;
+      if (!selectedChats) {
+        throw const FormatException('restore_preparation_database_required');
+      }
       final selectedFiles = restoreFiles && bundleIncludesFiles;
       staged = await RestoreBundleStaging.create(
         appDataDirectory: appDataDirectory,
@@ -62,7 +65,6 @@ final class RestoreBundlePreparation {
       final receipt = RestoreReceipt.prepared(
         runId: staged.runId,
         createdAtUtc: createdAtUtc ?? DateTime.now().toUtc(),
-        restoreChats: selectedChats,
         restoreFiles: selectedFiles,
         candidateManifestSha256: staged.candidateManifestSha256,
       );

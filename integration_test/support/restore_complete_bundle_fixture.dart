@@ -21,37 +21,17 @@ final class RestoreCompleteBundleFixtureState {
     required this.runId,
     required this.preparedReceiptChecksum,
     required this.candidateManifestSha256,
-    required this.primaryPreferenceKey,
-    required this.primaryOldPreferenceValue,
-    required this.primaryNewPreferenceValue,
-    required this.secondaryPreferenceKey,
-    required this.secondaryOldPreferenceValue,
-    required this.secondaryNewPreferenceValue,
-    required this.secretPreferenceKey,
-    required this.secretOldPreferenceValue,
-    required this.targetOnlyPreferenceKey,
-    required this.targetOnlyNewPreferenceValue,
     required this.oldConversationId,
     required this.newConversationId,
   });
 
-  static const version = 3;
+  static const version = 4;
 
   final String matrixRunId;
   final String failpoint;
   final String runId;
   final String preparedReceiptChecksum;
   final String candidateManifestSha256;
-  final String primaryPreferenceKey;
-  final String primaryOldPreferenceValue;
-  final String primaryNewPreferenceValue;
-  final String secondaryPreferenceKey;
-  final String secondaryOldPreferenceValue;
-  final String secondaryNewPreferenceValue;
-  final String secretPreferenceKey;
-  final String secretOldPreferenceValue;
-  final String targetOnlyPreferenceKey;
-  final String targetOnlyNewPreferenceValue;
   final String oldConversationId;
   final String newConversationId;
 
@@ -63,16 +43,6 @@ final class RestoreCompleteBundleFixtureState {
     'runId': runId,
     'preparedReceiptChecksum': preparedReceiptChecksum,
     'candidateManifestSha256': candidateManifestSha256,
-    'primaryPreferenceKey': primaryPreferenceKey,
-    'primaryOldPreferenceValue': primaryOldPreferenceValue,
-    'primaryNewPreferenceValue': primaryNewPreferenceValue,
-    'secondaryPreferenceKey': secondaryPreferenceKey,
-    'secondaryOldPreferenceValue': secondaryOldPreferenceValue,
-    'secondaryNewPreferenceValue': secondaryNewPreferenceValue,
-    'secretPreferenceKey': secretPreferenceKey,
-    'secretOldPreferenceValue': secretOldPreferenceValue,
-    'targetOnlyPreferenceKey': targetOnlyPreferenceKey,
-    'targetOnlyNewPreferenceValue': targetOnlyNewPreferenceValue,
     'oldConversationId': oldConversationId,
     'newConversationId': newConversationId,
   };
@@ -80,7 +50,7 @@ final class RestoreCompleteBundleFixtureState {
   factory RestoreCompleteBundleFixtureState.fromJson(
     Map<dynamic, dynamic> source,
   ) {
-    const expectedKeys = {
+    const keys = {
       'format',
       'version',
       'matrixRunId',
@@ -88,29 +58,19 @@ final class RestoreCompleteBundleFixtureState {
       'runId',
       'preparedReceiptChecksum',
       'candidateManifestSha256',
-      'primaryPreferenceKey',
-      'primaryOldPreferenceValue',
-      'primaryNewPreferenceValue',
-      'secondaryPreferenceKey',
-      'secondaryOldPreferenceValue',
-      'secondaryNewPreferenceValue',
-      'secretPreferenceKey',
-      'secretOldPreferenceValue',
-      'targetOnlyPreferenceKey',
-      'targetOnlyNewPreferenceValue',
       'oldConversationId',
       'newConversationId',
     };
     if (source.keys.any((key) => key is! String) ||
-        source.length != expectedKeys.length ||
-        !source.keys.toSet().containsAll(expectedKeys)) {
+        source.length != keys.length ||
+        !source.keys.toSet().containsAll(keys)) {
       throw const FormatException('restore_harness_state_fields');
     }
     final json = source.cast<String, dynamic>();
     if (json['format'] != restoreHarnessFormat || json['version'] != version) {
       throw const FormatException('restore_harness_state_header');
     }
-    for (final key in expectedKeys.difference({'version'})) {
+    for (final key in keys.difference({'version'})) {
       if (json[key] is! String || (json[key] as String).isEmpty) {
         throw const FormatException('restore_harness_state_types');
       }
@@ -121,26 +81,13 @@ final class RestoreCompleteBundleFixtureState {
       runId: json['runId'] as String,
       preparedReceiptChecksum: json['preparedReceiptChecksum'] as String,
       candidateManifestSha256: json['candidateManifestSha256'] as String,
-      primaryPreferenceKey: json['primaryPreferenceKey'] as String,
-      primaryOldPreferenceValue: json['primaryOldPreferenceValue'] as String,
-      primaryNewPreferenceValue: json['primaryNewPreferenceValue'] as String,
-      secondaryPreferenceKey: json['secondaryPreferenceKey'] as String,
-      secondaryOldPreferenceValue:
-          json['secondaryOldPreferenceValue'] as String,
-      secondaryNewPreferenceValue:
-          json['secondaryNewPreferenceValue'] as String,
-      secretPreferenceKey: json['secretPreferenceKey'] as String,
-      secretOldPreferenceValue: json['secretOldPreferenceValue'] as String,
-      targetOnlyPreferenceKey: json['targetOnlyPreferenceKey'] as String,
-      targetOnlyNewPreferenceValue:
-          json['targetOnlyNewPreferenceValue'] as String,
       oldConversationId: json['oldConversationId'] as String,
       newConversationId: json['newConversationId'] as String,
     );
   }
 
   static Future<RestoreCompleteBundleFixtureState> read(
-    RestoreHarnessControl control,
+    RestoreProcessHarnessControl control,
   ) async {
     final state = RestoreCompleteBundleFixtureState.fromJson(
       await readHarnessJson(control.stateFile),
@@ -154,7 +101,7 @@ final class RestoreCompleteBundleFixtureState {
 }
 
 Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
-  RestoreHarnessControl control,
+  RestoreProcessHarnessControl control,
 ) async {
   final appData = control.appDataDirectory;
   final source = control.sourceDirectory;
@@ -163,24 +110,6 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
 
   final oldConversationId = 'old-${control.scenarioId}';
   final newConversationId = 'new-${control.scenarioId}';
-  final primaryPreferenceKey = 'restore_harness_${control.scenarioId}_primary';
-  final secondaryPreferenceKey =
-      'restore_harness_${control.scenarioId}_secondary';
-  final secretPreferenceKey =
-      'restore_harness_${control.scenarioId}_secret_api_key';
-  final targetOnlyPreferenceKey =
-      'restore_harness_${control.scenarioId}_target_only';
-  const primaryOldPreferenceValue = 'old-primary';
-  const primaryNewPreferenceValue = 'new-primary';
-  const secondaryOldPreferenceValue = 'old-secondary';
-  const secondaryNewPreferenceValue = 'new-secondary';
-  const secretOldPreferenceValue = 'old-secret';
-  const targetOnlyNewPreferenceValue = 'new-target-only';
-  if (primaryPreferenceKey.compareTo(secondaryPreferenceKey) >= 0 ||
-      secondaryPreferenceKey.compareTo(secretPreferenceKey) >= 0 ||
-      secretPreferenceKey.compareTo(targetOnlyPreferenceKey) >= 0) {
-    throw StateError('restore_harness_preference_order');
-  }
   await createHarnessDatabase(
     File(p.join(appData.path, AppDatabase.databaseFileName)),
     conversationId: oldConversationId,
@@ -193,11 +122,7 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
 
   final settingsFile = File(p.join(source.path, 'settings.json'));
   await settingsFile.writeAsString(
-    jsonEncode({
-      primaryPreferenceKey: primaryNewPreferenceValue,
-      secondaryPreferenceKey: secondaryNewPreferenceValue,
-      targetOnlyPreferenceKey: targetOnlyNewPreferenceValue,
-    }),
+    jsonEncode({'restore_harness_value': 'new'}),
     flush: true,
   );
   final candidateDatabase = File(
@@ -263,16 +188,6 @@ Future<RestoreCompleteBundleFixtureState> prepareCompleteBundleFixture(
     runId: prepared.runId,
     preparedReceiptChecksum: prepared.receipt.checksum,
     candidateManifestSha256: prepared.receipt.candidateManifestSha256,
-    primaryPreferenceKey: primaryPreferenceKey,
-    primaryOldPreferenceValue: primaryOldPreferenceValue,
-    primaryNewPreferenceValue: primaryNewPreferenceValue,
-    secondaryPreferenceKey: secondaryPreferenceKey,
-    secondaryOldPreferenceValue: secondaryOldPreferenceValue,
-    secondaryNewPreferenceValue: secondaryNewPreferenceValue,
-    secretPreferenceKey: secretPreferenceKey,
-    secretOldPreferenceValue: secretOldPreferenceValue,
-    targetOnlyPreferenceKey: targetOnlyPreferenceKey,
-    targetOnlyNewPreferenceValue: targetOnlyNewPreferenceValue,
     oldConversationId: oldConversationId,
     newConversationId: newConversationId,
   );
@@ -313,13 +228,10 @@ Future<List<String>> harnessConversationIds(File file) async {
   }
 }
 
-Future<Map<String, dynamic>> harnessFileDescriptor(File file) async {
-  return {
-    'bytes': await file.length(),
-    'sha256': await harnessFileSha256(file),
-  };
-}
+Future<Map<String, dynamic>> harnessFileDescriptor(File file) async => {
+  'bytes': await file.length(),
+  'sha256': await harnessFileSha256(file),
+};
 
-Future<String> harnessFileSha256(File file) async {
-  return (await sha256.bind(file.openRead()).first).toString();
-}
+Future<String> harnessFileSha256(File file) async =>
+    (await sha256.bind(file.openRead()).first).toString();

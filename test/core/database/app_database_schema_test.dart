@@ -16,7 +16,8 @@ void main() {
     verifier = SchemaVerifier(GeneratedHelper());
   });
 
-  test('frozen schema includes and matches current schema 11', () async {
+  test('frozen schema includes and matches current schema 1', () async {
+    expect(AppDatabase.currentSchemaVersion, 1);
     expect(GeneratedHelper.versions, [AppDatabase.currentSchemaVersion]);
     final database = AppDatabase(NativeDatabase.memory());
     try {
@@ -31,11 +32,41 @@ void main() {
     }
   });
 
+  test('schema 1 creates every business persistence table', () async {
+    final database = AppDatabase(NativeDatabase.memory());
+    try {
+      final rows = await database
+          .customSelect("SELECT name FROM sqlite_master WHERE type = 'table';")
+          .get();
+      final tables = rows.map((row) => row.read<String>('name')).toSet();
+
+      expect(
+        tables,
+        containsAll(const {
+          'assistant_rows',
+          'provider_rows',
+          'provider_group_rows',
+          'mcp_server_rows',
+          'world_book_rows',
+          'assistant_memory_rows',
+          'quick_phrase_rows',
+          'search_service_rows',
+          'tts_service_rows',
+          'instruction_injection_rows',
+          'assistant_tag_rows',
+          'preference_rows',
+        }),
+      );
+    } finally {
+      await database.close();
+    }
+  });
+
   test('unpublished schema is rejected instead of migrated', () async {
     final database = AppDatabase(
       NativeDatabase.memory(
         setup: (rawDatabase) {
-          rawDatabase.userVersion = AppDatabase.currentSchemaVersion - 1;
+          rawDatabase.userVersion = 2;
         },
       ),
     );

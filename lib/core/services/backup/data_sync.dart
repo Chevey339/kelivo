@@ -10,9 +10,10 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xml/xml.dart';
 
+import '../../database/business_repository.dart';
+import '../../database/business_restore_service.dart';
 import '../../database/chat_database_repository.dart';
 import '../../models/backup.dart';
 import '../../models/chat_message.dart';
@@ -45,16 +46,19 @@ class DataSync {
   static const _databaseEntryName = 'database/kelivo.db';
   // A 16 MiB metadata cap keeps manifest parsing and entry metadata bounded.
   static const _maxManifestBytes = 16 * 1024 * 1024;
+  // Settings are parsed as one JSON object, so keep their decoded input bound.
+  static const _maxSettingsBytes = 16 * 1024 * 1024;
   // ZIP64 supports larger entries. Restore keeps explicit, diagnosable bounds.
   static const _maxRestoreEntryBytes = 8 * 1024 * 1024 * 1024;
   static const _maxRestoreTotalBytes = 16 * 1024 * 1024 * 1024;
   static const _maxRestoreEntries = 100000;
 
   final ChatService chatService;
+  final BusinessRepository businessRepository;
   BackupMergeReport? _lastMergeReport;
   BackupMergeReport? get lastMergeReport => _lastMergeReport;
 
-  DataSync({required this.chatService});
+  DataSync({required this.chatService, required this.businessRepository});
 
   // ===== WebDAV helpers =====
   Uri _collectionUri(WebDavConfig cfg) {
@@ -502,6 +506,13 @@ class DataSync {
           }
         }
         _validateZipPathPrefixes(allEntryNames, archiveFiles.keys);
+
+        final settingsEntry = archiveFiles['settings.json'];
+        if (settingsEntry != null &&
+            (settingsEntry.size <= 0 ||
+                settingsEntry.size > _maxSettingsBytes)) {
+          throw const FormatException('settings_size');
+        }
 
         final manifestEntry = archiveFiles[_manifestEntryName];
         Map<String, int>? declaredEntrySizes;
@@ -1060,6 +1071,20 @@ class DataSync {
     );
   }
 
+  static Map<String, dynamic> _readSettingsJsonSync(String path) {
+    final file = File(path);
+    if (!file.existsSync()) throw const FormatException('settings.json');
+    final length = file.lengthSync();
+    if (length <= 0 || length > _maxSettingsBytes) {
+      throw const FormatException('settings_size');
+    }
+    final decoded = jsonDecode(file.readAsStringSync());
+    if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
+      throw const FormatException('settings.json');
+    }
+    return decoded.cast<String, dynamic>();
+  }
+
   static String _sha256FileSync(File file) {
     final digestSink = _DigestOutputSink();
     final hashSink = sha256.startChunkedConversion(digestSink);
@@ -1346,9 +1371,11 @@ class DataSync {
   }
 
   Future<String> _exportSettingsJson() async {
-    final prefs = await SharedPreferencesAsync.instance;
-    final map = await prefs.snapshotForRegularBackup();
-    return jsonEncode(map);
+    final settings = await BusinessRestoreService(
+      businessRepository,
+    ).exportSettings();
+    settings.removeWhere((key, _) => BackupSettingsValidator.shouldIgnore(key));
+    return jsonEncode(settings);
   }
 
   Future<void> _restoreFromBackupFile(
@@ -1392,16 +1419,22 @@ class DataSync {
       } else {
         versionedBackup = null;
       }
-      final settings =
-          jsonDecode(await settingsFile.readAsString()) as Map<String, dynamic>;
+      final settingsPath = settingsFile.path;
+      final settings = await Isolate.run(
+        () => _readSettingsJsonSync(settingsPath),
+      );
       BackupSettingsValidator.normalizeAndValidate(settings);
-      final prefs = await SharedPreferencesAsync.instance;
+      final businessRestore = BusinessRestoreService(businessRepository);
       if (versionedBackup != null) {
         final includeChats = versionedBackup.includeChats;
         final includeFiles = versionedBackup.includeFiles;
         final restoreChats = cfg.includeChats && includeChats;
         final restoreFiles = cfg.includeFiles && includeFiles;
         if (mode == RestoreMode.overwrite) {
+          if (!restoreChats) {
+            await businessRestore.overwrite(settings);
+            return;
+          }
           final appDataPath = (await AppDirectories.getAppDataDirectory()).path;
           final extractedPath = extractDir.path;
           final sourceManifestSha256 = versionedBackup.normalizedManifestSha256;
@@ -1422,6 +1455,10 @@ class DataSync {
           _lastMergeReport = await chatService.mergeDatabaseSnapshot(
             File(p.join(extractDir.path, _databaseEntryName)),
           );
+        }
+        await businessRestore.merge(settings);
+        if (!restoreChats) {
+          return;
         }
       }
       final restoreChats =
@@ -1447,296 +1484,14 @@ class DataSync {
         geminiThoughtSigs = parsed.geminiThoughtSigs;
       }
 
-      // Restore settings
-      if (await settingsFile.exists()) {
-        try {
-          if (mode == RestoreMode.overwrite) {
-            // For overwrite mode, restore all settings
-            await prefs.restore(settings);
-          } else {
-            // For merge mode, intelligently merge settings
-            final existing = await prefs.snapshot();
-            BackupSettingsValidator.normalizeLegacyStringLists(existing);
-            final pendingSettings = <String, dynamic>{};
-
-            // Keys that should be merged as JSON arrays/objects
-            const mergeableKeys = {
-              'assistants_v1', // Assistant configurations
-              'assistant_memories_v1', // Assistant memory entries
-              'provider_configs_v1', // Provider configurations
-              'pinned_models_v1', // Pinned models list
-              'providers_order_v1', // Provider order list
-              'mcp_servers_v1', // MCP server configurations
-              'provider_groups_v1', // provider group list
-              'provider_group_map_v1', // providerKey -> groupId
-              'provider_group_collapsed_v1', // groupId|__ungrouped__ -> bool
-              'search_services_v1', // Search services configuration
-              'assistant_tags_v1', // Ordered tag list [{id,name}]
-              'assistant_tag_map_v1', // assistantId -> tagId
-              'assistant_tag_collapsed_v1', // tagId -> bool
-            };
-
-            for (final entry in settings.entries) {
-              final key = entry.key;
-              final newValue = entry.value;
-
-              if (mergeableKeys.contains(key)) {
-                // Special handling for mergeable configurations
-                if (key == 'assistants_v1' && existing.containsKey(key)) {
-                  // Merge assistants by ID with field-level rules.
-                  // Preserve local avatar if already set to avoid clearing/overwriting.
-                  final existingAssistants =
-                      jsonDecode(existing[key] as String) as List;
-                  final newAssistants = jsonDecode(newValue as String) as List;
-                  final assistantMap = <String, Map<String, dynamic>>{};
-
-                  // Seed map with existing assistants
-                  for (final a in existingAssistants) {
-                    if (a is Map && a.containsKey('id')) {
-                      // Store as mutable map<String, dynamic>
-                      assistantMap[a['id'].toString()] =
-                          Map<String, dynamic>.from(a);
-                    }
-                  }
-
-                  // Merge with imported assistants
-                  for (final a in newAssistants) {
-                    if (a is Map && a.containsKey('id')) {
-                      final id = a['id'].toString();
-                      final incoming = Map<String, dynamic>.from(a);
-
-                      if (!assistantMap.containsKey(id)) {
-                        // New assistant entirely
-                        assistantMap[id] = incoming;
-                        continue;
-                      }
-
-                      final local = assistantMap[id]!;
-
-                      // Start with default behavior: imported values override
-                      final merged = <String, dynamic>{...local, ...incoming};
-
-                      // Special rule: do not override existing non-empty avatar
-                      final localAvatar = (local['avatar'] ?? '').toString();
-                      final incomingAvatar = (incoming['avatar'] ?? '');
-                      if (localAvatar.trim().isNotEmpty) {
-                        // Keep local avatar regardless of imported value
-                        merged['avatar'] = localAvatar;
-                      } else {
-                        // Only take imported avatar if present (non-empty)
-                        final s = incomingAvatar is String
-                            ? incomingAvatar
-                            : incomingAvatar?.toString();
-                        if (s == null || s.trim().isEmpty) {
-                          merged['avatar'] = null;
-                        } else {
-                          merged['avatar'] = s;
-                        }
-                      }
-
-                      // Special rule: do not override existing non-empty background
-                      final localBg = (local['background'] ?? '').toString();
-                      final incomingBg = (incoming['background'] ?? '');
-                      if (localBg.trim().isNotEmpty) {
-                        // Keep local background regardless of imported value
-                        merged['background'] = localBg;
-                      } else {
-                        // Only take imported background if present (non-empty)
-                        final sb = incomingBg is String
-                            ? incomingBg
-                            : incomingBg?.toString();
-                        if (sb == null || sb.trim().isEmpty) {
-                          merged['background'] = null;
-                        } else {
-                          merged['background'] = sb;
-                        }
-                      }
-
-                      assistantMap[id] = merged;
-                    }
-                  }
-
-                  final mergedAssistants = assistantMap.values.toList();
-                  pendingSettings[key] = jsonEncode(mergedAssistants);
-                } else if (key == 'provider_configs_v1' &&
-                    existing.containsKey(key)) {
-                  // Merge provider configs: combine both maps
-                  final existingConfigs =
-                      jsonDecode(existing[key] as String)
-                          as Map<String, dynamic>;
-                  final newConfigs =
-                      jsonDecode(newValue as String) as Map<String, dynamic>;
-
-                  // Merge configs, new values override existing for same keys
-                  final mergedConfigs = {...existingConfigs, ...newConfigs};
-                  pendingSettings[key] = jsonEncode(mergedConfigs);
-                } else if (key == 'assistant_memories_v1' &&
-                    existing.containsKey(key)) {
-                  pendingSettings[key] = _mergeAssistantMemories(
-                    existing[key] as String,
-                    newValue as String,
-                  );
-                } else if (key == 'mcp_servers_v1' &&
-                    existing.containsKey(key)) {
-                  pendingSettings[key] = _mergeJsonListById(
-                    existing[key] as String,
-                    newValue as String,
-                  );
-                } else if (key == 'pinned_models_v1' &&
-                    existing.containsKey(key)) {
-                  // Merge pinned models: combine and deduplicate
-                  final existingModels = (existing[key] as List).cast<String>();
-                  final newModels = (newValue as List).cast<String>();
-                  final modelSet = <String>{};
-
-                  // Add all models to set for deduplication
-                  modelSet.addAll(existingModels);
-                  modelSet.addAll(newModels);
-
-                  pendingSettings[key] = modelSet.toList();
-                } else if (key == 'assistant_tags_v1') {
-                  // Merge tag list by id; keep existing order, append new tags at end (incoming order)
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingList =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(existingStr) as List);
-                  final newList = (newStr == null || newStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(newStr) as List);
-
-                  // Map existing by id and maintain order
-                  final existingOrder = <String>[];
-                  final tagById = <String, Map<String, dynamic>>{};
-                  for (final e in existingList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      existingOrder.add(id);
-                      tagById[id] = Map<String, dynamic>.from(e);
-                    }
-                  }
-                  // Add new tags that don't exist yet
-                  for (final e in newList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      if (!tagById.containsKey(id)) {
-                        tagById[id] = Map<String, dynamic>.from(e);
-                        existingOrder.add(id);
-                      }
-                    }
-                  }
-                  final merged = [
-                    for (final id in existingOrder) tagById[id],
-                  ].whereType<Map<String, dynamic>>().toList();
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if (key == 'assistant_tag_map_v1') {
-                  // Merge assistant->tag mapping; prefer existing on conflicts
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if (key == 'assistant_tag_collapsed_v1') {
-                  // Merge collapse states; prefer existing on conflicts
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if (key == 'provider_groups_v1') {
-                  // Merge provider groups by id; keep existing order, append new groups at end (incoming order)
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingList =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(existingStr) as List);
-                  final newList = (newStr == null || newStr.isEmpty)
-                      ? <dynamic>[]
-                      : (jsonDecode(newStr) as List);
-
-                  final existingOrder = <String>[];
-                  final groupById = <String, Map<String, dynamic>>{};
-                  for (final e in existingList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      existingOrder.add(id);
-                      groupById[id] = Map<String, dynamic>.from(e);
-                    }
-                  }
-                  for (final e in newList) {
-                    if (e is Map && e['id'] != null) {
-                      final id = e['id'].toString();
-                      if (!groupById.containsKey(id)) {
-                        groupById[id] = Map<String, dynamic>.from(e);
-                        existingOrder.add(id);
-                      }
-                    }
-                  }
-                  final merged = [
-                    for (final id in existingOrder) groupById[id],
-                  ].whereType<Map<String, dynamic>>().toList();
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if (key == 'provider_group_map_v1') {
-                  // Merge provider->group mapping; prefer existing on conflicts
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if (key == 'provider_group_collapsed_v1') {
-                  // Merge collapse states; prefer existing on conflicts
-                  final existingStr = (existing[key] ?? '') as String?;
-                  final newStr = (newValue ?? '') as String?;
-                  final existingMap =
-                      (existingStr == null || existingStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(existingStr) as Map<String, dynamic>);
-                  final newMap = (newStr == null || newStr.isEmpty)
-                      ? <String, dynamic>{}
-                      : (jsonDecode(newStr) as Map<String, dynamic>);
-                  final merged = <String, dynamic>{...newMap, ...existingMap};
-                  pendingSettings[key] = jsonEncode(merged);
-                } else if ((key == 'providers_order_v1' ||
-                        key == 'search_services_v1') &&
-                    existing.containsKey(key)) {
-                  // For these lists, prefer the imported version if different
-                  // This ensures new providers/services are properly ordered
-                  pendingSettings[key] = newValue;
-                } else {
-                  // For new keys, add them
-                  pendingSettings[key] = newValue;
-                }
-              } else if (!existing.containsKey(key)) {
-                // For non-mergeable keys, only add if not existing
-                pendingSettings[key] = newValue;
-              }
-              // Skip existing non-mergeable keys to preserve user preferences
-            }
-            BackupSettingsValidator.validate(pendingSettings);
-            await prefs.restoreAtomically(pendingSettings);
-          }
-        } catch (_) {
-          rethrow;
+      if (versionedBackup == null) {
+        if (mode == RestoreMode.overwrite) {
+          await businessRestore.overwrite(settings);
+        } else {
+          await businessRestore.merge(settings);
+        }
+        if (!restoreChats) {
+          return;
         }
       }
 
@@ -1973,85 +1728,6 @@ class DataSync {
     } finally {
       await _deleteDirectoryQuietly(extractDir);
     }
-  }
-
-  static String _mergeJsonListById(String existingRaw, String incomingRaw) {
-    final existingList = jsonDecode(existingRaw) as List;
-    final incomingList = jsonDecode(incomingRaw) as List;
-    final byId = <String, Map<String, dynamic>>{};
-    final order = <String>[];
-
-    void addIfNew(dynamic item) {
-      if (item is! Map || item['id'] == null) return;
-      final id = item['id'].toString();
-      if (id.isEmpty || byId.containsKey(id)) return;
-      byId[id] = Map<String, dynamic>.from(item);
-      order.add(id);
-    }
-
-    for (final item in existingList) {
-      addIfNew(item);
-    }
-    for (final item in incomingList) {
-      addIfNew(item);
-    }
-
-    return jsonEncode([for (final id in order) byId[id]]);
-  }
-
-  static String _mergeAssistantMemories(
-    String existingRaw,
-    String incomingRaw,
-  ) {
-    final existingList = jsonDecode(existingRaw) as List;
-    final incomingList = jsonDecode(incomingRaw) as List;
-    final merged = <Map<String, dynamic>>[];
-    final contentKeys = <String>{};
-    var maxId = 0;
-
-    void addExisting(dynamic item) {
-      if (item is! Map) return;
-      final map = Map<String, dynamic>.from(item);
-      final id = (map['id'] as num?)?.toInt() ?? 0;
-      if (id > maxId) maxId = id;
-      final key = _assistantMemoryContentKey(map);
-      if (key != null) contentKeys.add(key);
-      merged.add(map);
-    }
-
-    for (final item in existingList) {
-      addExisting(item);
-    }
-
-    for (final item in incomingList) {
-      if (item is! Map) continue;
-      final incoming = Map<String, dynamic>.from(item);
-      final key = _assistantMemoryContentKey(incoming);
-      if (key != null && contentKeys.contains(key)) continue;
-
-      final id = (incoming['id'] as num?)?.toInt() ?? 0;
-      final idTaken = merged.any(
-        (e) => ((e['id'] as num?)?.toInt() ?? 0) == id,
-      );
-      if (id <= 0 || idTaken) {
-        maxId += 1;
-        incoming['id'] = maxId;
-      } else if (id > maxId) {
-        maxId = id;
-      }
-
-      if (key != null) contentKeys.add(key);
-      merged.add(incoming);
-    }
-
-    return jsonEncode(merged);
-  }
-
-  static String? _assistantMemoryContentKey(Map<String, dynamic> memory) {
-    final assistantId = (memory['assistantId'] ?? '').toString().trim();
-    final content = (memory['content'] ?? '').toString().trim();
-    if (assistantId.isEmpty || content.isEmpty) return null;
-    return '$assistantId\n$content';
   }
 }
 
@@ -2438,133 +2114,4 @@ class _StreamingZipWrittenFile {
   final int compressedSize;
   final int uncompressedSize;
   final String sha256;
-}
-
-// ===== SharedPreferences async snapshot/restore helpers =====
-class SharedPreferencesAsync {
-  SharedPreferencesAsync._();
-  static SharedPreferencesAsync? _inst;
-
-  static Future<SharedPreferencesAsync> get instance async {
-    _inst ??= SharedPreferencesAsync._();
-    return _inst!;
-  }
-
-  Future<Map<String, dynamic>> snapshot() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-    final map = <String, dynamic>{};
-    for (final k in keys) {
-      if (BackupSettingsValidator.isLocalOnly(k)) continue;
-      map[k] = prefs.get(k);
-    }
-    return map;
-  }
-
-  /// Regular app backups include credentials so a restored installation keeps
-  /// working provider, proxy, WebDAV, S3, TTS, MCP, and search configuration.
-  Future<Map<String, dynamic>> snapshotForRegularBackup() async {
-    return snapshot();
-  }
-
-  Future<void> restore(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    for (final entry in data.entries) {
-      final k = entry.key;
-      final v = entry.value;
-      if (BackupSettingsValidator.isLocalOnly(k)) continue;
-      await _restoreValue(prefs, k, v);
-    }
-  }
-
-  Future<void> restoreSingle(String key, dynamic value) async {
-    if (BackupSettingsValidator.isLocalOnly(key)) return;
-    final prefs = await SharedPreferences.getInstance();
-    await _restoreValue(prefs, key, value);
-  }
-
-  /// Applies a settings batch with in-process compensation. This is used by
-  /// merge restore, where a partial key set would otherwise be observable.
-  Future<void> restoreAtomically(Map<String, dynamic> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    final previous = <String, Object?>{};
-    final absent = <String>{};
-    final written = <String>[];
-    for (final key in data.keys) {
-      if (BackupSettingsValidator.isLocalOnly(key)) continue;
-      final value = prefs.get(key);
-      if (value == null) {
-        absent.add(key);
-      } else {
-        previous[key] = value;
-      }
-    }
-    try {
-      for (final entry in data.entries) {
-        if (BackupSettingsValidator.isLocalOnly(entry.key)) continue;
-        await _restoreValue(prefs, entry.key, entry.value);
-        written.add(entry.key);
-      }
-    } catch (error, stackTrace) {
-      Object? rollbackError;
-      for (final key in written.reversed) {
-        try {
-          final restored = absent.contains(key)
-              ? await prefs.remove(key)
-              : await _restorePreviousValue(prefs, key, previous[key]!);
-          if (!restored) rollbackError ??= StateError(key);
-        } catch (failure) {
-          rollbackError ??= failure;
-        }
-      }
-      if (rollbackError != null) {
-        Error.throwWithStackTrace(
-          StateError('settings_merge_rollback:$rollbackError'),
-          stackTrace,
-        );
-      }
-      Error.throwWithStackTrace(error, stackTrace);
-    }
-  }
-
-  Future<bool> _restorePreviousValue(
-    SharedPreferences prefs,
-    String key,
-    Object value,
-  ) async {
-    if (value is bool) return prefs.setBool(key, value);
-    if (value is int) return prefs.setInt(key, value);
-    if (value is double) return prefs.setDouble(key, value);
-    if (value is String) return prefs.setString(key, value);
-    if (value is List<String>) return prefs.setStringList(key, value);
-    if (value is List && value.every((item) => item is String)) {
-      return prefs.setStringList(key, value.cast<String>());
-    }
-    throw FormatException(key);
-  }
-
-  Future<void> _restoreValue(
-    SharedPreferences prefs,
-    String key,
-    dynamic value,
-  ) async {
-    BackupSettingsValidator.validateValue(key, value);
-    final bool restored;
-    if (value is bool) {
-      restored = await prefs.setBool(key, value);
-    } else if (value is int) {
-      restored = await prefs.setInt(key, value);
-    } else if (value is double) {
-      restored = await prefs.setDouble(key, value);
-    } else if (value is String) {
-      restored = await prefs.setString(key, value);
-    } else if (value is List && value.every((item) => item is String)) {
-      restored = await prefs.setStringList(key, value.cast<String>());
-    } else {
-      throw FormatException(key);
-    }
-    if (!restored) {
-      throw StateError(key);
-    }
-  }
 }

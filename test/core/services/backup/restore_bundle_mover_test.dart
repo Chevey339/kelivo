@@ -4,16 +4,15 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_mover.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_durability.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_builder.dart';
 import 'package:Kelivo/core/services/backup/restore_previous_store.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
-import 'package:Kelivo/core/services/backup/restore_settings_store.dart';
-import 'package:Kelivo/core/services/backup/restore_settings_transition.dart';
 
 const _runId = '0123456789abcdef0123456789abcdef';
 const _candidateHash =
@@ -28,7 +27,6 @@ void main() {
     late Directory candidateDirectory;
 
     setUp(() async {
-      SharedPreferences.setMockInitialValues({'theme': 'old'});
       appData = await Directory.systemTemp.createTemp(
         'kelivo_restore_bundle_mover_test_',
       );
@@ -41,17 +39,14 @@ void main() {
       if (await appData.exists()) await appData.delete(recursive: true);
     });
 
-    test('rejects candidate components not selected by the receipt', () async {
+    test('rejects a candidate without the mandatory database leg', () async {
       final candidate = ValidatedRestoreCandidate(
         includeChats: false,
-        includeFiles: true,
-        secretsIncluded: true,
+        includeFiles: false,
         manifestSha256: _candidateHash,
-        settings: const {'theme': 'new'},
         entries: const {},
         databaseInfo: null,
       );
-      final preferences = await SharedPreferences.getInstance();
       final mover = RestoreBundleMover(
         appDataDirectory: appData,
         candidateDirectory: candidateDirectory,
@@ -59,12 +54,7 @@ void main() {
       );
 
       await expectLater(
-        mover.installCandidate(
-          receipt: _receipt(),
-          candidate: candidate,
-          settingsTransition: _transition(),
-          settingsStore: RestoreSettingsStore(preferences),
-        ),
+        mover.installCandidate(receipt: _receipt(), candidate: candidate),
         throwsA(
           isA<StateError>().having(
             (error) => error.message,
@@ -73,12 +63,10 @@ void main() {
           ),
         ),
       );
-      await preferences.reload();
-      expect(preferences.getString('theme'), 'old');
     });
 
     test(
-      'resumes old DB and asset moves after a post-rename failure',
+      'resumes old database and asset moves after a post-rename failure',
       () async {
         final database = File(p.join(appData.path, 'kelivo.db'));
         await database.writeAsBytes([1, 2, 3], flush: true);
@@ -86,12 +74,10 @@ void main() {
         await upload.parent.create();
         await upload.writeAsString('old asset', flush: true);
         await Directory(p.join(appData.path, 'images')).create();
-        final receipt = _receipt(chats: true, files: true);
-        final transition = _transition();
+        final receipt = _receipt(files: true);
         final bundle = await RestorePreviousBuilder.build(
           appDataDirectory: appData,
           preparedReceipt: receipt,
-          settingsTransition: transition,
         );
         final previousStore = RestorePreviousStore(runDirectory: runDirectory);
         final persisted = await previousStore.persistPending(
@@ -109,8 +95,6 @@ void main() {
           failingMover.moveLiveToPending(persisted),
           throwsA(isA<StateError>()),
         );
-        expect(await database.exists(), isTrue);
-        expect(await upload.parent.exists(), isFalse);
         final resumedMover = RestoreBundleMover(
           appDataDirectory: appData,
           candidateDirectory: candidateDirectory,
@@ -121,8 +105,9 @@ void main() {
           preparedReceipt: receipt,
         );
 
-        expect(await previousStore.previousDirectory.exists(), isTrue);
+        expect(await database.exists(), isFalse);
         expect(previous.plan.assets?.entries.keys, ['upload/item']);
+        expect(previous.plan.database.descriptor?.bytes, 3);
       },
     );
 
@@ -132,11 +117,10 @@ void main() {
       final asset = File(p.join(appData.path, 'upload', 'nested', 'item.txt'));
       await asset.parent.create(recursive: true);
       await asset.writeAsString('old asset');
-      final receipt = _receipt(chats: true, files: true);
+      final receipt = _receipt(files: true);
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appData,
         preparedReceipt: receipt,
-        settingsTransition: _transition(),
       );
       final previousStore = RestorePreviousStore(runDirectory: runDirectory);
       final pending = await previousStore.persistPending(
@@ -176,107 +160,44 @@ void main() {
     });
 
     test(
-      'resumes settings and asset installation from mixed positions',
+      'resumes database and asset installation from mixed positions',
       () async {
-        final oldUpload = File(p.join(appData.path, 'upload', 'old'));
-        await oldUpload.parent.create();
-        await oldUpload.writeAsString('old', flush: true);
-        for (final root in const ['images', 'avatars', 'fonts']) {
-          await Directory(p.join(appData.path, root)).create();
-        }
-        final receipt = _receipt(files: true);
-        final transition = _transition();
-        final bundle = await RestorePreviousBuilder.build(
-          appDataDirectory: appData,
-          preparedReceipt: receipt,
-          settingsTransition: transition,
-        );
-        final previousStore = RestorePreviousStore(runDirectory: runDirectory);
-        final persisted = await previousStore.persistPending(
-          bundle: bundle,
-          preparedReceipt: receipt,
-        );
-        final initialMover = RestoreBundleMover(
-          appDataDirectory: appData,
+        final fixture = await _prepareCutoverFixture(
+          appData: appData,
+          runDirectory: runDirectory,
           candidateDirectory: candidateDirectory,
-          previousStore: previousStore,
-        );
-        await initialMover.moveLiveToPending(persisted);
-        final previous = await previousStore.promotePending(
-          preparedReceipt: receipt,
-        );
-
-        final candidateEntries = <String, ValidatedRestoreEntry>{};
-        final settingsBytes = utf8.encode(jsonEncode({'theme': 'new'}));
-        candidateEntries['settings.json'] = (
-          bytes: settingsBytes.length,
-          sha256: sha256.convert(settingsBytes).toString(),
-        );
-        for (final root in const ['upload', 'images', 'avatars', 'fonts']) {
-          await Directory(p.join(candidateDirectory.path, root)).create();
-        }
-        final newUpload = File(
-          p.join(candidateDirectory.path, 'upload', 'new'),
-        );
-        await newUpload.writeAsString('new', flush: true);
-        candidateEntries['upload/new'] = (
-          bytes: await newUpload.length(),
-          sha256: (await sha256.bind(newUpload.openRead()).first).toString(),
-        );
-        final candidate = ValidatedRestoreCandidate(
-          includeChats: false,
-          includeFiles: true,
-          secretsIncluded: true,
-          manifestSha256: _candidateHash,
-          settings: const {'theme': 'new'},
-          entries: candidateEntries,
-          databaseInfo: null,
-        );
-        final preferences = await SharedPreferences.getInstance();
-        final settingsStore = RestoreSettingsStore(preferences);
-        final resumedTransition = RestoreSettingsTransition.resume(
-          plan: previous.plan.settings,
-          snapshotBytes: previous.settingsSnapshotBytes,
-          candidateSettings: candidate.settings,
-          secretsIncluded: candidate.secretsIncluded,
         );
         final failingMover = RestoreBundleMover(
           appDataDirectory: appData,
           candidateDirectory: candidateDirectory,
-          previousStore: previousStore,
+          previousStore: fixture.previousStore,
           durability: _ThrowAfterRenameDurability(RestorePlatformDurability()),
         );
 
         await expectLater(
           failingMover.installCandidate(
-            receipt: receipt,
-            candidate: candidate,
-            settingsTransition: resumedTransition,
-            settingsStore: settingsStore,
+            receipt: fixture.oldRenamed,
+            candidate: fixture.candidate,
           ),
           throwsA(isA<StateError>()),
         );
-        final resumedMover = RestoreBundleMover(
-          appDataDirectory: appData,
-          candidateDirectory: candidateDirectory,
-          previousStore: previousStore,
+        await fixture.mover.installCandidate(
+          receipt: fixture.oldRenamed,
+          candidate: fixture.candidate,
         );
-        await resumedMover.installCandidate(
-          receipt: receipt,
-          candidate: candidate,
-          settingsTransition: resumedTransition,
-          settingsStore: settingsStore,
+        final newInstalled = fixture.oldRenamed.advance(
+          RestoreReceiptState.newInstalled,
         );
-        await resumedMover.validateInstalled(
-          receipt: receipt,
-          candidate: candidate,
-          settingsTransition: resumedTransition,
-          settingsStore: settingsStore,
-          previous: previous,
+        await fixture.mover.validateInstalled(
+          receipt: newInstalled,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
         );
 
-        await preferences.reload();
-        expect(preferences.getString('theme'), 'new');
+        final installed = await RestorePreviousBuilder.describeFile(
+          File(p.join(appData.path, 'kelivo.db')),
+        );
+        expect(installed.sha256, fixture.newDatabaseSha256);
         expect(
           await File(p.join(appData.path, 'upload', 'new')).readAsString(),
           'new',
@@ -288,107 +209,53 @@ void main() {
       },
     );
 
-    test('resumes an interrupted asset rollback to previous', () async {
-      final oldUpload = File(p.join(appData.path, 'upload', 'old'));
-      await oldUpload.parent.create();
-      await oldUpload.writeAsString('old', flush: true);
-      for (final root in const ['images', 'avatars', 'fonts']) {
-        await Directory(p.join(appData.path, root)).create();
-      }
-      final prepared = _receipt(files: true);
-      final transition = _transition();
-      final bundle = await RestorePreviousBuilder.build(
-        appDataDirectory: appData,
-        preparedReceipt: prepared,
-        settingsTransition: transition,
-      );
-      final previousStore = RestorePreviousStore(runDirectory: runDirectory);
-      final pending = await previousStore.persistPending(
-        bundle: bundle,
-        preparedReceipt: prepared,
-      );
-      final mover = RestoreBundleMover(
-        appDataDirectory: appData,
+    test('resumes an interrupted database and asset rollback', () async {
+      final fixture = await _prepareCutoverFixture(
+        appData: appData,
+        runDirectory: runDirectory,
         candidateDirectory: candidateDirectory,
-        previousStore: previousStore,
       );
-      await mover.moveLiveToPending(pending);
-      final previous = await previousStore.promotePending(
-        preparedReceipt: prepared,
+      await fixture.mover.installCandidate(
+        receipt: fixture.oldRenamed,
+        candidate: fixture.candidate,
       );
-
-      for (final root in const ['upload', 'images', 'avatars', 'fonts']) {
-        await Directory(p.join(candidateDirectory.path, root)).create();
-      }
-      final newUpload = File(p.join(candidateDirectory.path, 'upload', 'new'));
-      await newUpload.writeAsString('new', flush: true);
-      final settingsBytes = utf8.encode(jsonEncode({'theme': 'new'}));
-      final candidate = ValidatedRestoreCandidate(
-        includeChats: false,
-        includeFiles: true,
-        secretsIncluded: true,
-        manifestSha256: _candidateHash,
-        settings: const {'theme': 'new'},
-        entries: {
-          'settings.json': (
-            bytes: settingsBytes.length,
-            sha256: sha256.convert(settingsBytes).toString(),
-          ),
-          'upload/new': (
-            bytes: await newUpload.length(),
-            sha256: (await sha256.bind(newUpload.openRead()).first).toString(),
-          ),
-        },
-        databaseInfo: null,
-      );
-      final preferences = await SharedPreferences.getInstance();
-      final settingsStore = RestoreSettingsStore(preferences);
-      final resumedTransition = RestoreSettingsTransition.resume(
-        plan: previous.plan.settings,
-        snapshotBytes: previous.settingsSnapshotBytes,
-        candidateSettings: candidate.settings,
-        secretsIncluded: candidate.secretsIncluded,
-      );
-      final oldRenamed = prepared.advance(
-        RestoreReceiptState.oldRenamed,
-        previousManifestSha256: previous.manifestSha256,
-      );
-      await mover.installCandidate(
-        receipt: oldRenamed,
-        candidate: candidate,
-        settingsTransition: resumedTransition,
-        settingsStore: settingsStore,
-      );
-      final rollingBack = oldRenamed.advance(RestoreReceiptState.rollingBack);
-
+      final rollingBack = fixture.oldRenamed
+          .advance(RestoreReceiptState.newInstalled)
+          .advance(RestoreReceiptState.rollingBack);
       final failingMover = RestoreBundleMover(
         appDataDirectory: appData,
         candidateDirectory: candidateDirectory,
-        previousStore: previousStore,
+        previousStore: fixture.previousStore,
         durability: _ThrowAfterRenameDurability(RestorePlatformDurability()),
       );
+
       await expectLater(
         failingMover.rollbackToPrevious(
           receipt: rollingBack,
-          candidate: candidate,
-          settingsTransition: resumedTransition,
-          settingsStore: settingsStore,
-          previous: previous,
+          candidate: fixture.candidate,
+          previous: fixture.previous,
         ),
         throwsA(isA<StateError>()),
       );
-
-      await mover.rollbackToPrevious(
+      await fixture.mover.rollbackToPrevious(
         receipt: rollingBack,
-        candidate: candidate,
-        settingsTransition: resumedTransition,
-        settingsStore: settingsStore,
-        previous: previous,
+        candidate: fixture.candidate,
+        previous: fixture.previous,
       );
-      await previousStore.validateControlOnlyAfterRollback(previous);
-      await preferences.reload();
-      expect(preferences.getString('theme'), 'old');
-      expect(await oldUpload.readAsString(), 'old');
+      await fixture.mover.validateRolledBack(
+        receipt: rollingBack,
+        candidate: fixture.candidate,
+        previous: fixture.previous,
+      );
+
+      final restored = await RestorePreviousBuilder.describeFile(
+        File(p.join(appData.path, 'kelivo.db')),
+      );
+      expect(restored.sha256, fixture.oldDatabaseSha256);
+      expect(
+        await File(p.join(appData.path, 'upload', 'old')).readAsString(),
+        'old',
+      );
       expect(
         await File(
           p.join(candidateDirectory.path, 'upload', 'new'),
@@ -399,22 +266,149 @@ void main() {
   });
 }
 
-RestoreReceipt _receipt({bool chats = false, bool files = false}) {
+RestoreReceipt _receipt({bool files = false, String? manifestSha256}) {
   return RestoreReceipt.prepared(
     runId: _runId,
     createdAtUtc: DateTime.utc(2026, 7, 9),
-    restoreChats: chats,
     restoreFiles: files,
-    candidateManifestSha256: _candidateHash,
+    candidateManifestSha256: manifestSha256 ?? _candidateHash,
   );
 }
 
-RestoreSettingsTransition _transition() {
-  return RestoreSettingsTransition.build(
-    currentSettings: const {'theme': 'old'},
-    candidateSettings: const {'theme': 'new'},
-    secretsIncluded: true,
+final class _CutoverFixture {
+  const _CutoverFixture({
+    required this.oldRenamed,
+    required this.candidate,
+    required this.previous,
+    required this.previousStore,
+    required this.mover,
+    required this.oldDatabaseSha256,
+    required this.newDatabaseSha256,
+  });
+
+  final RestoreReceipt oldRenamed;
+  final ValidatedRestoreCandidate candidate;
+  final PersistedRestorePrevious previous;
+  final RestorePreviousStore previousStore;
+  final RestoreBundleMover mover;
+  final String oldDatabaseSha256;
+  final String newDatabaseSha256;
+}
+
+Future<_CutoverFixture> _prepareCutoverFixture({
+  required Directory appData,
+  required Directory runDirectory,
+  required Directory candidateDirectory,
+}) async {
+  final liveDatabase = File(p.join(appData.path, 'kelivo.db'));
+  await _createDatabase(liveDatabase, conversationId: 'old');
+  final oldDatabase = await RestorePreviousBuilder.describeFile(liveDatabase);
+  final oldUpload = File(p.join(appData.path, 'upload', 'old'));
+  await oldUpload.parent.create();
+  await oldUpload.writeAsString('old', flush: true);
+  await Directory(p.join(appData.path, 'images')).create();
+
+  final candidateDatabase = File(
+    p.join(candidateDirectory.path, 'database', 'kelivo.db'),
   );
+  await candidateDatabase.parent.create(recursive: true);
+  await _createDatabase(candidateDatabase, conversationId: 'new');
+  final databaseInfo = await ChatDatabaseRepository.prepareSnapshotForRestore(
+    candidateDatabase,
+  );
+  final databaseDescriptor = await _manifestDescriptor(candidateDatabase);
+  for (final root in const ['upload', 'images', 'avatars', 'fonts']) {
+    await Directory(p.join(candidateDirectory.path, root)).create();
+  }
+  final newUpload = File(p.join(candidateDirectory.path, 'upload', 'new'));
+  await newUpload.writeAsString('new', flush: true);
+  final uploadDescriptor = await _manifestDescriptor(newUpload);
+  final manifest = File(p.join(candidateDirectory.path, 'manifest.json'));
+  await manifest.writeAsString(
+    jsonEncode({
+      'format': 'kelivo-backup',
+      'formatVersion': 2,
+      'payloadKind': 'sqlite',
+      'createdAtUtc': '2026-07-09T00:00:00.000Z',
+      'appVersion': 'test',
+      'includeChats': true,
+      'includeFiles': true,
+      'database': {
+        'entry': 'database/kelivo.db',
+        'schemaVersion': databaseInfo.schemaVersion,
+        'conversationCount': databaseInfo.conversationCount,
+        'messageCount': databaseInfo.messageCount,
+      },
+      'entries': {
+        'database/kelivo.db': databaseDescriptor,
+        'upload/new': uploadDescriptor,
+      },
+    }),
+    flush: true,
+  );
+  final manifestSha256 = (await sha256.bind(manifest.openRead()).first)
+      .toString();
+  final candidate = await RestoreBundleStaging.validateExistingCandidate(
+    candidateDirectory: candidateDirectory,
+    expectedManifestSha256: manifestSha256,
+  );
+  final prepared = _receipt(files: true, manifestSha256: manifestSha256);
+  final bundle = await RestorePreviousBuilder.build(
+    appDataDirectory: appData,
+    preparedReceipt: prepared,
+  );
+  final previousStore = RestorePreviousStore(runDirectory: runDirectory);
+  final pending = await previousStore.persistPending(
+    bundle: bundle,
+    preparedReceipt: prepared,
+  );
+  final mover = RestoreBundleMover(
+    appDataDirectory: appData,
+    candidateDirectory: candidateDirectory,
+    previousStore: previousStore,
+  );
+  await mover.moveLiveToPending(pending);
+  final previous = await previousStore.promotePending(
+    preparedReceipt: prepared,
+  );
+  final oldRenamed = prepared.advance(
+    RestoreReceiptState.oldRenamed,
+    previousManifestSha256: previous.manifestSha256,
+  );
+  return _CutoverFixture(
+    oldRenamed: oldRenamed,
+    candidate: candidate,
+    previous: previous,
+    previousStore: previousStore,
+    mover: mover,
+    oldDatabaseSha256: oldDatabase.sha256,
+    newDatabaseSha256: databaseDescriptor['sha256']! as String,
+  );
+}
+
+Future<Map<String, Object>> _manifestDescriptor(File file) async => {
+  'bytes': await file.length(),
+  'sha256': (await sha256.bind(file.openRead()).first).toString(),
+};
+
+Future<void> _createDatabase(
+  File file, {
+  required String conversationId,
+}) async {
+  final repository = ChatDatabaseRepository.open(file: file);
+  try {
+    await repository.ensureReady();
+    await repository.putMigrationBatch(
+      conversations: [Conversation(id: conversationId, title: conversationId)],
+      messages: const [],
+      toolEventsByMessageId: const {},
+      geminiSignaturesByMessageId: const {},
+    );
+    await repository.markMigrationComplete();
+    await repository.checkpoint();
+  } finally {
+    await repository.close();
+  }
 }
 
 final class _ThrowAfterRenameDurability implements RestoreDurability {

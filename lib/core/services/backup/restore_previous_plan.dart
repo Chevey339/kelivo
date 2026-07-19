@@ -3,14 +3,9 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
-import 'backup_settings_validator.dart';
 import 'restore_receipt.dart';
 
-const _componentOrder = [
-  RestoreComponent.settings,
-  RestoreComponent.database,
-  RestoreComponent.assets,
-];
+const _componentOrder = [RestoreComponent.database, RestoreComponent.assets];
 final _runIdPattern = RegExp(r'^[a-f0-9]{32}$');
 final _hashPattern = RegExp(r'^[a-f0-9]{64}$');
 
@@ -25,140 +20,6 @@ final class RestoreFileDescriptor {
   final String sha256;
 
   Map<String, dynamic> toJson() => {'bytes': bytes, 'sha256': sha256};
-}
-
-final class RestorePreviousSettingsPlan {
-  RestorePreviousSettingsPlan({
-    required this.snapshot,
-    required this.beforeFingerprint,
-    required this.targetFingerprint,
-    required Set<String> touchedKeys,
-    required Set<String> missingKeys,
-  }) : touchedKeys = Set.unmodifiable(touchedKeys),
-       missingKeys = Set.unmodifiable(missingKeys) {
-    _validateDescriptor(snapshot, 'settings');
-    _validateHash(beforeFingerprint, 'beforeFingerprint');
-    _validateHash(targetFingerprint, 'targetFingerprint');
-    if (!this.touchedKeys.containsAll(this.missingKeys) ||
-        this.touchedKeys.any(BackupSettingsValidator.isLocalOnly)) {
-      throw ArgumentError('restore_previous_settings_keys');
-    }
-  }
-
-  static const snapshotPath = 'settings.json';
-
-  final RestoreFileDescriptor snapshot;
-  final String beforeFingerprint;
-  final String targetFingerprint;
-  final Set<String> touchedKeys;
-  final Set<String> missingKeys;
-
-  static String fingerprintProjection(
-    Map<String, dynamic> values,
-    Set<String> touchedKeys,
-  ) {
-    if (!touchedKeys.containsAll(values.keys) ||
-        touchedKeys.any(BackupSettingsValidator.isLocalOnly)) {
-      throw ArgumentError('restore_previous_settings_projection');
-    }
-    BackupSettingsValidator.validate(values);
-    final keys = _sortedStrings(touchedKeys);
-    final projection = {
-      'format': 'kelivo.restore-settings-projection',
-      'formatVersion': 1,
-      'entries': [
-        for (final key in keys)
-          {
-            'key': key,
-            'present': values.containsKey(key),
-            if (values.containsKey(key)) 'value': values[key],
-          },
-      ],
-    };
-    return sha256.convert(utf8.encode(jsonEncode(projection))).toString();
-  }
-
-  Map<String, dynamic> validateSnapshotBytes(List<int> bytes) {
-    if (bytes.length != snapshot.bytes ||
-        sha256.convert(bytes).toString() != snapshot.sha256) {
-      throw const FormatException('restore_previous_settings_snapshot');
-    }
-    final decoded = jsonDecode(utf8.decode(bytes));
-    if (decoded is! Map || decoded.keys.any((key) => key is! String)) {
-      throw const FormatException('restore_previous_settings_snapshot');
-    }
-    final decodedValues = decoded.cast<String, dynamic>();
-    BackupSettingsValidator.validate(decodedValues);
-    final values = <String, dynamic>{
-      for (final entry in decodedValues.entries)
-        entry.key: entry.value is List
-            ? List<String>.unmodifiable((entry.value as List).cast<String>())
-            : entry.value,
-    };
-    final expectedKeys = touchedKeys.difference(missingKeys);
-    if (values.length != expectedKeys.length ||
-        !values.keys.toSet().containsAll(expectedKeys) ||
-        fingerprintProjection(values, touchedKeys) != beforeFingerprint) {
-      throw const FormatException('restore_previous_settings_snapshot');
-    }
-    return Map.unmodifiable(values);
-  }
-
-  void validateTargetProjection(Map<String, dynamic> values) {
-    if (fingerprintProjection(values, touchedKeys) != targetFingerprint) {
-      throw const FormatException('restore_previous_settings_target');
-    }
-  }
-
-  void validateBeforeProjection(Map<String, dynamic> values) {
-    if (fingerprintProjection(values, touchedKeys) != beforeFingerprint) {
-      throw const FormatException('restore_previous_settings_before');
-    }
-  }
-
-  Map<String, dynamic> toJson() => {
-    'snapshotPath': snapshotPath,
-    'snapshot': snapshot.toJson(),
-    'beforeFingerprint': beforeFingerprint,
-    'targetFingerprint': targetFingerprint,
-    'touchedKeys': _sortedStrings(touchedKeys),
-    'missingKeys': _sortedStrings(missingKeys),
-  };
-
-  factory RestorePreviousSettingsPlan.fromJson(Object? source) {
-    final json = _requireMap(source, const {
-      'snapshotPath',
-      'snapshot',
-      'beforeFingerprint',
-      'targetFingerprint',
-      'touchedKeys',
-      'missingKeys',
-    }, 'restore_previous_settings');
-    if (json['snapshotPath'] != snapshotPath ||
-        json['beforeFingerprint'] is! String ||
-        json['targetFingerprint'] is! String) {
-      throw const FormatException('restore_previous_settings');
-    }
-    try {
-      return RestorePreviousSettingsPlan(
-        snapshot: _parseDescriptor(json['snapshot'], 'settings'),
-        beforeFingerprint: json['beforeFingerprint'] as String,
-        targetFingerprint: json['targetFingerprint'] as String,
-        touchedKeys: _parseCanonicalStringSet(
-          json['touchedKeys'],
-          'restore_previous_settings_touched',
-        ),
-        missingKeys: _parseCanonicalStringSet(
-          json['missingKeys'],
-          'restore_previous_settings_missing',
-        ),
-      );
-    } on FormatException {
-      rethrow;
-    } catch (_) {
-      throw const FormatException('restore_previous_settings');
-    }
-  }
 }
 
 final class RestorePreviousDatabasePlan {
@@ -307,8 +168,7 @@ final class RestorePreviousPlan {
     required this.candidateManifestSha256,
     required Set<RestoreComponent> selectedComponents,
     required this.createdAtUtc,
-    required this.settings,
-    this.database,
+    required this.database,
     this.assets,
   }) : selectedComponents = Set.unmodifiable(selectedComponents) {
     if (!_runIdPattern.hasMatch(runId)) {
@@ -319,9 +179,7 @@ final class RestorePreviousPlan {
     if (!createdAtUtc.isUtc) {
       throw ArgumentError.value(createdAtUtc, 'createdAtUtc');
     }
-    if (!this.selectedComponents.contains(RestoreComponent.settings) ||
-        this.selectedComponents.contains(RestoreComponent.database) !=
-            (database != null) ||
+    if (!this.selectedComponents.contains(RestoreComponent.database) ||
         this.selectedComponents.contains(RestoreComponent.assets) !=
             (assets != null)) {
       throw ArgumentError('restore_previous_components');
@@ -329,21 +187,19 @@ final class RestorePreviousPlan {
   }
 
   static const format = 'kelivo.restore-previous-plan';
-  static const formatVersion = 1;
+  static const formatVersion = 2;
 
   final String runId;
   final String preparedReceiptChecksum;
   final String candidateManifestSha256;
   final Set<RestoreComponent> selectedComponents;
   final DateTime createdAtUtc;
-  final RestorePreviousSettingsPlan settings;
-  final RestorePreviousDatabasePlan? database;
+  final RestorePreviousDatabasePlan database;
   final RestorePreviousAssetsPlan? assets;
 
   factory RestorePreviousPlan.forPreparedReceipt({
     required RestoreReceipt receipt,
-    required RestorePreviousSettingsPlan settings,
-    RestorePreviousDatabasePlan? database,
+    required RestorePreviousDatabasePlan database,
     RestorePreviousAssetsPlan? assets,
   }) {
     if (receipt.state != RestoreReceiptState.prepared ||
@@ -356,7 +212,6 @@ final class RestorePreviousPlan {
       candidateManifestSha256: receipt.candidateManifestSha256,
       selectedComponents: receipt.selectedComponents,
       createdAtUtc: receipt.createdAtUtc,
-      settings: settings,
       database: database,
       assets: assets,
     );
@@ -390,8 +245,7 @@ final class RestorePreviousPlan {
         if (selectedComponents.contains(component)) component.name,
     ],
     'createdAtUtc': createdAtUtc.toIso8601String(),
-    'settings': settings.toJson(),
-    'database': database?.toJson(),
+    'database': database.toJson(),
     'assets': assets?.toJson(),
   };
 
@@ -407,7 +261,6 @@ final class RestorePreviousPlan {
       'candidateManifestSha256',
       'selectedComponents',
       'createdAtUtc',
-      'settings',
       'database',
       'assets',
       'checksum',
@@ -435,10 +288,7 @@ final class RestorePreviousPlan {
         candidateManifestSha256: json['candidateManifestSha256'] as String,
         selectedComponents: selectedComponents,
         createdAtUtc: createdAtUtc,
-        settings: RestorePreviousSettingsPlan.fromJson(json['settings']),
-        database: json['database'] == null
-            ? null
-            : RestorePreviousDatabasePlan.fromJson(json['database']),
+        database: RestorePreviousDatabasePlan.fromJson(json['database']),
         assets: json['assets'] == null
             ? null
             : RestorePreviousAssetsPlan.fromJson(json['assets']),
@@ -503,19 +353,6 @@ void _validateHash(String value, String field) {
   }
 }
 
-Set<String> _parseCanonicalStringSet(Object? source, String error) {
-  if (source is! List || source.any((value) => value is! String)) {
-    throw FormatException(error);
-  }
-  final values = source.cast<String>();
-  final canonical = values.toSet().toList()..sort();
-  if (canonical.length != values.length) throw FormatException(error);
-  for (var index = 0; index < values.length; index++) {
-    if (values[index] != canonical[index]) throw FormatException(error);
-  }
-  return canonical.toSet();
-}
-
 Set<RestoreComponent> _parseComponents(Object? source) {
   if (source is! List || source.any((value) => value is! String)) {
     throw const FormatException('restore_previous_components');
@@ -539,8 +376,6 @@ Set<RestoreComponent> _parseComponents(Object? source) {
   }
   return components;
 }
-
-List<String> _sortedStrings(Iterable<String> values) => values.toList()..sort();
 
 String? _assetRootFor(String entryName) {
   if (entryName.contains('\\') ||

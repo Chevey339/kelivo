@@ -14,8 +14,6 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
-import '../../../core/services/instruction_injection_store.dart';
-import '../../../core/services/world_book_store.dart';
 import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
@@ -638,17 +636,9 @@ class MessageBuilderService {
       List<InstructionInjection> actives = const <InstructionInjection>[];
       try {
         final ip = contextProvider.read<InstructionInjectionProvider>();
+        await ip.initialize();
         actives = ip.activesFor(assistantId);
-        if (actives.isEmpty) {
-          actives = await InstructionInjectionStore.getActives(
-            assistantId: assistantId,
-          );
-        }
-      } catch (_) {
-        actives = await InstructionInjectionStore.getActives(
-          assistantId: assistantId,
-        );
-      }
+      } catch (_) {}
       final prompts = actives
           .map((e) => e.prompt.trim())
           .where((p) => p.isNotEmpty)
@@ -671,20 +661,10 @@ class MessageBuilderService {
 
       try {
         final wb = contextProvider.read<WorldBookProvider>();
+        await wb.initialize();
         all = wb.books;
         activeBookIds = wb.activeBookIdsFor(assistantId);
-        if (all.isEmpty) all = await WorldBookStore.getAll();
-        if (activeBookIds.isEmpty) {
-          activeBookIds = await WorldBookStore.getActiveIds(
-            assistantId: assistantId,
-          );
-        }
-      } catch (_) {
-        all = await WorldBookStore.getAll();
-        activeBookIds = await WorldBookStore.getActiveIds(
-          assistantId: assistantId,
-        );
-      }
+      } catch (_) {}
 
       if (all.isEmpty || activeBookIds.isEmpty) return;
 

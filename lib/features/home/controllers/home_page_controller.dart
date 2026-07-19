@@ -353,6 +353,8 @@ class HomePageController extends ChangeNotifier {
     _fileUploadService = FileUploadService(
       getContext: () => _context,
       mediaController: _mediaController,
+      isImageCropperEnabled: () =>
+          _context.read<SettingsProvider>().imageCropperEnabled,
     );
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,

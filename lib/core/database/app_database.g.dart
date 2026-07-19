@@ -5432,6 +5432,3788 @@ class GenerationRunRowsCompanion extends UpdateCompanion<GenerationRunRow> {
   }
 }
 
+class $AssistantRowsTable extends AssistantRows
+    with TableInfo<$AssistantRowsTable, AssistantRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AssistantRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($AssistantRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'assistant_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AssistantRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AssistantRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AssistantRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $AssistantRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $AssistantRowsTable createAlias(String alias) {
+    return $AssistantRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class AssistantRow extends DataClass implements Insertable<AssistantRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const AssistantRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $AssistantRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  AssistantRowsCompanion toCompanion(bool nullToAbsent) {
+    return AssistantRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AssistantRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AssistantRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AssistantRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => AssistantRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AssistantRow copyWithCompanion(AssistantRowsCompanion data) {
+    return AssistantRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AssistantRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AssistantRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AssistantRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<AssistantRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AssistantRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AssistantRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $AssistantRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProviderRowsTable extends ProviderRows
+    with TableInfo<$ProviderRowsTable, ProviderRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProviderRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _providerKeyMeta = const VerificationMeta(
+    'providerKey',
+  );
+  @override
+  late final GeneratedColumn<String> providerKey = GeneratedColumn<String>(
+    'provider_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ProviderRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    providerKey,
+    sortOrder,
+    payload,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'provider_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProviderRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('provider_key')) {
+      context.handle(
+        _providerKeyMeta,
+        providerKey.isAcceptableOrUnknown(
+          data['provider_key']!,
+          _providerKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_providerKeyMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {providerKey};
+  @override
+  ProviderRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProviderRow(
+      providerKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}provider_key'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $ProviderRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $ProviderRowsTable createAlias(String alias) {
+    return $ProviderRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class ProviderRow extends DataClass implements Insertable<ProviderRow> {
+  final String providerKey;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const ProviderRow({
+    required this.providerKey,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['provider_key'] = Variable<String>(providerKey);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $ProviderRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  ProviderRowsCompanion toCompanion(bool nullToAbsent) {
+    return ProviderRowsCompanion(
+      providerKey: Value(providerKey),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProviderRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProviderRow(
+      providerKey: serializer.fromJson<String>(json['providerKey']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'providerKey': serializer.toJson<String>(providerKey),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProviderRow copyWith({
+    String? providerKey,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => ProviderRow(
+    providerKey: providerKey ?? this.providerKey,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ProviderRow copyWithCompanion(ProviderRowsCompanion data) {
+    return ProviderRow(
+      providerKey: data.providerKey.present
+          ? data.providerKey.value
+          : this.providerKey,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderRow(')
+          ..write('providerKey: $providerKey, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(providerKey, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProviderRow &&
+          other.providerKey == this.providerKey &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProviderRowsCompanion extends UpdateCompanion<ProviderRow> {
+  final Value<String> providerKey;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ProviderRowsCompanion({
+    this.providerKey = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProviderRowsCompanion.insert({
+    required String providerKey,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : providerKey = Value(providerKey),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProviderRow> custom({
+    Expression<String>? providerKey,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (providerKey != null) 'provider_key': providerKey,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProviderRowsCompanion copyWith({
+    Value<String>? providerKey,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ProviderRowsCompanion(
+      providerKey: providerKey ?? this.providerKey,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (providerKey.present) {
+      map['provider_key'] = Variable<String>(providerKey.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $ProviderRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderRowsCompanion(')
+          ..write('providerKey: $providerKey, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ProviderGroupRowsTable extends ProviderGroupRows
+    with TableInfo<$ProviderGroupRowsTable, ProviderGroupRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ProviderGroupRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($ProviderGroupRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'provider_group_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ProviderGroupRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ProviderGroupRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ProviderGroupRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $ProviderGroupRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $ProviderGroupRowsTable createAlias(String alias) {
+    return $ProviderGroupRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class ProviderGroupRow extends DataClass
+    implements Insertable<ProviderGroupRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const ProviderGroupRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $ProviderGroupRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  ProviderGroupRowsCompanion toCompanion(bool nullToAbsent) {
+    return ProviderGroupRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ProviderGroupRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ProviderGroupRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ProviderGroupRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => ProviderGroupRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ProviderGroupRow copyWithCompanion(ProviderGroupRowsCompanion data) {
+    return ProviderGroupRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderGroupRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ProviderGroupRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ProviderGroupRowsCompanion extends UpdateCompanion<ProviderGroupRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ProviderGroupRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ProviderGroupRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<ProviderGroupRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ProviderGroupRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ProviderGroupRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $ProviderGroupRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ProviderGroupRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $McpServerRowsTable extends McpServerRows
+    with TableInfo<$McpServerRowsTable, McpServerRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $McpServerRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($McpServerRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'mcp_server_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<McpServerRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  McpServerRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return McpServerRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $McpServerRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $McpServerRowsTable createAlias(String alias) {
+    return $McpServerRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class McpServerRow extends DataClass implements Insertable<McpServerRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const McpServerRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $McpServerRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  McpServerRowsCompanion toCompanion(bool nullToAbsent) {
+    return McpServerRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory McpServerRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return McpServerRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  McpServerRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => McpServerRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  McpServerRow copyWithCompanion(McpServerRowsCompanion data) {
+    return McpServerRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('McpServerRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is McpServerRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class McpServerRowsCompanion extends UpdateCompanion<McpServerRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const McpServerRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  McpServerRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<McpServerRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  McpServerRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return McpServerRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $McpServerRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('McpServerRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $WorldBookRowsTable extends WorldBookRows
+    with TableInfo<$WorldBookRowsTable, WorldBookRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $WorldBookRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($WorldBookRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'world_book_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<WorldBookRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  WorldBookRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return WorldBookRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $WorldBookRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $WorldBookRowsTable createAlias(String alias) {
+    return $WorldBookRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class WorldBookRow extends DataClass implements Insertable<WorldBookRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const WorldBookRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $WorldBookRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  WorldBookRowsCompanion toCompanion(bool nullToAbsent) {
+    return WorldBookRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory WorldBookRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return WorldBookRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  WorldBookRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => WorldBookRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  WorldBookRow copyWithCompanion(WorldBookRowsCompanion data) {
+    return WorldBookRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WorldBookRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is WorldBookRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class WorldBookRowsCompanion extends UpdateCompanion<WorldBookRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const WorldBookRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  WorldBookRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<WorldBookRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  WorldBookRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return WorldBookRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $WorldBookRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('WorldBookRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AssistantMemoryRowsTable extends AssistantMemoryRows
+    with TableInfo<$AssistantMemoryRowsTable, AssistantMemoryRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AssistantMemoryRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _assistantIdMeta = const VerificationMeta(
+    'assistantId',
+  );
+  @override
+  late final GeneratedColumn<String> assistantId = GeneratedColumn<String>(
+    'assistant_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($AssistantMemoryRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sortOrder,
+    assistantId,
+    payload,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'assistant_memory_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AssistantMemoryRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('assistant_id')) {
+      context.handle(
+        _assistantIdMeta,
+        assistantId.isAcceptableOrUnknown(
+          data['assistant_id']!,
+          _assistantIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_assistantIdMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AssistantMemoryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AssistantMemoryRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      assistantId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}assistant_id'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $AssistantMemoryRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $AssistantMemoryRowsTable createAlias(String alias) {
+    return $AssistantMemoryRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class AssistantMemoryRow extends DataClass
+    implements Insertable<AssistantMemoryRow> {
+  final String id;
+  final int sortOrder;
+  final String assistantId;
+  final String payload;
+  final DateTime updatedAt;
+  const AssistantMemoryRow({
+    required this.id,
+    required this.sortOrder,
+    required this.assistantId,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['assistant_id'] = Variable<String>(assistantId);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $AssistantMemoryRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  AssistantMemoryRowsCompanion toCompanion(bool nullToAbsent) {
+    return AssistantMemoryRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      assistantId: Value(assistantId),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AssistantMemoryRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AssistantMemoryRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      assistantId: serializer.fromJson<String>(json['assistantId']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'assistantId': serializer.toJson<String>(assistantId),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AssistantMemoryRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? assistantId,
+    String? payload,
+    DateTime? updatedAt,
+  }) => AssistantMemoryRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    assistantId: assistantId ?? this.assistantId,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AssistantMemoryRow copyWithCompanion(AssistantMemoryRowsCompanion data) {
+    return AssistantMemoryRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      assistantId: data.assistantId.present
+          ? data.assistantId.value
+          : this.assistantId,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantMemoryRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('assistantId: $assistantId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, sortOrder, assistantId, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AssistantMemoryRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.assistantId == this.assistantId &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AssistantMemoryRowsCompanion extends UpdateCompanion<AssistantMemoryRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> assistantId;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AssistantMemoryRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.assistantId = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AssistantMemoryRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String assistantId,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       assistantId = Value(assistantId),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<AssistantMemoryRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? assistantId,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (assistantId != null) 'assistant_id': assistantId,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AssistantMemoryRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? assistantId,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AssistantMemoryRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      assistantId: assistantId ?? this.assistantId,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (assistantId.present) {
+      map['assistant_id'] = Variable<String>(assistantId.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $AssistantMemoryRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantMemoryRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('assistantId: $assistantId, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuickPhraseRowsTable extends QuickPhraseRows
+    with TableInfo<$QuickPhraseRowsTable, QuickPhraseRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuickPhraseRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($QuickPhraseRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quick_phrase_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuickPhraseRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuickPhraseRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuickPhraseRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $QuickPhraseRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $QuickPhraseRowsTable createAlias(String alias) {
+    return $QuickPhraseRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class QuickPhraseRow extends DataClass implements Insertable<QuickPhraseRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const QuickPhraseRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $QuickPhraseRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  QuickPhraseRowsCompanion toCompanion(bool nullToAbsent) {
+    return QuickPhraseRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory QuickPhraseRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuickPhraseRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  QuickPhraseRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => QuickPhraseRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  QuickPhraseRow copyWithCompanion(QuickPhraseRowsCompanion data) {
+    return QuickPhraseRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickPhraseRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuickPhraseRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class QuickPhraseRowsCompanion extends UpdateCompanion<QuickPhraseRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const QuickPhraseRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  QuickPhraseRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<QuickPhraseRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  QuickPhraseRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return QuickPhraseRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $QuickPhraseRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickPhraseRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SearchServiceRowsTable extends SearchServiceRows
+    with TableInfo<$SearchServiceRowsTable, SearchServiceRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SearchServiceRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($SearchServiceRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'search_service_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SearchServiceRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SearchServiceRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SearchServiceRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $SearchServiceRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $SearchServiceRowsTable createAlias(String alias) {
+    return $SearchServiceRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class SearchServiceRow extends DataClass
+    implements Insertable<SearchServiceRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const SearchServiceRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $SearchServiceRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  SearchServiceRowsCompanion toCompanion(bool nullToAbsent) {
+    return SearchServiceRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory SearchServiceRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SearchServiceRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  SearchServiceRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => SearchServiceRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  SearchServiceRow copyWithCompanion(SearchServiceRowsCompanion data) {
+    return SearchServiceRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchServiceRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SearchServiceRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class SearchServiceRowsCompanion extends UpdateCompanion<SearchServiceRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const SearchServiceRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SearchServiceRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<SearchServiceRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SearchServiceRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return SearchServiceRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $SearchServiceRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchServiceRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $TtsServiceRowsTable extends TtsServiceRows
+    with TableInfo<$TtsServiceRowsTable, TtsServiceRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $TtsServiceRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($TtsServiceRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'tts_service_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<TtsServiceRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  TtsServiceRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return TtsServiceRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $TtsServiceRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $TtsServiceRowsTable createAlias(String alias) {
+    return $TtsServiceRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class TtsServiceRow extends DataClass implements Insertable<TtsServiceRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const TtsServiceRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $TtsServiceRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  TtsServiceRowsCompanion toCompanion(bool nullToAbsent) {
+    return TtsServiceRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory TtsServiceRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return TtsServiceRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  TtsServiceRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => TtsServiceRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  TtsServiceRow copyWithCompanion(TtsServiceRowsCompanion data) {
+    return TtsServiceRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TtsServiceRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is TtsServiceRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class TtsServiceRowsCompanion extends UpdateCompanion<TtsServiceRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const TtsServiceRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  TtsServiceRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<TtsServiceRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  TtsServiceRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return TtsServiceRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $TtsServiceRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('TtsServiceRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $InstructionInjectionRowsTable extends InstructionInjectionRows
+    with TableInfo<$InstructionInjectionRowsTable, InstructionInjectionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $InstructionInjectionRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>(
+        $InstructionInjectionRowsTable.$converterupdatedAt,
+      );
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'instruction_injection_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<InstructionInjectionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  InstructionInjectionRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return InstructionInjectionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $InstructionInjectionRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $InstructionInjectionRowsTable createAlias(String alias) {
+    return $InstructionInjectionRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class InstructionInjectionRow extends DataClass
+    implements Insertable<InstructionInjectionRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const InstructionInjectionRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $InstructionInjectionRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  InstructionInjectionRowsCompanion toCompanion(bool nullToAbsent) {
+    return InstructionInjectionRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory InstructionInjectionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return InstructionInjectionRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  InstructionInjectionRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => InstructionInjectionRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  InstructionInjectionRow copyWithCompanion(
+    InstructionInjectionRowsCompanion data,
+  ) {
+    return InstructionInjectionRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InstructionInjectionRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is InstructionInjectionRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class InstructionInjectionRowsCompanion
+    extends UpdateCompanion<InstructionInjectionRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const InstructionInjectionRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  InstructionInjectionRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<InstructionInjectionRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  InstructionInjectionRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return InstructionInjectionRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $InstructionInjectionRowsTable.$converterupdatedAt.toSql(
+          updatedAt.value,
+        ),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('InstructionInjectionRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $AssistantTagRowsTable extends AssistantTagRows
+    with TableInfo<$AssistantTagRowsTable, AssistantTagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $AssistantTagRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    check: () => ComparableExpr(sortOrder).isBiggerOrEqualValue(0),
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _payloadMeta = const VerificationMeta(
+    'payload',
+  );
+  @override
+  late final GeneratedColumn<String> payload = GeneratedColumn<String>(
+    'payload',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($AssistantTagRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [id, sortOrder, payload, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'assistant_tag_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<AssistantTagRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sortOrderMeta);
+    }
+    if (data.containsKey('payload')) {
+      context.handle(
+        _payloadMeta,
+        payload.isAcceptableOrUnknown(data['payload']!, _payloadMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_payloadMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  AssistantTagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return AssistantTagRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      payload: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}payload'],
+      )!,
+      updatedAt: $AssistantTagRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $AssistantTagRowsTable createAlias(String alias) {
+    return $AssistantTagRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class AssistantTagRow extends DataClass implements Insertable<AssistantTagRow> {
+  final String id;
+  final int sortOrder;
+  final String payload;
+  final DateTime updatedAt;
+  const AssistantTagRow({
+    required this.id,
+    required this.sortOrder,
+    required this.payload,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['payload'] = Variable<String>(payload);
+    {
+      map['updated_at'] = Variable<int>(
+        $AssistantTagRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  AssistantTagRowsCompanion toCompanion(bool nullToAbsent) {
+    return AssistantTagRowsCompanion(
+      id: Value(id),
+      sortOrder: Value(sortOrder),
+      payload: Value(payload),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory AssistantTagRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return AssistantTagRow(
+      id: serializer.fromJson<String>(json['id']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      payload: serializer.fromJson<String>(json['payload']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'payload': serializer.toJson<String>(payload),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  AssistantTagRow copyWith({
+    String? id,
+    int? sortOrder,
+    String? payload,
+    DateTime? updatedAt,
+  }) => AssistantTagRow(
+    id: id ?? this.id,
+    sortOrder: sortOrder ?? this.sortOrder,
+    payload: payload ?? this.payload,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  AssistantTagRow copyWithCompanion(AssistantTagRowsCompanion data) {
+    return AssistantTagRow(
+      id: data.id.present ? data.id.value : this.id,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      payload: data.payload.present ? data.payload.value : this.payload,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantTagRow(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, sortOrder, payload, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is AssistantTagRow &&
+          other.id == this.id &&
+          other.sortOrder == this.sortOrder &&
+          other.payload == this.payload &&
+          other.updatedAt == this.updatedAt);
+}
+
+class AssistantTagRowsCompanion extends UpdateCompanion<AssistantTagRow> {
+  final Value<String> id;
+  final Value<int> sortOrder;
+  final Value<String> payload;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const AssistantTagRowsCompanion({
+    this.id = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.payload = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  AssistantTagRowsCompanion.insert({
+    required String id,
+    required int sortOrder,
+    required String payload,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       sortOrder = Value(sortOrder),
+       payload = Value(payload),
+       updatedAt = Value(updatedAt);
+  static Insertable<AssistantTagRow> custom({
+    Expression<String>? id,
+    Expression<int>? sortOrder,
+    Expression<String>? payload,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (payload != null) 'payload': payload,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  AssistantTagRowsCompanion copyWith({
+    Value<String>? id,
+    Value<int>? sortOrder,
+    Value<String>? payload,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return AssistantTagRowsCompanion(
+      id: id ?? this.id,
+      sortOrder: sortOrder ?? this.sortOrder,
+      payload: payload ?? this.payload,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (payload.present) {
+      map['payload'] = Variable<String>(payload.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $AssistantTagRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('AssistantTagRowsCompanion(')
+          ..write('id: $id, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('payload: $payload, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $PreferenceRowsTable extends PreferenceRows
+    with TableInfo<$PreferenceRowsTable, PreferenceRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $PreferenceRowsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _valueMeta = const VerificationMeta('value');
+  @override
+  late final GeneratedColumn<String> value = GeneratedColumn<String>(
+    'value',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<DateTime, int> updatedAt =
+      GeneratedColumn<int>(
+        'updated_at',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<DateTime>($PreferenceRowsTable.$converterupdatedAt);
+  @override
+  List<GeneratedColumn> get $columns => [key, value, updatedAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'preference_rows';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<PreferenceRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value')) {
+      context.handle(
+        _valueMeta,
+        value.isAcceptableOrUnknown(data['value']!, _valueMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {key};
+  @override
+  PreferenceRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return PreferenceRow(
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value'],
+      )!,
+      updatedAt: $PreferenceRowsTable.$converterupdatedAt.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}updated_at'],
+        )!,
+      ),
+    );
+  }
+
+  @override
+  $PreferenceRowsTable createAlias(String alias) {
+    return $PreferenceRowsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<DateTime, int> $converterupdatedAt =
+      const MicrosecondDateTimeConverter();
+}
+
+class PreferenceRow extends DataClass implements Insertable<PreferenceRow> {
+  final String key;
+  final String value;
+  final DateTime updatedAt;
+  const PreferenceRow({
+    required this.key,
+    required this.value,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['key'] = Variable<String>(key);
+    map['value'] = Variable<String>(value);
+    {
+      map['updated_at'] = Variable<int>(
+        $PreferenceRowsTable.$converterupdatedAt.toSql(updatedAt),
+      );
+    }
+    return map;
+  }
+
+  PreferenceRowsCompanion toCompanion(bool nullToAbsent) {
+    return PreferenceRowsCompanion(
+      key: Value(key),
+      value: Value(value),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory PreferenceRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return PreferenceRow(
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<String>(json['value']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<String>(value),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  PreferenceRow copyWith({String? key, String? value, DateTime? updatedAt}) =>
+      PreferenceRow(
+        key: key ?? this.key,
+        value: value ?? this.value,
+        updatedAt: updatedAt ?? this.updatedAt,
+      );
+  PreferenceRow copyWithCompanion(PreferenceRowsCompanion data) {
+    return PreferenceRow(
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PreferenceRow(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(key, value, updatedAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is PreferenceRow &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.updatedAt == this.updatedAt);
+}
+
+class PreferenceRowsCompanion extends UpdateCompanion<PreferenceRow> {
+  final Value<String> key;
+  final Value<String> value;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const PreferenceRowsCompanion({
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  PreferenceRowsCompanion.insert({
+    required String key,
+    required String value,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : key = Value(key),
+       value = Value(value),
+       updatedAt = Value(updatedAt);
+  static Insertable<PreferenceRow> custom({
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<int>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  PreferenceRowsCompanion copyWith({
+    Value<String>? key,
+    Value<String>? value,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return PreferenceRowsCompanion(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(value.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<int>(
+        $PreferenceRowsTable.$converterupdatedAt.toSql(updatedAt.value),
+      );
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('PreferenceRowsCompanion(')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5458,6 +9240,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $MigrationIssueRowsTable(this);
   late final $GenerationRunRowsTable generationRunRows =
       $GenerationRunRowsTable(this);
+  late final $AssistantRowsTable assistantRows = $AssistantRowsTable(this);
+  late final $ProviderRowsTable providerRows = $ProviderRowsTable(this);
+  late final $ProviderGroupRowsTable providerGroupRows =
+      $ProviderGroupRowsTable(this);
+  late final $McpServerRowsTable mcpServerRows = $McpServerRowsTable(this);
+  late final $WorldBookRowsTable worldBookRows = $WorldBookRowsTable(this);
+  late final $AssistantMemoryRowsTable assistantMemoryRows =
+      $AssistantMemoryRowsTable(this);
+  late final $QuickPhraseRowsTable quickPhraseRows = $QuickPhraseRowsTable(
+    this,
+  );
+  late final $SearchServiceRowsTable searchServiceRows =
+      $SearchServiceRowsTable(this);
+  late final $TtsServiceRowsTable ttsServiceRows = $TtsServiceRowsTable(this);
+  late final $InstructionInjectionRowsTable instructionInjectionRows =
+      $InstructionInjectionRowsTable(this);
+  late final $AssistantTagRowsTable assistantTagRows = $AssistantTagRowsTable(
+    this,
+  );
+  late final $PreferenceRowsTable preferenceRows = $PreferenceRowsTable(this);
   late final Index idxConversationsUpdatedAt = Index(
     'idx_conversations_updated_at',
     'CREATE INDEX idx_conversations_updated_at ON conversation_rows (updated_at DESC, id ASC)',
@@ -5498,6 +9300,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_generation_runs_state_updated',
     'CREATE INDEX idx_generation_runs_state_updated ON generation_run_rows (state, updated_at, id)',
   );
+  late final Index idxAssistantMemoriesAssistant = Index(
+    'idx_assistant_memories_assistant',
+    'CREATE INDEX idx_assistant_memories_assistant ON assistant_memory_rows (assistant_id, id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -5514,6 +9320,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     migrationRunRows,
     migrationIssueRows,
     generationRunRows,
+    assistantRows,
+    providerRows,
+    providerGroupRows,
+    mcpServerRows,
+    worldBookRows,
+    assistantMemoryRows,
+    quickPhraseRows,
+    searchServiceRows,
+    ttsServiceRows,
+    instructionInjectionRows,
+    assistantTagRows,
+    preferenceRows,
     idxConversationsUpdatedAt,
     idxConversationsAssistant,
     idxMessagesConversationOrder,
@@ -5524,6 +9342,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxMigrationIssuesRunKind,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
+    idxAssistantMemoriesAssistant,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -9786,6 +13605,2271 @@ typedef $$GenerationRunRowsTableProcessedTableManager =
       GenerationRunRow,
       PrefetchHooks Function({bool conversationId})
     >;
+typedef $$AssistantRowsTableCreateCompanionBuilder =
+    AssistantRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AssistantRowsTableUpdateCompanionBuilder =
+    AssistantRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AssistantRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$AssistantRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AssistantRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AssistantRowsTable> {
+  $$AssistantRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AssistantRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AssistantRowsTable,
+          AssistantRow,
+          $$AssistantRowsTableFilterComposer,
+          $$AssistantRowsTableOrderingComposer,
+          $$AssistantRowsTableAnnotationComposer,
+          $$AssistantRowsTableCreateCompanionBuilder,
+          $$AssistantRowsTableUpdateCompanionBuilder,
+          (
+            AssistantRow,
+            BaseReferences<_$AppDatabase, $AssistantRowsTable, AssistantRow>,
+          ),
+          AssistantRow,
+          PrefetchHooks Function()
+        > {
+  $$AssistantRowsTableTableManager(_$AppDatabase db, $AssistantRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AssistantRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AssistantRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AssistantRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AssistantRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AssistantRowsTable,
+      AssistantRow,
+      $$AssistantRowsTableFilterComposer,
+      $$AssistantRowsTableOrderingComposer,
+      $$AssistantRowsTableAnnotationComposer,
+      $$AssistantRowsTableCreateCompanionBuilder,
+      $$AssistantRowsTableUpdateCompanionBuilder,
+      (
+        AssistantRow,
+        BaseReferences<_$AppDatabase, $AssistantRowsTable, AssistantRow>,
+      ),
+      AssistantRow,
+      PrefetchHooks Function()
+    >;
+typedef $$ProviderRowsTableCreateCompanionBuilder =
+    ProviderRowsCompanion Function({
+      required String providerKey,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ProviderRowsTableUpdateCompanionBuilder =
+    ProviderRowsCompanion Function({
+      Value<String> providerKey,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ProviderRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProviderRowsTable> {
+  $$ProviderRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get providerKey => $composableBuilder(
+    column: $table.providerKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$ProviderRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProviderRowsTable> {
+  $$ProviderRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get providerKey => $composableBuilder(
+    column: $table.providerKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProviderRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProviderRowsTable> {
+  $$ProviderRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get providerKey => $composableBuilder(
+    column: $table.providerKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProviderRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProviderRowsTable,
+          ProviderRow,
+          $$ProviderRowsTableFilterComposer,
+          $$ProviderRowsTableOrderingComposer,
+          $$ProviderRowsTableAnnotationComposer,
+          $$ProviderRowsTableCreateCompanionBuilder,
+          $$ProviderRowsTableUpdateCompanionBuilder,
+          (
+            ProviderRow,
+            BaseReferences<_$AppDatabase, $ProviderRowsTable, ProviderRow>,
+          ),
+          ProviderRow,
+          PrefetchHooks Function()
+        > {
+  $$ProviderRowsTableTableManager(_$AppDatabase db, $ProviderRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProviderRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProviderRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProviderRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> providerKey = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderRowsCompanion(
+                providerKey: providerKey,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String providerKey,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderRowsCompanion.insert(
+                providerKey: providerKey,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProviderRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProviderRowsTable,
+      ProviderRow,
+      $$ProviderRowsTableFilterComposer,
+      $$ProviderRowsTableOrderingComposer,
+      $$ProviderRowsTableAnnotationComposer,
+      $$ProviderRowsTableCreateCompanionBuilder,
+      $$ProviderRowsTableUpdateCompanionBuilder,
+      (
+        ProviderRow,
+        BaseReferences<_$AppDatabase, $ProviderRowsTable, ProviderRow>,
+      ),
+      ProviderRow,
+      PrefetchHooks Function()
+    >;
+typedef $$ProviderGroupRowsTableCreateCompanionBuilder =
+    ProviderGroupRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ProviderGroupRowsTableUpdateCompanionBuilder =
+    ProviderGroupRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ProviderGroupRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $ProviderGroupRowsTable> {
+  $$ProviderGroupRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$ProviderGroupRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $ProviderGroupRowsTable> {
+  $$ProviderGroupRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ProviderGroupRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ProviderGroupRowsTable> {
+  $$ProviderGroupRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ProviderGroupRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ProviderGroupRowsTable,
+          ProviderGroupRow,
+          $$ProviderGroupRowsTableFilterComposer,
+          $$ProviderGroupRowsTableOrderingComposer,
+          $$ProviderGroupRowsTableAnnotationComposer,
+          $$ProviderGroupRowsTableCreateCompanionBuilder,
+          $$ProviderGroupRowsTableUpdateCompanionBuilder,
+          (
+            ProviderGroupRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ProviderGroupRowsTable,
+              ProviderGroupRow
+            >,
+          ),
+          ProviderGroupRow,
+          PrefetchHooks Function()
+        > {
+  $$ProviderGroupRowsTableTableManager(
+    _$AppDatabase db,
+    $ProviderGroupRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ProviderGroupRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ProviderGroupRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ProviderGroupRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderGroupRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => ProviderGroupRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ProviderGroupRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ProviderGroupRowsTable,
+      ProviderGroupRow,
+      $$ProviderGroupRowsTableFilterComposer,
+      $$ProviderGroupRowsTableOrderingComposer,
+      $$ProviderGroupRowsTableAnnotationComposer,
+      $$ProviderGroupRowsTableCreateCompanionBuilder,
+      $$ProviderGroupRowsTableUpdateCompanionBuilder,
+      (
+        ProviderGroupRow,
+        BaseReferences<
+          _$AppDatabase,
+          $ProviderGroupRowsTable,
+          ProviderGroupRow
+        >,
+      ),
+      ProviderGroupRow,
+      PrefetchHooks Function()
+    >;
+typedef $$McpServerRowsTableCreateCompanionBuilder =
+    McpServerRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$McpServerRowsTableUpdateCompanionBuilder =
+    McpServerRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$McpServerRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $McpServerRowsTable> {
+  $$McpServerRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$McpServerRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $McpServerRowsTable> {
+  $$McpServerRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$McpServerRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $McpServerRowsTable> {
+  $$McpServerRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$McpServerRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $McpServerRowsTable,
+          McpServerRow,
+          $$McpServerRowsTableFilterComposer,
+          $$McpServerRowsTableOrderingComposer,
+          $$McpServerRowsTableAnnotationComposer,
+          $$McpServerRowsTableCreateCompanionBuilder,
+          $$McpServerRowsTableUpdateCompanionBuilder,
+          (
+            McpServerRow,
+            BaseReferences<_$AppDatabase, $McpServerRowsTable, McpServerRow>,
+          ),
+          McpServerRow,
+          PrefetchHooks Function()
+        > {
+  $$McpServerRowsTableTableManager(_$AppDatabase db, $McpServerRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$McpServerRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$McpServerRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$McpServerRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => McpServerRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => McpServerRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$McpServerRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $McpServerRowsTable,
+      McpServerRow,
+      $$McpServerRowsTableFilterComposer,
+      $$McpServerRowsTableOrderingComposer,
+      $$McpServerRowsTableAnnotationComposer,
+      $$McpServerRowsTableCreateCompanionBuilder,
+      $$McpServerRowsTableUpdateCompanionBuilder,
+      (
+        McpServerRow,
+        BaseReferences<_$AppDatabase, $McpServerRowsTable, McpServerRow>,
+      ),
+      McpServerRow,
+      PrefetchHooks Function()
+    >;
+typedef $$WorldBookRowsTableCreateCompanionBuilder =
+    WorldBookRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$WorldBookRowsTableUpdateCompanionBuilder =
+    WorldBookRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$WorldBookRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $WorldBookRowsTable> {
+  $$WorldBookRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$WorldBookRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $WorldBookRowsTable> {
+  $$WorldBookRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$WorldBookRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $WorldBookRowsTable> {
+  $$WorldBookRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$WorldBookRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $WorldBookRowsTable,
+          WorldBookRow,
+          $$WorldBookRowsTableFilterComposer,
+          $$WorldBookRowsTableOrderingComposer,
+          $$WorldBookRowsTableAnnotationComposer,
+          $$WorldBookRowsTableCreateCompanionBuilder,
+          $$WorldBookRowsTableUpdateCompanionBuilder,
+          (
+            WorldBookRow,
+            BaseReferences<_$AppDatabase, $WorldBookRowsTable, WorldBookRow>,
+          ),
+          WorldBookRow,
+          PrefetchHooks Function()
+        > {
+  $$WorldBookRowsTableTableManager(_$AppDatabase db, $WorldBookRowsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$WorldBookRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$WorldBookRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$WorldBookRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => WorldBookRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => WorldBookRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$WorldBookRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $WorldBookRowsTable,
+      WorldBookRow,
+      $$WorldBookRowsTableFilterComposer,
+      $$WorldBookRowsTableOrderingComposer,
+      $$WorldBookRowsTableAnnotationComposer,
+      $$WorldBookRowsTableCreateCompanionBuilder,
+      $$WorldBookRowsTableUpdateCompanionBuilder,
+      (
+        WorldBookRow,
+        BaseReferences<_$AppDatabase, $WorldBookRowsTable, WorldBookRow>,
+      ),
+      WorldBookRow,
+      PrefetchHooks Function()
+    >;
+typedef $$AssistantMemoryRowsTableCreateCompanionBuilder =
+    AssistantMemoryRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String assistantId,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AssistantMemoryRowsTableUpdateCompanionBuilder =
+    AssistantMemoryRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> assistantId,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AssistantMemoryRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $AssistantMemoryRowsTable> {
+  $$AssistantMemoryRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get assistantId => $composableBuilder(
+    column: $table.assistantId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$AssistantMemoryRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AssistantMemoryRowsTable> {
+  $$AssistantMemoryRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get assistantId => $composableBuilder(
+    column: $table.assistantId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AssistantMemoryRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AssistantMemoryRowsTable> {
+  $$AssistantMemoryRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get assistantId => $composableBuilder(
+    column: $table.assistantId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AssistantMemoryRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AssistantMemoryRowsTable,
+          AssistantMemoryRow,
+          $$AssistantMemoryRowsTableFilterComposer,
+          $$AssistantMemoryRowsTableOrderingComposer,
+          $$AssistantMemoryRowsTableAnnotationComposer,
+          $$AssistantMemoryRowsTableCreateCompanionBuilder,
+          $$AssistantMemoryRowsTableUpdateCompanionBuilder,
+          (
+            AssistantMemoryRow,
+            BaseReferences<
+              _$AppDatabase,
+              $AssistantMemoryRowsTable,
+              AssistantMemoryRow
+            >,
+          ),
+          AssistantMemoryRow,
+          PrefetchHooks Function()
+        > {
+  $$AssistantMemoryRowsTableTableManager(
+    _$AppDatabase db,
+    $AssistantMemoryRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AssistantMemoryRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AssistantMemoryRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$AssistantMemoryRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> assistantId = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantMemoryRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                assistantId: assistantId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String assistantId,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantMemoryRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                assistantId: assistantId,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AssistantMemoryRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AssistantMemoryRowsTable,
+      AssistantMemoryRow,
+      $$AssistantMemoryRowsTableFilterComposer,
+      $$AssistantMemoryRowsTableOrderingComposer,
+      $$AssistantMemoryRowsTableAnnotationComposer,
+      $$AssistantMemoryRowsTableCreateCompanionBuilder,
+      $$AssistantMemoryRowsTableUpdateCompanionBuilder,
+      (
+        AssistantMemoryRow,
+        BaseReferences<
+          _$AppDatabase,
+          $AssistantMemoryRowsTable,
+          AssistantMemoryRow
+        >,
+      ),
+      AssistantMemoryRow,
+      PrefetchHooks Function()
+    >;
+typedef $$QuickPhraseRowsTableCreateCompanionBuilder =
+    QuickPhraseRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$QuickPhraseRowsTableUpdateCompanionBuilder =
+    QuickPhraseRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$QuickPhraseRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $QuickPhraseRowsTable> {
+  $$QuickPhraseRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$QuickPhraseRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuickPhraseRowsTable> {
+  $$QuickPhraseRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$QuickPhraseRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuickPhraseRowsTable> {
+  $$QuickPhraseRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$QuickPhraseRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $QuickPhraseRowsTable,
+          QuickPhraseRow,
+          $$QuickPhraseRowsTableFilterComposer,
+          $$QuickPhraseRowsTableOrderingComposer,
+          $$QuickPhraseRowsTableAnnotationComposer,
+          $$QuickPhraseRowsTableCreateCompanionBuilder,
+          $$QuickPhraseRowsTableUpdateCompanionBuilder,
+          (
+            QuickPhraseRow,
+            BaseReferences<
+              _$AppDatabase,
+              $QuickPhraseRowsTable,
+              QuickPhraseRow
+            >,
+          ),
+          QuickPhraseRow,
+          PrefetchHooks Function()
+        > {
+  $$QuickPhraseRowsTableTableManager(
+    _$AppDatabase db,
+    $QuickPhraseRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuickPhraseRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuickPhraseRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuickPhraseRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => QuickPhraseRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => QuickPhraseRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$QuickPhraseRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $QuickPhraseRowsTable,
+      QuickPhraseRow,
+      $$QuickPhraseRowsTableFilterComposer,
+      $$QuickPhraseRowsTableOrderingComposer,
+      $$QuickPhraseRowsTableAnnotationComposer,
+      $$QuickPhraseRowsTableCreateCompanionBuilder,
+      $$QuickPhraseRowsTableUpdateCompanionBuilder,
+      (
+        QuickPhraseRow,
+        BaseReferences<_$AppDatabase, $QuickPhraseRowsTable, QuickPhraseRow>,
+      ),
+      QuickPhraseRow,
+      PrefetchHooks Function()
+    >;
+typedef $$SearchServiceRowsTableCreateCompanionBuilder =
+    SearchServiceRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$SearchServiceRowsTableUpdateCompanionBuilder =
+    SearchServiceRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$SearchServiceRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $SearchServiceRowsTable> {
+  $$SearchServiceRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$SearchServiceRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SearchServiceRowsTable> {
+  $$SearchServiceRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SearchServiceRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SearchServiceRowsTable> {
+  $$SearchServiceRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$SearchServiceRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SearchServiceRowsTable,
+          SearchServiceRow,
+          $$SearchServiceRowsTableFilterComposer,
+          $$SearchServiceRowsTableOrderingComposer,
+          $$SearchServiceRowsTableAnnotationComposer,
+          $$SearchServiceRowsTableCreateCompanionBuilder,
+          $$SearchServiceRowsTableUpdateCompanionBuilder,
+          (
+            SearchServiceRow,
+            BaseReferences<
+              _$AppDatabase,
+              $SearchServiceRowsTable,
+              SearchServiceRow
+            >,
+          ),
+          SearchServiceRow,
+          PrefetchHooks Function()
+        > {
+  $$SearchServiceRowsTableTableManager(
+    _$AppDatabase db,
+    $SearchServiceRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SearchServiceRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SearchServiceRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SearchServiceRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SearchServiceRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => SearchServiceRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SearchServiceRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SearchServiceRowsTable,
+      SearchServiceRow,
+      $$SearchServiceRowsTableFilterComposer,
+      $$SearchServiceRowsTableOrderingComposer,
+      $$SearchServiceRowsTableAnnotationComposer,
+      $$SearchServiceRowsTableCreateCompanionBuilder,
+      $$SearchServiceRowsTableUpdateCompanionBuilder,
+      (
+        SearchServiceRow,
+        BaseReferences<
+          _$AppDatabase,
+          $SearchServiceRowsTable,
+          SearchServiceRow
+        >,
+      ),
+      SearchServiceRow,
+      PrefetchHooks Function()
+    >;
+typedef $$TtsServiceRowsTableCreateCompanionBuilder =
+    TtsServiceRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$TtsServiceRowsTableUpdateCompanionBuilder =
+    TtsServiceRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$TtsServiceRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $TtsServiceRowsTable> {
+  $$TtsServiceRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$TtsServiceRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $TtsServiceRowsTable> {
+  $$TtsServiceRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$TtsServiceRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $TtsServiceRowsTable> {
+  $$TtsServiceRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$TtsServiceRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $TtsServiceRowsTable,
+          TtsServiceRow,
+          $$TtsServiceRowsTableFilterComposer,
+          $$TtsServiceRowsTableOrderingComposer,
+          $$TtsServiceRowsTableAnnotationComposer,
+          $$TtsServiceRowsTableCreateCompanionBuilder,
+          $$TtsServiceRowsTableUpdateCompanionBuilder,
+          (
+            TtsServiceRow,
+            BaseReferences<_$AppDatabase, $TtsServiceRowsTable, TtsServiceRow>,
+          ),
+          TtsServiceRow,
+          PrefetchHooks Function()
+        > {
+  $$TtsServiceRowsTableTableManager(
+    _$AppDatabase db,
+    $TtsServiceRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$TtsServiceRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$TtsServiceRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$TtsServiceRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => TtsServiceRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => TtsServiceRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$TtsServiceRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $TtsServiceRowsTable,
+      TtsServiceRow,
+      $$TtsServiceRowsTableFilterComposer,
+      $$TtsServiceRowsTableOrderingComposer,
+      $$TtsServiceRowsTableAnnotationComposer,
+      $$TtsServiceRowsTableCreateCompanionBuilder,
+      $$TtsServiceRowsTableUpdateCompanionBuilder,
+      (
+        TtsServiceRow,
+        BaseReferences<_$AppDatabase, $TtsServiceRowsTable, TtsServiceRow>,
+      ),
+      TtsServiceRow,
+      PrefetchHooks Function()
+    >;
+typedef $$InstructionInjectionRowsTableCreateCompanionBuilder =
+    InstructionInjectionRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$InstructionInjectionRowsTableUpdateCompanionBuilder =
+    InstructionInjectionRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$InstructionInjectionRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $InstructionInjectionRowsTable> {
+  $$InstructionInjectionRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$InstructionInjectionRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $InstructionInjectionRowsTable> {
+  $$InstructionInjectionRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$InstructionInjectionRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $InstructionInjectionRowsTable> {
+  $$InstructionInjectionRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$InstructionInjectionRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $InstructionInjectionRowsTable,
+          InstructionInjectionRow,
+          $$InstructionInjectionRowsTableFilterComposer,
+          $$InstructionInjectionRowsTableOrderingComposer,
+          $$InstructionInjectionRowsTableAnnotationComposer,
+          $$InstructionInjectionRowsTableCreateCompanionBuilder,
+          $$InstructionInjectionRowsTableUpdateCompanionBuilder,
+          (
+            InstructionInjectionRow,
+            BaseReferences<
+              _$AppDatabase,
+              $InstructionInjectionRowsTable,
+              InstructionInjectionRow
+            >,
+          ),
+          InstructionInjectionRow,
+          PrefetchHooks Function()
+        > {
+  $$InstructionInjectionRowsTableTableManager(
+    _$AppDatabase db,
+    $InstructionInjectionRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$InstructionInjectionRowsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$InstructionInjectionRowsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$InstructionInjectionRowsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => InstructionInjectionRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => InstructionInjectionRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$InstructionInjectionRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $InstructionInjectionRowsTable,
+      InstructionInjectionRow,
+      $$InstructionInjectionRowsTableFilterComposer,
+      $$InstructionInjectionRowsTableOrderingComposer,
+      $$InstructionInjectionRowsTableAnnotationComposer,
+      $$InstructionInjectionRowsTableCreateCompanionBuilder,
+      $$InstructionInjectionRowsTableUpdateCompanionBuilder,
+      (
+        InstructionInjectionRow,
+        BaseReferences<
+          _$AppDatabase,
+          $InstructionInjectionRowsTable,
+          InstructionInjectionRow
+        >,
+      ),
+      InstructionInjectionRow,
+      PrefetchHooks Function()
+    >;
+typedef $$AssistantTagRowsTableCreateCompanionBuilder =
+    AssistantTagRowsCompanion Function({
+      required String id,
+      required int sortOrder,
+      required String payload,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$AssistantTagRowsTableUpdateCompanionBuilder =
+    AssistantTagRowsCompanion Function({
+      Value<String> id,
+      Value<int> sortOrder,
+      Value<String> payload,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$AssistantTagRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
+  $$AssistantTagRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$AssistantTagRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
+  $$AssistantTagRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get payload => $composableBuilder(
+    column: $table.payload,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$AssistantTagRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $AssistantTagRowsTable> {
+  $$AssistantTagRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<String> get payload =>
+      $composableBuilder(column: $table.payload, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$AssistantTagRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $AssistantTagRowsTable,
+          AssistantTagRow,
+          $$AssistantTagRowsTableFilterComposer,
+          $$AssistantTagRowsTableOrderingComposer,
+          $$AssistantTagRowsTableAnnotationComposer,
+          $$AssistantTagRowsTableCreateCompanionBuilder,
+          $$AssistantTagRowsTableUpdateCompanionBuilder,
+          (
+            AssistantTagRow,
+            BaseReferences<
+              _$AppDatabase,
+              $AssistantTagRowsTable,
+              AssistantTagRow
+            >,
+          ),
+          AssistantTagRow,
+          PrefetchHooks Function()
+        > {
+  $$AssistantTagRowsTableTableManager(
+    _$AppDatabase db,
+    $AssistantTagRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$AssistantTagRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$AssistantTagRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$AssistantTagRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<String> payload = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantTagRowsCompanion(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int sortOrder,
+                required String payload,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => AssistantTagRowsCompanion.insert(
+                id: id,
+                sortOrder: sortOrder,
+                payload: payload,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$AssistantTagRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $AssistantTagRowsTable,
+      AssistantTagRow,
+      $$AssistantTagRowsTableFilterComposer,
+      $$AssistantTagRowsTableOrderingComposer,
+      $$AssistantTagRowsTableAnnotationComposer,
+      $$AssistantTagRowsTableCreateCompanionBuilder,
+      $$AssistantTagRowsTableUpdateCompanionBuilder,
+      (
+        AssistantTagRow,
+        BaseReferences<_$AppDatabase, $AssistantTagRowsTable, AssistantTagRow>,
+      ),
+      AssistantTagRow,
+      PrefetchHooks Function()
+    >;
+typedef $$PreferenceRowsTableCreateCompanionBuilder =
+    PreferenceRowsCompanion Function({
+      required String key,
+      required String value,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$PreferenceRowsTableUpdateCompanionBuilder =
+    PreferenceRowsCompanion Function({
+      Value<String> key,
+      Value<String> value,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$PreferenceRowsTableFilterComposer
+    extends Composer<_$AppDatabase, $PreferenceRowsTable> {
+  $$PreferenceRowsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<DateTime, DateTime, int> get updatedAt =>
+      $composableBuilder(
+        column: $table.updatedAt,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+}
+
+class $$PreferenceRowsTableOrderingComposer
+    extends Composer<_$AppDatabase, $PreferenceRowsTable> {
+  $$PreferenceRowsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$PreferenceRowsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $PreferenceRowsTable> {
+  $$PreferenceRowsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumn<String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<DateTime, int> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$PreferenceRowsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $PreferenceRowsTable,
+          PreferenceRow,
+          $$PreferenceRowsTableFilterComposer,
+          $$PreferenceRowsTableOrderingComposer,
+          $$PreferenceRowsTableAnnotationComposer,
+          $$PreferenceRowsTableCreateCompanionBuilder,
+          $$PreferenceRowsTableUpdateCompanionBuilder,
+          (
+            PreferenceRow,
+            BaseReferences<_$AppDatabase, $PreferenceRowsTable, PreferenceRow>,
+          ),
+          PreferenceRow,
+          PrefetchHooks Function()
+        > {
+  $$PreferenceRowsTableTableManager(
+    _$AppDatabase db,
+    $PreferenceRowsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$PreferenceRowsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$PreferenceRowsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$PreferenceRowsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> key = const Value.absent(),
+                Value<String> value = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => PreferenceRowsCompanion(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String key,
+                required String value,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => PreferenceRowsCompanion.insert(
+                key: key,
+                value: value,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$PreferenceRowsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $PreferenceRowsTable,
+      PreferenceRow,
+      $$PreferenceRowsTableFilterComposer,
+      $$PreferenceRowsTableOrderingComposer,
+      $$PreferenceRowsTableAnnotationComposer,
+      $$PreferenceRowsTableCreateCompanionBuilder,
+      $$PreferenceRowsTableUpdateCompanionBuilder,
+      (
+        PreferenceRow,
+        BaseReferences<_$AppDatabase, $PreferenceRowsTable, PreferenceRow>,
+      ),
+      PreferenceRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -9819,4 +15903,31 @@ class $AppDatabaseManager {
       $$MigrationIssueRowsTableTableManager(_db, _db.migrationIssueRows);
   $$GenerationRunRowsTableTableManager get generationRunRows =>
       $$GenerationRunRowsTableTableManager(_db, _db.generationRunRows);
+  $$AssistantRowsTableTableManager get assistantRows =>
+      $$AssistantRowsTableTableManager(_db, _db.assistantRows);
+  $$ProviderRowsTableTableManager get providerRows =>
+      $$ProviderRowsTableTableManager(_db, _db.providerRows);
+  $$ProviderGroupRowsTableTableManager get providerGroupRows =>
+      $$ProviderGroupRowsTableTableManager(_db, _db.providerGroupRows);
+  $$McpServerRowsTableTableManager get mcpServerRows =>
+      $$McpServerRowsTableTableManager(_db, _db.mcpServerRows);
+  $$WorldBookRowsTableTableManager get worldBookRows =>
+      $$WorldBookRowsTableTableManager(_db, _db.worldBookRows);
+  $$AssistantMemoryRowsTableTableManager get assistantMemoryRows =>
+      $$AssistantMemoryRowsTableTableManager(_db, _db.assistantMemoryRows);
+  $$QuickPhraseRowsTableTableManager get quickPhraseRows =>
+      $$QuickPhraseRowsTableTableManager(_db, _db.quickPhraseRows);
+  $$SearchServiceRowsTableTableManager get searchServiceRows =>
+      $$SearchServiceRowsTableTableManager(_db, _db.searchServiceRows);
+  $$TtsServiceRowsTableTableManager get ttsServiceRows =>
+      $$TtsServiceRowsTableTableManager(_db, _db.ttsServiceRows);
+  $$InstructionInjectionRowsTableTableManager get instructionInjectionRows =>
+      $$InstructionInjectionRowsTableTableManager(
+        _db,
+        _db.instructionInjectionRows,
+      );
+  $$AssistantTagRowsTableTableManager get assistantTagRows =>
+      $$AssistantTagRowsTableTableManager(_db, _db.assistantTagRows);
+  $$PreferenceRowsTableTableManager get preferenceRows =>
+      $$PreferenceRowsTableTableManager(_db, _db.preferenceRows);
 }

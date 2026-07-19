@@ -1,0 +1,416 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+
+import 'package:Kelivo/core/database/business_data.dart';
+import 'package:Kelivo/core/database/business_settings_router.dart';
+import 'package:Kelivo/core/models/assistant_memory.dart';
+
+void main() {
+  group('BusinessSettingsRouter', () {
+    test(
+      'registry distinguishes entity, preference, local and discarded keys',
+      () {
+        expect(
+          BusinessKeyRegistry.classify('assistants_v1'),
+          BusinessKeyDisposition.entity,
+        );
+        expect(
+          BusinessKeyRegistry.classify('theme_mode_v1'),
+          BusinessKeyDisposition.preference,
+        );
+        expect(
+          BusinessKeyRegistry.classify('providers_order_v1'),
+          BusinessKeyDisposition.providerOrder,
+        );
+        expect(
+          BusinessKeyRegistry.classify('mobile_assistant_edit_tab_order_v1'),
+          BusinessKeyDisposition.preference,
+        );
+        expect(
+          BusinessKeyRegistry.classify('flutter_log_enabled_v1'),
+          BusinessKeyDisposition.localOnly,
+        );
+        expect(
+          BusinessKeyRegistry.classify('pinned_chat_ids'),
+          BusinessKeyDisposition.discarded,
+        );
+        expect(
+          BusinessKeyRegistry.classify('plugin_future_key_v1'),
+          BusinessKeyDisposition.unknownPreference,
+        );
+      },
+    );
+
+    test(
+      'routes and exports canonical settings without losing credentials',
+      () {
+        final source = <String, Object?>{
+          'assistants_v1': jsonEncode([
+            {'id': 'assistant-2', 'name': 'Second', 'searchEnabled': false},
+            {'id': 'assistant-1', 'name': 'First', 'searchEnabled': true},
+          ]),
+          'provider_configs_v1': jsonEncode({
+            'late': {'id': 'late', 'apiKey': 'late-secret'},
+            'first': {
+              'id': 'first',
+              'apiKey': 'first-secret',
+              'proxyPassword': 'proxy-secret',
+            },
+          }),
+          // The orphan is normalized away; the provider omitted from the order
+          // is appended using the source map's insertion order.
+          'providers_order_v1': <String>['first', 'orphan'],
+          'theme_mode_v1': 'dark',
+          'use_dynamic_color_v1': false,
+          'thinking_budget_v1': 4096,
+          'tts_speech_rate_v1': 0.75,
+          'pinned_models_v1': jsonEncode(['first/model-a']),
+          'plugin_future_key_v1': <String>['one', 'two'],
+          'flutter_log_enabled_v1': true,
+          'pinned_chat_ids': <String>['chat-1'],
+        };
+
+        final snapshot = BusinessSettingsRouter.normalizeAndRoute(source);
+        final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+
+        expect(exported['providers_order_v1'], <String>['first', 'late']);
+        expect(
+          (jsonDecode(exported['provider_configs_v1']! as String) as Map).keys,
+          <String>['first', 'late'],
+        );
+        expect(exported['pinned_models_v1'], <String>['first/model-a']);
+        expect(exported['plugin_future_key_v1'], <String>['one', 'two']);
+        expect(exported['flutter_log_enabled_v1'], isNull);
+        expect(exported['pinned_chat_ids'], isNull);
+
+        final providers = snapshot.entities[BusinessEntityKind.provider]!;
+        expect(providers.map((row) => row.id), <String>['first', 'late']);
+        expect(jsonDecode(providers.first.payload)['apiKey'], 'first-secret');
+        expect(
+          jsonDecode(providers.first.payload)['proxyPassword'],
+          'proxy-secret',
+        );
+      },
+    );
+
+    test('generates deterministic row ids without mutating payloads', () {
+      final source = <String, Object?>{
+        'quick_phrases_v1': jsonEncode([
+          {'content': 'hello'},
+          {'content': 'hello'},
+        ]),
+      };
+
+      final first = BusinessSettingsRouter.normalizeAndRoute(source);
+      final second = BusinessSettingsRouter.normalizeAndRoute(source);
+      final firstRows = first.entities[BusinessEntityKind.quickPhrase]!;
+      final secondRows = second.entities[BusinessEntityKind.quickPhrase]!;
+
+      expect(firstRows.map((row) => row.id), secondRows.map((row) => row.id));
+      expect(firstRows[0].id, isNot(firstRows[1].id));
+      expect(jsonDecode(firstRows.first.payload), {'content': 'hello'});
+      expect(
+        jsonDecode(firstRows.first.payload) as Map<String, dynamic>,
+        isNot(contains('id')),
+      );
+
+      final published = BusinessSettingsRouter.exportSnapshot(first);
+      expect(jsonDecode(published['quick_phrases_v1']! as String), <Object?>[
+        {'content': 'hello'},
+        {'content': 'hello'},
+      ]);
+      final runtime = BusinessSettingsRouter.exportRuntimeSnapshot(first);
+      final runtimeRows =
+          jsonDecode(runtime['quick_phrases_v1']! as String) as List<dynamic>;
+      expect(runtimeRows[0], {'content': 'hello', 'id': firstRows[0].id});
+      expect(runtimeRows[1], {'content': 'hello', 'id': firstRows[1].id});
+    });
+
+    test('keeps missing assistant memory ids numeric at runtime', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'assistant_memories_v1': jsonEncode([
+          {'assistantId': 'assistant-1', 'content': 'Remember this'},
+        ]),
+      });
+      final row = snapshot.entities[BusinessEntityKind.assistantMemory]!.single;
+
+      expect(jsonDecode(row.payload), isNot(contains('id')));
+      final published = BusinessSettingsRouter.exportSnapshot(snapshot);
+      expect(
+        (jsonDecode(published['assistant_memories_v1']! as String) as List)
+            .single,
+        isNot(contains('id')),
+      );
+
+      final runtime = BusinessSettingsRouter.exportRuntimeSnapshot(snapshot);
+      final runtimePayload = Map<String, dynamic>.from(
+        (jsonDecode(runtime['assistant_memories_v1']! as String) as List).single
+            as Map,
+      );
+      expect(runtimePayload, isNot(contains('id')));
+      expect(AssistantMemory.fromJson(runtimePayload).id, 0);
+    });
+
+    test('normalizes legacy activation and assistant search exactly once', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'assistants_v1': jsonEncode([
+          {'id': 'a', 'name': 'A'},
+          {'id': 'b', 'name': 'B', 'searchEnabled': false},
+        ]),
+        'search_enabled_v1': true,
+        'instruction_injections_active_ids_v1': jsonEncode([
+          'one',
+          'one',
+          'two',
+        ]),
+      });
+      final exported = BusinessSettingsRouter.exportSnapshot(snapshot);
+      final assistants =
+          jsonDecode(exported['assistants_v1']! as String) as List;
+      final active =
+          jsonDecode(
+                exported['instruction_injections_active_ids_by_assistant_v1']!
+                    as String,
+              )
+              as Map<String, dynamic>;
+
+      expect(assistants[0]['searchEnabled'], isTrue);
+      expect(assistants[1]['searchEnabled'], isFalse);
+      expect(active, {
+        '__global__': ['one', 'two'],
+      });
+      expect(exported, isNot(contains('instruction_injections_active_ids_v1')));
+      expect(exported, isNot(contains('instruction_injections_active_id_v1')));
+    });
+
+    test('exports every entity key using the published external shape', () {
+      final exported = BusinessSettingsRouter.exportSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute(const {}),
+      );
+
+      for (final kind in BusinessEntityKind.values) {
+        expect(exported, contains(kind.sourceKey));
+        final decoded = jsonDecode(exported[kind.sourceKey]! as String);
+        expect(
+          decoded,
+          kind == BusinessEntityKind.provider ? isA<Map>() : isA<List>(),
+        );
+      }
+      expect(exported['providers_order_v1'], isEmpty);
+    });
+
+    test('accepts representative runtime payloads for every entity kind', () {
+      final snapshot = BusinessSettingsRouter.normalizeAndRoute({
+        'assistants_v1': jsonEncode([
+          {
+            'id': 'assistant-1',
+            'name': 'Assistant',
+            'temperature': 0.7,
+            'mcpServerIds': ['mcp-1'],
+          },
+        ]),
+        'provider_configs_v1': jsonEncode({
+          'provider-1': {
+            'id': 'provider-1',
+            'enabled': true,
+            'apiKey': 'secret',
+            'models': ['model-1'],
+          },
+        }),
+        'provider_groups_v1': jsonEncode([
+          {'id': 'group-1', 'name': 'Group', 'createdAt': 1},
+        ]),
+        'mcp_servers_v1': jsonEncode([
+          {
+            'id': 'mcp-1',
+            'enabled': false,
+            'transport': 'sse',
+            'tools': <Object?>[],
+          },
+        ]),
+        'world_books_v1': jsonEncode([
+          {
+            'id': 'book-1',
+            'enabled': true,
+            'entries': [
+              {'id': 'entry-1', 'content': 'World'},
+            ],
+          },
+        ]),
+        'assistant_memories_v1': jsonEncode([
+          {'id': 1, 'assistantId': 'assistant-1', 'content': 'Memory'},
+        ]),
+        'quick_phrases_v1': jsonEncode([
+          {
+            'id': 'phrase-1',
+            'title': 'Hello',
+            'content': 'Hello!',
+            'isGlobal': true,
+          },
+        ]),
+        'search_services_v1': jsonEncode([
+          {'id': 'search-1', 'type': 'bing_local', 'acceptLanguage': 'en-US'},
+        ]),
+        'tts_services_v1': jsonEncode([
+          {
+            'id': 'tts-1',
+            'kind': 'openai',
+            'enabled': true,
+            'apiKey': 'tts-secret',
+          },
+        ]),
+        'instruction_injections_v1': jsonEncode([
+          {'id': 'injection-1', 'title': 'Learn', 'prompt': 'Explain'},
+        ]),
+        'assistant_tags_v1': jsonEncode([
+          {'id': 'tag-1', 'name': 'Work'},
+        ]),
+      });
+
+      for (final kind in BusinessEntityKind.values) {
+        expect(snapshot.entities[kind], hasLength(1), reason: kind.sourceKey);
+      }
+    });
+
+    test('rejects malformed entities and unsupported unknown values', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'assistants_v1': jsonEncode({'id': 'not-a-list'}),
+        }),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'assistant_memories_v1': jsonEncode([
+            {'id': 1, 'content': 'missing assistant id'},
+          ]),
+        }),
+        throwsA(isA<FormatException>()),
+      );
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'plugin_future_key_v1': {'nested': true},
+        }),
+        throwsA(isA<FormatException>()),
+      );
+    });
+
+    test('rejects entity fields that runtime models cannot decode', () {
+      final invalidBySourceKey = <String, Object>{
+        'assistants_v1': [
+          {'id': 'assistant-1', 'temperature': 'hot'},
+        ],
+        'provider_configs_v1': {
+          'provider-1': {'enabled': 'yes'},
+        },
+        'mcp_servers_v1': [
+          {'id': 'mcp-1', 'tools': <String, Object?>{}},
+        ],
+        'world_books_v1': [
+          {'id': 'book-1', 'entries': <String, Object?>{}},
+        ],
+        'assistant_memories_v1': [
+          {'id': 'one', 'assistantId': 'assistant-1', 'content': 'memory'},
+        ],
+        'quick_phrases_v1': [
+          {'id': 'phrase-1', 'isGlobal': 'yes'},
+        ],
+        'search_services_v1': [
+          {'id': 'search-1', 'type': 1},
+        ],
+        'instruction_injections_v1': [
+          {'id': 'injection-1', 'prompt': 1},
+        ],
+      };
+
+      for (final entry in invalidBySourceKey.entries) {
+        expect(
+          () => BusinessSettingsRouter.normalizeAndRoute({
+            entry.key: jsonEncode(entry.value),
+          }),
+          throwsA(
+            isA<FormatException>().having(
+              (error) => error.message,
+              'source key',
+              entry.key,
+            ),
+          ),
+          reason: entry.key,
+        );
+      }
+    });
+
+    test('rejects a search service without its required type', () {
+      expect(
+        () => BusinessSettingsRouter.normalizeAndRoute({
+          'search_services_v1': jsonEncode([
+            {'id': 'search-1'},
+          ]),
+        }),
+        throwsA(
+          isA<FormatException>().having(
+            (error) => error.message,
+            'source key',
+            'search_services_v1',
+          ),
+        ),
+      );
+    });
+
+    test('preserves payload shapes tolerated by published decoders', () {
+      final source = <String, Object?>{
+        'provider_configs_v1': jsonEncode({
+          'provider-1': {
+            'id': 'provider-1',
+            'models': [1],
+          },
+        }),
+        'provider_groups_v1': jsonEncode([
+          {'id': 1, 'name': <Object?>[], 'createdAt': <Object?>[]},
+        ]),
+        'mcp_servers_v1': jsonEncode([
+          {
+            'id': 'mcp-1',
+            'transport': 'stdio',
+            'tools': <Object?>[],
+            'args': [1],
+            'env': {'PORT': 8080},
+          },
+        ]),
+        'world_books_v1': jsonEncode([
+          {
+            'id': 'book-1',
+            'entries': [
+              {
+                'id': 'entry-1',
+                'keywords': [1],
+              },
+            ],
+          },
+        ]),
+        'assistant_memories_v1': jsonEncode([
+          {'id': 1, 'assistantId': 'assistant-1', 'content': 42},
+        ]),
+        'tts_services_v1': jsonEncode([
+          {'id': 1, 'enabled': 'yes', 'speed': 'fast'},
+        ]),
+        'assistant_tags_v1': jsonEncode([
+          {'id': 1, 'name': <Object?>[]},
+        ]),
+      };
+
+      final exported = BusinessSettingsRouter.exportSnapshot(
+        BusinessSettingsRouter.normalizeAndRoute(source),
+      );
+
+      for (final key in source.keys) {
+        expect(
+          jsonDecode(exported[key]! as String),
+          jsonDecode(source[key]! as String),
+          reason: key,
+        );
+      }
+    });
+  });
+}

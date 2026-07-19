@@ -17,7 +17,6 @@ import 'theme/theme_factory.dart';
 import 'theme/palettes.dart';
 import 'package:provider/provider.dart';
 import 'package:dynamic_color/dynamic_color.dart';
-import 'core/providers/chat_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'core/providers/settings_provider.dart';
 import 'core/providers/mcp_provider.dart';
@@ -35,6 +34,12 @@ import 'core/providers/s3_backup_provider.dart';
 import 'core/providers/backup_reminder_provider.dart';
 import 'core/providers/hotkey_provider.dart';
 import 'core/database/database_installation_gate.dart';
+import 'core/database/app_database.dart';
+import 'core/database/business_migration_engine.dart';
+import 'core/database/business_preferences.dart';
+import 'core/database/business_repository.dart';
+import 'core/database/business_startup_gate.dart';
+import 'core/database/chat_database_gateway.dart';
 import 'core/services/chat/chat_service.dart';
 import 'core/services/database_v2_rollout_ledger.dart';
 import 'core/services/backup/restore_business_lease.dart';
@@ -50,12 +55,12 @@ import 'utils/sandbox_path_resolver.dart';
 import 'shared/widgets/app_overlays.dart';
 import 'shared/widgets/snackbar.dart';
 import 'shared/widgets/restore_failure_screen.dart';
-import 'shared/widgets/restore_cold_restart_screen.dart';
 import 'shared/widgets/restore_outcome_notice.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show
+        File,
         Platform,
         pid,
         stderr; // kept for global override usage inside provider
@@ -86,10 +91,6 @@ Future<void> main() async {
               appDataDirectory: appDataDirectory,
               businessLease: businessLease,
             );
-      } on RestoreColdRestartRequired {
-        await _initRestoreFailureWindow();
-        runApp(const _RestoreColdRestartApp());
-        return;
       } catch (error, stackTrace) {
         stderr.writeln('[RestoreStartupGate] $error\n$stackTrace');
         await _initRestoreFailureWindow();
@@ -122,6 +123,8 @@ Future<void> main() async {
       // logging.Logger.root.onRecord.listen((rec) { ... });
       // Cache current Documents directory to fix sandboxed absolute paths on iOS
       await SandboxPathResolver.init();
+      ChatDatabaseLease? processDatabaseLease;
+      BusinessPreferences? businessPreferences;
       try {
         final migrationDecision = await HiveToSqliteMigrationService.check();
         if (migrationDecision.needsMigration) {
@@ -141,6 +144,26 @@ Future<void> main() async {
               ) ??
               false,
         );
+        final databaseFile = File(
+          '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
+        );
+        final databaseLease = await ChatDatabaseGateway.instance.acquire(
+          databaseFile,
+        );
+        try {
+          final legacyPreferences =
+              await SharedPreferencesLegacyBusinessPreferences.open();
+          final loadedBusinessPreferences =
+              await BusinessStartupGate.migrateAndLoad(
+                repository: databaseLease.businessRepository,
+                legacyPreferences: legacyPreferences,
+              );
+          processDatabaseLease = databaseLease;
+          businessPreferences = loadedBusinessPreferences;
+        } catch (_) {
+          await databaseLease.release();
+          rethrow;
+        }
         try {
           final rollout = DatabaseV2RolloutLedger.rolloutDecision(
             installationId: installationReceipt.installationId,
@@ -177,7 +200,13 @@ Future<void> main() async {
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
-      runApp(MyApp(restoreOutcome: restoreOutcome?.state));
+      runApp(
+        MyApp(
+          databaseLease: processDatabaseLease,
+          businessPreferences: businessPreferences,
+          restoreOutcome: restoreOutcome?.state,
+        ),
+      );
     },
     zoneSpecification: ZoneSpecification(
       print: (self, parent, zone, line) {
@@ -238,24 +267,6 @@ class _RestoreFailureApp extends StatelessWidget {
   }
 }
 
-class _RestoreColdRestartApp extends StatelessWidget {
-  const _RestoreColdRestartApp();
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = ThemePalettes.defaultPalette;
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Kelivo',
-      supportedLocales: AppLocalizations.supportedLocales,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
-      theme: buildLightThemeForScheme(palette.light),
-      darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: const RestoreColdRestartScreen(restart: PlatformUtils.restartApp),
-    );
-  }
-}
-
 Future<void> _initDesktopWindow() async {
   if (kIsWeb) return;
   try {
@@ -299,54 +310,95 @@ class MigrationApp extends StatelessWidget {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, this.restoreOutcome});
+  const MyApp({
+    super.key,
+    required this.databaseLease,
+    required this.businessPreferences,
+    this.restoreOutcome,
+  });
 
+  final ChatDatabaseLease databaseLease;
+  final BusinessPreferences businessPreferences;
   final RestoreReceiptState? restoreOutcome;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(create: (_) => UserProvider()),
+        Provider<BusinessRepository>.value(
+          value: databaseLease.businessRepository,
+        ),
+        Provider<BusinessPreferences>.value(value: businessPreferences),
+        ChangeNotifierProvider(
+          create: (_) => UserProvider(preferences: businessPreferences),
+        ),
         ChangeNotifierProvider(
           create: (_) {
-            final settings = SettingsProvider();
-            unawaited(settings.incrementAppLaunchCount());
+            final settings = SettingsProvider(businessPreferences);
+            unawaited(
+              settings.loaded.then((_) => settings.incrementAppLaunchCount()),
+            );
             return settings;
           },
         ),
-        ChangeNotifierProvider(create: (_) => ChatService()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              ChatService(existingRepository: databaseLease.chatRepository),
+        ),
         ChangeNotifierProvider(create: (_) => McpToolService()),
-        ChangeNotifierProvider(create: (_) => McpProvider()),
+        ChangeNotifierProvider(
+          create: (_) => McpProvider(preferences: businessPreferences),
+        ),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(
-          create: (ctx) =>
-              AssistantProvider(chatService: ctx.read<ChatService>()),
+          create: (ctx) => AssistantProvider(
+            preferences: businessPreferences,
+            chatService: ctx.read<ChatService>(),
+          ),
         ),
-        ChangeNotifierProvider(create: (_) => TagProvider()),
-        ChangeNotifierProvider(create: (_) => TtsProvider()),
-        ChangeNotifierProvider(create: (_) => UpdateProvider()),
-        ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
-        ChangeNotifierProvider(create: (_) => InstructionInjectionProvider()),
         ChangeNotifierProvider(
-          create: (_) => InstructionInjectionGroupProvider(),
+          create: (_) => TagProvider(preferences: businessPreferences),
         ),
-        ChangeNotifierProvider(create: (_) => WorldBookProvider()),
-        ChangeNotifierProvider(create: (_) => MemoryProvider()),
-        ChangeNotifierProvider(create: (_) => BackupReminderProvider()),
+        ChangeNotifierProvider(
+          create: (_) => TtsProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(create: (_) => UpdateProvider()),
+        ChangeNotifierProvider(
+          create: (_) => QuickPhraseProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              InstructionInjectionProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => InstructionInjectionGroupProvider(
+            preferences: businessPreferences,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => WorldBookProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MemoryProvider(preferences: businessPreferences),
+        ),
+        ChangeNotifierProvider(
+          create: (_) =>
+              BackupReminderProvider(preferences: businessPreferences),
+        ),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
           create: (ctx) => BackupProvider(
             chatService: ctx.read<ChatService>(),
+            businessRepository: databaseLease.businessRepository,
             initialConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
         ChangeNotifierProvider(
           create: (ctx) => S3BackupProvider(
             chatService: ctx.read<ChatService>(),
+            businessRepository: databaseLease.businessRepository,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
           ),
         ),

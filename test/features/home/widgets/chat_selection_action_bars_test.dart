@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +16,7 @@ Future<void> _pumpBar(WidgetTester tester, Widget child) async {
   SharedPreferences.setMockInitialValues({});
   await tester.pumpWidget(
     ChangeNotifierProvider(
-      create: (_) => SettingsProvider(),
+      create: (_) => SettingsProvider(createBusinessTestPreferences()),
       child: MaterialApp(
         localizationsDelegates: const [
           AppLocalizations.delegate,

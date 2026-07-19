@@ -8,23 +8,18 @@ import '../../database/app_database.dart';
 import 'restore_durability.dart';
 import 'restore_previous_plan.dart';
 import 'restore_receipt.dart';
-import 'restore_settings_transition.dart';
 
 final class RestorePreviousBundle {
-  const RestorePreviousBundle({
-    required this.plan,
-    required this.settingsSnapshotBytes,
-  });
+  const RestorePreviousBundle({required this.plan});
 
   final RestorePreviousPlan plan;
-  final List<int> settingsSnapshotBytes;
 }
 
 /// Describes the closed live bundle before any restore object is moved.
 ///
 /// File contents are hashed as streams. The resulting immutable plan is the
-/// authority used by later cutover phases; this builder never mutates live
-/// settings, the database, or asset roots.
+/// authority used by later cutover phases; this builder never mutates the
+/// live database or asset roots.
 final class RestorePreviousBuilder {
   RestorePreviousBuilder._();
 
@@ -36,12 +31,10 @@ final class RestorePreviousBuilder {
   static const _maximumAssetPathBytes = 8 * 1024 * 1024;
   static const _maximumSinglePathBytes = 0xffff;
   static const _maximumManifestBytes = 16 * 1024 * 1024;
-  static const _maximumSettingsBytes = 16 * 1024 * 1024;
 
   static Future<RestorePreviousBundle> build({
     required Directory appDataDirectory,
     required RestoreReceipt preparedReceipt,
-    required RestoreSettingsTransition settingsTransition,
   }) async {
     if (preparedReceipt.state != RestoreReceiptState.prepared ||
         preparedReceipt.sequence != 1) {
@@ -55,27 +48,13 @@ final class RestorePreviousBuilder {
       throw StateError('restore_previous_builder_app_data');
     }
 
-    final snapshotBytes = List<int>.unmodifiable(
-      settingsTransition.snapshotBytes,
-    );
-    if (snapshotBytes.length > _maximumSettingsBytes) {
-      throw StateError('restore_previous_settings_budget');
-    }
-    settingsTransition.plan.validateSnapshotBytes(snapshotBytes);
-    settingsTransition.plan.validateTargetProjection(
-      settingsTransition.valuesToSet,
-    );
-
-    final database =
-        preparedReceipt.selectedComponents.contains(RestoreComponent.database)
-        ? await inspectDatabase(appDataDirectory)
-        : null;
+    final database = await inspectDatabase(appDataDirectory);
     final assets =
         preparedReceipt.selectedComponents.contains(RestoreComponent.assets)
         ? await inspectAssets(appDataDirectory)
         : null;
     final totalBytes =
-        (database?.descriptor?.bytes ?? 0) +
+        (database.descriptor?.bytes ?? 0) +
         (assets?.entries.values.fold<int>(
               0,
               (total, descriptor) => total + descriptor.bytes,
@@ -86,17 +65,13 @@ final class RestorePreviousBuilder {
     }
     final plan = RestorePreviousPlan.forPreparedReceipt(
       receipt: preparedReceipt,
-      settings: settingsTransition.plan,
       database: database,
       assets: assets,
     );
     if (utf8.encode(jsonEncode(plan.toJson())).length > _maximumManifestBytes) {
       throw StateError('restore_previous_manifest_budget');
     }
-    return RestorePreviousBundle(
-      plan: plan,
-      settingsSnapshotBytes: snapshotBytes,
-    );
+    return RestorePreviousBundle(plan: plan);
   }
 
   static Future<void> validateLive({
@@ -110,11 +85,9 @@ final class RestorePreviousBuilder {
         FileSystemEntityType.directory) {
       throw StateError('restore_previous_builder_app_data');
     }
-    if (expected.database != null) {
-      final actual = await inspectDatabase(appDataDirectory);
-      if (!_sameDatabase(actual, expected.database!)) {
-        throw StateError('restore_previous_database_changed');
-      }
+    final actualDatabase = await inspectDatabase(appDataDirectory);
+    if (!_sameDatabase(actualDatabase, expected.database)) {
+      throw StateError('restore_previous_database_changed');
     }
     if (expected.assets != null) {
       final actual = await inspectAssets(appDataDirectory);
@@ -137,38 +110,34 @@ final class RestorePreviousBuilder {
         FileSystemEntityType.directory) {
       throw StateError('restore_previous_stored_directory');
     }
-    if (expected.database != null) {
-      final databaseFile = File(
-        p.joinAll([
-          directory.path,
-          ...RestorePreviousDatabasePlan.databasePath.split('/'),
-        ]),
-      );
-      final actual = await _inspectDatabaseFile(databaseFile);
-      if (!_sameDatabase(actual, expected.database!)) {
-        throw StateError('restore_previous_stored_database');
-      }
-      final databaseDirectory = databaseFile.parent;
-      if (expected.database!.state == RestorePreviousDatabaseState.file) {
-        final entries = await databaseDirectory
-            .list(followLinks: false)
-            .toList();
-        if (entries.length != 1 ||
-            p.basename(entries.single.path) != AppDatabase.databaseFileName ||
-            await FileSystemEntity.type(
-                  entries.single.path,
-                  followLinks: false,
-                ) !=
-                FileSystemEntityType.file) {
-          throw StateError('restore_previous_stored_database_topology');
-        }
-      } else if (await FileSystemEntity.type(
-            databaseDirectory.path,
-            followLinks: false,
-          ) !=
-          FileSystemEntityType.notFound) {
+    final databaseFile = File(
+      p.joinAll([
+        directory.path,
+        ...RestorePreviousDatabasePlan.databasePath.split('/'),
+      ]),
+    );
+    final actual = await _inspectDatabaseFile(databaseFile);
+    if (!_sameDatabase(actual, expected.database)) {
+      throw StateError('restore_previous_stored_database');
+    }
+    final databaseDirectory = databaseFile.parent;
+    if (expected.database.state == RestorePreviousDatabaseState.file) {
+      final entries = await databaseDirectory.list(followLinks: false).toList();
+      if (entries.length != 1 ||
+          p.basename(entries.single.path) != AppDatabase.databaseFileName ||
+          await FileSystemEntity.type(
+                entries.single.path,
+                followLinks: false,
+              ) !=
+              FileSystemEntityType.file) {
         throw StateError('restore_previous_stored_database_topology');
       }
+    } else if (await FileSystemEntity.type(
+          databaseDirectory.path,
+          followLinks: false,
+        ) !=
+        FileSystemEntityType.notFound) {
+      throw StateError('restore_previous_stored_database_topology');
     }
     if (expected.assets != null) {
       final actual = await inspectAssets(directory);

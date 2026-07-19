@@ -4,7 +4,8 @@ import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/services/tts/tts_playback_models.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../support/business_preferences_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -15,9 +16,12 @@ void main() {
   late Set<String> audioEventChannels;
   late int speakCallCount;
   late List<String> spokenTexts;
+  late BusinessPreferencesTestHarness harness;
+  late BusinessPreferencesTestSession session;
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues(const {});
+  setUp(() async {
+    harness = await BusinessPreferencesTestHarness.create();
+    session = await harness.open();
     audioEventChannels = <String>{};
     speakCallCount = 0;
     spokenTexts = <String>[];
@@ -74,12 +78,13 @@ void main() {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMessageHandler(channelName, null);
     }
+    return harness.dispose();
   });
 
   test(
     'changing system TTS speed keeps the current playback position',
     () async {
-      final provider = TtsProvider();
+      final provider = TtsProvider(preferences: session.preferences);
       addTearDown(provider.dispose);
 
       await _waitUntil(() => provider.isAvailable);
@@ -110,7 +115,7 @@ void main() {
   test(
     'finished system TTS can be replayed from the floating player',
     () async {
-      final provider = TtsProvider();
+      final provider = TtsProvider(preferences: session.preferences);
       addTearDown(provider.dispose);
 
       await _waitUntil(() => provider.isAvailable);

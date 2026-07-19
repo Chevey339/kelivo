@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/providers/s3_backup_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
@@ -35,6 +37,8 @@ void main() {
   group('S3BackupProvider restore paths', () {
     late Directory root;
     late PathProviderPlatform previousPathProvider;
+    late AppDatabase database;
+    late BusinessRepository businessRepository;
 
     setUp(() async {
       root = await Directory.systemTemp.createTemp(
@@ -43,9 +47,12 @@ void main() {
       previousPathProvider = PathProviderPlatform.instance;
       PathProviderPlatform.instance = _FakePathProviderPlatform(root.path);
       SharedPreferences.setMockInitialValues({});
+      database = AppDatabase.open(file: File('${root.path}/business.sqlite'));
+      businessRepository = BusinessRepository(database);
     });
 
     tearDown(() async {
+      await database.close();
       PathProviderPlatform.instance = previousPathProvider;
       if (await root.exists()) await root.delete(recursive: true);
     });
@@ -72,6 +79,7 @@ void main() {
       addTearDown(chatService.dispose);
       final provider = S3BackupProvider(
         chatService: chatService,
+        businessRepository: businessRepository,
         initialConfig: S3Config(
           endpoint: 'http://${server.address.address}:${server.port}',
           bucket: 'backup-bucket',

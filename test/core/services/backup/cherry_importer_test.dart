@@ -8,9 +8,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/business_repository.dart';
+import 'package:Kelivo/core/database/business_restore_service.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
-import 'package:Kelivo/core/database/chat_database_gateway.dart';
-import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/backup/cherry_importer.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 
@@ -36,14 +38,28 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late Directory tempDir;
+  late AppDatabase database;
+  late BusinessRepository businessRepository;
+  late ChatService chatService;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('kelivo_cherry_test_');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
     SharedPreferences.setMockInitialValues({});
+    final databaseFile = File('${tempDir.path}/kelivo.db');
+    database = AppDatabase.open(file: databaseFile);
+    businessRepository = BusinessRepository(database);
+    chatService = ChatService(
+      existingRepository: ChatDatabaseRepository(
+        database,
+        databaseFile: databaseFile,
+      ),
+    );
   });
 
   tearDown(() async {
+    await chatService.close();
+    await database.close();
     await Hive.close();
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
@@ -80,11 +96,10 @@ void main() {
             ], compressed: true),
       });
 
-      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
-        settings: SettingsProvider(),
+        businessRepository: businessRepository,
         chatService: chatService,
       );
 
@@ -133,9 +148,17 @@ void main() {
       expect(standaloneMessage.role, 'user');
       expect(standaloneMessage.content, 'hello from standalone message');
 
+      final exported = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      final providers =
+          jsonDecode(exported['provider_configs_v1'] as String) as Map;
+      expect((providers['openai'] as Map)['apiKey'], 'sk-test');
+      expect(exported['providers_order_v1'], ['openai']);
+      expect(exported['assistants_v1'], contains('assistant-1'));
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('provider_configs_v1'), contains('openai'));
-      expect(prefs.getString('assistants_v1'), contains('assistant-1'));
+      expect(prefs.getString('provider_configs_v1'), isNull);
+      expect(prefs.getString('assistants_v1'), isNull);
     });
 
     test('keeps legacy data.json zip import working', () async {
@@ -179,11 +202,10 @@ void main() {
         ),
       });
 
-      final chatService = ChatService(databaseGateway: ChatDatabaseGateway());
       final result = await CherryImporter.importFromCherryStudio(
         file: backup,
         mode: RestoreMode.overwrite,
-        settings: SettingsProvider(),
+        businessRepository: businessRepository,
         chatService: chatService,
       );
 
@@ -210,12 +232,65 @@ void main() {
         CherryImporter.importFromCherryStudio(
           file: backup,
           mode: RestoreMode.overwrite,
-          settings: SettingsProvider(),
-          chatService: ChatService(databaseGateway: ChatDatabaseGateway()),
+          businessRepository: businessRepository,
+          chatService: chatService,
         ),
         throwsA(anything),
       );
     });
+
+    test(
+      'rolls back its whole business patch when an entity write fails',
+      () async {
+        final backup = await _createZip(tempDir, <String, List<int>>{
+          'data.json': utf8.encode(
+            jsonEncode(<String, dynamic>{
+              'version': 5,
+              'localStorage': <String, dynamic>{
+                'persist:cherry-studio': _persistStateJson(),
+              },
+              'indexedDB': <String, dynamic>{
+                'topics': <dynamic>[],
+                'message_blocks': <dynamic>[],
+                'files': <dynamic>[],
+              },
+            }),
+          ),
+        });
+        await BusinessRestoreService(businessRepository).overwrite({
+          'provider_configs_v1': jsonEncode({
+            'local': {'id': 'local', 'apiKey': 'keep-me'},
+          }),
+          'providers_order_v1': ['local'],
+          'assistants_v1': jsonEncode([
+            {'id': 'local-assistant', 'name': 'Keep me'},
+          ]),
+        });
+        final before = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        await database.customStatement(
+          'CREATE TRIGGER fail_cherry_assistant_insert '
+          'BEFORE INSERT ON assistant_rows BEGIN '
+          "SELECT RAISE(ABORT, 'injected failure'); END;",
+        );
+
+        await expectLater(
+          CherryImporter.importFromCherryStudio(
+            file: backup,
+            mode: RestoreMode.merge,
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ),
+          throwsA(anything),
+        );
+
+        expect(
+          await BusinessRestoreService(businessRepository).exportSettings(),
+          before,
+        );
+      },
+    );
   });
 }
 

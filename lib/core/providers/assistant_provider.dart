@@ -3,9 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../utils/sandbox_path_resolver.dart';
+import '../database/business_preferences.dart';
 import '../models/assistant.dart';
 import '../models/assistant_regex.dart';
 import '../models/preset_message.dart';
@@ -17,8 +17,8 @@ import '../../utils/app_directories.dart';
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
-  static const String _legacySearchEnabledKey = 'search_enabled_v1';
 
+  final BusinessPreferences preferences;
   final List<Assistant> _assistants = <Assistant>[];
   String? _currentAssistantId;
   final ChatService? chatService;
@@ -34,30 +34,24 @@ class AssistantProvider extends ChangeNotifier {
 
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
-  AssistantProvider({this.chatService}) {
+  AssistantProvider({required this.preferences, this.chatService}) {
     _load();
   }
 
   Future<void> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_assistantsKey);
+    await preferences.load();
+    final raw = preferences.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
-      final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
-      final migrated = _decodeAssistantsWithLegacySearch(
-        raw,
-        legacySearchEnabled: legacySearchEnabled,
-      );
-      bool migratedSearchEnabled = false;
       _assistants
         ..clear()
-        ..addAll(migrated.assistants);
-      migratedSearchEnabled = migrated.didApplyLegacySearch;
+        ..addAll(_decodeAssistants(raw));
       // Fix any sandboxed local paths (avatars/backgrounds) imported from other platforms
-      bool changed = migratedSearchEnabled;
+      bool changed = false;
       for (int i = 0; i < _assistants.length; i++) {
         final a = _assistants[i];
         String? av = a.avatar;
         String? bg = a.background;
+        var itemChanged = false;
         if (av != null &&
             av.isNotEmpty &&
             (av.startsWith('/') || av.contains(':')) &&
@@ -66,6 +60,7 @@ class AssistantProvider extends ChangeNotifier {
           if (fixed != av) {
             av = fixed;
             changed = true;
+            itemChanged = true;
           }
         }
         if (bg != null &&
@@ -76,9 +71,10 @@ class AssistantProvider extends ChangeNotifier {
           if (fixedBg != bg) {
             bg = fixedBg;
             changed = true;
+            itemChanged = true;
           }
         }
-        if (changed) {
+        if (itemChanged) {
           _assistants[i] = a.copyWith(avatar: av, background: bg);
         }
       }
@@ -91,7 +87,7 @@ class AssistantProvider extends ChangeNotifier {
     // Do not create defaults here because localization is not available.
     // Defaults will be ensured later via ensureDefaults(context).
     // Restore current assistant if present
-    final savedId = prefs.getString(_currentAssistantKey);
+    final savedId = preferences.getString(_currentAssistantKey);
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     } else {
@@ -100,35 +96,15 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  _AssistantDecodeResult _decodeAssistantsWithLegacySearch(
-    String raw, {
-    required bool? legacySearchEnabled,
-  }) {
+  List<Assistant> _decodeAssistants(String raw) {
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
-      bool didApplyLegacySearch = false;
-      final assistants = [
+      return [
         for (final e in decoded)
-          if (e is Map)
-            (() {
-              final json = e.cast<String, dynamic>();
-              if (legacySearchEnabled != null &&
-                  !json.containsKey('searchEnabled')) {
-                json['searchEnabled'] = legacySearchEnabled;
-                didApplyLegacySearch = true;
-              }
-              return Assistant.fromJson(json);
-            })(),
+          if (e is Map) Assistant.fromJson(e.cast<String, dynamic>()),
       ];
-      return _AssistantDecodeResult(
-        assistants: assistants,
-        didApplyLegacySearch: didApplyLegacySearch,
-      );
     } catch (_) {
-      return const _AssistantDecodeResult(
-        assistants: <Assistant>[],
-        didApplyLegacySearch: false,
-      );
+      return const <Assistant>[];
     }
   }
 
@@ -168,8 +144,7 @@ class AssistantProvider extends ChangeNotifier {
     // Set current assistant if not set
     if (_currentAssistantId == null && _assistants.isNotEmpty) {
       _currentAssistantId = _assistants.first.id;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_currentAssistantKey, _currentAssistantId!);
+      await preferences.setString(_currentAssistantKey, _currentAssistantId!);
     }
     notifyListeners();
   }
@@ -291,16 +266,17 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Future<void> _persist() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
+    await preferences.setString(
+      _assistantsKey,
+      Assistant.encodeList(_assistants),
+    );
   }
 
   Future<void> setCurrentAssistant(String id) async {
     if (_currentAssistantId == id) return;
     _currentAssistantId = id;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_currentAssistantKey, id);
+    await preferences.setString(_currentAssistantKey, id);
   }
 
   Assistant? getById(String id) {
@@ -514,11 +490,10 @@ class AssistantProvider extends ChangeNotifier {
           : null;
     }
     await _persist();
-    final prefs = await SharedPreferences.getInstance();
     if (_currentAssistantId != null) {
-      await prefs.setString(_currentAssistantKey, _currentAssistantId!);
+      await preferences.setString(_currentAssistantKey, _currentAssistantId!);
     } else {
-      await prefs.remove(_currentAssistantKey);
+      await preferences.remove(_currentAssistantKey);
     }
     notifyListeners();
     return true;
@@ -584,14 +559,4 @@ class AssistantProvider extends ChangeNotifier {
     notifyListeners();
     await _persist();
   }
-}
-
-class _AssistantDecodeResult {
-  const _AssistantDecodeResult({
-    required this.assistants,
-    required this.didApplyLegacySearch,
-  });
-
-  final List<Assistant> assistants;
-  final bool didApplyLegacySearch;
 }

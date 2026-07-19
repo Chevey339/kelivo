@@ -2,7 +2,6 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../database/app_database.dart';
 import 'restore_bundle_mover.dart';
@@ -12,13 +11,10 @@ import 'restore_live_database.dart';
 import 'restore_previous_builder.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
-import 'restore_settings_store.dart';
-import 'restore_settings_transition.dart';
 import 'restore_workspace_lock.dart';
 
-typedef _PreviousTransition = ({
+typedef _PreviousState = ({
   PersistedRestorePrevious previous,
-  RestoreSettingsTransition transition,
   ValidatedRestoreCandidate candidate,
 });
 
@@ -53,7 +49,6 @@ final class RestoreCutoverExecutor {
   factory RestoreCutoverExecutor({
     required Directory appDataDirectory,
     required String runId,
-    required SharedPreferences preferences,
     required RestoreWorkspaceLock workspaceLock,
     RestoreDurability? durability,
     bool archived = false,
@@ -62,7 +57,6 @@ final class RestoreCutoverExecutor {
     return RestoreCutoverExecutor._(
       appDataDirectory: appDataDirectory,
       runId: runId,
-      preferences: preferences,
       workspaceLock: workspaceLock,
       durability: resolvedDurability,
       archived: archived,
@@ -72,12 +66,10 @@ final class RestoreCutoverExecutor {
   RestoreCutoverExecutor._({
     required this.appDataDirectory,
     required this.runId,
-    required SharedPreferences preferences,
     required this.workspaceLock,
     required this.durability,
     required bool archived,
-  }) : settingsStore = RestoreSettingsStore(preferences),
-       receiptStore = RestoreReceiptStore(
+  }) : receiptStore = RestoreReceiptStore(
          appDataDirectory: appDataDirectory,
          runId: runId,
          durability: durability,
@@ -99,7 +91,6 @@ final class RestoreCutoverExecutor {
   final String runId;
   final RestoreWorkspaceLock workspaceLock;
   final RestoreDurability durability;
-  final RestoreSettingsStore settingsStore;
   final RestoreReceiptStore receiptStore;
   late final RestorePreviousStore previousStore;
   late final RestoreBundleMover mover;
@@ -148,12 +139,10 @@ final class RestoreCutoverExecutor {
           continue;
         case RestoreReceiptState.oldRenamed:
           try {
-            final state = await _loadPreviousTransition(preparedReceipt);
+            final state = await _loadPreviousState(preparedReceipt);
             await mover.installCandidate(
               receipt: latest,
               candidate: state.candidate,
-              settingsTransition: state.transition,
-              settingsStore: settingsStore,
             );
           } catch (error, stackTrace) {
             return _rollbackAfterCutoverFailure(
@@ -169,12 +158,10 @@ final class RestoreCutoverExecutor {
           continue;
         case RestoreReceiptState.newInstalled:
           try {
-            final state = await _loadPreviousTransition(preparedReceipt);
+            final state = await _loadPreviousState(preparedReceipt);
             await mover.validateInstalled(
               receipt: latest,
               candidate: state.candidate,
-              settingsTransition: state.transition,
-              settingsStore: settingsStore,
               previous: state.previous,
             );
           } catch (error, stackTrace) {
@@ -191,12 +178,10 @@ final class RestoreCutoverExecutor {
           continue;
         case RestoreReceiptState.verified:
           try {
-            final state = await _loadPreviousTransition(preparedReceipt);
+            final state = await _loadPreviousState(preparedReceipt);
             await mover.validateInstalled(
               receipt: latest,
               candidate: state.candidate,
-              settingsTransition: state.transition,
-              settingsStore: settingsStore,
               previous: state.previous,
             );
           } catch (error, stackTrace) {
@@ -228,60 +213,6 @@ final class RestoreCutoverExecutor {
   /// remains fail-closed. A rolled-back run may repeat its idempotent reverse
   /// moves so an interrupted terminal barrier cannot expose mixed state.
   Future<RestoreReceipt> revalidateTerminalWhileWorkspaceLocked(
-    RestoreReceipt terminalReceipt, {
-    bool repairSettings = true,
-  }) async {
-    final history = await receiptStore.readHistoryWhileWorkspaceLocked();
-    if (history.isEmpty ||
-        history.first.state != RestoreReceiptState.prepared ||
-        history.last.checksum != terminalReceipt.checksum) {
-      throw StateError('restore_cutover_terminal_history');
-    }
-    final preparedReceipt = history.first;
-    switch (terminalReceipt.state) {
-      case RestoreReceiptState.committed:
-        final state = await _loadPreviousTransition(preparedReceipt);
-        await mover.validateInstalled(
-          receipt: terminalReceipt,
-          candidate: state.candidate,
-          settingsTransition: state.transition,
-          settingsStore: settingsStore,
-          previous: state.previous,
-          repairSettings: repairSettings,
-        );
-        return terminalReceipt;
-      case RestoreReceiptState.rolledBack:
-        final state = await _loadRollbackTransition(preparedReceipt);
-        await mover.rollbackToPrevious(
-          receipt: terminalReceipt,
-          candidate: state.candidate,
-          settingsTransition: state.transition,
-          settingsStore: settingsStore,
-          previous: state.previous,
-          repairSettings: repairSettings,
-        );
-        await mover.validateRolledBack(
-          receipt: terminalReceipt,
-          candidate: state.candidate,
-          settingsTransition: state.transition,
-          settingsStore: settingsStore,
-          previous: state.previous,
-        );
-        return terminalReceipt;
-      case RestoreReceiptState.prepared:
-      case RestoreReceiptState.oldRenamed:
-      case RestoreReceiptState.newInstalled:
-      case RestoreReceiptState.verified:
-      case RestoreReceiptState.rollingBack:
-        throw StateError('restore_cutover_terminal_state');
-    }
-  }
-
-  /// Checks only the terminal settings projection. No value is written.
-  ///
-  /// This is used after a process boundary so the startup gate can distinguish
-  /// a durable readback from a recoverable before/target mixture.
-  Future<RestoreSettingsReadback> inspectTerminalSettingsWhileWorkspaceLocked(
     RestoreReceipt terminalReceipt,
   ) async {
     final history = await receiptStore.readHistoryWhileWorkspaceLocked();
@@ -293,17 +224,26 @@ final class RestoreCutoverExecutor {
     final preparedReceipt = history.first;
     switch (terminalReceipt.state) {
       case RestoreReceiptState.committed:
-        final state = await _loadPreviousTransition(preparedReceipt);
-        return settingsStore.inspectReadback(
-          transition: state.transition,
-          expected: RestoreSettingsExpectedProjection.target,
+        final state = await _loadPreviousState(preparedReceipt);
+        await mover.validateInstalled(
+          receipt: terminalReceipt,
+          candidate: state.candidate,
+          previous: state.previous,
         );
+        return terminalReceipt;
       case RestoreReceiptState.rolledBack:
-        final state = await _loadRollbackTransition(preparedReceipt);
-        return settingsStore.inspectReadback(
-          transition: state.transition,
-          expected: RestoreSettingsExpectedProjection.before,
+        final state = await _loadRollbackState(preparedReceipt);
+        await mover.rollbackToPrevious(
+          receipt: terminalReceipt,
+          candidate: state.candidate,
+          previous: state.previous,
         );
+        await mover.validateRolledBack(
+          receipt: terminalReceipt,
+          candidate: state.candidate,
+          previous: state.previous,
+        );
+        return terminalReceipt;
       case RestoreReceiptState.prepared:
       case RestoreReceiptState.oldRenamed:
       case RestoreReceiptState.newInstalled:
@@ -317,12 +257,10 @@ final class RestoreCutoverExecutor {
     required RestoreReceipt latest,
     required RestoreReceipt preparedReceipt,
   }) async {
-    final state = await _loadPreviousTransition(preparedReceipt);
+    final state = await _loadPreviousState(preparedReceipt);
     await mover.validateRollbackStart(
       receipt: latest,
       candidate: state.candidate,
-      settingsTransition: state.transition,
-      settingsStore: settingsStore,
       previous: state.previous,
     );
     final rollingBack = latest.advance(RestoreReceiptState.rollingBack);
@@ -373,22 +311,17 @@ final class RestoreCutoverExecutor {
   Future<RestoreReceipt> _completeRollback({
     required RestoreReceipt rollingBack,
     required RestoreReceipt preparedReceipt,
-    _PreviousTransition? state,
+    _PreviousState? state,
   }) async {
-    final rollbackState =
-        state ?? await _loadRollbackTransition(preparedReceipt);
+    final rollbackState = state ?? await _loadRollbackState(preparedReceipt);
     await mover.rollbackToPrevious(
       receipt: rollingBack,
       candidate: rollbackState.candidate,
-      settingsTransition: rollbackState.transition,
-      settingsStore: settingsStore,
       previous: rollbackState.previous,
     );
     await mover.validateRolledBack(
       receipt: rollingBack,
       candidate: rollbackState.candidate,
-      settingsTransition: rollbackState.transition,
-      settingsStore: settingsStore,
       previous: rollbackState.previous,
     );
     final rolledBack = rollingBack.advance(RestoreReceiptState.rolledBack);
@@ -396,7 +329,7 @@ final class RestoreCutoverExecutor {
     return rolledBack;
   }
 
-  Future<_PreviousTransition> _completePrevious({
+  Future<_PreviousState> _completePrevious({
     required RestoreReceipt preparedReceipt,
     required ValidatedRestoreCandidate candidate,
   }) async {
@@ -425,13 +358,10 @@ final class RestoreCutoverExecutor {
         preparedReceipt: preparedReceipt,
       );
       await previousStore.validateComplete(previous);
-      final transition = _resumeTransition(previous, candidate);
-      await settingsStore.validateBefore(transition);
-      return (previous: previous, transition: transition, candidate: candidate);
+      return (previous: previous, candidate: candidate);
     }
 
     PersistedRestorePrevious pending;
-    RestoreSettingsTransition transition;
     var validateWholeLiveBeforeMove = false;
     final manifestType = await FileSystemEntity.type(
       p.join(previousStore.pendingDirectory.path, 'manifest.json'),
@@ -442,29 +372,19 @@ final class RestoreCutoverExecutor {
       pending = await previousStore.readPending(
         preparedReceipt: preparedReceipt,
       );
-      transition = _resumeTransition(pending, candidate);
     } else {
       if (manifestType != FileSystemEntityType.notFound) {
         throw StateError('restore_cutover_previous_manifest_type');
       }
-      transition = await settingsStore.buildTransition(
-        candidateSettings: candidate.settings,
-        secretsIncluded: candidate.secretsIncluded,
+      await RestoreLiveDatabase.normalize(
+        databaseFile: File(
+          p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+        ),
+        durability: durability,
       );
-      if (preparedReceipt.selectedComponents.contains(
-        RestoreComponent.database,
-      )) {
-        await RestoreLiveDatabase.normalize(
-          databaseFile: File(
-            p.join(appDataDirectory.path, AppDatabase.databaseFileName),
-          ),
-          durability: durability,
-        );
-      }
       final bundle = await RestorePreviousBuilder.build(
         appDataDirectory: appDataDirectory,
         preparedReceipt: preparedReceipt,
-        settingsTransition: transition,
       );
       pending = await previousStore.persistPending(
         bundle: bundle,
@@ -472,7 +392,6 @@ final class RestoreCutoverExecutor {
       );
       validateWholeLiveBeforeMove = true;
     }
-    await settingsStore.validateBefore(transition);
     if (validateWholeLiveBeforeMove) {
       await RestorePreviousBuilder.validateLive(
         appDataDirectory: appDataDirectory,
@@ -483,10 +402,10 @@ final class RestoreCutoverExecutor {
     final previous = await previousStore.promotePending(
       preparedReceipt: preparedReceipt,
     );
-    return (previous: previous, transition: transition, candidate: candidate);
+    return (previous: previous, candidate: candidate);
   }
 
-  Future<_PreviousTransition> _loadPreviousTransition(
+  Future<_PreviousState> _loadPreviousState(
     RestoreReceipt preparedReceipt,
   ) async {
     if (await FileSystemEntity.type(
@@ -501,14 +420,10 @@ final class RestoreCutoverExecutor {
     );
     await previousStore.validateComplete(previous);
     final candidate = await _readCandidateManifest(preparedReceipt);
-    return (
-      previous: previous,
-      transition: _resumeTransition(previous, candidate),
-      candidate: candidate,
-    );
+    return (previous: previous, candidate: candidate);
   }
 
-  Future<_PreviousTransition> _loadRollbackTransition(
+  Future<_PreviousState> _loadRollbackState(
     RestoreReceipt preparedReceipt,
   ) async {
     if (await FileSystemEntity.type(
@@ -522,23 +437,7 @@ final class RestoreCutoverExecutor {
       preparedReceipt: preparedReceipt,
     );
     final candidate = await _readCandidateManifest(preparedReceipt);
-    return (
-      previous: previous,
-      transition: _resumeTransition(previous, candidate),
-      candidate: candidate,
-    );
-  }
-
-  RestoreSettingsTransition _resumeTransition(
-    PersistedRestorePrevious previous,
-    ValidatedRestoreCandidate candidate,
-  ) {
-    return RestoreSettingsTransition.resume(
-      plan: previous.plan.settings,
-      snapshotBytes: previous.settingsSnapshotBytes,
-      candidateSettings: candidate.settings,
-      secretsIncluded: candidate.secretsIncluded,
-    );
+    return (previous: previous, candidate: candidate);
   }
 
   Future<ValidatedRestoreCandidate> _readCandidateManifest(

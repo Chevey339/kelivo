@@ -1578,16 +1578,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Kelivo could not restart automatically. Fully close it, then open it again.';
 
   @override
-  String get backupRestoreColdRestartTitle => 'One more restart is required';
-
-  @override
-  String get backupRestoreColdRestartContent =>
-      'Kelivo reached a recoverable restore state. Restart once more so settings can be verified from a fresh process before your data is opened.';
-
-  @override
-  String get backupRestoreColdRestartButton => 'Restart Kelivo';
-
-  @override
   String get backupRestoreRolledBackTitle => 'Restore was rolled back';
 
   @override

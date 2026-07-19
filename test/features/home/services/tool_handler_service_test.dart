@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'dart:convert';
 
 import 'package:flutter/widgets.dart';
@@ -48,9 +49,11 @@ void main() {
         assistantId: assistant.id,
         content: 'old memory',
       );
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(createBusinessTestPreferences()),
+            assistant,
+          )!;
 
       result = await handler('edit_memory', {
         'id': memory.id,
@@ -80,9 +83,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(createBusinessTestPreferences()),
+            assistant,
+          )!;
 
       final result = await handler('edit_memory', {
         'id': 410,
@@ -117,9 +122,11 @@ void main() {
       );
 
       final context = tester.element(find.byType(SizedBox));
-      final handler = ToolHandlerService(
-        contextProvider: context,
-      ).buildToolCallHandler(SettingsProvider(), assistant)!;
+      final handler = ToolHandlerService(contextProvider: context)
+          .buildToolCallHandler(
+            SettingsProvider(createBusinessTestPreferences()),
+            assistant,
+          )!;
 
       final result = await handler('edit_memory', {
         'id': 410,
@@ -146,12 +153,18 @@ class _ToolHandlerTestScope extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AssistantProvider>(
-          create: (_) => AssistantProvider(),
+          create: (_) =>
+              AssistantProvider(preferences: createBusinessTestPreferences()),
         ),
-        ChangeNotifierProvider<McpProvider>(create: (_) => McpProvider()),
+        ChangeNotifierProvider<McpProvider>(
+          create: (_) =>
+              McpProvider(preferences: createBusinessTestPreferences()),
+        ),
         ChangeNotifierProvider<McpToolService>(create: (_) => McpToolService()),
         ChangeNotifierProvider<MemoryProvider>(
-          create: (_) => memoryProvider ?? MemoryProvider(),
+          create: (_) =>
+              memoryProvider ??
+              MemoryProvider(preferences: createBusinessTestPreferences()),
         ),
       ],
       child: child,
@@ -160,6 +173,9 @@ class _ToolHandlerTestScope extends StatelessWidget {
 }
 
 class _ThrowingMemoryProvider extends MemoryProvider {
+  _ThrowingMemoryProvider()
+    : super(preferences: createBusinessTestPreferences());
+
   @override
   Future<AssistantMemory?> update({required int id, required String content}) {
     throw StateError('storage offline');

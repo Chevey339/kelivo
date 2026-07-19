@@ -1,7 +1,7 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/providers/assistant_provider.dart';
@@ -14,16 +14,15 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 
 const _assistantId = 'assistant-mcp-test';
 
-void _seedPreferences() {
-  SharedPreferences.setMockInitialValues({
-    'assistants_v1': Assistant.encodeList(const [
-      Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
-    ]),
-  });
-}
-
 Future<AssistantProvider> _createAssistantProvider(WidgetTester tester) async {
-  final provider = AssistantProvider();
+  final harness = await createBusinessTestHarness(
+    initial: {
+      'assistants_v1': Assistant.encodeList(const [
+        Assistant(id: _assistantId, name: 'Test Assistant', temperature: 0.6),
+      ]),
+    },
+  );
+  final provider = AssistantProvider(preferences: harness.preferences);
   for (var i = 0; i < 25; i++) {
     if (provider.getById(_assistantId) != null) return provider;
     await tester.pump(const Duration(milliseconds: 10));
@@ -37,10 +36,18 @@ Widget _buildHarness({
 }) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => SettingsProvider()),
+      ChangeNotifierProvider(
+        create: (_) => SettingsProvider(assistantProvider.preferences),
+      ),
       ChangeNotifierProvider.value(value: assistantProvider),
-      ChangeNotifierProvider(create: (_) => MemoryProvider()),
-      ChangeNotifierProvider(create: (_) => QuickPhraseProvider()),
+      ChangeNotifierProvider(
+        create: (_) =>
+            MemoryProvider(preferences: assistantProvider.preferences),
+      ),
+      ChangeNotifierProvider(
+        create: (_) =>
+            QuickPhraseProvider(preferences: assistantProvider.preferences),
+      ),
     ],
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -54,7 +61,6 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('assistant edit page shows MCP tab on mobile', (tester) async {
-    _seedPreferences();
     final assistantProvider = await _createAssistantProvider(tester);
 
     await tester.pumpWidget(
@@ -72,7 +78,6 @@ void main() {
   testWidgets('assistant local tools page uses clock icon for time info', (
     tester,
   ) async {
-    _seedPreferences();
     final assistantProvider = await _createAssistantProvider(tester);
 
     await tester.pumpWidget(
@@ -104,7 +109,6 @@ void main() {
   });
 
   testWidgets('assistant desktop dialog shows MCP menu item', (tester) async {
-    _seedPreferences();
     final assistantProvider = await _createAssistantProvider(tester);
 
     await tester.pumpWidget(

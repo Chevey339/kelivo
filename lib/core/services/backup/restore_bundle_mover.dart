@@ -10,8 +10,6 @@ import 'restore_previous_builder.dart';
 import 'restore_previous_plan.dart';
 import 'restore_previous_store.dart';
 import 'restore_receipt.dart';
-import 'restore_settings_store.dart';
-import 'restore_settings_transition.dart';
 
 /// Performs only descriptor-guarded, same-volume bundle moves.
 final class RestoreBundleMover {
@@ -38,20 +36,15 @@ final class RestoreBundleMover {
     if (plan.assets != null) {
       await _movePreviousAssets(plan.assets!);
     }
-    if (plan.database != null) {
-      await _movePreviousDatabase(plan.database!);
-    }
+    await _movePreviousDatabase(plan.database);
     await previousStore.validateComplete(previous);
   }
 
   Future<void> installCandidate({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
-    required RestoreSettingsTransition settingsTransition,
-    required RestoreSettingsStore settingsStore,
   }) async {
     _requireCandidateBinding(receipt, candidate);
-    await settingsStore.apply(settingsTransition);
     if (receipt.selectedComponents.contains(RestoreComponent.database)) {
       final descriptor = candidate.entries[_databaseEntry];
       if (descriptor == null || candidate.databaseInfo == null) {
@@ -84,17 +77,9 @@ final class RestoreBundleMover {
   Future<void> validateInstalled({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
-    required RestoreSettingsTransition settingsTransition,
-    required RestoreSettingsStore settingsStore,
     required PersistedRestorePrevious previous,
-    bool repairSettings = true,
   }) async {
     _requireCandidateBinding(receipt, candidate);
-    if (repairSettings) {
-      await settingsStore.apply(settingsTransition);
-    } else {
-      await settingsStore.validateTarget(settingsTransition);
-    }
     if (receipt.selectedComponents.contains(RestoreComponent.database)) {
       final descriptor = candidate.entries[_databaseEntry]!;
       final source = File(
@@ -149,8 +134,6 @@ final class RestoreBundleMover {
   Future<void> validateRollbackStart({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
-    required RestoreSettingsTransition settingsTransition,
-    required RestoreSettingsStore settingsStore,
     required PersistedRestorePrevious previous,
   }) async {
     if (receipt.state != RestoreReceiptState.oldRenamed &&
@@ -160,10 +143,9 @@ final class RestoreBundleMover {
     }
     _requireCandidateBinding(receipt, candidate);
     await previousStore.validateComplete(previous);
-    await settingsStore.validateRecoverable(settingsTransition);
     if (receipt.selectedComponents.contains(RestoreComponent.database)) {
       final descriptor = candidate.entries[_databaseEntry];
-      if (descriptor == null || previous.plan.database == null) {
+      if (descriptor == null) {
         throw StateError('restore_mover_rollback_database');
       }
       await _requireNewDatabaseSplit(
@@ -195,10 +177,7 @@ final class RestoreBundleMover {
   Future<void> rollbackToPrevious({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
-    required RestoreSettingsTransition settingsTransition,
-    required RestoreSettingsStore settingsStore,
     required PersistedRestorePrevious previous,
-    bool repairSettings = true,
   }) async {
     if (receipt.state != RestoreReceiptState.rollingBack &&
         receipt.state != RestoreReceiptState.rolledBack) {
@@ -208,7 +187,7 @@ final class RestoreBundleMover {
     if (receipt.selectedComponents.contains(RestoreComponent.database)) {
       final descriptor = candidate.entries[_databaseEntry];
       final oldDatabase = previous.plan.database;
-      if (descriptor == null || oldDatabase == null) {
+      if (descriptor == null) {
         throw StateError('restore_mover_rollback_database');
       }
       await _rollbackDatabase(
@@ -233,16 +212,11 @@ final class RestoreBundleMover {
         );
       }
     }
-    if (repairSettings) {
-      await settingsStore.rollback(settingsTransition);
-    }
   }
 
   Future<void> validateRolledBack({
     required RestoreReceipt receipt,
     required ValidatedRestoreCandidate candidate,
-    required RestoreSettingsTransition settingsTransition,
-    required RestoreSettingsStore settingsStore,
     required PersistedRestorePrevious previous,
   }) async {
     if (receipt.state != RestoreReceiptState.rollingBack &&
@@ -250,7 +224,6 @@ final class RestoreBundleMover {
       throw StateError('restore_mover_rollback_state');
     }
     _requireCandidateBinding(receipt, candidate);
-    await settingsStore.validateBefore(settingsTransition);
     await RestorePreviousBuilder.validateLive(
       appDataDirectory: appDataDirectory,
       expected: previous.plan,

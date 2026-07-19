@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/home/controllers/home_page_controller.dart';
@@ -16,7 +17,9 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          ),
           ChangeNotifierProvider(create: (_) => ChatService()),
         ],
         child: MaterialApp(

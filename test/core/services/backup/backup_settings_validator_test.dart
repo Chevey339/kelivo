@@ -23,6 +23,10 @@ void main() {
 
     test('accepts supported preference values and ignores local-only keys', () {
       expect(
+        BackupSettingsValidator.isLocalOnly('flutter_log_enabled_v1'),
+        isTrue,
+      );
+      expect(
         () => BackupSettingsValidator.validate({
           'bool': true,
           'int': 1,
@@ -30,9 +34,14 @@ void main() {
           'string': 'value',
           'list': ['a', 'b'],
           'window_width_v1': {'not': 'persistable'},
+          'flutter_log_enabled_v1': {'not': 'persistable'},
+          'restore_future_marker': {'not': 'persistable'},
+          'pinned_chat_ids': {'not': 'persistable'},
+          'provider_configs_backup_v1': {'not': 'persistable'},
         }),
         returnsNormally,
       );
+      expect(BackupSettingsValidator.isDiscarded('pinned_chat_ids'), isTrue);
     });
 
     test('rejects malformed structured settings and unsupported values', () {

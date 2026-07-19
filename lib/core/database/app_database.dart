@@ -359,6 +359,175 @@ class GenerationRunRows extends Table {
   ];
 }
 
+class AssistantRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class ProviderRows extends Table {
+  TextColumn get providerKey => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {providerKey};
+}
+
+class ProviderGroupRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class McpServerRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class WorldBookRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(
+  name: 'idx_assistant_memories_assistant',
+  columns: {#assistantId, #id},
+)
+class AssistantMemoryRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get assistantId => text()();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class QuickPhraseRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class SearchServiceRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class TtsServiceRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class InstructionInjectionRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class AssistantTagRows extends Table {
+  TextColumn get id => text()();
+  IntColumn get sortOrder =>
+      integer()
+      // ignore: recursive_getters
+      .check(sortOrder.isBiggerOrEqualValue(0))();
+  TextColumn get payload => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class PreferenceRows extends Table {
+  TextColumn get key => text()();
+  TextColumn get value => text()();
+  IntColumn get updatedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {key};
+}
+
 @DriftDatabase(
   tables: [
     ConversationRows,
@@ -372,6 +541,18 @@ class GenerationRunRows extends Table {
     MigrationRunRows,
     MigrationIssueRows,
     GenerationRunRows,
+    AssistantRows,
+    ProviderRows,
+    ProviderGroupRows,
+    McpServerRows,
+    WorldBookRows,
+    AssistantMemoryRows,
+    QuickPhraseRows,
+    SearchServiceRows,
+    TtsServiceRows,
+    InstructionInjectionRows,
+    AssistantTagRows,
+    PreferenceRows,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -379,9 +560,9 @@ class AppDatabase extends _$AppDatabase {
 
   static const databaseFileName = 'kelivo.db';
 
-  // Schema 11 is the first release-candidate SQLite contract. It deliberately
-  // separates the final format from every unpublished schema 1-10 database.
-  static const currentSchemaVersion = 11;
+  // Schema 1 is the first published SQLite contract. Every other non-zero
+  // version belongs to an unpublished or future format and is rejected.
+  static const currentSchemaVersion = 1;
   // Keep SQLite's established 1000-page cadence explicit. At the usual 4 KiB
   // page size this starts a checkpoint around 4 MiB, but page size remains the
   // source of truth.

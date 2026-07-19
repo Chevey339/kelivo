@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
@@ -19,8 +20,13 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
-          ChangeNotifierProvider(create: (_) => SettingsProvider()),
-          ChangeNotifierProvider(create: (_) => UserProvider()),
+          ChangeNotifierProvider(
+            create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                UserProvider(preferences: createBusinessTestPreferences()),
+          ),
         ],
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

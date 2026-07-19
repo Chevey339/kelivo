@@ -1,3 +1,4 @@
+import "../../../support/business_test_harness.dart";
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +17,7 @@ import 'package:Kelivo/l10n/app_localizations.dart';
 
 Widget _harness(StatsSnapshot snapshot) {
   return ChangeNotifierProvider(
-    create: (_) => SettingsProvider(),
+    create: (_) => SettingsProvider(createBusinessTestPreferences()),
     child: MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -65,6 +66,8 @@ StatsSnapshot _snapshot({
 }
 
 class _StableSettingsProvider extends SettingsProvider {
+  _StableSettingsProvider() : super(createBusinessTestPreferences());
+
   @override
   Map<String, ProviderConfig> get providerConfigs => const {};
 
@@ -73,6 +76,9 @@ class _StableSettingsProvider extends SettingsProvider {
 }
 
 class _StableAssistantProvider extends AssistantProvider {
+  _StableAssistantProvider()
+    : super(preferences: createBusinessTestPreferences());
+
   @override
   List<Assistant> get assistants => const [];
 }

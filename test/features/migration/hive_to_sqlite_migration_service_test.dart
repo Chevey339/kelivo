@@ -46,6 +46,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'provider_configs_v1': '{"openai":{"apiKey":"test-key"}}',
       'display_chat_font_scale_v1': 1.3,
+      'pinned_chat_ids': 'discarded-chat-id',
     });
   });
 
@@ -152,6 +153,7 @@ void main() {
     expect(settingsJson, contains('provider_configs_v1'));
     expect(settingsJson, contains('test-key'));
     expect(settingsJson, isNot(contains('display_chat_font_scale_v1')));
+    expect(settingsJson, isNot(contains('pinned_chat_ids')));
     final chatsEntry = archive.findFile('chats.json');
     expect(chatsEntry, isNotNull);
     final chatsJson = String.fromCharCodes(chatsEntry!.readBytes()!);

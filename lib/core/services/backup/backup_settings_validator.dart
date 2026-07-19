@@ -1,25 +1,21 @@
 import 'dart:convert';
 
-/// Pure validation shared by backup preflight and preference restoration.
+import '../../database/business_settings_router.dart';
+
+/// Pure validation shared by backup preflight and business-data restoration.
 final class BackupSettingsValidator {
   BackupSettingsValidator._();
 
-  static const _localOnlyKeys = {
-    'window_width_v1',
-    'window_height_v1',
-    'window_pos_x_v1',
-    'window_pos_y_v1',
-    'window_maximized_v1',
-    'display_chat_font_scale_v1',
-    'desktop_hotkeys_commands_v1',
-    'desktop_hotkeys_enabled_v1',
-  };
   static const _jsonListKeys = {
     'assistants_v1',
     'assistant_memories_v1',
     'mcp_servers_v1',
     'provider_groups_v1',
+    'world_books_v1',
+    'quick_phrases_v1',
     'search_services_v1',
+    'tts_services_v1',
+    'instruction_injections_v1',
     'assistant_tags_v1',
   };
   static const _jsonMapKeys = {
@@ -43,7 +39,13 @@ final class BackupSettingsValidator {
     'providers_order_v1',
   };
 
-  static bool isLocalOnly(String key) => _localOnlyKeys.contains(key);
+  static bool isLocalOnly(String key) =>
+      BusinessKeyRegistry.classify(key) == BusinessKeyDisposition.localOnly;
+
+  static bool isDiscarded(String key) =>
+      BusinessKeyRegistry.classify(key) == BusinessKeyDisposition.discarded;
+
+  static bool shouldIgnore(String key) => isLocalOnly(key) || isDiscarded(key);
 
   static void normalizeAndValidate(Map<String, dynamic> data) {
     normalizeLegacyStringLists(data);
@@ -68,7 +70,7 @@ final class BackupSettingsValidator {
 
   static void validate(Map<String, dynamic> data) {
     for (final entry in data.entries) {
-      if (isLocalOnly(entry.key)) continue;
+      if (shouldIgnore(entry.key)) continue;
       validateValue(entry.key, entry.value);
     }
   }
