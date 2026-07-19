@@ -652,6 +652,10 @@
   "homePageClearContext": "清空上下文",
   "homePageClearContextWithCount": "清空上下文 ({actual}/{configured})",
   "homePageDefaultAssistant": "默认助手",
+  "svgSaveFile": "下载 SVG",
+  "svgSaveSuccess": "SVG 已保存",
+  "svgSaveFailed": "保存失败",
+  "svgSaveDialogTitle": "保存 SVG",
   "mermaidExportPng": "导出 PNG",
   "mermaidExportFailed": "导出失败",
   "mermaidImageTab": "图片",
@@ -2150,5 +2154,60 @@
   "documentProcessingResetDefault": "重置为默认",
   "@documentProcessingResetDefault": {
     "description": "将文档处理设置重置为默认值"
+  "multiAIConversationMode": "对话模式",
+  "@multiAIConversationMode": {
+    "description": "多 AI 卡片组中的对话模式切换行标签"
+  },
+  "multiAIContinue": "继续",
+  "@multiAIContinue": {
+    "description": "多 AI 对话中继续模式的按钮标签"
+  },
+  "multiAIContinueHint": "继续多模型对话，每个模型继承原有上下文",
+  "@multiAIContinueHint": {
+    "description": "继续模式按钮的提示"
+  },
+  "multiAISynthesize": "合成",
+  "@multiAISynthesize": {
+    "description": "多 AI 对话中合成模式的按钮标签"
+  },
+  "multiAISynthesizeHint": "将多模型对话合成为一个回复",
+  "@multiAISynthesizeHint": {
+    "description": "合成模式按钮的提示"
+  },
+  "multiAISynthesizeTaskSummarize": "总结",
+  "@multiAISynthesizeTaskSummarize": {
+    "description": "总结合成任务标签"
+  },
+  "multiAISynthesizeTaskSummarizeDesc": "总结对话，聚焦各模型回复的异同",
+  "@multiAISynthesizeTaskSummarizeDesc": {
+    "description": "总结合成任务描述"
+  },
+  "multiAISynthesizeTaskFuse": "融合",
+  "@multiAISynthesizeTaskFuse": {
+    "description": "融合合成任务标签"
+  },
+  "multiAISynthesizeTaskFuseDesc": "综合各模型观点，给出一个最佳回复",
+  "@multiAISynthesizeTaskFuseDesc": {
+    "description": "融合合成任务描述"
+  },
+  "multiAISynthesizeTaskComment": "点评",
+  "@multiAISynthesizeTaskComment": {
+    "description": "点评合成任务标签"
+  },
+  "multiAISynthesizeTaskCommentDesc": "点评不同模型的观点分歧",
+  "@multiAISynthesizeTaskCommentDesc": {
+    "description": "点评合成任务描述"
+  },
+  "multiAISynthesizeSummarizePrompt": "请总结以下对话，聚焦各助手回复的异同之处。",
+  "@multiAISynthesizeSummarizePrompt": {
+    "description": "总结合成任务的默认提示词"
+  },
+  "multiAISynthesizeFusePrompt": "请总结以下对话，并基于各方回复给出一个综合性的回答。",
+  "@multiAISynthesizeFusePrompt": {
+    "description": "融合合成任务的默认提示词"
+  },
+  "multiAISynthesizeCommentPrompt": "请点评各模型的不同观点。",
+  "@multiAISynthesizeCommentPrompt": {
+    "description": "点评合成任务的默认提示词"
   }
 }

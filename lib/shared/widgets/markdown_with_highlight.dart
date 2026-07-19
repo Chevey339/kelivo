@@ -488,7 +488,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
         } else if (lang.toLowerCase() == 'plantuml') {
           return PlantUMLBlock(code: restoredCode);
         } else if (lang.toLowerCase() == 'svg') {
-          return SvgPreviewBlock(code: restoredCode);
+          return SvgPreviewBlock(
+            code: restoredCode,
+            streaming: widget.streaming && !closed,
+          );
         }
         return _CollapsibleCodeBlock(
           language: lang,
@@ -4300,7 +4303,7 @@ class FencedCodeBlockMd extends BlockMd {
     } else if (langLower == 'plantuml') {
       return PlantUMLBlock(code: code);
     } else if (langLower == 'svg') {
-      return SvgPreviewBlock(code: code);
+      return SvgPreviewBlock(code: code, streaming: isStreamingFence);
     }
     return _CollapsibleCodeBlock(
       language: lang,

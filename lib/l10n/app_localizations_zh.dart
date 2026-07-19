@@ -456,6 +456,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homePageDefaultAssistant => '默认助手';
 
   @override
+  String get svgSaveFile => '下载 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已保存';
+
+  @override
+  String get svgSaveFailed => '保存失败';
+
+  @override
+  String get svgSaveDialogTitle => '保存 SVG';
+
+  @override
   String get mermaidExportPng => '导出 PNG';
 
   @override
@@ -5542,6 +5554,46 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get documentProcessingResetDefault => '重置为默认';
+  String get multiAIConversationMode => '对话模式';
+
+  @override
+  String get multiAIContinue => '继续';
+
+  @override
+  String get multiAIContinueHint => '继续多模型对话，每个模型继承原有上下文';
+
+  @override
+  String get multiAISynthesize => '合成';
+
+  @override
+  String get multiAISynthesizeHint => '将多模型对话合成为一个回复';
+
+  @override
+  String get multiAISynthesizeTaskSummarize => '总结';
+
+  @override
+  String get multiAISynthesizeTaskSummarizeDesc => '总结对话，聚焦各模型回复的异同';
+
+  @override
+  String get multiAISynthesizeTaskFuse => '融合';
+
+  @override
+  String get multiAISynthesizeTaskFuseDesc => '综合各模型观点，给出一个最佳回复';
+
+  @override
+  String get multiAISynthesizeTaskComment => '点评';
+
+  @override
+  String get multiAISynthesizeTaskCommentDesc => '点评不同模型的观点分歧';
+
+  @override
+  String get multiAISynthesizeSummarizePrompt => '请总结以下对话，聚焦各助手回复的异同之处。';
+
+  @override
+  String get multiAISynthesizeFusePrompt => '请总结以下对话，并基于各方回复给出一个综合性的回答。';
+
+  @override
+  String get multiAISynthesizeCommentPrompt => '请点评各模型的不同观点。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -5994,6 +6046,18 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get homePageDefaultAssistant => '默认助手';
+
+  @override
+  String get svgSaveFile => '下载 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已保存';
+
+  @override
+  String get svgSaveFailed => '保存失败';
+
+  @override
+  String get svgSaveDialogTitle => '保存 SVG';
 
   @override
   String get mermaidExportPng => '导出 PNG';
@@ -11082,6 +11146,46 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get documentProcessingResetDefault => '重置为默认';
+  String get multiAIConversationMode => '对话模式';
+
+  @override
+  String get multiAIContinue => '继续';
+
+  @override
+  String get multiAIContinueHint => '继续多模型对话，每个模型继承原有上下文';
+
+  @override
+  String get multiAISynthesize => '合成';
+
+  @override
+  String get multiAISynthesizeHint => '将多模型对话合成为一个回复';
+
+  @override
+  String get multiAISynthesizeTaskSummarize => '总结';
+
+  @override
+  String get multiAISynthesizeTaskSummarizeDesc => '总结对话，聚焦各模型回复的异同';
+
+  @override
+  String get multiAISynthesizeTaskFuse => '融合';
+
+  @override
+  String get multiAISynthesizeTaskFuseDesc => '综合各模型观点，给出一个最佳回复';
+
+  @override
+  String get multiAISynthesizeTaskComment => '点评';
+
+  @override
+  String get multiAISynthesizeTaskCommentDesc => '点评不同模型的观点分歧';
+
+  @override
+  String get multiAISynthesizeSummarizePrompt => '请总结以下对话，聚焦各助手回复的异同之处。';
+
+  @override
+  String get multiAISynthesizeFusePrompt => '请总结以下对话，并基于各方回复给出一个综合性的回答。';
+
+  @override
+  String get multiAISynthesizeCommentPrompt => '请点评各模型的不同观点。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -11534,6 +11638,18 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get homePageDefaultAssistant => '預設助理';
+
+  @override
+  String get svgSaveFile => '下載 SVG';
+
+  @override
+  String get svgSaveSuccess => 'SVG 已儲存';
+
+  @override
+  String get svgSaveFailed => '儲存失敗';
+
+  @override
+  String get svgSaveDialogTitle => '儲存 SVG';
 
   @override
   String get mermaidExportPng => '匯出 PNG';
@@ -16622,4 +16738,44 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get documentProcessingResetDefault => '重設為預設';
+  String get multiAIConversationMode => '對話模式';
+
+  @override
+  String get multiAIContinue => '繼續';
+
+  @override
+  String get multiAIContinueHint => '繼續多模型對話，每個模型繼承原有上下文';
+
+  @override
+  String get multiAISynthesize => '合成';
+
+  @override
+  String get multiAISynthesizeHint => '將多模型對話合成為一個回覆';
+
+  @override
+  String get multiAISynthesizeTaskSummarize => '總結';
+
+  @override
+  String get multiAISynthesizeTaskSummarizeDesc => '總結對話，聚焦各模型回覆的異同';
+
+  @override
+  String get multiAISynthesizeTaskFuse => '融合';
+
+  @override
+  String get multiAISynthesizeTaskFuseDesc => '綜合各模型觀點，給出一個最佳回覆';
+
+  @override
+  String get multiAISynthesizeTaskComment => '點評';
+
+  @override
+  String get multiAISynthesizeTaskCommentDesc => '點評不同模型的觀點分歧';
+
+  @override
+  String get multiAISynthesizeSummarizePrompt => '請總結以下對話，聚焦各助手回覆的異同之處。';
+
+  @override
+  String get multiAISynthesizeFusePrompt => '請總結以下對話，並基於各方回覆給出一個綜合性的回答。';
+
+  @override
+  String get multiAISynthesizeCommentPrompt => '請點評各模型的不同觀點。';
 }
