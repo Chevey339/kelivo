@@ -767,10 +767,15 @@ class HomePageController extends ChangeNotifier {
     // Allow retry of the last subgroup assistant message.
     if (message.id == lastAssistant.id) return true;
 
-    // Allow retry of the user message immediately before the last assistant.
+    // Allow retry of the user message preceding the last assistant round.
+    // Walk backwards past sibling assistants to find the anchor user.
     if (lastAssistantIdx != null && lastAssistantIdx > 0) {
-      final preceding = msgs[lastAssistantIdx - 1];
-      if (preceding.role == 'user' && message.id == preceding.id) return true;
+      for (int i = lastAssistantIdx - 1; i >= 0; i--) {
+        if (msgs[i].role == 'user') {
+          if (message.id == msgs[i].id) return true;
+          break; // 找到第一个 user 就停，不穿透到更早轮次
+        }
+      }
     }
 
     return false;

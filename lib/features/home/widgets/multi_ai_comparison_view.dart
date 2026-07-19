@@ -8,6 +8,7 @@ import '../../chat/widgets/chat_message_widget.dart'
     show ChatMessageWidget, ReasoningSegment;
 import '../../chat/widgets/message_more_sheet.dart'
     show showMessageMoreSheet, MessageMoreAction;
+
 import '../controllers/home_page_controller.dart';
 
 /// Card container for a single multi-AI round (anchor).
@@ -43,6 +44,9 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
 
   @override
   void dispose() {
+    for (final sgId in widget.subgroupedMessages.keys) {
+      _SingleModelCardState.clearSelection(sgId);
+    }
     _pageCtrl.removeListener(_onPageChanged);
     _pageCtrl.dispose();
     super.dispose();
@@ -68,8 +72,7 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
         itemBuilder: (context, index) {
           final sgId = subgroups[index];
           final versions = widget.subgroupedMessages[sgId] ?? [];
-          final latest = versions.isNotEmpty ? versions.last : null;
-          if (latest == null) return const SizedBox.shrink();
+          if (versions.isEmpty) return const SizedBox.shrink();
 
           return Padding(
             padding: EdgeInsets.only(
@@ -77,7 +80,8 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
               left: index > 0 ? 8 : 0,
             ),
             child: _SingleModelCard(
-              message: latest,
+              key: ValueKey('single-model-$sgId'),
+              versions: versions,
               anchorUserMessageId: widget.anchorUserMessageId,
               controller: widget.controller,
               showActions: widget.isLatestRound,
@@ -90,25 +94,75 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
   }
 }
 
-class _SingleModelCard extends StatelessWidget {
+class _SingleModelCard extends StatefulWidget {
   const _SingleModelCard({
-    required this.message,
+    super.key,
+    required this.versions,
     required this.anchorUserMessageId,
     required this.controller,
     required this.showActions,
     required this.subgroupId,
   });
 
-  final ChatMessage message;
+  final List<ChatMessage> versions;
   final String anchorUserMessageId;
   final HomePageController controller;
   final bool showActions;
   final String subgroupId;
 
   @override
+  State<_SingleModelCard> createState() => _SingleModelCardState();
+}
+
+class _SingleModelCardState extends State<_SingleModelCard> {
+  static final Map<String, int> _selectedIdxByThread = {};
+
+  int get _selectedIdx {
+    final stored = _selectedIdxByThread[widget.subgroupId];
+    if (stored != null && stored >= 0 && stored < widget.versions.length) {
+      return stored;
+    }
+    return widget.versions.length - 1;
+  }
+
+  ChatMessage get _currentMessage => widget.versions[_selectedIdx];
+
+  void _selectVersion(int idx) {
+    if (idx < 0 || idx >= widget.versions.length) return;
+    _selectedIdxByThread[widget.subgroupId] = idx;
+    setState(() {});
+  }
+
+  static void clearSelection(String subgroupId) {
+    _selectedIdxByThread.remove(subgroupId);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SingleModelCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldLen = oldWidget.versions.length;
+    final newLen = widget.versions.length;
+    final subgId = widget.subgroupId;
+
+    if (newLen > oldLen) {
+      _selectedIdxByThread[subgId] = newLen - 1;
+      setState(() {});
+    } else if (newLen < oldLen) {
+      final stillExists = widget.versions.any(
+        (v) => v.id == oldWidget.versions[_selectedIdx].id,
+      );
+      if (!stillExists) {
+        _selectedIdxByThread[subgId] = newLen - 1;
+        setState(() {});
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    final message = _currentMessage;
 
     return Container(
       decoration: BoxDecoration(
@@ -159,22 +213,23 @@ class _SingleModelCard extends StatelessWidget {
                   ),
                 ],
                 const Spacer(),
-                if (showActions) ...[
+                if (widget.showActions) ...[
                   _ActionBtn(
                     icon: Lucide.X,
                     color: cs.error,
                     tooltip: l10n.multiAIDropThread,
-                    onTap: () =>
-                        controller.multiAIEngine.dropThread(subgroupId),
+                    onTap: () => widget.controller.multiAIEngine.dropThread(
+                      widget.subgroupId,
+                    ),
                   ),
                   const SizedBox(width: 4),
                   _ActionBtn(
                     icon: Lucide.Check,
                     color: cs.primary,
                     tooltip: l10n.multiAIAdoptVersion,
-                    onTap: () => controller.multiAIEngine.resolveThread(
-                      anchorId: anchorUserMessageId,
-                      threadId: subgroupId,
+                    onTap: () => widget.controller.multiAIEngine.resolveThread(
+                      anchorId: widget.anchorUserMessageId,
+                      threadId: widget.subgroupId,
                       version: message.version,
                     ),
                   ),
@@ -190,6 +245,8 @@ class _SingleModelCard extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
+    final controller = widget.controller;
+    final message = _currentMessage;
     final reasoning = controller.reasoning[message.id];
     final reasoningSegments = controller.reasoningSegments[message.id];
     final notifier = controller.streamingContentNotifier.getNotifier(
@@ -246,8 +303,14 @@ class _SingleModelCard extends StatelessWidget {
             message: streamingMsg,
             showTokenStats: false,
             showModelIcon: false,
-            versionIndex: null,
-            versionCount: null,
+            versionIndex: _selectedIdx,
+            versionCount: widget.versions.length,
+            onPrevVersion: _selectedIdx > 0
+                ? () => _selectVersion(_selectedIdx - 1)
+                : null,
+            onNextVersion: _selectedIdx < widget.versions.length - 1
+                ? () => _selectVersion(_selectedIdx + 1)
+                : null,
             reasoningText: mergedReasoning,
             reasoningExpanded: reasoning?.expanded ?? false,
             reasoningLoading:
@@ -268,8 +331,8 @@ class _SingleModelCard extends StatelessWidget {
             onRegenerate: () {
               if (controller.multiAIEngine.isActive) {
                 controller.retryMultiAIThread(
-                  threadId: subgroupId,
-                  anchorUserMsgId: anchorUserMessageId,
+                  threadId: widget.subgroupId,
+                  anchorUserMsgId: widget.anchorUserMessageId,
                   message: streamingMsg,
                 );
               } else {
