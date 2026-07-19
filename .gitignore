@@ -63,3 +63,4 @@ internationalization.md
 /.agent/
 /.agents/
 /skills-lock.json
+/.kilo
