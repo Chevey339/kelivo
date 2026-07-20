@@ -527,6 +527,25 @@ class ProactiveCareHeadlessChatStore {
     return _db!;
   }
 
+  /// Converts a raw SQLite value to [DateTime].
+  /// Drift 2.x stores DateTime as unix timestamp (seconds, INTEGER) by
+  /// default (`store_date_time_values_as_text` is false without build.yaml).
+  static DateTime _dateTimeFromSql(Object? value) {
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value * 1000);
+    }
+    // Fallback for ISO-8601 text (should not happen with default drift config)
+    return DateTime.parse(value as String);
+  }
+
+  static DateTime? _dateTimeFromSqlNullable(Object? value) {
+    if (value == null) return null;
+    return _dateTimeFromSql(value);
+  }
+
+  /// Converts [DateTime] to unix timestamp seconds for drift compatibility.
+  static int _dateTimeToSql(DateTime dt) => dt.millisecondsSinceEpoch ~/ 1000;
+
   /// Loads a single assistant by id from the `assistant_rows` table.
   static Future<Assistant?> loadAssistantFor(String assistantId) async {
     final db = await _ensureDb();
@@ -545,7 +564,7 @@ class ProactiveCareHeadlessChatStore {
     final db = await _ensureDb();
     db.execute(
       'UPDATE assistant_rows SET proactive_care_next_message_at = ? WHERE id = ?',
-      [nextCareTime.toIso8601String(), assistantId],
+      [_dateTimeToSql(nextCareTime), assistantId],
     );
   }
 
@@ -590,13 +609,14 @@ class ProactiveCareHeadlessChatStore {
       'presetMessages': jsonDecode(row['preset_messages_json'] as String),
       'regexRules': jsonDecode(row['regex_rules_json'] as String),
       'enableProactiveCare': (row['enable_proactive_care'] as int) != 0,
-      'proactiveCareNextMessageAt':
-          row['proactive_care_next_message_at'] as String?,
+      'proactiveCareNextMessageAt': _dateTimeFromSqlNullable(
+        row['proactive_care_next_message_at'],
+      )?.toIso8601String(),
       'proactiveCarePrompt': row['proactive_care_prompt'] as String,
       'proactiveCareDecisionPrompt':
           row['proactive_care_decision_prompt'] as String,
-      'createdAt': row['created_at'] as String,
-      'updatedAt': row['updated_at'] as String,
+      'createdAt': _dateTimeFromSql(row['created_at']).toIso8601String(),
+      'updatedAt': _dateTimeFromSql(row['updated_at']).toIso8601String(),
     });
   }
 
@@ -619,8 +639,8 @@ class ProactiveCareHeadlessChatStore {
     final conversation = Conversation(
       id: row['id'] as String,
       title: row['title'] as String,
-      createdAt: DateTime.parse(row['created_at'] as String),
-      updatedAt: DateTime.parse(row['updated_at'] as String),
+      createdAt: _dateTimeFromSql(row['created_at']),
+      updatedAt: _dateTimeFromSql(row['updated_at']),
       isPinned: (row['is_pinned'] as int) != 0,
       assistantId: row['assistant_id'] as String?,
       truncateIndex: row['truncate_index'] as int? ?? -1,
@@ -641,7 +661,7 @@ class ProactiveCareHeadlessChatStore {
           id: mRow['id'] as String,
           role: mRow['role'] as String,
           content: mRow['content'] as String,
-          timestamp: DateTime.parse(mRow['timestamp'] as String),
+          timestamp: _dateTimeFromSql(mRow['timestamp']),
           modelId: mRow['model_id'] as String?,
           providerId: mRow['provider_id'] as String?,
           totalTokens: mRow['total_tokens'] as int?,
@@ -682,7 +702,7 @@ class ProactiveCareHeadlessChatStore {
       providerId: providerId,
     );
 
-    // Insert message
+    // Insert message (id is always a fresh UUID, plain INSERT is safe)
     final msgCount =
         (db.select(
               'SELECT COUNT(*) as cnt FROM message_rows WHERE conversation_id = ?',
@@ -691,7 +711,7 @@ class ProactiveCareHeadlessChatStore {
             as int);
 
     db.execute(
-      '''INSERT OR REPLACE INTO message_rows
+      '''INSERT INTO message_rows
          (id, conversation_id, role, content, timestamp, model_id, provider_id,
           total_tokens, is_streaming, group_id, subgroup_id, version, message_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
@@ -700,7 +720,7 @@ class ProactiveCareHeadlessChatStore {
         convo.id,
         message.role,
         message.content,
-        message.timestamp.toIso8601String(),
+        _dateTimeToSql(message.timestamp),
         message.modelId,
         message.providerId,
         message.totalTokens,
@@ -712,24 +732,34 @@ class ProactiveCareHeadlessChatStore {
       ],
     );
 
-    // Update conversation
+    // Update conversation — use UPDATE for existing conversations to avoid
+    // INSERT OR REPLACE triggering ON DELETE CASCADE on message_rows.
     convo.updatedAt = DateTime.now();
-    db.execute(
-      '''INSERT OR REPLACE INTO conversation_rows
-         (id, title, created_at, updated_at, is_pinned, assistant_id,
-          truncate_index, version_selections_json)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-      [
+    if (conversation != null) {
+      // Existing conversation: only touch updated_at.
+      db.execute('UPDATE conversation_rows SET updated_at = ? WHERE id = ?', [
+        _dateTimeToSql(convo.updatedAt),
         convo.id,
-        convo.title,
-        convo.createdAt.toIso8601String(),
-        convo.updatedAt.toIso8601String(),
-        convo.isPinned ? 1 : 0,
-        convo.assistantId,
-        convo.truncateIndex,
-        jsonEncode(convo.versionSelections),
-      ],
-    );
+      ]);
+    } else {
+      // Brand-new conversation: safe to INSERT.
+      db.execute(
+        '''INSERT INTO conversation_rows
+           (id, title, created_at, updated_at, is_pinned, assistant_id,
+            truncate_index, version_selections_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+        [
+          convo.id,
+          convo.title,
+          _dateTimeToSql(convo.createdAt),
+          _dateTimeToSql(convo.updatedAt),
+          convo.isPinned ? 1 : 0,
+          convo.assistantId,
+          convo.truncateIndex,
+          jsonEncode(convo.versionSelections),
+        ],
+      );
+    }
 
     return (conversation: convo, message: message);
   }

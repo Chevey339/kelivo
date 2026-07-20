@@ -388,6 +388,23 @@ class ProactiveCareAlarmService {
     }
   }
 
+  /// Re-schedules alarms for all assistants that have proactive care enabled
+  /// and a future [proactiveCareNextMessageAt]. Call this on app startup to
+  /// recover alarms lost after force-stop or process death.
+  static Future<void> rescheduleAll(List<Assistant> assistants) async {
+    if (!_isAndroid) return;
+    for (final a in assistants) {
+      if (!a.enableProactiveCare) continue;
+      final at = a.proactiveCareNextMessageAt;
+      if (at == null || !at.isAfter(DateTime.now())) continue;
+      try {
+        await sync(a);
+      } catch (e) {
+        FlutterLogger.log('rescheduleAll failed for ${a.id}: $e', tag: _logTag);
+      }
+    }
+  }
+
   /// Ensures the exact alarm permission (Android 12+) and the notification
   /// permission (Android 13+) are granted, requesting them when missing.
   /// Requesting the exact alarm permission opens the system

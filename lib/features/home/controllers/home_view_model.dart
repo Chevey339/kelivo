@@ -1521,7 +1521,6 @@ class HomeViewModel extends ChangeNotifier {
     return _generationController.isReasoningEnabled(budget);
   }
 
-
   // ============================================================================
   // Proactive Care
   // ============================================================================
@@ -1542,8 +1541,13 @@ class HomeViewModel extends ChangeNotifier {
 
     final settings = _contextProvider.read<SettingsProvider>();
     final provKey =
-        assistant.chatModelProvider ?? settings.currentModelProvider;
-    final mdlId = assistant.chatModelId ?? settings.currentModelId;
+        settings.proactiveCareDecisionModelProvider ??
+        assistant.chatModelProvider ??
+        settings.currentModelProvider;
+    final mdlId =
+        settings.proactiveCareDecisionModelId ??
+        assistant.chatModelId ??
+        settings.currentModelId;
     if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
 

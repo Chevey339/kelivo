@@ -46,6 +46,7 @@ import 'dart:io'
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/proactive_care_alarm_service.dart';
+import 'core/services/proactive_care_message_flow.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final RouteObserver<ModalRoute<dynamic>> routeObserver =
@@ -255,6 +256,11 @@ class MyApp extends StatelessWidget {
                     if (mode != AndroidBackgroundChatMode.off) {
                       final l10n = AppLocalizations.of(context);
                       if (l10n == null) return;
+                      // Capture before any async gap to satisfy
+                      // use_build_context_synchronously.
+                      final allAssistants = context
+                          .read<AssistantProvider>()
+                          .assistants;
                       // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
                         final already =
@@ -278,6 +284,23 @@ class MyApp extends StatelessWidget {
                         if (Platform.isAndroid &&
                             ProactiveCareAlarmService.isSupported) {
                           await ProactiveCareAlarmService.initialize();
+                          // Persist l10n strings so the background isolate can
+                          // use localized text instead of English fallbacks.
+                          await ProactiveCareL10nSnapshot.save(
+                            defaultConversationTitle:
+                                l10n.chatServiceDefaultConversationTitle,
+                            carePromptDefault:
+                                l10n.assistantEditProactiveCarePromptDefault,
+                            decisionPromptDefault: l10n
+                                .assistantEditProactiveCareDecisionPromptDefault,
+                            failureNotificationBody:
+                                l10n.proactiveCareFailedNotificationBody,
+                          );
+                          // Recover alarms lost after force-stop or process
+                          // death by re-scheduling all enabled assistants.
+                          await ProactiveCareAlarmService.rescheduleAll(
+                            allAssistants,
+                          );
                         }
                       } catch (_) {}
                     }
