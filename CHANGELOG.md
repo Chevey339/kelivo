@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.9.1] - 2026-07-20
+
+### Added
+- Configurable focus-input hotkey (#60)
+
+### Fixed
+- Ensure assistant loaded before message generation to prevent system prompt race (#63)
+- Gate input unfocus on resume to iOS only (#62)
+- Markdown image regex stack overflow (definitive fix) (#61)
+
 ## [1.9.0] - 2026-07-19
 
 > ⚠️ **Image generation users must update**

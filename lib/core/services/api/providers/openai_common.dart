@@ -645,9 +645,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
         (internalMediaPaths.isNotEmpty ||
             (isLastUser && userMediaPaths?.isNotEmpty == true));
 
-    if (!hasMarkdownImages &&
-        !hasCustomImages &&
-        !hasAnyMediaAttachments) {
+    if (!hasMarkdownImages && !hasCustomImages && !hasAnyMediaAttachments) {
       outMsg['content'] = raw;
       out.add(outMsg);
       continue;

@@ -24,7 +24,8 @@ class ModelGrouping {
     if (id.contains('claude-3.5')) return 'Claude 3.5';
     if (id.contains('claude-3')) return 'Claude 3';
     if (id.contains('deepseek')) return 'DeepSeek';
-    if (id.contains('kimi') || RegExp(r'(?:^|[-_/])k3(?:$|[-.])').hasMatch(id)) {
+    if (id.contains('kimi') ||
+        RegExp(r'(?:^|[-_/])k3(?:$|[-.])').hasMatch(id)) {
       return 'Kimi';
     }
     if (RegExp(r'qwen|qwq|qvq|dashscope').hasMatch(id)) return 'Qwen';
