@@ -762,10 +762,7 @@ class ChatActions {
     }
 
     final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
-    final assistantId = assistant?.id;
+    final assistantProvider = contextProvider.read<AssistantProvider>();
     // Capture approval service reference before async gap
     ToolApprovalService? approvalService;
     AskUserInteractionService? askUserService;
@@ -775,6 +772,13 @@ class ChatActions {
     try {
       askUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
+    try {
+      await assistantProvider.loaded;
+    } catch (e) {
+      return ChatActionResult.error(e.toString());
+    }
+    final assistant = assistantProvider.currentAssistant;
+    final assistantId = assistant?.id;
     final modelConfig = messageGenerationService.getModelConfig(
       settings,
       assistant,
@@ -961,9 +965,7 @@ class ChatActions {
   }) async {
     // Avoid using BuildContext across async gaps (this class holds a BuildContext).
     final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
+    final assistantProvider = contextProvider.read<AssistantProvider>();
     // Capture approval service reference before async gap
     ToolApprovalService? regenApprovalService;
     AskUserInteractionService? regenAskUserService;
@@ -973,6 +975,12 @@ class ChatActions {
     try {
       regenAskUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
+    try {
+      await assistantProvider.loaded;
+    } catch (e) {
+      return ChatActionResult.error(e.toString());
+    }
+    final assistant = assistantProvider.currentAssistant;
 
     await cancelStreaming(conversation);
 
@@ -1175,9 +1183,7 @@ class ChatActions {
     bool allowImagesApiRouting = true,
   }) async {
     final settings = contextProvider.read<SettingsProvider>();
-    final assistant = contextProvider
-        .read<AssistantProvider>()
-        .currentAssistant;
+    final assistantProvider = contextProvider.read<AssistantProvider>();
     ToolApprovalService? approvalService;
     AskUserInteractionService? askUserService;
     try {
@@ -1186,6 +1192,12 @@ class ChatActions {
     try {
       askUserService = contextProvider.read<AskUserInteractionService>();
     } catch (_) {}
+    try {
+      await assistantProvider.loaded;
+    } catch (e) {
+      return ChatActionResult.error(e.toString());
+    }
+    final assistant = assistantProvider.currentAssistant;
 
     final visibleIndex = _messages.indexWhere(
       (candidate) => candidate.id == message.id,

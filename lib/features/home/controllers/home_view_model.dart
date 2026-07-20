@@ -371,6 +371,7 @@ class HomeViewModel extends ChangeNotifier {
     );
 
     if (!result.success) {
+      isProcessingFiles.value = false;
       if (result.errorMessage == 'no_model') {
         onWarning?.call('no_model');
       } else if (result.errorMessage != 'empty_input') {
@@ -748,6 +749,13 @@ class HomeViewModel extends ChangeNotifier {
     isProcessingFiles.value = false;
 
     final ap = _contextProvider.read<AssistantProvider>();
+    try {
+      await ap.loaded;
+    } catch (e) {
+      onError?.call(e.toString());
+      return;
+    }
+    if (!_contextProvider.mounted) return;
     final assistantId = ap.currentAssistantId;
     final a = ap.currentAssistant;
 
@@ -797,6 +805,13 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     final ap = _contextProvider.read<AssistantProvider>();
+    try {
+      await ap.loaded;
+    } catch (e) {
+      onError?.call(e.toString());
+      return;
+    }
+    if (!_contextProvider.mounted) return;
     final conversation = await _chatService.createDraftConversation(
       title: AppLocalizations.of(_contextProvider)!.temporaryChatTitle,
       assistantId: ap.currentAssistantId,

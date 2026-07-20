@@ -153,7 +153,7 @@ void main() {
     addTearDown(reminders.dispose);
 
     await Future.wait(<Future<void>>[
-      _nextNotification(assistants),
+      assistants.loaded,
       _nextNotification(tags),
       _nextNotification(groups),
     ]);
@@ -198,7 +198,7 @@ void main() {
     addTearDown(restoredReminders.dispose);
 
     await Future.wait(<Future<void>>[
-      _nextNotification(restoredAssistants),
+      restoredAssistants.loaded,
       _nextNotification(restoredTags),
       _nextNotification(restoredUser),
       _nextNotification(restoredGroups),

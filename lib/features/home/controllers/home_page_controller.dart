@@ -606,6 +606,7 @@ class HomePageController extends ChangeNotifier {
   Future<void> initChat() async {
     final prefs = _context.read<SettingsProvider>();
     final assistantProvider = _context.read<AssistantProvider>();
+    await assistantProvider.loaded;
     await _chatService.init();
     if (prefs.newChatOnLaunch) {
       await _createNewConversation();

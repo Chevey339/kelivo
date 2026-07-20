@@ -35,11 +35,15 @@ class AssistantProvider extends ChangeNotifier {
   bool get currentSearchEnabled => currentAssistant?.searchEnabled ?? false;
 
   AssistantProvider({required this.preferences, this.chatService}) {
-    _load();
+    loaded = _load();
   }
 
+  late final Future<void> loaded;
+
   Future<void> _load() async {
-    await preferences.load();
+    if (!preferences.isLoaded) {
+      await preferences.load();
+    }
     final raw = preferences.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
       _assistants
@@ -87,7 +91,8 @@ class AssistantProvider extends ChangeNotifier {
     // Do not create defaults here because localization is not available.
     // Defaults will be ensured later via ensureDefaults(context).
     // Restore current assistant if present
-    final savedId = preferences.getString(_currentAssistantKey);
+    final savedValue = preferences.get(_currentAssistantKey);
+    final savedId = savedValue is String ? savedValue : null;
     if (savedId != null && _assistants.any((a) => a.id == savedId)) {
       _currentAssistantId = savedId;
     } else {
@@ -119,6 +124,7 @@ class AssistantProvider extends ChangeNotifier {
 
   // Ensure localized default assistants exist; call this after localization is ready.
   Future<void> ensureDefaults(dynamic context) async {
+    await loaded;
     if (_assistants.isNotEmpty) return;
     final l10n = AppLocalizations.of(context)!;
     // 1) 默认助手
@@ -273,6 +279,7 @@ class AssistantProvider extends ChangeNotifier {
   }
 
   Future<void> setCurrentAssistant(String id) async {
+    await loaded;
     if (_currentAssistantId == id) return;
     _currentAssistantId = id;
     notifyListeners();
