@@ -17,7 +17,7 @@ import '../../utils/app_directories.dart';
 import '../services/proactive_care_alarm_service.dart';
 
 class AssistantProvider extends ChangeNotifier {
-  static const String assistantsPrefsKey = 'assistants_v1';
+  static const String _assistantsKey = 'assistants_v1';
   static const String _currentAssistantKey = 'current_assistant_id_v1';
   static const String _legacySearchEnabledKey = 'search_enabled_v1';
 
@@ -56,7 +56,7 @@ class AssistantProvider extends ChangeNotifier {
   Future<void> loadFromPrefs() async {
     if (_loaded) return;
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(assistantsPrefsKey);
+    final raw = prefs.getString(_assistantsKey);
     if (raw != null && raw.isNotEmpty) {
       final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
       final migrated = _decodeAssistantsWithLegacySearch(
@@ -101,7 +101,7 @@ class AssistantProvider extends ChangeNotifier {
     SharedPreferences prefs,
     ChatDatabaseRepository? repo,
   ) async {
-    final raw = prefs.getString(assistantsPrefsKey);
+    final raw = prefs.getString(_assistantsKey);
     if (raw == null || raw.isEmpty) return;
 
     final legacySearchEnabled = prefs.getBool(_legacySearchEnabledKey);
@@ -148,11 +148,11 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       try {
         await repo.putAssistants(_assistants);
-        await prefs.remove(assistantsPrefsKey);
+        await prefs.remove(_assistantsKey);
         await prefs.remove(_legacySearchEnabledKey);
       } catch (_) {}
     } else if (changed) {
-      await prefs.setString(assistantsPrefsKey, Assistant.encodeList(_assistants));
+      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -352,10 +352,10 @@ class AssistantProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     if (repo != null) {
       await repo.putAssistants(_assistants);
-      await prefs.remove(assistantsPrefsKey);
+      await prefs.remove(_assistantsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
-      await prefs.setString(assistantsPrefsKey, Assistant.encodeList(_assistants));
+      await prefs.setString(_assistantsKey, Assistant.encodeList(_assistants));
     }
   }
 
@@ -364,7 +364,7 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       await repo.putAssistant(a, sortOrder: sortOrder);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(assistantsPrefsKey);
+      await prefs.remove(_assistantsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
       await _persist();
@@ -376,7 +376,7 @@ class AssistantProvider extends ChangeNotifier {
     if (repo != null) {
       await repo.deleteAssistant(id);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(assistantsPrefsKey);
+      await prefs.remove(_assistantsKey);
       await prefs.remove(_legacySearchEnabledKey);
     } else {
       await _persist();

@@ -46,7 +46,7 @@ Future<void> proactiveCareAlarmCallback(
   // pipeline.
   if (_forwardToMainIsolate(assistantId)) return;
 
-  final assistant = await ProactiveCareMessageFlow.loadAssistantFromPrefs(
+  final assistant = await ProactiveCareMessageFlow.loadAssistantFromDb(
     assistantId,
   );
   if (assistant == null) {
@@ -167,7 +167,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
         );
         if (newTime != null) {
           final persisted =
-              await ProactiveCareMessageFlow.updateAssistantNextCareTimeInPrefs(
+              await ProactiveCareMessageFlow.updateAssistantNextCareTimeInDb(
                 assistant.id,
                 newTime,
               );

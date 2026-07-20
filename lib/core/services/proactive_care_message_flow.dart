@@ -9,7 +9,6 @@ import '../../utils/app_directories.dart';
 import '../models/assistant.dart';
 import '../models/chat_message.dart';
 import '../models/conversation.dart';
-import '../providers/assistant_provider.dart';
 import '../providers/settings_provider.dart';
 import 'api/chat_api_service.dart';
 import 'chat/prompt_transformer.dart';
@@ -98,7 +97,7 @@ class ProactiveCareModelConfig {
 /// the main isolate (app alive) and in the alarm background isolate (app
 /// killed). Only data loading and persistence differ between the two paths:
 /// the main isolate uses providers + ChatService, the background isolate uses
-/// SharedPreferences + [ProactiveCareHeadlessChatStore].
+/// SQLite via [ProactiveCareHeadlessChatStore].
 class ProactiveCareMessageFlow {
   const ProactiveCareMessageFlow._();
 
@@ -109,44 +108,33 @@ class ProactiveCareMessageFlow {
   // Keep in sync with UserProvider.
   static const String _userNamePrefsKey = 'user_name';
 
-  /// Loads [assistantId] from the persisted assistant list (background path).
-  static Future<Assistant?> loadAssistantFromPrefs(String assistantId) async {
+  /// Loads [assistantId] from SQLite (background isolate path).
+  static Future<Assistant?> loadAssistantFromDb(String assistantId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(AssistantProvider.assistantsPrefsKey);
-      if (raw == null || raw.isEmpty) return null;
-      for (final a in Assistant.decodeList(raw)) {
-        if (a.id == assistantId) return a;
-      }
+      return await ProactiveCareHeadlessChatStore.loadAssistantFor(assistantId);
     } catch (e) {
-      FlutterLogger.log('Load assistant failed: $e', tag: _logTag);
+      FlutterLogger.log('Load assistant from DB failed: $e', tag: _logTag);
     }
     return null;
   }
 
-  /// Persists a new next-care time for [assistantId] (background path; the
-  /// app process is dead, so there is no concurrent writer).
-  static Future<bool> updateAssistantNextCareTimeInPrefs(
+  /// Persists a new next-care time for [assistantId] in SQLite (background
+  /// isolate path; the app process is dead, so there is no concurrent writer).
+  static Future<bool> updateAssistantNextCareTimeInDb(
     String assistantId,
     DateTime nextCareTime,
   ) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(AssistantProvider.assistantsPrefsKey);
-      if (raw == null || raw.isEmpty) return false;
-      final assistants = Assistant.decodeList(raw);
-      final idx = assistants.indexWhere((a) => a.id == assistantId);
-      if (idx == -1) return false;
-      assistants[idx] = assistants[idx].copyWith(
-        proactiveCareNextMessageAt: nextCareTime,
-      );
-      await prefs.setString(
-        AssistantProvider.assistantsPrefsKey,
-        Assistant.encodeList(assistants),
+      await ProactiveCareHeadlessChatStore.updateNextCareTime(
+        assistantId,
+        nextCareTime,
       );
       return true;
     } catch (e) {
-      FlutterLogger.log('Persist next care time failed: $e', tag: _logTag);
+      FlutterLogger.log(
+        'Persist next care time to DB failed: $e',
+        tag: _logTag,
+      );
       return false;
     }
   }
@@ -539,6 +527,79 @@ class ProactiveCareHeadlessChatStore {
     return _db!;
   }
 
+  /// Loads a single assistant by id from the `assistant_rows` table.
+  static Future<Assistant?> loadAssistantFor(String assistantId) async {
+    final db = await _ensureDb();
+    final rows = db.select('SELECT * FROM assistant_rows WHERE id = ?', [
+      assistantId,
+    ]);
+    if (rows.isEmpty) return null;
+    return _assistantFromRow(rows.first);
+  }
+
+  /// Updates the proactive care next-message time for [assistantId].
+  static Future<void> updateNextCareTime(
+    String assistantId,
+    DateTime nextCareTime,
+  ) async {
+    final db = await _ensureDb();
+    db.execute(
+      'UPDATE assistant_rows SET proactive_care_next_message_at = ? WHERE id = ?',
+      [nextCareTime.toIso8601String(), assistantId],
+    );
+  }
+
+  /// Maps a raw sqlite3 row to an [Assistant] via its JSON constructor,
+  /// mirroring `ChatDatabaseRepository._assistantFromRow`.
+  static Assistant _assistantFromRow(sqlite.Row row) {
+    return Assistant.fromJson({
+      'id': row['id'] as String,
+      'name': row['name'] as String,
+      'avatar': row['avatar'] as String?,
+      'useAssistantAvatar': (row['use_assistant_avatar'] as int) != 0,
+      'useAssistantName': (row['use_assistant_name'] as int) != 0,
+      'background': row['background'] as String?,
+      'chatModelProvider': row['chat_model_provider'] as String?,
+      'chatModelId': row['chat_model_id'] as String?,
+      'temperature': row['temperature'] as double?,
+      'topP': row['top_p'] as double?,
+      'contextMessageSize': row['context_message_size'] as int,
+      'limitContextMessages': (row['limit_context_messages'] as int) != 0,
+      'streamOutput': (row['stream_output'] as int) != 0,
+      'thinkingBudget': row['thinking_budget'] as int?,
+      'maxTokens': row['max_tokens'] as int?,
+      'systemPrompt': row['system_prompt'] as String,
+      'messageTemplate': row['message_template'] as String,
+      'searchEnabled': (row['search_enabled'] as int) != 0,
+      'mcpServerIds': (jsonDecode(row['mcp_server_ids_json'] as String) as List)
+          .cast<String>(),
+      'localToolIds': (jsonDecode(row['local_tool_ids_json'] as String) as List)
+          .cast<String>(),
+      'customHeaders': jsonDecode(row['custom_headers_json'] as String),
+      'customBody': jsonDecode(row['custom_body_json'] as String),
+      'enableMemory': (row['enable_memory'] as int) != 0,
+      'memoryMode': row['memory_mode'] as String,
+      'enableRecentChatsReference':
+          (row['enable_recent_chats_reference'] as int) != 0,
+      'recentChatsSummaryMessageCount':
+          row['recent_chats_summary_message_count'] as int,
+      'memoryRecordPrompt': row['memory_record_prompt'] as String,
+      'docxMode': row['docx_mode'] as String,
+      'pdfMode': row['pdf_mode'] as String,
+      'otherOfficeMode': row['other_office_mode'] as String,
+      'presetMessages': jsonDecode(row['preset_messages_json'] as String),
+      'regexRules': jsonDecode(row['regex_rules_json'] as String),
+      'enableProactiveCare': (row['enable_proactive_care'] as int) != 0,
+      'proactiveCareNextMessageAt':
+          row['proactive_care_next_message_at'] as String?,
+      'proactiveCarePrompt': row['proactive_care_prompt'] as String,
+      'proactiveCareDecisionPrompt':
+          row['proactive_care_decision_prompt'] as String,
+      'createdAt': row['created_at'] as String,
+      'updatedAt': row['updated_at'] as String,
+    });
+  }
+
   /// Returns the most recently active conversation of [assistantId] and its
   /// messages, or a null conversation when the assistant has none.
   static Future<({Conversation? conversation, List<ChatMessage> messages})>
@@ -575,20 +636,22 @@ class ProactiveCareHeadlessChatStore {
     );
     final messages = <ChatMessage>[];
     for (final mRow in msgRows) {
-      messages.add(ChatMessage(
-        id: mRow['id'] as String,
-        role: mRow['role'] as String,
-        content: mRow['content'] as String,
-        timestamp: DateTime.parse(mRow['timestamp'] as String),
-        modelId: mRow['model_id'] as String?,
-        providerId: mRow['provider_id'] as String?,
-        totalTokens: mRow['total_tokens'] as int?,
-        conversationId: mRow['conversation_id'] as String,
-        isStreaming: (mRow['is_streaming'] as int? ?? 0) != 0,
-        groupId: mRow['group_id'] as String?,
-        subgroupId: mRow['subgroup_id'] as String?,
-        version: mRow['version'] as int? ?? 0,
-      ));
+      messages.add(
+        ChatMessage(
+          id: mRow['id'] as String,
+          role: mRow['role'] as String,
+          content: mRow['content'] as String,
+          timestamp: DateTime.parse(mRow['timestamp'] as String),
+          modelId: mRow['model_id'] as String?,
+          providerId: mRow['provider_id'] as String?,
+          totalTokens: mRow['total_tokens'] as int?,
+          conversationId: mRow['conversation_id'] as String,
+          isStreaming: (mRow['is_streaming'] as int? ?? 0) != 0,
+          groupId: mRow['group_id'] as String?,
+          subgroupId: mRow['subgroup_id'] as String?,
+          version: mRow['version'] as int? ?? 0,
+        ),
+      );
     }
 
     return (conversation: conversation, messages: messages);
@@ -620,10 +683,12 @@ class ProactiveCareHeadlessChatStore {
     );
 
     // Insert message
-    final msgCount = (db.select(
-      'SELECT COUNT(*) as cnt FROM message_rows WHERE conversation_id = ?',
-      [convo.id],
-    ).first['cnt'] as int);
+    final msgCount =
+        (db.select(
+              'SELECT COUNT(*) as cnt FROM message_rows WHERE conversation_id = ?',
+              [convo.id],
+            ).first['cnt']
+            as int);
 
     db.execute(
       '''INSERT OR REPLACE INTO message_rows
