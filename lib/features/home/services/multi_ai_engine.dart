@@ -662,7 +662,6 @@ class MultiAIEngine extends ChangeNotifier {
   Future<void> resolveThread({
     required String anchorId,
     required String threadId,
-    required int version,
   }) async {
     // Collect ALL messages that share groupIds with subgroup messages, across
     // all rounds. This includes dropped-thread messages (subgroupId == null but
@@ -687,7 +686,7 @@ class MultiAIEngine extends ChangeNotifier {
       }
     }
     debugPrint(
-      '[MultiAI][resolveThread] anchorId=$anchorId threadId=$threadId version=$version total=${allSubgroup.length}',
+      '[MultiAI][resolveThread] anchorId=$anchorId threadId=$threadId total=${allSubgroup.length}',
     );
     if (allSubgroup.isEmpty) return;
 
@@ -722,7 +721,7 @@ class MultiAIEngine extends ChangeNotifier {
           version: updated.version,
         );
         // Record version selection for ALL rounds of the adopted thread.
-        if (msg.subgroupId == threadId && adoptedThreadGroupIds.contains(gid)) {
+        if (msg.subgroupId == threadId) {
           _chatController.versionSelections[gid] = i;
         }
       }
@@ -794,11 +793,7 @@ class MultiAIEngine extends ChangeNotifier {
       if (capturedAnchor != null && capturedAnchorMsgs != null) {
         final threadMsgs = capturedAnchorMsgs[remainingTid] ?? [];
         if (threadMsgs.isNotEmpty) {
-          await resolveThread(
-            anchorId: capturedAnchor,
-            threadId: remainingTid,
-            version: threadMsgs.last.version,
-          );
+          await resolveThread(anchorId: capturedAnchor, threadId: remainingTid);
           return; // resolveThread handles exit + notify
         }
       }
