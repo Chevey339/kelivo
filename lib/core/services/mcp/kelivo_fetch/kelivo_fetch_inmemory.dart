@@ -66,17 +66,21 @@ Future<List<(mcp.Tool tool, String id)>> listFetchTools(
       .toList(growable: false);
 }
 
-/// Call one of the in-memory fetch tools.
-/// name must be one of: fetch_html | fetch_markdown | fetch_txt | fetch_json
+/// Fetch a URL through the in-memory tool with bounded output.
 Future<mcp.CallToolResult> callFetchTool(
-  mcp.Client client,
-  String name, {
+  mcp.Client client, {
   required String url,
   Map<String, String>? headers,
+  int? maxLength,
+  int? startIndex,
+  bool raw = false,
 }) async {
-  final result = await client.callTool(name, {
+  final result = await client.callTool('kelivo_fetch', {
     'url': url,
     if (headers != null && headers.isNotEmpty) 'headers': headers,
+    if (maxLength != null) 'max_length': maxLength,
+    if (startIndex != null) 'start_index': startIndex,
+    if (raw) 'raw': true,
   });
   return result;
 }
