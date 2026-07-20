@@ -555,8 +555,10 @@ class _ChatInputBarState extends State<ChatInputBar>
     // When app resumes from background, suppress context menu briefly to avoid flickering
     if (state == AppLifecycleState.resumed) {
       _suppressContextMenu = true;
-      // Also unfocus to reset any stuck toolbar state
-      widget.focusNode?.unfocus();
+      // Also unfocus to reset any stuck toolbar state (iOS only)
+      if (Platform.isIOS) {
+        widget.focusNode?.unfocus();
+      }
       // Re-enable context menu after a short delay
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
@@ -567,7 +569,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         state == AppLifecycleState.paused) {
       // When going to background, hide any open toolbar
       _suppressContextMenu = true;
-      widget.focusNode?.unfocus();
+      if (Platform.isIOS) {
+        widget.focusNode?.unfocus();
+      }
     }
   }
 
