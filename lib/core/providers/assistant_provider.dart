@@ -490,10 +490,10 @@ class AssistantProvider extends ChangeNotifier {
     final idx = _assistants.indexWhere((a) => a.id == updated.id);
     if (idx == -1) return;
 
+    final prev = _assistants[idx];
     var next = updated;
 
     try {
-      final prev = _assistants[idx];
       final raw = (updated.avatar ?? '').trim();
       final prevRaw = (prev.avatar ?? '').trim();
       final changed = raw != prevRaw;
@@ -561,7 +561,7 @@ class AssistantProvider extends ChangeNotifier {
     _assistants[idx] = next;
     await _persistSingle(next, sortOrder: idx);
     notifyListeners();
-    _syncProactiveCareAlarm(updated, next);
+    _syncProactiveCareAlarm(prev, next);
   }
 
   /// Schedule or cancel the proactive care alarm when relevant fields change.

@@ -227,6 +227,16 @@ class ProactiveCareMessageFlow {
     return 'User';
   }
 
+  /// Loads the global thinking budget from SharedPreferences for use in
+  /// background isolates where SettingsProvider is unavailable.
+  static Future<int?> loadThinkingBudgetFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getInt('thinking_budget_v1');
+    } catch (_) {}
+    return null;
+  }
+
   /// Collapses message versions, keeping the selected (or latest) version per
   /// group. Same semantics as MessageBuilderService.collapseVersions.
   @visibleForTesting

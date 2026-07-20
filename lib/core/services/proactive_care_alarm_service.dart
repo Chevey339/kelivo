@@ -96,6 +96,9 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
     // running: re-check the main port right before touching the database.
     if (_forwardToMainIsolate(assistant.id)) return;
 
+    final fallbackThinkingBudget =
+        await ProactiveCareMessageFlow.loadThinkingBudgetFromPrefs();
+
     final recent =
         await ProactiveCareHeadlessChatStore.loadRecentConversationFor(
           assistant.id,
@@ -124,6 +127,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
       modelId: modelCfg.modelId,
       assistant: assistant,
       apiMessages: apiMessages,
+      fallbackThinkingBudget: fallbackThinkingBudget,
     );
     if (reply.isEmpty) {
       throw StateError('model returned an empty proactive care reply');
@@ -164,6 +168,7 @@ Future<void> _runHeadlessCareFlow(Assistant assistant, int alarmId) async {
             {'role': 'assistant', 'content': reply},
           ],
           decisionPrompt: decisionPrompt,
+          fallbackThinkingBudget: fallbackThinkingBudget,
         );
         if (newTime != null) {
           final persisted =
