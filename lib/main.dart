@@ -679,10 +679,28 @@ class MyApp extends StatelessWidget {
                     });
                   }
 
-                  // Enforce app font as a default across the tree for Texts without explicit family
-                  final appWithOverlays = AppOverlays(
-                    child: child ?? const SizedBox.shrink(),
+                  final mq = MediaQuery.of(ctx);
+                  final display = View.of(ctx).display;
+                  final displaySize = display.size / display.devicePixelRatio;
+                  final isFloatingIpad =
+                      defaultTargetPlatform == TargetPlatform.iOS &&
+                      displaySize.shortestSide >= 600 &&
+                      (mq.size.shortestSide < displaySize.shortestSide - 1 ||
+                          mq.size.longestSide < displaySize.longestSide - 1);
+                  final systemTop = mq.viewPadding.top;
+                  final controlsTop = systemTop < 56 ? 56.0 : systemTop;
+                  final appWithOverlays = MediaQuery(
+                    data: isFloatingIpad
+                        ? mq.copyWith(
+                            padding: mq.padding.copyWith(top: controlsTop),
+                            viewPadding: mq.viewPadding.copyWith(
+                              top: controlsTop,
+                            ),
+                          )
+                        : mq,
+                    child: AppOverlays(child: child ?? const SizedBox.shrink()),
                   );
+                  // Enforce app font as a default across the tree for Texts without explicit family
                   return AnnotatedRegion<SystemUiOverlayStyle>(
                     value: overlay,
                     child: effectiveAppFont == null
