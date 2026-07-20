@@ -566,22 +566,34 @@
   "backupPageIncrementalPreviewNewConv": "新對話 {count} 個 · 新訊息 {msgCount} 條",
   "@backupPageIncrementalPreviewNewConv": {
     "placeholders": {
-      "count": { "type": "int" },
-      "msgCount": { "type": "int" }
+      "count": {
+        "type": "int"
+      },
+      "msgCount": {
+        "type": "int"
+      }
     }
   },
   "backupPageIncrementalPreviewUpdatedConv": "更新舊對話 {count} 個 · 新訊息 {msgCount} 條",
   "@backupPageIncrementalPreviewUpdatedConv": {
     "placeholders": {
-      "count": { "type": "int" },
-      "msgCount": { "type": "int" }
+      "count": {
+        "type": "int"
+      },
+      "msgCount": {
+        "type": "int"
+      }
     }
   },
   "backupPageIncrementalPreviewFiles": "新附件 {count} 個 ({size})",
   "@backupPageIncrementalPreviewFiles": {
     "placeholders": {
-      "count": { "type": "int" },
-      "size": { "type": "String" }
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
     }
   },
   "backupReminderSectionTitle": "備份提醒",
@@ -2037,17 +2049,27 @@
   "@imageCompressionSingleResult": {
     "description": "SnackBar 單圖壓縮完成後的體積變化提示",
     "placeholders": {
-      "from": { "type": "String" },
-      "to": { "type": "String" },
-      "pct": { "type": "String" }
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "imageCompressionBatchResult": "全部壓縮完成，共節省 {saved} (-{pct}%)",
   "@imageCompressionBatchResult": {
     "description": "SnackBar 全部圖片壓縮完成後的節省提示",
     "placeholders": {
-      "saved": { "type": "String" },
-      "pct": { "type": "String" }
+      "saved": {
+        "type": "String"
+      },
+      "pct": {
+        "type": "String"
+      }
     }
   },
   "messageMoreSheetMultiAI": "啟動對比",
@@ -2062,7 +2084,9 @@
   "@multiAIModelsBadge": {
     "description": "Badge on model selector button showing active model count in multi-AI mode",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "modelSelectorMultiSelect": "多選",
@@ -2073,7 +2097,9 @@
   "@modelSelectorMultiConfirm": {
     "description": "Confirm button in multi-select mode of model selector",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "multiAIAdoptVersion": "採納",
@@ -2101,7 +2127,9 @@
   "@multiAISelectedCount": {
     "description": "多選模式下顯示已選模型數量",
     "placeholders": {
-      "count": { "type": "int" }
+      "count": {
+        "type": "int"
+      }
     }
   },
   "multiAIDropThread": "移除",
@@ -2240,7 +2268,7 @@
   "@assistantEditProactiveCarePromptHint": {
     "description": "主動關懷提示詞輸入框提示"
   },
-  "assistantEditProactiveCarePromptDefault": "現在到了你主動給使用者發訊息的時間。請保持你的角色設定，結合上下文與目前時間，主動給使用者發一條自然、貼心的訊息。只輸出訊息內容本身。",
+  "assistantEditProactiveCarePromptDefault": "請根據助手的角色設定、上下文、以及目前時間，給使用者發一條訊息",
   "@assistantEditProactiveCarePromptDefault": {
     "description": "預設主動關懷提示詞"
   },
@@ -2248,7 +2276,7 @@
   "@assistantEditProactiveCareDecisionPromptTitle": {
     "description": "決策提示詞編輯器標題"
   },
-  "assistantEditProactiveCareDecisionPromptDefault": "你現在在\"主動發訊息時間決策\"。你需要代入助手的角色，判斷下次什麼時候給使用者發訊息。\n【功能說明】\n- 主動發訊息功能：助手會在設定的時間主動給使用者發送一條訊息，無需使用者提問。\n- 請你先看一下下次發訊息的時間，如果你認為目前設定的時間無需改變，則保持原時間。反之，則修改\n- 請你代入助手的角色，根據上下文，以及助手最後一次回覆使用者訊息的時間，從以下幾方面考慮:\n1.使用者沒有給你發訊息，你希望什麼時候主動找使用者\n2.請根據助手設定的性格決定時間；如果助手是依賴使用者的性格或熱情的性格，就早些給使用者發訊息；反之，高冷性格就晚些發\n3.如果上下文提到了助手要提醒/監督/關心使用者，就早些按符合助手設定的時間主動給使用者發訊息\n4.如果上文提到助手睡覺/在忙等等，就按助手起床/忙完的時間給使用者發訊息\n5.你也可以根據上下文製造一些突發事件，按你製造的突發事件的時間給使用者發訊息）",
+  "assistantEditProactiveCareDecisionPromptDefault": "你是一個角色扮演場景的導演，負責判斷助手（assistant）下一次應主動向使用者發訊息的時間。\n\n【功能說明】\n· 主動發訊息：助手可在設定時間主動向使用者發送訊息，無需使用者提問。\n· 若不設定主動發訊息的時間，則助手無法在使用者不發言的情況下主動發送任何訊息。\n· 你需要評估當前設定的下次發訊息時間：若認為無需調整，則保持原時間；否則進行修改。\n\n【注意】\n· 只考慮助手的視角看到的資訊，不考慮使用者的視角。\n\n【考慮角度】\n1. 助手在睡醒、完成某件事、安全回到宿舍等情況下，應主動向使用者報備或打招呼。\n2. 若上下文中提到助手因睡著、忙碌等原因未能及時查看使用者的訊息，則應設定在助手睡醒或忙完後，主動給使用者發一條訊息。\n3. 若上下文中提到助手需要在某個時間點監督或提醒使用者，則設定在該時間點主動發訊息。\n4. 當一個話題尚未聊完時，需要假設：使用者在助手最後一條訊息發出後始終沒有回覆，那麼助手應在什麼時間主動發訊息？請據此設定時間。\n\n【示例】\n1. 聊天記錄中，使用者凌晨發訊息稱自己失眠，預計早上10:30起床，但助手沒有失眠，會按正常時間（如8:30）起床。此時應將主動發訊息時間設為助手的起床時間。\n2. 聊天記錄中，使用者與助手正在聊考試話題。你在8:30看到的最後一條訊息是助手在8:30發出的一個提問。依據第4條規則，需考慮使用者一直未回覆的情況，助手應在10分鐘之內主動發訊息追問。",
   "@assistantEditProactiveCareDecisionPromptDefault": {
     "description": "預設決策時間提示詞"
   },

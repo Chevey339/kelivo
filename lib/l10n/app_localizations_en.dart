@@ -5860,7 +5860,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditProactiveCarePromptDefault =>
-      'It is time to proactively message the user. Stay in character, consider the conversation context and the current time, and write one natural, caring message to the user. Output only the message itself.';
+      'Based on the assistant\'s character settings, conversation context, and the current time, send a message to the user.';
 
   @override
   String get assistantEditProactiveCareDecisionPromptTitle =>
@@ -5868,7 +5868,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get assistantEditProactiveCareDecisionPromptDefault =>
-      'You are in the \"proactive message time decision\" phase. Take on the assistant\'s role and decide when to message the user next.\n\n[Feature description]\n- Proactive messaging: the assistant sends a message at the scheduled time without waiting for the user to ask.\n- First check the next scheduled message time. Keep it if it still fits; otherwise change it.\n- As the assistant, using context and the time of your last reply, consider:\n1. If the user has not messaged you, when would you reach out?\n2. Match timing to personality: clingy or warm personalities message sooner; aloof personalities later.\n3. If context mentions reminders, supervision, or care, message sooner at a fitting time.\n4. If you were sleeping or busy, message when you would wake up or finish.\n5. You may invent a situational event and schedule the message for when it would happen.';
+      'You are the director of a role-playing scenario, responsible for deciding when the assistant should next proactively message the user.\n\n[Feature description]\n· Proactive messaging: the assistant can send a message to the user at a scheduled time without waiting for the user to speak first.\n· If no proactive message time is set, the assistant cannot send any message while the user is silent.\n· Evaluate the currently scheduled next message time: keep it if no adjustment is needed; otherwise change it.\n\n[Note]\n· Only consider information visible from the assistant\'s perspective, not the user\'s.\n\n[Considerations]\n1. The assistant should proactively check in or greet the user after waking up, finishing a task, arriving safely at the dorm, etc.\n2. If the context mentions the assistant missed the user\'s messages due to sleeping or being busy, schedule a message for when the assistant wakes up or finishes.\n3. If the context mentions the assistant needs to supervise or remind the user at a specific time, schedule the message for that time.\n4. When a topic is unfinished, assume the user never replies after the assistant\'s last message — decide when the assistant should proactively follow up.\n\n[Examples]\n1. The user messaged at midnight saying they have insomnia and plan to wake at 10:30, but the assistant sleeps normally and wakes at 8:30. Set the proactive message time to the assistant\'s wake-up time.\n2. The user and assistant are discussing an exam. At 8:30 the last message is a question from the assistant. Per rule 4, assume the user never replies — the assistant should follow up within 10 minutes.';
 
   @override
   String get assistantEditProactiveCareDateTimePickerTitle =>
