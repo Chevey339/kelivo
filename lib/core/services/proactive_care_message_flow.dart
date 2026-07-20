@@ -673,7 +673,7 @@ class ProactiveCareHeadlessChatStore {
   /// background isolate is torn down.
   static Future<void> close() async {
     try {
-      _db?.dispose();
+      _db?.close();
       _db = null;
     } catch (e) {
       FlutterLogger.log('DB close failed: $e', tag: _logTag);
