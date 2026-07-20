@@ -23,6 +23,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -327,16 +328,34 @@ class HomePageController extends ChangeNotifier {
   /// forward proactive care triggers to [HomeViewModel.handleProactiveCareTrigger].
   void _registerProactiveCarePort() {
     if (!Platform.isAndroid || !ProactiveCareAlarmService.isSupported) return;
-    _proactiveCarePort = ReceivePort();
-    IsolateNameServer.registerPortWithName(
-      _proactiveCarePort!.sendPort,
-      proactiveCareMainPortName,
-    );
-    _proactiveCarePort!.listen((dynamic data) {
-      final assistantId = data as String?;
-      if (assistantId == null || assistantId.isEmpty) return;
-      _viewModel.handleProactiveCareTrigger(assistantId);
-    });
+    try {
+      // A stale mapping can survive a hot restart; replace it.
+      IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
+      final port = ReceivePort();
+      final registered = IsolateNameServer.registerPortWithName(
+        port.sendPort,
+        proactiveCareMainPortName,
+      );
+      if (!registered) {
+        port.close();
+        FlutterLogger.log(
+          'Proactive care port registration failed',
+          tag: 'HomePageController',
+        );
+        return;
+      }
+      _proactiveCarePort = port;
+      port.listen((dynamic data) {
+        final assistantId = data?.toString() ?? '';
+        if (assistantId.isEmpty) return;
+        unawaited(_viewModel.handleProactiveCareTrigger(assistantId));
+      });
+    } catch (e) {
+      FlutterLogger.log(
+        'Proactive care port setup failed: $e',
+        tag: 'HomePageController',
+      );
+    }
   }
 
   void _initializeAnimations() {
