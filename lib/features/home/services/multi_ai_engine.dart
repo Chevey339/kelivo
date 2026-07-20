@@ -658,7 +658,7 @@ class MultiAIEngine extends ChangeNotifier {
 
   /// Resolve (adopt) a thread: clear subgroupId on ALL messages across ALL
   /// rounds, renumber versions per round groupId, set version selection for
-  /// the adopted round, then exit multi-AI mode.
+  /// all rounds of the adopted thread, then exit multi-AI mode.
   Future<void> resolveThread({
     required String anchorId,
     required String threadId,
@@ -691,18 +691,16 @@ class MultiAIEngine extends ChangeNotifier {
     );
     if (allSubgroup.isEmpty) return;
 
-    // Determine the roundGroupId of the adopted thread (needed for
-    // version selection later).
-    String? roundGroupId;
-    int adoptedFinalVersion = 0;
+    // Collect ALL groupIds belonging to the adopted thread (every round).
+    final adoptedThreadGroupIds = <String>{};
 
     // Group by groupId for per-round version renumbering.
     final byGid = <String, List<ChatMessage>>{};
     for (final m in allSubgroup) {
       final gid = m.groupId ?? m.id;
       byGid.putIfAbsent(gid, () => []).add(m);
-      if (m.subgroupId == threadId && roundGroupId == null) {
-        roundGroupId = gid;
+      if (m.subgroupId == threadId) {
+        adoptedThreadGroupIds.add(gid);
       }
     }
 
@@ -713,7 +711,6 @@ class MultiAIEngine extends ChangeNotifier {
 
       for (int i = 0; i < msgs.length; i++) {
         final msg = msgs[i];
-        final isAdopted = msg.subgroupId == threadId && msg.version == version;
         final updated = msg.copyWith(subgroupId: null, version: i);
         _chatController.replaceMessage(updated);
         await _chatService.updateMessage(
@@ -724,22 +721,22 @@ class MultiAIEngine extends ChangeNotifier {
           isStreaming: updated.isStreaming,
           version: updated.version,
         );
-        // Only record adoptedFinalVersion from the round that matches
-        // roundGroupId — otherwise later rounds with different message
-        // counts (e.g. after a model was dropped) can overwrite it.
-        if (isAdopted && gid == roundGroupId) adoptedFinalVersion = i;
+        // Record version selection for ALL rounds of the adopted thread.
+        if (msg.subgroupId == threadId && adoptedThreadGroupIds.contains(gid)) {
+          _chatController.versionSelections[gid] = i;
+        }
       }
     }
 
-    // Persist version selection for the adopted round.
+    // Persist version selections for ALL rounds of the adopted thread.
     final convId = _chatController.currentConversation?.id;
-    if (convId != null && roundGroupId != null) {
-      _chatController.versionSelections[roundGroupId] = adoptedFinalVersion;
-      await _chatService.setSelectedVersion(
-        convId,
-        roundGroupId,
-        adoptedFinalVersion,
-      );
+    if (convId != null) {
+      for (final gid in adoptedThreadGroupIds) {
+        final sel = _chatController.versionSelections[gid];
+        if (sel != null) {
+          await _chatService.setSelectedVersion(convId, gid, sel);
+        }
+      }
     }
 
     // If no more subgroup messages remain, exit entirely.
