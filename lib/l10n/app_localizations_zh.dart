@@ -16960,5 +16960,5 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '主動關懷訊息生成失敗，請開啟應用程式檢查模型配置與網路。';
 
   @override
-  String get multiAIAddModelTooltip => '添加模型';
+  String get multiAIAddModelTooltip => '新增模型';
 }

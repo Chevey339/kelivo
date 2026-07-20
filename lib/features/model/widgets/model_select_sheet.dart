@@ -213,29 +213,35 @@ Future<List<ModelSelection>?> showMultiModelSelector(
     if (platform == TargetPlatform.macOS ||
         platform == TargetPlatform.windows ||
         platform == TargetPlatform.linux) {
-      // Desktop: use dialog
-      final cs = Theme.of(context).colorScheme;
-      await showDialog(
+      // Desktop: use general dialog with desktop-optimized body
+      await showGeneralDialog(
         context: context,
-        builder: (ctx) => Dialog(
-          backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: SizedBox(
-            width: 480,
-            height: 600,
-            child: _ModelSelectSheet(
-              preselectedKeys: preselectedKeys,
-              lockedKeys: lockedKeys,
-              onMultiSelectConfirm: (list) {
-                completer.complete(list);
-                Navigator.of(ctx).maybePop();
-              },
-            ),
-          ),
+        barrierDismissible: true,
+        barrierLabel: 'multi-model-select-desktop',
+        barrierColor: Colors.black.withValues(alpha: 0.25),
+        pageBuilder: (ctx, _, __) => _DesktopModelSelectDialogBody(
+          limitProviderKey: limitProviderKey,
+          preselectedKeys: preselectedKeys,
+          lockedKeys: lockedKeys,
+          onMultiSelectConfirm: (list) {
+            completer.complete(list);
+          },
         ),
+        transitionBuilder: (ctx, anim, _, child) {
+          final curved = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+          );
+          return FadeTransition(
+            opacity: curved,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+              child: child,
+            ),
+          );
+        },
       );
+      if (!completer.isCompleted) completer.complete(null);
     } else {
       // Mobile: use bottom sheet
       final cs = Theme.of(context).colorScheme;
@@ -1993,11 +1999,15 @@ class _DesktopModelSelectDialogBody extends StatefulWidget {
     this.initialProviderKey,
     this.initialModelId,
     this.onMultiSelectConfirm,
+    this.preselectedKeys,
+    this.lockedKeys,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
   final void Function(List<ModelSelection>)? onMultiSelectConfirm;
+  final Set<String>? preselectedKeys;
+  final Set<String>? lockedKeys;
   @override
   State<_DesktopModelSelectDialogBody> createState() =>
       _DesktopModelSelectDialogBodyState();
@@ -2027,6 +2037,12 @@ class _DesktopModelSelectDialogBodyState
   @override
   void initState() {
     super.initState();
+    if (widget.preselectedKeys != null && widget.preselectedKeys!.isNotEmpty) {
+      _multiSelect.activate(
+        preSelected: widget.preselectedKeys,
+        locked: widget.lockedKeys,
+      );
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusSearchField());
     Future.microtask(_loadModels);
   }

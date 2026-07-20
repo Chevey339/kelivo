@@ -1338,15 +1338,10 @@ class _HomePageState extends State<HomePage>
               _controller.multiAIEngine.mode == MultiAIMode.continue_
           ? _controller.multiAIEngine.models.length
           : null,
-      onExitMultiAI:
-          _controller.multiAIEngine.isActive &&
-              _controller.chatController.subgroupActiveGroupIds.isEmpty
-          ? _controller.exitMultiAIMode
-          : null,
       onMultiSelectModel: () {
         final engine = _controller.multiAIEngine;
         if (engine.roundCount == 0) {
-          _controller.showMultiAIModelSelector();
+          _controller.editMultiAIModels();
         }
       },
     );

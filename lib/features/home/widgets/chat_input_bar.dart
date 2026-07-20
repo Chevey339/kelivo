@@ -106,7 +106,6 @@ class ChatInputBar extends StatefulWidget {
     this.inputBackgroundOpacityDark =
         SettingsProvider.defaultChatInputBackgroundOpacityDark,
     this.multiAIModelCount,
-    this.onExitMultiAI,
     this.onMultiSelectModel,
   });
 
@@ -115,7 +114,6 @@ class ChatInputBar extends StatefulWidget {
   final VoidCallback? onSelectModel;
   final VoidCallback? onLongPressSelectModel;
   final int? multiAIModelCount;
-  final VoidCallback? onExitMultiAI;
   final VoidCallback? onMultiSelectModel;
   final VoidCallback? onOpenMcp;
   final VoidCallback? onLongPressMcp;

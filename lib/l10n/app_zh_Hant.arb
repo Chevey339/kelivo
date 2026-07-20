@@ -2276,7 +2276,7 @@
   "@proactiveCareFailedNotificationBody": {
     "description": "主動關懷訊息生成失敗時的通知內容"
   },
-  "multiAIAddModelTooltip": "添加模型",
+  "multiAIAddModelTooltip": "新增模型",
   "@multiAIAddModelTooltip": {
     "description": "多AI卡片底部添加模型按鈕的提示"
   }

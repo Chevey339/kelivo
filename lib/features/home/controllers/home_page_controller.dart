@@ -1986,6 +1986,34 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Edit model selection before any round has started (badge tap at
+  /// roundCount == 0). Opens the selector with current models pre-selected
+  /// but fully editable (no locked keys).
+  Future<void> editMultiAIModels() async {
+    final engine = multiAIEngine;
+    if (!engine.isActive || engine.roundCount != 0) return;
+    if (currentConversation == null) return;
+
+    final existingKeys = engine.models
+        .map((m) => ModelMultiSelectState.keyFor(m.providerKey, m.modelId))
+        .toSet();
+
+    final result = await showMultiModelSelector(
+      _context,
+      preselectedKeys: existingKeys,
+    );
+    if (result == null || result.length < 2) return;
+    if (!_context.mounted) return;
+
+    final threadIds = List<String>.generate(
+      result.length,
+      (_) => const Uuid().v4(),
+    );
+    engine.exit();
+    engine.enter(result, existingThreadIds: threadIds);
+    notifyListeners();
+  }
+
   /// Show model selector with locked existing models for adding models
   /// mid-round (the "+" button on first-round card footer).
   Future<void> addMultiAIModels() async {
