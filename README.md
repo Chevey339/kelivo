@@ -26,15 +26,14 @@ We are aware that the upstream Kelivo repository is undergoing a major data stor
 
 ## ✨ New Features
 
-Unlike most personal-customization or single-feature forks, Cuplivo aims to add multiple features for a broader audience to try out.
+Unlike most personal-customization or single-feature forks, Cuplivo aims to add multiple features for a broader audience to try out. Some items may be removed as upstream (Kelivo) adds their counterparts.
 
-1. **SQLite storage** — Replaced Hive with SQLite for improved reliability. Assistant storage (SharedPreferences) has also been migrated to SQLite, expanding database coverage.
-   - *In practice*: Data loss incidents are expected to drop by roughly 90%.
-   - *Note*: Existing `.zip` backups remain fully compatible, as they are not raw Hive binaries.
-
-2. **Incremental backup** — Uploads only conversations, messages and related attachments since a selected date.
+1. **Incremental backup** — Uploads only conversations, messages and related attachments since a selected date.
    - *In practice*: A 12.6 MB full backup is typically followed by incremental uploads of 50 KB to 1.5 MB. Savings become more apparent as attachments and images accumulate. This reduces bandwidth and storage overhead, encouraging more frequent backups.
    - *Note*: Periodic full snapshots are still recommended.
+
+2. **Proactive care** — AI can proactively send care messages to users on a configurable schedule (Android only).
+   - *Android-only*: background alarm + notification channel; alarm persists through force-stop
 
 3. **Multi-AI side-by-side comparison** — Select 2 or more models to answer simultaneously and compare their responses side by side — pick the best result, or synthesize them into a single reply via summary, fusion, or commentary (like a more flexible OpenRouter Fusion).
    - Desktop now shows 2 model responses per page in a two-column layout.
@@ -56,12 +55,11 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 9. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
 10. **Additional fixes across the repo**
-   - OCR result caching now persists across restarts (SQLite-backed)
-   - `fetch_markdown` tool output now strips `<script>` and `<style>` tags to reduce excessive token consumption
-   - Accurate Gemini cached-token reporting
-   - Optimized title generation logic (auto-retry on first failure)
-   - Large base64 images no longer cause regex stack overflow
-   - Various other stability improvements
+    - OCR result caching now persists across restarts (SQLite-backed)
+    - Accurate Gemini cached-token reporting
+    - Optimized title generation logic (auto-retry on first failure)
+    - Large base64 images no longer cause regex stack overflow
+    - Various other stability improvements
 
 ## ⚠️ Note
 
