@@ -5,6 +5,28 @@ import 'package:flutter/foundation.dart';
 import 'package:Kelivo/features/home/controllers/chat_actions.dart';
 
 void main() {
+  group('ChatActions.resolveStreamErrorContent', () {
+    test('零正文失败时把错误信息写入助手消息', () {
+      expect(
+        ChatActions.resolveStreamErrorContent(
+          partialContent: '',
+          errorText: 'Connection failed',
+        ),
+        'Connection failed',
+      );
+    });
+
+    test('已有部分回复时保留回复正文', () {
+      expect(
+        ChatActions.resolveStreamErrorContent(
+          partialContent: 'Partial response',
+          errorText: 'Connection failed',
+        ),
+        'Partial response',
+      );
+    });
+  });
+
   group('ChatActions.listenSequentiallyToStream', () {
     test('正常流按顺序处理 chunk 并调用 done', () async {
       final controller = async.StreamController<int>();

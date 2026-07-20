@@ -525,6 +525,12 @@ class ChatActions {
   }
 
   @visibleForTesting
+  static String resolveStreamErrorContent({
+    required String partialContent,
+    required String errorText,
+  }) => partialContent.isEmpty ? errorText : partialContent;
+
+  @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
     required Future<void> Function(T chunk) onData,
@@ -1906,9 +1912,13 @@ class ChatActions {
 
     streamController.cleanupTimers(messageId);
     streamController.finishReasoningIfNeeded(messageId);
-    final displayContent = state.fullContentRaw.isEmpty
+    final partialContent = state.fullContentRaw.isEmpty
         ? ''
         : _transformAssistantContent(state, state.fullContentRaw);
+    final displayContent = resolveStreamErrorContent(
+      partialContent: partialContent,
+      errorText: errorText,
+    );
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
       content: displayContent,
       totalTokens: state.totalTokens,
@@ -1927,7 +1937,10 @@ class ChatActions {
       }
       streamController.removeStreamingNotifier(messageId);
       _setConversationLoading(conversationId, false);
-      await _conversationStreams.remove(conversationId)?.cancel();
+      // The sequential stream drain owns source cancellation after this error
+      // handler returns. Re-entering its barrier cancel here would wait on this
+      // handler itself and prevent the UI error callback below from firing.
+      _conversationStreams.remove(conversationId);
       onStreamError?.call(errorText);
       onStreamFinished?.call();
       await _finishIosBackgroundGeneration(success: false, detail: errorText);
