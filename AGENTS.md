@@ -1,6 +1,6 @@
 # AGENTS.md
 
-> Kelivo is a cross-platform Flutter LLM chat client (Android / iOS / macOS / Windows / Linux).
+> Cuplivo is a cross-platform Flutter LLM chat client (Android / iOS / macOS / Windows / Linux), a community fork of Kelivo.
 > This file defines hard constraints for AI-assisted development. Predictable, auditable, repeatable.
 
 ## 1. Repository Facts
@@ -48,6 +48,22 @@
 - Theme and dynamic color follow the repo as-is:
   - `lib/theme/**` is the single source of truth for theming and tokens
   - Android dynamic color is only enabled per-platform in `main.dart`. Do not extrapolate Android visual or interaction rules to desktop.
+- This repository (Cuplivo) is a **community fork** of upstream [Kelivo](https://github.com/Chevey339/kelivo).
+- Branch conventions:
+  - `legacy` → always corresponds to upstream Kelivo
+  - `cuplivo`, `cuplivo-next` → always correspond to this fork (Cuplivo)
+  - `master` → depends on local repository; cannot be assumed upstream or fork
+- README intentionally retains many upstream references (download links, Issues, sponsors, community groups, Star History). Do not "fix" or rewrite these links.
+- Key Cuplivo-specific features:
+  - SQLite storage (replaced Hive)
+  - Incremental backup
+  - Multi-AI side-by-side comparison
+  - Manual image compression
+  - Memory mode switcher (Auto Injection / On Demand Tool)
+  - Tool prompt optimization
+  - SVG preview
+  - PDF/Office file attachments
+  - Various repo-wide fixes (OCR cache persistence, Gemini cached-token reporting, title generation retry, etc.)
 
 ## 2. Working Style
 
@@ -113,17 +129,22 @@ dart format <changed-paths>
 ```
 
 - Unformatted code must not be committed.
+- If no Dart code was modified, running `dart format` or `flutter` commands is unnecessary.
+- `dart format` applies only to Dart files, not Markdown (.md) or YAML (.yaml/.yml).
 
 ### 3.4 Minimum Sufficient Verification After Completion
 
-- Default minimum verification loop:
+- Default minimum verification:
 
 ```bash
 flutter analyze
-flutter test
 ```
 
-- If the change scope is clearly narrow, at minimum run the relevant test subset and explain in the delivery notes why only a subset was run.
+- Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally** -- CI validates the complete suite remotely.
+- If no directly related tests exist, perform manual verification and state it in delivery notes.
+- **For user-visible changes**, after development, provide a manual test plan covering:
+  - Happy path
+  - Edge cases (if applicable)
 - If the following content types are modified, the corresponding extra action is mandatory:
 
 | Change Type | Required Action |
@@ -251,7 +272,7 @@ flutter test
 - `flutter gen-l10n` has been executed and generated files match ARB content.
 - `dart format` has been executed.
 - `flutter analyze` has been executed.
-- Related `flutter test` has been executed. If no related tests exist, create and run them following official testing standards.
+- Related `flutter test` (subset) executed, or manual verification performed and stated.
 - Test scenarios cover the happy path, boundary values, and failure paths for this task's requirements -- not just a single green run.
 - Desktop tasks have confirmed the entry layer. No desktop-only logic leaked into mobile branches.
 - New or adjusted UI prioritized reuse of existing shared / desktop components. No near-duplicate widgets created.
@@ -286,17 +307,4 @@ flutter test
 - Mechanisms over hand-picked magic constants. If a threshold must be hardcoded, explain why and state its boundaries.
 - When small-step verification is possible, do not make large irreversible changes.
 
-## 8. Historical Pitfall Log
 
-> Record significant pitfalls encountered during development here.
-
-- Recording principles:
-  - Only record issues that actually occurred in this repo and have reuse value for future development.
-  - Do not write "heard this might happen" hearsay entries.
-  - When adding entries, prefer "symptom -> root cause -> fix/constraint". Avoid recording conclusions without context.
-
-## Appendix: Skills Usage Rules
-
-- Before starting a task, scan available skill documents in `/.agents/skills/`.
-- When activating a skill, declare the skill name and purpose in communication.
-- Regular development does not mandate any specific skill. Activate only when semantically matched.
