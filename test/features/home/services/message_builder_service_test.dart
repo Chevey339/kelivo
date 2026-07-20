@@ -1,11 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:Kelivo/core/models/assistant.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import 'package:Kelivo/features/home/services/ocr_service.dart';
+
+import '../../../support/business_test_harness.dart';
 
 class _FakeBuildContext implements BuildContext {
   @override
@@ -450,6 +456,116 @@ void main() {
       ]);
     });
 
+    test('user 消息会附带内部 revision id，strip 后不再出现', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'u1', role: 'user', content: 'hello'),
+          _message(id: 'a1', role: 'assistant', content: 'hi'),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+      );
+
+      expect(apiMessages.first['role'], 'user');
+      expect(
+        apiMessages.first[MessageBuilderService.internalRevisionIdKey],
+        'u1',
+      );
+      expect(
+        apiMessages.last.containsKey(
+          MessageBuilderService.internalRevisionIdKey,
+        ),
+        isFalse,
+      );
+
+      service.stripInternalRevisionIds(apiMessages);
+      expect(
+        apiMessages.any(
+          (message) => message.containsKey(multimodalInternalRevisionIdKey),
+        ),
+        isFalse,
+      );
+    });
+
+    test('WorldBook 注入后的最终裁剪会限制发送消息数', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+      // prepareApiMessages injects WorldBook against the full history, then
+      // applies a single context trim before OCR.
+      final apiMessages = <Map<String, dynamic>>[
+        {'role': 'system', 'content': 'system'},
+        for (var index = 0; index < 6; index++)
+          {
+            'role': index.isEven ? 'user' : 'assistant',
+            'content': 'message-$index',
+          },
+        {'role': 'user', 'content': 'worldbook-top'},
+        {'role': 'user', 'content': 'worldbook-bottom'},
+      ];
+
+      service.applyContextLimit(
+        apiMessages,
+        const Assistant(id: 'assistant-1', name: 'test', contextMessageSize: 4),
+      );
+      expect(apiMessages.length, 5); // system + 4
+      expect(apiMessages.first['role'], 'system');
+      // Images in dropped history are never OCR'd because OCR runs after this trim.
+      expect(
+        apiMessages.any((m) => (m['content'] ?? '').toString() == 'message-0'),
+        isFalse,
+      );
+    });
+
+    test('上下文裁剪会丢掉历史图片消息并保留内部 revision id', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      final apiMessages = <Map<String, dynamic>>[
+        for (var index = 0; index < 6; index++)
+          if (index.isEven)
+            {
+              'role': 'user',
+              'content': 'u$index\n[image:/img-$index.png]',
+              MessageBuilderService.internalRevisionIdKey: 'u$index',
+            }
+          else
+            {'role': 'assistant', 'content': 'a$index'},
+      ];
+
+      service.applyContextLimit(
+        apiMessages,
+        const Assistant(id: 'assistant-1', name: 'test', contextMessageSize: 2),
+      );
+
+      expect(apiMessages, hasLength(2));
+      final retainedContents = apiMessages
+          .map((message) => (message['content'] ?? '').toString())
+          .toList();
+      expect(retainedContents.join('\n'), isNot(contains('/img-0.png')));
+      expect(retainedContents.join('\n'), isNot(contains('/img-2.png')));
+
+      final retainedUser = apiMessages.firstWhere(
+        (message) => message['role'] == 'user',
+      );
+      expect(
+        retainedUser[MessageBuilderService.internalRevisionIdKey],
+        isNotNull,
+      );
+      expect(
+        (retainedUser['content'] ?? '').toString(),
+        contains('[image:'),
+      );
+    });
+
     test('无限制上下文不会裁掉一千条以上的消息', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({}),
@@ -571,6 +687,83 @@ void main() {
         'assistant',
         'user',
       ]);
+    });
+  });
+
+  group('MessageBuilderService.processUserMessagesForApi', () {
+    test('不处理缺少内部 revision ID 的 WorldBook lore user 消息', () async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+
+      final ocrCalls = <List<String>>[];
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({}),
+        contextProvider: _FakeBuildContext(),
+        ocrHandler: (imagePaths, {revisionId, session}) async {
+          ocrCalls.add(List<String>.of(imagePaths));
+          return 'ocr-should-not-run';
+        },
+        ocrPrefetch: ({required revisionIds, required imagePaths}) async {
+          ocrCalls.add(['prefetch', ...imagePaths]);
+          return OcrPrepareSession();
+        },
+      );
+
+      const loreContent =
+          'lore with markers\n[image:/tmp/lore.png]\n[file:/tmp/lore.txt|lore.txt|text/plain]';
+      final apiMessages = <Map<String, dynamic>>[
+        {
+          'role': 'user',
+          'content': loreContent, // WorldBook injection: no revision id
+        },
+        {
+          'role': 'user',
+          'content': 'real user\n[image:/tmp/real.png]',
+          MessageBuilderService.internalRevisionIdKey: 'u-real',
+        },
+      ];
+
+      await settings.setProviderConfig(
+        'ocr-provider',
+        ProviderConfig(
+          id: 'ocr-provider',
+          enabled: true,
+          name: 'OCR',
+          apiKey: 'key',
+          baseUrl: 'https://example.test',
+          models: const ['ocr-model'],
+          modelOverrides: const {
+            'ocr-model': {
+              'input': ['text', 'image'],
+            },
+          },
+        ),
+      );
+      await settings.setOcrModel('ocr-provider', 'ocr-model');
+      await settings.setOcrEnabled(true);
+
+      await service.processUserMessagesForApi(
+        apiMessages,
+        settings,
+        const Assistant(id: 'a1', name: 'test'),
+      );
+
+      expect(apiMessages.first['content'], loreContent);
+      expect(
+        apiMessages.first.containsKey(
+          MessageBuilderService.internalMediaPathsKey,
+        ),
+        isFalse,
+      );
+      expect(
+        ocrCalls.expand((paths) => paths),
+        isNot(contains('/tmp/lore.png')),
+      );
+      expect(
+        ocrCalls.expand((paths) => paths),
+        contains('/tmp/real.png'),
+      );
     });
   });
 }

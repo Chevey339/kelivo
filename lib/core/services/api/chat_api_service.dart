@@ -506,6 +506,7 @@ class ChatApiService {
     for (final message in messages) {
       final copy = Map<String, dynamic>.from(message);
       copy.remove(multimodalInternalMediaPathsKey);
+      copy.remove(multimodalInternalRevisionIdKey);
       if (copy.containsKey('content')) {
         copy['content'] = await _stripImageInputsFromContent(copy['content']);
       }

@@ -476,6 +476,7 @@ Future<List<Map<String, dynamic>>> _buildLongCatOmniMessages(
     final raw = (original['content'] ?? '').toString();
     final outMsg = Map<String, dynamic>.from(original);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg['role'] = role;
     final internalMediaPaths =
         (original[multimodalInternalMediaPathsKey] as List?)
@@ -571,6 +572,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final role = (m['role'] ?? 'user').toString();
     final outMsg = Map<String, dynamic>.from(m);
     outMsg.remove(multimodalInternalMediaPathsKey);
+    outMsg.remove(multimodalInternalRevisionIdKey);
     outMsg['role'] = role;
 
     if (originalContent is List) {

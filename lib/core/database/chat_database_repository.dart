@@ -4198,6 +4198,197 @@ class ChatDatabaseRepository {
     });
   }
 
+  static const String imageOcrArtifactKind = 'image_ocr_v1';
+
+  /// Batch-load OCR artifacts for revisions.
+  ///
+  /// Returns revisionId → (contentHash → OCR text).
+  Future<Map<String, Map<String, String>>> getImageOcrArtifacts(
+    Iterable<String> revisionIds,
+  ) async {
+    final ids = revisionIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.providerArtifactRows)..where(
+              (row) =>
+                  row.revisionId.isIn(ids) &
+                  row.kind.equals(imageOcrArtifactKind),
+            ))
+            .get();
+    final result = <String, Map<String, String>>{};
+    for (final row in rows) {
+      final items = _decodeImageOcrPayload(row.payload);
+      if (items.isEmpty) continue;
+      result[row.revisionId] = items;
+    }
+    return result;
+  }
+
+  /// Merge OCR items into the revision artifact and upsert.
+  Future<void> upsertImageOcrArtifactItems({
+    required String revisionId,
+    required Map<String, String> items,
+  }) async {
+    final cleaned = <String, String>{
+      for (final entry in items.entries)
+        if (entry.key.trim().isNotEmpty && entry.value.trim().isNotEmpty)
+          entry.key.trim(): entry.value.trim(),
+    };
+    if (cleaned.isEmpty) return;
+
+    await _db.transaction(() async {
+      final message = await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.id.equals(revisionId))).getSingleOrNull();
+      if (message == null) {
+        throw StateError('provider_artifact_revision_missing');
+      }
+
+      final existingRows =
+          await (_db.select(_db.providerArtifactRows)..where(
+                (row) =>
+                    row.revisionId.equals(revisionId) &
+                    row.kind.equals(imageOcrArtifactKind),
+              ))
+              .get();
+      final merged = <String, String>{
+        for (final row in existingRows) ..._decodeImageOcrPayload(row.payload),
+        ...cleaned,
+      };
+      final now = DateTime.now().toUtc();
+      final createdAt = existingRows.isNotEmpty
+          ? existingRows.first.createdAt
+          : message.timestamp;
+      final updatedAt = now.isBefore(createdAt) ? createdAt : now;
+      await _db
+          .into(_db.providerArtifactRows)
+          .insertOnConflictUpdate(
+            ProviderArtifactRowsCompanion.insert(
+              conversationId: message.conversationId,
+              revisionId: revisionId,
+              kind: imageOcrArtifactKind,
+              payload: _encodeImageOcrPayload(merged),
+              createdAt: createdAt,
+              updatedAt: updatedAt,
+            ),
+          );
+    });
+  }
+
+  /// Copy still-present image OCR items from one revision to another.
+  Future<void> inheritImageOcrArtifacts({
+    required String fromRevisionId,
+    required String toRevisionId,
+    required Set<String> retainedContentHashes,
+  }) async {
+    if (retainedContentHashes.isEmpty) return;
+    if (fromRevisionId == toRevisionId) return;
+    final source = await getImageOcrArtifacts([fromRevisionId]);
+    final items = source[fromRevisionId];
+    if (items == null || items.isEmpty) return;
+    final inherited = <String, String>{
+      for (final entry in items.entries)
+        if (retainedContentHashes.contains(entry.key) &&
+            entry.value.trim().isNotEmpty)
+          entry.key: entry.value.trim(),
+    };
+    if (inherited.isEmpty) return;
+    await upsertImageOcrArtifactItems(
+      revisionId: toRevisionId,
+      items: inherited,
+    );
+  }
+
+  /// Look up content hashes for known asset paths.
+  ///
+  /// Paths with multiple distinct content hashes are omitted so callers cannot
+  /// accidentally reuse a stale hash after the file at that path changed.
+  Future<Map<String, String>> getAssetContentHashesByPaths(
+    Iterable<String> paths,
+  ) async {
+    final normalized = paths
+        .map((path) => path.trim())
+        .where((path) => path.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+    if (normalized.isEmpty) return const {};
+    await _ensureAssetGcSchema();
+    final placeholders = List.filled(normalized.length, '?').join(', ');
+    final rows = await _db
+        .customSelect(
+          '''
+          SELECT path, content_hash
+          FROM asset_rows
+          WHERE path IN ($placeholders)
+          ORDER BY last_referenced_at DESC, created_at DESC, id DESC;
+          ''',
+          variables: [for (final path in normalized) Variable<String>(path)],
+        )
+        .get();
+    final hashesByPath = <String, Set<String>>{};
+    for (final row in rows) {
+      final path = row.read<String>('path');
+      final hash = row.read<String>('content_hash');
+      if (path.isEmpty || hash.isEmpty) continue;
+      hashesByPath.putIfAbsent(path, () => <String>{}).add(hash);
+    }
+    return {
+      for (final entry in hashesByPath.entries)
+        if (entry.value.length == 1) entry.key: entry.value.single,
+    };
+  }
+
+  /// Content hashes of image assets linked to a revision.
+  Future<Set<String>> getMessageImageContentHashes(String revisionId) async {
+    final id = revisionId.trim();
+    if (id.isEmpty) return const {};
+    await _ensureAssetGcSchema();
+    final rows = await _db
+        .customSelect(
+          '''
+      SELECT a.content_hash AS content_hash
+      FROM message_asset_rows m
+      JOIN asset_rows a ON a.id = m.asset_id
+      WHERE m.revision_id = ? AND m.kind = 'image';
+      ''',
+          variables: [Variable<String>(id)],
+        )
+        .get();
+    return {
+      for (final row in rows)
+        if (row.read<String>('content_hash').trim().isNotEmpty)
+          row.read<String>('content_hash').trim(),
+    };
+  }
+
+  Map<String, String> _decodeImageOcrPayload(String payload) {
+    final raw = payload.trim();
+    if (raw.isEmpty) return const {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return const {};
+      final itemsRaw = decoded['items'];
+      if (itemsRaw is! Map) return const {};
+      final items = <String, String>{};
+      for (final entry in itemsRaw.entries) {
+        final hash = entry.key.toString().trim();
+        final text = entry.value?.toString().trim() ?? '';
+        if (hash.isEmpty || text.isEmpty) continue;
+        items[hash] = text;
+      }
+      return items;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  String _encodeImageOcrPayload(Map<String, String> items) {
+    return jsonEncode({
+      'version': 1,
+      'items': items,
+    });
+  }
+
   Future<void> _upsertGeminiThoughtSignature(
     String messageId,
     String signature,

@@ -64,7 +64,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       continue;
     }
     nonSystemMessages.add(
-      Map<String, dynamic>.from(m)..['role'] = role.isEmpty ? 'user' : role,
+      Map<String, dynamic>.from(m)
+        ..remove(multimodalInternalMediaPathsKey)
+        ..remove(multimodalInternalRevisionIdKey)
+        ..['role'] = role.isEmpty ? 'user' : role,
     );
   }
 

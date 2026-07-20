@@ -22,6 +22,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
+import 'ocr_service.dart';
 
 /// Service for building API messages from conversation state.
 ///
@@ -36,11 +37,13 @@ import '../../../utils/markdown_media_sanitizer.dart';
 /// - Inlining local images for model context
 class MessageBuilderService {
   static const String internalMediaPathsKey = multimodalInternalMediaPathsKey;
+  static const String internalRevisionIdKey = multimodalInternalRevisionIdKey;
 
   MessageBuilderService({
     required this.chatService,
     required this.contextProvider,
     this.ocrHandler,
+    this.ocrPrefetch,
     this.geminiThoughtSignatureHandler,
   });
 
@@ -50,7 +53,19 @@ class MessageBuilderService {
   final BuildContext contextProvider;
 
   /// OCR handler for processing images (optional, injected from home_page)
-  final Future<String?> Function(List<String> imagePaths)? ocrHandler;
+  final Future<String?> Function(
+    List<String> imagePaths, {
+    String? revisionId,
+    OcrPrepareSession? session,
+  })?
+  ocrHandler;
+
+  /// Optional batch prefetch of persisted OCR before per-message processing.
+  final Future<OcrPrepareSession> Function({
+    required List<String> revisionIds,
+    required List<String> imagePaths,
+  })?
+  ocrPrefetch;
 
   /// OCR text wrapper function
   String Function(String ocrText)? ocrTextWrapper;
@@ -195,10 +210,14 @@ class MessageBuilderService {
         content = geminiThoughtSignatureHandler!(m, content);
       }
       if (content.isEmpty) continue;
+      final role = m.role == 'assistant' ? 'assistant' : 'user';
       final message = <String, dynamic>{
-        'role': m.role == 'assistant' ? 'assistant' : 'user',
+        'role': role,
         'content': content,
       };
+      if (role == 'user') {
+        message[internalRevisionIdKey] = m.id;
+      }
       if (toolContinuationReasoningContent?.isNotEmpty == true) {
         message['reasoning_content'] = toolContinuationReasoningContent;
       }
@@ -206,6 +225,13 @@ class MessageBuilderService {
     }
 
     return out;
+  }
+
+  /// Remove internal user revision IDs before provider requests.
+  void stripInternalRevisionIds(List<Map<String, dynamic>> apiMessages) {
+    for (final message in apiMessages) {
+      message.remove(internalRevisionIdKey);
+    }
   }
 
   ChatMessage? _latestPersistedMessage(ChatMessage message) {
@@ -316,12 +342,64 @@ class MessageBuilderService {
 
     List<String>? lastUserImagePaths;
 
-    // Find last user message index
+    // Only real persisted user messages carry an internal revision ID.
+    // WorldBook lore may also use role=user and must not be treated as chat input.
+    bool isPersistedUserMessage(Map<String, dynamic> message) {
+      if (message['role'] != 'user') return false;
+      return (message[internalRevisionIdKey] ?? '').toString().trim().isNotEmpty;
+    }
+
+    // Find last real user message index (skip injected lore).
     int lastUserIdx = -1;
     for (int i = apiMessages.length - 1; i >= 0; i--) {
-      if (apiMessages[i]['role'] == 'user') {
+      if (isPersistedUserMessage(apiMessages[i])) {
         lastUserIdx = i;
         break;
+      }
+    }
+
+    OcrPrepareSession? ocrSession;
+    if (ocrActive && ocrPrefetch != null) {
+      final revisionIds = <String>[];
+      final allImagePaths = <String>{};
+      for (final message in apiMessages) {
+        if (!isPersistedUserMessage(message)) continue;
+        final revisionId = (message[internalRevisionIdKey] ?? '')
+            .toString()
+            .trim();
+        final parsedUser = parseInputFromRaw(
+          (message['content'] ?? '').toString(),
+        );
+        final videoPaths = <String>{
+          for (final d in parsedUser.documents)
+            if (isVideoMime(_effectiveAttachmentMime(d))) d.path.trim(),
+        }..removeWhere((p) => p.isEmpty);
+        final audioPaths = <String>{
+          for (final d in parsedUser.documents)
+            if (isAudioMime(_effectiveAttachmentMime(d))) d.path.trim(),
+        }..removeWhere((p) => p.isEmpty);
+        final ocrTargets = parsedUser.imagePaths
+            .map((p) => p.trim())
+            .where(
+              (p) =>
+                  p.isNotEmpty &&
+                  !videoPaths.contains(p) &&
+                  !audioPaths.contains(p),
+            )
+            .toSet();
+        if (ocrTargets.isEmpty) continue;
+        if (revisionId.isNotEmpty) revisionIds.add(revisionId);
+        allImagePaths.addAll(ocrTargets);
+      }
+      if (allImagePaths.isNotEmpty) {
+        try {
+          ocrSession = await ocrPrefetch!(
+            revisionIds: revisionIds,
+            imagePaths: allImagePaths.toList(growable: false),
+          );
+        } catch (_) {
+          ocrSession = null;
+        }
       }
     }
 
@@ -368,7 +446,7 @@ class MessageBuilderService {
     }
 
     for (int i = 0; i < apiMessages.length; i++) {
-      if (apiMessages[i]['role'] != 'user') continue;
+      if (!isPersistedUserMessage(apiMessages[i])) continue;
       final rawUser = (apiMessages[i]['content'] ?? '').toString();
       final parsedUser = parseInputFromRaw(rawUser);
       final videoPaths = <String>{
@@ -458,7 +536,14 @@ class MessageBuilderService {
             .toSet()
             .toList();
         if (ocrTargets.isNotEmpty) {
-          final ocrText = await ocrHandler!(ocrTargets);
+          final revisionId = (apiMessages[i][internalRevisionIdKey] ?? '')
+              .toString()
+              .trim();
+          final ocrText = await ocrHandler!(
+            ocrTargets,
+            revisionId: revisionId.isEmpty ? null : revisionId,
+            session: ocrSession,
+          );
           if (ocrText != null && ocrText.trim().isNotEmpty) {
             final wrapped = ocrTextWrapper != null
                 ? ocrTextWrapper!(ocrText)

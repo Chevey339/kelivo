@@ -345,7 +345,14 @@ class HomePageController extends ChangeNotifier {
   }
 
   void _initializeServices() {
-    _ocrService = OcrService();
+    _ocrService = OcrService(
+      resolveContentHashes: (paths) =>
+          _chatService.resolveImageContentHashes(paths),
+      loadArtifacts: (revisionIds) =>
+          _chatService.getImageOcrArtifacts(revisionIds),
+      persistArtifact: (revisionId, items) =>
+          _chatService.upsertImageOcrArtifactItems(revisionId, items),
+    );
     _translationService = TranslationService(
       chatService: _chatService,
       getContext: () => _scaffoldKey.currentContext ?? _context,
@@ -359,8 +366,18 @@ class HomePageController extends ChangeNotifier {
     _messageBuilderService = MessageBuilderService(
       chatService: _chatService,
       contextProvider: _context,
-      ocrHandler: (imagePaths) =>
-          _ocrService.getOcrTextForImages(imagePaths, _context),
+      ocrHandler: (imagePaths, {revisionId, session}) =>
+          _ocrService.getOcrTextForImages(
+            imagePaths,
+            _context,
+            revisionId: revisionId,
+            session: session,
+          ),
+      ocrPrefetch: ({required revisionIds, required imagePaths}) =>
+          _ocrService.prefetchPersistedOcr(
+            revisionIds: revisionIds,
+            imagePaths: imagePaths,
+          ),
       geminiThoughtSignatureHandler: _appendGeminiThoughtSignatureForApi,
     );
     _messageBuilderService.ocrTextWrapper = _ocrService.wrapOcrBlock;

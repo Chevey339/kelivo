@@ -1,6 +1,7 @@
 import '../models/chat_input_data.dart';
 
 const String multimodalInternalMediaPathsKey = '_kelivo_media_paths';
+const String multimodalInternalRevisionIdKey = '_kelivo_revision_id';
 
 bool isImageMime(String mime) => mime.toLowerCase().startsWith('image/');
 

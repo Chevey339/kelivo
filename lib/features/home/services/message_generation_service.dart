@@ -157,14 +157,9 @@ class MessageGenerationService {
       }
     }
 
-    // Process user messages (documents, OCR, templates)
-    final lastUserImagePaths = await messageBuilderService
-        .processUserMessagesForApi(apiMessages, settings, assistant);
-
-    // Signal processing finished
-    onFileProcessingFinished?.call();
-
-    // Inject prompts
+    // Inject prompts first so WorldBook can scan the full untrimmed history
+    // (same keyword trigger range as before OCR-after-trim). Document/OCR work
+    // runs only after the single final context trim below.
     messageBuilderService.injectSystemPrompt(apiMessages, assistant, modelId);
     await messageBuilderService.injectMemoryAndRecentChats(
       apiMessages,
@@ -192,9 +187,18 @@ class MessageGenerationService {
       assistantId,
     );
 
-    // Apply context limit and inline images
+    // Single final trim after WorldBook TOP/BOTTOM/AT_DEPTH injections. OCR and
+    // document extraction must run only on this retained set so images that will
+    // not be sent are never processed (#769).
     messageBuilderService.applyContextLimit(apiMessages, assistant);
+
+    final lastUserImagePaths = await messageBuilderService
+        .processUserMessagesForApi(apiMessages, settings, assistant);
+
+    onFileProcessingFinished?.call();
+
     await messageBuilderService.inlineLocalImages(apiMessages);
+    messageBuilderService.stripInternalRevisionIds(apiMessages);
 
     // Prepare tools
     final toolDefs = generationController.buildToolDefinitions(

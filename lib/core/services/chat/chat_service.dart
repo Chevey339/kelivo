@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
@@ -1183,6 +1184,22 @@ class ChatService extends ChangeNotifier {
       }
     }
     return List.unmodifiable(out.values);
+  }
+
+  /// Image sources eligible for OCR identity: local files and data URLs.
+  List<String> _extractOcrImageSources(String content) {
+    final out = <String>[];
+    final imgRe = RegExp(r'\[image:(.+?)\]');
+    for (final match in imgRe.allMatches(content)) {
+      final path = match.group(1)?.trim();
+      if (path == null || path.isEmpty || path.startsWith('http')) continue;
+      if (path.startsWith('data:')) {
+        out.add(path);
+      } else {
+        out.add(SandboxPathResolver.fix(path));
+      }
+    }
+    return out;
   }
 
   bool _messageCanOwnAssets(ChatMessage message) =>
@@ -2408,28 +2425,32 @@ class ChatService extends ChangeNotifier {
     _messageOrderIds[persisted.id] = <String>[];
     _messageCounts[persisted.id] = 0;
     for (final message in sourceMessages) {
-      await addMessageDirectly(
-        persisted.id,
-        ChatMessage(
-          role: message.role,
-          content: message.content,
-          timestamp: message.timestamp,
-          modelId: message.modelId,
-          providerId: message.providerId,
-          totalTokens: message.totalTokens,
-          conversationId: persisted.id,
-          isStreaming: false,
-          reasoningText: message.reasoningText,
-          reasoningStartAt: message.reasoningStartAt,
-          reasoningFinishedAt: message.reasoningFinishedAt,
-          translation: message.translation,
-          reasoningSegmentsJson: message.reasoningSegmentsJson,
-          promptTokens: message.promptTokens,
-          completionTokens: message.completionTokens,
-          cachedTokens: message.cachedTokens,
-          durationMs: message.durationMs,
-        ),
+      final forked = ChatMessage(
+        role: message.role,
+        content: message.content,
+        timestamp: message.timestamp,
+        modelId: message.modelId,
+        providerId: message.providerId,
+        totalTokens: message.totalTokens,
+        conversationId: persisted.id,
+        isStreaming: false,
+        reasoningText: message.reasoningText,
+        reasoningStartAt: message.reasoningStartAt,
+        reasoningFinishedAt: message.reasoningFinishedAt,
+        translation: message.translation,
+        reasoningSegmentsJson: message.reasoningSegmentsJson,
+        promptTokens: message.promptTokens,
+        completionTokens: message.completionTokens,
+        cachedTokens: message.cachedTokens,
+        durationMs: message.durationMs,
       );
+      await addMessageDirectly(persisted.id, forked);
+      if (message.role == 'user') {
+        await _inheritImageOcrArtifactsBestEffort(
+          fromRevisionId: message.id,
+          toRevisionId: forked.id,
+        );
+      }
     }
     _currentConversationId = persisted.id;
     notifyListeners();
@@ -2452,6 +2473,12 @@ class ChatService extends ChangeNotifier {
     if (_messageCanOwnAssets(newMsg)) {
       await _synchronizeMessageAssetsBestEffort(newMsg);
     }
+    if (newMsg.role == 'user') {
+      await _inheritImageOcrArtifactsBestEffort(
+        fromRevisionId: messageId,
+        toRevisionId: newMsg.id,
+      );
+    }
     final cid = newMsg.conversationId;
     _conversationsCache[cid] = result.conversation;
     final order = _messageOrderIds.putIfAbsent(cid, () => <String>[]);
@@ -2462,6 +2489,118 @@ class ChatService extends ChangeNotifier {
     if (arr != null) arr.add(newMsg);
     notifyListeners();
     return newMsg;
+  }
+
+  /// Resolve image path/data-URL → content SHA-256 from current bytes.
+  ///
+  /// Never trusts path→hash rows alone: the same path may point at different
+  /// historical assets after content replacement. Duplicate inputs are hashed
+  /// once and reused.
+  Future<Map<String, String>> resolveImageContentHashes(
+    List<String> imagePaths,
+  ) async {
+    if (!_initialized) await init();
+    final result = <String, String>{};
+    if (imagePaths.isEmpty) return result;
+
+    final uniquePaths = <String>{
+      for (final raw in imagePaths)
+        if (raw.trim().isNotEmpty) raw.trim(),
+    };
+    for (final path in uniquePaths) {
+      try {
+        if (path.startsWith('data:')) {
+          result[path] = await _hashDataUrl(path);
+          continue;
+        }
+        final fixed = SandboxPathResolver.fix(path);
+        final normalized = p.normalize(File(fixed).absolute.path);
+        final file = File(normalized);
+        if (await FileSystemEntity.type(file.path, followLinks: false) !=
+            FileSystemEntityType.file) {
+          continue;
+        }
+        result[path] = await _assetContentHash(file);
+      } catch (_) {
+        // Skip unreadable sources; caller will treat them as cache misses.
+      }
+    }
+    return result;
+  }
+
+  static Future<String> _hashDataUrl(String dataUrl) {
+    return Isolate.run(() {
+      final comma = dataUrl.indexOf(',');
+      if (comma < 0) {
+        return sha256.convert(utf8.encode(dataUrl)).toString();
+      }
+      final meta = dataUrl.substring(0, comma).toLowerCase();
+      final payload = dataUrl.substring(comma + 1);
+      if (meta.contains(';base64')) {
+        return sha256.convert(base64Decode(payload)).toString();
+      }
+      return sha256
+          .convert(utf8.encode(Uri.decodeFull(payload)))
+          .toString();
+    });
+  }
+
+  Future<Map<String, Map<String, String>>> getImageOcrArtifacts(
+    Iterable<String> revisionIds,
+  ) async {
+    if (!_initialized) await init();
+    final ids = revisionIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty && !_isTemporaryMessageId(id))
+        .toList(growable: false);
+    if (ids.isEmpty) return const {};
+    try {
+      return await _repo.getImageOcrArtifacts(ids);
+    } catch (error) {
+      debugPrint('OCR artifact load failed: $error');
+      return const {};
+    }
+  }
+
+  Future<void> upsertImageOcrArtifactItems(
+    String revisionId,
+    Map<String, String> items,
+  ) async {
+    if (!_initialized) await init();
+    if (_isTemporaryMessageId(revisionId) || items.isEmpty) return;
+    try {
+      await _repo.upsertImageOcrArtifactItems(
+        revisionId: revisionId,
+        items: items,
+      );
+    } catch (error) {
+      debugPrint('OCR artifact persist failed: $error');
+    }
+  }
+
+  Future<void> _inheritImageOcrArtifactsBestEffort({
+    required String fromRevisionId,
+    required String toRevisionId,
+  }) async {
+    if (_isTemporaryMessageId(toRevisionId)) return;
+    try {
+      var hashes = await _repo.getMessageImageContentHashes(toRevisionId);
+      if (hashes.isEmpty) {
+        final message = await _repo.getMessage(toRevisionId);
+        if (message == null) return;
+        final paths = _extractOcrImageSources(message.content);
+        if (paths.isEmpty) return;
+        hashes = (await resolveImageContentHashes(paths)).values.toSet();
+      }
+      if (hashes.isEmpty) return;
+      await _repo.inheritImageOcrArtifacts(
+        fromRevisionId: fromRevisionId,
+        toRevisionId: toRevisionId,
+        retainedContentHashes: hashes,
+      );
+    } catch (error) {
+      debugPrint('OCR artifact inherit failed: $error');
+    }
   }
 
   Map<String, int> getVersionSelections(String conversationId) {
