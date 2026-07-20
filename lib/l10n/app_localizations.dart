@@ -2837,6 +2837,12 @@ abstract class AppLocalizations {
   /// **'Toggle Topics'**
   String get hotkeyToggleTopicPanel;
 
+  /// No description provided for @hotkeyFocusInput.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus Input'**
+  String get hotkeyFocusInput;
+
   /// No description provided for @hotkeysPressShortcut.
   ///
   /// In en, this message translates to:
