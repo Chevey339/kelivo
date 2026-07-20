@@ -236,6 +236,7 @@
   "hotkeySwitchModel": "切換模型",
   "hotkeyToggleAssistantPanel": "切換助理顯示",
   "hotkeyToggleTopicPanel": "切換話題顯示",
+  "hotkeyFocusInput": "聚焦輸入框",
   "hotkeysPressShortcut": "按下快捷鍵",
   "hotkeysResetDefault": "重置為預設",
   "hotkeysClearShortcut": "清除快捷鍵",

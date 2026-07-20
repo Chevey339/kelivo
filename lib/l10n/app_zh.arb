@@ -424,6 +424,7 @@
   "hotkeySwitchModel": "切换模型",
   "hotkeyToggleAssistantPanel": "切换助手显示",
   "hotkeyToggleTopicPanel": "切换话题显示",
+  "hotkeyFocusInput": "聚焦输入框",
   "hotkeysPressShortcut": "按下快捷键",
   "hotkeysResetDefault": "重置为默认",
   "hotkeysClearShortcut": "清除快捷键",

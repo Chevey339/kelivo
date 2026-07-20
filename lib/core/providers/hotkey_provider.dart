@@ -91,6 +91,14 @@ class HotkeyProvider extends ChangeNotifier {
       defaultMac: 'cmd+bracketright',
       enabledByDefault: true,
     ),
+    // Focus chat input (no default)
+    'focus_input': AppHotkey(
+      id: 'focus_input',
+      l10nLabelKey: 'hotkeyFocusInput',
+      defaultWinLinux: '',
+      defaultMac: '',
+      enabledByDefault: true,
+    ),
   };
 
   final Map<String, HotKey> _registered = <String, HotKey>{};
@@ -252,6 +260,9 @@ class HotkeyProvider extends ChangeNotifier {
         break;
       case 'toggle_topics':
         HotkeyEventBus.instance.fire(HotkeyAction.toggleLeftPanelTopics);
+        break;
+      case 'focus_input':
+        HotkeyEventBus.instance.fire(HotkeyAction.focusInput);
         break;
     }
   }
