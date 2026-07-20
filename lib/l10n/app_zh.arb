@@ -2255,7 +2255,7 @@
   "@assistantEditProactiveCareDateTimePickerTitle": {
     "description": "日期时间选择器标题"
   },
-  "assistantEditProactiveCareExactAlarmPermissionDenied": "未授予精确闹钟权限，主动关怀无法按时唤醒应用，请在系统设置中允许"闹钟和提醒"。",
+  "assistantEditProactiveCareExactAlarmPermissionDenied": "未授予精确闹钟权限，主动关怀无法按时唤醒应用，请在系统设置中允许「闹钟和提醒」。",
   "@assistantEditProactiveCareExactAlarmPermissionDenied": {
     "description": "精确闹钟权限被拒绝时的警告"
   },
