@@ -1301,7 +1301,7 @@ data: {"type":"message_stop"}
         messages: [
           {'role': 'user', 'content': 'inspect'},
         ],
-        userImagePaths: [file.path],
+        userMediaPaths: [file.path],
         onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
         stream: false,
       ).toList();

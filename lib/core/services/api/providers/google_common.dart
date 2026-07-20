@@ -251,7 +251,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -271,7 +271,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       config: config,
       modelId: modelId,
       messages: messages,
-      userImagePaths: userImagePaths,
+      userMediaPaths: userMediaPaths,
       thinkingBudget: thinkingBudget,
       temperature: temperature,
       topP: topP,
@@ -361,7 +361,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       final hasMarkdownImages = raw.contains('![') && raw.contains('](');
       final hasCustomImages = raw.contains('[image:');
       final hasAttachedImages =
-          isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+          isLast && role == 'user' && (userMediaPaths?.isNotEmpty == true);
       if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
         final parsed = await _parseTextAndImages(
           raw,
@@ -396,7 +396,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           }
         }
         if (hasAttachedImages) {
-          for (final p in userImagePaths!) {
+          for (final p in userMediaPaths!) {
             final normalized = normalizeSrc(p);
             if (!seenSources.add(normalized)) continue;
             if (p.startsWith('data:')) {
@@ -795,7 +795,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     final hasMarkdownImages = raw.contains('![') && raw.contains('](');
     final hasCustomImages = raw.contains('[image:');
     final hasAttachedImages =
-        isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
+        isLast && role == 'user' && (userMediaPaths?.isNotEmpty == true);
 
     if (hasMarkdownImages || hasCustomImages || hasAttachedImages) {
       final parsed = await _parseTextAndImages(
@@ -834,7 +834,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         }
       }
       if (hasAttachedImages) {
-        for (final p in userImagePaths!) {
+        for (final p in userMediaPaths!) {
           final normalized = normalizeSrc(p);
           if (!seenSources.add(normalized)) continue;
           if (p.startsWith('data:')) {

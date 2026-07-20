@@ -43,7 +43,7 @@ void main() {
       GenerationContext(
         assistantMessage: message,
         apiMessages: const [],
-        userImagePaths: const [],
+        userMediaPaths: const [],
         allowImagesApiRouting: false,
         providerKey: 'test',
         modelId: 'test-model',
@@ -79,7 +79,7 @@ void main() {
       GenerationContext(
         assistantMessage: message,
         apiMessages: const [],
-        userImagePaths: const [],
+        userMediaPaths: const [],
         allowImagesApiRouting: false,
         providerKey: 'test',
         modelId: 'test-model',

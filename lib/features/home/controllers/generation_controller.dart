@@ -205,7 +205,7 @@ class GenerationController {
   stream_ctrl.GenerationContext buildGenerationContext({
     required ChatMessage assistantMessage,
     required List<Map<String, dynamic>> apiMessages,
-    required List<String> userImagePaths,
+    required List<String> userMediaPaths,
     required bool allowImagesApiRouting,
     required String providerKey,
     required String modelId,
@@ -229,7 +229,7 @@ class GenerationController {
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: apiMessages,
-      userImagePaths: userImagePaths,
+      userMediaPaths: userMediaPaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,

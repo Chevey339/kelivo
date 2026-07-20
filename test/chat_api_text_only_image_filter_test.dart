@@ -138,7 +138,7 @@ void main() {
               {'role': 'user', 'content': 'before [image:${file.path}] after'},
               {'role': 'user', 'content': 'continue'},
             ],
-            userImagePaths: [file.path],
+            userMediaPaths: [file.path],
             stream: false,
           ).toList();
         },
@@ -171,7 +171,7 @@ void main() {
               {'role': 'user', 'content': 'before [image:${file.path}] after'},
               {'role': 'user', 'content': 'continue'},
             ],
-            userImagePaths: [file.path],
+            userMediaPaths: [file.path],
             stream: false,
           ).toList();
         },

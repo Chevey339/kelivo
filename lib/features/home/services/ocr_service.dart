@@ -101,7 +101,7 @@ class OcrService {
       config: cfg,
       modelId: model,
       messages: messages,
-      userImagePaths: imagePaths,
+      userMediaPaths: imagePaths,
       thinkingBudget: null,
       temperature: 0.0,
       topP: null,

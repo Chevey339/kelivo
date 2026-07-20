@@ -271,7 +271,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'describe this image'},
           ],
-          userImagePaths: [inputImage.path],
+          userMediaPaths: [inputImage.path],
           allowImagesApiRouting: false,
           stream: false,
         ).toList();
@@ -325,7 +325,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'make the background blue'},
         ],
-        userImagePaths: [inputImage.path],
+        userMediaPaths: [inputImage.path],
       ).toList();
 
       expect(requestUri.path, '/v1/images/edits');
@@ -378,7 +378,7 @@ void main() {
         messages: const [
           {'role': 'user', 'content': 'make it cinematic'},
         ],
-        userImagePaths: [inputImage.path],
+        userMediaPaths: [inputImage.path],
       ).toList();
 
       expect(requestBody, contains('filename="source.jpg"'));
@@ -447,7 +447,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'edit this image'},
           ],
-          userImagePaths: const ['/tmp/source.png'],
+          userMediaPaths: const ['/tmp/source.png'],
         ).toList(),
         throwsA(
           isA<UnsupportedError>().having(

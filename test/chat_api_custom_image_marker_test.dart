@@ -200,7 +200,7 @@ void main() {
           messages: const [
             {'role': 'user', 'content': 'continue'},
           ],
-          userImagePaths: [file.path],
+          userMediaPaths: [file.path],
           stream: false,
         ).toList();
       });
