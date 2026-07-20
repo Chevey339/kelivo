@@ -1,14 +1,23 @@
 # Changelog
 
+## [2.0.1] - 2026-07-20
+
+> ℹ️ **This release fixes the permission issue that made "Ta 的来信" (proactive care) completely unusable in v2.0.0.**
+>
+> Proactive care lets AI assistants send care messages to you on a configurable schedule.
+>
+> **Platform support**: Android only. Users on other platforms will see no visible changes.
+>
+> **Permissions**: Android will request notification permissions for care message alerts.
+
+### Fixed
+
+- Remove `USE_EXACT_ALARM` permission request, fixing the permission check that blocked "Ta 的来信" on Android
+- Update default proactive care prompts
+
 ## [2.0.0] - 2026-07-20
 
-> ℹ️ **This release introduces Ta 的来信** (**proactive care**), which lets AI assistants send care messages to you on a configurable schedule.
->
-> **Platform support**: Android only. Users on **other platforms** will see **no visible changes** after upgrading. The feature uses `android_alarm_manager_plus` for alarm scheduling and a headless background isolate for care decision-making and message generation.
->
-> **Porting notes**: This feature was ported from another fork of Kelivo and adapted for Cuplivo's Drift/SQLite architecture. Stability is still being evaluated.
->
-> **Permissions**: Android will request notification permissions for care message alerts. This is an opt-in custom feature — you can decline the request without affecting Cuplivo's regular chat usage.
+> ❌ **This version is unusable.** The permission check logic for "Ta 的来信" (proactive care) is broken — the feature never works on any device. Please upgrade to v2.0.1.
 
 ### Added
 
