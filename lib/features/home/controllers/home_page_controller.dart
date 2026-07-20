@@ -686,7 +686,9 @@ class HomePageController extends ChangeNotifier {
     } else if (multiAIEngine.isActive) {
       if (!_context.mounted) return ChatInputSubmissionResult.rejected;
       final settings = _context.read<SettingsProvider>();
-      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      final assistant = await _context
+          .read<AssistantProvider>()
+          .getLoadedCurrentAssistant();
       final gid = await multiAIEngine.startRound(
         input: input,
         conversation: currentConversation!,

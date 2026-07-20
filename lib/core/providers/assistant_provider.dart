@@ -44,6 +44,12 @@ class AssistantProvider extends ChangeNotifier {
 
   AssistantProvider({this.chatService});
 
+  /// Ensures loading completes, then returns [currentAssistant].
+  Future<Assistant?> getLoadedCurrentAssistant() async {
+    await ensureLoaded();
+    return currentAssistant;
+  }
+
   Future<void> ensureLoaded() async {
     if (_loaded) return;
     final repo = _repo;
