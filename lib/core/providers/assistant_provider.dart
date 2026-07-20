@@ -572,11 +572,11 @@ class AssistantProvider extends ChangeNotifier {
     final timeChanged =
         prev.proactiveCareNextMessageAt != next.proactiveCareNextMessageAt;
     if (!isEnabled && wasEnabled) {
-      ProactiveCareAlarmService.cancelAlarm(next.id);
+      ProactiveCareAlarmService.cancelFor(next.id);
     } else if (isEnabled && (!wasEnabled || timeChanged)) {
       final at = next.proactiveCareNextMessageAt;
       if (at != null) {
-        ProactiveCareAlarmService.scheduleAlarm(next.id, at);
+        ProactiveCareAlarmService.sync(next);
       }
     }
   }
@@ -614,7 +614,7 @@ class AssistantProvider extends ChangeNotifier {
     await chatService?.deleteConversationsForAssistant(id);
     // Cancel any pending proactive care alarm for this assistant.
     if (Platform.isAndroid && ProactiveCareAlarmService.isSupported) {
-      ProactiveCareAlarmService.cancelAlarm(id);
+      ProactiveCareAlarmService.cancelFor(id);
     }
 
     final removingCurrent = _assistants[idx].id == _currentAssistantId;

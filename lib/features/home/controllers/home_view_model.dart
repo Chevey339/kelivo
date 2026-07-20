@@ -15,7 +15,7 @@ import '../../../core/services/notification_service.dart';
 import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../core/services/proactive_care_message_flow.dart';
 import '../../../core/providers/user_provider.dart';
-import '../../../utils/avatar_cache.dart';
+
 import '../../../l10n/app_localizations.dart';
 import '../../chat/widgets/chat_message_widget.dart' show ToolUIPart;
 import '../../chat/utils/thinking_tag_parser.dart';
@@ -1575,7 +1575,9 @@ class HomeViewModel extends ChangeNotifier {
         latest.copyWith(proactiveCareNextMessageAt: newTime),
       );
       // Reschedule the alarm with the new time.
-      await ProactiveCareAlarmService.scheduleAlarm(assistant.id, newTime);
+      await ProactiveCareAlarmService.sync(
+        latest.copyWith(proactiveCareNextMessageAt: newTime),
+      );
     } catch (e) {
       FlutterLogger.log(
         '[ProactiveCare] Decision request failed: $e',
