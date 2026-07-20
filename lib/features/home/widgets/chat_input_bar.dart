@@ -1185,17 +1185,6 @@ class _ChatInputBarState extends State<ChatInputBar>
                 color: cs.onPrimaryContainer,
               ),
             ),
-            if (widget.onExitMultiAI != null) ...[
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: widget.onExitMultiAI,
-                child: Icon(
-                  Lucide.X,
-                  size: 14,
-                  color: cs.onPrimaryContainer.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
           ],
         ),
       ),

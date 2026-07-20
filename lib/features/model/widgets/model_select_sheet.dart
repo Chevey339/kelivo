@@ -203,6 +203,7 @@ Future<List<ModelSelection>?> showMultiModelSelector(
   BuildContext context, {
   String? limitProviderKey,
   Set<String>? preselectedKeys,
+  Set<String>? lockedKeys,
 }) async {
   final completer = Completer<List<ModelSelection>?>();
   if (_modelSelectorOpen) return null;
@@ -225,6 +226,8 @@ Future<List<ModelSelection>?> showMultiModelSelector(
             width: 480,
             height: 600,
             child: _ModelSelectSheet(
+              preselectedKeys: preselectedKeys,
+              lockedKeys: lockedKeys,
               onMultiSelectConfirm: (list) {
                 completer.complete(list);
                 Navigator.of(ctx).maybePop();
@@ -244,6 +247,8 @@ Future<List<ModelSelection>?> showMultiModelSelector(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         builder: (ctx) => _ModelSelectSheet(
+          preselectedKeys: preselectedKeys,
+          lockedKeys: lockedKeys,
           onMultiSelectConfirm: (list) {
             completer.complete(list);
             Navigator.of(ctx).maybePop();
@@ -338,11 +343,15 @@ class _ModelSelectSheet extends StatefulWidget {
     this.initialProviderKey,
     this.initialModelId,
     this.onMultiSelectConfirm,
+    this.preselectedKeys,
+    this.lockedKeys,
   });
   final String? limitProviderKey;
   final String? initialProviderKey;
   final String? initialModelId;
   final void Function(List<ModelSelection>)? onMultiSelectConfirm;
+  final Set<String>? preselectedKeys;
+  final Set<String>? lockedKeys;
   @override
   State<_ModelSelectSheet> createState() => _ModelSelectSheetState();
 }
@@ -383,7 +392,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       <String, int>{}; // 'pk::modelId' in favorites -> index
 
   // Multi-select state
-  final _multiSelect = _ModelMultiSelectState();
+  final _multiSelect = ModelMultiSelectState();
 
   // Async loading state
   bool _isLoading = true;
@@ -459,6 +468,13 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     _itemPositionsListener.itemPositions.addListener(
       _scheduleActiveProviderUpdate,
     );
+    // Auto-activate multi-select when preselected keys are provided.
+    if (widget.preselectedKeys != null && widget.preselectedKeys!.isNotEmpty) {
+      _multiSelect.activate(
+        preSelected: widget.preselectedKeys,
+        locked: widget.lockedKeys,
+      );
+    }
     // Delay loading to allow the sheet to open first
     Future.delayed(const Duration(milliseconds: 50), () {
       if (mounted) {
@@ -1012,20 +1028,25 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                           child: Row(
                             children: [
                               GestureDetector(
-                                onTap: () => setState(() {
-                                  final currentKey = _currentModelKey(
-                                    context.read<SettingsProvider>(),
-                                    context.read<AssistantProvider>(),
-                                  );
-                                  final preSelected = currentKey.isEmpty
-                                      ? null
-                                      : <String>{
-                                          currentKey.replaceFirst('::', '|'),
-                                        };
-                                  _multiSelect.toggleActive(
-                                    preSelected: preSelected,
-                                  );
-                                }),
+                                onTap: _multiSelect.lockedCount > 0
+                                    ? null
+                                    : () => setState(() {
+                                        final currentKey = _currentModelKey(
+                                          context.read<SettingsProvider>(),
+                                          context.read<AssistantProvider>(),
+                                        );
+                                        final preSelected = currentKey.isEmpty
+                                            ? null
+                                            : <String>{
+                                                currentKey.replaceFirst(
+                                                  '::',
+                                                  '|',
+                                                ),
+                                              };
+                                        _multiSelect.toggleActive(
+                                          preSelected: preSelected,
+                                        );
+                                      }),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
@@ -1046,7 +1067,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                                   ),
                                   child: Text(
                                     _multiSelect.isActive
-                                        ? '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕'
+                                        ? (_multiSelect.lockedCount > 0
+                                              ? l10n.modelSelectorMultiConfirm(
+                                                  _multiSelect.count,
+                                                )
+                                              : '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕')
                                         : l10n.modelSelectorMultiSelect,
                                     style: TextStyle(
                                       fontSize: 12,
@@ -1455,8 +1480,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final mSelectKey = _ModelMultiSelectState.keyFor(m.providerKey, m.id);
+    final mSelectKey = ModelMultiSelectState.keyFor(m.providerKey, m.id);
     final isMultiSelected = _multiSelect.contains(mSelectKey);
+    final isLocked = _multiSelect.isLocked(mSelectKey);
     final bg = _multiSelect.isActive
         ? (isMultiSelected
               ? cs.primary.withValues(alpha: 0.15)
@@ -1475,9 +1501,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
           pressedBlendStrength: 0.10,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           onTap: _multiSelect.isActive
-              ? () => setState(() {
-                  _multiSelect.toggle(mSelectKey);
-                })
+              ? (isLocked
+                    ? null
+                    : () => setState(() {
+                        _multiSelect.toggle(mSelectKey);
+                      }))
               : () => Navigator.of(
                   context,
                 ).pop(ModelSelection(m.providerKey, m.id)),
@@ -1505,9 +1533,11 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                     child: Icon(
                       isMultiSelected ? Lucide.CheckSquare : Lucide.Square,
                       size: 18,
-                      color: isMultiSelected
-                          ? cs.primary
-                          : cs.onSurface.withValues(alpha: 0.4),
+                      color: isLocked
+                          ? cs.onSurface.withValues(alpha: 0.25)
+                          : (isMultiSelected
+                                ? cs.primary
+                                : cs.onSurface.withValues(alpha: 0.4)),
                     ),
                   ),
                 _BrandAvatar(name: m.id, assetOverride: m.asset, size: 28),
@@ -1796,18 +1826,22 @@ class _ModelItem {
 /// Used by both mobile [_ModelSelectSheetState] and desktop
 /// [_DesktopModelSelectDialogBodyState] to eliminate duplicated
 /// toggle, confirm, and pre-selection logic.
-class _ModelMultiSelectState {
+class ModelMultiSelectState {
   bool isActive = false;
   final Set<String> _selected = {};
+  Set<String> _locked = {};
 
   static String keyFor(String providerKey, String modelId) =>
       '$providerKey|$modelId';
 
   int get count => _selected.length;
+  int get lockedCount => _locked.length;
   bool canConfirm(int minCount) => count >= minCount;
   bool contains(String key) => _selected.contains(key);
+  bool isLocked(String key) => _locked.contains(key);
 
   void toggle(String key) {
+    if (_locked.contains(key)) return;
     if (_selected.contains(key)) {
       _selected.remove(key);
     } else {
@@ -1815,24 +1849,26 @@ class _ModelMultiSelectState {
     }
   }
 
-  /// Enter multi-select mode, optionally pre-selecting keys.
-  void activate({Iterable<String>? preSelected}) {
+  /// Enter multi-select mode, optionally pre-selecting and locking keys.
+  void activate({Iterable<String>? preSelected, Set<String>? locked}) {
     isActive = true;
     _selected.clear();
+    _locked = locked ?? {};
     if (preSelected != null) _selected.addAll(preSelected);
   }
 
   void deactivate() {
     isActive = false;
     _selected.clear();
+    _locked = {};
   }
 
   /// Toggle between active and inactive; optionally pre-select on activation.
-  void toggleActive({Iterable<String>? preSelected}) {
+  void toggleActive({Iterable<String>? preSelected, Set<String>? locked}) {
     if (isActive) {
       deactivate();
     } else {
-      activate(preSelected: preSelected);
+      activate(preSelected: preSelected, locked: locked);
     }
   }
 
@@ -1972,7 +2008,7 @@ class _DesktopModelSelectDialogBodyState
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   bool _loading = true;
-  final _multiSelect = _ModelMultiSelectState();
+  final _multiSelect = ModelMultiSelectState();
   Map<String, _ProviderGroup> _groups = const {};
   List<String> _orderedKeys = const [];
   // Flattened rows and precise index mapping for jump
@@ -2320,20 +2356,25 @@ class _DesktopModelSelectDialogBodyState
                             child: Row(
                               children: [
                                 GestureDetector(
-                                  onTap: () => setState(() {
-                                    final currentKey = _currentModelKey(
-                                      context.read<SettingsProvider>(),
-                                      context.read<AssistantProvider>(),
-                                    );
-                                    final preSelected = currentKey.isEmpty
-                                        ? null
-                                        : <String>{
-                                            currentKey.replaceFirst('::', '|'),
-                                          };
-                                    _multiSelect.toggleActive(
-                                      preSelected: preSelected,
-                                    );
-                                  }),
+                                  onTap: _multiSelect.lockedCount > 0
+                                      ? null
+                                      : () => setState(() {
+                                          final currentKey = _currentModelKey(
+                                            context.read<SettingsProvider>(),
+                                            context.read<AssistantProvider>(),
+                                          );
+                                          final preSelected = currentKey.isEmpty
+                                              ? null
+                                              : <String>{
+                                                  currentKey.replaceFirst(
+                                                    '::',
+                                                    '|',
+                                                  ),
+                                                };
+                                          _multiSelect.toggleActive(
+                                            preSelected: preSelected,
+                                          );
+                                        }),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 8,
@@ -2354,7 +2395,11 @@ class _DesktopModelSelectDialogBodyState
                                     ),
                                     child: Text(
                                       _multiSelect.isActive
-                                          ? '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕'
+                                          ? (_multiSelect.lockedCount > 0
+                                                ? l10n.modelSelectorMultiConfirm(
+                                                    _multiSelect.count,
+                                                  )
+                                                : '${l10n.modelSelectorMultiConfirm(_multiSelect.count)} ✕')
                                           : l10n.modelSelectorMultiSelect,
                                       style: TextStyle(
                                         fontSize: 11,
@@ -2570,7 +2615,7 @@ class _DesktopModelSelectDialogBodyState
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final key = _ModelMultiSelectState.keyFor(m.providerKey, m.id);
+    final key = ModelMultiSelectState.keyFor(m.providerKey, m.id);
     final isMultiSelected = _multiSelect.contains(key);
     final bg = _multiSelect.isActive
         ? (isMultiSelected

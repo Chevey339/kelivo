@@ -1344,12 +1344,10 @@ class _HomePageState extends State<HomePage>
           ? _controller.exitMultiAIMode
           : null,
       onMultiSelectModel: () {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.multiAIModeLockedToast,
-          type: NotificationType.info,
-        );
+        final engine = _controller.multiAIEngine;
+        if (engine.roundCount == 0) {
+          _controller.showMultiAIModelSelector();
+        }
       },
     );
   }

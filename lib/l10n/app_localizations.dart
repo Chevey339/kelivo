@@ -10801,6 +10801,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t generate the proactive care message. Open the app to check the model settings and network.'**
   String get proactiveCareFailedNotificationBody;
+
+  /// Tooltip for the add model button in multi-AI card footer
+  ///
+  /// In en, this message translates to:
+  /// **'Add Model'**
+  String get multiAIAddModelTooltip;
 }
 
 class _AppLocalizationsDelegate

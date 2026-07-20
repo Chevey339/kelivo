@@ -1986,6 +1986,46 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Show model selector with locked existing models for adding models
+  /// mid-round (the "+" button on first-round card footer).
+  Future<void> addMultiAIModels() async {
+    final engine = multiAIEngine;
+    if (!engine.isActive || engine.roundCount != 1) return;
+    if (currentConversation == null) return;
+
+    final existingKeys = engine.models
+        .map((m) => ModelMultiSelectState.keyFor(m.providerKey, m.modelId))
+        .toSet();
+
+    final result = await showMultiModelSelector(
+      _context,
+      preselectedKeys: existingKeys,
+      lockedKeys: existingKeys,
+    );
+    if (result == null) return;
+    if (!_context.mounted) return;
+
+    final newModels = result
+        .where(
+          (m) => !existingKeys.contains(
+            ModelMultiSelectState.keyFor(m.providerKey, m.modelId),
+          ),
+        )
+        .toList();
+    if (newModels.isEmpty) return;
+
+    final settings = _context.read<SettingsProvider>();
+    final assistant = _context.read<AssistantProvider>().currentAssistant;
+
+    await engine.addModelsAndExecute(
+      newModels: newModels,
+      conversation: currentConversation!,
+      settings: settings,
+      assistant: assistant,
+    );
+    notifyListeners();
+  }
+
   // ============================================================================
   // Public Methods - UI State
   // ============================================================================

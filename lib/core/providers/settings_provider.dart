@@ -100,7 +100,8 @@ class SettingsProvider extends ChangeNotifier {
   static const String _suggestionInsertOnTapOnlyKey =
       'suggestion_insert_on_tap_only_v1';
   static const String _compressModelKey = 'compress_model_v1';
-  static const String _proactiveCareDecisionModelKey = 'proactive_care_decision_model_v1';
+  static const String _proactiveCareDecisionModelKey =
+      'proactive_care_decision_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
@@ -909,8 +910,9 @@ class SettingsProvider extends ChangeNotifier {
         ? defaultCompressPrompt
         : compressp;
     // load proactive care decision model
-    final proactiveCareDecisionSel =
-        prefs.getString(_proactiveCareDecisionModelKey);
+    final proactiveCareDecisionSel = prefs.getString(
+      _proactiveCareDecisionModelKey,
+    );
     if (proactiveCareDecisionSel != null &&
         proactiveCareDecisionSel.contains('::')) {
       final parts = proactiveCareDecisionSel.split('::');
