@@ -225,6 +225,18 @@ class ChatApiService {
     }
   }
 
+  /// Like `matchAsPrefix` for `![alt](url)` using O(1)-stack indexOf.
+  /// Only matches at [start]; returns `null` if `raw[start]` is not `![`.
+  static (int, int, String)? _nextMarkdownImage(String raw, int start) {
+    if (!raw.startsWith('![', start)) return null;
+    final altEnd = raw.indexOf('](', start + 2);
+    if (altEnd < 0) return null;
+    final srcEnd = raw.indexOf(')', altEnd + 2);
+    if (srcEnd < 0) return null;
+    final url = raw.substring(altEnd + 2, srcEnd).trim();
+    return (start, srcEnd + 1, url);
+  }
+
   // Simple container for parsed text + image refs
   static Future<_ParsedTextAndImages> _parseTextAndImages(
     String raw, {
@@ -235,7 +247,6 @@ class ChatApiService {
     bool keepDisallowedImageText = true,
   }) async {
     if (raw.isEmpty) return const _ParsedTextAndImages('', <_ImageRef>[]);
-    final mdImg = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
     // Match custom inline image markers like: [image:/absolute/path.png]
     // Use a single backslash in a raw string to escape '[' and ']' in regex.
     final customImg = RegExp(r"\[image:(.+?)\]");
@@ -309,15 +320,15 @@ class ChatApiService {
         continue;
       }
 
-      final m1 = mdImg.matchAsPrefix(raw, i);
+      final m1 = _nextMarkdownImage(raw, i);
       final m2 = customImg.matchAsPrefix(raw, i);
       if (m1 != null) {
-        final full = raw.substring(m1.start, m1.end);
-        final url = (m1.group(1) ?? '').trim();
+        final full = raw.substring(m1.$1, m1.$2);
+        final url = m1.$3;
         if (url.isEmpty) {
           // Empty URL: treat as plain text, do not try to interpret as image.
           buf.write(full);
-          i = m1.end;
+          i = m1.$2;
           continue;
         }
         // Inline base64 / data URLs: always treat as image but keep them out of text.
@@ -327,7 +338,7 @@ class ChatApiService {
           } else if (keepDisallowedImageText) {
             buf.write(full);
           }
-          i = m1.end;
+          i = m1.$2;
           continue;
         }
         // Remote http(s) URLs
@@ -336,14 +347,14 @@ class ChatApiService {
             // Model does not accept image input (or we intentionally skip http images):
             // keep original markdown so the model can see the template.
             if (keepDisallowedImageText) buf.write(full);
-            i = m1.end;
+            i = m1.$2;
             continue;
           }
           final ok = await _isValidRemoteImageUrl(url);
           if (!ok) {
             // Invalid / unreachable image URL (e.g. 404) → keep as plain text.
             buf.write(full);
-            i = m1.end;
+            i = m1.$2;
             continue;
           }
           images.add(_ImageRef('url', url));
@@ -351,13 +362,13 @@ class ChatApiService {
             // Keep markdown so the model can see template syntax and URL.
             buf.write(full);
           }
-          i = m1.end;
+          i = m1.$2;
           continue;
         }
         // Local / relative path: only treat as image when the file exists.
         if (!allowLocalImages) {
           if (keepDisallowedImageText) buf.write(full);
-          i = m1.end;
+          i = m1.$2;
           continue;
         }
         try {
@@ -366,18 +377,18 @@ class ChatApiService {
           if (!file.existsSync()) {
             // Missing local file: do NOT treat as image; keep original markdown.
             buf.write(full);
-            i = m1.end;
+            i = m1.$2;
             continue;
           }
         } catch (_) {
           // Any error probing the file → fall back to plain text.
           buf.write(full);
-          i = m1.end;
+          i = m1.$2;
           continue;
         }
         images.add(_ImageRef('path', url));
         // For real local files we keep previous behavior: only attach as image, omit markdown from text.
-        i = m1.end;
+        i = m1.$2;
         continue;
       }
       if (m2 != null) {
