@@ -2279,6 +2279,55 @@ class $AssistantRowsTable extends AssistantRows
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _enableProactiveCareMeta =
+      const VerificationMeta('enableProactiveCare');
+  @override
+  late final GeneratedColumn<bool> enableProactiveCare = GeneratedColumn<bool>(
+    'enable_proactive_care',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("enable_proactive_care" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _proactiveCareNextMessageAtMeta =
+      const VerificationMeta('proactiveCareNextMessageAt');
+  @override
+  late final GeneratedColumn<DateTime> proactiveCareNextMessageAt =
+      GeneratedColumn<DateTime>(
+        'proactive_care_next_message_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _proactiveCarePromptMeta =
+      const VerificationMeta('proactiveCarePrompt');
+  @override
+  late final GeneratedColumn<String> proactiveCarePrompt =
+      GeneratedColumn<String>(
+        'proactive_care_prompt',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
+  static const VerificationMeta _proactiveCareDecisionPromptMeta =
+      const VerificationMeta('proactiveCareDecisionPrompt');
+  @override
+  late final GeneratedColumn<String> proactiveCareDecisionPrompt =
+      GeneratedColumn<String>(
+        'proactive_care_decision_prompt',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(''),
+      );
   static const VerificationMeta _enableMemoryMeta = const VerificationMeta(
     'enableMemory',
   );
@@ -2440,6 +2489,10 @@ class $AssistantRowsTable extends AssistantRows
     mcpServerIdsJson,
     localToolIdsJson,
     regexRulesJson,
+    enableProactiveCare,
+    proactiveCareNextMessageAt,
+    proactiveCarePrompt,
+    proactiveCareDecisionPrompt,
     enableMemory,
     memoryMode,
     enableRecentChatsReference,
@@ -2663,6 +2716,42 @@ class $AssistantRowsTable extends AssistantRows
         ),
       );
     }
+    if (data.containsKey('enable_proactive_care')) {
+      context.handle(
+        _enableProactiveCareMeta,
+        enableProactiveCare.isAcceptableOrUnknown(
+          data['enable_proactive_care']!,
+          _enableProactiveCareMeta,
+        ),
+      );
+    }
+    if (data.containsKey('proactive_care_next_message_at')) {
+      context.handle(
+        _proactiveCareNextMessageAtMeta,
+        proactiveCareNextMessageAt.isAcceptableOrUnknown(
+          data['proactive_care_next_message_at']!,
+          _proactiveCareNextMessageAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('proactive_care_prompt')) {
+      context.handle(
+        _proactiveCarePromptMeta,
+        proactiveCarePrompt.isAcceptableOrUnknown(
+          data['proactive_care_prompt']!,
+          _proactiveCarePromptMeta,
+        ),
+      );
+    }
+    if (data.containsKey('proactive_care_decision_prompt')) {
+      context.handle(
+        _proactiveCareDecisionPromptMeta,
+        proactiveCareDecisionPrompt.isAcceptableOrUnknown(
+          data['proactive_care_decision_prompt']!,
+          _proactiveCareDecisionPromptMeta,
+        ),
+      );
+    }
     if (data.containsKey('enable_memory')) {
       context.handle(
         _enableMemoryMeta,
@@ -2855,6 +2944,22 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}regex_rules_json'],
       )!,
+      enableProactiveCare: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}enable_proactive_care'],
+      )!,
+      proactiveCareNextMessageAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}proactive_care_next_message_at'],
+      ),
+      proactiveCarePrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}proactive_care_prompt'],
+      )!,
+      proactiveCareDecisionPrompt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}proactive_care_decision_prompt'],
+      )!,
       enableMemory: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}enable_memory'],
@@ -2933,6 +3038,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final String mcpServerIdsJson;
   final String localToolIdsJson;
   final String regexRulesJson;
+  final bool enableProactiveCare;
+  final DateTime? proactiveCareNextMessageAt;
+  final String proactiveCarePrompt;
+  final String proactiveCareDecisionPrompt;
   final bool enableMemory;
   final String memoryMode;
   final bool enableRecentChatsReference;
@@ -2969,6 +3078,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.mcpServerIdsJson,
     required this.localToolIdsJson,
     required this.regexRulesJson,
+    required this.enableProactiveCare,
+    this.proactiveCareNextMessageAt,
+    required this.proactiveCarePrompt,
+    required this.proactiveCareDecisionPrompt,
     required this.enableMemory,
     required this.memoryMode,
     required this.enableRecentChatsReference,
@@ -3024,6 +3137,16 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['mcp_server_ids_json'] = Variable<String>(mcpServerIdsJson);
     map['local_tool_ids_json'] = Variable<String>(localToolIdsJson);
     map['regex_rules_json'] = Variable<String>(regexRulesJson);
+    map['enable_proactive_care'] = Variable<bool>(enableProactiveCare);
+    if (!nullToAbsent || proactiveCareNextMessageAt != null) {
+      map['proactive_care_next_message_at'] = Variable<DateTime>(
+        proactiveCareNextMessageAt,
+      );
+    }
+    map['proactive_care_prompt'] = Variable<String>(proactiveCarePrompt);
+    map['proactive_care_decision_prompt'] = Variable<String>(
+      proactiveCareDecisionPrompt,
+    );
     map['enable_memory'] = Variable<bool>(enableMemory);
     map['memory_mode'] = Variable<String>(memoryMode);
     map['enable_recent_chats_reference'] = Variable<bool>(
@@ -3082,6 +3205,13 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       mcpServerIdsJson: Value(mcpServerIdsJson),
       localToolIdsJson: Value(localToolIdsJson),
       regexRulesJson: Value(regexRulesJson),
+      enableProactiveCare: Value(enableProactiveCare),
+      proactiveCareNextMessageAt:
+          proactiveCareNextMessageAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(proactiveCareNextMessageAt),
+      proactiveCarePrompt: Value(proactiveCarePrompt),
+      proactiveCareDecisionPrompt: Value(proactiveCareDecisionPrompt),
       enableMemory: Value(enableMemory),
       memoryMode: Value(memoryMode),
       enableRecentChatsReference: Value(enableRecentChatsReference),
@@ -3132,6 +3262,18 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       mcpServerIdsJson: serializer.fromJson<String>(json['mcpServerIdsJson']),
       localToolIdsJson: serializer.fromJson<String>(json['localToolIdsJson']),
       regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
+      enableProactiveCare: serializer.fromJson<bool>(
+        json['enableProactiveCare'],
+      ),
+      proactiveCareNextMessageAt: serializer.fromJson<DateTime?>(
+        json['proactiveCareNextMessageAt'],
+      ),
+      proactiveCarePrompt: serializer.fromJson<String>(
+        json['proactiveCarePrompt'],
+      ),
+      proactiveCareDecisionPrompt: serializer.fromJson<String>(
+        json['proactiveCareDecisionPrompt'],
+      ),
       enableMemory: serializer.fromJson<bool>(json['enableMemory']),
       memoryMode: serializer.fromJson<String>(json['memoryMode']),
       enableRecentChatsReference: serializer.fromJson<bool>(
@@ -3179,6 +3321,14 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'mcpServerIdsJson': serializer.toJson<String>(mcpServerIdsJson),
       'localToolIdsJson': serializer.toJson<String>(localToolIdsJson),
       'regexRulesJson': serializer.toJson<String>(regexRulesJson),
+      'enableProactiveCare': serializer.toJson<bool>(enableProactiveCare),
+      'proactiveCareNextMessageAt': serializer.toJson<DateTime?>(
+        proactiveCareNextMessageAt,
+      ),
+      'proactiveCarePrompt': serializer.toJson<String>(proactiveCarePrompt),
+      'proactiveCareDecisionPrompt': serializer.toJson<String>(
+        proactiveCareDecisionPrompt,
+      ),
       'enableMemory': serializer.toJson<bool>(enableMemory),
       'memoryMode': serializer.toJson<String>(memoryMode),
       'enableRecentChatsReference': serializer.toJson<bool>(
@@ -3222,6 +3372,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     String? mcpServerIdsJson,
     String? localToolIdsJson,
     String? regexRulesJson,
+    bool? enableProactiveCare,
+    Value<DateTime?> proactiveCareNextMessageAt = const Value.absent(),
+    String? proactiveCarePrompt,
+    String? proactiveCareDecisionPrompt,
     bool? enableMemory,
     String? memoryMode,
     bool? enableRecentChatsReference,
@@ -3262,6 +3416,13 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
     localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
     regexRulesJson: regexRulesJson ?? this.regexRulesJson,
+    enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
+    proactiveCareNextMessageAt: proactiveCareNextMessageAt.present
+        ? proactiveCareNextMessageAt.value
+        : this.proactiveCareNextMessageAt,
+    proactiveCarePrompt: proactiveCarePrompt ?? this.proactiveCarePrompt,
+    proactiveCareDecisionPrompt:
+        proactiveCareDecisionPrompt ?? this.proactiveCareDecisionPrompt,
     enableMemory: enableMemory ?? this.enableMemory,
     memoryMode: memoryMode ?? this.memoryMode,
     enableRecentChatsReference:
@@ -3340,6 +3501,18 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       regexRulesJson: data.regexRulesJson.present
           ? data.regexRulesJson.value
           : this.regexRulesJson,
+      enableProactiveCare: data.enableProactiveCare.present
+          ? data.enableProactiveCare.value
+          : this.enableProactiveCare,
+      proactiveCareNextMessageAt: data.proactiveCareNextMessageAt.present
+          ? data.proactiveCareNextMessageAt.value
+          : this.proactiveCareNextMessageAt,
+      proactiveCarePrompt: data.proactiveCarePrompt.present
+          ? data.proactiveCarePrompt.value
+          : this.proactiveCarePrompt,
+      proactiveCareDecisionPrompt: data.proactiveCareDecisionPrompt.present
+          ? data.proactiveCareDecisionPrompt.value
+          : this.proactiveCareDecisionPrompt,
       enableMemory: data.enableMemory.present
           ? data.enableMemory.value
           : this.enableMemory,
@@ -3394,6 +3567,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
+          ..write('enableProactiveCare: $enableProactiveCare, ')
+          ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
+          ..write('proactiveCarePrompt: $proactiveCarePrompt, ')
+          ..write('proactiveCareDecisionPrompt: $proactiveCareDecisionPrompt, ')
           ..write('enableMemory: $enableMemory, ')
           ..write('memoryMode: $memoryMode, ')
           ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
@@ -3437,6 +3614,10 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     mcpServerIdsJson,
     localToolIdsJson,
     regexRulesJson,
+    enableProactiveCare,
+    proactiveCareNextMessageAt,
+    proactiveCarePrompt,
+    proactiveCareDecisionPrompt,
     enableMemory,
     memoryMode,
     enableRecentChatsReference,
@@ -3477,6 +3658,11 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.mcpServerIdsJson == this.mcpServerIdsJson &&
           other.localToolIdsJson == this.localToolIdsJson &&
           other.regexRulesJson == this.regexRulesJson &&
+          other.enableProactiveCare == this.enableProactiveCare &&
+          other.proactiveCareNextMessageAt == this.proactiveCareNextMessageAt &&
+          other.proactiveCarePrompt == this.proactiveCarePrompt &&
+          other.proactiveCareDecisionPrompt ==
+              this.proactiveCareDecisionPrompt &&
           other.enableMemory == this.enableMemory &&
           other.memoryMode == this.memoryMode &&
           other.enableRecentChatsReference == this.enableRecentChatsReference &&
@@ -3516,6 +3702,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<String> mcpServerIdsJson;
   final Value<String> localToolIdsJson;
   final Value<String> regexRulesJson;
+  final Value<bool> enableProactiveCare;
+  final Value<DateTime?> proactiveCareNextMessageAt;
+  final Value<String> proactiveCarePrompt;
+  final Value<String> proactiveCareDecisionPrompt;
   final Value<bool> enableMemory;
   final Value<String> memoryMode;
   final Value<bool> enableRecentChatsReference;
@@ -3553,6 +3743,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
+    this.enableProactiveCare = const Value.absent(),
+    this.proactiveCareNextMessageAt = const Value.absent(),
+    this.proactiveCarePrompt = const Value.absent(),
+    this.proactiveCareDecisionPrompt = const Value.absent(),
     this.enableMemory = const Value.absent(),
     this.memoryMode = const Value.absent(),
     this.enableRecentChatsReference = const Value.absent(),
@@ -3591,6 +3785,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
+    this.enableProactiveCare = const Value.absent(),
+    this.proactiveCareNextMessageAt = const Value.absent(),
+    this.proactiveCarePrompt = const Value.absent(),
+    this.proactiveCareDecisionPrompt = const Value.absent(),
     this.enableMemory = const Value.absent(),
     this.memoryMode = const Value.absent(),
     this.enableRecentChatsReference = const Value.absent(),
@@ -3633,6 +3831,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<String>? mcpServerIdsJson,
     Expression<String>? localToolIdsJson,
     Expression<String>? regexRulesJson,
+    Expression<bool>? enableProactiveCare,
+    Expression<DateTime>? proactiveCareNextMessageAt,
+    Expression<String>? proactiveCarePrompt,
+    Expression<String>? proactiveCareDecisionPrompt,
     Expression<bool>? enableMemory,
     Expression<String>? memoryMode,
     Expression<bool>? enableRecentChatsReference,
@@ -3675,6 +3877,14 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (mcpServerIdsJson != null) 'mcp_server_ids_json': mcpServerIdsJson,
       if (localToolIdsJson != null) 'local_tool_ids_json': localToolIdsJson,
       if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
+      if (enableProactiveCare != null)
+        'enable_proactive_care': enableProactiveCare,
+      if (proactiveCareNextMessageAt != null)
+        'proactive_care_next_message_at': proactiveCareNextMessageAt,
+      if (proactiveCarePrompt != null)
+        'proactive_care_prompt': proactiveCarePrompt,
+      if (proactiveCareDecisionPrompt != null)
+        'proactive_care_decision_prompt': proactiveCareDecisionPrompt,
       if (enableMemory != null) 'enable_memory': enableMemory,
       if (memoryMode != null) 'memory_mode': memoryMode,
       if (enableRecentChatsReference != null)
@@ -3718,6 +3928,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<String>? mcpServerIdsJson,
     Value<String>? localToolIdsJson,
     Value<String>? regexRulesJson,
+    Value<bool>? enableProactiveCare,
+    Value<DateTime?>? proactiveCareNextMessageAt,
+    Value<String>? proactiveCarePrompt,
+    Value<String>? proactiveCareDecisionPrompt,
     Value<bool>? enableMemory,
     Value<String>? memoryMode,
     Value<bool>? enableRecentChatsReference,
@@ -3756,6 +3970,12 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
       localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
       regexRulesJson: regexRulesJson ?? this.regexRulesJson,
+      enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
+      proactiveCareNextMessageAt:
+          proactiveCareNextMessageAt ?? this.proactiveCareNextMessageAt,
+      proactiveCarePrompt: proactiveCarePrompt ?? this.proactiveCarePrompt,
+      proactiveCareDecisionPrompt:
+          proactiveCareDecisionPrompt ?? this.proactiveCareDecisionPrompt,
       enableMemory: enableMemory ?? this.enableMemory,
       memoryMode: memoryMode ?? this.memoryMode,
       enableRecentChatsReference:
@@ -3850,6 +4070,24 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (regexRulesJson.present) {
       map['regex_rules_json'] = Variable<String>(regexRulesJson.value);
     }
+    if (enableProactiveCare.present) {
+      map['enable_proactive_care'] = Variable<bool>(enableProactiveCare.value);
+    }
+    if (proactiveCareNextMessageAt.present) {
+      map['proactive_care_next_message_at'] = Variable<DateTime>(
+        proactiveCareNextMessageAt.value,
+      );
+    }
+    if (proactiveCarePrompt.present) {
+      map['proactive_care_prompt'] = Variable<String>(
+        proactiveCarePrompt.value,
+      );
+    }
+    if (proactiveCareDecisionPrompt.present) {
+      map['proactive_care_decision_prompt'] = Variable<String>(
+        proactiveCareDecisionPrompt.value,
+      );
+    }
     if (enableMemory.present) {
       map['enable_memory'] = Variable<bool>(enableMemory.value);
     }
@@ -3920,6 +4158,10 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
+          ..write('enableProactiveCare: $enableProactiveCare, ')
+          ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
+          ..write('proactiveCarePrompt: $proactiveCarePrompt, ')
+          ..write('proactiveCareDecisionPrompt: $proactiveCareDecisionPrompt, ')
           ..write('enableMemory: $enableMemory, ')
           ..write('memoryMode: $memoryMode, ')
           ..write('enableRecentChatsReference: $enableRecentChatsReference, ')
@@ -6750,6 +6992,10 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
       Value<String> regexRulesJson,
+      Value<bool> enableProactiveCare,
+      Value<DateTime?> proactiveCareNextMessageAt,
+      Value<String> proactiveCarePrompt,
+      Value<String> proactiveCareDecisionPrompt,
       Value<bool> enableMemory,
       Value<String> memoryMode,
       Value<bool> enableRecentChatsReference,
@@ -6789,6 +7035,10 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
       Value<String> regexRulesJson,
+      Value<bool> enableProactiveCare,
+      Value<DateTime?> proactiveCareNextMessageAt,
+      Value<String> proactiveCarePrompt,
+      Value<String> proactiveCareDecisionPrompt,
       Value<bool> enableMemory,
       Value<String> memoryMode,
       Value<bool> enableRecentChatsReference,
@@ -6929,6 +7179,26 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get enableProactiveCare => $composableBuilder(
+    column: $table.enableProactiveCare,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get proactiveCareNextMessageAt => $composableBuilder(
+    column: $table.proactiveCareNextMessageAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get proactiveCarePrompt => $composableBuilder(
+    column: $table.proactiveCarePrompt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get proactiveCareDecisionPrompt => $composableBuilder(
+    column: $table.proactiveCareDecisionPrompt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7117,6 +7387,27 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get enableProactiveCare => $composableBuilder(
+    column: $table.enableProactiveCare,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get proactiveCareNextMessageAt =>
+      $composableBuilder(
+        column: $table.proactiveCareNextMessageAt,
+        builder: (column) => ColumnOrderings(column),
+      );
+
+  ColumnOrderings<String> get proactiveCarePrompt => $composableBuilder(
+    column: $table.proactiveCarePrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get proactiveCareDecisionPrompt => $composableBuilder(
+    column: $table.proactiveCareDecisionPrompt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get enableMemory => $composableBuilder(
     column: $table.enableMemory,
     builder: (column) => ColumnOrderings(column),
@@ -7292,6 +7583,27 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get enableProactiveCare => $composableBuilder(
+    column: $table.enableProactiveCare,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get proactiveCareNextMessageAt =>
+      $composableBuilder(
+        column: $table.proactiveCareNextMessageAt,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<String> get proactiveCarePrompt => $composableBuilder(
+    column: $table.proactiveCarePrompt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get proactiveCareDecisionPrompt => $composableBuilder(
+    column: $table.proactiveCareDecisionPrompt,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get enableMemory => $composableBuilder(
     column: $table.enableMemory,
     builder: (column) => column,
@@ -7393,6 +7705,12 @@ class $$AssistantRowsTableTableManager
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
+                Value<bool> enableProactiveCare = const Value.absent(),
+                Value<DateTime?> proactiveCareNextMessageAt =
+                    const Value.absent(),
+                Value<String> proactiveCarePrompt = const Value.absent(),
+                Value<String> proactiveCareDecisionPrompt =
+                    const Value.absent(),
                 Value<bool> enableMemory = const Value.absent(),
                 Value<String> memoryMode = const Value.absent(),
                 Value<bool> enableRecentChatsReference = const Value.absent(),
@@ -7431,6 +7749,10 @@ class $$AssistantRowsTableTableManager
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
                 regexRulesJson: regexRulesJson,
+                enableProactiveCare: enableProactiveCare,
+                proactiveCareNextMessageAt: proactiveCareNextMessageAt,
+                proactiveCarePrompt: proactiveCarePrompt,
+                proactiveCareDecisionPrompt: proactiveCareDecisionPrompt,
                 enableMemory: enableMemory,
                 memoryMode: memoryMode,
                 enableRecentChatsReference: enableRecentChatsReference,
@@ -7470,6 +7792,12 @@ class $$AssistantRowsTableTableManager
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
+                Value<bool> enableProactiveCare = const Value.absent(),
+                Value<DateTime?> proactiveCareNextMessageAt =
+                    const Value.absent(),
+                Value<String> proactiveCarePrompt = const Value.absent(),
+                Value<String> proactiveCareDecisionPrompt =
+                    const Value.absent(),
                 Value<bool> enableMemory = const Value.absent(),
                 Value<String> memoryMode = const Value.absent(),
                 Value<bool> enableRecentChatsReference = const Value.absent(),
@@ -7508,6 +7836,10 @@ class $$AssistantRowsTableTableManager
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
                 regexRulesJson: regexRulesJson,
+                enableProactiveCare: enableProactiveCare,
+                proactiveCareNextMessageAt: proactiveCareNextMessageAt,
+                proactiveCarePrompt: proactiveCarePrompt,
+                proactiveCareDecisionPrompt: proactiveCareDecisionPrompt,
                 enableMemory: enableMemory,
                 memoryMode: memoryMode,
                 enableRecentChatsReference: enableRecentChatsReference,

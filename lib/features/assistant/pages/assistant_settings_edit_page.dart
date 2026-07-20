@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -48,7 +48,9 @@ import '../../../theme/design_tokens.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../core/services/proactive_care_alarm_service.dart';
 import '../utils/assistant_edit_tab_layout.dart';
+import '../widgets/proactive_care_datetime_picker.dart';
 import 'assistant_regex_tab.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
@@ -58,6 +60,7 @@ part 'assistant_settings_edit_local_tools_tab.dart';
 part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
+part 'assistant_settings_edit_proactive_letter_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -130,6 +133,13 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       icon: Lucide.CaseSensitive,
       child: AssistantRegexTab(assistantId: assistantId),
     ),
+    if (Platform.isAndroid)
+      _AssistantEditTabSpec(
+        id: assistantEditTabProactiveLetter,
+        label: l10n.assistantEditPageProactiveLetterTab,
+        icon: Lucide.HeartPulse,
+        child: _ProactiveLetterTab(assistantId: assistantId),
+      ),
   ];
 }
 
@@ -140,6 +150,9 @@ List<_AssistantEditTabSpec> _orderedAssistantEditTabs(
   final byId = {for (final tab in tabs) tab.id: tab};
   return orderAssistantEditTabIds(
     savedOrder: order,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: Platform.isAndroid,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 
@@ -155,6 +168,9 @@ List<_AssistantEditTabSpec> _visibleAssistantEditTabs(
   return visibleAssistantEditTabIds(
     savedOrder: settings.mobileAssistantEditTabOrder,
     hiddenIds: settings.hiddenMobileAssistantEditTabs,
+    defaultOrder: defaultAssistantEditTabIdsFor(
+      includeProactiveCare: Platform.isAndroid,
+    ),
   ).map((id) => byId[id]).nonNulls.toList();
 }
 

@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'dart:isolate' show ReceivePort;
+import 'dart:ui' show IsolateNameServer;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +22,7 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/proactive_care_alarm_service.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
@@ -143,6 +147,7 @@ class HomePageController extends ChangeNotifier {
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
+  ReceivePort? _proactiveCarePort;
 
   // ============================================================================
   // Animation Controllers
@@ -315,6 +320,23 @@ class HomePageController extends ChangeNotifier {
     _initializeProviders();
     _setupKeyboardListeners();
     _setupDesktopFeatures();
+    _registerProactiveCarePort();
+  }
+
+  /// Register the main-isolate port so the alarm background isolate can
+  /// forward proactive care triggers to [HomeViewModel.handleProactiveCareTrigger].
+  void _registerProactiveCarePort() {
+    if (!Platform.isAndroid || !ProactiveCareAlarmService.isSupported) return;
+    _proactiveCarePort = ReceivePort();
+    IsolateNameServer.registerPortWithName(
+      _proactiveCarePort!.sendPort,
+      proactiveCareMainPortName,
+    );
+    _proactiveCarePort!.listen((dynamic data) {
+      final assistantId = data as String?;
+      if (assistantId == null || assistantId.isEmpty) return;
+      _viewModel.handleProactiveCareTrigger(assistantId);
+    });
   }
 
   void _initializeAnimations() {
@@ -2432,6 +2454,8 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _proactiveCarePort?.close();
+    IsolateNameServer.removePortNameMapping(proactiveCareMainPortName);
     _convoFadeController.dispose();
     _mcpProvider?.removeListener(_onMcpChanged);
     _scrollCtrl.dispose();

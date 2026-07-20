@@ -100,6 +100,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String _suggestionInsertOnTapOnlyKey =
       'suggestion_insert_on_tap_only_v1';
   static const String _compressModelKey = 'compress_model_v1';
+  static const String _proactiveCareDecisionModelKey = 'proactive_care_decision_model_v1';
   static const String _compressPromptKey = 'compress_prompt_v1';
   static const String _themePaletteKey = 'theme_palette_v1';
   static const String _useDynamicColorKey = 'use_dynamic_color_v1';
@@ -907,6 +908,17 @@ class SettingsProvider extends ChangeNotifier {
     _compressPrompt = (compressp == null || compressp.trim().isEmpty)
         ? defaultCompressPrompt
         : compressp;
+    // load proactive care decision model
+    final proactiveCareDecisionSel =
+        prefs.getString(_proactiveCareDecisionModelKey);
+    if (proactiveCareDecisionSel != null &&
+        proactiveCareDecisionSel.contains('::')) {
+      final parts = proactiveCareDecisionSel.split('::');
+      if (parts.length >= 2) {
+        _proactiveCareDecisionModelProvider = parts[0];
+        _proactiveCareDecisionModelId = parts.sublist(1).join('::');
+      }
+    }
     // learning mode
     _learningModeEnabled = prefs.getBool(_learningModeEnabledKey) ?? false;
     final lmp = prefs.getString(_learningModePromptKey);
@@ -2679,6 +2691,12 @@ class SettingsProvider extends ChangeNotifier {
       await prefs.remove(_compressModelKey);
       changed = true;
     }
+    if (_proactiveCareDecisionModelProvider == providerKey) {
+      _proactiveCareDecisionModelProvider = null;
+      _proactiveCareDecisionModelId = null;
+      await prefs.remove(_proactiveCareDecisionModelKey);
+      changed = true;
+    }
     if (changed) notifyListeners();
   }
 
@@ -2734,6 +2752,13 @@ class SettingsProvider extends ChangeNotifier {
       _compressModelProvider = null;
       _compressModelId = null;
       await prefs.remove(_compressModelKey);
+      changed = true;
+    }
+    if (_proactiveCareDecisionModelProvider == providerKey &&
+        _proactiveCareDecisionModelId == modelId) {
+      _proactiveCareDecisionModelProvider = null;
+      _proactiveCareDecisionModelId = null;
+      await prefs.remove(_proactiveCareDecisionModelKey);
       changed = true;
     }
     // Also remove from pinned if applicable
@@ -2793,6 +2818,11 @@ class SettingsProvider extends ChangeNotifier {
       _compressModelProvider = null;
       _compressModelId = null;
       await prefs.remove(_compressModelKey);
+    }
+    if (_proactiveCareDecisionModelProvider == key) {
+      _proactiveCareDecisionModelProvider = null;
+      _proactiveCareDecisionModelId = null;
+      await prefs.remove(_proactiveCareDecisionModelKey);
     }
 
     // Remove pinned models for this provider
@@ -3220,6 +3250,43 @@ Requirements:
 
   Future<void> resetCompressPrompt() async =>
       setCompressPrompt(defaultCompressPrompt);
+
+  // ============================================================================
+  // Proactive Care Decision Model
+  // ============================================================================
+
+  String? _proactiveCareDecisionModelProvider;
+  String? _proactiveCareDecisionModelId;
+  String? get proactiveCareDecisionModelProvider =>
+      _proactiveCareDecisionModelProvider;
+  String? get proactiveCareDecisionModelId => _proactiveCareDecisionModelId;
+  String? get proactiveCareDecisionModelKey =>
+      (_proactiveCareDecisionModelProvider != null &&
+          _proactiveCareDecisionModelId != null)
+      ? '${_proactiveCareDecisionModelProvider!}::${_proactiveCareDecisionModelId!}'
+      : null;
+
+  Future<void> setProactiveCareDecisionModel(
+    String providerKey,
+    String modelId,
+  ) async {
+    _proactiveCareDecisionModelProvider = providerKey;
+    _proactiveCareDecisionModelId = modelId;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _proactiveCareDecisionModelKey,
+      '$providerKey::$modelId',
+    );
+  }
+
+  Future<void> resetProactiveCareDecisionModel() async {
+    _proactiveCareDecisionModelProvider = null;
+    _proactiveCareDecisionModelId = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_proactiveCareDecisionModelKey);
+  }
 
   // Learning Mode
   bool _learningModeEnabled = false;
@@ -4219,6 +4286,9 @@ DO NOT GIVE ANSWERS OR DO HOMEWORK FOR THE USER. If the user asks a math or logi
     copy._compressModelProvider = _compressModelProvider;
     copy._compressModelId = _compressModelId;
     copy._compressPrompt = _compressPrompt;
+    copy._proactiveCareDecisionModelProvider =
+        _proactiveCareDecisionModelProvider;
+    copy._proactiveCareDecisionModelId = _proactiveCareDecisionModelId;
     copy._translateModelProvider = _translateModelProvider;
     copy._translateModelId = _translateModelId;
     copy._translatePrompt = _translatePrompt;

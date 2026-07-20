@@ -2215,5 +2215,65 @@
   "multiAIRetryBlockedUnresolvedComparison": "请先采纳或丢弃对比结果，再进行重试。",
   "@multiAIRetryBlockedUnresolvedComparison": {
     "description": "Toast shown when retry is blocked due to active or unresolved multi-AI comparison state"
+  },
+  "assistantEditPageProactiveLetterTab": "Ta的来信",
+  "@assistantEditPageProactiveLetterTab": {
+    "description": "主动关怀/Ta的来信设置页签标签"
+  },
+  "assistantEditProactiveCareEnableTitle": "主动关怀",
+  "@assistantEditProactiveCareEnableTitle": {
+    "description": "主动关怀开关标题"
+  },
+  "assistantEditProactiveCareNextMessageTimeTitle": "下次助手主动发消息时间",
+  "@assistantEditProactiveCareNextMessageTimeTitle": {
+    "description": "下次主动发消息时间标签"
+  },
+  "assistantEditProactiveCareNextMessageTimeUnset": "未设置",
+  "@assistantEditProactiveCareNextMessageTimeUnset": {
+    "description": "未设置主动发消息时间时显示"
+  },
+  "assistantEditProactiveCarePromptTitle": "主动关怀提示词",
+  "@assistantEditProactiveCarePromptTitle": {
+    "description": "主动关怀提示词编辑器标题"
+  },
+  "assistantEditProactiveCarePromptHint": "助手主动发消息时使用的提示词",
+  "@assistantEditProactiveCarePromptHint": {
+    "description": "主动关怀提示词输入框提示"
+  },
+  "assistantEditProactiveCarePromptDefault": "现在到了你主动给用户发消息的时间。请保持你的角色设定，结合上下文与当前时间，主动给用户发一条自然、贴心的消息。只输出消息内容本身。",
+  "@assistantEditProactiveCarePromptDefault": {
+    "description": "默认主动关怀提示词"
+  },
+  "assistantEditProactiveCareDecisionPromptTitle": "决策时间功能说明提示词",
+  "@assistantEditProactiveCareDecisionPromptTitle": {
+    "description": "决策提示词编辑器标题"
+  },
+  "assistantEditProactiveCareDecisionPromptDefault": "你现在在\"主动发消息时间决策\"。你需要代入助手的角色，判断下次什么时候给用户发消息。\n【功能说明】\n- 主动发消息功能：助手会在设定的时间主动给用户发送一条消息，无需用户提问。\n- 请你先看一下下次发消息的时间，如果你认为当前设定的时间无需改变，则保持原时间。反之，则修改\n- 请你代入助手的角色，根据上下文，以及助手最后一次回复用户消息的时间，从以下几方面考虑:\n1.用户没有给你发消息，你希望什么时候主动找用户\n2.请根据助手设定的性格决定时间；如果助手是依赖用户的性格或热情的性格，就早些给用户发消息；反之，高冷性格就晚些发\n3.如果上下文提到了助手要提醒/监督/关心用户，就早些按符合助手设定的时间主动给用户发消息\n4.如果上文提到助手睡觉/在忙等等，就按助手起床/忙完的时间给用户发消息\n5.你也可以根据上下文制造一些突发事件，按你制造的突发事件的时间给用户发消息）",
+  "@assistantEditProactiveCareDecisionPromptDefault": {
+    "description": "默认决策时间提示词"
+  },
+  "assistantEditProactiveCareDateTimePickerTitle": "选择日期和时间",
+  "@assistantEditProactiveCareDateTimePickerTitle": {
+    "description": "日期时间选择器标题"
+  },
+  "assistantEditProactiveCareExactAlarmPermissionDenied": "未授予精确闹钟权限，主动关怀无法按时唤醒应用，请在系统设置中允许「闹钟和提醒」。",
+  "@assistantEditProactiveCareExactAlarmPermissionDenied": {
+    "description": "精确闹钟权限被拒绝时的警告"
+  },
+  "assistantEditProactiveCareNotificationPermissionDenied": "未授予通知权限，主动关怀消息将无法通知你，请在系统设置中开启通知。",
+  "@assistantEditProactiveCareNotificationPermissionDenied": {
+    "description": "通知权限被拒绝时的警告"
+  },
+  "defaultModelPageProactiveCareModelTitle": "Ta的来信决策模型",
+  "@defaultModelPageProactiveCareModelTitle": {
+    "description": "主动关怀决策模型卡片标题"
+  },
+  "defaultModelPageProactiveCareModelSubtitle": "用于决定助手何时主动发消息的模型",
+  "@defaultModelPageProactiveCareModelSubtitle": {
+    "description": "主动关怀决策模型卡片副标题"
+  },
+  "proactiveCareFailedNotificationBody": "主动关怀消息生成失败，请打开应用检查模型配置与网络。",
+  "@proactiveCareFailedNotificationBody": {
+    "description": "主动关怀消息生成失败时的通知内容"
   }
 }

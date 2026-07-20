@@ -111,6 +111,15 @@ class AssistantRows extends Table {
   TextColumn get localToolIdsJson => text().withDefault(const Constant('[]'))();
   TextColumn get regexRulesJson => text().withDefault(const Constant('[]'))();
 
+  // --- Proactive Care ("Ta的来信") ---
+  BoolColumn get enableProactiveCare =>
+      boolean().withDefault(const Constant(false))();
+  DateTimeColumn get proactiveCareNextMessageAt => dateTime().nullable()();
+  TextColumn get proactiveCarePrompt =>
+      text().withDefault(const Constant(''))();
+  TextColumn get proactiveCareDecisionPrompt =>
+      text().withDefault(const Constant(''))();
+
   // --- Memory ---
   BoolColumn get enableMemory => boolean().withDefault(const Constant(false))();
   TextColumn get memoryMode =>
@@ -228,7 +237,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -266,6 +275,32 @@ class AppDatabase extends _$AppDatabase {
           await migrator.addColumn(
             assistantRows,
             assistantRows.otherOfficeMode,
+          );
+        } catch (_) {}
+      }
+      if (from < 6) {
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.enableProactiveCare,
+          );
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.proactiveCareNextMessageAt,
+          );
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.proactiveCarePrompt,
+          );
+        } catch (_) {}
+        try {
+          await migrator.addColumn(
+            assistantRows,
+            assistantRows.proactiveCareDecisionPrompt,
           );
         } catch (_) {}
       }

@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -227,6 +229,33 @@ class DefaultModelPage extends StatelessWidget {
             },
             configAction: () => showOcrPromptSheet(context),
           ),
+          if (Platform.isAndroid) ...[
+            const SizedBox(height: 16),
+            _ModelCard(
+              icon: Lucide.HeartPulse,
+              title: l10n.defaultModelPageProactiveCareModelTitle,
+              subtitle: l10n.defaultModelPageProactiveCareModelSubtitle,
+              modelProvider: settings.proactiveCareDecisionModelProvider,
+              modelId: settings.proactiveCareDecisionModelId,
+              fallbackProvider: settings.currentModelProvider,
+              fallbackModelId: settings.currentModelId,
+              onReset: () async {
+                await settings.resetProactiveCareDecisionModel();
+              },
+              onPick: () async {
+                final sel = await pickConfiguredModel(
+                  settings.proactiveCareDecisionModelProvider,
+                  settings.proactiveCareDecisionModelId,
+                );
+                if (sel != null) {
+                  await settings.setProactiveCareDecisionModel(
+                    sel.providerKey,
+                    sel.modelId,
+                  );
+                }
+              },
+            ),
+          ],
         ],
       ),
     );

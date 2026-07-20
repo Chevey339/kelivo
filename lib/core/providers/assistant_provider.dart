@@ -14,6 +14,7 @@ import '../models/preset_message.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/avatar_cache.dart';
 import '../../utils/app_directories.dart';
+import '../services/proactive_care_alarm_service.dart';
 
 class AssistantProvider extends ChangeNotifier {
   static const String _assistantsKey = 'assistants_v1';
@@ -495,10 +496,10 @@ class AssistantProvider extends ChangeNotifier {
     final idx = _assistants.indexWhere((a) => a.id == updated.id);
     if (idx == -1) return;
 
+    final prev = _assistants[idx];
     var next = updated;
 
     try {
-      final prev = _assistants[idx];
       final raw = (updated.avatar ?? '').trim();
       final prevRaw = (prev.avatar ?? '').trim();
       final changed = raw != prevRaw;
@@ -566,6 +567,24 @@ class AssistantProvider extends ChangeNotifier {
     _assistants[idx] = next;
     await _persistSingle(next, sortOrder: idx);
     notifyListeners();
+    _syncProactiveCareAlarm(prev, next);
+  }
+
+  /// Schedule or cancel the proactive care alarm when relevant fields change.
+  void _syncProactiveCareAlarm(Assistant prev, Assistant next) {
+    if (!Platform.isAndroid || !ProactiveCareAlarmService.isSupported) return;
+    final wasEnabled = prev.enableProactiveCare;
+    final isEnabled = next.enableProactiveCare;
+    final timeChanged =
+        prev.proactiveCareNextMessageAt != next.proactiveCareNextMessageAt;
+    if (!isEnabled && wasEnabled) {
+      ProactiveCareAlarmService.cancelFor(next.id);
+    } else if (isEnabled && (!wasEnabled || timeChanged)) {
+      final at = next.proactiveCareNextMessageAt;
+      if (at != null) {
+        ProactiveCareAlarmService.sync(next);
+      }
+    }
   }
 
   Future<void> setSearchEnabledForCurrentAssistant(bool enabled) async {
@@ -599,6 +618,10 @@ class AssistantProvider extends ChangeNotifier {
     if (_assistants.length <= 1) return false;
 
     await chatService?.deleteConversationsForAssistant(id);
+    // Cancel any pending proactive care alarm for this assistant.
+    if (Platform.isAndroid && ProactiveCareAlarmService.isSupported) {
+      ProactiveCareAlarmService.cancelFor(id);
+    }
 
     final removingCurrent = _assistants[idx].id == _currentAssistantId;
     _assistants.removeAt(idx);

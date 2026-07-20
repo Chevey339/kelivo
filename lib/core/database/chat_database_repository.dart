@@ -970,6 +970,11 @@ class ChatDatabaseRepository {
       'otherOfficeMode': row.otherOfficeMode,
       'presetMessages': jsonDecode(row.presetMessagesJson),
       'regexRules': jsonDecode(row.regexRulesJson),
+      'enableProactiveCare': row.enableProactiveCare,
+      'proactiveCareNextMessageAt': row.proactiveCareNextMessageAt
+          ?.toIso8601String(),
+      'proactiveCarePrompt': row.proactiveCarePrompt,
+      'proactiveCareDecisionPrompt': row.proactiveCareDecisionPrompt,
       'createdAt': row.createdAt.toIso8601String(),
       'updatedAt': row.updatedAt.toIso8601String(),
     });
@@ -1013,6 +1018,10 @@ class ChatDatabaseRepository {
       regexRulesJson: Value(
         jsonEncode(a.regexRules.map((e) => e.toJson()).toList()),
       ),
+      enableProactiveCare: Value(a.enableProactiveCare),
+      proactiveCareNextMessageAt: Value(a.proactiveCareNextMessageAt),
+      proactiveCarePrompt: Value(a.proactiveCarePrompt),
+      proactiveCareDecisionPrompt: Value(a.proactiveCareDecisionPrompt),
       sortOrder: sortOrder,
       createdAt: a.createdAt,
       updatedAt: a.updatedAt,

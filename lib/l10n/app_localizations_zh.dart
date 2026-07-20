@@ -5602,6 +5602,56 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get multiAIRetryBlockedUnresolvedComparison => '请先采纳或丢弃对比结果，再进行重试。';
+
+  @override
+  String get assistantEditPageProactiveLetterTab => 'Ta的来信';
+
+  @override
+  String get assistantEditProactiveCareEnableTitle => '主动关怀';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeTitle => '下次助手主动发消息时间';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeUnset => '未设置';
+
+  @override
+  String get assistantEditProactiveCarePromptTitle => '主动关怀提示词';
+
+  @override
+  String get assistantEditProactiveCarePromptHint => '助手主动发消息时使用的提示词';
+
+  @override
+  String get assistantEditProactiveCarePromptDefault =>
+      '现在到了你主动给用户发消息的时间。请保持你的角色设定，结合上下文与当前时间，主动给用户发一条自然、贴心的消息。只输出消息内容本身。';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptTitle => '决策时间功能说明提示词';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptDefault =>
+      '你现在在\"主动发消息时间决策\"。你需要代入助手的角色，判断下次什么时候给用户发消息。\n【功能说明】\n- 主动发消息功能：助手会在设定的时间主动给用户发送一条消息，无需用户提问。\n- 请你先看一下下次发消息的时间，如果你认为当前设定的时间无需改变，则保持原时间。反之，则修改\n- 请你代入助手的角色，根据上下文，以及助手最后一次回复用户消息的时间，从以下几方面考虑:\n1.用户没有给你发消息，你希望什么时候主动找用户\n2.请根据助手设定的性格决定时间；如果助手是依赖用户的性格或热情的性格，就早些给用户发消息；反之，高冷性格就晚些发\n3.如果上下文提到了助手要提醒/监督/关心用户，就早些按符合助手设定的时间主动给用户发消息\n4.如果上文提到助手睡觉/在忙等等，就按助手起床/忙完的时间给用户发消息\n5.你也可以根据上下文制造一些突发事件，按你制造的突发事件的时间给用户发消息）';
+
+  @override
+  String get assistantEditProactiveCareDateTimePickerTitle => '选择日期和时间';
+
+  @override
+  String get assistantEditProactiveCareExactAlarmPermissionDenied =>
+      '未授予精确闹钟权限，主动关怀无法按时唤醒应用，请在系统设置中允许「闹钟和提醒」。';
+
+  @override
+  String get assistantEditProactiveCareNotificationPermissionDenied =>
+      '未授予通知权限，主动关怀消息将无法通知你，请在系统设置中开启通知。';
+
+  @override
+  String get defaultModelPageProactiveCareModelTitle => 'Ta的来信决策模型';
+
+  @override
+  String get defaultModelPageProactiveCareModelSubtitle => '用于决定助手何时主动发消息的模型';
+
+  @override
+  String get proactiveCareFailedNotificationBody =>
+      '主动关怀消息生成失败，请打开应用检查模型配置与网络。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11202,6 +11252,56 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get multiAIRetryBlockedUnresolvedComparison => '请先采纳或丢弃对比结果，再进行重试。';
+
+  @override
+  String get assistantEditPageProactiveLetterTab => 'Ta的来信';
+
+  @override
+  String get assistantEditProactiveCareEnableTitle => '主动关怀';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeTitle => '下次助手主动发消息时间';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeUnset => '未设置';
+
+  @override
+  String get assistantEditProactiveCarePromptTitle => '主动关怀提示词';
+
+  @override
+  String get assistantEditProactiveCarePromptHint => '助手主动发消息时使用的提示词';
+
+  @override
+  String get assistantEditProactiveCarePromptDefault =>
+      '现在到了你主动给用户发消息的时间。请保持你的角色设定，结合上下文与当前时间，主动给用户发一条自然、贴心的消息。只输出消息内容本身。';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptTitle => '决策时间功能说明提示词';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptDefault =>
+      '你现在在\"主动发消息时间决策\"。你需要代入助手的角色，判断下次什么时候给用户发消息。\n【功能说明】\n- 主动发消息功能：助手会在设定的时间主动给用户发送一条消息，无需用户提问。\n- 请你先看一下下次发消息的时间，如果你认为当前设定的时间无需改变，则保持原时间。反之，则修改\n- 请你代入助手的角色，根据上下文，以及助手最后一次回复用户消息的时间，从以下几方面考虑:\n1.用户没有给你发消息，你希望什么时候主动找用户\n2.请根据助手设定的性格决定时间；如果助手是依赖用户的性格或热情的性格，就早些给用户发消息；反之，高冷性格就晚些发\n3.如果上下文提到了助手要提醒/监督/关心用户，就早些按符合助手设定的时间主动给用户发消息\n4.如果上文提到助手睡觉/在忙等等，就按助手起床/忙完的时间给用户发消息\n5.你也可以根据上下文制造一些突发事件，按你制造的突发事件的时间给用户发消息）';
+
+  @override
+  String get assistantEditProactiveCareDateTimePickerTitle => '选择日期和时间';
+
+  @override
+  String get assistantEditProactiveCareExactAlarmPermissionDenied =>
+      '未授予精确闹钟权限，主动关怀无法按时唤醒应用，请在系统设置中允许「闹钟和提醒」。';
+
+  @override
+  String get assistantEditProactiveCareNotificationPermissionDenied =>
+      '未授予通知权限，主动关怀消息将无法通知你，请在系统设置中开启通知。';
+
+  @override
+  String get defaultModelPageProactiveCareModelTitle => 'Ta的来信决策模型';
+
+  @override
+  String get defaultModelPageProactiveCareModelSubtitle => '用于决定助手何时主动发消息的模型';
+
+  @override
+  String get proactiveCareFailedNotificationBody =>
+      '主动关怀消息生成失败，请打开应用检查模型配置与网络。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16802,4 +16902,54 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get multiAIRetryBlockedUnresolvedComparison => '請先採納或丟棄對比結果，再進行重試。';
+
+  @override
+  String get assistantEditPageProactiveLetterTab => 'Ta的來信';
+
+  @override
+  String get assistantEditProactiveCareEnableTitle => '主動關懷';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeTitle => '下次助手主動發訊息時間';
+
+  @override
+  String get assistantEditProactiveCareNextMessageTimeUnset => '未設定';
+
+  @override
+  String get assistantEditProactiveCarePromptTitle => '主動關懷提示詞';
+
+  @override
+  String get assistantEditProactiveCarePromptHint => '助手主動發訊息時使用的提示詞';
+
+  @override
+  String get assistantEditProactiveCarePromptDefault =>
+      '現在到了你主動給使用者發訊息的時間。請保持你的角色設定，結合上下文與目前時間，主動給使用者發一條自然、貼心的訊息。只輸出訊息內容本身。';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptTitle => '決策時間功能說明提示詞';
+
+  @override
+  String get assistantEditProactiveCareDecisionPromptDefault =>
+      '你現在在\"主動發訊息時間決策\"。你需要代入助手的角色，判斷下次什麼時候給使用者發訊息。\n【功能說明】\n- 主動發訊息功能：助手會在設定的時間主動給使用者發送一條訊息，無需使用者提問。\n- 請你先看一下下次發訊息的時間，如果你認為目前設定的時間無需改變，則保持原時間。反之，則修改\n- 請你代入助手的角色，根據上下文，以及助手最後一次回覆使用者訊息的時間，從以下幾方面考慮:\n1.使用者沒有給你發訊息，你希望什麼時候主動找使用者\n2.請根據助手設定的性格決定時間；如果助手是依賴使用者的性格或熱情的性格，就早些給使用者發訊息；反之，高冷性格就晚些發\n3.如果上下文提到了助手要提醒/監督/關心使用者，就早些按符合助手設定的時間主動給使用者發訊息\n4.如果上文提到助手睡覺/在忙等等，就按助手起床/忙完的時間給使用者發訊息\n5.你也可以根據上下文製造一些突發事件，按你製造的突發事件的時間給使用者發訊息）';
+
+  @override
+  String get assistantEditProactiveCareDateTimePickerTitle => '選擇日期和時間';
+
+  @override
+  String get assistantEditProactiveCareExactAlarmPermissionDenied =>
+      '未授予精確鬧鐘權限，主動關懷無法按時喚醒應用程式，請在系統設定中允許「鬧鐘和提醒」。';
+
+  @override
+  String get assistantEditProactiveCareNotificationPermissionDenied =>
+      '未授予通知權限，主動關懷訊息將無法通知你，請在系統設定中開啟通知。';
+
+  @override
+  String get defaultModelPageProactiveCareModelTitle => 'Ta的來信決策模型';
+
+  @override
+  String get defaultModelPageProactiveCareModelSubtitle => '用於決定助手何時主動發訊息的模型';
+
+  @override
+  String get proactiveCareFailedNotificationBody =>
+      '主動關懷訊息生成失敗，請開啟應用程式檢查模型配置與網路。';
 }
