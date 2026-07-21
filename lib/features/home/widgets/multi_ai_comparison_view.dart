@@ -302,7 +302,6 @@ class _SingleModelCardState extends State<_SingleModelCard> {
                     onTap: () => widget.controller.multiAIEngine.resolveThread(
                       anchorId: widget.anchorUserMessageId,
                       threadId: widget.subgroupId,
-                      version: message.version,
                     ),
                   ),
                 ],
