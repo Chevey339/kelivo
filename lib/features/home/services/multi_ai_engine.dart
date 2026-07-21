@@ -92,14 +92,20 @@ class MultiAIEngine extends ChangeNotifier {
   Set<String> get subgroupActiveGroupIds =>
       _chatController.subgroupActiveGroupIds;
 
-  /// Compute anchor user-message IDs → set of distinct subgroupIds across
-  /// all rounds, filtered to only anchors with ≥ 2 distinct threads.
+  /// Compute anchor user-message groupIds → set of distinct subgroupIds
+  /// across all rounds, filtered to only anchors with ≥ 2 distinct threads.
+  ///
+  /// Uses groupId (not message id) so that edited user-message versions
+  /// (which share the same groupId) resolve to the same anchor. Otherwise
+  /// after an edit-resend the anchor key would point at the stale original
+  /// version id and the comparison cards would disappear from the new
+  /// version in the collapsed list.
   static Map<String, Set<String>> _computeAnchors(List<ChatMessage> messages) {
     final anchors = <String, Set<String>>{};
     String? lastUser;
     for (final m in messages) {
       if (m.role == 'user') {
-        lastUser = m.id;
+        lastUser = m.groupId ?? m.id;
       } else if (m.subgroupId != null && lastUser != null) {
         anchors.putIfAbsent(lastUser, () => <String>{}).add(m.subgroupId!);
       }
@@ -123,15 +129,21 @@ class MultiAIEngine extends ChangeNotifier {
   int get roundCount => _computeAnchors(_chatController.messages).length;
 
   /// Collect all subgroup messages that belong to the round anchored by
-  /// [anchorUserMsgId]. Reads forwards from the anchor until the next user
-  /// message (or end of list), groups by subgroupId, and sorts by version
-  /// within each group.
+  /// [anchorUserMsgId] (a user-message groupId). Reads forwards from the
+  /// anchor until the next user message with a different groupId (or end of
+  /// list), groups by subgroupId, and sorts by version within each group.
+  ///
+  /// Matching by groupId (instead of message id) ensures that edited
+  /// user-message versions — which share the original groupId — keep
+  /// collecting the same round's subgroup messages instead of terminating
+  /// the scan at the new version.
   Map<String, List<ChatMessage>> getMessagesForAnchor(String anchorUserMsgId) {
     bool collecting = false;
     final result = <String, List<ChatMessage>>{};
     for (final m in _chatController.messages) {
       if (m.role == 'user') {
-        if (m.id == anchorUserMsgId) {
+        final gid = m.groupId ?? m.id;
+        if (gid == anchorUserMsgId) {
           collecting = true;
           continue;
         } else if (collecting) {
@@ -956,7 +968,9 @@ class MultiAIEngine extends ChangeNotifier {
       conversation,
     );
     if (anchorId != null) {
-      final anchorIdx = completeMessages.indexWhere((m) => m.id == anchorId);
+      final anchorIdx = completeMessages.indexWhere(
+        (m) => m.role == 'user' && (m.groupId ?? m.id) == anchorId,
+      );
       if (anchorIdx >= 0) {
         completeMessages = completeMessages.sublist(0, anchorIdx + 1);
       }

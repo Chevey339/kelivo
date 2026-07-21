@@ -863,7 +863,9 @@ class HomePageController extends ChangeNotifier {
     if (lastAssistantIdx != null && lastAssistantIdx > 0) {
       for (int i = lastAssistantIdx - 1; i >= 0; i--) {
         if (msgs[i].role == 'user') {
-          if (message.id == msgs[i].id) return true;
+          final msgGid = message.groupId ?? message.id;
+          final anchorGid = msgs[i].groupId ?? msgs[i].id;
+          if (msgGid == anchorGid) return true;
           break; // 找到第一个 user 就停，不穿透到更早轮次
         }
       }
@@ -944,7 +946,7 @@ class HomePageController extends ChangeNotifier {
     if (message.role == 'user' &&
         multiAIEngine.isActive &&
         _chatController.subgroupActiveGroupIds.isNotEmpty) {
-      final anchorUserMsgId = message.id;
+      final anchorUserMsgId = message.groupId ?? message.id;
       final settings = _context.read<SettingsProvider>();
       final assistant = _context.read<AssistantProvider>().currentAssistant;
       await multiAIEngine.retryRound(

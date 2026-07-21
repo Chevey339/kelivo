@@ -626,8 +626,11 @@ class _MessageListViewState extends State<MessageListView> {
             padding: widget.dividerPadding,
             child: _buildContextDivider(context),
           ),
-        if (widget.afterMessageWidgets?.containsKey(message.id) == true)
-          widget.afterMessageWidgets![message.id]!,
+        if (widget.afterMessageWidgets?.containsKey(
+              message.groupId ?? message.id,
+            ) ==
+            true)
+          widget.afterMessageWidgets![message.groupId ?? message.id]!,
       ],
     );
 
