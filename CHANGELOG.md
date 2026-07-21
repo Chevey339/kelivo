@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.1] - 2026-07-22
+
+> ℹ️ **This release fixes a long-standing billing issue.** Since upstream Kelivo v1.1.6, clicking "Stop" never actually closed the underlying TCP connection. Providers were not notified of the cancellation, so even models supporting streaming cancellation could continue generating silently in the background — leading to unexpected token consumption and overcharges. **All users are recommended to upgrade.**
+
+### Fixed
+
+- Stop button now forcefully closes the underlying TCP connection, ensuring providers are immediately notified of cancellation and preventing silent background generation that caused overbilling (present since upstream Kelivo v1.1.6) (#79)
+- Update about page GitHub links and update check URL to cuplivo/cuplivo (#80)
+
 ## [2.1.0] - 2026-07-21
 
 > ⚠ **This release includes a critical backup-restore fix.** In versions 1.5.0–2.0.2, "Smart Merge" did not merge assistants from the backup file into the local database — now fixed to merge correctly.

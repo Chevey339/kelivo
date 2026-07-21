@@ -57,7 +57,7 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
 10. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
 11. **Additional fixes across the repo**
-    - OCR result caching now persists across restarts (SQLite-backed)
+    - **Force-close TCP on stop** — The long-standing issue since upstream Kelivo v1.1.6 is now fixed: clicking "Stop" never actually closed the TCP connection. Providers were not notified of cancellation, causing silent background generation and unexpected token consumption / overbilling
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)
     - Large base64 images no longer cause regex stack overflow
