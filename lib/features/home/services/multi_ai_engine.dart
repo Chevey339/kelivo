@@ -119,6 +119,9 @@ class MultiAIEngine extends ChangeNotifier {
     return anchors.keys.isEmpty ? null : anchors.keys.last;
   }
 
+  /// Number of completed multi-AI rounds (anchors with ≥2 threads).
+  int get roundCount => _computeAnchors(_chatController.messages).length;
+
   /// Collect all subgroup messages that belong to the round anchored by
   /// [anchorUserMsgId]. Reads forwards from the anchor until the next user
   /// message (or end of list), groups by subgroupId, and sorts by version
@@ -900,6 +903,76 @@ class MultiAIEngine extends ChangeNotifier {
       result.add(m);
     }
     return result;
+  }
+
+  /// Add new models mid-round and execute their first response immediately.
+  ///
+  /// New models receive context truncated to just before the latest anchor
+  /// user message (same as [startRoundFromHistory]).
+  ///
+  /// Relies on [_executeThreads]' skip logic: existing threads' subgroupIds
+  /// already exist in the message list, so they are skipped; only new
+  /// threads execute.
+  Future<void> addModelsAndExecute({
+    required List<ModelSelection> newModels,
+    required Conversation conversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    ToolApprovalService? approvalService,
+    AskUserInteractionService? askUserService,
+  }) async {
+    if (!_isActive || newModels.isEmpty) return;
+
+    final oldModelCount = _models.length;
+    final newThreadIds = List<String>.generate(
+      newModels.length,
+      (_) => const Uuid().v4(),
+    );
+
+    _models.addAll(newModels);
+    _threadIds.addAll(newThreadIds);
+    notifyListeners();
+
+    // Find the current round's groupId from an existing thread's message.
+    String roundGroupId;
+    final existingTid = _threadIds
+        .take(oldModelCount)
+        .firstWhere(
+          (tid) => _chatController.messages.any((m) => m.subgroupId == tid),
+          orElse: () => '',
+        );
+    if (existingTid.isNotEmpty) {
+      final existingMsg = _chatController.messages.firstWhere(
+        (m) => m.subgroupId == existingTid,
+      );
+      roundGroupId = existingMsg.groupId ?? existingMsg.id;
+    } else {
+      roundGroupId = const Uuid().v4();
+    }
+
+    // Truncate history to just before the anchor user message.
+    final anchorId = latestAnchorId;
+    var completeMessages = _chatController.messagesForCompleteHistoryContext(
+      conversation,
+    );
+    if (anchorId != null) {
+      final anchorIdx = completeMessages.indexWhere((m) => m.id == anchorId);
+      if (anchorIdx >= 0) {
+        completeMessages = completeMessages.sublist(0, anchorIdx + 1);
+      }
+    }
+
+    await _executeThreads(
+      conversation: conversation,
+      settings: settings,
+      assistant: assistant,
+      approvalService: approvalService,
+      askUserService: askUserService,
+      completeMessages: completeMessages,
+      roundGroupId: roundGroupId,
+    );
+
+    notifyListeners();
   }
 
   /// Switch the engine's conversation mode.

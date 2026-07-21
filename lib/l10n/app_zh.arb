@@ -2303,5 +2303,9 @@
   "proactiveCareFailedNotificationBody": "主动关怀消息生成失败，请打开应用检查模型配置与网络。",
   "@proactiveCareFailedNotificationBody": {
     "description": "主动关怀消息生成失败时的通知内容"
+  },
+  "multiAIAddModelTooltip": "添加模型",
+  "@multiAIAddModelTooltip": {
+    "description": "多AI卡片底部添加模型按钮的提示"
   }
 }

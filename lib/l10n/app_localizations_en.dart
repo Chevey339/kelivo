@@ -5893,4 +5893,7 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get proactiveCareFailedNotificationBody =>
       'Couldn\'t generate the proactive care message. Open the app to check the model settings and network.';
+
+  @override
+  String get multiAIAddModelTooltip => 'Add Model';
 }

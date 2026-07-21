@@ -1986,6 +1986,90 @@ class HomePageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Edit model selection before any round has started (badge tap at
+  /// roundCount == 0). Opens the selector with current models pre-selected
+  /// but fully editable (no locked keys).
+  Future<void> editMultiAIModels() async {
+    final engine = multiAIEngine;
+    if (!engine.isActive || engine.roundCount != 0) return;
+    if (currentConversation == null) return;
+
+    final existingKeys = engine.models
+        .map((m) => ModelMultiSelectState.keyFor(m.providerKey, m.modelId))
+        .toSet();
+
+    final result = await showMultiModelSelector(
+      _context,
+      preselectedKeys: existingKeys,
+    );
+    if (result == null || result.isEmpty) return;
+    if (!_context.mounted) return;
+
+    if (result.length == 1) {
+      final sel = result.first;
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      engine.exit();
+      if (assistant != null) {
+        await _context.read<AssistantProvider>().updateAssistant(
+          assistant.copyWith(
+            chatModelProvider: sel.providerKey,
+            chatModelId: sel.modelId,
+          ),
+        );
+      }
+      notifyListeners();
+      return;
+    }
+
+    final threadIds = List<String>.generate(
+      result.length,
+      (_) => const Uuid().v4(),
+    );
+    engine.exit();
+    engine.enter(result, existingThreadIds: threadIds);
+    notifyListeners();
+  }
+
+  /// Show model selector with locked existing models for adding models
+  /// mid-round (the "+" button on first-round card footer).
+  Future<void> addMultiAIModels() async {
+    final engine = multiAIEngine;
+    if (!engine.isActive || engine.roundCount != 1) return;
+    if (currentConversation == null) return;
+
+    final existingKeys = engine.models
+        .map((m) => ModelMultiSelectState.keyFor(m.providerKey, m.modelId))
+        .toSet();
+
+    final result = await showMultiModelSelector(
+      _context,
+      preselectedKeys: existingKeys,
+      lockedKeys: existingKeys,
+    );
+    if (result == null) return;
+    if (!_context.mounted) return;
+
+    final newModels = result
+        .where(
+          (m) => !existingKeys.contains(
+            ModelMultiSelectState.keyFor(m.providerKey, m.modelId),
+          ),
+        )
+        .toList();
+    if (newModels.isEmpty) return;
+
+    final settings = _context.read<SettingsProvider>();
+    final assistant = _context.read<AssistantProvider>().currentAssistant;
+
+    await engine.addModelsAndExecute(
+      newModels: newModels,
+      conversation: currentConversation!,
+      settings: settings,
+      assistant: assistant,
+    );
+    notifyListeners();
+  }
+
   // ============================================================================
   // Public Methods - UI State
   // ============================================================================

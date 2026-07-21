@@ -2756,5 +2756,9 @@
   "proactiveCareFailedNotificationBody": "Couldn't generate the proactive care message. Open the app to check the model settings and network.",
   "@proactiveCareFailedNotificationBody": {
     "description": "Notification body when proactive care message generation fails"
+  },
+  "multiAIAddModelTooltip": "Add Model",
+  "@multiAIAddModelTooltip": {
+    "description": "Tooltip for the add model button in multi-AI card footer"
   }
 }

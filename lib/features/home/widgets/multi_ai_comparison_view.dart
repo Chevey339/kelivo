@@ -90,6 +90,8 @@ class _MultiAICardGroupState extends State<MultiAICardGroup> {
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
       child: Row(
         children: [
+          if (engine.roundCount == 1)
+            _AddModelButton(onTap: () => widget.controller.addMultiAIModels()),
           Text(
             l10n.multiAIConversationMode,
             style: TextStyle(
@@ -437,6 +439,37 @@ class _SingleModelCardState extends State<_SingleModelCard> {
           ),
         );
       },
+    );
+  }
+}
+
+class _AddModelButton extends StatelessWidget {
+  const _AddModelButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Tooltip(
+        message: l10n.multiAIAddModelTooltip,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: cs.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(Lucide.Plus, size: 14, color: cs.primary),
+          ),
+        ),
+      ),
     );
   }
 }

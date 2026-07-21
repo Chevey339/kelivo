@@ -1338,18 +1338,11 @@ class _HomePageState extends State<HomePage>
               _controller.multiAIEngine.mode == MultiAIMode.continue_
           ? _controller.multiAIEngine.models.length
           : null,
-      onExitMultiAI:
-          _controller.multiAIEngine.isActive &&
-              _controller.chatController.subgroupActiveGroupIds.isEmpty
-          ? _controller.exitMultiAIMode
-          : null,
       onMultiSelectModel: () {
-        final l10n = AppLocalizations.of(context)!;
-        showAppSnackBar(
-          context,
-          message: l10n.multiAIModeLockedToast,
-          type: NotificationType.info,
-        );
+        final engine = _controller.multiAIEngine;
+        if (engine.roundCount == 0) {
+          _controller.editMultiAIModels();
+        }
       },
     );
   }
