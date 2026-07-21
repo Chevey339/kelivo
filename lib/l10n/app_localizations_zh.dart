@@ -5655,6 +5655,76 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get multiAIAddModelTooltip => '添加模型';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsAddTooltip => '添加技能';
+
+  @override
+  String get skillsImportManualTitle => '手动添加';
+
+  @override
+  String get skillsImportManualHint => '粘贴完整的 SKILL.md 内容（包含 YAML 前置元数据）';
+
+  @override
+  String get skillsImportFileLabel => '从文件导入';
+
+  @override
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
+
+  @override
+  String get skillsDeleteConfirmTitle => '删除技能';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '确定删除 \"$name\"？此操作不可撤销。';
+  }
+
+  @override
+  String skillsImportSuccess(int count) {
+    return '已导入 $count 个技能';
+  }
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String skillsFrontmatterNameMismatch(String frontmatterName, String dirName) {
+    return '前置元数据中的名称 \"$frontmatterName\" 必须与目录名 \"$dirName\" 一致。';
+  }
+
+  @override
+  String get skillsInvalidFrontmatter =>
+      'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
+
+  @override
+  String skillsNotFound(String name) {
+    return '未找到技能：$name';
+  }
+
+  @override
+  String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
+
+  @override
+  String skillsSaveFailed(String detail) {
+    return '保存技能失败：$detail';
+  }
+
+  @override
+  String skillsImportFailed(int count) {
+    return '导入 $count 个技能失败';
+  }
+
+  @override
+  String get skillsDeleteConfirmDeleteButton => '删除';
+
+  @override
+  String get assistantEditPageSkillsTab => '技能';
+
+  @override
+  String get settingsPageSkills => '技能';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11308,6 +11378,76 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get multiAIAddModelTooltip => '添加模型';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsAddTooltip => '添加技能';
+
+  @override
+  String get skillsImportManualTitle => '手动添加';
+
+  @override
+  String get skillsImportManualHint => '粘贴完整的 SKILL.md 内容（包含 YAML 前置元数据）';
+
+  @override
+  String get skillsImportFileLabel => '从文件导入';
+
+  @override
+  String get skillsEmptyMessage => '暂无技能。从文件导入或手动创建一个。';
+
+  @override
+  String get skillsDeleteConfirmTitle => '删除技能';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '确定删除 \"$name\"？此操作不可撤销。';
+  }
+
+  @override
+  String skillsImportSuccess(int count) {
+    return '已导入 $count 个技能';
+  }
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String skillsFrontmatterNameMismatch(String frontmatterName, String dirName) {
+    return '前置元数据中的名称 \"$frontmatterName\" 必须与目录名 \"$dirName\" 一致。';
+  }
+
+  @override
+  String get skillsInvalidFrontmatter =>
+      'SKILL.md 必须包含有效的 YAML 前置元数据且包含 name 字段。';
+
+  @override
+  String skillsNotFound(String name) {
+    return '未找到技能：$name';
+  }
+
+  @override
+  String get skillsFrontmatterNameMissing => 'SKILL.md 前置元数据必须包含 name 字段。';
+
+  @override
+  String skillsSaveFailed(String detail) {
+    return '保存技能失败：$detail';
+  }
+
+  @override
+  String skillsImportFailed(int count) {
+    return '导入 $count 个技能失败';
+  }
+
+  @override
+  String get skillsDeleteConfirmDeleteButton => '删除';
+
+  @override
+  String get assistantEditPageSkillsTab => '技能';
+
+  @override
+  String get settingsPageSkills => '技能';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -16961,4 +17101,74 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get multiAIAddModelTooltip => '新增模型';
+
+  @override
+  String get skillsTitle => '技能';
+
+  @override
+  String get skillsAddTooltip => '新增技能';
+
+  @override
+  String get skillsImportManualTitle => '手動新增';
+
+  @override
+  String get skillsImportManualHint => '貼上完整的 SKILL.md 內容（包含 YAML 前置元資料）';
+
+  @override
+  String get skillsImportFileLabel => '從檔案匯入';
+
+  @override
+  String get skillsEmptyMessage => '暫無技能。從檔案匯入或手動建立一個。';
+
+  @override
+  String get skillsDeleteConfirmTitle => '刪除技能';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return '確定刪除 \"$name\"？此操作不可復原。';
+  }
+
+  @override
+  String skillsImportSuccess(int count) {
+    return '已匯入 $count 個技能';
+  }
+
+  @override
+  String get skillsTab => '技能';
+
+  @override
+  String skillsFrontmatterNameMismatch(String frontmatterName, String dirName) {
+    return '前置元資料中的名稱 \"$frontmatterName\" 必須與目錄名稱 \"$dirName\" 一致。';
+  }
+
+  @override
+  String get skillsInvalidFrontmatter =>
+      'SKILL.md 必須包含有效的 YAML 前置元資料且包含 name 欄位。';
+
+  @override
+  String skillsNotFound(String name) {
+    return '找不到技能：$name';
+  }
+
+  @override
+  String get skillsFrontmatterNameMissing => 'SKILL.md 前置元資料必須包含 name 欄位。';
+
+  @override
+  String skillsSaveFailed(String detail) {
+    return '儲存技能失敗：$detail';
+  }
+
+  @override
+  String skillsImportFailed(int count) {
+    return '匯入 $count 個技能失敗';
+  }
+
+  @override
+  String get skillsDeleteConfirmDeleteButton => '刪除';
+
+  @override
+  String get assistantEditPageSkillsTab => '技能';
+
+  @override
+  String get settingsPageSkills => '技能';
 }

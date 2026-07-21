@@ -175,6 +175,7 @@ class DataSync {
       final avatarsDirPath = (await _getAvatarsDir()).path;
       final imagesDirPath = (await _getImagesDir()).path;
       final fontsDirPath = (await _getFontsDir()).path;
+      final skillsDirPath = (await _getSkillsDir()).path;
       final settingsPath = settingsTmp?.path;
       final chatsPath = chatsTmp?.path;
       final effectiveIncludeFiles = isIncremental
@@ -194,6 +195,7 @@ class DataSync {
           avatarsDirPath: avatarsDirPath,
           imagesDirPath: imagesDirPath,
           fontsDirPath: fontsDirPath,
+          skillsDirPath: skillsDirPath,
         );
       });
 
@@ -311,6 +313,7 @@ class DataSync {
     required String avatarsDirPath,
     required String imagesDirPath,
     required String fontsDirPath,
+    required String skillsDirPath,
     DateTime? since,
   }) {
     final writer = _StreamingZipWriter(outPath);
@@ -324,6 +327,9 @@ class DataSync {
       if (chatsPath != null) {
         _addFileToZip(writer, chatsPath, 'chats.json');
       }
+
+      // skills/ — always included, independent of includeFiles
+      _addDirectoryToZip(writer, skillsDirPath, 'skills', since: since);
 
       // files under upload/, images/, and avatars/
       if (includeFiles) {
@@ -693,6 +699,10 @@ class DataSync {
 
   Future<Directory> _getFontsDir() async {
     return await AppDirectories.getFontsDirectory();
+  }
+
+  Future<Directory> _getSkillsDir() async {
+    return await AppDirectories.getSkillsDirectory();
   }
 
   /// Analyze incremental scope for preview purposes — scans conversations and

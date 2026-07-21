@@ -2760,5 +2760,69 @@
   "multiAIAddModelTooltip": "Add Model",
   "@multiAIAddModelTooltip": {
     "description": "Tooltip for the add model button in multi-AI card footer"
-  }
+  },
+  "skillsTitle": "Skills",
+  "skillsAddTooltip": "Add Skill",
+  "skillsImportManualTitle": "Add Manually",
+  "skillsImportManualHint": "Paste the complete SKILL.md content (including YAML frontmatter)",
+  "skillsImportFileLabel": "Import from File",
+  "skillsEmptyMessage": "No skills yet. Import from a file or create one manually.",
+  "skillsDeleteConfirmTitle": "Delete Skill",
+  "skillsDeleteConfirmMessage": "Delete \"{name}\"? This cannot be undone.",
+  "@skillsDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportSuccess": "Imported {count} skill(s)",
+  "@skillsImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsTab": "Skills",
+  "skillsFrontmatterNameMismatch": "Frontmatter name \"{frontmatterName}\" must match directory name \"{dirName}\".",
+  "@skillsFrontmatterNameMismatch": {
+    "placeholders": {
+      "frontmatterName": {
+        "type": "String"
+      },
+      "dirName": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsInvalidFrontmatter": "SKILL.md must contain valid YAML frontmatter with a name field.",
+  "skillsNotFound": "Skill not found: {name}",
+  "@skillsNotFound": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsFrontmatterNameMissing": "SKILL.md frontmatter must contain a name field.",
+  "skillsSaveFailed": "Failed to save skill: {detail}",
+  "@skillsSaveFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportFailed": "Failed to import {count} skill(s)",
+  "@skillsImportFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsDeleteConfirmDeleteButton": "Delete",
+  "assistantEditPageSkillsTab": "Skills",
+  "settingsPageSkills": "Skills"
 }

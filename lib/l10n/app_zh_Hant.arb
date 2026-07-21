@@ -2307,5 +2307,69 @@
   "multiAIAddModelTooltip": "新增模型",
   "@multiAIAddModelTooltip": {
     "description": "多AI卡片底部添加模型按鈕的提示"
-  }
+  },
+  "skillsTitle": "技能",
+  "skillsAddTooltip": "新增技能",
+  "skillsImportManualTitle": "手動新增",
+  "skillsImportManualHint": "貼上完整的 SKILL.md 內容（包含 YAML 前置元資料）",
+  "skillsImportFileLabel": "從檔案匯入",
+  "skillsEmptyMessage": "暫無技能。從檔案匯入或手動建立一個。",
+  "skillsDeleteConfirmTitle": "刪除技能",
+  "skillsDeleteConfirmMessage": "確定刪除 \"{name}\"？此操作不可復原。",
+  "@skillsDeleteConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportSuccess": "已匯入 {count} 個技能",
+  "@skillsImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsTab": "技能",
+  "skillsFrontmatterNameMismatch": "前置元資料中的名稱 \"{frontmatterName}\" 必須與目錄名稱 \"{dirName}\" 一致。",
+  "@skillsFrontmatterNameMismatch": {
+    "placeholders": {
+      "frontmatterName": {
+        "type": "String"
+      },
+      "dirName": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsInvalidFrontmatter": "SKILL.md 必須包含有效的 YAML 前置元資料且包含 name 欄位。",
+  "skillsNotFound": "找不到技能：{name}",
+  "@skillsNotFound": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsFrontmatterNameMissing": "SKILL.md 前置元資料必須包含 name 欄位。",
+  "skillsSaveFailed": "儲存技能失敗：{detail}",
+  "@skillsSaveFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "skillsImportFailed": "匯入 {count} 個技能失敗",
+  "@skillsImportFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "skillsDeleteConfirmDeleteButton": "刪除",
+  "assistantEditPageSkillsTab": "技能",
+  "settingsPageSkills": "技能"
 }

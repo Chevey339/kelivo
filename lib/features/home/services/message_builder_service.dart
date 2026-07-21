@@ -19,9 +19,11 @@ import '../../../core/services/instruction_injection_store.dart';
 import '../../../core/services/world_book_store.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
+import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
+import '../../../features/skills/skill_manager.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
 
@@ -703,6 +705,45 @@ These memories are automatically included in future conversation contexts within
         final lp = prompts.join('\n\n');
         _appendToSystemMessage(apiMessages, lp);
       }
+    } catch (_) {}
+  }
+
+  /// Inject available skill list (metadata only) into apiMessages.
+  Future<void> injectSkillListPrompt(
+    List<Map<String, dynamic>> apiMessages,
+    String? assistantId,
+  ) async {
+    try {
+      List<String> skillIds;
+      try {
+        final ap = contextProvider.read<AssistantProvider>();
+        final a = (assistantId != null)
+            ? ap.getById(assistantId)
+            : ap.currentAssistant;
+        if (a == null) return;
+        skillIds = a.skillIds;
+      } catch (_) {
+        return;
+      }
+      if (skillIds.isEmpty) return;
+
+      final targetSet = skillIds.toSet();
+      final allSkills = await SkillManager.listSkills();
+      final matched = allSkills
+          .where((s) => targetSet.contains(s.name) && s.description.isNotEmpty)
+          .toList(growable: false);
+      if (matched.isEmpty) return;
+
+      final sb = StringBuffer();
+      sb.writeln('<available_skills>');
+      for (final skill in matched) {
+        sb.writeln('  <skill>');
+        sb.writeln('    <name>${skill.name}</name>');
+        sb.writeln('    <description>${skill.description}</description>');
+        sb.writeln('  </skill>');
+      }
+      sb.write('</available_skills>');
+      _appendToSystemMessage(apiMessages, sb.toString());
     } catch (_) {}
   }
 

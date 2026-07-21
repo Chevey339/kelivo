@@ -417,6 +417,25 @@ class AssistantProvider extends ChangeNotifier {
     ];
   }
 
+  Future<void> removeSkillFromAllAssistants(String skillName) async {
+    bool changed = false;
+    for (int i = 0; i < _assistants.length; i++) {
+      final a = _assistants[i];
+      if (a.skillIds.contains(skillName)) {
+        _assistants[i] = a.copyWith(
+          skillIds: a.skillIds
+              .where((id) => id != skillName)
+              .toList(growable: false),
+        );
+        changed = true;
+      }
+    }
+    if (changed) {
+      await _persist();
+      notifyListeners();
+    }
+  }
+
   Future<String> addAssistant({String? name, dynamic context}) async {
     final a = Assistant(
       id: const Uuid().v4(),

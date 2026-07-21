@@ -58,6 +58,7 @@ Do **not** store sensitive information, including:
   final bool searchEnabled; // per-assistant external web search switch
   final List<String> mcpServerIds; // bound MCP server IDs
   final List<String> localToolIds; // enabled local tool IDs
+  final List<String> skillIds; // enabled skill names
   final String? background; // chat background (color/image ref)
   // Custom request overrides (per assistant)
   final List<Map<String, String>>
@@ -108,6 +109,7 @@ Do **not** store sensitive information, including:
     this.searchEnabled = false,
     this.mcpServerIds = const <String>[],
     this.localToolIds = const <String>[],
+    this.skillIds = const <String>[],
     this.background,
     this.customHeaders = const <Map<String, String>>[],
     this.customBody = const <Map<String, String>>[],
@@ -150,6 +152,7 @@ Do **not** store sensitive information, including:
     bool? searchEnabled,
     List<String>? mcpServerIds,
     List<String>? localToolIds,
+    List<String>? skillIds,
     String? background,
     List<Map<String, String>>? customHeaders,
     List<Map<String, String>>? customBody,
@@ -202,6 +205,7 @@ Do **not** store sensitive information, including:
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIds: mcpServerIds ?? this.mcpServerIds,
       localToolIds: localToolIds ?? this.localToolIds,
+      skillIds: skillIds ?? this.skillIds,
       background: clearBackground ? null : (background ?? this.background),
       customHeaders: customHeaders ?? this.customHeaders,
       customBody: customBody ?? this.customBody,
@@ -249,6 +253,7 @@ Do **not** store sensitive information, including:
     'searchEnabled': searchEnabled,
     'mcpServerIds': mcpServerIds,
     'localToolIds': localToolIds,
+    'skillIds': skillIds,
     'background': background,
     'customHeaders': customHeaders,
     'customBody': customBody,
@@ -292,6 +297,7 @@ Do **not** store sensitive information, including:
         (json['mcpServerIds'] as List?)?.cast<String>() ?? const <String>[],
     localToolIds:
         (json['localToolIds'] as List?)?.cast<String>() ?? const <String>[],
+    skillIds: (json['skillIds'] as List?)?.cast<String>() ?? const <String>[],
     background: json['background'] as String?,
     customHeaders: (() {
       final raw = json['customHeaders'];

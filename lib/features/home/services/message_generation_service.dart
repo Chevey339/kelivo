@@ -191,6 +191,7 @@ class MessageGenerationService {
       apiMessages,
       assistantId,
     );
+    await messageBuilderService.injectSkillListPrompt(apiMessages, assistantId);
 
     // Apply context limit and inline images
     messageBuilderService.applyContextLimit(apiMessages, assistant);
