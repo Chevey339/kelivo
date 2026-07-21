@@ -214,7 +214,7 @@ Future<List<ModelSelection>?> showMultiModelSelector(
         platform == TargetPlatform.windows ||
         platform == TargetPlatform.linux) {
       // Desktop: use general dialog with desktop-optimized body
-      await showGeneralDialog(
+      final popResult = await showGeneralDialog<ModelSelection>(
         context: context,
         barrierDismissible: true,
         barrierLabel: 'multi-model-select-desktop',
@@ -241,11 +241,13 @@ Future<List<ModelSelection>?> showMultiModelSelector(
           );
         },
       );
-      if (!completer.isCompleted) completer.complete(null);
+      if (!completer.isCompleted) {
+        completer.complete(popResult != null ? [popResult] : null);
+      }
     } else {
       // Mobile: use bottom sheet
       final cs = Theme.of(context).colorScheme;
-      await showModalBottomSheet(
+      final popResult = await showModalBottomSheet<ModelSelection>(
         context: context,
         isScrollControlled: true,
         backgroundColor: cs.surface,
@@ -262,7 +264,9 @@ Future<List<ModelSelection>?> showMultiModelSelector(
         ),
       );
       // Complete with null if sheet dismissed without confirm
-      if (!completer.isCompleted) completer.complete(null);
+      if (!completer.isCompleted) {
+        completer.complete(popResult != null ? [popResult] : null);
+      }
     }
   } finally {
     _modelSelectorOpen = false;

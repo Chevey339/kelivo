@@ -2002,8 +2002,24 @@ class HomePageController extends ChangeNotifier {
       _context,
       preselectedKeys: existingKeys,
     );
-    if (result == null || result.length < 2) return;
+    if (result == null || result.isEmpty) return;
     if (!_context.mounted) return;
+
+    if (result.length == 1) {
+      final sel = result.first;
+      final assistant = _context.read<AssistantProvider>().currentAssistant;
+      engine.exit();
+      if (assistant != null) {
+        await _context.read<AssistantProvider>().updateAssistant(
+          assistant.copyWith(
+            chatModelProvider: sel.providerKey,
+            chatModelId: sel.modelId,
+          ),
+        );
+      }
+      notifyListeners();
+      return;
+    }
 
     final threadIds = List<String>.generate(
       result.length,
