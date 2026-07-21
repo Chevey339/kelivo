@@ -34,11 +34,11 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
 }) async* {
-  final input = await _openAIImagesInput(messages, userImagePaths);
+  final input = await _openAIImagesInput(messages, userMediaPaths);
   final outputMime = _openAIImagesOutputMime(config, modelId, extraBody);
   final upstreamModelId = _apiModelId(config, modelId);
   if (input.imageRefs.isNotEmpty &&
@@ -200,10 +200,10 @@ Future<String> _lastOpenAIImagePrompt(
 
 Future<_OpenAIImagesInput> _openAIImagesInput(
   List<Map<String, dynamic>> messages,
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
 ) async {
   final prompt = await _lastOpenAIImagePrompt(messages);
-  final explicitPaths = (userImagePaths ?? const <String>[])
+  final explicitPaths = (userMediaPaths ?? const <String>[])
       .map((path) => path.trim())
       .where((path) => path.isNotEmpty)
       .toList(growable: false);

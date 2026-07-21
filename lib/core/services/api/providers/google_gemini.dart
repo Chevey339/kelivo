@@ -186,7 +186,7 @@ Stream<ChatStreamChunk> _sendGoogleGeminiStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -203,7 +203,7 @@ Stream<ChatStreamChunk> _sendGoogleGeminiStream(
     cfg,
     modelId,
     messages,
-    userImagePaths: userImagePaths,
+    userMediaPaths: userMediaPaths,
     thinkingBudget: thinkingBudget,
     temperature: temperature,
     topP: topP,

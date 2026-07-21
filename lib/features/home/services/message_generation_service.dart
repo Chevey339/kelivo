@@ -302,7 +302,7 @@ class MessageGenerationService {
   stream_ctrl.GenerationContext buildGenerationContext({
     required ChatMessage assistantMessage,
     required PreparedGeneration prepared,
-    required List<String> userImagePaths,
+    required List<String> userMediaPaths,
     required bool allowImagesApiRouting,
     required String providerKey,
     required String modelId,
@@ -320,7 +320,7 @@ class MessageGenerationService {
     return stream_ctrl.GenerationContext(
       assistantMessage: assistantMessage,
       apiMessages: prepared.apiMessages,
-      userImagePaths: userImagePaths,
+      userMediaPaths: userMediaPaths,
       allowImagesApiRouting: allowImagesApiRouting,
       providerKey: providerKey,
       modelId: modelId,
@@ -559,13 +559,14 @@ class MessageGenerationService {
         .toList(growable: false);
   }
 
-  /// Build user image paths considering OCR mode.
-  List<String> buildUserImagePaths({
+  /// Build user media paths (images, videos, audio, office docs) considering OCR mode.
+  List<String> buildUserMediaPaths({
     required ChatInputData? input,
-    required List<String> lastUserImagePaths,
+    required List<String> lastUserMediaPaths,
     required SettingsProvider settings,
     required String providerKey,
     required String modelId,
+    Assistant? assistant,
   }) {
     final bool ocrActive =
         settings.ocrEnabled &&
@@ -578,12 +579,38 @@ class MessageGenerationService {
       modelId: modelId,
     );
 
+    /// Skip office docs in 'extract' mode: their text is already injected
+    /// into the API message via processUserMessagesForApi.
+    bool skipOfficeDoc(String mime) {
+      final lower = mime.toLowerCase();
+      if (assistant != null) {
+        if (lower == 'application/pdf') return assistant.pdfMode != 'direct';
+        if (lower ==
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          return assistant.docxMode != 'direct';
+        }
+        if (isOfficeDocumentMime(lower)) {
+          return assistant.otherOfficeMode != 'direct';
+        }
+        return true;
+      }
+      // No assistant — use defaults:
+      if (lower == 'application/pdf' ||
+          lower ==
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        return true; // default extract
+      }
+      if (isOfficeDocumentMime(lower)) return false; // default direct
+      return true;
+    }
+
     if (input != null) {
       final currentMediaPaths = <String>[];
       for (final d in input.documents) {
         final effectiveMime = _effectiveAttachmentMime(d);
         if (isVideoMime(effectiveMime) ||
-            isOfficeDocumentMime(effectiveMime) ||
+            (isOfficeDocumentMime(effectiveMime) &&
+                !skipOfficeDoc(effectiveMime)) ||
             (includeAudio && isAudioMime(effectiveMime))) {
           currentMediaPaths.add(d.path);
         }
@@ -595,7 +622,7 @@ class MessageGenerationService {
     }
 
     return _filterMediaPathsForProvider(
-      lastUserImagePaths
+      lastUserMediaPaths
           .where((path) {
             if (!ocrActive) return true;
             return !isImageMime(

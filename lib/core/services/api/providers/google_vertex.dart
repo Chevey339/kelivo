@@ -5,7 +5,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -22,7 +22,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexStream(
     cfg,
     modelId,
     messages,
-    userImagePaths: userImagePaths,
+    userMediaPaths: userMediaPaths,
     thinkingBudget: thinkingBudget,
     temperature: temperature,
     topP: topP,
@@ -118,7 +118,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
   required ProviderConfig config,
   required String modelId,
   required List<Map<String, dynamic>> messages,
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -197,12 +197,12 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     final m = nonSystemMessages[i];
     final isLast = i == nonSystemMessages.length - 1;
     if (isLast &&
-        (userImagePaths?.isNotEmpty == true) &&
+        (userMediaPaths?.isNotEmpty == true) &&
         (m['role'] == 'user')) {
       final parts = <Map<String, dynamic>>[];
       final text = (m['content'] ?? '').toString();
       if (text.isNotEmpty) parts.add({'type': 'text', 'text': text});
-      for (final p in userImagePaths!) {
+      for (final p in userMediaPaths!) {
         // Vertex AI Claude does not support remote URLs in 'image' blocks generally.
         // We must download and encode.
         String mime;

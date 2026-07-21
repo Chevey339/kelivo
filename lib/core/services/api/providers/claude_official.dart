@@ -25,7 +25,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
   ProviderConfig config,
   String modelId,
   List<Map<String, dynamic>> messages, {
-  List<String>? userImagePaths,
+  List<String>? userMediaPaths,
   int? thinkingBudget,
   double? temperature,
   double? topP,
@@ -214,12 +214,12 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       continue;
     }
     if (isLast &&
-        (userImagePaths?.isNotEmpty == true) &&
+        (userMediaPaths?.isNotEmpty == true) &&
         (m['role'] == 'user')) {
       final parts = <Map<String, dynamic>>[];
       final text = (m['content'] ?? '').toString();
       if (text.isNotEmpty) parts.add({'type': 'text', 'text': text});
-      for (final p in userImagePaths!) {
+      for (final p in userMediaPaths!) {
         if (p.startsWith('http') || p.startsWith('data:')) {
           parts.add({'type': 'text', 'text': p});
         } else {

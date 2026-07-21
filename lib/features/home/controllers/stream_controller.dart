@@ -1316,7 +1316,7 @@ class GenerationContext {
   GenerationContext({
     required this.assistantMessage,
     required this.apiMessages,
-    required this.userImagePaths,
+    required this.userMediaPaths,
     required this.allowImagesApiRouting,
     required this.providerKey,
     required this.modelId,
@@ -1336,7 +1336,7 @@ class GenerationContext {
 
   final ChatMessage assistantMessage;
   final List<Map<String, dynamic>> apiMessages;
-  final List<String> userImagePaths;
+  final List<String> userMediaPaths;
   final bool allowImagesApiRouting;
   final String providerKey;
   final String modelId;

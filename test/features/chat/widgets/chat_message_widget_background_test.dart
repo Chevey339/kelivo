@@ -232,7 +232,7 @@ void main() {
           home_stream.GenerationContext(
             assistantMessage: message,
             apiMessages: const [],
-            userImagePaths: const [],
+            userMediaPaths: const [],
             allowImagesApiRouting: false,
             providerKey: 'test',
             modelId: 'test-model',
