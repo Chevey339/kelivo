@@ -225,6 +225,10 @@ class ChatActions {
   /// Track multi-model stream messageIds per conversation (for cancel cleanup).
   final Map<String, Set<String>> _multiAIStreamKeys = <String, Set<String>>{};
 
+  /// Guard against re-entrant cancelStreaming calls and
+  /// concurrent _handleStreamError cleanup.
+  bool _isCancelling = false;
+
   void _setConversationLoading(String conversationId, bool loading) {
     chatController.setConversationLoading(conversationId, loading);
     onLoadingChanged?.call(conversationId, loading);
@@ -921,96 +925,106 @@ class ChatActions {
   /// Cancel the active streaming for the current conversation.
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
-    if (cid == null) return;
-
-    // Cancel any pending tool approval requests to prevent deadlock
+    if (cid == null || _isCancelling) return;
+    _isCancelling = true;
     try {
-      contextProvider.read<ToolApprovalService>().cancelAll();
-    } catch (_) {
-      // ToolApprovalService may not be registered yet
-    }
-    try {
-      contextProvider.read<AskUserInteractionService>().cancelAll();
-    } catch (_) {
-      // AskUserInteractionService may not be registered yet
-    }
-
-    // Reset file processing state on cancel
-    onFileProcessingFinished?.call();
-
-    // Cancel all multi-AI streams for this conversation
-    final multiKeys = _multiAIStreamKeys.remove(cid);
-    if (multiKeys != null) {
-      for (final key in multiKeys) {
-        await _conversationStreams.remove(key)?.cancel();
+      // Cancel any pending tool approval requests to prevent deadlock
+      try {
+        contextProvider.read<ToolApprovalService>().cancelAll();
+      } catch (_) {
+        // ToolApprovalService may not be registered yet
       }
-    }
-
-    // Cancel active stream for current conversation only
-    final sub = _conversationStreams.remove(cid);
-    await sub?.cancel();
-    ChatApiService.cancelRequest(cid);
-
-    // Find the latest assistant streaming message within current conversation and mark it finished
-    ChatMessage? streaming;
-    for (var i = _messages.length - 1; i >= 0; i--) {
-      final m = _messages[i];
-      if (m.role == 'assistant' && m.isStreaming) {
-        streaming = m;
-        break;
-      }
-    }
-    if (streaming != null) {
-      // Mark streaming as ended to allow UI rebuilds again
-      streamController.markStreamingEnded(streaming.id);
-      streamController.cleanupTimers(streaming.id);
-
-      final idx = _messages.indexWhere((m) => m.id == streaming!.id);
-      final latestStreaming = idx == -1 ? streaming : _messages[idx];
-
-      await chatService.updateMessage(
-        latestStreaming.id,
-        content: latestStreaming.content,
-        isStreaming: false,
-        totalTokens: latestStreaming.totalTokens,
-      );
-
-      if (idx != -1) {
-        _messages[idx] = latestStreaming.copyWith(isStreaming: false);
-        onMessagesChanged?.call();
+      try {
+        contextProvider.read<AskUserInteractionService>().cancelAll();
+      } catch (_) {
+        // AskUserInteractionService may not be registered yet
       }
 
-      streamController.removeStreamingNotifier(streaming.id);
-      chatController.forceClearConversationLoading(cid);
+      // Reset file processing state on cancel
+      onFileProcessingFinished?.call();
 
-      // Use unified reasoning completion method
-      await streamController.finishReasoningAndPersist(
-        streaming.id,
-        updateReasoningInDb:
-            (
-              String messageId, {
-              String? reasoningText,
-              DateTime? reasoningFinishedAt,
-              String? reasoningSegmentsJson,
-            }) async {
-              await chatService.updateMessage(
-                messageId,
-                reasoningText: reasoningText,
-                reasoningFinishedAt: reasoningFinishedAt,
-                reasoningSegmentsJson: reasoningSegmentsJson,
-              );
-            },
-      );
+      // Cancel all multi-AI streams for this conversation
+      final multiKeys = _multiAIStreamKeys.remove(cid);
+      if (multiKeys != null) {
+        for (final key in multiKeys) {
+          ChatApiService.cancelRequest(key);
+          try {
+            await _conversationStreams.remove(key)?.cancel();
+          } catch (_) {}
+        }
+      }
 
-      // If streaming output included inline base64 images, sanitize them even on manual cancel
-      onScheduleImageSanitize?.call(
-        streaming.id,
-        latestStreaming.content,
-        immediate: true,
-      );
-      await _cancelIosBackgroundGeneration();
-    } else {
-      chatController.forceClearConversationLoading(cid);
+      // Cancel active stream for current conversation only
+      ChatApiService.cancelRequest(cid);
+      final sub = _conversationStreams.remove(cid);
+      await sub?.cancel();
+
+      // Find all assistant streaming messages within current conversation and mark them finished
+      final streamingMessages = <ChatMessage>[];
+      for (var i = _messages.length - 1; i >= 0; i--) {
+        final m = _messages[i];
+        if (m.role == 'assistant' && m.isStreaming) {
+          streamingMessages.add(m);
+        }
+      }
+      if (streamingMessages.isNotEmpty) {
+        for (final streaming in streamingMessages) {
+          // Mark streaming as ended to allow UI rebuilds again
+          streamController.markStreamingEnded(streaming.id);
+          streamController.cleanupTimers(streaming.id);
+
+          final idx = _messages.indexWhere((m) => m.id == streaming.id);
+          final latestStreaming = idx == -1 ? streaming : _messages[idx];
+
+          await chatService.updateMessage(
+            latestStreaming.id,
+            content: latestStreaming.content,
+            isStreaming: false,
+            totalTokens: latestStreaming.totalTokens,
+          );
+
+          if (idx != -1) {
+            _messages[idx] = latestStreaming.copyWith(isStreaming: false);
+            onMessagesChanged?.call();
+          }
+
+          streamController.removeStreamingNotifier(streaming.id);
+
+          // Use unified reasoning completion method
+          await streamController.finishReasoningAndPersist(
+            streaming.id,
+            updateReasoningInDb:
+                (
+                  String messageId, {
+                  String? reasoningText,
+                  DateTime? reasoningFinishedAt,
+                  String? reasoningSegmentsJson,
+                }) async {
+                  await chatService.updateMessage(
+                    messageId,
+                    reasoningText: reasoningText,
+                    reasoningFinishedAt: reasoningFinishedAt,
+                    reasoningSegmentsJson: reasoningSegmentsJson,
+                  );
+                },
+          );
+
+          // If streaming output included inline base64 images, sanitize them even on manual cancel
+          onScheduleImageSanitize?.call(
+            streaming.id,
+            latestStreaming.content,
+            immediate: true,
+          );
+        }
+        chatController.forceClearConversationLoading(cid);
+        onLoadingChanged?.call(cid, false);
+        await _cancelIosBackgroundGeneration();
+      } else {
+        chatController.forceClearConversationLoading(cid);
+        onLoadingChanged?.call(cid, false);
+      }
+    } finally {
+      _isCancelling = false;
     }
   }
 
@@ -1641,6 +1655,10 @@ class ChatActions {
 
     // Remove notifier AFTER onMessagesChanged so the UI rebuild sees final content
     streamController.removeStreamingNotifier(messageId);
+
+    if (_isCancelling) {
+      return;
+    }
 
     _setConversationLoading(conversationId, false);
 

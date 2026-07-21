@@ -653,6 +653,7 @@ class MultiAIEngine extends ChangeNotifier {
         return m.subgroupId == threadId;
       }).toList();
 
+      _chatController.setConversationLoading(conversation.id, true);
       await _pipeline.executeAssistantResponse(
         assistantMessage: newMsg,
         providerKey: model.providerKey,

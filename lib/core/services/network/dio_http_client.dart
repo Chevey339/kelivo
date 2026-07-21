@@ -126,6 +126,12 @@ class DioHttpClient extends http.BaseClient {
         return client;
       },
     );
+
+    _cancelToken.whenCancel.then((_) {
+      try {
+        _dio.close(force: true);
+      } catch (_) {}
+    });
   }
 
   final Dio _dio;
