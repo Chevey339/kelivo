@@ -908,11 +908,13 @@ class DataSync {
       });
 
       // Restore settings
+      Object? backupAssistantsRaw;
       final settingsFile = File(p.join(extractDir.path, 'settings.json'));
       if (await settingsFile.exists()) {
         try {
           final txt = await settingsFile.readAsString();
           final map = jsonDecode(txt) as Map<String, dynamic>;
+          backupAssistantsRaw = map.remove('assistants_v1');
           final prefs = await SharedPreferencesAsync.instance;
           if (mode == RestoreMode.overwrite) {
             // For overwrite mode, restore all settings
@@ -923,7 +925,6 @@ class DataSync {
 
             // Keys that should be merged as JSON arrays/objects
             const mergeableKeys = {
-              'assistants_v1', // Assistant configurations
               'assistant_memories_v1', // Assistant memory entries
               'provider_configs_v1', // Provider configurations
               'pinned_models_v1', // Pinned models list
@@ -944,92 +945,7 @@ class DataSync {
 
               if (mergeableKeys.contains(key)) {
                 // Special handling for mergeable configurations
-                if (key == 'assistants_v1' && existing.containsKey(key)) {
-                  // Merge assistants by ID with field-level rules.
-                  // Preserve local avatar if already set to avoid clearing/overwriting.
-                  try {
-                    final existingAssistants =
-                        jsonDecode(existing[key] as String) as List;
-                    final newAssistants =
-                        jsonDecode(newValue as String) as List;
-                    final assistantMap = <String, Map<String, dynamic>>{};
-
-                    // Seed map with existing assistants
-                    for (final a in existingAssistants) {
-                      if (a is Map && a.containsKey('id')) {
-                        // Store as mutable map<String, dynamic>
-                        assistantMap[a['id'].toString()] =
-                            Map<String, dynamic>.from(a);
-                      }
-                    }
-
-                    // Merge with imported assistants
-                    for (final a in newAssistants) {
-                      if (a is Map && a.containsKey('id')) {
-                        final id = a['id'].toString();
-                        final incoming = Map<String, dynamic>.from(a);
-
-                        if (!assistantMap.containsKey(id)) {
-                          // New assistant entirely
-                          assistantMap[id] = incoming;
-                          continue;
-                        }
-
-                        final local = assistantMap[id]!;
-
-                        // Start with default behavior: imported values override
-                        final merged = <String, dynamic>{...local, ...incoming};
-
-                        // Special rule: do not override existing non-empty avatar
-                        final localAvatar = (local['avatar'] ?? '').toString();
-                        final incomingAvatar = (incoming['avatar'] ?? '');
-                        if (localAvatar.trim().isNotEmpty) {
-                          // Keep local avatar regardless of imported value
-                          merged['avatar'] = localAvatar;
-                        } else {
-                          // Only take imported avatar if present (non-empty)
-                          final s = incomingAvatar is String
-                              ? incomingAvatar
-                              : incomingAvatar?.toString();
-                          if (s == null || s.trim().isEmpty) {
-                            merged['avatar'] = null;
-                          } else {
-                            merged['avatar'] = s;
-                          }
-                        }
-
-                        // Special rule: do not override existing non-empty background
-                        final localBg = (local['background'] ?? '').toString();
-                        final incomingBg = (incoming['background'] ?? '');
-                        if (localBg.trim().isNotEmpty) {
-                          // Keep local background regardless of imported value
-                          merged['background'] = localBg;
-                        } else {
-                          // Only take imported background if present (non-empty)
-                          final sb = incomingBg is String
-                              ? incomingBg
-                              : incomingBg?.toString();
-                          if (sb == null || sb.trim().isEmpty) {
-                            merged['background'] = null;
-                          } else {
-                            merged['background'] = sb;
-                          }
-                        }
-
-                        assistantMap[id] = merged;
-                      }
-                    }
-
-                    final mergedAssistants = assistantMap.values.toList();
-                    await prefs.restoreSingle(
-                      key,
-                      jsonEncode(mergedAssistants),
-                    );
-                  } catch (e) {
-                    // If merge fails, keep existing
-                  }
-                } else if (key == 'provider_configs_v1' &&
-                    existing.containsKey(key)) {
+                if (key == 'provider_configs_v1' && existing.containsKey(key)) {
                   // Merge provider configs: combine both maps
                   try {
                     final existingConfigs =
@@ -1568,6 +1484,30 @@ class DataSync {
           }
         }
       }
+
+      // Restore assistants to SQLite (after clearAllData in chats block)
+      if (backupAssistantsRaw is String && chatService.initialized) {
+        try {
+          final decoded = jsonDecode(backupAssistantsRaw) as List;
+          if (mode == RestoreMode.overwrite) {
+            final assistants = decoded
+                .whereType<Map>()
+                .map((e) => Assistant.fromJson(Map<String, dynamic>.from(e)))
+                .toList();
+            await chatService.putAssistants(assistants);
+          } else {
+            final incoming = decoded
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+            final existing = await chatService.getAllAssistants();
+            final existingMaps = existing.map((a) => a.toJson()).toList();
+            final merged = _mergeAssistantMaps(existingMaps, incoming);
+            final assistants = merged.map(Assistant.fromJson).toList();
+            await chatService.putAssistants(assistants);
+          }
+        } catch (_) {}
+      }
     } finally {
       await _deleteDirectoryQuietly(extractDir);
     }
@@ -1595,6 +1535,70 @@ class DataSync {
     }
 
     return jsonEncode([for (final id in order) byId[id]]);
+  }
+
+  static List<Map<String, dynamic>> _mergeAssistantMaps(
+    List<Map<String, dynamic>> existing,
+    List<Map<String, dynamic>> incoming,
+  ) {
+    final assistantMap = <String, Map<String, dynamic>>{};
+
+    // Seed map with existing assistants
+    for (final a in existing) {
+      final id = a['id']?.toString();
+      if (id != null && id.isNotEmpty) {
+        assistantMap[id] = Map<String, dynamic>.from(a);
+      }
+    }
+
+    // Merge with incoming assistants
+    for (final a in incoming) {
+      final id = a['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final inc = Map<String, dynamic>.from(a);
+
+      if (!assistantMap.containsKey(id)) {
+        assistantMap[id] = inc;
+        continue;
+      }
+
+      final local = assistantMap[id]!;
+      final merged = <String, dynamic>{...local, ...inc};
+
+      // Special rule: do not override existing non-empty avatar
+      final localAvatar = (local['avatar'] ?? '').toString();
+      final incomingAvatar = (inc['avatar'] ?? '');
+      if (localAvatar.trim().isNotEmpty) {
+        merged['avatar'] = localAvatar;
+      } else {
+        final s = incomingAvatar is String
+            ? incomingAvatar
+            : incomingAvatar?.toString();
+        if (s == null || s.trim().isEmpty) {
+          merged['avatar'] = null;
+        } else {
+          merged['avatar'] = s;
+        }
+      }
+
+      // Special rule: do not override existing non-empty background
+      final localBg = (local['background'] ?? '').toString();
+      final incomingBg = (inc['background'] ?? '');
+      if (localBg.trim().isNotEmpty) {
+        merged['background'] = localBg;
+      } else {
+        final sb = incomingBg is String ? incomingBg : incomingBg?.toString();
+        if (sb == null || sb.trim().isEmpty) {
+          merged['background'] = null;
+        } else {
+          merged['background'] = sb;
+        }
+      }
+
+      assistantMap[id] = merged;
+    }
+
+    return assistantMap.values.toList();
   }
 
   static String _mergeAssistantMemories(
