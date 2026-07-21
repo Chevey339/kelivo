@@ -1,14 +1,31 @@
 # Changelog
 
-## [2.0.2] - 2026-07-22
+## [2.1.0] - 2026-07-21
+
+> ⚠ **This release includes a critical backup-restore fix.** In versions 1.5.0–2.0.2, "Smart Merge" did not merge assistants from the backup file into the local database — now fixed to merge correctly.
+>
+> v2.0 introduced **Android-specific Proactive Care** ("Ta 的来信"). Extra permissions may be requested; existing features are unaffected without granting them.
+>
+> v2.1 introduces the **Skill** mechanism. This is a first cut — not fully featured yet; improvements will follow in subsequent releases.
+
+### Added
+
+- SKILLS mechanism — filesystem-based skill storage, import from file/manual entry, assistant binding, `load_skill` tool, backup support
+
+### Fixed
+
+- Smart Merge now correctly restores assistants from backup files (affects versions 1.5.0–2.0.2)
+- Restore assistants to SQLite instead of SharedPreferences (prevents data loss) (#74)
+- Multi-AI anchor system uses `groupId` instead of `messageId` for correct thread resolution (#72)
+- Rename `userImagePaths` to `userMediaPaths`; fix office document handling in Responses API (#66)
+
+## [2.0.2] - 2026-07-21
 
 > ✅ **"Ta 的来信" (proactive care) is now fully functional in this release.**
-> 
+>
 > **Proactive Care** lets AI assistatns send care messages to you on a configurable schedule **on Android only**. Extra permissions may be requested; for users who don't need this feature, just ignore them. **Existing features will not be affected without new permissions**.
-> 
+>
 > Users on other platforms can still install this version as it introduces other fixes around the feature of MultiAI.
-> 
-> 
 
 ### Added
 

@@ -39,22 +39,24 @@ Unlike most personal-customization or single-feature forks, Cuplivo aims to add 
    - Desktop now shows 2 model responses per page in a two-column layout.
    - *Tip*: Multi-select models in the model picker before sending a message to activate this mode.
 
-4. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
+4. **Skill mechanism** — Import SKILL.md files or create them manually, bind skills to assistants, and use `load_skill` tool to dynamically load skill instructions. Skills are persisted on the filesystem and included in backups.
+
+5. **Manual image compression** — Phone photos and desktop screenshots are pixel‑sharp but often overkill for LLM tasks.
    - *In practice*: Resizing the long edge from 4096 to 2048 px yields ~425 KB (down from 2.06 MB) and cuts input tokens from 8,136 to 3,096, with no perceptible drop in model response quality.
    - *Note*: Ideal for high-resolution captures and low-detail tasks.
 
-5. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
+6. **Memory mode switcher** — Per-assistant toggle between **Auto Injection** (memories injected into system prompt on every turn) and **On Demand (Tool)** (memories accessed via `read_memory` tool only when needed). Tool mode keeps the system prompt stable, dramatically improving API cache hit rates and reducing latency.
    - *Tip*: For best cache performance, disable Recent Chats Reference and switch to On Demand mode.
 
-6. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
+7. **Tool prompt optimization** — Rewrote built-in tool descriptions to be more concise and precise, helping models select the right tool more consistently and minimizing output format errors.
 
-7. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
+8. **SVG preview** — Renders SVG diagrams inline within `svg` code blocks.
 
-8. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; added Kimi K3 with max reasoning and both naming variants; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
+9. **Model capability support** — Adapted for GPT-5.6 (sol/luna/terra) with xhigh/max reasoning effort; added Kimi K3 with max reasoning and both naming variants; broadened Qwen 3.5–3.7 and Doubao seed-2 model family detection for accurate feature availability.
 
-9. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
+10. **PDF/Office file attachments** — Upload PDF, Word, Excel, and PowerPoint documents directly as attachments, with configurable document processing options.
 
-10. **Additional fixes across the repo**
+11. **Additional fixes across the repo**
     - OCR result caching now persists across restarts (SQLite-backed)
     - Accurate Gemini cached-token reporting
     - Optimized title generation logic (auto-retry on first failure)

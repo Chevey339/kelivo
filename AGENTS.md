@@ -239,6 +239,7 @@ flutter analyze
   - `README.md` → ✨ **New Features** section (Cuplivo vs Kelivo differences)
   - `README_ZH_CN.md` → ✨ **新功能** 章节
 - This ensures users can always see what distinguishes Cuplivo from upstream Kelivo.
+- Features items are ordered by **descending importance** (most important first). Before inserting a new item, always ask the user which two existing items it should go between, and renumber all items accordingly in both README files.
 
 ### 3.11 Tests and Self-Review Must Be Requirement-Driven
 
