@@ -411,7 +411,7 @@ class _AboutPageState extends State<AboutPage> {
                 context,
                 svgAsset: 'assets/icons/github.svg',
                 label: l10n.aboutPageGithub,
-                onTap: () => _openUrl('https://github.com/Chevey339/kelivo'),
+                onTap: () => _openUrl('https://github.com/cuplivo/cuplivo'),
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -419,7 +419,7 @@ class _AboutPageState extends State<AboutPage> {
                 icon: Lucide.FileText,
                 label: l10n.aboutPageLicense,
                 onTap: () => _openUrl(
-                  'https://github.com/Chevey339/kelivo/blob/master/LICENSE',
+                  'https://github.com/cuplivo/cuplivo/blob/master/LICENSE',
                 ),
               ),
               _iosDivider(context),

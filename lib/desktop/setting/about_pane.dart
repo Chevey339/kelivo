@@ -173,14 +173,14 @@ class _DesktopAboutPaneState extends State<DesktopAboutPane> {
                     svgAsset: 'assets/icons/github.svg',
                     label: l10n.aboutPageGithub,
                     onTap: () =>
-                        _openUrl('https://github.com/Chevey339/kelivo'),
+                        _openUrl('https://github.com/cuplivo/cuplivo'),
                   ),
                   const _DeskRowDivider(),
                   _DeskNavRow(
                     icon: lucide.Lucide.FileText,
                     label: l10n.aboutPageLicense,
                     onTap: () => _openUrl(
-                      'https://github.com/Chevey339/kelivo/blob/master/LICENSE',
+                      'https://github.com/cuplivo/cuplivo/blob/master/LICENSE',
                     ),
                   ),
                   const _DeskRowDivider(),
