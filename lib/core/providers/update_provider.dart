@@ -72,6 +72,52 @@ class UpdateInfo {
       downloads: downloads,
     );
   }
+
+  /// Parses a GitHub Releases API response into [UpdateInfo].
+  factory UpdateInfo.fromGithubRelease(Map<String, dynamic> json) {
+    final tag = (json['tag_name'] ?? '').toString();
+    // Strip leading 'v' prefix if present (e.g. "v1.2.3" -> "1.2.3")
+    final version = tag.startsWith('v') ? tag.substring(1) : tag;
+
+    DateTime? released;
+    final publishedAt = json['published_at']?.toString();
+    if (publishedAt != null && publishedAt.isNotEmpty) {
+      try {
+        released = DateTime.parse(publishedAt);
+      } catch (_) {}
+    }
+
+    // Map release assets to platform download keys
+    final downloads = <String, String>{};
+    final assets = (json['assets'] as List?) ?? const [];
+    for (final asset in assets) {
+      if (asset is! Map) continue;
+      final name = (asset['name'] ?? '').toString().toLowerCase();
+      final url = (asset['browser_download_url'] ?? '').toString();
+      if (url.isEmpty) continue;
+      if (name.endsWith('.apk')) {
+        downloads['android'] = url;
+      } else if (name.endsWith('.ipa')) {
+        downloads['ios'] = url;
+      } else if (name.endsWith('.dmg') || name.endsWith('.pkg')) {
+        downloads['macos'] = url;
+      } else if (name.endsWith('.exe') || name.endsWith('.msix')) {
+        downloads['windows'] = url;
+      } else if (name.endsWith('.appimage') ||
+          name.endsWith('.deb') ||
+          name.endsWith('.rpm')) {
+        downloads['linux'] = url;
+      }
+    }
+
+    return UpdateInfo(
+      app: 'cuplivo',
+      version: version,
+      releasedAt: released,
+      notes: (json['body'] ?? '').toString(),
+      downloads: downloads,
+    );
+  }
 }
 
 class UpdateProvider extends ChangeNotifier {
@@ -88,17 +134,18 @@ class UpdateProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      final ts = DateTime.now().millisecondsSinceEpoch;
       final url = Uri.parse(
-        'https://kelivo.psycheas.top/update.json?kelivo=$ts',
+        'https://api.github.com/repos/cuplivo/cuplivo/releases/latest',
       );
-      final resp = await http.get(url);
+      final resp = await http.get(url, headers: {
+        'Accept': 'application/vnd.github+json',
+      });
       if (resp.statusCode != 200) {
         throw Exception('HTTP ${resp.statusCode}');
       }
       final data =
           jsonDecode(utf8.decode(resp.bodyBytes)) as Map<String, dynamic>;
-      final info = UpdateInfo.fromJson(data);
+      final info = UpdateInfo.fromGithubRelease(data);
 
       final pkg = await PackageInfo.fromPlatform();
       final currentVer = pkg.version; // e.g., 1.0.0
