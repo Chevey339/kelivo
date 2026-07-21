@@ -101,3 +101,61 @@
 - **File strategy**: Compressed result written to same dir, same basename, new extension (e.g. `photo.png` → `photo.jpg`). Original file deleted. `_images` path updated accordingly.
 - **UI**: File size shown as gradient overlay at bottom of each 64×64 thumbnail, with `Lucide.ImageDown` icon. Tappable → opens dialog. `_imageSizes` cache maintained alongside `_images` to avoid repeated disk reads.
 - **Compression progress**: Dialog buttons show loading spinner while compressing. Single "压缩" or "全部压缩" (后者仅在 totalImageCount > 1 时可用).
+
+## Skill System
+
+### Core Concept
+
+- **Skill**: A directory at `<appData>/skills/<name>/SKILL.md` containing a specialized instruction set + optional auxiliary files (scripts/, references/, assets/). The directory name IS the skill's identity — it must match the `name` field in YAML frontmatter and follow AgentSkills naming rules (lowercase letters, digits, hyphens; ≤64 chars; no leading/trailing/consecutive hyphens).
+- **`SkillManager`**: The facade that owns all skill CRUD. Reads SKILL.md from disk lazily — no memory cache. Atomic write pattern: staging dir → rename target→backup → rename staging→target → cleanup. Path safety: rejects names containing `/`, `..`, leading/trailing dots, and whitespace.
+- **`AppDirectories.getSkillsDirectory()`**: Returns `<appData>/skills/`. Each skill lives in its own subdirectory matching the skill name.
+
+### Lifecycle
+
+- **Import** (three channels, all funnel to `SkillManager.saveSkill()`):
+  - Manual paste: User pastes complete SKILL.md (YAML frontmatter + body) into a text box. Real-time frontmatter parsing + name validation.
+  - File picker: System file picker selects a single `.md` file or `.zip` archive. ZIPs are scanned for all `SKILL.md` files (any nesting depth), each validated and imported independently.
+  - GitHub URL: v1 not implemented; user can download ZIP and use file picker. If added later, uses GitHub Contents API + `saveSkillFilesAtomically()`.
+- **Update**: Re-import with the same name overwrites the directory. Atomic write handles crash safety.
+- **Delete**: `SkillManager.deleteSkill(name)` removes the directory. Removes from all assistants' `skillIds` (orphan cleanup).
+- **Export**: Included in backup via `_packZipSync` — `skills/` directory packed independently of `includeFiles`, always included. Incremental backup uses mtime ≥ since filtering (same mechanism as upload/avatars/images/fonts).
+
+### System Prompt Injection
+
+- **`<available_skills>`**: An XML block injected into the system prompt listing only the skills the current assistant has bound. Contains `name` + `description` only (progressive disclosure level 1). Excludes disabled or unbound skills.
+  ```xml
+  <available_skills>
+    <skill>
+      <name>pdf-processing</name>
+      <description>Extract text and tables from PDF files...</description>
+    </skill>
+  </available_skills>
+  ```
+
+### Tool Layer
+
+- **`load_skill`**: A built-in tool exposed to the model (gated by `assistant.skillIds`). Named to mirror `read_memory` (memory 'tool' mode). Parameter `{ name: string }` (required). Returns the SKILL.md Markdown body as plain text. Optional parameters can be added later by extending `properties` without changing `required`.
+
+### Assistant Binding
+
+- **`assistant.skillIds`**: `List<String>` on the `Assistant` model, stored in SQLite as JSON (`skillIdsJson` TEXT column, same pattern as `localToolIdsJson`). Only skills in this list are injected into the assistant's `<available_skills>` and have their `load_skill` tool definition exposed.
+
+### Backup Integration
+
+- `skills/` directory is always included in backup ZIPs — NOT gated by `includeFiles`. Rationale: skill files are small (pure text) and fundamental to assistant behavior. Incremental backup filters by mtime via existing `_addDirectoryToZip(since:)`.
+- Restore: `_extractZipSync` decompresses `skills/` entries, preserving mtime from ZIP entry `lastModTime`. `SkillManager` discovers imported skills on next `listSkills()`.
+
+### Relationship to Existing Concepts
+
+- **Skill vs InstructionInjection**: Both provide instructions to the model. **InstructionInjection** follows `memory 'injection'` mode: full prompt is injected into every system message regardless of relevance. **Skill** follows `memory 'tool'` mode: only metadata (name/description) is injected; the model must choose to call `load_skill` to read the full body. This is the key structural distinction — `InstructionInjection : injection mode :: Skill : tool mode`.
+- **Skill vs WorldBook**: **WorldBook** entries are triggered by keyword/regex matching against conversation context and injected at specific positions (after system prompt, top of chat, bottom of chat, at depth). **Skill** has no keyword triggering — the model decides based on the `<available_skills>` descriptions.
+- **Skill vs LocalTool/MCP**: **LocalTool** and **MCP** are executable tools: model calls them → something happens (read clipboard, execute code). **Skill**'s `load_skill` is a "knowledge tool": model calls it → receives instruction text → nothing executes. Same tool dispatch pathway, different semantics.
+
+### Example Dialogue
+
+> **Dev:** "A user pasted a long workflow prompt into InstructionInjection expecting the model to use it only when working on that specific task. Should this be a Skill instead?"
+> **Domain expert:** "Correct. InstructionInjection always injects into every system prompt — it's `memory 'injection'` mode. The model gets that prompt unconditionally, even for unrelated queries. Skill only exposes its name and description in `<available_skills>`; the model reads the full body only when it calls `load_skill`. This way the instruction stays out of context until it's actually needed."
+
+### Flagged Ambiguities
+
+- "skill" was used interchangeably to mean both "a set of instructions loaded from disk" and "an individual step in a model's reasoning process" — resolved: the former is **Skill** (capitalized, bounded in the codebase), the latter falls under general LLM domain language and is not part of Cuplivo's domain model.

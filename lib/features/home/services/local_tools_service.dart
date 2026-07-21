@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:math_expressions/math_expressions.dart';
 
 import '../../../core/models/assistant.dart';
+import '../../../features/skills/skill_manager.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
 
@@ -15,6 +16,7 @@ class LocalToolNames {
   static const String textToSpeech = 'text_to_speech';
   static const String askUser = 'ask_user_input_v0';
   static const String calculate = 'calculate';
+  static const String loadSkill = 'load_skill';
 }
 
 class LocalToolsService {
@@ -155,6 +157,26 @@ class LocalToolsService {
         },
       });
     }
+    if (assistant.skillIds.isNotEmpty) {
+      tools.add(const {
+        'type': 'function',
+        'function': {
+          'name': LocalToolNames.loadSkill,
+          'description':
+              'Load the full instructions of a named skill. Use this when the task matches the description of an available skill and you need the detailed instructions. Call this early before attempting the task.',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'name': {
+                'type': 'string',
+                'description': 'The name of the skill to load',
+              },
+            },
+            'required': ['name'],
+          },
+        },
+      });
+    }
     return tools;
   }
 
@@ -164,7 +186,14 @@ class LocalToolsService {
     Assistant? assistant, {
     TextToSpeechStarter? onSpeakText,
   }) async {
-    if (assistant == null || !assistant.localToolIds.contains(name)) {
+    if (assistant == null) return null;
+
+    // load_skill is gated by skillIds, not localToolIds
+    if (name == LocalToolNames.loadSkill) {
+      return _handleLoadSkill(args, assistant);
+    }
+
+    if (!assistant.localToolIds.contains(name)) {
       return null;
     }
     if (name == LocalToolNames.timeInfo) {
@@ -291,5 +320,34 @@ class LocalToolsService {
         'detail': e.toString(),
       });
     }
+  }
+
+  static Future<String?> _handleLoadSkill(
+    Map<String, dynamic> args,
+    Assistant assistant,
+  ) async {
+    final name = (args['name'] ?? '').toString().trim();
+    if (name.isEmpty) {
+      return jsonEncode({
+        'error': 'missing_name',
+        'message':
+            'Please provide a "name" parameter with the skill name to load.',
+      });
+    }
+    if (!assistant.skillIds.contains(name)) {
+      return jsonEncode({
+        'error': 'skill_not_found',
+        'message': 'Skill "$name" is not enabled for this assistant.',
+      });
+    }
+    final body = await SkillManager.readSkillBody(name);
+    if (body == null) {
+      return jsonEncode({
+        'error': 'skill_not_found',
+        'message':
+            'Skill "$name" was not found on disk. It may have been deleted.',
+      });
+    }
+    return body;
   }
 }

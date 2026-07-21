@@ -10807,6 +10807,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add Model'**
   String get multiAIAddModelTooltip;
+
+  /// No description provided for @skillsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get skillsTitle;
+
+  /// No description provided for @skillsAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Skill'**
+  String get skillsAddTooltip;
+
+  /// No description provided for @skillsImportManualTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Manually'**
+  String get skillsImportManualTitle;
+
+  /// No description provided for @skillsImportManualHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste the complete SKILL.md content (including YAML frontmatter)'**
+  String get skillsImportManualHint;
+
+  /// No description provided for @skillsImportFileLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from File'**
+  String get skillsImportFileLabel;
+
+  /// No description provided for @skillsEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'No skills yet. Import from a file or create one manually.'**
+  String get skillsEmptyMessage;
+
+  /// No description provided for @skillsDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Skill'**
+  String get skillsDeleteConfirmTitle;
+
+  /// No description provided for @skillsDeleteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"? This cannot be undone.'**
+  String skillsDeleteConfirmMessage(String name);
+
+  /// No description provided for @skillsImportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported {count} skill(s)'**
+  String skillsImportSuccess(int count);
+
+  /// No description provided for @skillsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get skillsTab;
+
+  /// No description provided for @skillsFrontmatterNameMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Frontmatter name \"{frontmatterName}\" must match directory name \"{dirName}\".'**
+  String skillsFrontmatterNameMismatch(String frontmatterName, String dirName);
+
+  /// No description provided for @skillsInvalidFrontmatter.
+  ///
+  /// In en, this message translates to:
+  /// **'SKILL.md must contain valid YAML frontmatter with a name field.'**
+  String get skillsInvalidFrontmatter;
+
+  /// No description provided for @skillsNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill not found: {name}'**
+  String skillsNotFound(String name);
+
+  /// No description provided for @skillsFrontmatterNameMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'SKILL.md frontmatter must contain a name field.'**
+  String get skillsFrontmatterNameMissing;
+
+  /// No description provided for @skillsSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save skill: {detail}'**
+  String skillsSaveFailed(String detail);
+
+  /// No description provided for @skillsImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import {count} skill(s)'**
+  String skillsImportFailed(int count);
+
+  /// No description provided for @skillsDeleteConfirmDeleteButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get skillsDeleteConfirmDeleteButton;
+
+  /// No description provided for @assistantEditPageSkillsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get assistantEditPageSkillsTab;
+
+  /// No description provided for @settingsPageSkills.
+  ///
+  /// In en, this message translates to:
+  /// **'Skills'**
+  String get settingsPageSkills;
 }
 
 class _AppLocalizationsDelegate

@@ -5896,4 +5896,77 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get multiAIAddModelTooltip => 'Add Model';
+
+  @override
+  String get skillsTitle => 'Skills';
+
+  @override
+  String get skillsAddTooltip => 'Add Skill';
+
+  @override
+  String get skillsImportManualTitle => 'Add Manually';
+
+  @override
+  String get skillsImportManualHint =>
+      'Paste the complete SKILL.md content (including YAML frontmatter)';
+
+  @override
+  String get skillsImportFileLabel => 'Import from File';
+
+  @override
+  String get skillsEmptyMessage =>
+      'No skills yet. Import from a file or create one manually.';
+
+  @override
+  String get skillsDeleteConfirmTitle => 'Delete Skill';
+
+  @override
+  String skillsDeleteConfirmMessage(String name) {
+    return 'Delete \"$name\"? This cannot be undone.';
+  }
+
+  @override
+  String skillsImportSuccess(int count) {
+    return 'Imported $count skill(s)';
+  }
+
+  @override
+  String get skillsTab => 'Skills';
+
+  @override
+  String skillsFrontmatterNameMismatch(String frontmatterName, String dirName) {
+    return 'Frontmatter name \"$frontmatterName\" must match directory name \"$dirName\".';
+  }
+
+  @override
+  String get skillsInvalidFrontmatter =>
+      'SKILL.md must contain valid YAML frontmatter with a name field.';
+
+  @override
+  String skillsNotFound(String name) {
+    return 'Skill not found: $name';
+  }
+
+  @override
+  String get skillsFrontmatterNameMissing =>
+      'SKILL.md frontmatter must contain a name field.';
+
+  @override
+  String skillsSaveFailed(String detail) {
+    return 'Failed to save skill: $detail';
+  }
+
+  @override
+  String skillsImportFailed(int count) {
+    return 'Failed to import $count skill(s)';
+  }
+
+  @override
+  String get skillsDeleteConfirmDeleteButton => 'Delete';
+
+  @override
+  String get assistantEditPageSkillsTab => 'Skills';
+
+  @override
+  String get settingsPageSkills => 'Skills';
 }

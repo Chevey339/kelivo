@@ -2267,6 +2267,18 @@ class $AssistantRowsTable extends AssistantRows
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _skillIdsJsonMeta = const VerificationMeta(
+    'skillIdsJson',
+  );
+  @override
+  late final GeneratedColumn<String> skillIdsJson = GeneratedColumn<String>(
+    'skill_ids_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _regexRulesJsonMeta = const VerificationMeta(
     'regexRulesJson',
   );
@@ -2488,6 +2500,7 @@ class $AssistantRowsTable extends AssistantRows
     searchEnabled,
     mcpServerIdsJson,
     localToolIdsJson,
+    skillIdsJson,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -2704,6 +2717,15 @@ class $AssistantRowsTable extends AssistantRows
         localToolIdsJson.isAcceptableOrUnknown(
           data['local_tool_ids_json']!,
           _localToolIdsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('skill_ids_json')) {
+      context.handle(
+        _skillIdsJsonMeta,
+        skillIdsJson.isAcceptableOrUnknown(
+          data['skill_ids_json']!,
+          _skillIdsJsonMeta,
         ),
       );
     }
@@ -2940,6 +2962,10 @@ class $AssistantRowsTable extends AssistantRows
         DriftSqlType.string,
         data['${effectivePrefix}local_tool_ids_json'],
       )!,
+      skillIdsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}skill_ids_json'],
+      )!,
       regexRulesJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}regex_rules_json'],
@@ -3037,6 +3063,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
   final bool searchEnabled;
   final String mcpServerIdsJson;
   final String localToolIdsJson;
+  final String skillIdsJson;
   final String regexRulesJson;
   final bool enableProactiveCare;
   final DateTime? proactiveCareNextMessageAt;
@@ -3077,6 +3104,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     required this.searchEnabled,
     required this.mcpServerIdsJson,
     required this.localToolIdsJson,
+    required this.skillIdsJson,
     required this.regexRulesJson,
     required this.enableProactiveCare,
     this.proactiveCareNextMessageAt,
@@ -3136,6 +3164,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     map['search_enabled'] = Variable<bool>(searchEnabled);
     map['mcp_server_ids_json'] = Variable<String>(mcpServerIdsJson);
     map['local_tool_ids_json'] = Variable<String>(localToolIdsJson);
+    map['skill_ids_json'] = Variable<String>(skillIdsJson);
     map['regex_rules_json'] = Variable<String>(regexRulesJson);
     map['enable_proactive_care'] = Variable<bool>(enableProactiveCare);
     if (!nullToAbsent || proactiveCareNextMessageAt != null) {
@@ -3204,6 +3233,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       searchEnabled: Value(searchEnabled),
       mcpServerIdsJson: Value(mcpServerIdsJson),
       localToolIdsJson: Value(localToolIdsJson),
+      skillIdsJson: Value(skillIdsJson),
       regexRulesJson: Value(regexRulesJson),
       enableProactiveCare: Value(enableProactiveCare),
       proactiveCareNextMessageAt:
@@ -3261,6 +3291,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       searchEnabled: serializer.fromJson<bool>(json['searchEnabled']),
       mcpServerIdsJson: serializer.fromJson<String>(json['mcpServerIdsJson']),
       localToolIdsJson: serializer.fromJson<String>(json['localToolIdsJson']),
+      skillIdsJson: serializer.fromJson<String>(json['skillIdsJson']),
       regexRulesJson: serializer.fromJson<String>(json['regexRulesJson']),
       enableProactiveCare: serializer.fromJson<bool>(
         json['enableProactiveCare'],
@@ -3320,6 +3351,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       'searchEnabled': serializer.toJson<bool>(searchEnabled),
       'mcpServerIdsJson': serializer.toJson<String>(mcpServerIdsJson),
       'localToolIdsJson': serializer.toJson<String>(localToolIdsJson),
+      'skillIdsJson': serializer.toJson<String>(skillIdsJson),
       'regexRulesJson': serializer.toJson<String>(regexRulesJson),
       'enableProactiveCare': serializer.toJson<bool>(enableProactiveCare),
       'proactiveCareNextMessageAt': serializer.toJson<DateTime?>(
@@ -3371,6 +3403,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     bool? searchEnabled,
     String? mcpServerIdsJson,
     String? localToolIdsJson,
+    String? skillIdsJson,
     String? regexRulesJson,
     bool? enableProactiveCare,
     Value<DateTime?> proactiveCareNextMessageAt = const Value.absent(),
@@ -3415,6 +3448,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     searchEnabled: searchEnabled ?? this.searchEnabled,
     mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
     localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
+    skillIdsJson: skillIdsJson ?? this.skillIdsJson,
     regexRulesJson: regexRulesJson ?? this.regexRulesJson,
     enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
     proactiveCareNextMessageAt: proactiveCareNextMessageAt.present
@@ -3498,6 +3532,9 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
       localToolIdsJson: data.localToolIdsJson.present
           ? data.localToolIdsJson.value
           : this.localToolIdsJson,
+      skillIdsJson: data.skillIdsJson.present
+          ? data.skillIdsJson.value
+          : this.skillIdsJson,
       regexRulesJson: data.regexRulesJson.present
           ? data.regexRulesJson.value
           : this.regexRulesJson,
@@ -3566,6 +3603,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           ..write('searchEnabled: $searchEnabled, ')
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
+          ..write('skillIdsJson: $skillIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -3613,6 +3651,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
     searchEnabled,
     mcpServerIdsJson,
     localToolIdsJson,
+    skillIdsJson,
     regexRulesJson,
     enableProactiveCare,
     proactiveCareNextMessageAt,
@@ -3657,6 +3696,7 @@ class AssistantRow extends DataClass implements Insertable<AssistantRow> {
           other.searchEnabled == this.searchEnabled &&
           other.mcpServerIdsJson == this.mcpServerIdsJson &&
           other.localToolIdsJson == this.localToolIdsJson &&
+          other.skillIdsJson == this.skillIdsJson &&
           other.regexRulesJson == this.regexRulesJson &&
           other.enableProactiveCare == this.enableProactiveCare &&
           other.proactiveCareNextMessageAt == this.proactiveCareNextMessageAt &&
@@ -3701,6 +3741,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
   final Value<bool> searchEnabled;
   final Value<String> mcpServerIdsJson;
   final Value<String> localToolIdsJson;
+  final Value<String> skillIdsJson;
   final Value<String> regexRulesJson;
   final Value<bool> enableProactiveCare;
   final Value<DateTime?> proactiveCareNextMessageAt;
@@ -3742,6 +3783,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.searchEnabled = const Value.absent(),
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
+    this.skillIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -3784,6 +3826,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     this.searchEnabled = const Value.absent(),
     this.mcpServerIdsJson = const Value.absent(),
     this.localToolIdsJson = const Value.absent(),
+    this.skillIdsJson = const Value.absent(),
     this.regexRulesJson = const Value.absent(),
     this.enableProactiveCare = const Value.absent(),
     this.proactiveCareNextMessageAt = const Value.absent(),
@@ -3830,6 +3873,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Expression<bool>? searchEnabled,
     Expression<String>? mcpServerIdsJson,
     Expression<String>? localToolIdsJson,
+    Expression<String>? skillIdsJson,
     Expression<String>? regexRulesJson,
     Expression<bool>? enableProactiveCare,
     Expression<DateTime>? proactiveCareNextMessageAt,
@@ -3876,6 +3920,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       if (searchEnabled != null) 'search_enabled': searchEnabled,
       if (mcpServerIdsJson != null) 'mcp_server_ids_json': mcpServerIdsJson,
       if (localToolIdsJson != null) 'local_tool_ids_json': localToolIdsJson,
+      if (skillIdsJson != null) 'skill_ids_json': skillIdsJson,
       if (regexRulesJson != null) 'regex_rules_json': regexRulesJson,
       if (enableProactiveCare != null)
         'enable_proactive_care': enableProactiveCare,
@@ -3927,6 +3972,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     Value<bool>? searchEnabled,
     Value<String>? mcpServerIdsJson,
     Value<String>? localToolIdsJson,
+    Value<String>? skillIdsJson,
     Value<String>? regexRulesJson,
     Value<bool>? enableProactiveCare,
     Value<DateTime?>? proactiveCareNextMessageAt,
@@ -3969,6 +4015,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
       searchEnabled: searchEnabled ?? this.searchEnabled,
       mcpServerIdsJson: mcpServerIdsJson ?? this.mcpServerIdsJson,
       localToolIdsJson: localToolIdsJson ?? this.localToolIdsJson,
+      skillIdsJson: skillIdsJson ?? this.skillIdsJson,
       regexRulesJson: regexRulesJson ?? this.regexRulesJson,
       enableProactiveCare: enableProactiveCare ?? this.enableProactiveCare,
       proactiveCareNextMessageAt:
@@ -4067,6 +4114,9 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
     if (localToolIdsJson.present) {
       map['local_tool_ids_json'] = Variable<String>(localToolIdsJson.value);
     }
+    if (skillIdsJson.present) {
+      map['skill_ids_json'] = Variable<String>(skillIdsJson.value);
+    }
     if (regexRulesJson.present) {
       map['regex_rules_json'] = Variable<String>(regexRulesJson.value);
     }
@@ -4157,6 +4207,7 @@ class AssistantRowsCompanion extends UpdateCompanion<AssistantRow> {
           ..write('searchEnabled: $searchEnabled, ')
           ..write('mcpServerIdsJson: $mcpServerIdsJson, ')
           ..write('localToolIdsJson: $localToolIdsJson, ')
+          ..write('skillIdsJson: $skillIdsJson, ')
           ..write('regexRulesJson: $regexRulesJson, ')
           ..write('enableProactiveCare: $enableProactiveCare, ')
           ..write('proactiveCareNextMessageAt: $proactiveCareNextMessageAt, ')
@@ -6991,6 +7042,7 @@ typedef $$AssistantRowsTableCreateCompanionBuilder =
       Value<bool> searchEnabled,
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
+      Value<String> skillIdsJson,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -7034,6 +7086,7 @@ typedef $$AssistantRowsTableUpdateCompanionBuilder =
       Value<bool> searchEnabled,
       Value<String> mcpServerIdsJson,
       Value<String> localToolIdsJson,
+      Value<String> skillIdsJson,
       Value<String> regexRulesJson,
       Value<bool> enableProactiveCare,
       Value<DateTime?> proactiveCareNextMessageAt,
@@ -7174,6 +7227,11 @@ class $$AssistantRowsTableFilterComposer
 
   ColumnFilters<String> get localToolIdsJson => $composableBuilder(
     column: $table.localToolIdsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get skillIdsJson => $composableBuilder(
+    column: $table.skillIdsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7382,6 +7440,11 @@ class $$AssistantRowsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get skillIdsJson => $composableBuilder(
+    column: $table.skillIdsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => ColumnOrderings(column),
@@ -7578,6 +7641,11 @@ class $$AssistantRowsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get skillIdsJson => $composableBuilder(
+    column: $table.skillIdsJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get regexRulesJson => $composableBuilder(
     column: $table.regexRulesJson,
     builder: (column) => column,
@@ -7704,6 +7772,7 @@ class $$AssistantRowsTableTableManager
                 Value<bool> searchEnabled = const Value.absent(),
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
+                Value<String> skillIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -7748,6 +7817,7 @@ class $$AssistantRowsTableTableManager
                 searchEnabled: searchEnabled,
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
+                skillIdsJson: skillIdsJson,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,
@@ -7791,6 +7861,7 @@ class $$AssistantRowsTableTableManager
                 Value<bool> searchEnabled = const Value.absent(),
                 Value<String> mcpServerIdsJson = const Value.absent(),
                 Value<String> localToolIdsJson = const Value.absent(),
+                Value<String> skillIdsJson = const Value.absent(),
                 Value<String> regexRulesJson = const Value.absent(),
                 Value<bool> enableProactiveCare = const Value.absent(),
                 Value<DateTime?> proactiveCareNextMessageAt =
@@ -7835,6 +7906,7 @@ class $$AssistantRowsTableTableManager
                 searchEnabled: searchEnabled,
                 mcpServerIdsJson: mcpServerIdsJson,
                 localToolIdsJson: localToolIdsJson,
+                skillIdsJson: skillIdsJson,
                 regexRulesJson: regexRulesJson,
                 enableProactiveCare: enableProactiveCare,
                 proactiveCareNextMessageAt: proactiveCareNextMessageAt,

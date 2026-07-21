@@ -54,6 +54,7 @@ import 'setting/world_book_pane.dart';
 import 'setting/backup_pane.dart';
 import 'setting/hotkeys_pane.dart';
 import 'setting/network_proxy_pane.dart';
+import 'setting/skills_pane.dart';
 import 'setting/about_pane.dart';
 import 'setting/stats_pane.dart';
 import 'package:system_fonts/system_fonts.dart';
@@ -93,6 +94,7 @@ enum _SettingsMenuItem {
   mcp,
   quickPhrases,
   instructionInjection,
+  skills,
   worldBook,
   tts,
   networkProxy,
@@ -225,6 +227,10 @@ class _DesktopSettingsPageState extends State<DesktopSettingsPage> {
                           return const DesktopInstructionInjectionPane(
                             key: ValueKey('instructionInjection'),
                           );
+                        case _SettingsMenuItem.skills:
+                          return const DesktopSkillsPane(
+                            key: ValueKey('skills'),
+                          );
                         case _SettingsMenuItem.worldBook:
                           return const DesktopWorldBookPane(
                             key: ValueKey('worldBook'),
@@ -295,6 +301,11 @@ class _SettingsMenu extends StatelessWidget {
         _SettingsMenuItem.instructionInjection,
         lucide.Lucide.Layers,
         l10n.settingsPageInstructionInjection,
+      ),
+      (
+        _SettingsMenuItem.skills,
+        lucide.Lucide.BookOpen,
+        l10n.settingsPageSkills,
       ),
       (
         _SettingsMenuItem.worldBook,

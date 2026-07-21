@@ -604,6 +604,8 @@ class ProactiveCareHeadlessChatStore {
           .cast<String>(),
       'localToolIds': (jsonDecode(row['local_tool_ids_json'] as String) as List)
           .cast<String>(),
+      'skillIds': (jsonDecode(row['skill_ids_json'] as String) as List)
+          .cast<String>(),
       'customHeaders': jsonDecode(row['custom_headers_json'] as String),
       'customBody': jsonDecode(row['custom_body_json'] as String),
       'enableMemory': (row['enable_memory'] as int) != 0,

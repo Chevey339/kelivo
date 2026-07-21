@@ -36,6 +36,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../home/services/local_tools_service.dart';
+import '../../skills/skill_manager.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/emoji_picker_dialog.dart';
@@ -61,6 +62,7 @@ part 'assistant_settings_edit_mcp_tab.dart';
 part 'assistant_settings_edit_quick_phrase_tab.dart';
 part 'assistant_settings_edit_custom_request_tab.dart';
 part 'assistant_settings_edit_proactive_letter_tab.dart';
+part 'assistant_settings_edit_skills_tab.dart';
 
 const int _contextMessageMin = Assistant.minContextMessageSize;
 const int _contextMessageMax = Assistant.maxContextMessageSize;
@@ -108,6 +110,12 @@ List<_AssistantEditTabSpec> _assistantEditTabSpecs(
       label: l10n.assistantEditPageLocalToolsTab,
       icon: Lucide.Wrench,
       child: _LocalToolsTab(assistantId: assistantId),
+    ),
+    _AssistantEditTabSpec(
+      id: assistantEditTabSkills,
+      label: l10n.assistantEditPageSkillsTab,
+      icon: Lucide.BookOpen,
+      child: _SkillsTab(assistantId: assistantId),
     ),
     _AssistantEditTabSpec(
       id: assistantEditTabMcp,
@@ -1492,6 +1500,7 @@ enum _AssistantDesktopMenu {
   prompts,
   memory,
   localTools,
+  skills,
   mcp,
   quick,
   custom,
@@ -1612,6 +1621,8 @@ class _DesktopAssistantDialogShellState
                         return _MemoryTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.localTools:
                         return _LocalToolsTab(assistantId: widget.assistantId);
+                      case _AssistantDesktopMenu.skills:
+                        return _SkillsTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.mcp:
                         return _McpTab(assistantId: widget.assistantId);
                       case _AssistantDesktopMenu.quick:
@@ -1656,6 +1667,7 @@ class _DesktopAssistantMenuState extends State<_DesktopAssistantMenu> {
       (_AssistantDesktopMenu.prompts, l10n.assistantEditPagePromptsTab),
       (_AssistantDesktopMenu.memory, l10n.assistantEditPageMemoryTab),
       (_AssistantDesktopMenu.localTools, l10n.assistantEditPageLocalToolsTab),
+      (_AssistantDesktopMenu.skills, l10n.assistantEditPageSkillsTab),
       (_AssistantDesktopMenu.mcp, l10n.assistantEditPageMcpTab),
       (_AssistantDesktopMenu.quick, l10n.assistantEditPageQuickPhraseTab),
       (_AssistantDesktopMenu.custom, l10n.assistantEditPageCustomTab),

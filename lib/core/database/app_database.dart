@@ -109,6 +109,7 @@ class AssistantRows extends Table {
       boolean().withDefault(const Constant(false))();
   TextColumn get mcpServerIdsJson => text().withDefault(const Constant('[]'))();
   TextColumn get localToolIdsJson => text().withDefault(const Constant('[]'))();
+  TextColumn get skillIdsJson => text().withDefault(const Constant('[]'))();
   TextColumn get regexRulesJson => text().withDefault(const Constant('[]'))();
 
   // --- Proactive Care ("Ta的来信") ---
@@ -237,7 +238,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -303,6 +304,14 @@ class AppDatabase extends _$AppDatabase {
             assistantRows.proactiveCareDecisionPrompt,
           );
         } catch (_) {}
+      }
+      if (from < 7) {
+        try {
+          await migrator.addColumn(assistantRows, assistantRows.skillIdsJson);
+        } catch (_) {}
+        await customStatement(
+          "UPDATE assistant_rows SET skill_ids_json = '[]' WHERE skill_ids_json IS NULL",
+        );
       }
     },
   );

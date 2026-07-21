@@ -18,6 +18,7 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../skills/pages/skills_page.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
@@ -282,6 +283,17 @@ class SettingsPage extends StatelessWidget {
                       builder: (_) => const InstructionInjectionPage(),
                     ),
                   );
+                },
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.BookOpen,
+                label: l10n.settingsPageSkills,
+                onTap: () {
+                  Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const SkillsPage()));
                 },
               ),
               _iosDivider(context),

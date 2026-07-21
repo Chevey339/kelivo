@@ -14,6 +14,7 @@ void main() {
         'regex',
         'localTools',
         'mcp',
+        'skills',
       ]);
     });
 
