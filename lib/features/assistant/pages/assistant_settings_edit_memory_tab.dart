@@ -1,8 +1,59 @@
 part of 'assistant_settings_edit_page.dart';
 
-class _MemoryTab extends StatelessWidget {
+class _MemoryTab extends StatefulWidget {
   const _MemoryTab({required this.assistantId});
   final String assistantId;
+
+  @override
+  State<_MemoryTab> createState() => _MemoryTabState();
+}
+
+class _MemoryTabState extends State<_MemoryTab> {
+  late final TextEditingController _memoryRecordCtrl;
+  late final FocusNode _memoryRecordFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    final ap = context.read<AssistantProvider>();
+    final a = ap.getById(widget.assistantId)!;
+    _memoryRecordCtrl = TextEditingController(text: a.memoryRecordPrompt);
+    _memoryRecordFocus = FocusNode(debugLabel: 'memoryRecordPromptFocus');
+  }
+
+  @override
+  void didUpdateWidget(covariant _MemoryTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.assistantId != widget.assistantId) {
+      final ap = context.read<AssistantProvider>();
+      final a = ap.getById(widget.assistantId)!;
+      _memoryRecordCtrl.text = a.memoryRecordPrompt;
+    }
+  }
+
+  @override
+  void dispose() {
+    _memoryRecordCtrl.dispose();
+    _memoryRecordFocus.dispose();
+    super.dispose();
+  }
+
+  void _insertAtCursor(TextEditingController controller, String toInsert) {
+    final text = controller.text;
+    final sel = controller.selection;
+    final start = (sel.start >= 0 && sel.start <= text.length)
+        ? sel.start
+        : text.length;
+    final end = (sel.end >= 0 && sel.end <= text.length && sel.end >= start)
+        ? sel.end
+        : start;
+    final nextText = text.replaceRange(start, end, toInsert);
+    controller.value = controller.value.copyWith(
+      text: nextText,
+      selection: TextSelection.collapsed(offset: start + toInsert.length),
+      composing: TextRange.empty,
+    );
+  }
 
   Future<void> _showAddEditSheet(
     BuildContext context, {
@@ -101,7 +152,7 @@ class _MemoryTab extends StatelessWidget {
                             final mp = context.read<MemoryProvider>();
                             if (id == null) {
                               await mp.add(
-                                assistantId: assistantId,
+                                assistantId: widget.assistantId,
                                 content: text,
                               );
                             } else {
@@ -130,7 +181,7 @@ class _MemoryTab extends StatelessWidget {
                                 final mp = context.read<MemoryProvider>();
                                 if (id == null) {
                                   await mp.add(
-                                    assistantId: assistantId,
+                                    assistantId: widget.assistantId,
                                     content: text,
                                   );
                                 } else {
@@ -251,7 +302,7 @@ class _MemoryTab extends StatelessWidget {
                             final mp = context.read<MemoryProvider>();
                             if (id == null) {
                               await mp.add(
-                                assistantId: assistantId,
+                                assistantId: widget.assistantId,
                                 content: text,
                               );
                             } else {
@@ -280,7 +331,7 @@ class _MemoryTab extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
-    final a = ap.getById(assistantId)!;
+    final a = ap.getById(widget.assistantId)!;
     final mp = context.watch<MemoryProvider>();
     // Ensure provider loads persisted memories once
     try {
@@ -288,7 +339,7 @@ class _MemoryTab extends StatelessWidget {
         mp.initialize();
       });
     } catch (_) {}
-    final memories = mp.getForAssistant(assistantId);
+    final memories = mp.getForAssistant(widget.assistantId);
 
     // Align the section card visuals with the basic settings page iOS-style list cards
     Widget sectionCard({
@@ -354,6 +405,83 @@ class _MemoryTab extends StatelessWidget {
                     : const SizedBox.shrink(),
               ),
             ],
+          ),
+        ),
+
+        // Memory record prompt section
+        sectionCard(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n.assistantEditMemoryRecordPromptTitle,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: AppFontWeights.emphasis,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _memoryRecordCtrl,
+                  focusNode: _memoryRecordFocus,
+                  onChanged: (v) => context
+                      .read<AssistantProvider>()
+                      .updateAssistant(a.copyWith(memoryRecordPrompt: v)),
+                  maxLines: 8,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  enableInteractiveSelection: true,
+                  decoration: InputDecoration(
+                    hintText: l10n.assistantEditMemoryRecordPromptHint,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: cs.primary.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.assistantEditAvailableVariables,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: AppFontWeights.semibold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _VarExplainList(
+                  items: [
+                    (l10n.assistantEditVariableCurrentHour, '{current_hour}'),
+                  ],
+                  onTapVar: (v) {
+                    _insertAtCursor(_memoryRecordCtrl, v);
+                    context.read<AssistantProvider>().updateAssistant(
+                      a.copyWith(memoryRecordPrompt: _memoryRecordCtrl.text),
+                    );
+                    Future.microtask(() => _memoryRecordFocus.requestFocus());
+                  },
+                ),
+              ],
+            ),
           ),
         ),
 
@@ -489,7 +617,7 @@ class _MemoryTab extends StatelessWidget {
           builder: (context) {
             final chatService = context.watch<ChatService>();
             final summaries = chatService
-                .getConversationsWithSummaryForAssistant(assistantId);
+                .getConversationsWithSummaryForAssistant(widget.assistantId);
 
             if (summaries.isEmpty) {
               return Padding(
