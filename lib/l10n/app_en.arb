@@ -859,6 +859,7 @@
     }
   },
   "chatMessageWidgetCopiedToClipboard": "Copied to clipboard",
+  "chatMessageWidgetQuote": "Quote",
   "chatMessageWidgetResendTooltip": "Resend",
   "chatMessageWidgetMoreTooltip": "More",
   "chatMessageWidgetThinking": "Thinking...",
