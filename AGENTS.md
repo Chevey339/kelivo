@@ -54,6 +54,7 @@
   - `cuplivo`, `cuplivo-next` → always correspond to this fork (Cuplivo)
   - `master` → depends on local repository; cannot be assumed upstream or fork
 - README intentionally retains many upstream references (download links, Issues, sponsors, community groups, Star History). Do not "fix" or rewrite these links.
+- `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when updating the changelog, always update both files simultaneously.
 - Key Cuplivo-specific features:
   - SQLite storage (replaced Hive)
   - Incremental backup
@@ -232,7 +233,14 @@ flutter analyze
 - If Material native components must be used for semantic or framework reasons, explicitly suppress off-style default feedback and consolidate styling into shared components instead of patching it piecemeal across pages.
 - Icons, spacing, forms, dialogs, and panel styles should follow existing theme tokens and components. Do not mix multiple visual languages on the same page.
 
-### 3.10 Tests and Self-Review Must Be Requirement-Driven
+### 3.10 Release: README Features Section Sync
+
+- When creating a release that includes **new Cuplivo-specific features** or **fixes for existing bugs** (existing = bugs present in v1.1.17 and earlier; bugs introduced in the new version itself are excluded), the features section must be updated in both README files simultaneously:
+  - `README.md` → ✨ **New Features** section (Cuplivo vs Kelivo differences)
+  - `README_ZH_CN.md` → ✨ **新功能** 章节
+- This ensures users can always see what distinguishes Cuplivo from upstream Kelivo.
+
+### 3.11 Tests and Self-Review Must Be Requirement-Driven
 
 - Tests must be driven by requirements, defect symptoms, or acceptance criteria -- not by chasing implementation details.
 - Before writing tests, list the minimum scenario set for this task. At minimum, explicitly cover:
