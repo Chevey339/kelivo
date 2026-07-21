@@ -15,6 +15,7 @@ import '../../../core/services/search/search_tool_service.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
+import 'tool_schema_sanitizer.dart';
 
 /// 工具调用处理服务
 ///
@@ -34,111 +35,13 @@ class ToolHandlerService {
 
   /// Sanitize/translate JSON Schema to each provider's accepted subset.
   ///
-  /// Different providers (Google, OpenAI, Claude) have different requirements
-  /// for tool parameter schemas. This method normalizes schemas to work across
-  /// all providers.
+  /// Delegates to [ToolSchemaSanitizer] (a pure, Flutter-free, unit-testable
+  /// module). Kept here as a static wrapper so existing call sites
+  /// (`ToolHandlerService.sanitizeToolParametersForProvider`) are unchanged.
   static Map<String, dynamic> sanitizeToolParametersForProvider(
     Map<String, dynamic> schema,
     ProviderKind kind,
-  ) {
-    Map<String, dynamic> clone = _deepCloneMap(schema);
-    clone = _sanitizeNode(clone, kind) as Map<String, dynamic>;
-    return clone;
-  }
-
-  static dynamic _sanitizeNode(dynamic node, ProviderKind kind) {
-    if (node is List) {
-      return node.map((e) => _sanitizeNode(e, kind)).toList();
-    }
-    if (node is! Map) return node;
-
-    final m = Map<String, dynamic>.from(node);
-    // Remove $schema as it's not needed for tool definitions
-    m.remove(r'$schema');
-
-    // Convert 'const' to 'enum' for compatibility
-    if (m.containsKey('const')) {
-      final v = m['const'];
-      if (v is String || v is num || v is bool) {
-        m['enum'] = [v];
-      }
-      m.remove('const');
-    }
-
-    // Flatten anyOf/oneOf/allOf to first variant for simplicity
-    for (final key in [
-      'anyOf',
-      'oneOf',
-      'allOf',
-      'any_of',
-      'one_of',
-      'all_of',
-    ]) {
-      if (m[key] is List && (m[key] as List).isNotEmpty) {
-        final first = (m[key] as List).first;
-        final flattened = _sanitizeNode(first, kind);
-        m.remove(key);
-        if (flattened is Map<String, dynamic>) {
-          m
-            ..remove('type')
-            ..remove('properties')
-            ..remove('items');
-          m.addAll(flattened);
-        }
-      }
-    }
-
-    // Normalize type array to single type
-    final t = m['type'];
-    if (t is List && t.isNotEmpty) m['type'] = t.first.toString();
-
-    // Normalize items array to single item
-    final items = m['items'];
-    if (items is List && items.isNotEmpty) m['items'] = items.first;
-    if (m['items'] is Map) m['items'] = _sanitizeNode(m['items'], kind);
-
-    // Recursively sanitize properties
-    if (m['properties'] is Map) {
-      final props = Map<String, dynamic>.from(m['properties']);
-      final norm = <String, dynamic>{};
-      props.forEach((k, v) {
-        norm[k] = _sanitizeNode(v, kind);
-      });
-      m['properties'] = norm;
-    }
-
-    // Keep only allowed keys based on provider
-    Set<String> allowed;
-    switch (kind) {
-      case ProviderKind.google:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-        };
-        break;
-      case ProviderKind.openai:
-      case ProviderKind.claude:
-        allowed = {
-          'type',
-          'description',
-          'properties',
-          'required',
-          'items',
-          'enum',
-        };
-        break;
-    }
-    m.removeWhere((k, v) => !allowed.contains(k));
-    return m;
-  }
-
-  static Map<String, dynamic> _deepCloneMap(Map<String, dynamic> input) {
-    return jsonDecode(jsonEncode(input)) as Map<String, dynamic>;
-  }
+  ) => ToolSchemaSanitizer.sanitizeToolParametersForProvider(schema, kind);
 
   static String _toolError({
     required String error,
