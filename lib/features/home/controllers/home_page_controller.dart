@@ -41,6 +41,7 @@ import '../services/ocr_service.dart';
 import '../services/translation_service.dart';
 import '../services/file_upload_service.dart';
 import '../widgets/chat_input_bar.dart';
+import '../utils/quoted_selection_formatter.dart';
 import '../../model/widgets/model_select_sheet.dart';
 
 enum ChatSelectionMode { share, delete }
@@ -709,6 +710,21 @@ class HomePageController extends ChangeNotifier {
       return;
     }
     await sendMessage(ChatInputData(text: text));
+  }
+
+  void insertQuotedSelection(String selectedText) {
+    if (_userMessageEditState != null || currentQueuedInput != null) return;
+    final current = _inputController.value;
+    final next = insertQuotedSelectionIntoDraft(current, selectedText);
+    if (next == current) return;
+
+    _inputController.value = next;
+    notifyListeners();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_context.mounted) return;
+      forceScrollToBottomSoon(animate: false);
+      _inputFocus.requestFocus();
+    });
   }
 
   void _replaceInputWithSuggestion(String text) {

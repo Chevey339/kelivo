@@ -1181,6 +1181,11 @@ class _HomePageState extends State<HomePage>
               mode: ChatSelectionMode.delete,
             ),
         onSpeakMessage: (message) => _controller.speakMessage(message),
+        onQuoteSelection:
+            _controller.isUserMessageEditActive ||
+                _controller.currentQueuedInput != null
+            ? null
+            : _controller.insertQuotedSelection,
         onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
         onRecoveredAskUserAnswer: (message, part, result) =>
             _controller.submitRecoveredAskUserAnswer(message, part, result),

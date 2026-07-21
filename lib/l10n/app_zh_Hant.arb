@@ -709,6 +709,7 @@
   "chatMessageWidgetCannotOpenFile": "無法開啟檔案: {message}",
   "chatMessageWidgetOpenFileError": "開啟檔案失敗: {error}",
   "chatMessageWidgetCopiedToClipboard": "已複製到剪貼簿",
+  "chatMessageWidgetQuote": "引用",
   "chatMessageWidgetResendTooltip": "重新傳送",
   "chatMessageWidgetMoreTooltip": "更多",
   "chatMessageWidgetThinking": "正在思考...",

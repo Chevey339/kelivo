@@ -10,6 +10,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  testWidgets('inserts a selected message quote into the current draft', (
+    tester,
+  ) async {
+    HomePageController? controller;
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => SettingsProvider()),
+          ChangeNotifierProvider(create: (_) => ChatService()),
+        ],
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _ControllerHarness(onCreated: (value) => controller = value),
+        ),
+      ),
+    );
+
+    controller!.inputController.value = const TextEditingValue(
+      text: 'Follow up',
+      selection: TextSelection.collapsed(offset: 9),
+    );
+    controller!.insertQuotedSelection('first line\nsecond line');
+
+    expect(
+      controller!.inputController.text,
+      'Follow up\n\n> first line\n> second line\n\n',
+    );
+    expect(
+      controller!.inputController.selection.baseOffset,
+      controller!.inputController.text.length,
+    );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('initializes chat controller before timeline scroll callbacks', (
     tester,
   ) async {
