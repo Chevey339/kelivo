@@ -82,6 +82,10 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // Android: start AlarmManager service for proactive care exact alarms
+      if (!kIsWeb && Platform.isAndroid) {
+        await ProactiveCareAlarmService.initialize();
+      }
       // Start app (Flutter log capture is toggleable and off by default)
       runApp(const MyApp());
     },
@@ -253,14 +257,14 @@ class MyApp extends StatelessWidget {
                 try {
                   if (Platform.isAndroid) {
                     final mode = settings.androidBackgroundChatMode;
+                    final l10n = AppLocalizations.of(context);
+                    if (l10n == null) return;
+                    // Capture before any async gap to satisfy
+                    // use_build_context_synchronously.
+                    final allAssistants = context
+                        .read<AssistantProvider>()
+                        .assistants;
                     if (mode != AndroidBackgroundChatMode.off) {
-                      final l10n = AppLocalizations.of(context);
-                      if (l10n == null) return;
-                      // Capture before any async gap to satisfy
-                      // use_build_context_synchronously.
-                      final allAssistants = context
-                          .read<AssistantProvider>()
-                          .assistants;
                       // Enable only if currently disabled to avoid duplicate ROM prompts
                       try {
                         final already =
@@ -279,31 +283,32 @@ class MyApp extends StatelessWidget {
                         await NotificationService.ensureInitialized();
                         await NotificationService.ensureAndroidNotificationsPermission();
                       }
-                      // Initialize proactive care alarms (reschedule any pending)
-                      try {
-                        if (Platform.isAndroid &&
-                            ProactiveCareAlarmService.isSupported) {
-                          await ProactiveCareAlarmService.initialize();
-                          // Persist l10n strings so the background isolate can
-                          // use localized text instead of English fallbacks.
-                          await ProactiveCareL10nSnapshot.save(
-                            defaultConversationTitle:
-                                l10n.chatServiceDefaultConversationTitle,
-                            carePromptDefault:
-                                l10n.assistantEditProactiveCarePromptDefault,
-                            decisionPromptDefault: l10n
-                                .assistantEditProactiveCareDecisionPromptDefault,
-                            failureNotificationBody:
-                                l10n.proactiveCareFailedNotificationBody,
-                          );
-                          // Recover alarms lost after force-stop or process
-                          // death by re-scheduling all enabled assistants.
-                          await ProactiveCareAlarmService.rescheduleAll(
-                            allAssistants,
-                          );
-                        }
-                      } catch (_) {}
                     }
+                    // Initialize proactive care alarms (reschedule any pending).
+                    // This runs regardless of background chat mode, because
+                    // proactive care uses its own exact-alarm mechanism
+                    // independent of the background chat service.
+                    try {
+                      if (ProactiveCareAlarmService.isSupported) {
+                        // Persist l10n strings so the background isolate can
+                        // use localized text instead of English fallbacks.
+                        await ProactiveCareL10nSnapshot.save(
+                          defaultConversationTitle:
+                              l10n.chatServiceDefaultConversationTitle,
+                          carePromptDefault:
+                              l10n.assistantEditProactiveCarePromptDefault,
+                          decisionPromptDefault: l10n
+                              .assistantEditProactiveCareDecisionPromptDefault,
+                          failureNotificationBody:
+                              l10n.proactiveCareFailedNotificationBody,
+                        );
+                        // Recover alarms lost after force-stop or process
+                        // death by re-scheduling all enabled assistants.
+                        await ProactiveCareAlarmService.rescheduleAll(
+                          allAssistants,
+                        );
+                      }
+                    } catch (_) {}
                   }
                 } catch (_) {}
               });
