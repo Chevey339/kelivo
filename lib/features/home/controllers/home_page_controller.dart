@@ -1049,8 +1049,10 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> cancelStreaming() async {
+    debugPrint('[CancelTrace] HomePageController.cancelStreaming ENTER');
     await _viewModel.cancelStreaming();
     notifyListeners();
+    debugPrint('[CancelTrace] HomePageController.cancelStreaming EXIT');
   }
 
   // ============================================================================

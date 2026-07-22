@@ -699,6 +699,9 @@ class ChatController extends ChangeNotifier {
     }
     final newCount = _loadingConversationCounts[conversationId] ?? 0;
     final newLoading = newCount > 0;
+    debugPrint(
+      '[CancelTrace] setConversationLoading: cid=$conversationId loading=$loading prev=$prevCount now=$newCount newLoading=$newLoading',
+    );
     if (prevLoading != newLoading) {
       notifyListeners();
     }
@@ -707,8 +710,12 @@ class ChatController extends ChangeNotifier {
   /// Force-clear the loading counter for a conversation (used for manual cancel).
   /// Always notifies listeners.
   void forceClearConversationLoading(String conversationId) {
-    final wasLoading = (_loadingConversationCounts[conversationId] ?? 0) > 0;
+    final prevCount = _loadingConversationCounts[conversationId] ?? 0;
+    final wasLoading = prevCount > 0;
     _loadingConversationCounts.remove(conversationId);
+    debugPrint(
+      '[CancelTrace] forceClearConversationLoading: cid=$conversationId prev=$prevCount wasLoading=$wasLoading',
+    );
     if (wasLoading) {
       notifyListeners();
     }
