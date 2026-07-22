@@ -771,6 +771,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   // Local expand state for inline <think> card (defaults to expanded)
   bool? _inlineThinkExpanded;
   bool _inlineThinkManuallyToggled = false;
+  final Map<int, bool> _inlineThinkExpandedMap = {};
   // User message context menu state
   final GlobalKey _userBubbleKey = GlobalKey();
   OverlayEntry? _userMenuOverlay;
@@ -2014,6 +2015,9 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
   List<_RenderBlock> _buildRenderBlocks(
     String visualContent, {
     List<ReasoningSegment>? reasoningSegments,
+    List<int>? overrideOffsets,
+    List<int>? overrideReasoningCounts,
+    List<int>? overrideToolCounts,
   }) {
     final visibleTools = (widget.toolParts ?? const <ToolUIPart>[])
         .where((p) => p.toolName != 'builtin_search')
@@ -2028,9 +2032,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
           : <_RenderBlock>[_RenderBlock.text(visualContent)];
     }
 
-    final offsets = widget.contentSplitOffsets;
-    final reasoningCounts = widget.reasoningCountAtSplit;
-    final toolCounts = widget.toolCountAtSplit;
+    final offsets = overrideOffsets ?? widget.contentSplitOffsets;
+    final reasoningCounts =
+        overrideReasoningCounts ?? widget.reasoningCountAtSplit;
+    final toolCounts = overrideToolCounts ?? widget.toolCountAtSplit;
     if (offsets == null || reasoningCounts == null || toolCounts == null) {
       final blocks = <_RenderBlock>[_RenderBlock.thinking(steps)];
       if (visualContent.trim().isNotEmpty) {
@@ -2077,6 +2082,103 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     if (stepIndex < steps.length) {
       blocks.add(_RenderBlock.thinking(steps.sublist(stepIndex)));
     }
+    return blocks;
+  }
+
+  List<_RenderBlock> _buildInterleavedInlineThinkRenderBlocks({
+    required Assistant? assistant,
+  }) {
+    final rawContent = widget.message.content;
+    final splitOffsets = widget.contentSplitOffsets!;
+    final toolCounts = widget.toolCountAtSplit ?? const <int>[];
+    final visibleTools = (widget.toolParts ?? const <ToolUIPart>[])
+        .where((p) => p.toolName != 'builtin_search')
+        .toList();
+
+    final rawSegments = <String>[];
+    var prev = 0;
+    for (final offset in splitOffsets) {
+      final safe = offset.clamp(0, rawContent.length);
+      rawSegments.add(rawContent.substring(prev, safe));
+      prev = safe;
+    }
+    rawSegments.add(rawContent.substring(prev));
+
+    final blocks = <_RenderBlock>[];
+    var toolCursor = 0;
+    var reasoningCount = 0;
+    var toolCount = 0;
+    var thinkSegIdx = 0;
+
+    final autoCollapse = context.read<SettingsProvider>().autoCollapseThinking;
+    final defaultExpanded = !autoCollapse;
+
+    for (var i = 0; i < rawSegments.length; i++) {
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(rawSegments[i]);
+      final steps = <_TimelineStepData>[];
+
+      if (parsed.hasThinking) {
+        final segIdx = thinkSegIdx++;
+        steps.add(
+          _TimelineStepData.reasoning(
+            reasoning: ReasoningSegment(
+              text: parsed.thinkingTexts.join('\n\n'),
+              expanded: _inlineThinkExpandedMap[segIdx] ?? defaultExpanded,
+              loading: false,
+              onToggle: () => setState(() {
+                final cur = _inlineThinkExpandedMap[segIdx] ?? defaultExpanded;
+                _inlineThinkExpandedMap[segIdx] = !cur;
+                _inlineThinkManuallyToggled = true;
+              }),
+            ),
+            reasoningCountAfter: ++reasoningCount,
+            toolCountAfter: toolCount,
+          ),
+        );
+      }
+
+      final toolEnd = i < toolCounts.length
+          ? toolCounts[i]
+          : visibleTools.length;
+      while (toolCursor < toolEnd && toolCursor < visibleTools.length) {
+        steps.add(
+          _TimelineStepData.tool(
+            tool: visibleTools[toolCursor],
+            reasoningCountAfter: reasoningCount,
+            toolCountAfter: ++toolCount,
+          ),
+        );
+        toolCursor++;
+      }
+
+      if (steps.isNotEmpty) {
+        blocks.add(_RenderBlock.thinking(steps));
+      }
+
+      final text = applyAssistantRegexes(
+        parsed.visibleContent,
+        assistant: assistant,
+        scope: AssistantRegexScope.assistant,
+        target: AssistantRegexTransformTarget.visual,
+      ).trim();
+      if (text.isNotEmpty) {
+        blocks.add(_RenderBlock.text(text));
+      }
+    }
+
+    while (toolCursor < visibleTools.length) {
+      blocks.add(
+        _RenderBlock.thinking([
+          _TimelineStepData.tool(
+            tool: visibleTools[toolCursor],
+            reasoningCountAfter: reasoningCount,
+            toolCountAfter: ++toolCount,
+          ),
+        ]),
+      );
+      toolCursor++;
+    }
+
     return blocks;
   }
 
@@ -2190,51 +2292,67 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 (widget.reasoningText != null &&
                     widget.reasoningText!.isNotEmpty) ||
                 widget.reasoningLoading;
-            final effectiveReasoningText =
-                (widget.reasoningText != null &&
-                    widget.reasoningText!.isNotEmpty)
-                ? widget.reasoningText!
-                : extractedThinking;
-            final usingInlineThink =
-                (widget.reasoningText == null ||
-                    widget.reasoningText!.isEmpty) &&
-                extractedThinking.isNotEmpty;
-            final effectiveExpanded = usingInlineThink
-                ? (_inlineThinkExpanded ?? true)
-                : widget.reasoningExpanded;
-            final effectiveLoading = usingInlineThink
-                ? false
-                : (widget.reasoningFinishedAt == null);
 
-            List<ReasoningSegment>? effectiveReasoningSegments =
-                widget.reasoningSegments;
-            if ((effectiveReasoningSegments == null ||
-                    effectiveReasoningSegments.isEmpty) &&
-                (hasProvidedReasoning || effectiveReasoningText.isNotEmpty)) {
-              effectiveReasoningSegments = <ReasoningSegment>[
-                ReasoningSegment(
-                  text: effectiveReasoningText,
-                  expanded: effectiveExpanded,
-                  loading: effectiveLoading,
-                  startAt: usingInlineThink ? null : widget.reasoningStartAt,
-                  finishedAt: usingInlineThink
-                      ? null
-                      : widget.reasoningFinishedAt,
-                  onToggle: usingInlineThink
-                      ? () => setState(() {
-                          _inlineThinkExpanded =
-                              !(_inlineThinkExpanded ?? true);
-                          _inlineThinkManuallyToggled = true;
-                        })
-                      : widget.onToggleReasoning,
-                ),
-              ];
+            final useInterleavedInlineThink =
+                !hasProvidedReasoning &&
+                (widget.reasoningSegments == null ||
+                    widget.reasoningSegments!.isEmpty) &&
+                (widget.toolParts?.isNotEmpty ?? false) &&
+                (widget.contentSplitOffsets?.isNotEmpty ?? false) &&
+                ThinkingTagParser.hasInlineThinkTags(widget.message.content);
+
+            final List<_RenderBlock> renderBlocks;
+            if (useInterleavedInlineThink) {
+              renderBlocks = _buildInterleavedInlineThinkRenderBlocks(
+                assistant: assistant,
+              );
+            } else {
+              final effectiveReasoningText =
+                  (widget.reasoningText != null &&
+                      widget.reasoningText!.isNotEmpty)
+                  ? widget.reasoningText!
+                  : extractedThinking;
+              final usingInlineThink =
+                  (widget.reasoningText == null ||
+                      widget.reasoningText!.isEmpty) &&
+                  extractedThinking.isNotEmpty;
+              final effectiveExpanded = usingInlineThink
+                  ? (_inlineThinkExpanded ?? true)
+                  : widget.reasoningExpanded;
+              final effectiveLoading = usingInlineThink
+                  ? false
+                  : (widget.reasoningFinishedAt == null);
+
+              List<ReasoningSegment>? effectiveReasoningSegments =
+                  widget.reasoningSegments;
+              if ((effectiveReasoningSegments == null ||
+                      effectiveReasoningSegments.isEmpty) &&
+                  (hasProvidedReasoning || effectiveReasoningText.isNotEmpty)) {
+                effectiveReasoningSegments = <ReasoningSegment>[
+                  ReasoningSegment(
+                    text: effectiveReasoningText,
+                    expanded: effectiveExpanded,
+                    loading: effectiveLoading,
+                    startAt: usingInlineThink ? null : widget.reasoningStartAt,
+                    finishedAt: usingInlineThink
+                        ? null
+                        : widget.reasoningFinishedAt,
+                    onToggle: usingInlineThink
+                        ? () => setState(() {
+                            _inlineThinkExpanded =
+                                !(_inlineThinkExpanded ?? true);
+                            _inlineThinkManuallyToggled = true;
+                          })
+                        : widget.onToggleReasoning,
+                  ),
+                ];
+              }
+
+              renderBlocks = _buildRenderBlocks(
+                visualContent,
+                reasoningSegments: effectiveReasoningSegments,
+              );
             }
-
-            final renderBlocks = _buildRenderBlocks(
-              visualContent,
-              reasoningSegments: effectiveReasoningSegments,
-            );
             if (renderBlocks.isEmpty &&
                 widget.message.isStreaming &&
                 visualContent.isEmpty) {

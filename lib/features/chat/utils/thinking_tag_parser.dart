@@ -16,6 +16,10 @@ class ThinkingTagParser {
     caseSensitive: false,
   );
 
+  static bool hasInlineThinkTags(String input) {
+    return _openTagRe.hasMatch(input);
+  }
+
   static ThinkingTagParseResult parseLegacyInlineBlocks(String input) {
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
