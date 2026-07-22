@@ -5,12 +5,18 @@
 
 ## 1. Repository Facts
 
+### 1.1 Overall
+
 - This is a Flutter app repository. Root `pubspec.yaml` declares `sdk: ^3.12.1` and `flutter: >=3.44.1` with `flutter.generate: true`.
 - Main code lives in `lib/`, tests in `test/`. Local path dependencies exist:
   - `dependencies/mcp_client`
   - `dependencies/tray_manager/packages/tray_manager`
   - `dependencies/flutter_tts`
   - `dependencies/flutter-permission-handler/permission_handler_windows`
+- The package name is `Cuplivo`. Existing imports use `package:Cuplivo/...` everywhere. Do not "normalize" the package name.
+
+### 1.2 l10n
+
 - Localization is driven by `l10n.yaml`:
   - `arb-dir: lib/l10n`
   - `template-arb-file: app_en.arb`
@@ -27,7 +33,9 @@
   - All other generated logic must go through commands, not manual edits
   - `.dart_tool/**`
   - `build/**`
-- The package name is `Cuplivo`. Existing imports use `package:Cuplivo/...` everywhere. Do not "normalize" the package name.
+
+### 1.3 Desktop & Mobile
+
 - Top-level platform entry is `_selectHome()` in `lib/main.dart`:
   - macOS / Windows / Linux -> `DesktopHomePage`
   - Android / iOS -> `HomePage`
@@ -48,29 +56,27 @@
 - Theme and dynamic color follow the repo as-is:
   - `lib/theme/**` is the single source of truth for theming and tokens
   - Android dynamic color is only enabled per-platform in `main.dart`. Do not extrapolate Android visual or interaction rules to desktop.
+
+### 1.4 Fork & Upstream
+
 - This repository (Cuplivo) is a **community fork** of upstream [Kelivo](https://github.com/Chevey339/kelivo).
+
 - Branch conventions:
+  
   - `legacy` → always corresponds to upstream Kelivo
   - `cuplivo`, `cuplivo-next` → always correspond to this fork (Cuplivo)
   - `master` → depends on local repository; cannot be assumed upstream or fork
+
 - README intentionally retains many upstream references (download links, Issues, sponsors, community groups, Star History). Do not "fix" or rewrite these links.
+
 - `CHANGELOG.md` and `CHANGELOG_CN.md` must be kept in sync — when updating the changelog, always update both files simultaneously.
-- Key Cuplivo-specific features:
-  - SQLite storage (replaced Hive)
-  - Incremental backup
-  - Multi-AI side-by-side comparison
-  - Manual image compression
-  - Memory mode switcher (Auto Injection / On Demand Tool)
-  - Tool prompt optimization
-  - SVG preview
-  - PDF/Office file attachments
-  - Various repo-wide fixes (OCR cache persistence, Gemini cached-token reporting, title generation retry, etc.)
 
 ## 2. Working Style
 
-- Communicate in Chinese throughout. Stay focused on the current task. No vague suggestions.
-- Facts first. All conclusions must be based on current code, config, tests, build scripts, or git state. No guessing.
-- Debug-first. Never add silent degradation, swallowed errors, hidden fallback paths, or fake success branches just to "make it run".
+- Debug-first.
+  - Never add silent degradation, swallowed errors, hidden fallback paths, or fake success branches just to "make it run".
+  - **When frustrated by repeated bugs or failure to locate a bug, always suggest adding debug logs.**
+  - When adding debug logs, prefer `debugPrint` with necessary files imported.
 - Default to KISS / YAGNI:
   - Use the most direct, most verifiable approach first.
   - Do not pre-plant extra layers, empty abstractions, or config switches for "architectural completeness" or "might need it later".
@@ -118,11 +124,12 @@ flutter gen-l10n
 
 ### 3.2 Generated Code Must Be Maintained Via Commands
 
-- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart` files.
+- Generated file changes must correspond strictly to source changes. Do not hand-craft `*.g.dart`, `lib/l10n/app_localizations_*.dart` files.
 
 ### 3.3 Format Code Before Finishing
 
 - Any change to Dart/Flutter code requires formatting before completion.
+- Changes restricted to Markdown (.md) or YAML (.yaml/.yml) do NOT need formatting, and CANNOT be formatted via `dart format`.
 - Prefer formatting only the changed paths. For large changes, format `lib/` and `test/`.
 
 ```bash
@@ -130,8 +137,6 @@ dart format <changed-paths>
 ```
 
 - Unformatted code must not be committed.
-- If no Dart code was modified, running `dart format` or `flutter` commands is unnecessary.
-- `dart format` applies only to Dart files, not Markdown (.md) or YAML (.yaml/.yml).
 
 ### 3.4 Minimum Sufficient Verification After Completion
 
@@ -141,22 +146,22 @@ dart format <changed-paths>
 flutter analyze
 ```
 
-- All `flutter analyze` info / warning issues must be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
-- Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally** -- CI validates the complete suite remotely.
+- ALL `flutter analyze` info / warning issues MUST be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
+- Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally**, as CI validates the complete suite remotely.
 - If no directly related tests exist, perform manual verification and state it in delivery notes.
 - **For user-visible changes**, after development, provide a manual test plan covering:
   - Happy path
   - Edge cases (if applicable)
 - If the following content types are modified, the corresponding extra action is mandatory:
 
-| Change Type | Required Action |
-| --- | --- |
-| ARB / localization | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze` |
-| `pubspec.yaml` / dependencies | `flutter pub get`, then `flutter analyze` and related tests |
-| `.github/workflows/**` / build scripts | Check ALL similar workflow files, not just one |
-| Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly |
-| `dependencies/**` path dependencies | Run analysis/tests in the dependency's own directory, not just the root repo |
-| `lib/desktop/**`, desktop hotkeys/tray/window logic | At least one desktop-targeted verification (e.g. `flutter run -d macos`, `flutter build macos`, or the corresponding Windows/Linux target); if only the current machine's platform was verified, state the uncovered platform boundary |
+| Change Type                                                 | Required Action                                                                                                                                                                                                                        |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ARB / localization                                          | `flutter gen-l10n`, check `desiredFileName.txt`, then `flutter analyze`                                                                                                                                                                |
+| `pubspec.yaml` / dependencies                               | `flutter pub get`, then `flutter analyze` and related tests                                                                                                                                                                            |
+| `.github/workflows/**` / build scripts                      | Check ALL similar workflow files, not just one                                                                                                                                                                                         |
+| Platform directories `android/ ios/ macos/ linux/ windows/` | At least one targeted platform verification; if impossible, state why explicitly                                                                                                                                                       |
+| `dependencies/**` path dependencies                         | Run analysis/tests in the dependency's own directory, not just the root repo                                                                                                                                                           |
+| `lib/desktop/**`, desktop hotkeys/tray/window logic         | At least one desktop-targeted verification (e.g. `flutter run -d macos`, `flutter build macos`, or the corresponding Windows/Linux target); if only the current machine's platform was verified, state the uncovered platform boundary |
 
 - If local environment limitations prevent completing any verification, the final delivery notes must explicitly state "what was not run, why, and where the risk lies".
 
@@ -316,5 +321,3 @@ flutter analyze
 - Error messages must be useful -- they should help locate and recover, not just say "failed".
 - Mechanisms over hand-picked magic constants. If a threshold must be hardcoded, explain why and state its boundaries.
 - When small-step verification is possible, do not make large irreversible changes.
-
-
