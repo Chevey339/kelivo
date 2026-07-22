@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:KelivoDev/theme/app_font_weights.dart';
 
 import '../../../core/services/haptics.dart';
 import '../../../icons/lucide_adapter.dart';

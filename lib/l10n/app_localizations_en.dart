@@ -1841,6 +1841,60 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupReminderSnoozeTooltip => 'Remind me later';
 
   @override
+  String get backupAutoSectionTitle => 'Auto Backup';
+
+  @override
+  String get backupAutoEnableTitle => 'Enable auto backup';
+
+  @override
+  String get backupAutoFrequencyTitle => 'Backup interval';
+
+  @override
+  String get backupAutoTimeTitle => 'Backup time';
+
+  @override
+  String get backupAutoLastBackupTitle => 'Last auto backup';
+
+  @override
+  String get backupAutoNextBackupTitle => 'Next auto backup';
+
+  @override
+  String get backupAutoEveryDay => 'Every day';
+
+  @override
+  String get backupAutoEveryThreeDays => 'Every 3 days';
+
+  @override
+  String get backupAutoEveryWeek => 'Every week';
+
+  @override
+  String get backupAutoEveryFourteenDays => 'Every 14 days';
+
+  @override
+  String get backupAutoEveryMonth => 'Every month';
+
+  @override
+  String backupAutoCustomDays(int days) {
+    return 'Every $days days';
+  }
+
+  @override
+  String get backupAutoCustomOption => 'Custom...';
+
+  @override
+  String get backupAutoCustomDialogTitle => 'Custom Interval';
+
+  @override
+  String get backupAutoCustomDialogDescription =>
+      'Enter how many days to wait between auto backups.';
+
+  @override
+  String get backupAutoCustomDaysLabel => 'Days';
+
+  @override
+  String get backupAutoCustomDaysInvalid => 'Enter a number from 1 to 365.';
+
+  @override
   String get chatHistoryPageTitle => 'Chat History';
 
   @override

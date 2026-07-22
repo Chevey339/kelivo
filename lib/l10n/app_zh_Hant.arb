@@ -611,6 +611,30 @@
   "backupReminderSidebarSubtitle": "已經到你設定的備份週期了。",
   "backupReminderSidebarAction": "去備份",
   "backupReminderSnoozeTooltip": "稍後提醒",
+  "backupAutoSectionTitle": "自動備份",
+  "backupAutoEnableTitle": "啟用自動備份",
+  "backupAutoFrequencyTitle": "備份間隔",
+  "backupAutoTimeTitle": "備份時間",
+  "backupAutoLastBackupTitle": "上次自動備份",
+  "backupAutoNextBackupTitle": "下次自動備份",
+  "backupAutoEveryDay": "每天",
+  "backupAutoEveryThreeDays": "每 3 天",
+  "backupAutoEveryWeek": "每週",
+  "backupAutoEveryFourteenDays": "每 14 天",
+  "backupAutoEveryMonth": "每月",
+  "backupAutoCustomDays": "每 {days} 天",
+  "@backupAutoCustomDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAutoCustomOption": "自訂...",
+  "backupAutoCustomDialogTitle": "自訂間隔",
+  "backupAutoCustomDialogDescription": "輸入自動備份間隔天數。",
+  "backupAutoCustomDaysLabel": "天數",
+  "backupAutoCustomDaysInvalid": "請輸入 1 到 365 之間的數字。",
   "homePageClearContext": "清空上下文",
   "homePageClearContextWithCount": "清空上下文 ({actual}/{configured})",
   "homePageDefaultAssistant": "預設助理",

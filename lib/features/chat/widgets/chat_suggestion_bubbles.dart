@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../shared/widgets/ios_tactile.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:KelivoDev/theme/app_font_weights.dart';
 
 class ChatSuggestionBubbles extends StatelessWidget {
   const ChatSuggestionBubbles({

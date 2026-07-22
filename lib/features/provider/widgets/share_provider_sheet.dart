@@ -9,7 +9,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:KelivoDev/theme/app_font_weights.dart';
 
 String encodeProviderConfig(ProviderConfig cfg) {
   String type;

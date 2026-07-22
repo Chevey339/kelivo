@@ -233,7 +233,7 @@ Future<void> _initRestoreFailureWindow() async {
       return;
     }
     await windowManager.waitUntilReadyToShow(
-      const WindowOptions(title: 'Kelivo'),
+      const WindowOptions(title: 'Kelivo Dev'),
       () async {
         await windowManager.show();
         await windowManager.focus();
@@ -254,7 +254,7 @@ class _RestoreFailureApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Kelivo',
+      title: 'Kelivo Dev',
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -275,7 +275,7 @@ Future<void> _initDesktopWindow() async {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
     // Initialize and show desktop window with persisted size/position
-    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo');
+    await DesktopWindowController.instance.initializeAndShow(title: 'Kelivo Dev');
   } catch (_) {
     // Ignore on unsupported platforms.
   }
@@ -294,7 +294,7 @@ class MigrationApp extends StatelessWidget {
     final palette = ThemePalettes.defaultPalette;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Kelivo',
+      title: 'Kelivo Dev',
       supportedLocales: AppLocalizations.supportedLocales,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
@@ -382,10 +382,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),
         ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              BackupReminderProvider(preferences: businessPreferences),
-        ),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
@@ -402,6 +398,13 @@ class MyApp extends StatelessWidget {
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => BackupReminderProvider(
+            preferences: businessPreferences,
+            backupProvider: ctx.read<BackupProvider>(),
+            webDavConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
       ],
@@ -601,7 +604,7 @@ class MyApp extends StatelessWidget {
               // debugPrint('[Theme/App] Dark scaffoldBg=${dark.colorScheme.surface.value.toRadixString(16)} card≈${dark.colorScheme.surface.value.toRadixString(16)} shadow=${dark.colorScheme.shadow.value.toRadixString(16)}');
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                title: 'Kelivo',
+                title: 'Kelivo Dev',
                 // App UI language; null = follow system (respects iOS per-app language)
                 locale: settings.appLocaleForMaterialApp,
                 supportedLocales: AppLocalizations.supportedLocales,

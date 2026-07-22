@@ -746,6 +746,30 @@
   "backupReminderSidebarSubtitle": "Your backup interval has arrived.",
   "backupReminderSidebarAction": "Go to backup",
   "backupReminderSnoozeTooltip": "Remind me later",
+  "backupAutoSectionTitle": "Auto Backup",
+  "backupAutoEnableTitle": "Enable auto backup",
+  "backupAutoFrequencyTitle": "Backup interval",
+  "backupAutoTimeTitle": "Backup time",
+  "backupAutoLastBackupTitle": "Last auto backup",
+  "backupAutoNextBackupTitle": "Next auto backup",
+  "backupAutoEveryDay": "Every day",
+  "backupAutoEveryThreeDays": "Every 3 days",
+  "backupAutoEveryWeek": "Every week",
+  "backupAutoEveryFourteenDays": "Every 14 days",
+  "backupAutoEveryMonth": "Every month",
+  "backupAutoCustomDays": "Every {days} days",
+  "@backupAutoCustomDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "backupAutoCustomOption": "Custom...",
+  "backupAutoCustomDialogTitle": "Custom Interval",
+  "backupAutoCustomDialogDescription": "Enter how many days to wait between auto backups.",
+  "backupAutoCustomDaysLabel": "Days",
+  "backupAutoCustomDaysInvalid": "Enter a number from 1 to 365.",
   "chatHistoryPageTitle": "Chat History",
   "chatHistoryPageSearchTooltip": "Search",
   "chatHistoryPageDeleteAllTooltip": "Delete Unpinned",

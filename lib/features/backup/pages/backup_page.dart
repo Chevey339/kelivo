@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:KelivoDev/theme/app_font_weights.dart';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -295,8 +295,10 @@ class _BackupPageState extends State<BackupPage> {
                       value: cfg.includeChats,
                       onChanged: (v) async {
                         final newCfg = cfg.copyWith(includeChats: v);
+                        final reminderProvider = context.read<BackupReminderProvider>();
                         await settings.setWebDavConfig(newCfg);
                         vm.updateConfig(newCfg);
+                        reminderProvider.webDavConfig = newCfg;
 
                         final newS3Cfg = s3Cfg.copyWith(includeChats: v);
                         await settings.setS3Config(newS3Cfg);
@@ -311,8 +313,10 @@ class _BackupPageState extends State<BackupPage> {
                       value: cfg.includeFiles,
                       onChanged: (v) async {
                         final newCfg = cfg.copyWith(includeFiles: v);
+                        final reminderProvider = context.read<BackupReminderProvider>();
                         await settings.setWebDavConfig(newCfg);
                         vm.updateConfig(newCfg);
+                        reminderProvider.webDavConfig = newCfg;
 
                         final newS3Cfg = s3Cfg.copyWith(includeFiles: v);
                         await settings.setS3Config(newS3Cfg);
@@ -324,6 +328,9 @@ class _BackupPageState extends State<BackupPage> {
 
                 header(l10n.backupReminderSectionTitle),
                 const _BackupReminderMobileSection(),
+
+                header(l10n.backupAutoSectionTitle),
+                const _BackupAutoMobileSection(),
 
                 // Section 2: 本地备份
                 ..._buildMobileLocalBackupSection(context, l10n, vm, header),
@@ -1539,6 +1546,169 @@ class _BackupReminderMobileSection extends StatelessWidget {
   }
 }
 
+class _BackupAutoMobileSection extends StatelessWidget {
+  const _BackupAutoMobileSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final reminder = context.watch<BackupReminderProvider>();
+
+    return _iosSectionCard(
+      children: [
+        _iosSwitchRow(
+          context,
+          icon: Lucide.Upload,
+          label: l10n.backupAutoEnableTitle,
+          value: reminder.autoEnabled,
+          onChanged: (value) async {
+            final provider = context.read<BackupReminderProvider>();
+            if (!value) {
+              await provider.setAutoEnabled(false);
+              return;
+            }
+            final minutes = await showBackupReminderTimePicker(
+              context,
+              initialMinutes: provider.autoMinutesOfDay,
+            );
+            if (minutes == null) return;
+            await provider.saveAutoBackupSchedule(
+              enabled: true,
+              intervalDays: provider.autoIntervalDays,
+              reminderMinutesOfDay: minutes,
+            );
+          },
+        ),
+        if (reminder.autoEnabled) ...[
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Repeat,
+            label: l10n.backupAutoFrequencyTitle,
+            detailText: backupAutoFrequencyLabel(
+              l10n,
+              reminder.autoIntervalDays,
+            ),
+            onTap: () => _showBackupAutoFrequencySheet(context),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.clock,
+            label: l10n.backupAutoTimeTitle,
+            detailText: backupReminderTimeLabel(
+              context,
+              reminder.autoMinutesOfDay,
+            ),
+            onTap: () async {
+              final provider = context.read<BackupReminderProvider>();
+              final minutes = await showBackupReminderTimePicker(
+                context,
+                initialMinutes: provider.autoMinutesOfDay,
+              );
+              if (minutes == null) return;
+              await provider.saveAutoBackupSchedule(
+                enabled: true,
+                intervalDays: provider.autoIntervalDays,
+                reminderMinutesOfDay: minutes,
+              );
+            },
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.CheckCircle,
+            label: l10n.backupAutoLastBackupTitle,
+            detailText: backupReminderDateTimeLabel(
+              context,
+              reminder.autoLastBackupAt,
+            ),
+          ),
+          _iosDivider(context),
+          _iosNavRow(
+            context,
+            icon: Lucide.Calendar,
+            label: l10n.backupAutoNextBackupTitle,
+            detailText: backupReminderNextLabel(
+              context,
+              reminder.nextAutoBackupAt,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+Future<void> _showBackupAutoFrequencySheet(BuildContext context) async {
+  final l10n = AppLocalizations.of(context)!;
+  final provider = context.read<BackupReminderProvider>();
+  final selected = await showModalBottomSheet<int>(
+    context: context,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) {
+      final options = <int>[
+        ...BackupReminderProvider.presetIntervals,
+        if (!BackupReminderProvider.presetIntervals.contains(
+          provider.autoIntervalDays,
+        ))
+          provider.autoIntervalDays,
+        0,
+      ];
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final days in options)
+                _ReminderFrequencyTile(
+                  label: days == 0
+                      ? l10n.backupAutoCustomOption
+                      : backupAutoFrequencyLabel(l10n, days),
+                  selected: days != 0 && days == provider.autoIntervalDays,
+                  onTap: () => Navigator.of(ctx).pop(days),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  if (!context.mounted || selected == null) return;
+
+  final days = selected == 0
+      ? await showBackupReminderCustomDaysDialog(
+          context,
+          initialDays: provider.autoIntervalDays,
+        )
+      : selected;
+  if (!context.mounted || days == null) return;
+  final providerAfterDialog = context.read<BackupReminderProvider>();
+  var minutes = providerAfterDialog.autoMinutesOfDay;
+  minutes ??= await showBackupReminderTimePicker(context);
+  if (!context.mounted || minutes == null) return;
+  await context.read<BackupReminderProvider>().saveAutoBackupSchedule(
+    enabled: true,
+    intervalDays: days,
+    reminderMinutesOfDay: minutes,
+  );
+}
+
+String backupAutoFrequencyLabel(AppLocalizations l10n, int days) {
+  return switch (days) {
+    1 => l10n.backupAutoEveryDay,
+    3 => l10n.backupAutoEveryThreeDays,
+    7 => l10n.backupAutoEveryWeek,
+    14 => l10n.backupAutoEveryFourteenDays,
+    30 => l10n.backupAutoEveryMonth,
+    _ => l10n.backupAutoCustomDays(days),
+  };
+}
+
 Future<void> _showBackupReminderFrequencySheet(BuildContext context) async {
   final l10n = AppLocalizations.of(context)!;
   final provider = context.read<BackupReminderProvider>();
@@ -2496,8 +2666,10 @@ class _WebDavSettingsPageState extends State<_WebDavSettingsPage> {
           : _pathCtrl.text.trim(),
       userAgent: _userAgentCtrl.text.trim(),
     );
+    final reminderProvider = context.read<BackupReminderProvider>();
     await widget.settings.setWebDavConfig(newCfg);
     widget.vm.updateConfig(newCfg);
+    reminderProvider.webDavConfig = newCfg;
     if (mounted) {
       Navigator.of(context).pop();
     }

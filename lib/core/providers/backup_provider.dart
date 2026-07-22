@@ -96,6 +96,19 @@ class BackupProvider extends ChangeNotifier {
     return _dataSync.listBackupFiles(_cfg);
   }
 
+  Future<bool> silentBackup() async {
+    if (_busy) return false;
+    _busy = true;
+    try {
+      await _dataSync.backupToWebDav(_cfg);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      _busy = false;
+    }
+  }
+
   Future<File> exportToFile() => _dataSync.exportToFile(_cfg);
   Future<void> restoreFromLocalFile(
     File file, {
