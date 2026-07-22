@@ -141,6 +141,7 @@ dart format <changed-paths>
 flutter analyze
 ```
 
+- All `flutter analyze` info / warning issues must be fixed. GitHub CI runs with `--fatal-infos`, so info-level issues are errors.
 - Run only the test subset relevant to the change scope. Full `flutter test` is **not required locally** -- CI validates the complete suite remotely.
 - If no directly related tests exist, perform manual verification and state it in delivery notes.
 - **For user-visible changes**, after development, provide a manual test plan covering:
