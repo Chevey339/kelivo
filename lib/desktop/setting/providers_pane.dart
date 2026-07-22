@@ -308,6 +308,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'Gemini', key: 'Gemini'),
       (name: 'OpenRouter', key: 'OpenRouter'),
       (name: 'Vercel AI Gateway', key: 'Vercel'),
+      (name: 'Atlas Cloud', key: 'Atlas Cloud'),
       (name: 'KelivoIN', key: 'KelivoIN'),
       (name: 'Tensdaq', key: 'Tensdaq'),
       (name: 'DeepSeek', key: 'DeepSeek'),
