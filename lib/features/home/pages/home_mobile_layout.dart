@@ -116,12 +116,22 @@ class HomeMobileScaffold extends StatelessWidget {
           if (closeDrawer) drawerController.close();
         },
       ),
-      child: Scaffold(
-        key: scaffoldKey,
-        resizeToAvoidBottomInset: true,
-        extendBodyBehindAppBar: true,
-        appBar: appBarOverride ?? _buildAppBar(context, cs),
-        body: body,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Keep the chat artwork at the full window size while Scaffold
+          // resizes only its body around the keyboard. Transparent IMEs can
+          // then reveal the artwork instead of Scaffold's surface color.
+          const MobileBackgroundLayer(),
+          Scaffold(
+            key: scaffoldKey,
+            resizeToAvoidBottomInset: true,
+            extendBodyBehindAppBar: true,
+            backgroundColor: Colors.transparent,
+            appBar: appBarOverride ?? _buildAppBar(context, cs),
+            body: body,
+          ),
+        ],
       ),
     );
   }
