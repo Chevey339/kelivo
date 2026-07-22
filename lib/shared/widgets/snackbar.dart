@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/services/haptics.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 enum NotificationType { success, error, info, warning }
 

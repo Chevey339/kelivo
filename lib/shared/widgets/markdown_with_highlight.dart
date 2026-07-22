@@ -28,14 +28,14 @@ import 'export_capture_scope.dart';
 import 'mermaid_image_cache.dart';
 import 'plantuml_block.dart';
 import 'package:path/path.dart' as p;
-import 'package:KelivoDev/l10n/app_localizations.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
-import 'package:KelivoDev/theme/theme_factory.dart' show getPlatformFontFallback;
+import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/theme_factory.dart' show getPlatformFontFallback;
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import '../../core/providers/settings_provider.dart';
-import 'package:KelivoDev/desktop/html_preview_dialog.dart';
+import 'package:Kelivo/desktop/html_preview_dialog.dart';
 import '../cache/byte_lru_cache.dart';
 import 'incremental_markdown_document.dart';
 

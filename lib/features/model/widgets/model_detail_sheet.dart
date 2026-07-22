@@ -13,7 +13,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import 'model_edit_state_helper.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<bool?> showModelDetailSheet(
   BuildContext context, {

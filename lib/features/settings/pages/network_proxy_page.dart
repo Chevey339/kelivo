@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

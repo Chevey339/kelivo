@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';

@@ -7,7 +7,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/models/model_types.dart';
 import '../../icons/lucide_adapter.dart';
 import '../../l10n/app_localizations.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 /// Shared model tag/capsule renderer used across model lists.
 class ModelTagWrap extends StatelessWidget {

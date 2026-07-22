@@ -4,7 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 class SelectCopyPage extends StatelessWidget {
   const SelectCopyPage({super.key, required this.message});

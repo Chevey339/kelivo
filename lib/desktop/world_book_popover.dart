@@ -7,7 +7,7 @@ import '../core/models/world_book.dart';
 import '../core/providers/world_book_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
-import 'package:KelivoDev/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_font_weights.dart';
 
 Future<void> showDesktopWorldBookPopover(
   BuildContext context, {

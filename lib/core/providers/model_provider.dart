@@ -8,7 +8,7 @@ import '../services/network/dio_http_client.dart';
 import '../services/api_key_manager.dart';
 import '../services/api/provider_request_headers.dart';
 import '../services/model_override_payload_parser.dart';
-import 'package:KelivoDev/secrets/fallback.dart';
+import 'package:Kelivo/secrets/fallback.dart';
 import '../services/api/google_service_account_auth.dart';
 import '../models/model_types.dart';
 
