@@ -1782,6 +1782,59 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupReminderSnoozeTooltip => '稍后提醒';
 
   @override
+  String get backupAutoSectionTitle => '自动备份';
+
+  @override
+  String get backupAutoEnableTitle => '启用自动备份';
+
+  @override
+  String get backupAutoFrequencyTitle => '备份间隔';
+
+  @override
+  String get backupAutoTimeTitle => '备份时间';
+
+  @override
+  String get backupAutoLastBackupTitle => '上次自动备份';
+
+  @override
+  String get backupAutoNextBackupTitle => '下次自动备份';
+
+  @override
+  String get backupAutoEveryDay => '每天';
+
+  @override
+  String get backupAutoEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupAutoEveryWeek => '每周';
+
+  @override
+  String get backupAutoEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupAutoEveryMonth => '每月';
+
+  @override
+  String backupAutoCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupAutoCustomOption => '自定义...';
+
+  @override
+  String get backupAutoCustomDialogTitle => '自定义间隔';
+
+  @override
+  String get backupAutoCustomDialogDescription => '输入自动备份间隔天数。';
+
+  @override
+  String get backupAutoCustomDaysLabel => '天数';
+
+  @override
+  String get backupAutoCustomDaysInvalid => '请输入 1 到 365 之间的数字。';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -7317,6 +7370,59 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupReminderSnoozeTooltip => '稍后提醒';
 
   @override
+  String get backupAutoSectionTitle => '自动备份';
+
+  @override
+  String get backupAutoEnableTitle => '启用自动备份';
+
+  @override
+  String get backupAutoFrequencyTitle => '备份间隔';
+
+  @override
+  String get backupAutoTimeTitle => '备份时间';
+
+  @override
+  String get backupAutoLastBackupTitle => '上次自动备份';
+
+  @override
+  String get backupAutoNextBackupTitle => '下次自动备份';
+
+  @override
+  String get backupAutoEveryDay => '每天';
+
+  @override
+  String get backupAutoEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupAutoEveryWeek => '每周';
+
+  @override
+  String get backupAutoEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupAutoEveryMonth => '每月';
+
+  @override
+  String backupAutoCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupAutoCustomOption => '自定义...';
+
+  @override
+  String get backupAutoCustomDialogTitle => '自定义间隔';
+
+  @override
+  String get backupAutoCustomDialogDescription => '输入自动备份间隔天数。';
+
+  @override
+  String get backupAutoCustomDaysLabel => '天数';
+
+  @override
+  String get backupAutoCustomDaysInvalid => '请输入 1 到 365 之间的数字。';
+
+  @override
   String get chatHistoryPageTitle => '聊天历史';
 
   @override
@@ -12850,6 +12956,59 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupReminderSnoozeTooltip => '稍後提醒';
+
+  @override
+  String get backupAutoSectionTitle => '自動備份';
+
+  @override
+  String get backupAutoEnableTitle => '啟用自動備份';
+
+  @override
+  String get backupAutoFrequencyTitle => '備份間隔';
+
+  @override
+  String get backupAutoTimeTitle => '備份時間';
+
+  @override
+  String get backupAutoLastBackupTitle => '上次自動備份';
+
+  @override
+  String get backupAutoNextBackupTitle => '下次自動備份';
+
+  @override
+  String get backupAutoEveryDay => '每天';
+
+  @override
+  String get backupAutoEveryThreeDays => '每 3 天';
+
+  @override
+  String get backupAutoEveryWeek => '每週';
+
+  @override
+  String get backupAutoEveryFourteenDays => '每 14 天';
+
+  @override
+  String get backupAutoEveryMonth => '每月';
+
+  @override
+  String backupAutoCustomDays(int days) {
+    return '每 $days 天';
+  }
+
+  @override
+  String get backupAutoCustomOption => '自訂...';
+
+  @override
+  String get backupAutoCustomDialogTitle => '自訂間隔';
+
+  @override
+  String get backupAutoCustomDialogDescription => '輸入自動備份間隔天數。';
+
+  @override
+  String get backupAutoCustomDaysLabel => '天數';
+
+  @override
+  String get backupAutoCustomDaysInvalid => '請輸入 1 到 365 之間的數字。';
 
   @override
   String get chatHistoryPageTitle => '聊天歷史';

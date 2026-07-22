@@ -340,6 +340,10 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
+              SliverToBoxAdapter(child: _BackupAutoDesktopSection()),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 10)),
+
               _buildLocalBackupSliver(context, l10n, cs),
 
               const SliverToBoxAdapter(child: SizedBox(height: 10)),
@@ -1229,6 +1233,161 @@ class _ReminderDetailText extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _BackupAutoDesktopSection extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final reminder = context.watch<BackupReminderProvider>();
+
+    return _sectionCard(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Text(
+            l10n.backupAutoSectionTitle,
+            style: TextStyle(fontSize: 15, fontWeight: AppFontWeights.semibold),
+          ),
+        ),
+        _ItemRow(
+          label: l10n.backupAutoEnableTitle,
+          vpad: 2,
+          trailing: IosSwitch(
+            value: reminder.autoEnabled,
+            onChanged: (value) async {
+              final provider = context.read<BackupReminderProvider>();
+              if (!value) {
+                await provider.setAutoEnabled(false);
+                return;
+              }
+              final minutes = await showBackupReminderTimePicker(
+                context,
+                initialMinutes: provider.autoMinutesOfDay,
+              );
+              if (minutes == null) return;
+              await provider.saveAutoBackupSchedule(
+                enabled: true,
+                intervalDays: provider.autoIntervalDays,
+                reminderMinutesOfDay: minutes,
+              );
+            },
+          ),
+        ),
+        if (reminder.autoEnabled) ...[
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupAutoFrequencyTitle,
+            trailing: _AutoFrequencyDropdown(reminder: reminder),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupAutoTimeTitle,
+            trailing: _DeskIosButton(
+              label: backupReminderTimeLabel(
+                context,
+                reminder.autoMinutesOfDay,
+              ),
+              filled: false,
+              dense: true,
+              onTap: () async {
+                final provider = context.read<BackupReminderProvider>();
+                final minutes = await showBackupReminderTimePicker(
+                  context,
+                  initialMinutes: provider.autoMinutesOfDay,
+                );
+                if (minutes == null) return;
+                await provider.saveAutoBackupSchedule(
+                  enabled: true,
+                  intervalDays: provider.autoIntervalDays,
+                  reminderMinutesOfDay: minutes,
+                );
+              },
+            ),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupAutoLastBackupTitle,
+            trailing: _ReminderDetailText(
+              backupReminderDateTimeLabel(context, reminder.autoLastBackupAt),
+            ),
+          ),
+          _rowDivider(context),
+          _ItemRow(
+            label: l10n.backupAutoNextBackupTitle,
+            trailing: _ReminderDetailText(
+              backupReminderNextLabel(context, reminder.nextAutoBackupAt),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _AutoFrequencyDropdown extends StatelessWidget {
+  const _AutoFrequencyDropdown({required this.reminder});
+
+  final BackupReminderProvider reminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final current = reminder.autoIntervalDays;
+    final preset = BackupReminderProvider.presetIntervals;
+    final options = <DesktopSelectOption<int>>[
+      for (final days in preset)
+        DesktopSelectOption(
+          value: days,
+          label: _autoFrequencyLabel(l10n, days),
+        ),
+    ];
+    if (!preset.contains(current) && current > 0) {
+      options.add(DesktopSelectOption(value: current, label: _autoFrequencyLabel(l10n, current)));
+    }
+    options.add(DesktopSelectOption(value: -1, label: l10n.backupAutoCustomOption));
+    return DesktopSelectDropdown<int>(
+      value: current,
+      options: options,
+      minWidth: 150,
+      onSelected: (value) async {
+        if (!context.mounted) return;
+        if (value == -1) {
+          final custom = await showBackupReminderCustomDaysDialog(
+            context,
+            initialDays: current,
+          );
+          if (custom == null || !context.mounted) return;
+          await _applyAutoInterval(context, custom);
+          return;
+        }
+        await _applyAutoInterval(context, value);
+      },
+    );
+  }
+
+  Future<void> _applyAutoInterval(BuildContext context, int days) async {
+    final provider = context.read<BackupReminderProvider>();
+    var minutes = provider.autoMinutesOfDay;
+    minutes ??= await showBackupReminderTimePicker(context);
+    if (minutes == null) return;
+    await provider.saveAutoBackupSchedule(
+      enabled: true,
+      intervalDays: days,
+      reminderMinutesOfDay: minutes,
+    );
+  }
+
+  static String _autoFrequencyLabel(AppLocalizations l10n, int days) {
+    return switch (days) {
+      1 => l10n.backupAutoEveryDay,
+      3 => l10n.backupAutoEveryThreeDays,
+      7 => l10n.backupAutoEveryWeek,
+      14 => l10n.backupAutoEveryFourteenDays,
+      30 => l10n.backupAutoEveryMonth,
+      _ => l10n.backupAutoCustomDays(days),
+    };
   }
 }
 

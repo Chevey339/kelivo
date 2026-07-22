@@ -3521,6 +3521,108 @@ abstract class AppLocalizations {
   /// **'Remind me later'**
   String get backupReminderSnoozeTooltip;
 
+  /// No description provided for @backupAutoSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Backup'**
+  String get backupAutoSectionTitle;
+
+  /// No description provided for @backupAutoEnableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable auto backup'**
+  String get backupAutoEnableTitle;
+
+  /// No description provided for @backupAutoFrequencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup interval'**
+  String get backupAutoFrequencyTitle;
+
+  /// No description provided for @backupAutoTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup time'**
+  String get backupAutoTimeTitle;
+
+  /// No description provided for @backupAutoLastBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Last auto backup'**
+  String get backupAutoLastBackupTitle;
+
+  /// No description provided for @backupAutoNextBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Next auto backup'**
+  String get backupAutoNextBackupTitle;
+
+  /// No description provided for @backupAutoEveryDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Every day'**
+  String get backupAutoEveryDay;
+
+  /// No description provided for @backupAutoEveryThreeDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 3 days'**
+  String get backupAutoEveryThreeDays;
+
+  /// No description provided for @backupAutoEveryWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Every week'**
+  String get backupAutoEveryWeek;
+
+  /// No description provided for @backupAutoEveryFourteenDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every 14 days'**
+  String get backupAutoEveryFourteenDays;
+
+  /// No description provided for @backupAutoEveryMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Every month'**
+  String get backupAutoEveryMonth;
+
+  /// No description provided for @backupAutoCustomDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {days} days'**
+  String backupAutoCustomDays(int days);
+
+  /// No description provided for @backupAutoCustomOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom...'**
+  String get backupAutoCustomOption;
+
+  /// No description provided for @backupAutoCustomDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Interval'**
+  String get backupAutoCustomDialogTitle;
+
+  /// No description provided for @backupAutoCustomDialogDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter how many days to wait between auto backups.'**
+  String get backupAutoCustomDialogDescription;
+
+  /// No description provided for @backupAutoCustomDaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Days'**
+  String get backupAutoCustomDaysLabel;
+
+  /// No description provided for @backupAutoCustomDaysInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number from 1 to 365.'**
+  String get backupAutoCustomDaysInvalid;
+
   /// No description provided for @chatHistoryPageTitle.
   ///
   /// In en, this message translates to:
