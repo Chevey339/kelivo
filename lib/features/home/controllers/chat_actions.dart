@@ -925,7 +925,13 @@ class ChatActions {
   /// Cancel the active streaming for the current conversation.
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
-    if (cid == null || _isCancelling) return;
+    if (cid == null || _isCancelling) {
+      debugPrint(
+        '[CancelTrace] cancelStreaming SKIPPED: cid=$cid _isCancelling=$_isCancelling',
+      );
+      return;
+    }
+    debugPrint('[CancelTrace] cancelStreaming ENTER: cid=$cid');
     _isCancelling = true;
     try {
       // Cancel any pending tool approval requests to prevent deadlock
@@ -957,7 +963,11 @@ class ChatActions {
       // Cancel active stream for current conversation only
       ChatApiService.cancelRequest(cid);
       final sub = _conversationStreams.remove(cid);
-      await sub?.cancel();
+      try {
+        await sub?.cancel();
+      } catch (e) {
+        debugPrint('[CancelTrace] sub.cancel() threw (ignored): $e');
+      }
 
       // Find all assistant streaming messages within current conversation and mark them finished
       final streamingMessages = <ChatMessage>[];
@@ -967,6 +977,9 @@ class ChatActions {
           streamingMessages.add(m);
         }
       }
+      debugPrint(
+        '[CancelTrace] cancelStreaming: streamingMessages=${streamingMessages.length} cntBefore=${chatController.loadingConversationIds.contains(cid)}',
+      );
       if (streamingMessages.isNotEmpty) {
         for (final streaming in streamingMessages) {
           // Mark streaming as ended to allow UI rebuilds again
@@ -976,11 +989,24 @@ class ChatActions {
           final idx = _messages.indexWhere((m) => m.id == streaming.id);
           final latestStreaming = idx == -1 ? streaming : _messages[idx];
 
-          await chatService.updateMessage(
-            latestStreaming.id,
-            content: latestStreaming.content,
-            isStreaming: false,
-            totalTokens: latestStreaming.totalTokens,
+          debugPrint(
+            '[CancelTrace] cancelStreaming before updateMessage: msg=${latestStreaming.id}',
+          );
+          try {
+            await chatService.updateMessage(
+              latestStreaming.id,
+              content: latestStreaming.content,
+              isStreaming: false,
+              totalTokens: latestStreaming.totalTokens,
+            );
+          } catch (e, st) {
+            debugPrint(
+              '[CancelTrace] cancelStreaming updateMessage THREW: $e\n$st',
+            );
+            rethrow;
+          }
+          debugPrint(
+            '[CancelTrace] cancelStreaming after updateMessage: msg=${latestStreaming.id}',
           );
 
           if (idx != -1) {
@@ -991,22 +1017,35 @@ class ChatActions {
           streamController.removeStreamingNotifier(streaming.id);
 
           // Use unified reasoning completion method
-          await streamController.finishReasoningAndPersist(
-            streaming.id,
-            updateReasoningInDb:
-                (
-                  String messageId, {
-                  String? reasoningText,
-                  DateTime? reasoningFinishedAt,
-                  String? reasoningSegmentsJson,
-                }) async {
-                  await chatService.updateMessage(
-                    messageId,
-                    reasoningText: reasoningText,
-                    reasoningFinishedAt: reasoningFinishedAt,
-                    reasoningSegmentsJson: reasoningSegmentsJson,
-                  );
-                },
+          debugPrint(
+            '[CancelTrace] cancelStreaming before finishReasoningAndPersist: msg=${streaming.id}',
+          );
+          try {
+            await streamController.finishReasoningAndPersist(
+              streaming.id,
+              updateReasoningInDb:
+                  (
+                    String messageId, {
+                    String? reasoningText,
+                    DateTime? reasoningFinishedAt,
+                    String? reasoningSegmentsJson,
+                  }) async {
+                    await chatService.updateMessage(
+                      messageId,
+                      reasoningText: reasoningText,
+                      reasoningFinishedAt: reasoningFinishedAt,
+                      reasoningSegmentsJson: reasoningSegmentsJson,
+                    );
+                  },
+            );
+          } catch (e, st) {
+            debugPrint(
+              '[CancelTrace] cancelStreaming finishReasoningAndPersist THREW: $e\n$st',
+            );
+            rethrow;
+          }
+          debugPrint(
+            '[CancelTrace] cancelStreaming after finishReasoningAndPersist: msg=${streaming.id}',
           );
 
           // If streaming output included inline base64 images, sanitize them even on manual cancel
@@ -1016,14 +1055,20 @@ class ChatActions {
             immediate: true,
           );
         }
+        debugPrint('[CancelTrace] cancelStreaming BEFORE forceClear');
         chatController.forceClearConversationLoading(cid);
         onLoadingChanged?.call(cid, false);
+        debugPrint('[CancelTrace] cancelStreaming AFTER forceClear');
         await _cancelIosBackgroundGeneration();
       } else {
+        debugPrint('[CancelTrace] cancelStreaming else-branch forceClear');
         chatController.forceClearConversationLoading(cid);
         onLoadingChanged?.call(cid, false);
       }
     } finally {
+      debugPrint(
+        '[CancelTrace] cancelStreaming EXIT: cid=$cid _isCancelling->false',
+      );
       _isCancelling = false;
     }
   }
@@ -1098,6 +1143,9 @@ class ChatActions {
       );
 
       final streamKey = streamKeyOverride ?? conversationId;
+      debugPrint(
+        '[CancelTrace] _executeGeneration: streamKey=$streamKey requestId=${requestIdOverride ?? conversationId} priorSub=${_conversationStreams[streamKey] != null}',
+      );
       await _conversationStreams[streamKey]?.cancel();
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
         stream: stream,
@@ -1622,6 +1670,9 @@ class ChatActions {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final errorText = e.toString();
+    debugPrint(
+      '[CancelTrace] _handleStreamError ENTER: cid=$conversationId _isCancelling=$_isCancelling errorType=${e.runtimeType}',
+    );
 
     // Reset file processing state on error
     onFileProcessingFinished?.call();
@@ -1657,6 +1708,9 @@ class ChatActions {
     streamController.removeStreamingNotifier(messageId);
 
     if (_isCancelling) {
+      debugPrint(
+        '[CancelTrace] _handleStreamError early-return (isCancelling)',
+      );
       return;
     }
 
@@ -1695,6 +1749,9 @@ class ChatActions {
 
     final conversationId = state.conversationId;
     final messageId = state.messageId;
+    debugPrint(
+      '[CancelTrace] _handleStreamDone ENTER: cid=$conversationId _isCancelling=$_isCancelling loadingContains=${_loadingConversationIds.contains(conversationId)} inFlight=${_finishStreamingFutures[messageId] != null}',
+    );
 
     // Ensure streaming is marked as ended
     streamController.markStreamingEnded(messageId);

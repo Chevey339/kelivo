@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import '../../providers/settings_provider.dart';
@@ -70,9 +71,16 @@ class ChatApiService {
 
   static void cancelRequest(String requestId) {
     final key = requestId.trim();
-    if (key.isEmpty) return;
+    if (key.isEmpty) {
+      debugPrint('[CancelTrace] cancelRequest: key empty');
+      return;
+    }
     final token = _activeCancelTokens.remove(key);
-    if (token == null) return;
+    if (token == null) {
+      debugPrint('[CancelTrace] cancelRequest: token NOT FOUND for key=$key');
+      return;
+    }
+    debugPrint('[CancelTrace] cancelRequest: cancelling key=$key');
     try {
       if (!token.isCancelled) token.cancel('cancelled');
     } catch (_) {}
@@ -732,6 +740,9 @@ class ChatApiService {
       client.close();
       if (rid.isNotEmpty) {
         final cur = _activeCancelTokens[rid];
+        debugPrint(
+          '[CancelTrace] sendMessageStream finally: rid=$rid curIdentical=${identical(cur, cancelToken)}',
+        );
         if (identical(cur, cancelToken)) {
           _activeCancelTokens.remove(rid);
         }
