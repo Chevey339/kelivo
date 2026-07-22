@@ -33,6 +33,7 @@ class _TranslatePageState extends State<TranslatePage> {
   String? _modelId;
   StreamSubscription? _sub;
   bool _loading = false;
+  String? _requestId;
 
   @override
   void initState() {
@@ -42,6 +43,7 @@ class _TranslatePageState extends State<TranslatePage> {
 
   @override
   void dispose() {
+    ChatApiService.cancelRequest(_requestId ?? '');
     _sub?.cancel();
     _src.dispose();
     _dst.dispose();
@@ -131,12 +133,14 @@ class _TranslatePageState extends State<TranslatePage> {
     });
 
     try {
+      _requestId = 'translate_${DateTime.now().millisecondsSinceEpoch}';
       final stream = ChatApiService.sendMessageStream(
         config: cfg,
         modelId: mid,
         messages: [
           {'role': 'user', 'content': p},
         ],
+        requestId: _requestId,
       );
       _sub = stream.listen(
         (chunk) {
@@ -175,6 +179,7 @@ class _TranslatePageState extends State<TranslatePage> {
   }
 
   Future<void> _stop() async {
+    ChatApiService.cancelRequest(_requestId ?? '');
     try {
       await _sub?.cancel();
     } catch (_) {}
