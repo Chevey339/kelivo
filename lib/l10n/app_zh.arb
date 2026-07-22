@@ -2371,5 +2371,15 @@
   },
   "skillsDeleteConfirmDeleteButton": "删除",
   "assistantEditPageSkillsTab": "技能",
-  "settingsPageSkills": "技能"
+  "settingsPageSkills": "技能",
+  "responseTruncated": "回答已被截断（{reason}），内容可能不完整",
+  "@responseTruncated": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "truncationReasonMaxTokens": "输出长度限制",
+  "truncationReasonContextExceeded": "上下文窗口超限"
 }

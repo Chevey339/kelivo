@@ -708,11 +708,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         final metaComment = _collectThoughtSigCommentFromParts(parts);
         if (metaComment.isNotEmpty) contentStr += metaComment;
       }
+      final fr = (cand['finishReason'] ?? cand['finish_reason'] ?? '')
+          .toString();
       yield ChatStreamChunk(
         content: contentStr,
         isDone: true,
         totalTokens: totalUsage?.totalTokens ?? 0,
         usage: totalUsage,
+        truncationReason: fr == 'MAX_TOKENS' ? 'max_tokens' : null,
       );
       return;
     }
@@ -1127,6 +1130,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       return sb.toString();
     }
 
+    String? finishReason; // detect stream completion from server
     await for (final chunk in _ensureTrailingNewline(sse)) {
       buffer += chunk;
       final lines = buffer.split('\n');
@@ -1152,7 +1156,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           if (candidates is List && candidates.isNotEmpty) {
             String textDelta = '';
             String reasoningDelta = '';
-            String? finishReason; // detect stream completion from server
             for (final cand in candidates) {
               if (cand is! Map) continue;
               final content = cand['content'];
@@ -1515,6 +1518,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 isDone: true,
                 totalTokens: totalTokens,
                 usage: usage,
+                truncationReason: finishReason == 'MAX_TOKENS'
+                    ? 'max_tokens'
+                    : null,
               );
               return;
             }
@@ -1559,6 +1565,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         isDone: true,
         totalTokens: totalTokens,
         usage: usage,
+        truncationReason: finishReason == 'MAX_TOKENS' ? 'max_tokens' : null,
       );
       return;
     }

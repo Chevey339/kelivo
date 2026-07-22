@@ -1740,6 +1740,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           isDone: true,
           totalTokens: aggUsage?.totalTokens ?? 0,
           usage: aggUsage,
+          truncationReason: (c0['finish_reason'] as String?) == 'length'
+              ? 'max_tokens'
+              : null,
         );
         return;
       }
@@ -1779,6 +1782,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
   String? finishReason;
+  String?
+  incompleteReason; // Responses API: json['response']['incomplete_details']['reason']
 
   await for (final chunk in _ensureTrailingNewline(sse)) {
     buffer += chunk;
@@ -2404,6 +2409,22 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 entry['args'] = (entry['args'] ?? '') + argsDelta;
               }
             }
+          } else if (type == 'response.incomplete') {
+            final u = json['response']?['usage'];
+            if (u != null) {
+              final inTok = (u['input_tokens'] ?? 0) as int? ?? 0;
+              final outTok = (u['output_tokens'] ?? 0) as int? ?? 0;
+              usage = (usage ?? const TokenUsage()).merge(
+                TokenUsage(promptTokens: inTok, completionTokens: outTok),
+              );
+              totalTokens = usage.totalTokens;
+            }
+            try {
+              final details = json['response']?['incomplete_details'];
+              if (details is Map) {
+                incompleteReason = (details['reason'] ?? '').toString();
+              }
+            } catch (_) {}
           } else if (type == 'response.completed') {
             final u = json['response']?['usage'];
             if (u != null) {
@@ -2822,6 +2843,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     isDone: true,
                     totalTokens: usage?.totalTokens ?? approxTotal2,
                     usage: usage,
+                    truncationReason: incompleteReason == 'max_tokens'
+                        ? 'max_tokens'
+                        : null,
                   );
                   return;
                 }
@@ -2928,6 +2952,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 isDone: true,
                 totalTokens: usage?.totalTokens ?? approxTotal,
                 usage: usage,
+                truncationReason: incompleteReason == 'max_tokens'
+                    ? 'max_tokens'
+                    : null,
               );
               return;
             }
@@ -2941,6 +2968,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               isDone: true,
               totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
+              truncationReason: incompleteReason == 'max_tokens'
+                  ? 'max_tokens'
+                  : null,
             );
             return;
           } else {
@@ -3760,6 +3790,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 isDone: true,
                 totalTokens: usage?.totalTokens ?? approxTotal,
                 usage: usage,
+                truncationReason: finishReason == 'length'
+                    ? 'max_tokens'
+                    : null,
               );
               return;
             }
@@ -4285,5 +4318,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     isDone: true,
     totalTokens: approxTotal,
     usage: usage,
+    truncationReason:
+        finishReason == 'length' || incompleteReason == 'max_tokens'
+        ? 'max_tokens'
+        : null,
   );
 }

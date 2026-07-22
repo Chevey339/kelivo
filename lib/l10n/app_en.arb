@@ -2824,5 +2824,15 @@
   },
   "skillsDeleteConfirmDeleteButton": "Delete",
   "assistantEditPageSkillsTab": "Skills",
-  "settingsPageSkills": "Skills"
+  "settingsPageSkills": "Skills",
+  "responseTruncated": "Response was truncated ({reason}). The content may be incomplete.",
+  "@responseTruncated": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "truncationReasonMaxTokens": "output length limit",
+  "truncationReasonContextExceeded": "context window exceeded"
 }
