@@ -5725,6 +5725,17 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get settingsPageSkills => '技能';
+
+  @override
+  String responseTruncated(String reason) {
+    return '回答已被截断（$reason），内容可能不完整';
+  }
+
+  @override
+  String get truncationReasonMaxTokens => '输出长度限制';
+
+  @override
+  String get truncationReasonContextExceeded => '上下文窗口超限';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -11448,6 +11459,17 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get settingsPageSkills => '技能';
+
+  @override
+  String responseTruncated(String reason) {
+    return '回答已被截断（$reason），内容可能不完整';
+  }
+
+  @override
+  String get truncationReasonMaxTokens => '输出长度限制';
+
+  @override
+  String get truncationReasonContextExceeded => '上下文窗口超限';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -17171,4 +17193,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get settingsPageSkills => '技能';
+
+  @override
+  String responseTruncated(String reason) {
+    return '回答已被截斷（$reason），內容可能不完整';
+  }
+
+  @override
+  String get truncationReasonMaxTokens => '輸出長度限制';
+
+  @override
+  String get truncationReasonContextExceeded => '上下文窗口超限';
 }

@@ -1494,6 +1494,9 @@ class ChatStreamChunk {
   final TokenUsage? usage;
   final List<ToolCallInfo>? toolCalls;
   final List<ToolResultInfo>? toolResults;
+  // Non-null when the response was truncated (e.g. max_tokens, context exceeded).
+  // Value maps to ARB key suffixes: 'max_tokens' or 'context_exceeded'.
+  final String? truncationReason;
 
   ChatStreamChunk({
     required this.content,
@@ -1503,6 +1506,7 @@ class ChatStreamChunk {
     this.usage,
     this.toolCalls,
     this.toolResults,
+    this.truncationReason,
   });
 }
 

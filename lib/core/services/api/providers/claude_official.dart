@@ -509,11 +509,18 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         continue; // next round
       }
       // No tool use -> return final text
+      final sr = (obj['stop_reason'] ?? obj['stopReason'] ?? '').toString();
       yield ChatStreamChunk(
         content: buf.toString(),
         isDone: true,
         totalTokens: (totalUsage?.totalTokens ?? 0),
         usage: totalUsage,
+        truncationReason:
+            sr == 'max_tokens' || sr == 'model_context_window_exceeded'
+            ? (sr == 'model_context_window_exceeded'
+                  ? 'context_exceeded'
+                  : 'max_tokens')
+            : null,
       );
       return;
     }
@@ -957,6 +964,12 @@ Stream<ChatStreamChunk> _sendClaudeStream(
           isDone: true,
           totalTokens: (totalUsage?.totalTokens ?? roundTokens),
           usage: totalUsage ?? usage,
+          truncationReason:
+              sr == 'max_tokens' || sr == 'model_context_window_exceeded'
+              ? (sr == 'model_context_window_exceeded'
+                    ? 'context_exceeded'
+                    : 'max_tokens')
+              : null,
         );
         return;
       }

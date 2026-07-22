@@ -11,6 +11,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -1484,6 +1485,23 @@ class ChatActions {
         messageId,
         reasoningText: r.text,
         reasoningFinishedAt: r.finishedAt,
+      );
+    }
+
+    // Show truncation warning if the response was cut off
+    final tr = chunk.truncationReason;
+    if (tr != null) {
+      if (!contextProvider.mounted) return;
+      final l10n = _l10n;
+      if (l10n == null) return;
+      final reasonText = tr == 'max_tokens'
+          ? l10n.truncationReasonMaxTokens
+          : l10n.truncationReasonContextExceeded;
+      showAppSnackBar(
+        contextProvider,
+        message: l10n.responseTruncated(reasonText),
+        type: NotificationType.warning,
+        duration: const Duration(seconds: 30),
       );
     }
   }

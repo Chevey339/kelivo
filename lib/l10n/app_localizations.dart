@@ -10921,6 +10921,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skills'**
   String get settingsPageSkills;
+
+  /// No description provided for @responseTruncated.
+  ///
+  /// In en, this message translates to:
+  /// **'Response was truncated ({reason}). The content may be incomplete.'**
+  String responseTruncated(String reason);
+
+  /// No description provided for @truncationReasonMaxTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'output length limit'**
+  String get truncationReasonMaxTokens;
+
+  /// No description provided for @truncationReasonContextExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'context window exceeded'**
+  String get truncationReasonContextExceeded;
 }
 
 class _AppLocalizationsDelegate

@@ -5969,4 +5969,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsPageSkills => 'Skills';
+
+  @override
+  String responseTruncated(String reason) {
+    return 'Response was truncated ($reason). The content may be incomplete.';
+  }
+
+  @override
+  String get truncationReasonMaxTokens => 'output length limit';
+
+  @override
+  String get truncationReasonContextExceeded => 'context window exceeded';
 }
