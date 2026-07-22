@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.2] - 2026-07-22
+
+### Added
+
+- Toast notification when a response is truncated due to max_tokens or context window exceeded (#97)
+
+### Fixed
+
+- Stop button no longer requires two presses — `sub.cancel()` exception no longer leaves loading state stuck (#77)
+- Translate stop button now actually closes the HTTP connection via CancelToken force-close (#96)
+- Correct interleaved order of inline think blocks and tool calls across split boundaries (#95)
+- Improved mobile background layout and iPad floating window support (#98)
+
 ## [2.1.1] - 2026-07-22
 
 > ℹ️ **This release fixes a long-standing billing issue.** Since upstream Kelivo v1.1.6, clicking "Stop" never actually closed the underlying TCP connection. Providers were not notified of the cancellation, so even models supporting streaming cancellation could continue generating silently in the background — leading to unexpected token consumption and overcharges. **All users are recommended to upgrade.**
