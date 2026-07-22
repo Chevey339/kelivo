@@ -34,6 +34,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   StreamSubscription? _subscription;
   bool _translating = false;
+  String? _requestId;
 
   @override
   void initState() {
@@ -44,6 +45,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
 
   @override
   void dispose() {
+    ChatApiService.cancelRequest(_requestId ?? '');
     _subscription?.cancel();
     _source.dispose();
     _output.dispose();
@@ -168,12 +170,14 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     });
 
     try {
+      _requestId = 'translate_${DateTime.now().millisecondsSinceEpoch}';
       final stream = ChatApiService.sendMessageStream(
         config: cfg,
         modelId: modelId,
         messages: [
           {'role': 'user', 'content': prompt},
         ],
+        requestId: _requestId,
       );
 
       _subscription = stream.listen(
@@ -212,6 +216,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
   }
 
   Future<void> _stopTranslate() async {
+    ChatApiService.cancelRequest(_requestId ?? '');
     try {
       await _subscription?.cancel();
     } catch (_) {}
