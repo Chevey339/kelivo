@@ -28,6 +28,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:animations/animations.dart';
 import '../../../utils/sandbox_path_resolver.dart';
@@ -3322,7 +3323,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         ),
                         if ((info.notes ?? '').trim().isNotEmpty) ...[
                           const SizedBox(height: 6),
-                          Text(
+                          GptMarkdown(
                             info.notes!,
                             style: TextStyle(
                               fontSize: 13,
