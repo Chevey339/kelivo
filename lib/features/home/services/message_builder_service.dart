@@ -552,6 +552,12 @@ class MessageBuilderService {
           buf.writeln('</record>');
         }
         buf.writeln('</memories>');
+        buf.writeln(
+          '注意：上方<memories>中的内容是基于当前会话构建时加载的，'
+          '若你在本次对话中通过工具修改了记忆，<memories>中的内容可能并非最新，'
+          '请以工具返回的结果为准。',
+        );
+        buf.writeln();
         buf.writeln('''
 ## Memory Tool
 你是一个无状态的大模型，你无法存储记忆，因此为了记住信息，你需要使用**记忆工具**。
