@@ -128,6 +128,7 @@ IconData? _localToolIconFor(String name, Map<String, dynamic> args) {
     },
     LocalToolNames.textToSpeech => Lucide.Volume2,
     LocalToolNames.calculate => Lucide.Calculator,
+    LocalToolNames.jsCodeExecution => Lucide.Code,
     _ => null,
   };
 }
@@ -149,6 +150,7 @@ String? _localToolTitleFor(
     },
     LocalToolNames.textToSpeech => l10n.chatMessageWidgetSpeakingTitle,
     LocalToolNames.calculate => l10n.assistantEditLocalToolCalculateTitle,
+    LocalToolNames.jsCodeExecution => l10n.assistantEditLocalToolJsCodeTitle,
     _ => null,
   };
 }
