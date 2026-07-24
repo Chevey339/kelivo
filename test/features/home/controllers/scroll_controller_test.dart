@@ -297,7 +297,7 @@ void main() {
       );
       scrollController.jumpTo(0);
 
-      chatScrollController.forceScrollToBottom();
+      chatScrollController.scrollToBottom();
       await tester.pump();
       expect(
         scrollController.offset,
@@ -334,8 +334,9 @@ void main() {
       final chatScrollController = ChatScrollController(
         scrollController: scrollController,
         onStateChanged: () {},
-        getAutoScrollEnabled: () => false,
+        getAutoScrollEnabled: () => true,
         getAutoScrollIdleSeconds: () => 8,
+        isGenerating: () => true,
       );
       await tester.pumpWidget(
         _IndexedScrollHarness(
@@ -344,6 +345,8 @@ void main() {
           messages: messages,
         ),
       );
+      scrollController.jumpTo(0);
+      chatScrollController.handleUserScrollIntent();
 
       chatScrollController.forceScrollToBottom();
       await tester.pump();
@@ -546,6 +549,8 @@ void main() {
 
       chatScrollController.forceScrollToBottom();
       await tester.pump();
+      expect(chatScrollController.explicitBottomAnimationInProgress, isTrue);
+      await tester.pumpAndSettle();
       expect(
         scrollController.offset,
         scrollController.position.maxScrollExtent,

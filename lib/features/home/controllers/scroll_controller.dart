@@ -469,7 +469,8 @@ class ChatScrollController {
     _userScrollTimer?.cancel();
     _lastJumpUserMessageId = null;
     revealNavButtons();
-    scrollToBottom(animate: animate);
+    _autoStickToBottom = true;
+    _scheduleExplicitScrollToBottom(animate: animate);
   }
 
   /// Force scroll after rebuilds when switching topics/conversations.
@@ -531,6 +532,8 @@ class ChatScrollController {
   void _scheduleExplicitScrollToBottom({bool animate = true}) {
     final request = ++_bottomScrollRequest;
     _scheduledBottomScrollRequest = request;
+    _explicitBottomAnimationInProgress =
+        animate && _scrollController.hasClients;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (_scheduledBottomScrollRequest == request) {
         _scheduledBottomScrollRequest = null;
