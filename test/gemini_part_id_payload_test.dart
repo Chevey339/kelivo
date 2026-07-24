@@ -98,8 +98,9 @@ void main() {
                 'metadata': {
                   'google': {
                     'part': {
-                      'id': 'api_call_1',
+                      'id': 'internal_call_1',
                       'functionCall': {
+                        'id': 'api_call_1',
                         'name': 'fetch_markdown',
                         'args': {'url': 'https://example.com'},
                       },
@@ -117,7 +118,9 @@ void main() {
             'content': '{"result":"ok"}',
             'metadata': {
               'google': {
-                'part': {'id': 'api_call_1'},
+                'part': {
+                  'functionCall': {'id': 'api_call_1'},
+                },
               },
             },
           },
@@ -130,7 +133,10 @@ void main() {
       _expectNoGooglePartIds(requestBody!);
       final contents = (requestBody!['contents'] as List).cast<Map>();
       final modelParts = (contents[1]['parts'] as List).cast<Map>();
+      final responseParts = (contents[2]['parts'] as List).cast<Map>();
       expect(modelParts.single['thoughtSignature'], 'sig-call');
+      expect(modelParts.single['functionCall']['id'], 'api_call_1');
+      expect(responseParts.single['functionResponse']['id'], 'api_call_1');
     });
 
     test(
@@ -160,8 +166,9 @@ void main() {
             request.response.write(
               'data: ${jsonEncode(_streamChunk([
                 {
-                  'id': '',
+                  'id': 'internal_live_call',
                   'functionCall': {
+                    'id': 'api_live_call',
                     'name': 'fetch_markdown',
                     'args': {'url': 'https://example.com'},
                   },
@@ -221,7 +228,7 @@ void main() {
         ).toList();
 
         expect(chunks.last.isDone, isTrue);
-        expect(seenToolCallIds.single, isNotEmpty);
+        expect(seenToolCallIds.single, 'api_live_call');
         expect(requestCount, 2);
         expect(requestBodies, hasLength(2));
         _expectNoGooglePartIds(requestBodies[1]);
@@ -231,8 +238,70 @@ void main() {
         expect(modelParts.single['thoughtSignature'], 'sig-live');
         expect(modelParts.single.containsKey('functionCall'), isTrue);
         expect(userParts.single.containsKey('functionResponse'), isTrue);
+        expect(modelParts.single['functionCall']['id'], 'api_live_call');
+        expect(userParts.single['functionResponse']['id'], 'api_live_call');
       },
     );
+
+    test('preserves functionCall id in non-stream continuation', () async {
+      final requestBodies = <Map<String, dynamic>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      var requestCount = 0;
+      server.listen((request) async {
+        requestCount++;
+        requestBodies.add(
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>,
+        );
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode(
+            requestCount == 1
+                ? _streamChunk([
+                    {
+                      'functionCall': {
+                        'id': 'api_non_stream_call',
+                        'name': 'fetch_markdown',
+                        'args': {'url': 'https://example.com'},
+                      },
+                    },
+                  ])
+                : _streamChunk([
+                    {'text': 'done'},
+                  ]),
+          ),
+        );
+        await request.response.close();
+      });
+
+      final seenToolCallIds = <String?>[];
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _geminiConfig(
+          'http://${server.address.address}:${server.port}/v1beta',
+        ),
+        modelId: 'gemini-3.1-pro-preview',
+        messages: const [
+          {'role': 'user', 'content': 'Fetch the page.'},
+        ],
+        onToolCall: (name, args, {toolCallId}) async {
+          seenToolCallIds.add(toolCallId);
+          return '{"result":"ok"}';
+        },
+        stream: false,
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(seenToolCallIds.single, 'api_non_stream_call');
+      expect(requestBodies, hasLength(2));
+      final contents = (requestBodies[1]['contents'] as List).cast<Map>();
+      final userParts = (contents[2]['parts'] as List).cast<Map>();
+      expect(userParts.single['functionResponse']['id'], 'api_non_stream_call');
+    });
 
     test('keeps image parts in live tool-call continuation contents', () async {
       final dir = await Directory.systemTemp.createTemp(
