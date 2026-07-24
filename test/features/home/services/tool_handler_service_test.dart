@@ -60,7 +60,11 @@ void main() {
         'content': 'new memory',
       });
 
-      expect(result, 'new memory');
+      final payload = jsonDecode(result) as Map<String, dynamic>;
+      expect(payload['success'], true);
+      expect(payload['id'], memory.id);
+      expect(payload['content'], 'new memory');
+      expect(payload['action'], 'edit_memory');
     });
 
     testWidgets('edit_memory returns tool error when id does not exist', (

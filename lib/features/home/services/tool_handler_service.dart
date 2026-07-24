@@ -488,7 +488,12 @@ class ToolHandlerService {
           );
         }
         final m = await mp.add(assistantId: assistant!.id, content: content);
-        return m.content;
+        return jsonEncode({
+          'success': true,
+          'id': m.id,
+          'content': m.content,
+          'action': 'create_memory',
+        });
       } else if (name == 'edit_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
         final content = (args['content'] ?? '').toString();
@@ -516,7 +521,12 @@ class ToolHandlerService {
                 'Use the available memory records shown in context, or create a new memory instead of editing a missing one.',
           );
         }
-        return m.content;
+        return jsonEncode({
+          'success': true,
+          'id': id,
+          'content': m.content,
+          'action': 'edit_memory',
+        });
       } else if (name == 'delete_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
         if (id <= 0) {
@@ -536,7 +546,11 @@ class ToolHandlerService {
                 'Use the available memory records shown in context, or skip deleting a missing memory.',
           );
         }
-        return 'deleted';
+        return jsonEncode({
+          'success': true,
+          'id': id,
+          'action': 'delete_memory',
+        });
       }
     } catch (e) {
       return _toolError(
