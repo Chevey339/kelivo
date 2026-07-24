@@ -10,8 +10,10 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/search/search_tool_service.dart';
+import '../../../core/utils/memory_placeholder.dart';
 import 'ask_user_interaction_service.dart';
 import 'local_tools_service.dart';
 import 'tool_approval_service.dart';
@@ -188,6 +190,11 @@ class ToolHandlerService {
       toolDefs.addAll(_buildMemoryToolDefinitions());
     }
 
+    // Read recent chats tool (only registered when recent chats reference is enabled)
+    if (assistant?.enableRecentChatsReference == true && supportsTools) {
+      toolDefs.addAll(_buildRecentChatsToolDefinitions());
+    }
+
     // Local tools
     toolDefs.addAll(
       LocalToolsService.buildToolDefinitions(
@@ -206,6 +213,25 @@ class ToolHandlerService {
     toolDefs.addAll(mcpTools);
 
     return toolDefs;
+  }
+
+  /// Build recent chats tool definition (read_recent_chats).
+  List<Map<String, dynamic>> _buildRecentChatsToolDefinitions() {
+    return [
+      {
+        'type': 'function',
+        'function': {
+          'name': 'read_recent_chats',
+          'description':
+              '读取用户最近的一些对话标题和摘要(排除当前对话),用于了解用户的历史话题和偏好,无参数。',
+          'parameters': {
+            'type': 'object',
+            'properties': <String, dynamic>{},
+            'required': <String>[],
+          },
+        },
+      },
+    ];
   }
 
   /// Build memory tool definitions (create/edit/delete).
@@ -358,8 +384,12 @@ class ToolHandlerService {
           return await SearchToolService.executeSearch(q, settings);
         }
 
-        // Memory tools
-        final memoryResult = await _handleMemoryToolCall(name, args, assistant);
+        // Memory and recent chats tools
+        final memoryResult = await _handleMemoryAndRecentChatsToolCall(
+          name,
+          args,
+          assistant,
+        );
         if (memoryResult != null) {
           return memoryResult;
         }
@@ -460,14 +490,66 @@ class ToolHandlerService {
     };
   }
 
-  /// Handle memory tool calls (create/edit/delete).
+  /// Handle memory and recent chats tool calls.
   ///
-  /// Returns null if the tool is not a memory tool or memory is not enabled.
-  Future<String?> _handleMemoryToolCall(
+  /// Returns null if the tool is not handled here.
+  Future<String?> _handleMemoryAndRecentChatsToolCall(
     String name,
     Map<String, dynamic> args,
     Assistant? assistant,
   ) async {
+    // Recent chats: gated on enableRecentChatsReference
+    if (name == 'read_recent_chats') {
+      if (assistant?.enableRecentChatsReference != true) {
+        return _toolError(
+          error: 'recent_chats_not_enabled',
+          message: 'Recent chats reference is not enabled for this assistant.',
+          tool: name,
+        );
+      }
+      try {
+        final chatService = contextProvider.read<ChatService>();
+        final currentId = chatService.currentConversationId;
+        final relevantChats = chatService
+            .getAllConversations()
+            .where(
+              (c) =>
+                  c.assistantId == assistant!.id &&
+                  c.id != currentId,
+            )
+            .where((c) => c.title.trim().isNotEmpty)
+            .take(10)
+            .toList();
+        if (relevantChats.isEmpty) {
+          return 'No recent chats available.';
+        }
+        final sb = StringBuffer();
+        sb.writeln('<recent_chats>');
+        sb.writeln(
+          '这是用户最近的一些对话标题和摘要，你可以参考这些内容了解用户偏好和关注点',
+        );
+        for (final c in relevantChats) {
+          // Format: timestamp: title || summary
+          final timestamp = c.updatedAt.toIso8601String().substring(0, 10);
+          final title = c.title.trim();
+          final summary = (c.summary ?? '').trim();
+          if (summary.isNotEmpty) {
+            sb.writeln('  $timestamp: $title || $summary');
+          } else {
+            sb.writeln('  $timestamp: $title');
+          }
+        }
+        sb.writeln('</recent_chats>');
+        return sb.toString();
+      } catch (e) {
+        return _toolError(
+          error: 'recent_chats_execution_error',
+          message: e.toString(),
+          tool: name,
+        );
+      }
+    }
+
     if (assistant?.enableMemory != true) return null;
     if (name != 'create_memory' &&
         name != 'edit_memory' &&
@@ -479,19 +561,20 @@ class ToolHandlerService {
       final mp = contextProvider.read<MemoryProvider>();
 
       if (name == 'create_memory') {
-        final content = (args['content'] ?? '').toString();
-        if (content.isEmpty) {
+        final rawContent = (args['content'] ?? '').toString();
+        if (rawContent.isEmpty) {
           return _toolError(
             error: 'invalid_memory_content',
             message: 'Memory content must not be empty.',
             tool: name,
           );
         }
+        final content = expandMemoryPlaceholders(rawContent);
         final m = await mp.add(assistantId: assistant!.id, content: content);
         return m.content;
       } else if (name == 'edit_memory') {
         final id = (args['id'] as num?)?.toInt() ?? -1;
-        final content = (args['content'] ?? '').toString();
+        final rawContent = (args['content'] ?? '').toString();
         if (id <= 0) {
           return _toolError(
             error: 'invalid_memory_id',
@@ -499,13 +582,14 @@ class ToolHandlerService {
             tool: name,
           );
         }
-        if (content.isEmpty) {
+        if (rawContent.isEmpty) {
           return _toolError(
             error: 'invalid_memory_content',
             message: 'Memory content must not be empty.',
             tool: name,
           );
         }
+        final content = expandMemoryPlaceholders(rawContent);
         final m = await mp.update(id: id, content: content);
         if (m == null) {
           return _toolError(

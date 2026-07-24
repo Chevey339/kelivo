@@ -621,13 +621,13 @@ class MessageBuilderService {
         final mp = contextProvider.read<MemoryProvider>();
         await mp.initialize();
         final mems = mp.getForAssistant(assistant!.id);
-        final currentHour = _formatCurrentHour(DateTime.now());
         final buf = StringBuffer();
         buf.writeln('## Memories');
         buf.writeln(
           'These are memories that you can reference in the future conversations.',
         );
         buf.writeln('<memories>');
+        // 始终输出 <memories> 标签(空列表也输出),保证"无记忆"这个状态字节级稳定
         for (final m in mems) {
           buf.writeln('<record>');
           buf.writeln('<id>${m.id}</id>');
@@ -653,50 +653,21 @@ class MessageBuilderService {
 - 首次聊天时间
 - ...
 请主动调用工具记录，而不是需要用户要求。
-记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是$currentHour。
+如果你想在记忆中插入时间,使用占位符(系统在写入前会自动替换为实际时间):
+- {year} {month} {day} - 年/月/日(2 位数字,如 07)
+- {hour} {minute} {second} - 时/分/秒(24 小时制)
+- {time} - 完整时间(等价于 {year}/{month}/{day} {hour}:{minute},无秒)
+示例:"用户于 {year}/{month}/{day} 注册" 会被存为 "用户于 2026/07/13 注册"。
+如要写"昨天"等相对时间,请先获取当前日期后写具体数字。
 无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
 相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
 你可以在和用户闲聊的时候暗示用户你能记住东西。
 ''');
         _appendToSystemMessage(apiMessages, buf.toString());
       }
-      if (assistant?.enableRecentChatsReference == true) {
-        final chats = chatService.getAllConversations();
-        final relevantChats = chats
-            .where(
-              (c) =>
-                  c.assistantId == assistant!.id &&
-                  c.id != currentConversationId,
-            )
-            .where((c) => c.title.trim().isNotEmpty)
-            .take(10)
-            .toList();
-        if (relevantChats.isNotEmpty) {
-          final sb = StringBuffer();
-          sb.writeln('<recent_chats>');
-          sb.writeln('这是用户最近的一些对话标题和摘要，你可以参考这些内容了解用户偏好和关注点');
-          for (final c in relevantChats) {
-            sb.writeln('<conversation>');
-            // Format: timestamp: title || summary
-            final timestamp = c.updatedAt.toIso8601String().substring(0, 10);
-            final title = c.title.trim();
-            final summary = (c.summary ?? '').trim();
-            if (summary.isNotEmpty) {
-              sb.writeln('  $timestamp: $title || $summary');
-            } else {
-              sb.writeln('  $timestamp: $title');
-            }
-            sb.writeln('</conversation>');
-          }
-          sb.writeln('</recent_chats>');
-          _appendToSystemMessage(apiMessages, sb.toString());
-        }
-      }
+      // recent_chats 块已从 system message 移除,改为通过 read_recent_chats 工具按需读取
+      // (见 spec §5.2 / §5.3)
     } catch (_) {}
-  }
-
-  String _formatCurrentHour(DateTime now) {
-    return '${now.year}年${now.month}月${now.day}日的${now.hour}点';
   }
 
   /// Inject search tool usage prompt into apiMessages.

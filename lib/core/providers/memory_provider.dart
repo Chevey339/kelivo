@@ -15,7 +15,8 @@ class MemoryProvider extends ChangeNotifier {
   List<AssistantMemory> get memories => List.unmodifiable(_memories);
 
   List<AssistantMemory> getForAssistant(String assistantId) =>
-      _memories.where((m) => m.assistantId == assistantId).toList();
+      _memories.where((m) => m.assistantId == assistantId).toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
 
   Future<void> initialize() {
     if (_initialized) return Future<void>.value();
