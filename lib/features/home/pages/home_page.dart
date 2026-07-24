@@ -1349,8 +1349,7 @@ class _HomePageState extends State<HomePage>
           onScrollToTop: () => _controller.scrollToTop(animate: false),
           onPreviousMessage: _controller.jumpToPreviousQuestion,
           onNextMessage: _controller.jumpToNextQuestion,
-          onScrollToBottom: () =>
-              _controller.forceScrollToBottom(animate: false),
+          onScrollToBottom: _controller.forceScrollToBottom,
         );
       },
     );

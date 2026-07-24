@@ -1968,13 +1968,35 @@ class HomePageController extends ChangeNotifier {
   }
 
   Future<void> forceScrollToBottom({bool animate = true}) async {
-    if (_chatController.hasMoreAfter) {
-      final loaded = await _chatController.loadEndWindow();
-      if (loaded) {
-        _viewModel.restoreMessageUiState();
+    final useJumpTransition = animate && _chatController.hasMoreAfter;
+    if (useJumpTransition) {
+      try {
+        await _messageJumpTransitionController.reverse();
+      } catch (_) {}
+    }
+
+    try {
+      if (_chatController.hasMoreAfter) {
+        final loaded = await _chatController.loadEndWindow();
+        if (loaded) {
+          _viewModel.restoreMessageUiState();
+        }
+      }
+      if (useJumpTransition) {
+        try {
+          await WidgetsBinding.instance.endOfFrame;
+        } catch (_) {}
+        await _scrollCtrl.settleAtBottomBeforeReveal();
+      } else {
+        _scrollCtrl.forceScrollToBottom(animate: animate);
+      }
+    } finally {
+      if (useJumpTransition) {
+        try {
+          await _messageJumpTransitionController.forward();
+        } catch (_) {}
       }
     }
-    _scrollCtrl.forceScrollToBottom(animate: animate);
   }
 
   // ============================================================================

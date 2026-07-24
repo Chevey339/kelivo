@@ -569,11 +569,31 @@ class ChatScrollController {
           _messageListController.isAttached &&
           _messageListController.numberOfItems > 0;
       if (hasIndexedTail) {
-        // Indexed tail resolution intentionally jumps even when [animate] is
-        // true. Animating toward a lazy estimated offset would require visible
-        // corrections as the real last-item extent is measured. The parameter
-        // only controls the plain ScrollController fallback below.
         final lastIndex = _messageListController.numberOfItems - 1;
+        final target = pos.maxScrollExtent;
+        if ((target - pos.pixels).abs() <= 0.5) {
+          _updateJumpToBottomVisibility(false);
+          _autoStickToBottom = true;
+          return;
+        }
+        if (animate) {
+          _explicitBottomAnimationInProgress = true;
+          try {
+            await _animateToMessageIndex(
+              index: lastIndex,
+              alignment: 1,
+              bottomRequest: request,
+            );
+          } finally {
+            if (request == _bottomScrollRequest) {
+              _explicitBottomAnimationInProgress = false;
+            }
+          }
+          if (request != _bottomScrollRequest) return;
+          _updateJumpToBottomVisibility(false);
+          _autoStickToBottom = true;
+          return;
+        }
         for (var pass = 0; pass < 4; pass++) {
           if (request != _bottomScrollRequest ||
               !_scrollController.hasClients ||
@@ -852,6 +872,7 @@ class ChatScrollController {
   Future<void> _animateToMessageIndex({
     required int index,
     required double alignment,
+    int? bottomRequest,
   }) async {
     if (!_scrollController.hasClients ||
         !_messageListController.isAttached ||
@@ -859,12 +880,21 @@ class ChatScrollController {
         index >= _messageListController.numberOfItems) {
       return;
     }
-    _cancelProgrammaticNavigation(stopDrivenScroll: true);
-    _autoStickToBottom = false;
+    if (bottomRequest == null) {
+      _cancelProgrammaticNavigation(stopDrivenScroll: true);
+      _autoStickToBottom = false;
+    } else {
+      if (bottomRequest != _bottomScrollRequest) return;
+      _cancelIndexedNavigation();
+    }
     final request = ++_indexedNavigationRequest;
     final position = _scrollController.position;
     final estimatedDistance =
-        (_messageRevealOffset(index, alignment) - position.pixels).abs();
+        ((bottomRequest == null
+                    ? _messageRevealOffset(index, alignment)
+                    : position.maxScrollExtent) -
+                position.pixels)
+            .abs();
     final duration = estimatedDistance < 320
         ? const Duration(milliseconds: 220)
         : estimatedDistance < 1000
@@ -901,6 +931,7 @@ class ChatScrollController {
 
     void updatePosition() {
       if (request != _indexedNavigationRequest ||
+          (bottomRequest != null && bottomRequest != _bottomScrollRequest) ||
           !_scrollController.hasClients ||
           !_messageListController.isAttached ||
           index >= _messageListController.numberOfItems) {
@@ -912,10 +943,11 @@ class ChatScrollController {
       // while the target enters its cache area. Re-read the indexed offset on
       // every tick so that correction is absorbed by this one continuous
       // animation instead of becoming a visible jump after it.
-      final target = _messageRevealOffset(
-        index,
-        alignment,
-      ).clamp(position.minScrollExtent, position.maxScrollExtent);
+      final target =
+          (bottomRequest == null
+                  ? _messageRevealOffset(index, alignment)
+                  : position.maxScrollExtent)
+              .clamp(position.minScrollExtent, position.maxScrollExtent);
       final progress = animation.value;
       final remainingProgress = 1.0 - previousProgress;
       final stepProgress = remainingProgress <= 0.0001

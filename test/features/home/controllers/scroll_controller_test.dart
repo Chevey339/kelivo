@@ -323,6 +323,55 @@ void main() {
       scrollController.dispose();
     });
 
+    testWidgets('indexed bottom command uses a continuous scroll animation', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+        ),
+      );
+
+      chatScrollController.forceScrollToBottom();
+      await tester.pump();
+      expect(chatScrollController.explicitBottomAnimationInProgress, isTrue);
+      expect(
+        scrollController.offset,
+        lessThan(scrollController.position.maxScrollExtent),
+      );
+
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(scrollController.offset, greaterThan(0));
+      expect(
+        scrollController.offset,
+        lessThan(scrollController.position.maxScrollExtent),
+      );
+
+      await tester.pumpAndSettle();
+      expect(
+        scrollController.offset,
+        moreOrLessEquals(scrollController.position.maxScrollExtent, epsilon: 1),
+      );
+      expect(chatScrollController.explicitBottomAnimationInProgress, isFalse);
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
     testWidgets('programmatic animation does not become user scroll intent', (
       tester,
     ) async {
