@@ -312,12 +312,15 @@ class ChatActions {
     final reasoning = streamController.reasoning[messageId];
     final segments = streamController.reasoningSegments[messageId];
     final splits = streamController.getContentSplitData(messageId);
-    final reasoningSegmentsJson = segments != null || splits != null
+    final details = streamController.reasoningDetails[messageId];
+    final reasoningSegmentsJson =
+        segments != null || splits != null || details != null
         ? streamController.serializeReasoningSegmentsWithSplits(
             segments ?? const [],
             contentSplitOffsets: splits?.offsets,
             reasoningCountAtSplit: splits?.reasoningCounts,
             toolCountAtSplit: splits?.toolCounts,
+            reasoningDetails: details,
           )
         : message.reasoningSegmentsJson;
     return message.copyWith(
@@ -1480,6 +1483,15 @@ class ChatActions {
           )
         : '';
 
+    // Persist vendor reasoning details (may carry thinking signatures) so
+    // they can be echoed back on subsequent turns.
+    if (chunk.reasoningDetails != null) {
+      streamController.setReasoningDetails(
+        state.messageId,
+        chunk.reasoningDetails,
+      );
+    }
+
     // Handle reasoning
     if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
       await _handleReasoningChunk(chunk, state);
@@ -2018,12 +2030,15 @@ class ChatActions {
     final segs = streamController.reasoningSegments[streaming.id];
 
     final splits = streamController.getContentSplitData(streaming.id);
-    final reasoningSegmentsJson = segs != null || splits != null
+    final details = streamController.reasoningDetails[streaming.id];
+    final reasoningSegmentsJson =
+        segs != null || splits != null || details != null
         ? streamController.serializeReasoningSegmentsWithSplits(
             segs ?? const [],
             contentSplitOffsets: splits?.offsets,
             reasoningCountAtSplit: splits?.reasoningCounts,
             toolCountAtSplit: splits?.toolCounts,
+            reasoningDetails: details,
           )
         : streaming.reasoningSegmentsJson;
     final snapshot = streaming.copyWith(

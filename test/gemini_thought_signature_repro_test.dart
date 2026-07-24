@@ -774,5 +774,106 @@ void main() {
         );
       },
     );
+
+    test(
+      'history tool replay without persisted signature uses placeholder',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        late Map<String, dynamic> requestBody;
+        server.listen((request) async {
+          requestBody =
+              jsonDecode(await utf8.decoder.bind(request).join())
+                  as Map<String, dynamic>;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.headers.set('Transfer-Encoding', 'chunked');
+          request.response.write(
+            'data: ${jsonEncode(_streamChunk([_textPart(text: 'ok')], finishReason: 'STOP'))}\n\n',
+          );
+          request.response.write('data: [DONE]');
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: 'gemini-3.1-pro-preview',
+          messages: const [
+            {'role': 'user', 'content': '查 Kelivo'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'call_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'fetch_markdown',
+                    'arguments': '{"url":"https://example.com"}',
+                  },
+                  // Legacy metadata: raw part kept (with API-issued id) but
+                  // the thoughtSignature was never persisted.
+                  'metadata': {
+                    'google': {
+                      'part': {
+                        'functionCall': {
+                          'name': 'fetch_markdown',
+                          'args': {'url': 'https://example.com'},
+                          'id': 'K49ODMl4',
+                        },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'call_1',
+              'name': 'fetch_markdown',
+              'content': '{"result":"ok"}',
+            },
+            {'role': 'user', 'content': '继续总结'},
+          ],
+          tools: const [
+            {
+              'function_declarations': [
+                {
+                  'name': 'fetch_markdown',
+                  'description': 'Fetch a page as markdown',
+                  'parameters': {
+                    'type': 'object',
+                    'properties': {
+                      'url': {'type': 'string'},
+                    },
+                    'required': ['url'],
+                  },
+                },
+              ],
+            },
+          ],
+        ).toList();
+
+        expect(chunks.last.isDone, isTrue);
+        final contents = (requestBody['contents'] as List).cast<Map>();
+        final modelParts = (contents[1]['parts'] as List).cast<Map>();
+        final replayedCall = modelParts.singleWhere(
+          (part) => part.containsKey('functionCall'),
+        );
+
+        expect(
+          _thoughtSignatureOf(replayedCall),
+          'context_engineering_is_the_way_to_go',
+        );
+      },
+    );
   });
 }

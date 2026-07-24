@@ -1,6 +1,12 @@
 part of '../chat_api_service.dart';
 
 const String _geminiThoughtSigTag = 'gemini_thought_signatures';
+
+/// Placeholder thought signature accepted by the Gemini API when the original
+/// signature is unavailable (e.g. legacy history persisted before signatures
+/// were captured). Same value used by Google's own Gemini CLI.
+const String _geminiDummyThoughtSignature =
+    'context_engineering_is_the_way_to_go';
 final RegExp _geminiThoughtSigComment = RegExp(
   r'<!--\s*gemini_thought_signatures:(.*?)-->',
   dotAll: true,
@@ -116,7 +122,7 @@ void _applyGeminiThoughtSignatures(
       }
     }
   } else if (attachDummyWhenMissing) {
-    const dummy = 'context_engineering_is_the_way_to_go';
+    const dummy = _geminiDummyThoughtSignature;
     bool inlineFound = false;
     bool textTagged = false;
     for (final part in parts) {

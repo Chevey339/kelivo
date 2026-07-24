@@ -190,6 +190,61 @@ void main() {
       expect(finalAssistantMessage.containsKey('reasoning_content'), isFalse);
     });
 
+    test('reasoning_details 只挂在最终 assistant 消息，不重复到 tool call 消息', () {
+      final service = MessageBuilderService(
+        chatService: _FakeChatService({
+          'a1': [
+            {
+              'id': 'call_1',
+              'name': 'get_weather',
+              'arguments': {'location': 'Hangzhou'},
+              'content': 'Cloudy 7~13°C',
+            },
+          ],
+        }),
+        contextProvider: _FakeBuildContext(),
+      );
+
+      const reasoningDetails = [
+        {
+          'type': 'reasoning.text',
+          'text': 'final round thinking',
+          'signature': 'sig-final',
+        },
+      ];
+      final apiMessages = service.buildApiMessages(
+        messages: [
+          _message(id: 'u1', role: 'user', content: '杭州明天天气怎么样？'),
+          ChatMessage(
+            id: 'a1',
+            role: 'assistant',
+            content: '明天多云，7 到 13 度。',
+            conversationId: 'conversation-1',
+            reasoningSegmentsJson:
+                '{"v":2,"segments":[],"reasoningDetails":[{"type":"reasoning.text","text":"final round thinking","signature":"sig-final"}]}',
+          ),
+        ],
+        versionSelections: const {},
+        currentConversation: Conversation(title: 'test'),
+        includeToolMessages: true,
+      );
+
+      final assistantToolMessage = apiMessages.firstWhere(
+        (message) =>
+            message['role'] == 'assistant' && message['tool_calls'] is List,
+      );
+      final finalAssistantMessage = apiMessages.lastWhere(
+        (message) =>
+            message['role'] == 'assistant' && message['tool_calls'] == null,
+      );
+
+      // Replaying the same reasoning on both assistant messages makes
+      // OpenRouter/Anthropic reject the history; only the final message may
+      // carry it.
+      expect(assistantToolMessage.containsKey('reasoning_details'), isFalse);
+      expect(finalAssistantMessage['reasoning_details'], reasoningDetails);
+    });
+
     test('恢复工具回答续写时只发送 tool call 和 tool result', () {
       final service = MessageBuilderService(
         chatService: _FakeChatService({

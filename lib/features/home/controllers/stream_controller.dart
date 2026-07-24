@@ -109,6 +109,18 @@ class StreamController {
   final Map<String, String> _geminiThoughtSigs = <String, String>{};
   Map<String, String> get geminiThoughtSigs => _geminiThoughtSigs;
 
+  /// Vendor reasoning details (OpenRouter-style `reasoning_details`, may carry
+  /// thinking signatures) per assistant message. Persisted inside the
+  /// reasoningSegmentsJson payload so they can be echoed back on later turns.
+  final Map<String, dynamic> _reasoningDetails = <String, dynamic>{};
+  Map<String, dynamic> get reasoningDetails => _reasoningDetails;
+
+  /// Store the latest reasoning details snapshot for a message.
+  void setReasoningDetails(String messageId, dynamic details) {
+    if (details == null) return;
+    _reasoningDetails[messageId] = details;
+  }
+
   // ============================================================================
   // Throttle State
   // ============================================================================
@@ -216,6 +228,7 @@ class StreamController {
     _contentSplits.remove(messageId);
     _toolParts.remove(messageId);
     _geminiThoughtSigs.remove(messageId);
+    _reasoningDetails.remove(messageId);
     _cleanupStreamTimers(messageId);
   }
 
@@ -226,6 +239,7 @@ class StreamController {
     _contentSplits.clear();
     _toolParts.clear();
     _geminiThoughtSigs.clear();
+    _reasoningDetails.clear();
     _cancelAllTimers();
     streamingContentNotifier.clear();
   }
@@ -297,6 +311,7 @@ class StreamController {
     List<int>? contentSplitOffsets,
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
+    dynamic reasoningDetails,
   }) {
     final list = segments
         .map(
@@ -312,7 +327,8 @@ class StreamController {
 
     if (contentSplitOffsets == null &&
         reasoningCountAtSplit == null &&
-        toolCountAtSplit == null) {
+        toolCountAtSplit == null &&
+        reasoningDetails == null) {
       return _encodeJson(list);
     }
 
@@ -332,7 +348,23 @@ class StreamController {
         'reasoningCounts': normalized.reasoningCounts,
         'toolCounts': normalized.toolCounts,
       },
+      if (reasoningDetails != null) 'reasoningDetails': reasoningDetails,
     });
+  }
+
+  /// Extract persisted vendor reasoning details (if any) from a serialized
+  /// reasoningSegmentsJson payload.
+  dynamic deserializeReasoningDetails(String? json) {
+    if (json == null || json.isEmpty) return null;
+    try {
+      final decoded = _decodeJson(json);
+      if (decoded is! Map<String, dynamic>) return null;
+      final details = decoded['reasoningDetails'];
+      if (details is List && details.isNotEmpty) return details;
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Deserialize reasoning segments from JSON string.
@@ -1293,6 +1325,12 @@ class StreamController {
     );
     if (contentSplits != null) {
       _contentSplits[messageId] = contentSplits;
+    }
+
+    // Restore vendor reasoning details (thinking signatures) for API replays
+    final details = deserializeReasoningDetails(message.reasoningSegmentsJson);
+    if (details != null) {
+      _reasoningDetails[messageId] = details;
     }
   }
 
