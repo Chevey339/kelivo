@@ -4673,6 +4673,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolJsCodeTitle => 'JavaScript 代码执行';
+
+  @override
+  String get assistantEditLocalToolJsCodeSubtitle =>
+      '运行 JavaScript 代码，用于计算、文本处理、数据转换等。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -10208,6 +10215,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '计算数学表达式，支持加减乘除幂运算 sqrt sin cos 等。';
 
   @override
+  String get assistantEditLocalToolJsCodeTitle => 'JavaScript 代码执行';
+
+  @override
+  String get assistantEditLocalToolJsCodeSubtitle =>
+      '运行 JavaScript 代码，用于计算、文本处理、数据转换等。';
+
+  @override
   String get assistantEditMemorySwitchTitle => '记忆';
 
   @override
@@ -15740,7 +15754,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get assistantEditLocalToolCalculateSubtitle =>
-      '計算數學表達式，支援加減乘除冪運算 sqrt sin cos 等。';
+      '計算數學表達式，支持加減乘除幂運算 sqrt sin cos 等。';
+
+  @override
+  String get assistantEditLocalToolJsCodeTitle => 'JavaScript 程式碼執行';
+
+  @override
+  String get assistantEditLocalToolJsCodeSubtitle =>
+      '執行 JavaScript 程式碼，用於計算、文字處理、資料轉換等。';
 
   @override
   String get assistantEditMemorySwitchTitle => '記憶';

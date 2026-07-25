@@ -9008,6 +9008,18 @@ abstract class AppLocalizations {
   /// **'Evaluate mathematical expressions, supports + - * / power sqrt sin cos etc.'**
   String get assistantEditLocalToolCalculateSubtitle;
 
+  /// No description provided for @assistantEditLocalToolJsCodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'JavaScript Code'**
+  String get assistantEditLocalToolJsCodeTitle;
+
+  /// No description provided for @assistantEditLocalToolJsCodeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Run JavaScript code for calculations, text processing, data transformation, and more.'**
+  String get assistantEditLocalToolJsCodeSubtitle;
+
   /// No description provided for @assistantEditMemorySwitchTitle.
   ///
   /// In en, this message translates to:

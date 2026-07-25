@@ -24,6 +24,9 @@ class _LocalToolsTab extends StatelessWidget {
     final calculateEnabled = assistant.localToolIds.contains(
       LocalToolNames.calculate,
     );
+    final jsCodeEnabled = assistant.localToolIds.contains(
+      LocalToolNames.jsCodeExecution,
+    );
 
     Future<void> updateTool(String toolId, bool value) {
       final ids = assistant.localToolIds.toSet();
@@ -81,6 +84,15 @@ class _LocalToolsTab extends StatelessWidget {
               subtitle: l10n.assistantEditLocalToolCalculateSubtitle,
               enabled: calculateEnabled,
               onChanged: (value) => updateTool(LocalToolNames.calculate, value),
+            ),
+            _iosDivider(context),
+            _LocalToolRow(
+              icon: Lucide.Code,
+              title: l10n.assistantEditLocalToolJsCodeTitle,
+              subtitle: l10n.assistantEditLocalToolJsCodeSubtitle,
+              enabled: jsCodeEnabled,
+              onChanged: (value) =>
+                  updateTool(LocalToolNames.jsCodeExecution, value),
             ),
           ],
         ),
