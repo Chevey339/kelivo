@@ -42,6 +42,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   bool _savingTemporaryBackup = false;
   bool _mobileBackupSaved = false;
   bool _busy = false;
+  int _failedAttempts = 0;
 
   bool get _usesMobileBackupFlow =>
       widget.mobileBackupSaver != null || Platform.isAndroid || Platform.isIOS;
@@ -82,6 +83,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       setState(() => _backupFile = backupFile);
       await widget.service.migrate(backupPath: backupFile?.path);
     } catch (error, stackTrace) {
+      _failedAttempts++;
       if (mounted && _status.stage != HiveToSqliteMigrationStage.failed) {
         setState(() {
           _status = HiveToSqliteMigrationStatus(
@@ -169,8 +171,55 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       await widget.service.migrate(backupPath: backupPath);
     } catch (_) {
       // Status stream already carries the failure details.
+      _failedAttempts++;
     } finally {
       await _deleteTemporaryBackup();
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _confirmSkipMigration() async {
+    if (_busy) return;
+    final l10n = AppLocalizations.of(context)!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          title: Text(l10n.migrationSkipDialogTitle),
+          content: Text(l10n.migrationSkipDialogMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(l10n.migrationSkipDialogCancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                l10n.migrationSkipDialogConfirm,
+                style: TextStyle(color: cs.error),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await widget.service.skipMigrationAndStartFresh();
+      if (!mounted) return;
+      await requestAppRestart(context, PlatformUtils.restartApp);
+    } catch (error, stackTrace) {
+      if (mounted) {
+        setState(() {
+          _status = _status.copyWith(
+            error: '$error',
+            log: [..._status.log, '$error', stackTrace.toString()],
+          );
+        });
+      }
+    } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -257,6 +306,7 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         key: key,
         status: _status,
         onRetry: _busy ? null : _retry,
+        onSkip: !_busy && _failedAttempts >= 2 ? _confirmSkipMigration : null,
       ),
     };
   }
@@ -322,6 +372,7 @@ class _ProgressStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final cs = Theme.of(context).colorScheme;
     final inMigration = status.stage == HiveToSqliteMigrationStage.migrating;
     final backupFileReady =
         status.stage == HiveToSqliteMigrationStage.backupReady || inMigration;
@@ -354,6 +405,14 @@ class _ProgressStep extends StatelessWidget {
         _ChecklistCard(
           items: inMigration ? _migrationItems(l10n) : _backupItems(),
         ),
+        if (status.chatsExportDegraded) ...[
+          const SizedBox(height: 12),
+          _NoteCard(
+            icon: Lucide.TriangleAlert,
+            color: cs.error,
+            text: l10n.migrationChatsExportDegradedNote,
+          ),
+        ],
         if (backupFileReady && status.backupPath != null) ...[
           const SizedBox(height: 12),
           _BackupFileCard(path: status.backupPath!),
@@ -480,6 +539,14 @@ class _CompleteStep extends StatelessWidget {
         const SizedBox(height: 12),
         if (status.backupPath != null)
           _BackupFileCard(path: status.backupPath!),
+        if (status.chatsExportDegraded) ...[
+          const SizedBox(height: 12),
+          _NoteCard(
+            icon: Lucide.TriangleAlert,
+            color: cs.error,
+            text: l10n.migrationChatsExportDegradedNote,
+          ),
+        ],
         const Spacer(),
         _PrimaryButton(
           icon: Lucide.RefreshCw,
@@ -492,10 +559,16 @@ class _CompleteStep extends StatelessWidget {
 }
 
 class _FailedStep extends StatelessWidget {
-  const _FailedStep({super.key, required this.status, required this.onRetry});
+  const _FailedStep({
+    super.key,
+    required this.status,
+    required this.onRetry,
+    required this.onSkip,
+  });
 
   final HiveToSqliteMigrationStatus status;
   final VoidCallback? onRetry;
+  final VoidCallback? onSkip;
 
   @override
   Widget build(BuildContext context) {
@@ -516,6 +589,14 @@ class _FailedStep extends StatelessWidget {
         const SizedBox(height: 12),
         if (status.backupPath != null)
           _BackupFileCard(path: status.backupPath!),
+        if (status.chatsExportDegraded) ...[
+          const SizedBox(height: 12),
+          _NoteCard(
+            icon: Lucide.TriangleAlert,
+            color: cs.error,
+            text: l10n.migrationChatsExportDegradedNote,
+          ),
+        ],
         const SizedBox(height: 12),
         _LogCard(lines: status.log),
         const Spacer(),
@@ -524,6 +605,19 @@ class _FailedStep extends StatelessWidget {
           label: l10n.migrationRetryButton,
           onPressed: onRetry,
         ),
+        if (onSkip != null) ...[
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: onSkip,
+            child: Text(
+              l10n.migrationSkipButton,
+              style: TextStyle(
+                color: cs.error,
+                fontWeight: AppFontWeights.semibold,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

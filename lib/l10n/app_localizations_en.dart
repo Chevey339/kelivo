@@ -5754,6 +5754,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get migrationRetryButton => 'Retry Migration';
 
   @override
+  String get migrationSkipButton => 'Skip Migration and Start Fresh';
+
+  @override
+  String get migrationSkipDialogTitle => 'Skip migration?';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo will start with an empty chat database. Your old chat history stays on disk (renamed with a .retired suffix) but will NOT be migrated and will not appear in the app. Use your backup ZIP if you need to recover it later.';
+
+  @override
+  String get migrationSkipDialogCancel => 'Cancel';
+
+  @override
+  String get migrationSkipDialogConfirm => 'Skip and Start Fresh';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'The chats.json export was skipped because of an error. The backup ZIP still contains the raw Hive files with your complete chat history.';
+
+  @override
   String get timelineJumpToLatest => 'Jump to latest';
 
   @override

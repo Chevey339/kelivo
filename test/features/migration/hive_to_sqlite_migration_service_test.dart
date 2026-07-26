@@ -427,6 +427,104 @@ void main() {
   });
 
   test(
+    'repairs duplicate (groupId, version) pairs including empty-string '
+    'groupIds instead of failing validation',
+    () async {
+      final baseTime = DateTime(2024, 3, 1, 9);
+      final conversation = Conversation(
+        id: 'conversation-dup-versions',
+        title: 'Duplicate Versions Source',
+        createdAt: baseTime,
+        updatedAt: baseTime.add(const Duration(hours: 1)),
+      );
+      final messages = [
+        ChatMessage(
+          id: 'dup-a',
+          role: 'assistant',
+          content: 'first take',
+          conversationId: conversation.id,
+          timestamp: baseTime,
+          groupId: 'dup-group',
+          version: 0,
+        ),
+        ChatMessage(
+          id: 'dup-b',
+          role: 'assistant',
+          content: 'second take',
+          conversationId: conversation.id,
+          timestamp: baseTime.add(const Duration(minutes: 1)),
+          groupId: 'dup-group',
+          version: 0,
+        ),
+        // '' is stored verbatim and is a real value to the SQLite unique
+        // (conversationId, groupId, version) index, so empty-string groups
+        // need the same version repair as named groups.
+        ChatMessage(
+          id: 'empty-a',
+          role: 'assistant',
+          content: 'empty group first',
+          conversationId: conversation.id,
+          timestamp: baseTime.add(const Duration(minutes: 2)),
+          groupId: '',
+          version: 0,
+        ),
+        ChatMessage(
+          id: 'empty-b',
+          role: 'assistant',
+          content: 'empty group second',
+          conversationId: conversation.id,
+          timestamp: baseTime.add(const Duration(minutes: 3)),
+          groupId: '',
+          version: 0,
+        ),
+      ];
+      conversation.messageIds.addAll(messages.map((message) => message.id));
+
+      _registerHiveAdapters();
+      Hive.init(tempDir.path);
+      final conversations = await Hive.openBox<Conversation>('conversations');
+      final messagesBox = await Hive.openBox<ChatMessage>('messages');
+      await conversations.put(conversation.id, conversation);
+      for (final message in messages) {
+        await messagesBox.put(message.id, message);
+      }
+      await conversations.close();
+      await messagesBox.close();
+      await Hive.close();
+
+      final decision = await HiveToSqliteMigrationService.check();
+      expect(decision.needsMigration, isTrue);
+
+      final service = HiveToSqliteMigrationService(decision);
+      await service.migrate();
+      await service.dispose();
+
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+
+      final migrated = await chatService.loadMessages(conversation.id);
+      expect(migrated.map((m) => m.id).toList(), [
+        'dup-a',
+        'dup-b',
+        'empty-a',
+        'empty-b',
+      ]);
+      expect(
+        migrated
+            .where((m) => m.groupId == 'dup-group')
+            .map((m) => m.version)
+            .toSet(),
+        {0, 1},
+      );
+      expect(
+        migrated.where((m) => m.groupId == '').map((m) => m.version).toSet(),
+        {0, 1},
+      );
+    },
+  );
+
+  test(
     'does not show empty resource directories in initial backup items',
     () async {
       final hiveFile = File('${tempDir.path}/conversations.hive');

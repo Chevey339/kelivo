@@ -5531,6 +5531,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationRetryButton => '重试迁移';
 
   @override
+  String get migrationSkipButton => '跳过迁移并全新开始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳过迁移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳过并全新开始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
+
+  @override
   String get timelineJumpToLatest => '跳到最新';
 
   @override
@@ -11122,6 +11142,26 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationRetryButton => '重试迁移';
 
   @override
+  String get migrationSkipButton => '跳过迁移并全新开始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳过迁移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 将以空的聊天数据库启动。旧的聊天记录会保留在磁盘上（重命名为 .retired 后缀），但不会被迁移，也不会在应用中显示。之后如需找回，请使用已保存的备份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳过并全新开始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 导出因出错而被跳过。备份 ZIP 仍包含原始 Hive 文件，完整聊天记录未丢失。';
+
+  @override
   String get timelineJumpToLatest => '跳到最新';
 
   @override
@@ -16711,6 +16751,26 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get migrationRetryButton => '重試遷移';
+
+  @override
+  String get migrationSkipButton => '跳過遷移並全新開始';
+
+  @override
+  String get migrationSkipDialogTitle => '跳過遷移？';
+
+  @override
+  String get migrationSkipDialogMessage =>
+      'Kelivo 將以空的聊天資料庫啟動。舊的聊天記錄會保留在磁碟上（重新命名為 .retired 後綴），但不會被遷移，也不會在應用程式中顯示。之後如需找回，請使用已儲存的備份 ZIP。';
+
+  @override
+  String get migrationSkipDialogCancel => '取消';
+
+  @override
+  String get migrationSkipDialogConfirm => '跳過並全新開始';
+
+  @override
+  String get migrationChatsExportDegradedNote =>
+      'chats.json 匯出因出錯而被跳過。備份 ZIP 仍包含原始 Hive 檔案，完整聊天記錄未遺失。';
 
   @override
   String get timelineJumpToLatest => '跳到最新';
