@@ -683,9 +683,13 @@ class HomePageController extends ChangeNotifier {
     }
     final editState = _userMessageEditState;
     if (editState != null) {
-      final newMsg = await _saveEditedUserMessageVersion(input, editState);
+      ChatMessage? newMsg;
+      try {
+        newMsg = await _saveEditedUserMessageVersion(input, editState);
+      } finally {
+        _exitUserMessageEdit(clearDraft: false);
+      }
       if (newMsg == null) return ChatInputSubmissionResult.rejected;
-      _exitUserMessageEdit(clearDraft: false);
       await regenerateAtMessage(newMsg);
       return ChatInputSubmissionResult.sent;
     }
@@ -1093,15 +1097,17 @@ class HomePageController extends ChangeNotifier {
   Future<void> saveUserMessageEditOnly() async {
     final editState = _userMessageEditState;
     if (editState == null) return;
-    final input = _mediaController.snapshotInput(_inputController.text);
-    if (input.text.trim().isEmpty &&
-        input.imagePaths.isEmpty &&
-        input.documents.isEmpty) {
-      return;
+    try {
+      final input = _mediaController.snapshotInput(_inputController.text);
+      if (input.text.trim().isEmpty &&
+          input.imagePaths.isEmpty &&
+          input.documents.isEmpty) {
+        return;
+      }
+      await _saveEditedUserMessageVersion(input, editState);
+    } finally {
+      _exitUserMessageEdit(clearDraft: true);
     }
-    final newMsg = await _saveEditedUserMessageVersion(input, editState);
-    if (newMsg == null) return;
-    _exitUserMessageEdit(clearDraft: true);
   }
 
   void _enterUserMessageEdit(ChatMessage message) {
