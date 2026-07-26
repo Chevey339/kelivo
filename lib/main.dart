@@ -41,6 +41,7 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/chat/system_prompt_time_snapshot.dart';
 import 'core/services/database_v2_rollout_ledger.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
@@ -77,6 +78,7 @@ Future<void> main() async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      SystemPromptTimeSnapshotService.instance.initialize();
       FlutterLogger.installGlobalHandlers();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
