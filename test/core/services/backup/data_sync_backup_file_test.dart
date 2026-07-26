@@ -106,6 +106,8 @@ class _RecordingSnapshotPathChatService extends ChatService {
 class _RecordingClearChatService extends ChatService {
   bool cleared = false;
   bool replaced = false;
+  List<Conversation>? replacedConversations;
+  List<ChatMessage>? replacedMessages;
 
   @override
   Future<void> clearAllData({bool deleteUploads = true}) async {
@@ -126,6 +128,8 @@ class _RecordingClearChatService extends ChatService {
     required Map<String, String> geminiSignaturesByMessageId,
   }) async {
     replaced = true;
+    replacedConversations = conversations;
+    replacedMessages = messages;
   }
 
   @override
@@ -2779,14 +2783,12 @@ void main() {
     );
 
     test(
-      'rejects an invalid chat candidate without changing live data',
+      'sanitizes an orphan-message candidate into an empty chat restore '
+      'while settings still apply',
       () async {
         await BusinessRestoreService(
           businessRepository,
         ).overwrite({'preserved_setting': 'old'});
-        final before = await BusinessRestoreService(
-          businessRepository,
-        ).exportSettings();
         final chatService = ChatService();
         await chatService.init();
         addTearDown(chatService.close);
@@ -2824,22 +2826,24 @@ void main() {
           chatService: chatService,
         );
 
-        await expectLater(
-          sync.restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
-          throwsA(anything),
+        // 1.1.17 silently tolerated messages whose conversation is missing:
+        // they were simply invisible. The sanitizer now prunes the orphan and
+        // the overwrite restore proceeds with an empty chat payload.
+        await sync.restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
         );
-        expect(
-          await BusinessRestoreService(businessRepository).exportSettings(),
-          before,
-        );
-        expect(chatService.getConversation(existingConversation.id), isNotNull);
+
+        final after = await BusinessRestoreService(
+          businessRepository,
+        ).exportSettings();
+        expect(after['preserved_setting'], 'new');
+        expect(chatService.getConversation(existingConversation.id), isNull);
       },
     );
 
-    test('rejects a conversation that declares a missing message', () async {
+    test('prunes a dangling declared message and restores the conversation '
+        'empty', () async {
       final chatsFile = File('${root.path}/missing_declared_message.json');
       await chatsFile.writeAsString(
         jsonEncode({
@@ -2861,27 +2865,23 @@ void main() {
       encoder.closeSync();
       final chatService = _RecordingClearChatService();
 
-      await expectLater(
-        DataSync(
-          businessRepository: businessRepository,
-          chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'conversation_message_ids',
-          ),
-        ),
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
       );
-      expect(chatService.cleared, isFalse);
+
+      expect(chatService.replaced, isTrue);
+      final conversation = chatService.replacedConversations!.single;
+      expect(conversation.id, 'conversation');
+      expect(conversation.messageIds, isEmpty);
+      expect(chatService.replacedMessages, isEmpty);
     });
 
     test(
-      'rejects message order that disagrees with the conversation',
+      'restores messages in the order the conversation declares them',
       () async {
         final chatsFile = File('${root.path}/mismatched_message_order.json');
         await chatsFile.writeAsString(
@@ -2917,27 +2917,127 @@ void main() {
         encoder.closeSync();
         final chatService = _RecordingClearChatService();
 
-        await expectLater(
-          DataSync(
-            businessRepository: businessRepository,
-            chatService: chatService,
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-          ),
-          throwsA(
-            isA<StateError>().having(
-              (error) => error.message,
-              'message',
-              'conversation_message_order',
-            ),
-          ),
+        // 1.1.17 rendered conversations by messageIds, so that list is the
+        // authoritative order; the messages array is realigned to it.
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
         );
-        expect(chatService.cleared, isFalse);
+
+        expect(chatService.replaced, isTrue);
+        expect(chatService.replacedConversations!.single.messageIds, [
+          'second-message',
+          'first-message',
+        ]);
+        expect(chatService.replacedMessages!.map((m) => m.id).toList(), [
+          'second-message',
+          'first-message',
+        ]);
       },
     );
 
-    test('rejects duplicate MCP server relations in a candidate', () async {
+    test(
+      'reassigns duplicate (groupId, version) pairs a 1.1.17 runtime '
+      'tolerated instead of rejecting the backup',
+      () async {
+        final chatsFile = File('${root.path}/duplicate_group_versions.json');
+        await chatsFile.writeAsString(
+          jsonEncode({
+            'conversations': [
+              Conversation(
+                id: 'conversation',
+                title: 'Conversation',
+                messageIds: const [
+                  'grouped-a',
+                  'grouped-b',
+                  'empty-group-a',
+                  'empty-group-b',
+                ],
+              ).toJson(),
+            ],
+            'messages': [
+              ChatMessage(
+                id: 'grouped-a',
+                role: 'assistant',
+                content: 'first take',
+                conversationId: 'conversation',
+                groupId: 'group',
+                version: 0,
+              ).toJson(),
+              ChatMessage(
+                id: 'grouped-b',
+                role: 'assistant',
+                content: 'second take',
+                conversationId: 'conversation',
+                groupId: 'group',
+                version: 0,
+              ).toJson(),
+              ChatMessage(
+                id: 'empty-group-a',
+                role: 'assistant',
+                content: 'empty group first',
+                conversationId: 'conversation',
+                groupId: '',
+                version: 0,
+              ).toJson(),
+              ChatMessage(
+                id: 'empty-group-b',
+                role: 'assistant',
+                content: 'empty group second',
+                conversationId: 'conversation',
+                groupId: '',
+                version: 0,
+              ).toJson(),
+            ],
+          }),
+        );
+        final zipFile = File('${root.path}/duplicate_group_versions.zip');
+        final encoder = ZipFileEncoder();
+        encoder.create(zipFile.path);
+        encoder.addFileSync(validSettingsFile, 'settings.json');
+        encoder.addFileSync(chatsFile, 'chats.json');
+        encoder.closeSync();
+        final chatService = _RecordingClearChatService();
+
+        // message_rows has unique(conversationId, groupId, version) and the
+        // restore writes with INSERT OR REPLACE, so without version repair a
+        // duplicate pair silently swallows the earlier row and the overwrite
+        // candidate validation rejects the whole archive.
+        await DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+        );
+
+        expect(chatService.replaced, isTrue);
+        final messages = chatService.replacedMessages!;
+        expect(messages.map((m) => m.id).toList(), [
+          'grouped-a',
+          'grouped-b',
+          'empty-group-a',
+          'empty-group-b',
+        ]);
+        final groupedVersions = {
+          for (final m in messages.where((m) => m.groupId == 'group'))
+            m.id: m.version,
+        };
+        expect(groupedVersions['grouped-a'], 0);
+        expect(groupedVersions['grouped-b'], 1);
+        final emptyGroupVersions = {
+          for (final m in messages.where((m) => m.groupId == ''))
+            m.id: m.version,
+        };
+        expect(emptyGroupVersions['empty-group-a'], 0);
+        expect(emptyGroupVersions['empty-group-b'], 1);
+      },
+    );
+
+    test('deduplicates MCP server relations in a candidate', () async {
       final chatsFile = File('${root.path}/duplicate_mcp_relations.json');
       await chatsFile.writeAsString(
         jsonEncode({
@@ -2960,23 +3060,18 @@ void main() {
       encoder.closeSync();
       final chatService = _RecordingClearChatService();
 
-      await expectLater(
-        DataSync(
-          businessRepository: businessRepository,
-          chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (error) => error.message,
-            'message',
-            'conversation_mcp_server_ids',
-          ),
-        ),
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
       );
-      expect(chatService.replaced, isFalse);
+
+      expect(chatService.replaced, isTrue);
+      expect(chatService.replacedConversations!.single.mcpServerIds, [
+        'server',
+      ]);
     });
 
     test(

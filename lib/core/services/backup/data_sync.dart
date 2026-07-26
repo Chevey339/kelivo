@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:typed_data';
 
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as p;
@@ -1197,6 +1197,38 @@ class DataSync {
     }
   }
 
+  /// Copies the backup's asset payload directories (upload/images/avatars/
+  /// fonts) into the live directories without deleting anything already
+  /// present, so files referenced by an untouched chat database survive.
+  Future<void> _restoreAssetDirectoriesAdditive(
+    Directory payloadDirectory,
+  ) async {
+    final targets =
+        <({String entryName, Future<Directory> Function() resolveTarget})>[
+          (entryName: 'upload', resolveTarget: _getUploadDir),
+          (entryName: 'images', resolveTarget: _getImagesDir),
+          (entryName: 'avatars', resolveTarget: _getAvatarsDir),
+          (entryName: 'fonts', resolveTarget: _getFontsDir),
+        ];
+    for (final target in targets) {
+      final src = Directory(p.join(payloadDirectory.path, target.entryName));
+      if (!await src.exists()) continue;
+      final dst = await target.resolveTarget();
+      if (!await dst.exists()) {
+        await dst.create(recursive: true);
+      }
+      for (final ent in src.listSync(recursive: true)) {
+        if (ent is File) {
+          final rel = p.relative(ent.path, from: src.path);
+          final targetFile = File(p.join(dst.path, rel));
+          if (!await targetFile.exists()) {
+            await _copyRestoredFile(ent, targetFile);
+          }
+        }
+      }
+    }
+  }
+
   Future<void> _validateOverwriteChatCandidate({
     required Directory stagingDirectory,
     required File chatsFile,
@@ -1206,7 +1238,11 @@ class DataSync {
     await _deleteDatabaseFamily(candidatePath);
     try {
       await Isolate.run(() async {
-        final parsed = await _parseChatBackup(File(chatsPath));
+        final parsed = _sanitizeLegacyChatBackup(
+          await _parseChatBackup(File(chatsPath)),
+        );
+        // Sanitized data must satisfy the strict invariants; a violation here
+        // is a sanitizer bug, not a tolerated legacy shape.
         _validateBackupReferences(
           conversations: parsed.conversations,
           messages: parsed.messages,
@@ -1285,6 +1321,153 @@ class DataSync {
                   .toList(),
             ),
           ),
+      geminiThoughtSigs: geminiThoughtSigs,
+    );
+  }
+
+  /// Legacy (1.1.17) backups can carry shapes the old runtime silently
+  /// tolerated: dangling or duplicate messageIds references, messages no
+  /// conversation references, and messages whose conversationId disagrees
+  /// with the conversation referencing them. Restore what 1.1.17 actually
+  /// displayed instead of rejecting the archive: each conversation's
+  /// messageIds order is authoritative, dangling references are pruned
+  /// (SQLite derives order from message_order, so pruning matches the old
+  /// runtime), duplicate references keep their first occurrence, and
+  /// unreferenced messages were never visible so they are skipped.
+  static _ParsedChatBackup _sanitizeLegacyChatBackup(_ParsedChatBackup parsed) {
+    final conversations = <Conversation>[];
+    final conversationIds = <String>{};
+    var duplicateConversations = 0;
+    for (final conversation in parsed.conversations) {
+      if (conversationIds.add(conversation.id)) {
+        conversations.add(conversation);
+      } else {
+        duplicateConversations++;
+      }
+    }
+
+    final messagesById = <String, ChatMessage>{};
+    var duplicateMessages = 0;
+    for (final message in parsed.messages) {
+      if (messagesById.containsKey(message.id)) {
+        duplicateMessages++;
+      } else {
+        messagesById[message.id] = message;
+      }
+    }
+
+    final sanitizedConversations = <Conversation>[];
+    final sanitizedMessages = <ChatMessage>[];
+    final referencedMessageIds = <String>{};
+    var danglingReferences = 0;
+    var duplicateReferences = 0;
+    var rehomedMessages = 0;
+    var duplicateMcpServerIds = 0;
+    var versionConflicts = 0;
+    for (final conversation in conversations) {
+      final mcpServerIds = <String>[];
+      final seenMcpServerIds = <String>{};
+      for (final serverId in conversation.mcpServerIds) {
+        if (seenMcpServerIds.add(serverId)) {
+          mcpServerIds.add(serverId);
+        } else {
+          duplicateMcpServerIds++;
+        }
+      }
+      final keptMessageIds = <String>[];
+      // SQLite enforces unique(conversationId, groupId, version) while the
+      // 1.1.17 runtime tolerated duplicate (groupId, version) pairs (and
+      // rehoming above can create new ones); reassign versions the same way
+      // the Hive migration does so INSERT OR REPLACE cannot swallow rows.
+      final seenGroupVersions = <String>{};
+      final maxGroupVersions = <String, int>{};
+      for (final messageId in conversation.messageIds) {
+        var message = messagesById[messageId];
+        if (message == null) {
+          danglingReferences++;
+          continue;
+        }
+        if (!referencedMessageIds.add(messageId)) {
+          duplicateReferences++;
+          continue;
+        }
+        keptMessageIds.add(messageId);
+        if (message.conversationId != conversation.id) {
+          rehomedMessages++;
+          message = message.copyWith(conversationId: conversation.id);
+        }
+        final groupId = message.groupId;
+        if (groupId != null) {
+          var version = message.version;
+          if (!seenGroupVersions.add('$groupId $version')) {
+            version = (maxGroupVersions[groupId] ?? version) + 1;
+            versionConflicts++;
+            message = message.copyWith(version: version);
+            seenGroupVersions.add('$groupId $version');
+          }
+          final knownMax = maxGroupVersions[groupId];
+          if (knownMax == null || version > knownMax) {
+            maxGroupVersions[groupId] = version;
+          }
+        }
+        sanitizedMessages.add(message);
+      }
+      sanitizedConversations.add(
+        conversation.copyWith(
+          messageIds: keptMessageIds,
+          mcpServerIds: mcpServerIds,
+        ),
+      );
+    }
+    final unreferencedMessages =
+        messagesById.length - referencedMessageIds.length;
+
+    final toolEvents = <String, List<Map<String, dynamic>>>{};
+    var danglingArtifacts = 0;
+    for (final entry in parsed.toolEvents.entries) {
+      if (referencedMessageIds.contains(entry.key)) {
+        toolEvents[entry.key] = entry.value;
+      } else {
+        danglingArtifacts++;
+      }
+    }
+    final geminiThoughtSigs = <String, String>{};
+    for (final entry in parsed.geminiThoughtSigs.entries) {
+      if (referencedMessageIds.contains(entry.key)) {
+        geminiThoughtSigs[entry.key] = entry.value;
+      } else {
+        danglingArtifacts++;
+      }
+    }
+
+    final pruned =
+        duplicateConversations +
+        duplicateMessages +
+        danglingReferences +
+        duplicateReferences +
+        rehomedMessages +
+        duplicateMcpServerIds +
+        versionConflicts +
+        unreferencedMessages +
+        danglingArtifacts;
+    if (pruned > 0) {
+      debugPrint(
+        'Legacy backup sanitized: '
+        'duplicateConversations=$duplicateConversations '
+        'duplicateMessages=$duplicateMessages '
+        'danglingReferences=$danglingReferences '
+        'duplicateReferences=$duplicateReferences '
+        'rehomedMessages=$rehomedMessages '
+        'duplicateMcpServerIds=$duplicateMcpServerIds '
+        'versionConflicts=$versionConflicts '
+        'unreferencedMessages=$unreferencedMessages '
+        'danglingArtifacts=$danglingArtifacts',
+      );
+    }
+    return (
+      conversations: sanitizedConversations,
+      messages: sanitizedMessages,
+      toolEvents: toolEvents,
       geminiThoughtSigs: geminiThoughtSigs,
     );
   }
@@ -1513,6 +1696,13 @@ class DataSync {
         }
         if (mode == RestoreMode.overwrite) {
           if (!restoreChats) {
+            if (restoreFiles) {
+              // File restore is independent from chat restore. The live
+              // database stays untouched here, so copy the payload
+              // additively (never deleting existing files it references)
+              // and persist business data last, matching the legacy path.
+              await _restoreAssetDirectoriesAdditive(extractDir);
+            }
             await _runLiveBusinessRestore(
               () => businessRestore.overwrite(
                 settings,
@@ -1549,6 +1739,9 @@ class DataSync {
           entityRowIds: entityRowIds,
         );
         if (!restoreChats) {
+          if (restoreFiles) {
+            await _restoreAssetDirectoriesAdditive(extractDir);
+          }
           await _runLiveBusinessRestore(pendingBusinessRestore);
           return;
         }
@@ -1569,7 +1762,9 @@ class DataSync {
         );
       }
       if (restoreChats) {
-        final parsed = await _parseChatBackup(chatsFile);
+        final parsed = _sanitizeLegacyChatBackup(
+          await _parseChatBackup(chatsFile),
+        );
         conversations = parsed.conversations;
         messages = parsed.messages;
         toolEvents = parsed.toolEvents;
@@ -1748,85 +1943,7 @@ class DataSync {
           }
         } else {
           // Merge mode: Only copy non-existing files
-          // Merge upload directory
-          final uploadSrc = Directory(
-            p.join(restorePayloadDirectory.path, 'upload'),
-          );
-          if (await uploadSrc.exists()) {
-            final dst = await _getUploadDir();
-            if (!await dst.exists()) {
-              await dst.create(recursive: true);
-            }
-            for (final ent in uploadSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: uploadSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await _copyRestoredFile(ent, target);
-                }
-              }
-            }
-          }
-
-          // Merge images directory
-          final imagesSrc = Directory(
-            p.join(restorePayloadDirectory.path, 'images'),
-          );
-          if (await imagesSrc.exists()) {
-            final dst = await _getImagesDir();
-            if (!await dst.exists()) {
-              await dst.create(recursive: true);
-            }
-            for (final ent in imagesSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: imagesSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await _copyRestoredFile(ent, target);
-                }
-              }
-            }
-          }
-
-          // Merge avatars directory
-          final avatarsSrc = Directory(
-            p.join(restorePayloadDirectory.path, 'avatars'),
-          );
-          if (await avatarsSrc.exists()) {
-            final dst = await _getAvatarsDir();
-            if (!await dst.exists()) {
-              await dst.create(recursive: true);
-            }
-            for (final ent in avatarsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: avatarsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await _copyRestoredFile(ent, target);
-                }
-              }
-            }
-          }
-
-          // Merge managed local fonts directory
-          final fontsSrc = Directory(
-            p.join(restorePayloadDirectory.path, 'fonts'),
-          );
-          if (await fontsSrc.exists()) {
-            final dst = await _getFontsDir();
-            if (!await dst.exists()) {
-              await dst.create(recursive: true);
-            }
-            for (final ent in fontsSrc.listSync(recursive: true)) {
-              if (ent is File) {
-                final rel = p.relative(ent.path, from: fontsSrc.path);
-                final target = File(p.join(dst.path, rel));
-                if (!await target.exists()) {
-                  await _copyRestoredFile(ent, target);
-                }
-              }
-            }
-          }
+          await _restoreAssetDirectoriesAdditive(restorePayloadDirectory);
         }
       }
       final restoreBusiness = pendingBusinessRestore;
