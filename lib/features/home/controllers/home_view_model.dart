@@ -642,6 +642,17 @@ class HomeViewModel extends ChangeNotifier {
     );
     if (plan.isEmpty) return;
 
+    // Deleting the row an active generation checkpoints into would make the
+    // next streaming write hit a foreign key on deleted messages; stop the
+    // generation first.
+    final streamingMessageId = _chatActions.activeStreamingMessageId(
+      conversation.id,
+    );
+    if (streamingMessageId != null &&
+        plan.deletedMessageIds.contains(streamingMessageId)) {
+      await _chatActions.cancelStreaming(conversation);
+    }
+
     final deletedMessageIds = await _chatService.deleteMessages(
       conversationId: conversation.id,
       messageIds: plan.deletedMessageIds,
@@ -684,6 +695,16 @@ class HomeViewModel extends ChangeNotifier {
     final conversation = currentConversation;
     var removedRevisionIds = deletedMessageIds;
     if (conversation != null) {
+      // Deleting the row an active generation checkpoints into would make the
+      // next streaming write hit a foreign key on deleted messages; stop the
+      // generation first.
+      final streamingMessageId = _chatActions.activeStreamingMessageId(
+        conversation.id,
+      );
+      if (streamingMessageId != null &&
+          deletedMessageIds.contains(streamingMessageId)) {
+        await _chatActions.cancelStreaming(conversation);
+      }
       removedRevisionIds = await _chatService.deleteMessages(
         conversationId: conversation.id,
         messageIds: deletedMessageIds,

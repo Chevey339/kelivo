@@ -9,6 +9,7 @@ import '../shared/widgets/snackbar.dart';
 import '../core/services/chat/chat_service.dart';
 import '../core/models/conversation.dart';
 import '../theme/app_font_weights.dart';
+import '../features/home/controllers/chat_actions.dart';
 
 Future<String?> showChatHistoryDesktopDialog(
   BuildContext context, {
@@ -152,6 +153,7 @@ class _ChatHistoryDesktopDialogState extends State<_ChatHistoryDesktopDialog> {
                                 .map((c) => c.id)
                                 .toList();
                             for (final id in idsToDelete) {
+                              await ChatActions.cancelActiveGenerationFor(id);
                               await svc.deleteConversation(id);
                             }
                             if (!context.mounted) return;

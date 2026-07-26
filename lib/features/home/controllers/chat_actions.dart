@@ -135,7 +135,46 @@ class ChatActions {
     required this.messageGenerationService,
     required this.contextProvider,
     required this.viewModel,
-  });
+  }) {
+    _current = this;
+  }
+
+  /// Latest live instance. Deletion entry points that sit outside the home
+  /// controller graph (e.g. the drawer's conversation delete) reach the
+  /// active generation state through it to uphold the "deleting implies
+  /// stopping generation" invariant.
+  static ChatActions? _current;
+
+  /// Stop any in-flight generation for [conversationId] before its rows are
+  /// deleted, so streaming checkpoints cannot write to removed messages.
+  static Future<void> cancelActiveGenerationFor(String conversationId) async {
+    final actions = _current;
+    if (actions == null || !actions._hasActiveGeneration(conversationId)) {
+      return;
+    }
+    await actions.cancelStreamingById(conversationId);
+  }
+
+  /// Stop in-flight generations for every conversation owned by
+  /// [assistantId]. Used by assistant deletion, which batch-deletes the
+  /// assistant's conversations and must uphold the "deleting implies
+  /// stopping generation" invariant for each of them.
+  static Future<void> cancelActiveGenerationsForAssistant(
+    String assistantId,
+  ) async {
+    final actions = _current;
+    if (actions == null) return;
+    final conversationIds = actions.chatService
+        .getAllConversations()
+        .where((c) => c.assistantId == assistantId)
+        .map((c) => c.id)
+        .toList();
+    for (final id in conversationIds) {
+      if (actions._hasActiveGeneration(id)) {
+        await actions.cancelStreamingById(id);
+      }
+    }
+  }
 
   final HomeViewModel viewModel;
   final ChatService chatService;
@@ -295,6 +334,30 @@ class ChatActions {
       chatController.loadingConversationIds;
   Map<String, StreamSubscription<dynamic>> get _conversationStreams =>
       chatController.conversationStreams;
+
+  bool _hasActiveGeneration(String conversationId) =>
+      _conversationStreams.containsKey(conversationId) ||
+      _activeAssistantMessages[conversationId] != null;
+
+  /// Id of the assistant message an in-flight generation checkpoints into,
+  /// or null when [conversationId] has no active generation.
+  String? activeStreamingMessageId(String conversationId) =>
+      _activeAssistantMessages[conversationId]?.id;
+
+  static const Duration _streamCancelTimeout = Duration(seconds: 3);
+
+  /// A barrier cancel only completes once the generator leaves its current
+  /// suspension point, which a dead connection can stall indefinitely even
+  /// after `cancelRequest`; bound the wait and continue local cleanup.
+  Future<void> _cancelSubscriptionWithTimeout(
+    StreamSubscription<dynamic> subscription,
+  ) async {
+    try {
+      await subscription.cancel().timeout(_streamCancelTimeout);
+    } on TimeoutException {
+      // Cancellation keeps running in the background.
+    }
+  }
 
   void _setConversationLoading(String conversationId, bool loading) {
     chatController.setConversationLoading(conversationId, loading);
@@ -1304,15 +1367,25 @@ class ChatActions {
   Future<void> cancelStreaming(Conversation? conversation) async {
     final cid = conversation?.id;
     if (cid == null) return;
+    await cancelStreamingById(cid);
+  }
 
-    // Cancel any pending tool approval requests to prevent deadlock
+  /// Cancel the active streaming for the conversation with id [cid].
+  Future<void> cancelStreamingById(String cid) async {
+    // Cancel pending tool approval requests for this conversation to prevent
+    // deadlock. Scoped by conversation id: the static deletion entry points
+    // (cancelActiveGenerationFor / cancelActiveGenerationsForAssistant) may
+    // cancel a background conversation while another one is streaming, and a
+    // global cancelAll would deny that other conversation's pending approvals.
     try {
-      contextProvider.read<ToolApprovalService>().cancelAll();
+      contextProvider.read<ToolApprovalService>().cancelForConversation(cid);
     } catch (_) {
       // ToolApprovalService may not be registered yet
     }
     try {
-      contextProvider.read<AskUserInteractionService>().cancelAll();
+      contextProvider.read<AskUserInteractionService>().cancelForConversation(
+        cid,
+      );
     } catch (_) {
       // AskUserInteractionService may not be registered yet
     }
@@ -1320,10 +1393,16 @@ class ChatActions {
     // Reset file processing state on cancel
     onFileProcessingFinished?.call();
 
+    // Abort the HTTP request before waiting on the subscription: the barrier
+    // cancel only completes once the generator leaves its network await,
+    // which a stalled connection would otherwise block indefinitely.
+    ChatApiService.cancelRequest(cid);
+
     // Cancel active stream for current conversation only
     final sub = _conversationStreams.remove(cid);
-    await sub?.cancel();
-    ChatApiService.cancelRequest(cid);
+    if (sub != null) {
+      await _cancelSubscriptionWithTimeout(sub);
+    }
 
     // The active identity is independent from the currently loaded window.
     final streaming = _activeAssistantMessages.cancellationTarget(
@@ -1453,7 +1532,15 @@ class ChatActions {
         ocrActive: ctx.ocrActive,
       );
 
-      await _conversationStreams[conversationId]?.cancel();
+      // Replacing a previous stream: the new request has not registered its
+      // cancel token yet (that happens on listen), so cancelRequest still
+      // targets the old one. Break its network wait first so the barrier
+      // cancel below cannot stall on a dead connection.
+      final previousSub = _conversationStreams.remove(conversationId);
+      if (previousSub != null) {
+        ChatApiService.cancelRequest(conversationId);
+        await _cancelSubscriptionWithTimeout(previousSub);
+      }
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
         stream: stream,
         onData: (chunk) => _handleStreamChunk(chunk, state),
@@ -1818,7 +1905,11 @@ class ChatActions {
       onStreamFinished?.call();
     }
 
-    await _conversationStreams.remove(conversationId)?.cancel();
+    // This finish handler runs inside the sequential drain, so awaiting the
+    // barrier cancel here would wait on this very drain and never complete.
+    // The source stream is finishing on its own (a done chunk arrived);
+    // onDone performs the remaining cleanup, so only drop the map entry.
+    _conversationStreams.remove(conversationId);
   }
 
   /// Finish streaming and persist final state.
@@ -2000,7 +2091,10 @@ class ChatActions {
     // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call();
-    await _conversationStreams.remove(conversationId)?.cancel();
+    // The source stream is already done and this handler runs inside the
+    // sequential drain; awaiting the barrier cancel here would wait on this
+    // very drain and never complete, so only drop the map entry.
+    _conversationStreams.remove(conversationId);
   }
 
   // ============================================================================

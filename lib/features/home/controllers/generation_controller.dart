@@ -144,12 +144,14 @@ class GenerationController {
     Assistant? assistant, {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    String? conversationId,
   }) {
     return toolHandlerService.buildToolCallHandler(
       settings,
       assistant,
       approvalService: approvalService,
       askUserService: askUserService,
+      conversationId: conversationId,
     );
   }
 

@@ -116,11 +116,13 @@ class AskUserRequest {
   AskUserRequest({
     required this.toolCallId,
     required this.questions,
+    this.conversationId,
     required this._completer,
   });
 
   final String toolCallId;
   final List<AskUserQuestion> questions;
+  final String? conversationId;
   final Completer<AskUserResult> _completer;
 }
 
@@ -134,6 +136,7 @@ class AskUserInteractionService extends ChangeNotifier {
   Future<AskUserResult> requestAnswer({
     required String toolCallId,
     required Map<String, dynamic> arguments,
+    String? conversationId,
   }) {
     final questions = normalizeQuestions(arguments);
     if (questions.isEmpty) {
@@ -149,6 +152,7 @@ class AskUserInteractionService extends ChangeNotifier {
     _pending[key] = AskUserRequest(
       toolCallId: key,
       questions: questions,
+      conversationId: conversationId,
       completer: completer,
     );
     notifyListeners();
@@ -175,6 +179,33 @@ class AskUserInteractionService extends ChangeNotifier {
       }
     }
     _pending.clear();
+    notifyListeners();
+  }
+
+  /// Cancel pending requests that belong to [conversationId]. Requests with
+  /// no recorded conversation are cancelled too (fail-safe against leaking a
+  /// blocked tool handler), but requests owned by other conversations keep
+  /// waiting so cancelling one conversation cannot break another's stream.
+  void cancelForConversation(String conversationId) {
+    final toCancel = _pending.values
+        .where(
+          (request) =>
+              request.conversationId == null ||
+              request.conversationId == conversationId,
+        )
+        .toList();
+    if (toCancel.isEmpty) return;
+    for (final request in toCancel) {
+      _pending.remove(request.toolCallId);
+      if (!request._completer.isCompleted) {
+        request._completer.complete(
+          const AskUserResult.error(
+            error: 'cancelled',
+            message: 'Ask user request was cancelled.',
+          ),
+        );
+      }
+    }
     notifyListeners();
   }
 

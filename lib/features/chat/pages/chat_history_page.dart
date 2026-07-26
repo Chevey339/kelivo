@@ -10,6 +10,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/models/conversation.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../home/controllers/chat_actions.dart';
 
 class ChatHistoryPage extends StatefulWidget {
   const ChatHistoryPage({super.key, this.assistantId});
@@ -111,6 +112,7 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
                     .map((c) => c.id)
                     .toList();
                 for (final id in idsToDelete) {
+                  await ChatActions.cancelActiveGenerationFor(id);
                   await svc.deleteConversation(id);
                 }
                 if (!context.mounted) return;
@@ -286,6 +288,8 @@ class _ChatHistoryPageState extends State<ChatHistoryPage>
         ),
       ),
       onDismissed: (_) async {
+        await ChatActions.cancelActiveGenerationFor(c.id);
+        if (!context.mounted) return;
         await context.read<ChatService>().deleteConversation(c.id);
         if (!context.mounted) return;
         showAppSnackBar(

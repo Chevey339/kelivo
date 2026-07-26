@@ -45,6 +45,7 @@ import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
 import '../../../desktop/desktop_settings_navigation_bus.dart';
 import 'dart:async';
 import '../../../features/search/services/global_session_search_service.dart';
+import '../controllers/chat_actions.dart';
 import 'assistant_avatar.dart';
 import 'assistant_entry_actions.dart';
 
@@ -290,6 +291,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               final deletingCurrent =
                   chatService.currentConversationId == chat.id;
               final nextId = _nextRecentConversation(chatService, chat.id);
+              await ChatActions.cancelActiveGenerationFor(chat.id);
               await chatService.deleteConversation(chat.id);
               if (!context.mounted) return;
               showAppSnackBar(
@@ -489,6 +491,7 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                           chatService,
                           chat.id,
                         );
+                        await ChatActions.cancelActiveGenerationFor(chat.id);
                         await chatService.deleteConversation(chat.id);
                         if (!context.mounted) return;
                         showAppSnackBar(

@@ -19,12 +19,14 @@ class ToolApprovalRequest {
   final String toolCallId;
   final String toolName;
   final Map<String, dynamic> arguments;
+  final String? conversationId;
   final Completer<ToolApprovalResult> _completer;
 
   ToolApprovalRequest({
     required this.toolCallId,
     required this.toolName,
     required this.arguments,
+    this.conversationId,
     required this._completer,
   });
 }
@@ -57,12 +59,14 @@ class ToolApprovalService extends ChangeNotifier {
     required String toolCallId,
     required String toolName,
     required Map<String, dynamic> arguments,
+    String? conversationId,
   }) {
     final completer = Completer<ToolApprovalResult>();
     _pending[toolCallId] = ToolApprovalRequest(
       toolCallId: toolCallId,
       toolName: toolName,
       arguments: arguments,
+      conversationId: conversationId,
       completer: completer,
     );
     notifyListeners();
@@ -95,6 +99,28 @@ class ToolApprovalService extends ChangeNotifier {
       }
     }
     _pending.clear();
+    notifyListeners();
+  }
+
+  /// Cancel pending approvals that belong to [conversationId]. Requests with
+  /// no recorded conversation are cancelled too (fail-safe against leaking a
+  /// blocked tool handler), but approvals owned by other conversations keep
+  /// waiting so cancelling one conversation cannot break another's stream.
+  void cancelForConversation(String conversationId) {
+    final toCancel = _pending.values
+        .where(
+          (req) =>
+              req.conversationId == null ||
+              req.conversationId == conversationId,
+        )
+        .toList();
+    if (toCancel.isEmpty) return;
+    for (final req in toCancel) {
+      _pending.remove(req.toolCallId);
+      if (!req._completer.isCompleted) {
+        req._completer.complete(ToolApprovalResult.denied('cancelled'));
+      }
+    }
     notifyListeners();
   }
 }

@@ -4,6 +4,7 @@ import '../../../icons/lucide_adapter.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
+import '../../home/controllers/chat_actions.dart';
 import '../../../core/models/assistant.dart';
 import 'dart:io' show File;
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -272,6 +273,8 @@ class _AssistantCard extends StatelessWidget {
               }
               final ok = await _confirmDelete(context, l10n);
               if (!context.mounted || ok != true) return;
+              await ChatActions.cancelActiveGenerationsForAssistant(item.id);
+              if (!context.mounted) return;
               final success = await assistantProvider.deleteAssistant(item.id);
               if (!context.mounted) return;
               if (success != true) {
