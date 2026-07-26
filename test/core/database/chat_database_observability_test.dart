@@ -55,7 +55,7 @@ void main() {
       expect(connection.journalModeWal, isTrue);
       expect(connection.foreignKeysEnabled, isTrue);
       expect(connection.busyTimeoutMillis, 5000);
-      expect(connection.synchronous, 2);
+      expect(connection.synchronous, AppDatabase.synchronousNormal);
       expect(connection.walAutoCheckpointPages, 1000);
       expect(connection.journalSizeLimitBytes, 16 << 20);
       final conversation = Conversation(

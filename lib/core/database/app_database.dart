@@ -571,7 +571,11 @@ class AppDatabase extends _$AppDatabase {
   // a promise that an active WAL can never temporarily exceed 16 MiB.
   static const journalSizeLimitBytes = 16 << 20;
   static const busyTimeoutMillis = 5000;
-  static const synchronousFull = 2;
+  // Under WAL, NORMAL still guarantees crash consistency; a power loss can
+  // only drop transactions since the last checkpoint, which the
+  // generation-run recovery path already tolerates. FULL would add an fsync
+  // per write transaction on the streaming hot path.
+  static const synchronousNormal = 1;
   static const _executionIsolateProbeFunction =
       'kelivo_sqlite_on_opening_isolate';
   static const _maxExecutionIsolateProbeSamples = 1000;
@@ -616,7 +620,7 @@ class AppDatabase extends _$AppDatabase {
         database.execute('PRAGMA journal_mode = WAL;');
         database.execute('PRAGMA foreign_keys = ON;');
         database.execute('PRAGMA busy_timeout = $busyTimeoutMillis;');
-        database.execute('PRAGMA synchronous = FULL;');
+        database.execute('PRAGMA synchronous = NORMAL;');
         database.execute(
           'PRAGMA wal_autocheckpoint = $walAutoCheckpointPages;',
         );

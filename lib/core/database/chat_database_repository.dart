@@ -930,7 +930,7 @@ class ChatDatabaseRepository {
       if (contract.busyTimeoutMillis != AppDatabase.busyTimeoutMillis) {
         throw StateError('database_connection_contract:busy_timeout');
       }
-      if (contract.synchronous != AppDatabase.synchronousFull) {
+      if (contract.synchronous != AppDatabase.synchronousNormal) {
         throw StateError('database_connection_contract:synchronous');
       }
       if (contract.walAutoCheckpointPages !=
@@ -1156,6 +1156,30 @@ class ChatDatabaseRepository {
       'VALUES (?);',
       [revisionId],
     );
+  }
+
+  /// Bulk variant of [markMessageAssetReferencesDirty] for restore/import
+  /// paths that write message rows without going through
+  /// `_replaceMessageParts`. Queuing the revisions keeps the asset-reference
+  /// backfill invariant: every attachment-bearing revision is re-registered
+  /// before GC may collect its files.
+  Future<void> _markMessageAssetReferencesDirtyBatch(
+    List<String> revisionIds,
+  ) async {
+    if (revisionIds.isEmpty) return;
+    await _ensureAssetGcSchema();
+    const chunkSize = 200;
+    for (var start = 0; start < revisionIds.length; start += chunkSize) {
+      final end = start + chunkSize < revisionIds.length
+          ? start + chunkSize
+          : revisionIds.length;
+      final chunk = revisionIds.sublist(start, end);
+      await _db.customStatement(
+        'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+        'VALUES ${List.filled(chunk.length, '(?)').join(', ')};',
+        chunk,
+      );
+    }
   }
 
   Future<void> checkpoint() async {
@@ -3220,7 +3244,7 @@ class ChatDatabaseRepository {
               ))
               .getSingleOrNull();
       if (row == null) return null;
-      final current = await _conversationFromRow(row);
+      final current = await _conversationFromRow(row, includeMessageIds: false);
       final selections = Map<String, int>.from(current.versionSelections);
       if (version == null) {
         selections.remove(groupId);
@@ -3727,6 +3751,16 @@ class ChatDatabaseRepository {
         [entry.value, entry.key],
       );
     }
+    // Merged revisions bypass _replaceMessageParts, so queue the
+    // attachment-bearing ones for the asset-reference backfill before GC can
+    // treat their files as unreferenced.
+    await _ensureAssetGcSchema();
+    await _db.customStatement(
+      'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
+      'SELECT id FROM main.message_rows WHERE conversation_id = ? '
+      "AND (content LIKE '%[image:%' OR content LIKE '%[file:%');",
+      [targetId],
+    );
   }
 
   Future<void> _importBackupSnapshot(File snapshotFile) async {
@@ -3847,6 +3881,14 @@ class ChatDatabaseRepository {
         );
       }
     });
+    // Restored revisions bypass _replaceMessageParts, so their attachments
+    // are unknown to the asset registry until the queued backfill runs.
+    await _markMessageAssetReferencesDirtyBatch([
+      for (final entry in messages)
+        if (entry.message.content.contains('[image:') ||
+            entry.message.content.contains('[file:'))
+          entry.message.id,
+    ]);
   }
 
   Future<void> updateMessage(ChatMessage message) async {
