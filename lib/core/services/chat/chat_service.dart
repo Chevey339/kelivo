@@ -333,6 +333,7 @@ class ChatService extends ChangeNotifier {
     if (loadedSlots.length != page.slots.length) {
       throw StateError('timeline_selected_revision_shadow_missing');
     }
+    await _loadMessageOrder(conversationId);
     _cacheLoadedMessages(conversationId, messages);
     await _cacheMessageArtifacts(messages);
     return LoadedTimelinePage(
@@ -513,10 +514,15 @@ class ChatService extends ChangeNotifier {
         message.id: message,
       for (final message in messages) message.id: message,
     };
-    _messagesCache[conversationId] = [
-      for (final id in _messageOrderIds[conversationId] ?? const <String>[])
-        if (byId[id] != null) byId[id]!,
-    ];
+    // Without the order skeleton an intersection would drop every message just
+    // loaded; keep the merged insertion order instead of filtering to empty.
+    final order = _messageOrderIds[conversationId];
+    _messagesCache[conversationId] = order == null
+        ? byId.values.toList(growable: true)
+        : [
+            for (final id in order)
+              if (byId[id] != null) byId[id]!,
+          ];
     _touchMessageCache(conversationId);
     _enforceMessageCacheLimits();
   }
@@ -741,12 +747,31 @@ class ChatService extends ChangeNotifier {
 
     if (!_temporaryConversationIds.contains(conversationId)) {
       await _cacheMessageArtifacts(messages);
+      // A full read sorted by message_order is the authoritative order; backfill
+      // the skeleton so later windowed loads don't intersect against stale data.
+      // Merge instead of replacing outright: a concurrent addMessage may have
+      // appended ids while the reads above were in flight, and dropping them
+      // here would lose them for good (_loadMessageOrder short-circuits on the
+      // cached skeleton and never rebuilds it).
+      final orderedIds = messages
+          .map((message) => message.id)
+          .toList(growable: true);
+      final existingOrder = _messageOrderIds[conversationId];
+      if (existingOrder != null && existingOrder.isNotEmpty) {
+        final snapshotIds = orderedIds.toSet();
+        for (final id in existingOrder) {
+          if (!snapshotIds.contains(id)) orderedIds.add(id);
+        }
+      }
+      _messageOrderIds[conversationId] = orderedIds;
+      _messageCounts[conversationId] = orderedIds.length;
     }
 
-    // Cache the result
-    _messagesCache[conversationId] = List.of(messages);
-    _touchMessageCache(conversationId);
-    _enforceMessageCacheLimits();
+    // Merge into the cache instead of replacing it: a concurrent addMessage
+    // may have appended a message while the reads above were in flight, and
+    // it must survive alongside the snapshot (mirrors the order skeleton
+    // merge above).
+    _cacheLoadedMessages(conversationId, messages);
     return messages;
   }
 
@@ -2778,9 +2803,7 @@ class ChatService extends ChangeNotifier {
     }
     _messagesCache.remove(conversationId);
     _messageOrderIds.remove(conversationId);
-    _messageCounts[conversationId] = await _repo.getMessageCount(
-      conversationId,
-    );
+    await _loadMessageOrder(conversationId);
     await _cleanupOrphanUploads();
     notifyListeners();
     return Set<String>.unmodifiable(deletedIds);
