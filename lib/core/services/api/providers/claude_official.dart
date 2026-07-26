@@ -587,6 +587,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         if (line.isEmpty || !line.startsWith('data:')) continue;
 
         final data = line.substring(5).trimLeft();
+        // Anthropic reports failures in-band as `event: error` with
+        // {type:"error", error:{type,message}}; raise before the
+        // malformed-chunk guard below can swallow it.
+        _throwIfInBandStreamError(data);
         try {
           final obj = jsonDecode(data);
           final type = obj['type'];

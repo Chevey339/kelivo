@@ -287,6 +287,71 @@ bool _shouldRequestGoogleThoughts(
   return _apiModelId(config, modelId).toLowerCase().contains('gemini');
 }
 
+/// Gemini reports prompt-level blocks (safety filters etc.) in-band as
+/// `promptFeedback.blockReason` on a frame without candidates; surface those
+/// as a stream error instead of an empty "normal" completion.
+void _throwIfGeminiPromptBlocked(String data) {
+  if (!data.contains('blockReason')) return;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(data);
+  } catch (_) {
+    return;
+  }
+  if (decoded is! Map) return;
+  final candidates = decoded['candidates'];
+  if (candidates is List && candidates.isNotEmpty) return;
+  final feedback = decoded['promptFeedback'];
+  if (feedback is! Map) return;
+  final reason = (feedback['blockReason'] ?? '').toString().trim();
+  if (reason.isEmpty || reason == 'BLOCK_REASON_UNSPECIFIED') return;
+  final message = (feedback['blockReasonMessage'] ?? '').toString().trim();
+  throw HttpException(
+    message.isEmpty
+        ? 'Prompt blocked ($reason)'
+        : 'Prompt blocked ($reason): $message',
+  );
+}
+
+/// Output-side content filtering ends the candidate with one of these
+/// `finishReason` values and then closes the stream like a regular
+/// completion, so a mid-generation block would otherwise just look like a
+/// short reply.
+const Set<String> _geminiBlockedFinishReasons = {
+  'SAFETY',
+  'RECITATION',
+  'BLOCKLIST',
+  'PROHIBITED_CONTENT',
+  'SPII',
+  'IMAGE_SAFETY',
+};
+
+/// Surfaces candidate-level content filtering (`finishReason: SAFETY` etc.)
+/// as a stream error so truncated output is not persisted as a normal finish.
+void _throwIfGeminiCandidateBlocked(String data) {
+  if (!data.contains('finishReason')) return;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(data);
+  } catch (_) {
+    return;
+  }
+  if (decoded is! Map) return;
+  final candidates = decoded['candidates'];
+  if (candidates is! List) return;
+  for (final cand in candidates) {
+    if (cand is! Map) continue;
+    final reason = (cand['finishReason'] ?? '').toString().trim();
+    if (!_geminiBlockedFinishReasons.contains(reason)) continue;
+    final message = (cand['finishMessage'] ?? '').toString().trim();
+    throw HttpException(
+      message.isEmpty
+          ? 'Response blocked ($reason)'
+          : 'Response blocked ($reason): $message',
+    );
+  }
+}
+
 Stream<ChatStreamChunk> _sendGoogleStream(
   http.Client client,
   ProviderConfig config,
@@ -1222,6 +1287,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         if (!line.startsWith('data:')) continue;
         final data = line.substring(5).trim(); // after 'data:'
         if (data.isEmpty) continue;
+        // Gemini can deliver {"error":{code,message,status}}, a prompt-level
+        // block, or a candidate-level content-filter finish in-band on a 2xx
+        // stream; raise before the malformed-chunk guard below can swallow it.
+        _throwIfInBandStreamError(data);
+        _throwIfGeminiPromptBlocked(data);
+        _throwIfGeminiCandidateBlocked(data);
         try {
           final obj = jsonDecode(data) as Map<String, dynamic>;
           final um = obj['usageMetadata'];
