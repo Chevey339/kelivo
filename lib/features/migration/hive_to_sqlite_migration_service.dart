@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
-import 'package:crypto/crypto.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,7 +13,6 @@ import '../../core/database/chat_database_repository.dart';
 import '../../core/models/chat_message.dart';
 import '../../core/models/conversation.dart';
 import '../../core/services/backup/backup_settings_validator.dart';
-import '../../core/services/database_v2_rollout_ledger.dart';
 import '../../utils/app_directories.dart';
 
 enum HiveToSqliteMigrationStage {
@@ -413,8 +411,6 @@ class HiveToSqliteMigrationService {
       );
 
       await repo.clearAllData();
-      final sourceHash = await _legacySourceHash();
-      final migrationRunId = 'hive-${sourceHash.substring(0, 32)}';
       // 1.1.17 tolerated dangling references, cross-conversation reuse and
       // duplicate (groupId, version) pairs at runtime; the batches must repair
       // or skip those shapes instead of failing the whole migration.
@@ -517,7 +513,6 @@ class HiveToSqliteMigrationService {
       if (repairStats.hasIssues) {
         _logLine('legacy-data repairs: ${repairStats.describe()}');
       }
-      final migrationIssueCounts = repairStats.toLedgerIssueCounts();
 
       _emit(
         HiveToSqliteMigrationStage.migrating,
@@ -546,24 +541,6 @@ class HiveToSqliteMigrationService {
       repo = null;
 
       await _replaceSqlite(tempFile, decision.sqliteFile);
-      try {
-        await DatabaseV2RolloutLedger(
-          decision.appDataDir,
-        ).recordMigrationCompleted(
-          migrationRunId: migrationRunId,
-          sourceKind: 'hive',
-          sourceHash: sourceHash,
-          migratedAtUtc: DateTime.now().toUtc(),
-          conversationCount: conversations.length,
-          messageCount: migratedMessages,
-          issueCounts: migrationIssueCounts,
-        );
-      } catch (error) {
-        // Rollout evidence must never turn an already verified and installed
-        // database into a false migration failure. Missing evidence keeps the
-        // later retirement gate closed, which is the safe fallback.
-        _logLine('rollout-ledger: $error');
-      }
       _emit(
         HiveToSqliteMigrationStage.complete,
         1,
@@ -597,19 +574,6 @@ class HiveToSqliteMigrationService {
       await messagesBox?.close();
       await toolEventsBox?.close();
     }
-  }
-
-  Future<String> _legacySourceHash() async {
-    final entries = <String>[];
-    for (final file
-        in decision.hiveFiles.toList()
-          ..sort((a, b) => p.basename(a.path).compareTo(p.basename(b.path)))) {
-      final stat = await file.stat();
-      entries.add(
-        '${p.basename(file.path)}:${stat.size}:${stat.modified.toUtc().microsecondsSinceEpoch}',
-      );
-    }
-    return sha256.convert(utf8.encode(entries.join('\n'))).toString();
   }
 
   /// Escape hatch after repeated migration failures: renames the legacy Hive
@@ -1274,13 +1238,6 @@ class _MigrationRepairStats {
     return 'dangling=$danglingMessageRefs duplicates=$duplicateMessageIds '
         'conversationIdMismatches=$conversationIdMismatches '
         'versionConflicts=$versionConflicts';
-  }
-
-  Map<String, int> toLedgerIssueCounts() {
-    return <String, int>{
-      'recovered': conversationIdMismatches + versionConflicts,
-      'rejected': danglingMessageRefs + duplicateMessageIds,
-    };
   }
 }
 

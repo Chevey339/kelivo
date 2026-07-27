@@ -41,7 +41,6 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/services/chat/chat_service.dart';
-import 'core/services/database_v2_rollout_ledger.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
@@ -62,7 +61,6 @@ import 'dart:io'
     show
         File,
         Platform,
-        pid,
         stderr; // kept for global override usage inside provider
 import 'core/services/android_background.dart';
 import 'core/services/notification_service.dart';
@@ -136,7 +134,7 @@ Future<void> main() async {
           );
           return;
         }
-        final installationReceipt = await DatabaseInstallationGate.ensureReady(
+        await DatabaseInstallationGate.ensureReady(
           appDataDirectory: appDataDirectory,
           allowDatabaseIdentityChange:
               restoreOutcome?.selectedComponents.contains(
@@ -163,29 +161,6 @@ Future<void> main() async {
         } catch (_) {
           await databaseLease.release();
           rethrow;
-        }
-        try {
-          final rollout = DatabaseV2RolloutLedger.rolloutDecision(
-            installationId: installationReceipt.installationId,
-            enabledBasisPoints: const int.fromEnvironment(
-              'KELIVO_DATABASE_V2_ROLLOUT_BASIS_POINTS',
-              defaultValue: 10000,
-            ),
-          );
-          if (rollout.enabled) {
-            await DatabaseV2RolloutLedger(
-              appDataDirectory,
-            ).recordSuccessfulColdStart(
-              coldStartId:
-                  '$pid:${DateTime.now().toUtc().microsecondsSinceEpoch}',
-              atUtc: DateTime.now().toUtc(),
-            );
-          }
-        } catch (error) {
-          // Local rollout evidence is support/retirement metadata. The
-          // database admission result remains authoritative; a ledger failure
-          // keeps legacy cleanup disabled instead of blocking the user.
-          stderr.writeln('[DatabaseV2Rollout] $error');
         }
       } catch (error, stackTrace) {
         stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');

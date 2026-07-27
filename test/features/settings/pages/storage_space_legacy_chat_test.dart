@@ -9,9 +9,11 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqlite3/sqlite3.dart';
 
+import 'package:Kelivo/core/database/app_database.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
 import 'package:Kelivo/features/settings/pages/storage_space_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
@@ -62,15 +64,22 @@ void main() {
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProvider(root.path);
     SharedPreferences.setMockInitialValues({});
-    await DatabaseV2RolloutLedger(root).recordMigrationCompleted(
-      migrationRunId: 'hive-0123456789abcdef0123456789abcdef',
-      sourceKind: 'hive',
-      sourceHash: List.filled(64, 'a').join(),
-      migratedAtUtc: DateTime.utc(2026, 7, 12),
-      conversationCount: 2,
-      messageCount: 4,
-      issueCounts: const {},
+    final database = sqlite3.open(
+      p.join(root.path, AppDatabase.databaseFileName),
     );
+    try {
+      database.execute(
+        'CREATE TABLE IF NOT EXISTS chat_storage_meta_rows '
+        '(key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);',
+      );
+      database.execute(
+        'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) '
+        'VALUES (?, ?);',
+        [ChatStorageMetaKeys.hiveMigrationComplete, 'true'],
+      );
+    } finally {
+      database.close();
+    }
     await File(p.join(root.path, 'messages.hive')).writeAsString('legacy');
   });
 

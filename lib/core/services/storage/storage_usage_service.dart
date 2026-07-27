@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../../database/app_database.dart';
-import '../database_v2_rollout_ledger.dart';
+import '../hive_migration_marker.dart';
 import '../legacy_data_retirement_service.dart';
 import '../backup/restore_trace_service.dart';
 import '../../../utils/app_directories.dart';
@@ -129,9 +129,11 @@ abstract final class StorageUsageService {
     final root = await AppDirectories.getAppDataDirectory();
     var migrationCompleted = false;
     try {
-      migrationCompleted = await DatabaseV2RolloutLedger(root).read() != null;
+      migrationCompleted = HiveMigrationMarker.isMigrationComplete(
+        File(p.join(root.path, AppDatabase.databaseFileName)),
+      );
     } catch (_) {
-      // A malformed rollout receipt must not make legacy files clearable.
+      // An unreadable database must not make legacy files clearable.
     }
     var restoreTraces = RestoreTraceSnapshot.empty;
     try {
@@ -514,8 +516,8 @@ abstract final class StorageUsageService {
 
   static Future<void> clearLegacyChatData() async {
     final root = await AppDirectories.getAppDataDirectory();
-    final migration = await DatabaseV2RolloutLedger(root).read();
-    if (migration == null) {
+    final databaseFile = File(p.join(root.path, AppDatabase.databaseFileName));
+    if (!HiveMigrationMarker.isMigrationComplete(databaseFile)) {
       throw StateError('legacy_retirement_untracked');
     }
     await LegacyDataRetirementService(root).retireHiveArtifacts();

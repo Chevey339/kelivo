@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 
 import 'backup/restore_durability.dart';
@@ -19,19 +18,13 @@ enum LegacyRetirementState { deleting, completed }
 
 final class LegacyRetirementReceipt {
   const LegacyRetirementReceipt({
-    required this.sequence,
     required this.state,
-    required this.previousChecksum,
-    required this.checksum,
     required this.requestedAtUtc,
     required this.completedAtUtc,
     required this.deletedArtifacts,
   });
 
-  final int sequence;
   final LegacyRetirementState state;
-  final String? previousChecksum;
-  final String checksum;
   final DateTime requestedAtUtc;
   final DateTime? completedAtUtc;
   final List<LegacyHiveArtifact> deletedArtifacts;
@@ -40,10 +33,11 @@ final class LegacyRetirementReceipt {
 /// Deletes only the frozen Hive artifact family after an explicit user action.
 ///
 /// Migration admission is handled before the storage UI is available. The UI
-/// decides whether to offer cleanup by combining rollout evidence with
-/// [inspectHiveArtifacts]. This service keeps deletion crash-resumable, but it
-/// deliberately has no retention-age, diagnostic-export, or rollout threshold:
-/// once migration has completed, the retained Hive files belong to the user.
+/// decides whether to offer cleanup by combining the in-database migration
+/// receipt with [inspectHiveArtifacts]. Deletion stays crash-resumable through
+/// a single marker file: a `deleting` marker is published before the first
+/// unlink, so an interrupted cleanup resumes on the next request. A missing or
+/// malformed marker never blocks cleanup, because deletion is idempotent.
 final class LegacyDataRetirementService {
   LegacyDataRetirementService(
     this.appDataDirectory, {
@@ -57,17 +51,17 @@ final class LegacyDataRetirementService {
     'messages.hive',
     'tool_events_v1.hive',
   };
-  static const _retentionDirectoryName = '.database_v2_retention';
-  static final _checksumPattern = RegExp(r'^[0-9a-f]{64}$');
-  static final _receiptPattern = RegExp(r'^receipt_(\d{8})\.json$');
+  static const _markerFileName = '.hive_retirement.json';
+  static const _markerFormat = 'kelivo.hive-retirement-marker';
+  static const _markerFormatVersion = 1;
 
   final Directory appDataDirectory;
   final RestoreDurability durability;
   final Future<void> Function()? afterDeletingReceiptPublished;
   final DateTime Function()? clock;
 
-  Directory get _retentionDirectory =>
-      Directory(p.join(appDataDirectory.path, _retentionDirectoryName));
+  File get _markerFile =>
+      File(p.join(appDataDirectory.path, _markerFileName));
 
   Future<List<LegacyHiveArtifact>> inspectHiveArtifacts() async {
     final artifacts = <LegacyHiveArtifact>[];
@@ -92,9 +86,7 @@ final class LegacyDataRetirementService {
       final artifacts = await inspectHiveArtifacts();
       if (artifacts.isEmpty && existing != null) return existing;
       deleting = await _publishReceipt(
-        sequence: (existing?.sequence ?? 0) + 1,
         state: LegacyRetirementState.deleting,
-        previousChecksum: existing?.checksum,
         requestedAtUtc: (clock?.call() ?? DateTime.now()).toUtc(),
         completedAtUtc: null,
         artifacts: artifacts,
@@ -114,130 +106,79 @@ final class LegacyDataRetirementService {
       await durability.syncDirectory(appDataDirectory, fullBarrier: true);
     }
     return _publishReceipt(
-      sequence: deleting.sequence + 1,
       state: LegacyRetirementState.completed,
-      previousChecksum: deleting.checksum,
       requestedAtUtc: deleting.requestedAtUtc,
       completedAtUtc: (clock?.call() ?? DateTime.now()).toUtc(),
       artifacts: deleting.deletedArtifacts,
     );
   }
 
+  /// Returns the latest marker, or null when it is absent or malformed.
+  /// Malformed markers are intentionally not errors: the marker only carries
+  /// resume metadata, and cleanup must stay available without it.
   Future<LegacyRetirementReceipt?> readReceipt() async {
-    final type = await FileSystemEntity.type(
-      _retentionDirectory.path,
-      followLinks: false,
-    );
-    if (type == FileSystemEntityType.notFound) return null;
-    if (type != FileSystemEntityType.directory) {
-      throw StateError('legacy_retirement_receipt_directory');
+    if (await FileSystemEntity.type(_markerFile.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      return null;
     }
-    final files = <({int sequence, File file})>[];
-    await for (final entity in _retentionDirectory.list(followLinks: false)) {
-      if (entity is! File) {
-        throw StateError('legacy_retirement_receipt_topology');
-      }
-      final name = p.basename(entity.path);
-      final match = _receiptPattern.firstMatch(name);
-      if (match == null) {
-        if (name.startsWith('.receipt_')) continue;
-        throw StateError('legacy_retirement_receipt_topology');
-      }
-      files.add((sequence: int.parse(match.group(1)!), file: entity));
+    try {
+      return _decodeReceipt(await _markerFile.readAsString());
+    } on FormatException {
+      return null;
     }
-    if (files.isEmpty) return null;
-    files.sort((a, b) => a.sequence.compareTo(b.sequence));
-    String? previousChecksum;
-    LegacyRetirementReceipt? latest;
-    for (var index = 0; index < files.length; index++) {
-      if (files[index].sequence != index + 1) {
-        throw StateError('legacy_retirement_receipt_sequence');
-      }
-      final receipt = await _readReceiptFile(files[index].file);
-      if (receipt.sequence != files[index].sequence ||
-          receipt.previousChecksum != previousChecksum) {
-        throw StateError('legacy_retirement_receipt_chain');
-      }
-      previousChecksum = receipt.checksum;
-      latest = receipt;
-    }
-    return latest;
   }
 
   Future<LegacyRetirementReceipt> _publishReceipt({
-    required int sequence,
     required LegacyRetirementState state,
-    required String? previousChecksum,
     required DateTime requestedAtUtc,
     required DateTime? completedAtUtc,
     required List<LegacyHiveArtifact> artifacts,
   }) async {
-    if (!await _retentionDirectory.exists()) {
-      await _retentionDirectory.create(recursive: true);
-      await durability.restrictDirectory(_retentionDirectory);
-      await durability.syncDirectory(appDataDirectory, fullBarrier: true);
-    }
     final body = <String, Object?>{
-      'format': 'kelivo.database-v2-retention-receipt',
-      'formatVersion': 2,
-      'sequence': sequence,
+      'format': _markerFormat,
+      'formatVersion': _markerFormatVersion,
       'state': state.name,
-      'previousChecksum': previousChecksum,
       'requestedAtUtc': requestedAtUtc.toIso8601String(),
       'completedAtUtc': completedAtUtc?.toIso8601String(),
       'artifacts': artifacts.map((artifact) => artifact.toJson()).toList(),
     };
-    final checksum = sha256.convert(utf8.encode(jsonEncode(body))).toString();
-    final target = File(
-      p.join(
-        _retentionDirectory.path,
-        'receipt_${sequence.toString().padLeft(8, '0')}.json',
-      ),
-    );
-    if (await target.exists()) throw StateError('legacy_retirement_collision');
     final temporary = File(
       p.join(
-        _retentionDirectory.path,
-        '.receipt_${sequence}_${pid}_${DateTime.now().microsecondsSinceEpoch}.tmp',
+        appDataDirectory.path,
+        '.hive_retirement_${pid}_${DateTime.now().microsecondsSinceEpoch}.tmp',
       ),
     );
     try {
       await temporary.create(exclusive: true);
       await durability.restrictFile(temporary);
-      await temporary.writeAsString(
-        jsonEncode({...body, 'checksum': checksum}),
-        flush: true,
-      );
+      await temporary.writeAsString(jsonEncode(body), flush: true);
       await durability.syncFile(temporary, fullBarrier: true);
+      // renameAndSync refuses existing targets, so replace in two steps. A
+      // crash between delete and rename only loses resume metadata, which
+      // retireHiveArtifacts rebuilds from a fresh inspection.
+      if (await _markerFile.exists()) {
+        await _markerFile.delete();
+      }
       await durability.renameAndSync(
         source: temporary,
-        targetPath: target.path,
+        targetPath: _markerFile.path,
       );
-      return _readReceiptFile(target);
+      return _decodeReceipt(await _markerFile.readAsString());
     } finally {
       if (await temporary.exists()) await temporary.delete();
     }
   }
 
-  static Future<LegacyRetirementReceipt> _readReceiptFile(File file) async {
-    final value = jsonDecode(await file.readAsString());
-    if (value is! Map<String, dynamic>) {
-      throw const FormatException('legacy_retirement_receipt');
+  static LegacyRetirementReceipt _decodeReceipt(String content) {
+    final value = jsonDecode(content);
+    if (value is! Map<String, dynamic> ||
+        value['format'] != _markerFormat ||
+        value['formatVersion'] != _markerFormatVersion) {
+      throw const FormatException('legacy_retirement_marker');
     }
-    final checksum = value['checksum'];
-    final body = Map<String, dynamic>.from(value)..remove('checksum');
-    if (checksum is! String ||
-        !_checksumPattern.hasMatch(checksum) ||
-        sha256.convert(utf8.encode(jsonEncode(body))).toString() != checksum ||
-        value['format'] != 'kelivo.database-v2-retention-receipt' ||
-        value['formatVersion'] != 2) {
-      throw const FormatException('legacy_retirement_receipt');
-    }
-    final sequence = value['sequence'];
     final state = LegacyRetirementState.values
         .where((candidate) => candidate.name == value['state'])
         .firstOrNull;
-    final previousChecksum = value['previousChecksum'];
     final requestedAt = DateTime.tryParse(
       value['requestedAtUtc']?.toString() ?? '',
     );
@@ -246,24 +187,16 @@ final class LegacyDataRetirementService {
         ? null
         : DateTime.tryParse(completedRaw.toString());
     final artifacts = _decodeArtifacts(value['artifacts']);
-    if (sequence is! int ||
-        sequence <= 0 ||
-        state == null ||
-        (previousChecksum != null &&
-            (previousChecksum is! String ||
-                !_checksumPattern.hasMatch(previousChecksum))) ||
+    if (state == null ||
         requestedAt == null ||
         !requestedAt.isUtc ||
         (completedRaw != null && (completedAt == null || !completedAt.isUtc)) ||
         (state == LegacyRetirementState.deleting && completedAt != null) ||
         (state == LegacyRetirementState.completed && completedAt == null)) {
-      throw const FormatException('legacy_retirement_receipt');
+      throw const FormatException('legacy_retirement_marker');
     }
     return LegacyRetirementReceipt(
-      sequence: sequence,
       state: state,
-      previousChecksum: previousChecksum as String?,
-      checksum: checksum,
       requestedAtUtc: requestedAt,
       completedAtUtc: completedAt,
       deletedArtifacts: artifacts,

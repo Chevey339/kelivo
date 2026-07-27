@@ -4,9 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart';
 
 import 'package:Kelivo/core/database/app_database.dart';
-import 'package:Kelivo/core/services/database_v2_rollout_ledger.dart';
+import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 import 'package:Kelivo/core/services/storage/storage_usage_service.dart';
 
@@ -31,6 +32,23 @@ class _FakePathProviderPlatform extends PathProviderPlatform {
 Future<void> _writeSizedFile(Directory root, String name, int size) async {
   final file = File(p.join(root.path, name));
   await file.writeAsBytes(List<int>.filled(size, 1), flush: true);
+}
+
+void _markMigrationComplete(Directory root) {
+  final database = sqlite3.open(p.join(root.path, AppDatabase.databaseFileName));
+  try {
+    database.execute(
+      'CREATE TABLE IF NOT EXISTS chat_storage_meta_rows '
+      '(key TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);',
+    );
+    database.execute(
+      'INSERT OR REPLACE INTO chat_storage_meta_rows (key, value) '
+      'VALUES (?, ?);',
+      [ChatStorageMetaKeys.hiveMigrationComplete, 'true'],
+    );
+  } finally {
+    database.close();
+  }
 }
 
 void main() {
@@ -97,15 +115,7 @@ void main() {
   test(
     'migrated legacy chat data is clearable and disappears after cleanup',
     () async {
-      await DatabaseV2RolloutLedger(tempDir).recordMigrationCompleted(
-        migrationRunId: 'hive-0123456789abcdef0123456789abcdef',
-        sourceKind: 'hive',
-        sourceHash: List.filled(64, 'a').join(),
-        migratedAtUtc: DateTime.utc(2026, 7, 12),
-        conversationCount: 2,
-        messageCount: 4,
-        issueCounts: const {},
-      );
+      _markMigrationComplete(tempDir);
       await _writeSizedFile(tempDir, 'conversations.hive', 100);
       await _writeSizedFile(tempDir, 'messages.hive', 200);
       await _writeSizedFile(tempDir, 'tool_events_v1.hive', 300);
@@ -129,6 +139,52 @@ void main() {
       );
     },
   );
+
+  test(
+    'cleanup gate reopens after a legacy backup restore and re-migration',
+    () async {
+      _markMigrationComplete(tempDir);
+      await _writeSizedFile(tempDir, 'messages.hive', 200);
+      await StorageUsageService.clearLegacyChatData();
+
+      // Restoring a 1.1.17 backup brings the Hive files back and the
+      // re-migration writes its receipt into a fresh database. Earlier
+      // cleanup evidence must not lock the gate.
+      await File(p.join(tempDir.path, AppDatabase.databaseFileName)).delete();
+      _markMigrationComplete(tempDir);
+      await _writeSizedFile(tempDir, 'messages.hive', 128);
+
+      final again = await StorageUsageService.computeReport();
+      final legacy = again.categories.singleWhere(
+        (category) => category.key == StorageUsageCategoryKey.legacyChatData,
+      );
+      expect(legacy.stats.bytes, 128);
+      expect(again.clearable.bytes, greaterThanOrEqualTo(128));
+
+      await StorageUsageService.clearLegacyChatData();
+      final after = await StorageUsageService.computeReport();
+      expect(
+        after.categories.where(
+          (category) => category.key == StorageUsageCategoryKey.legacyChatData,
+        ),
+        isEmpty,
+      );
+      expect(
+        File(p.join(tempDir.path, 'messages.hive')).existsSync(),
+        isFalse,
+      );
+    },
+  );
+
+  test('legacy cleanup refuses to run without a migration receipt', () async {
+    await _writeSizedFile(tempDir, 'messages.hive', 64);
+
+    await expectLater(
+      StorageUsageService.clearLegacyChatData(),
+      throwsA(isA<StateError>()),
+    );
+    expect(File(p.join(tempDir.path, 'messages.hive')).existsSync(), isTrue);
+  });
 
   test(
     'chat records size works when only the main SQLite database exists',

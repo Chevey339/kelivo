@@ -75,12 +75,26 @@ void main() {
   test('a completed cleanup can clear newly reappeared legacy files', () async {
     final service = LegacyDataRetirementService(directory);
     await File(p.join(directory.path, 'messages.hive')).writeAsString('first');
-    final first = await service.retireHiveArtifacts();
+    await service.retireHiveArtifacts();
     await File(p.join(directory.path, 'messages.hive')).writeAsString('second');
 
     final second = await service.retireHiveArtifacts();
 
-    expect(second.sequence, first.sequence + 2);
+    expect(second.state, LegacyRetirementState.completed);
+    expect(await service.inspectHiveArtifacts(), isEmpty);
+  });
+
+  test('a malformed marker does not block cleanup', () async {
+    await File(
+      p.join(directory.path, '.hive_retirement.json'),
+    ).writeAsString('not json');
+    await File(p.join(directory.path, 'messages.hive')).writeAsString('legacy');
+    final service = LegacyDataRetirementService(directory);
+
+    expect(await service.readReceipt(), isNull);
+    final receipt = await service.retireHiveArtifacts();
+
+    expect(receipt.state, LegacyRetirementState.completed);
     expect(await service.inspectHiveArtifacts(), isEmpty);
   });
 }
