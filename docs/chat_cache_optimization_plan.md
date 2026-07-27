@@ -1,6 +1,6 @@
 # 聊天记录缓存与加载优化方案
 
-> 状态：实施中 —— P0 措施 1（缓存写空修复，含回归测试）与措施 5（synchronous=NORMAL + includeMessageIds:false）已随阶段 1 批次落地；其余措施待实施
+> 状态：实施中 —— P0 全部落地：措施 1（缓存写空修复）与措施 5（synchronous=NORMAL + includeMessageIds:false）随阶段 1 落地；措施 2（loadTimelinePage 尾窗缓存快路径，stale-free + debug 对拍 + 总开关）、措施 3（切换流水线 fetch-then-commit）、措施 4（错配帧消除 + _isLoadingWindow）、措施 6（摘要/建议改 await loadMessages、多版本建议落库修复、清空上下文零 IO 计数）随阶段 3 落地，经全量测试（约 1414 个）与对抗评审；P1/P2 待实施
 > 范围：`ChatService` 内存缓存、DB 读写路径、会话切换/启动流水线、消息列表与侧边栏渲染
 > 产出方式：6 路子系统深读 → 51 个问题合并去重为 12 条 → 逐条对抗验证（12/12 确认，含精度修正）→ 三角度方案设计 + 交叉评审综合
 

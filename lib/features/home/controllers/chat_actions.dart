@@ -107,6 +107,9 @@ class ChatActionResult {
 
   factory ChatActionResult.noModel() =>
       ChatActionResult(success: false, errorMessage: 'no_model');
+
+  factory ChatActionResult.inFlight() =>
+      ChatActionResult(success: false, errorMessage: 'in_flight');
 }
 
 /// Actions class for chat operations (send, regenerate, cancel, streaming).
@@ -326,6 +329,18 @@ class ChatActions {
       <String, _GenerationCheckpointCursor>{};
   final ActiveStreamingMessageStore _activeAssistantMessages =
       ActiveStreamingMessageStore();
+
+  /// Per-conversation send/regenerate claim, taken synchronously before the
+  /// first await so a re-entrant call loses before persisting anything. The
+  /// claim is handed off to the loading guard once loading is set; the token
+  /// prevents a stale finally from clearing a newer claim.
+  final Map<String, int> _sendInFlightClaims = <String, int>{};
+  var _sendInFlightClaimSerial = 0;
+
+  /// Whether a send/regenerate for [conversationId] has been claimed but has
+  /// not yet handed exclusion off to the loading guard.
+  bool isSendInFlight(String conversationId) =>
+      _sendInFlightClaims.containsKey(conversationId);
 
   List<ChatMessage> get _messages => chatController.messages;
   Map<String, int> get _versionSelections => chatController.versionSelections;
@@ -820,6 +835,24 @@ class ChatActions {
     required ChatInputData input,
     required Conversation conversation,
   }) async {
+    final claimToken = ++_sendInFlightClaimSerial;
+    if (_sendInFlightClaims.containsKey(conversation.id)) {
+      return ChatActionResult.inFlight();
+    }
+    _sendInFlightClaims[conversation.id] = claimToken;
+    try {
+      return await _sendMessageClaimed(input: input, conversation: conversation);
+    } finally {
+      if (_sendInFlightClaims[conversation.id] == claimToken) {
+        _sendInFlightClaims.remove(conversation.id);
+      }
+    }
+  }
+
+  Future<ChatActionResult> _sendMessageClaimed({
+    required ChatInputData input,
+    required Conversation conversation,
+  }) async {
     final content = input.text.trim();
     if (content.isEmpty &&
         input.imagePaths.isEmpty &&
@@ -900,6 +933,8 @@ class ChatActions {
     }
     _activeAssistantMessages.put(assistantMessage);
     _setConversationLoading(conversation.id, true);
+    // The loading guard now owns re-entry exclusion for this conversation.
+    _sendInFlightClaims.remove(conversation.id);
 
     // Pre-create streaming notifier BEFORE adding message to list
     // so that MessageListView can detect it's streaming on first render
@@ -1024,6 +1059,31 @@ class ChatActions {
   /// - Showing snackbars on errors
   /// - Haptic feedback
   Future<ChatActionResult> regenerateAtMessage({
+    required ChatMessage message,
+    required Conversation conversation,
+    bool assistantAsNewReply = false,
+    bool allowImagesApiRouting = true,
+  }) async {
+    final claimToken = ++_sendInFlightClaimSerial;
+    if (_sendInFlightClaims.containsKey(conversation.id)) {
+      return ChatActionResult.inFlight();
+    }
+    _sendInFlightClaims[conversation.id] = claimToken;
+    try {
+      return await _regenerateAtMessageClaimed(
+        message: message,
+        conversation: conversation,
+        assistantAsNewReply: assistantAsNewReply,
+        allowImagesApiRouting: allowImagesApiRouting,
+      );
+    } finally {
+      if (_sendInFlightClaims[conversation.id] == claimToken) {
+        _sendInFlightClaims.remove(conversation.id);
+      }
+    }
+  }
+
+  Future<ChatActionResult> _regenerateAtMessageClaimed({
     required ChatMessage message,
     required Conversation conversation,
     bool assistantAsNewReply = false,
@@ -1172,6 +1232,8 @@ class ChatActions {
     onMessagesChanged?.call();
 
     _setConversationLoading(conversation.id, true);
+    // The loading guard now owns re-entry exclusion for this conversation.
+    _sendInFlightClaims.remove(conversation.id);
 
     // Initialize reasoning
     final supportsReasoning = _isReasoningModel(providerKey, modelId);

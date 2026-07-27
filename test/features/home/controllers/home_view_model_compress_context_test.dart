@@ -117,67 +117,36 @@ void main() {
   });
 
   group('HomeViewModel.computeClearContextRemainingMessageCount', () {
-    test('长会话计数使用完整历史而不是当前懒加载窗口', () {
-      final completeHistory = <ChatMessage>[
-        for (var i = 0; i < 100; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            content: 'message $i',
-          ),
-      ];
-      final loadedTailWindow = completeHistory.sublist(80);
-
+    test('计数来自持久化总数，与窗口缓存无关', () {
       final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: completeHistory,
+        totalMessages: 100,
         truncateIndex: -1,
       );
 
-      expect(loadedTailWindow.length, 20);
       expect(count, 100);
     });
 
-    test('已有清空点时从完整历史的持久化截断位置开始计数', () {
-      final completeHistory = <ChatMessage>[
-        for (var i = 0; i < 100; i++)
-          _message(
-            id: 'm$i',
-            role: i.isEven ? 'user' : 'assistant',
-            content: 'message $i',
-          ),
-      ];
-
+    test('已有清空点时从持久化截断位置开始计数', () {
       final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: completeHistory,
+        totalMessages: 100,
         truncateIndex: 90,
       );
 
       expect(count, 10);
     });
 
-    test('截断点之前消息组的尾部新版本不会被算入剩余上下文', () {
-      final completeHistory = <ChatMessage>[
-        _message(id: 'u1-v0', role: 'user', content: 'old', groupId: 'u1'),
-        _message(id: 'a1', role: 'assistant', content: 'answer'),
-        _message(
-          id: 'u1-v1',
-          role: 'user',
-          content: 'edited old',
-          groupId: 'u1',
-          version: 1,
-        ),
-      ];
-      final collapsed = <ChatMessage>[completeHistory[2], completeHistory[1]];
-
-      final count = HomeViewModel.computeClearContextRemainingMessageCount(
-        completeMessages: completeHistory,
-        collapsedMessages: collapsed,
-        truncateIndex: 2,
+    test('截断位置越界时按未清空处理', () {
+      final beyond = HomeViewModel.computeClearContextRemainingMessageCount(
+        totalMessages: 100,
+        truncateIndex: 101,
+      );
+      final atEnd = HomeViewModel.computeClearContextRemainingMessageCount(
+        totalMessages: 100,
+        truncateIndex: 100,
       );
 
-      expect(count, 0);
+      expect(beyond, 100);
+      expect(atEnd, 0);
     });
   });
 }

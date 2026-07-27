@@ -73,6 +73,10 @@ class ChatService extends ChangeNotifier {
   static const int defaultLoadedWindowMax = 360;
   static const int _messageCacheMaxEntries = 720;
   static const int _messageCacheMaxBytes = 8 * 1024 * 1024;
+
+  // Kill switch for the loadTimelinePage in-memory fast path; set to false to
+  // force the database path everywhere.
+  static bool timelineCacheFastPathEnabled = true;
   static const int _assetReferenceBackfillVersion = 2;
   static const Duration _assetGcDelay = Duration(days: 7);
 
@@ -98,6 +102,11 @@ class ChatService extends ChangeNotifier {
   final Map<String, Map<String, int>> _firstGroupIndicesCache = {};
   final Map<String, int> _messageCounts = {};
   final Map<String, List<String>> _messageOrderIds = {};
+
+  int _timelineFastPathHitCount = 0;
+
+  @visibleForTesting
+  int get debugTimelineFastPathHitCount => _timelineFastPathHitCount;
 
   // Localized default title for new conversations; set by UI on startup.
   String _defaultConversationTitle = 'New Chat';
@@ -294,6 +303,18 @@ class ChatService extends ChangeNotifier {
         limit: limit,
       );
     }
+    if (timelineCacheFastPathEnabled &&
+        !fromStart &&
+        beforeRevisionId == null &&
+        afterRevisionId == null &&
+        aroundRevisionId == null) {
+      final cachedPage = _tryLoadCachedTailPage(conversationId, limit: limit);
+      if (cachedPage != null) {
+        _timelineFastPathHitCount += 1;
+        _debugVerifyCachedTailPage(cachedPage, limit: limit);
+        return cachedPage;
+      }
+    }
     final page = await _repo.loadLinearMessageWindow(
       conversationId: conversationId,
       beforeRevisionId: beforeRevisionId,
@@ -457,6 +478,161 @@ class ChatService extends ChangeNotifier {
       hasMoreAfter: end < activeMessages.length,
       totalSlotCount: activeMessages.length,
     );
+  }
+
+  // In-memory tail window for loadTimelinePage. Conservative by contract:
+  // anything that cannot be decided exactly from the cache returns null so the
+  // caller falls back to the database.
+  LoadedTimelinePage? _tryLoadCachedTailPage(
+    String conversationId, {
+    required int limit,
+  }) {
+    final order = _messageOrderIds[conversationId];
+    if (order == null) return null;
+    final conversation = _conversationsCache[conversationId];
+    if (conversation == null) return null;
+    final cached = _messagesCache[conversationId];
+    if (cached == null) return null;
+    final byId = <String, ChatMessage>{
+      for (final message in cached) message.id: message,
+    };
+    // Group membership, version counts, and the total slot count are only
+    // exact when every skeleton id resolves to a cached message.
+    final groups = <String, List<ChatMessage>>{};
+    final groupOrder = <String>[];
+    for (final id in order) {
+      final message = byId[id];
+      if (message == null) return null;
+      final groupId = message.groupId ?? message.id;
+      final revisions = groups[groupId];
+      if (revisions == null) {
+        groups[groupId] = <ChatMessage>[message];
+        groupOrder.add(groupId);
+      } else {
+        revisions.add(message);
+      }
+    }
+    final selections = conversation.versionSelections;
+    final selected = <ChatMessage>[];
+    for (final groupId in groupOrder) {
+      selected.add(
+        _selectTimelineRevision(groups[groupId]!, selections[groupId]),
+      );
+    }
+    final totalSlots = groupOrder.length;
+    final start = totalSlots > limit ? totalSlots - limit : 0;
+    String? parentRevisionId;
+    final loadedSlots = <LoadedTimelineSlot>[];
+    for (var index = start; index < totalSlots; index++) {
+      final message = selected[index];
+      loadedSlots.add(
+        LoadedTimelineSlot(
+          identity: ActiveTimelineSlot(
+            slotId: groupOrder[index],
+            revisionId: message.id,
+            parentRevisionId: parentRevisionId,
+            role: message.role,
+            createdAt: message.timestamp,
+            updatedAt: message.timestamp,
+            finalizedAt: message.isStreaming ? null : message.timestamp,
+            versionCount: groups[groupOrder[index]]!.length,
+            logicalIndex: index,
+          ),
+          message: message,
+        ),
+      );
+      parentRevisionId = message.id;
+    }
+    return LoadedTimelinePage(
+      conversationId: conversationId,
+      stateRevision: conversation.updatedAt.microsecondsSinceEpoch,
+      contextStartRevisionId: null,
+      slots: loadedSlots,
+      hasMoreBefore: start > 0,
+      hasMoreAfter: false,
+      totalSlotCount: totalSlots,
+    );
+  }
+
+  // Mirrors the ranking in ChatDatabaseRepository.loadLinearMessageWindow:
+  // the explicitly selected version wins, otherwise the highest version.
+  // Revisions arrive in message_order, so a later entry wins version ties.
+  static ChatMessage _selectTimelineRevision(
+    List<ChatMessage> revisions,
+    int? selectedVersion,
+  ) {
+    if (selectedVersion != null) {
+      ChatMessage? selected;
+      for (final revision in revisions) {
+        if (revision.version == selectedVersion) selected = revision;
+      }
+      if (selected != null) return selected;
+    }
+    var latest = revisions.first;
+    for (final revision in revisions) {
+      if (revision.version >= latest.version) latest = revision;
+    }
+    return latest;
+  }
+
+  void _debugVerifyCachedTailPage(LoadedTimelinePage page, {required int limit}) {
+    if (!kDebugMode && !kProfileMode) return;
+    final conversationId = page.conversationId;
+    unawaited(() async {
+      try {
+        final window = await _repo.loadLinearMessageWindow(
+          conversationId: conversationId,
+          limit: limit,
+        );
+        // The conversation may have legitimately changed since the hit; only
+        // compare when it is untouched.
+        final current = _conversationsCache[conversationId];
+        if (current == null ||
+            current.updatedAt.microsecondsSinceEpoch != page.stateRevision) {
+          return;
+        }
+        String describe(String groupId, String revisionId, int versionCount,
+                int logicalIndex) =>
+            '$groupId/$revisionId/$versionCount/$logicalIndex';
+        final expected = [
+          for (final slot in window.slots)
+            describe(
+              slot.groupId,
+              slot.revisionId,
+              slot.versionCount,
+              slot.logicalIndex,
+            ),
+        ];
+        final actual = [
+          for (final slot in page.slots)
+            describe(
+              slot.identity.slotId,
+              slot.identity.revisionId,
+              slot.identity.versionCount,
+              slot.identity.logicalIndex,
+            ),
+        ];
+        final consistent =
+            window.totalSlotCount == page.totalSlotCount &&
+            window.hasMoreBefore == page.hasMoreBefore &&
+            window.hasMoreAfter == page.hasMoreAfter &&
+            listEquals(expected, actual);
+        if (!consistent) {
+          // The database result is authoritative; this indicates a fast-path
+          // bug, not data the caller should act on.
+          debugPrint(
+            'timeline cache fast path mismatch for $conversationId; '
+            'database result is authoritative',
+          );
+          assert(
+            false,
+            'timeline cache fast path mismatch for $conversationId',
+          );
+        }
+      } catch (error) {
+        debugPrint('timeline cache fast path verification failed: $error');
+      }
+    }());
   }
 
   void retainTimelineWindow(
@@ -724,6 +900,13 @@ class ChatService extends ChangeNotifier {
   List<ChatMessage> getMessages(String conversationId) {
     if (!_initialized) return const [];
     return _messagesCache[conversationId] ?? const [];
+  }
+
+  // Same completeness judgment the loadMessages cache-hit branch uses.
+  bool isConversationFullyCached(String conversationId) {
+    if (!_initialized) return false;
+    final cached = _messagesCache[conversationId];
+    return cached != null && cached.length == getMessageCount(conversationId);
   }
 
   Future<List<ChatMessage>> loadMessages(String conversationId) async {

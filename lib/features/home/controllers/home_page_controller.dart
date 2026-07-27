@@ -148,6 +148,10 @@ class HomePageController extends ChangeNotifier {
   late Animation<double> _messageJumpOpacity;
   bool _chatControllerReady = false;
 
+  /// Serial of the latest animated conversation transition; superseded
+  /// transitions check it to discard their pre-commit work.
+  int _switchSerial = 0;
+
   // ============================================================================
   // State Fields
   // ============================================================================
@@ -710,6 +714,13 @@ class HomePageController extends ChangeNotifier {
       _replaceInputWithSuggestion(text);
       return;
     }
+    // A tap landing inside the pre-loading race window is a duplicate: the
+    // first send has been claimed but has not set the loading guard yet.
+    final conversationId = currentConversation?.id;
+    if (conversationId != null &&
+        _viewModel.isConversationSendInFlight(conversationId)) {
+      return;
+    }
     await sendMessage(ChatInputData(text: text));
   }
 
@@ -834,40 +845,67 @@ class HomePageController extends ChangeNotifier {
   // ============================================================================
 
   Future<void> switchConversationAnimated(String id) async {
-    try {
-      await _viewModel.flushCurrentConversationProgress();
-    } catch (_) {}
-    if (currentConversation?.id == id) return;
-    _exitUserMessageEdit(clearDraft: true);
-    if (!isDesktopPlatform) {
-      try {
-        await _convoFadeController.reverse();
-      } catch (_) {}
-    } else {
-      try {
-        _convoFadeController.stop();
-        _convoFadeController.value = 1.0;
-      } catch (_) {}
+    final serial = ++_switchSerial;
+    if (currentConversation?.id == id) {
+      // Already on the target: the serial bump above cancels any in-flight
+      // switch; reveal the current list again in case a fade-out is pending
+      // or in flight. forward() is a no-op when the list is fully visible.
+      if (!isDesktopPlatform) {
+        unawaited(_forwardConvoFade());
+      }
+      return;
     }
-
-    await _viewModel.switchConversation(id);
-    notifyListeners();
+    _exitUserMessageEdit(clearDraft: true);
 
     if (!isDesktopPlatform) {
+      // Fetch-then-commit: fade-out, progress flush, and the DB fetch run
+      // concurrently, but the fetched window is committed only after the
+      // fade-out completes so no new data flashes while opacity is not 0.
+      final fadeFuture = _reverseConvoFade();
+      final flushFuture = _flushProgressSilently();
+      final PreparedConversationSwitch? prepared;
+      try {
+        prepared = await _viewModel.prepareConversationSwitch(id);
+      } catch (_) {
+        if (serial == _switchSerial) await _forwardConvoFade();
+        rethrow;
+      }
+      if (serial != _switchSerial) return;
+      await Future.wait([fadeFuture, flushFuture]);
+      if (serial != _switchSerial) return;
+      if (prepared == null) {
+        // Target vanished; reveal the current list again.
+        await _forwardConvoFade();
+        return;
+      }
+      _viewModel.commitConversationSwitch(prepared);
+      notifyListeners();
+
       try {
         await WidgetsBinding.instance.endOfFrame;
-        if (currentConversation?.id != id) return;
+        if (serial != _switchSerial || currentConversation?.id != id) return;
         // Resolve the real last item while the new conversation is still
         // transparent. Its first maxScrollExtent can contain lazy estimates.
         final activeScrollController = _scrollCtrl;
         await activeScrollController.settleAtBottomBeforeReveal();
-        if (currentConversation?.id != id ||
+        if (serial != _switchSerial ||
+            currentConversation?.id != id ||
             !identical(_scrollCtrl, activeScrollController)) {
           return;
         }
         await _convoFadeController.forward();
       } catch (_) {}
+    } else {
+      await _flushProgressSilently();
+      try {
+        _convoFadeController.stop();
+        _convoFadeController.value = 1.0;
+      } catch (_) {}
+      if (serial != _switchSerial) return;
+      await _viewModel.switchConversation(id);
+      notifyListeners();
     }
+
     if (isDesktopPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _inputFocus.requestFocus();
@@ -875,7 +913,27 @@ class HomePageController extends ChangeNotifier {
     }
   }
 
+  Future<void> _reverseConvoFade() async {
+    try {
+      await _convoFadeController.reverse();
+    } catch (_) {}
+  }
+
+  Future<void> _forwardConvoFade() async {
+    try {
+      await _convoFadeController.forward();
+    } catch (_) {}
+  }
+
+  Future<void> _flushProgressSilently() async {
+    try {
+      await _viewModel.flushCurrentConversationProgress();
+    } catch (_) {}
+  }
+
   Future<void> createNewConversationAnimated() async {
+    // Cancel any in-flight conversation switch fetch.
+    _switchSerial++;
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}

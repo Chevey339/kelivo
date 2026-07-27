@@ -1,6 +1,6 @@
 # 异步化改造与 SQLite 迁移遗留问题审计及修复方案
 
-> 状态：第一批（发版阻断）+ 第三批 C1/C2/C3（含 B5）已实施 —— B1/B2/B3/B4、A1/A2/A3、A5、屏障自死锁已落地；过渡代码清理完成：rollout 账本退役、legacy 双表（tool_event_rows/gemini_thought_signature_rows）与 migration_run/issue 表族删除、restoreDatabaseSnapshot 死链移除，工具事件/签名改由 parts/artifacts 单源持久化；全量测试与对抗评审通过；第二批其余项（A4/A6-A9/B6）待实施
+> 状态：第一批（发版阻断）+ 第三批 C1/C2/C3（含 B5）+ A6/A9 已实施 —— B1/B2/B3/B4、A1/A2/A3、A5、屏障自死锁已落地；过渡代码清理完成（rollout 账本退役、legacy 双表与 migration 表族删除、restoreDatabaseSnapshot 死链移除，工具事件/签名单源 parts 持久化）；A6 窗口变异方法身份复查与 A9 send/regenerate 首个 await 前 in-flight 置位随阶段 3 落地；第二批其余项（A4/A7/A8/B6）待实施
 > 范围：同步→异步改造引入的缺陷、Hive→SQLite 迁移与备份/恢复链路、基于发版前提可删除的过渡代码
 > 前提：最后发布版本为 **1.1.17+61（纯 Hive）**，此后的 SQLite 迁移（#792/#800）与异步化改造均未发版。因此**只需支持"1.1.17 Hive 数据 → 当前版本"一次性迁移**，未发版期间的中间格式/灰度/回滚机制可删除。两个必须保留的兼容面：① 1.1.17 时代的备份文件必须仍可恢复；② Cherry/ChatBox 第三方导入是独立功能，不是过渡代码。
 > 产出方式：6 路审计面深读（Hive 迁移 / 过渡代码 / 核心异步化 / UI 异步化 / 备份恢复 / DB 完整性）→ 70 个问题去重为 14 条（已剔除与 `docs/chat_cache_optimization_plan.md` 12 条重复项）→ 逐条对抗验证 → 完整性批评家补漏二轮（API 流式层 / 退出期持久化 / 附件管线）→ 最终 **18 条确认、1 条驳回**
