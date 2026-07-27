@@ -438,98 +438,6 @@ class ConversationMcpServerRows extends Table with TableInfo {
   bool get dontWriteConstraints => true;
 }
 
-class ToolEventRows extends Table with TableInfo {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  ToolEventRows(this.attachedDatabase, [this._alias]);
-  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
-    'message_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL REFERENCES message_rows(id)ON DELETE CASCADE',
-  );
-  late final GeneratedColumn<String> eventsJson = GeneratedColumn<String>(
-    'events_json',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [messageId, eventsJson];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'tool_event_rows';
-  @override
-  Set<GeneratedColumn> get $primaryKey => {messageId};
-  @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
-  }
-
-  @override
-  ToolEventRows createAlias(String alias) {
-    return ToolEventRows(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const ['PRIMARY KEY(message_id)'];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class GeminiThoughtSignatureRows extends Table with TableInfo {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  GeminiThoughtSignatureRows(this.attachedDatabase, [this._alias]);
-  late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
-    'message_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL REFERENCES message_rows(id)ON DELETE CASCADE',
-  );
-  late final GeneratedColumn<String> signature = GeneratedColumn<String>(
-    'signature',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [messageId, signature];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'gemini_thought_signature_rows';
-  @override
-  Set<GeneratedColumn> get $primaryKey => {messageId};
-  @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
-  }
-
-  @override
-  GeminiThoughtSignatureRows createAlias(String alias) {
-    return GeminiThoughtSignatureRows(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const ['PRIMARY KEY(message_id)'];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
 class ChatStorageMetaRows extends Table with TableInfo {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -765,207 +673,6 @@ class ProviderArtifactRows extends Table with TableInfo {
     'FOREIGN KEY(revision_id)REFERENCES message_rows(id)ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
     'CHECK(updated_at >= created_at)',
   ];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class MigrationRunRows extends Table with TableInfo {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  MigrationRunRows(this.attachedDatabase, [this._alias]);
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumn<String> sourceKind = GeneratedColumn<String>(
-    'source_kind',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints:
-        'NOT NULL CHECK (source_kind IN (\'hive\', \'legacy_json\'))',
-  );
-  late final GeneratedColumn<String> sourceHash = GeneratedColumn<String>(
-    'source_hash',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumn<String> status = GeneratedColumn<String>(
-    'status',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints:
-        'NOT NULL CHECK (status IN (\'building\', \'completed\', \'failed\'))',
-  );
-  late final GeneratedColumn<int> startedAt = GeneratedColumn<int>(
-    'started_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumn<int> completedAt = GeneratedColumn<int>(
-    'completed_at',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    $customConstraints: 'NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    sourceKind,
-    sourceHash,
-    status,
-    startedAt,
-    completedAt,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'migration_run_rows';
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  List<Set<GeneratedColumn>> get uniqueKeys => [
-    {sourceKind, sourceHash},
-  ];
-  @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
-  }
-
-  @override
-  MigrationRunRows createAlias(String alias) {
-    return MigrationRunRows(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const [
-    'PRIMARY KEY(id)',
-    'UNIQUE(source_kind, source_hash)',
-    'CHECK(completed_at IS NULL OR completed_at >= started_at)',
-  ];
-  @override
-  bool get dontWriteConstraints => true;
-}
-
-class MigrationIssueRows extends Table with TableInfo {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  MigrationIssueRows(this.attachedDatabase, [this._alias]);
-  late final GeneratedColumn<String> id = GeneratedColumn<String>(
-    'id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumn<String> migrationRunId = GeneratedColumn<String>(
-    'migration_run_id',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints:
-        'NOT NULL REFERENCES migration_run_rows(id)ON DELETE CASCADE',
-  );
-  late final GeneratedColumn<String> conversationId = GeneratedColumn<String>(
-    'conversation_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'NULL',
-  );
-  late final GeneratedColumn<String> sourceEntityId = GeneratedColumn<String>(
-    'source_entity_id',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'NULL',
-  );
-  late final GeneratedColumn<String> kind = GeneratedColumn<String>(
-    'kind',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  late final GeneratedColumn<String> severity = GeneratedColumn<String>(
-    'severity',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints:
-        'NOT NULL CHECK (severity IN (\'warning\', \'recovered\', \'rejected\'))',
-  );
-  late final GeneratedColumn<String> detailsJson = GeneratedColumn<String>(
-    'details_json',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: 'NOT NULL DEFAULT \'{}\'',
-    defaultValue: const CustomExpression('\'{}\''),
-  );
-  late final GeneratedColumn<int> createdAt = GeneratedColumn<int>(
-    'created_at',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [
-    id,
-    migrationRunId,
-    conversationId,
-    sourceEntityId,
-    kind,
-    severity,
-    detailsJson,
-    createdAt,
-  ];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'migration_issue_rows';
-  @override
-  Set<GeneratedColumn> get $primaryKey => {id};
-  @override
-  Never map(Map<String, dynamic> data, {String? tablePrefix}) {
-    throw UnsupportedError('TableInfo.map in schema verification code');
-  }
-
-  @override
-  MigrationIssueRows createAlias(String alias) {
-    return MigrationIssueRows(attachedDatabase, alias);
-  }
-
-  @override
-  List<String> get customConstraints => const ['PRIMARY KEY(id)'];
   @override
   bool get dontWriteConstraints => true;
 }
@@ -1863,9 +1570,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
   late final MessageRows messageRows = MessageRows(this);
   late final ConversationMcpServerRows conversationMcpServerRows =
       ConversationMcpServerRows(this);
-  late final ToolEventRows toolEventRows = ToolEventRows(this);
-  late final GeminiThoughtSignatureRows geminiThoughtSignatureRows =
-      GeminiThoughtSignatureRows(this);
   late final ChatStorageMetaRows chatStorageMetaRows = ChatStorageMetaRows(
     this,
   );
@@ -1873,8 +1577,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
   late final ProviderArtifactRows providerArtifactRows = ProviderArtifactRows(
     this,
   );
-  late final MigrationRunRows migrationRunRows = MigrationRunRows(this);
-  late final MigrationIssueRows migrationIssueRows = MigrationIssueRows(this);
   late final GenerationRunRows generationRunRows = GenerationRunRows(this);
   late final AssistantRows assistantRows = AssistantRows(this);
   late final ProviderRows providerRows = ProviderRows(this);
@@ -1919,10 +1621,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
     'idx_provider_artifacts_revision_kind',
     'CREATE INDEX idx_provider_artifacts_revision_kind ON provider_artifact_rows (conversation_id, revision_id, kind)',
   );
-  late final Index idxMigrationIssuesRunKind = Index(
-    'idx_migration_issues_run_kind',
-    'CREATE INDEX idx_migration_issues_run_kind ON migration_issue_rows (migration_run_id, kind, id)',
-  );
   late final Index idxGenerationRunsActiveTarget = Index(
     'idx_generation_runs_active_target',
     'CREATE UNIQUE INDEX idx_generation_runs_active_target ON generation_run_rows (conversation_id, target_revision_id) WHERE state IN (\'preparing\', \'requesting\', \'streaming\', \'waiting_tool\')',
@@ -1943,13 +1641,9 @@ class DatabaseAtV1 extends GeneratedDatabase {
     conversationRows,
     messageRows,
     conversationMcpServerRows,
-    toolEventRows,
-    geminiThoughtSignatureRows,
     chatStorageMetaRows,
     messagePartRows,
     providerArtifactRows,
-    migrationRunRows,
-    migrationIssueRows,
     generationRunRows,
     assistantRows,
     providerRows,
@@ -1970,7 +1664,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
     idxMessagesGroup,
     idxMessagePartsRevisionOrdinal,
     idxProviderArtifactsRevisionKind,
-    idxMigrationIssuesRunKind,
     idxGenerationRunsActiveTarget,
     idxGenerationRunsStateUpdated,
     idxAssistantMemoriesAssistant,
@@ -1998,22 +1691,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
         'message_rows',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('tool_event_rows', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'message_rows',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [
-        TableUpdate('gemini_thought_signature_rows', kind: UpdateKind.delete),
-      ],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'message_rows',
-        limitUpdateKind: UpdateKind.delete,
-      ),
       result: [TableUpdate('message_part_rows', kind: UpdateKind.delete)],
     ),
     WritePropagation(
@@ -2022,13 +1699,6 @@ class DatabaseAtV1 extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('provider_artifact_rows', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'migration_run_rows',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('migration_issue_rows', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(

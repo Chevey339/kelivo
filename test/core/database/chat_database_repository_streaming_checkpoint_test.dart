@@ -126,29 +126,6 @@ void main() {
       expect(authoritative?.reasoningText, 'thinking');
     });
 
-    test(
-      'provider artifact remains authoritative over legacy signature',
-      () async {
-        await repository.setGeminiThoughtSignature(
-          'streaming',
-          'authoritative',
-        );
-        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
-        try {
-          raw.execute(
-            "UPDATE gemini_thought_signature_rows SET signature = 'wrong' "
-            "WHERE message_id = 'streaming';",
-          );
-        } finally {
-          raw.close();
-        }
-        expect(
-          await repository.getGeminiThoughtSignature('streaming'),
-          'authoritative',
-        );
-      },
-    );
-
     test('不存在的消息不会被 checkpoint 意外插入', () async {
       await expectLater(
         repository.updateStreamingCheckpoint(

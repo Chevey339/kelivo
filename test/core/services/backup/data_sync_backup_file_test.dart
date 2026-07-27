@@ -85,24 +85,6 @@ class _FailingArtifactChatService extends ChatService {
   }
 }
 
-class _FailingSnapshotRestoreChatService extends ChatService {
-  @override
-  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('written_during_restore', 'keep-concurrent-write');
-    throw StateError('snapshot restore failed');
-  }
-}
-
-class _RecordingSnapshotPathChatService extends ChatService {
-  String? snapshotPath;
-
-  @override
-  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
-    snapshotPath = snapshotFile.path;
-  }
-}
-
 class _RecordingClearChatService extends ChatService {
   bool cleared = false;
   bool replaced = false;
@@ -994,7 +976,7 @@ void main() {
         prefix: 'same_volume_staging',
         settings: const {},
       );
-      final chatService = _RecordingSnapshotPathChatService();
+      final chatService = ChatService();
 
       await DataSync(
         businessRepository: businessRepository,
@@ -1004,7 +986,6 @@ void main() {
         const WebDavConfig(includeChats: true, includeFiles: false),
       );
 
-      expect(chatService.snapshotPath, isNull);
       final workspace = Directory('${root.path}/.kelivo_restore');
       final runDirectory = await _singleRestoreRunDirectory(root);
       final runId = await File('${workspace.path}/.active_run').readAsString();
@@ -1285,7 +1266,7 @@ void main() {
 
         await DataSync(
           businessRepository: businessRepository,
-          chatService: _FailingSnapshotRestoreChatService(),
+          chatService: ChatService(),
         ).restoreFromLocalFile(
           zipFile,
           const WebDavConfig(includeChats: true, includeFiles: false),
@@ -1295,8 +1276,6 @@ void main() {
           await BusinessRestoreService(businessRepository).exportSettings(),
           before,
         );
-        final prefs = await SharedPreferences.getInstance();
-        expect(prefs.getString('written_during_restore'), isNull);
         final pending = await RestoreStartupGate.inspect(
           appDataDirectory: root,
         );

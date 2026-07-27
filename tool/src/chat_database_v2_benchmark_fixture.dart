@@ -240,13 +240,17 @@ CREATE TABLE conversation_mcp_server_rows (
   ordinal INTEGER NOT NULL,
   PRIMARY KEY (conversation_id, server_id)
 );
-CREATE TABLE tool_event_rows (
-  message_id TEXT NOT NULL PRIMARY KEY REFERENCES message_rows(id) ON DELETE CASCADE,
-  events_json TEXT NOT NULL
-);
-CREATE TABLE gemini_thought_signature_rows (
-  message_id TEXT NOT NULL PRIMARY KEY REFERENCES message_rows(id) ON DELETE CASCADE,
-  signature TEXT NOT NULL
+CREATE TABLE message_part_rows (
+  conversation_id TEXT NOT NULL,
+  revision_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL CHECK (ordinal >= 0),
+  kind TEXT NOT NULL CHECK (kind IN ('text', 'reasoning', 'tool_call', 'tool_result')),
+  payload TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (revision_id, ordinal),
+  FOREIGN KEY (revision_id) REFERENCES message_rows(id) ON DELETE CASCADE,
+  CHECK (updated_at >= created_at)
 );
 CREATE TABLE chat_storage_meta_rows (
   key TEXT NOT NULL PRIMARY KEY,
@@ -279,7 +283,9 @@ CREATE INDEX idx_conversations_assistant ON conversation_rows(assistant_id);
       'VALUES (?, ?, ?, ?, ?, ?, 0, ?);',
     );
     final toolInsert = database.prepare(
-      'INSERT INTO tool_event_rows (message_id, events_json) VALUES (?, ?);',
+      'INSERT INTO message_part_rows '
+      '(conversation_id, revision_id, ordinal, kind, payload, created_at, updated_at) '
+      'VALUES (?, ?, 0, ?, ?, ?, ?);',
     );
     try {
       for (var conversation = 0; conversation < conversations; conversation++) {
@@ -312,10 +318,14 @@ CREATE INDEX idx_conversations_assistant ON conversation_rows(assistant_id);
         ]);
         if (index % toolEvery == 0) {
           toolInsert.execute([
+            conversationId,
             id,
+            'tool_result',
             jsonEncode([
               {'type': 'result', 'index': index},
             ]),
+            seed + index,
+            seed + index,
           ]);
         }
       }

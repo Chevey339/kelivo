@@ -1577,12 +1577,6 @@ class ChatService extends ChangeNotifier {
     );
   }
 
-  Future<void> restoreDatabaseSnapshot(File snapshotFile) async {
-    if (!_initialized) await init();
-    await _repo.replaceBackupSnapshot(snapshotFile);
-    await _resetAfterOverwriteRestore();
-  }
-
   Future<BackupMergeReport> mergeDatabaseSnapshot(File snapshotFile) async {
     if (!_initialized) await init();
     final report = await _repo.mergeBackupSnapshot(snapshotFile);

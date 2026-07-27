@@ -92,7 +92,7 @@ void main() {
         expect(database.select('PRAGMA foreign_key_check;'), isEmpty);
         expect(
           database
-              .select('SELECT COUNT(*) FROM tool_event_rows;')
+              .select('SELECT COUNT(*) FROM message_part_rows;')
               .single
               .values
               .single,

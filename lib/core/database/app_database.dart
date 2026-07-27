@@ -151,24 +151,6 @@ class ConversationMcpServerRows extends Table {
   ];
 }
 
-class ToolEventRows extends Table {
-  TextColumn get messageId =>
-      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
-  TextColumn get eventsJson => text()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {messageId};
-}
-
-class GeminiThoughtSignatureRows extends Table {
-  TextColumn get messageId =>
-      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
-  TextColumn get signature => text()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {messageId};
-}
-
 class ChatStorageMetaRows extends Table {
   TextColumn get key => text()();
   TextColumn get value => text()();
@@ -242,59 +224,6 @@ class ProviderArtifactRows extends Table {
         'ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED',
     'CHECK (updated_at >= created_at)',
   ];
-}
-
-class MigrationRunRows extends Table {
-  TextColumn get id => text()();
-  TextColumn get sourceKind =>
-      text()
-      // ignore: recursive_getters
-      .check(sourceKind.isIn(const ['hive', 'legacy_json']))();
-  TextColumn get sourceHash => text()();
-  TextColumn get status =>
-      text()
-      // ignore: recursive_getters
-      .check(status.isIn(const ['building', 'completed', 'failed']))();
-  IntColumn get startedAt =>
-      integer().map(const MicrosecondDateTimeConverter())();
-  IntColumn get completedAt =>
-      integer().map(const MicrosecondDateTimeConverter()).nullable()();
-
-  @override
-  Set<Column<Object>> get primaryKey => {id};
-
-  @override
-  List<Set<Column<Object>>> get uniqueKeys => [
-    {sourceKind, sourceHash},
-  ];
-
-  @override
-  List<String> get customConstraints => [
-    'CHECK (completed_at IS NULL OR completed_at >= started_at)',
-  ];
-}
-
-@TableIndex(
-  name: 'idx_migration_issues_run_kind',
-  columns: {#migrationRunId, #kind, #id},
-)
-class MigrationIssueRows extends Table {
-  TextColumn get id => text()();
-  TextColumn get migrationRunId =>
-      text().references(MigrationRunRows, #id, onDelete: KeyAction.cascade)();
-  TextColumn get conversationId => text().nullable()();
-  TextColumn get sourceEntityId => text().nullable()();
-  TextColumn get kind => text()();
-  TextColumn get severity =>
-      text()
-      // ignore: recursive_getters
-      .check(severity.isIn(const ['warning', 'recovered', 'rejected']))();
-  TextColumn get detailsJson => text().withDefault(const Constant('{}'))();
-  IntColumn get createdAt =>
-      integer().map(const MicrosecondDateTimeConverter())();
-
-  @override
-  Set<Column<Object>> get primaryKey => {id};
 }
 
 @TableIndex.sql(
@@ -533,13 +462,9 @@ class PreferenceRows extends Table {
     ConversationRows,
     MessageRows,
     ConversationMcpServerRows,
-    ToolEventRows,
-    GeminiThoughtSignatureRows,
     ChatStorageMetaRows,
     MessagePartRows,
     ProviderArtifactRows,
-    MigrationRunRows,
-    MigrationIssueRows,
     GenerationRunRows,
     AssistantRows,
     ProviderRows,

@@ -71,6 +71,14 @@ void main() {
       );
     }
 
+    Future<void> reopenLive() async {
+      await live.close();
+      live = ChatDatabaseRepository.open(
+        file: File('${directory.path}/live.sqlite'),
+      );
+      await live.ensureReady();
+    }
+
     test('无冲突 conversation 原 ID 导入且 order/关联数据完整', () async {
       await putConversation(
         source,
@@ -194,6 +202,58 @@ void main() {
         )).single.content,
         'imported',
       );
+    });
+
+    test('迁移批写入后工具事件与签名物化进 parts/artifacts 可读', () async {
+      await putConversation(
+        live,
+        conversationId: 'materialized',
+        title: 'Materialized',
+        messageId: 'materialized-message',
+        content: 'answer',
+      );
+
+      await reopenLive();
+
+      expect(await live.getToolEvents('materialized-message'), const [
+        {'id': 'tool', 'content': 'answer'},
+      ]);
+      expect(
+        await live.getGeminiThoughtSignature('materialized-message'),
+        'sig-answer',
+      );
+    });
+
+    test('merge 拷贝 parts/artifacts，无 legacy 表时仍可读', () async {
+      await putConversation(
+        source,
+        conversationId: 'artifact-conversation',
+        title: 'Artifacts',
+        messageId: 'artifact-message',
+        content: 'answer',
+      );
+      await source.upsertImageOcrArtifactItems(
+        revisionId: 'artifact-message',
+        items: const {'hash-1': 'ocr text'},
+      );
+      await source.close();
+      sourceClosed = true;
+
+      final report = await live.mergeBackupSnapshot(sourceFile);
+      expect(report.importedConversations, 1);
+
+      await reopenLive();
+
+      expect(await live.getToolEvents('artifact-message'), const [
+        {'id': 'tool', 'content': 'answer'},
+      ]);
+      expect(
+        await live.getGeminiThoughtSignature('artifact-message'),
+        'sig-answer',
+      );
+      expect(await live.getImageOcrArtifacts(const ['artifact-message']), {
+        'artifact-message': {'hash-1': 'ocr text'},
+      });
     });
 
     test('非法 order 在事务写入前拒绝且 live 不变', () async {

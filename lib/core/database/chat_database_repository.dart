@@ -540,12 +540,8 @@ class ChatDatabaseRepository {
       'conversation_rows',
       'conversation_mcp_server_rows',
       'message_rows',
-      'tool_event_rows',
-      'gemini_thought_signature_rows',
       'chat_storage_meta_rows',
       'message_part_rows',
-      'migration_run_rows',
-      'migration_issue_rows',
       'generation_run_rows',
       'provider_artifact_rows',
       'assistant_rows',
@@ -625,8 +621,6 @@ class ChatDatabaseRepository {
         'duration_ms',
         'message_order',
       ],
-      'tool_event_rows': ['message_id', 'events_json'],
-      'gemini_thought_signature_rows': ['message_id', 'signature'],
       'chat_storage_meta_rows': ['key', 'value'],
       'message_part_rows': [
         'conversation_id',
@@ -636,24 +630,6 @@ class ChatDatabaseRepository {
         'payload',
         'created_at',
         'updated_at',
-      ],
-      'migration_run_rows': [
-        'id',
-        'source_kind',
-        'source_hash',
-        'status',
-        'started_at',
-        'completed_at',
-      ],
-      'migration_issue_rows': [
-        'id',
-        'migration_run_id',
-        'conversation_id',
-        'source_entity_id',
-        'kind',
-        'severity',
-        'details_json',
-        'created_at',
       ],
       'generation_run_rows': [
         'id',
@@ -782,12 +758,7 @@ class ChatDatabaseRepository {
         'conversation_id->conversation_rows.id:CASCADE',
       },
       'message_rows': {'conversation_id->conversation_rows.id:CASCADE'},
-      'tool_event_rows': {'message_id->message_rows.id:CASCADE'},
-      'gemini_thought_signature_rows': {'message_id->message_rows.id:CASCADE'},
       'message_part_rows': {'revision_id->message_rows.id:CASCADE'},
-      'migration_issue_rows': {
-        'migration_run_id->migration_run_rows.id:CASCADE',
-      },
       'generation_run_rows': {
         'conversation_id->conversation_rows.id:CASCADE',
         'target_revision_id->message_rows.id:NO ACTION',
@@ -861,43 +832,6 @@ class ChatDatabaseRepository {
 
   Future<void> ensureReady() async {
     await _db.customSelect('SELECT 1').get();
-  }
-
-  Future<void> completeMigrationRun({
-    required String migrationRunId,
-    required DateTime completedAt,
-  }) async {
-    final updated =
-        await (_db.update(
-          _db.migrationRunRows,
-        )..where((row) => row.id.equals(migrationRunId))).write(
-          MigrationRunRowsCompanion(
-            status: const Value('completed'),
-            completedAt: Value(completedAt),
-          ),
-        );
-    if (updated != 1) throw StateError('migration_run_missing');
-  }
-
-  Future<Map<String, int>> legacyMigrationIssueCounts(
-    String migrationRunId,
-  ) async {
-    final rows = await _db
-        .customSelect(
-          'SELECT severity, COUNT(*) AS issue_count '
-          'FROM migration_issue_rows WHERE migration_run_id = ? '
-          'GROUP BY severity;',
-          variables: [Variable.withString(migrationRunId)],
-          readsFrom: {_db.migrationIssueRows},
-        )
-        .get();
-    return Map.unmodifiable({
-      'warning': 0,
-      'recovered': 0,
-      'rejected': 0,
-      for (final row in rows)
-        row.read<String>('severity'): row.read<int>('issue_count'),
-    });
   }
 
   Future<ChatDatabaseConnectionContract> validateConnectionContract() async {
@@ -1042,6 +976,26 @@ class ChatDatabaseRepository {
               'UPDATE message_rows SET content = ? WHERE id = ?;',
               [rewritten, id],
             );
+            // Text parts mirror the content column and win on read, so they
+            // must be rewritten in lockstep or stale paths survive.
+            final textParts = await _db
+                .customSelect(
+                  "SELECT ordinal, payload FROM message_part_rows "
+                  "WHERE revision_id = ? AND kind = 'text';",
+                  variables: [Variable<String>(id)],
+                )
+                .get();
+            for (final part in textParts) {
+              final payload = part.read<String>('payload');
+              final rewrittenPayload = rewriteContent(payload);
+              if (rewrittenPayload != payload) {
+                await _db.customStatement(
+                  "UPDATE message_part_rows SET payload = ? "
+                  "WHERE revision_id = ? AND kind = 'text' AND ordinal = ?;",
+                  [rewrittenPayload, id, part.read<int>('ordinal')],
+                );
+              }
+            }
             updated += 1;
           }
           cursor = id;
@@ -3281,6 +3235,7 @@ class ChatDatabaseRepository {
         messages: messages,
         toolEventsByMessageId: toolEventsByMessageId,
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+        freshParts: true,
       );
     });
   }
@@ -3345,6 +3300,7 @@ class ChatDatabaseRepository {
         messages: messages,
         toolEventsByMessageId: const {},
         geminiSignaturesByMessageId: const {},
+        freshParts: false,
       );
 
       for (final entry in messagesToAppend.entries) {
@@ -3383,13 +3339,10 @@ class ChatDatabaseRepository {
         messages: messages,
         toolEventsByMessageId: toolEventsByMessageId,
         geminiSignaturesByMessageId: geminiSignaturesByMessageId,
+        freshParts: true,
       );
       await _writeMigrationCompleteReceipt();
     });
-  }
-
-  Future<void> replaceBackupSnapshot(File snapshotFile) async {
-    await _importBackupSnapshot(snapshotFile);
   }
 
   Future<BackupMergeReport> mergeBackupSnapshot(File snapshotFile) async {
@@ -3536,16 +3489,21 @@ class ChatDatabaseRepository {
     final groupOrdinals = <String, int>{};
     for (final row in messageRows) {
       final messageId = row.read<String>('id');
-      final tool = await _db
+      // Tool events and thought signatures are fingerprinted from the
+      // materialized parts/artifacts; part timestamps and ordinals are
+      // excluded so equal payloads hash equally across snapshots.
+      final toolParts = await _db
           .customSelect(
-            'SELECT events_json FROM $schema.tool_event_rows WHERE message_id = ?;',
+            'SELECT payload FROM $schema.message_part_rows '
+            "WHERE revision_id = ? AND kind = 'tool_call' "
+            'ORDER BY ordinal;',
             variables: [Variable<String>(messageId)],
           )
-          .getSingleOrNull();
+          .get();
       final signature = await _db
           .customSelect(
-            'SELECT signature FROM $schema.gemini_thought_signature_rows '
-            'WHERE message_id = ?;',
+            'SELECT payload FROM $schema.provider_artifact_rows '
+            "WHERE revision_id = ? AND kind = 'gemini_thought_signature';",
             variables: [Variable<String>(messageId)],
           )
           .getSingleOrNull();
@@ -3565,8 +3523,10 @@ class ChatDatabaseRepository {
       );
       messages.add([
         data,
-        tool?.data['events_json'],
-        signature?.data['signature'],
+        toolParts.isEmpty
+            ? null
+            : [for (final part in toolParts) part.read<String>('payload')],
+        signature?.read<String>('payload'),
       ]);
     }
     return sha256
@@ -3739,16 +3699,21 @@ class ChatDatabaseRepository {
         [entry.value, targetId, targetGroupId, entry.key],
       );
       await _db.customStatement(
-        'INSERT INTO main.tool_event_rows (message_id, events_json) '
-        'SELECT ?, events_json FROM merge_source.tool_event_rows '
-        'WHERE message_id = ?;',
-        [entry.value, entry.key],
+        'INSERT INTO main.message_part_rows '
+        '(conversation_id, revision_id, ordinal, kind, payload, '
+        'created_at, updated_at) '
+        'SELECT ?, ?, ordinal, kind, payload, created_at, updated_at '
+        'FROM merge_source.message_part_rows WHERE revision_id = ?;',
+        [targetId, entry.value, entry.key],
       );
+      // generation_run_rows are intentionally not copied: merged revisions
+      // are always persisted as non-streaming.
       await _db.customStatement(
-        'INSERT INTO main.gemini_thought_signature_rows (message_id, signature) '
-        'SELECT ?, signature FROM merge_source.gemini_thought_signature_rows '
-        'WHERE message_id = ?;',
-        [entry.value, entry.key],
+        'INSERT INTO main.provider_artifact_rows '
+        '(conversation_id, revision_id, kind, payload, created_at, updated_at) '
+        'SELECT ?, ?, kind, payload, created_at, updated_at '
+        'FROM merge_source.provider_artifact_rows WHERE revision_id = ?;',
+        [targetId, entry.value, entry.key],
       );
     }
     // Merged revisions bypass _replaceMessageParts, so queue the
@@ -3763,76 +3728,15 @@ class ChatDatabaseRepository {
     );
   }
 
-  Future<void> _importBackupSnapshot(File snapshotFile) async {
-    if (!await snapshotFile.exists()) {
-      throw FileSystemException(
-        'Snapshot database does not exist',
-        snapshotFile.path,
-      );
-    }
-
-    var attached = false;
-    try {
-      await _db.customStatement('ATTACH DATABASE ? AS restore_source;', [
-        snapshotFile.absolute.path,
-      ]);
-      attached = true;
-      await _db.transaction(() async {
-        await _clearChatRows();
-        for (final table in const [
-          'conversation_rows',
-          'conversation_mcp_server_rows',
-          'message_rows',
-          'tool_event_rows',
-          'gemini_thought_signature_rows',
-        ]) {
-          await _db.customStatement(
-            'INSERT INTO main.$table '
-            'SELECT * FROM restore_source.$table;',
-          );
-        }
-        await _writeMigrationCompleteReceipt();
-        final foreignKeyFailures = await _db
-            .customSelect('PRAGMA foreign_key_check;')
-            .get();
-        if (foreignKeyFailures.isNotEmpty) {
-          throw StateError('foreign_key_check');
-        }
-        final sourceConversationCount = await _attachedTableCount(
-          'restore_source',
-          'conversation_rows',
-        );
-        final sourceMessageCount = await _attachedTableCount(
-          'restore_source',
-          'message_rows',
-        );
-        if (await _attachedTableCount('main', 'conversation_rows') !=
-                sourceConversationCount ||
-            await _attachedTableCount('main', 'message_rows') !=
-                sourceMessageCount) {
-          throw StateError('snapshot_import_count');
-        }
-      });
-    } finally {
-      if (attached) {
-        await _db.customStatement('DETACH DATABASE restore_source;');
-      }
-    }
-    await validateIntegrity();
-  }
-
-  Future<int> _attachedTableCount(String schema, String table) async {
-    final row = await _db
-        .customSelect('SELECT COUNT(*) AS count FROM $schema.$table;')
-        .getSingle();
-    return row.read<int>('count');
-  }
-
   Future<void> _writeBackupData({
     required List<Conversation> conversations,
     required List<({ChatMessage message, int messageOrder})> messages,
     required Map<String, List<Map<String, dynamic>>> toolEventsByMessageId,
     required Map<String, String> geminiSignaturesByMessageId,
+    // True when the target rows are known to have no stored parts (fresh or
+    // freshly cleared database): absent tool events then mean "no events"
+    // rather than "preserve stored ones", skipping a per-message SELECT.
+    required bool freshParts,
   }) async {
     await _db.batch((batch) {
       for (final conversation in conversations) {
@@ -3860,29 +3764,30 @@ class ChatDatabaseRepository {
           mode: InsertMode.insertOrReplace,
         );
       }
-      for (final entry in toolEventsByMessageId.entries) {
-        batch.insert(
-          _db.toolEventRows,
-          ToolEventRowsCompanion.insert(
-            messageId: entry.key,
-            eventsJson: jsonEncode(entry.value),
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-      }
-      for (final entry in geminiSignaturesByMessageId.entries) {
-        batch.insert(
-          _db.geminiThoughtSignatureRows,
-          GeminiThoughtSignatureRowsCompanion.insert(
-            messageId: entry.key,
-            signature: entry.value,
-          ),
-          mode: InsertMode.insertOrReplace,
-        );
-      }
     });
-    // Restored revisions bypass _replaceMessageParts, so their attachments
-    // are unknown to the asset registry until the queued backfill runs.
+    // Parts/artifacts are the only persistence for tool events and thought
+    // signatures; the legacy tables no longer receive writes.
+    final batchMessageIds = <String>{};
+    for (final entry in messages) {
+      final id = entry.message.id;
+      batchMessageIds.add(id);
+      await _replaceMessageParts(
+        entry.message,
+        toolEvents: toolEventsByMessageId[id] ??
+            (freshParts ? const <Map<String, dynamic>>[] : null),
+      );
+    }
+    for (final entry in toolEventsByMessageId.entries) {
+      if (batchMessageIds.contains(entry.key)) continue;
+      final message = await getMessage(entry.key);
+      if (message == null) throw StateError('tool_event_message_missing');
+      await _replaceMessageParts(message, toolEvents: entry.value);
+    }
+    for (final entry in geminiSignaturesByMessageId.entries) {
+      await _upsertGeminiThoughtSignature(entry.key, entry.value);
+    }
+    // _replaceMessageParts already queues attachment-bearing revisions; the
+    // bulk mark stays as cheap insurance for the asset backfill invariant.
     await _markMessageAssetReferencesDirtyBatch([
       for (final entry in messages)
         if (entry.message.content.contains('[image:') ||
@@ -3945,14 +3850,6 @@ class ChatDatabaseRepository {
     await _db.transaction(() async {
       await _updateMessageShadow(message);
       await _replaceMessageParts(message, toolEvents: toolEvents);
-      await _db
-          .into(_db.toolEventRows)
-          .insertOnConflictUpdate(
-            ToolEventRowsCompanion.insert(
-              messageId: message.id,
-              eventsJson: jsonEncode(toolEvents),
-            ),
-          );
       if (generationRunId != null && checkpointSeq != null) {
         await GenerationRunCommands(_db).checkpoint(
           id: generationRunId,
@@ -4121,8 +4018,6 @@ class ChatDatabaseRepository {
   }
 
   Future<void> _clearChatRows() async {
-    await _db.delete(_db.geminiThoughtSignatureRows).go();
-    await _db.delete(_db.toolEventRows).go();
     await _db.delete(_db.conversationMcpServerRows).go();
     await _db.delete(_db.messageRows).go();
     await _db.delete(_db.conversationRows).go();
@@ -4158,15 +4053,6 @@ class ChatDatabaseRepository {
             .add(Map<String, dynamic>.from(decoded));
       }
     }
-    final missing = ids.difference(result.keys.toSet());
-    if (missing.isNotEmpty) {
-      final legacyRows = await (_db.select(
-        _db.toolEventRows,
-      )..where((row) => row.messageId.isIn(missing))).get();
-      for (final row in legacyRows) {
-        result[row.messageId] = _decodeToolEvents(row.eventsJson);
-      }
-    }
     return result;
   }
 
@@ -4178,14 +4064,6 @@ class ChatDatabaseRepository {
       final message = await getMessage(messageId);
       if (message == null) throw StateError('tool_event_message_missing');
       await _replaceMessageParts(message, toolEvents: events);
-      await _db
-          .into(_db.toolEventRows)
-          .insertOnConflictUpdate(
-            ToolEventRowsCompanion.insert(
-              messageId: messageId,
-              eventsJson: jsonEncode(events),
-            ),
-          );
     });
   }
 
@@ -4195,9 +4073,6 @@ class ChatDatabaseRepository {
       if (message != null) {
         await _replaceMessageParts(message, toolEvents: const []);
       }
-      await (_db.delete(
-        _db.toolEventRows,
-      )..where((t) => t.messageId.equals(messageId))).go();
     });
   }
 
@@ -4223,17 +4098,6 @@ class ChatDatabaseRepository {
       for (final row in rows)
         if (row.payload.trim().isNotEmpty) row.revisionId: row.payload.trim(),
     };
-    final missing = ids.difference(result.keys.toSet());
-    if (missing.isNotEmpty) {
-      final legacyRows = await (_db.select(
-        _db.geminiThoughtSignatureRows,
-      )..where((row) => row.messageId.isIn(missing))).get();
-      for (final row in legacyRows) {
-        if (row.signature.trim().isNotEmpty) {
-          result[row.messageId] = row.signature.trim();
-        }
-      }
-    }
     return result;
   }
 
@@ -4462,28 +4326,15 @@ class ChatDatabaseRepository {
                 : now,
           ),
         );
-    await _db
-        .into(_db.geminiThoughtSignatureRows)
-        .insertOnConflictUpdate(
-          GeminiThoughtSignatureRowsCompanion.insert(
-            messageId: messageId,
-            signature: signature,
-          ),
-        );
   }
 
   Future<void> deleteGeminiThoughtSignature(String messageId) async {
-    await _db.transaction(() async {
-      await (_db.delete(_db.providerArtifactRows)..where(
-            (row) =>
-                row.revisionId.equals(messageId) &
-                row.kind.equals('gemini_thought_signature'),
-          ))
-          .go();
-      await (_db.delete(
-        _db.geminiThoughtSignatureRows,
-      )..where((t) => t.messageId.equals(messageId))).go();
-    });
+    await (_db.delete(_db.providerArtifactRows)..where(
+          (row) =>
+              row.revisionId.equals(messageId) &
+              row.kind.equals('gemini_thought_signature'),
+        ))
+        .go();
   }
 
   Future<List<String>> getActiveStreamingIds() async {
@@ -4828,15 +4679,6 @@ class ChatDatabaseRepository {
     } catch (_) {
       return <String, int>{};
     }
-  }
-
-  List<Map<String, dynamic>> _decodeToolEvents(String raw) {
-    final decoded = jsonDecode(raw);
-    if (decoded is! List) return const <Map<String, dynamic>>[];
-    return decoded
-        .whereType<Map>()
-        .map((event) => event.map((key, value) => MapEntry('$key', value)))
-        .toList(growable: false);
   }
 
   List<String> _decodeStringList(String raw) {

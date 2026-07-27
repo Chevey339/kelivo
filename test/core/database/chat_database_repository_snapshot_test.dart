@@ -120,43 +120,6 @@ void main() {
       expect(await sourceRepository.isMigrationComplete(), isFalse);
     });
 
-    test('replaces live chat tables from a validated snapshot', () async {
-      await sourceRepository.putMigrationBatch(
-        conversations: [Conversation(id: 'old', title: 'Old')],
-        messages: const [],
-        toolEventsByMessageId: const {},
-        geminiSignaturesByMessageId: const {},
-      );
-      final snapshotFile = File('${directory.path}/replacement.sqlite');
-      await _createSnapshotFixture(
-        databaseFile: snapshotFile,
-        conversationId: 'new',
-        title: 'New',
-        messageId: 'new-message',
-        messageContent: 'new content',
-        isStreaming: true,
-      );
-      await _deleteDatabaseSidecars(snapshotFile);
-
-      final info = await ChatDatabaseRepository.prepareSnapshotForRestore(
-        snapshotFile,
-      );
-      expect(info.conversationCount, 1);
-      await sourceRepository.replaceBackupSnapshot(snapshotFile);
-
-      expect(await sourceRepository.getConversation('old'), isNull);
-      expect(await sourceRepository.getConversation('new'), isNotNull);
-      expect(
-        (await sourceRepository.getMessagesRange(
-          'new',
-          start: 0,
-          limit: 1,
-        )).single.isStreaming,
-        isFalse,
-      );
-      expect(await sourceRepository.isMigrationComplete(), isTrue);
-    });
-
     test(
       'inspects only normalized standalone snapshots without writing',
       () async {
@@ -356,15 +319,6 @@ Future<void> _createSnapshotFixture({
 
 Future<void> _deleteDatabaseFamily(File databaseFile) async {
   for (final suffix in const ['', '-wal', '-shm', '-journal']) {
-    final file = File('${databaseFile.path}$suffix');
-    if (await file.exists()) {
-      await file.delete();
-    }
-  }
-}
-
-Future<void> _deleteDatabaseSidecars(File databaseFile) async {
-  for (final suffix in const ['-wal', '-shm', '-journal']) {
     final file = File('${databaseFile.path}$suffix');
     if (await file.exists()) {
       await file.delete();

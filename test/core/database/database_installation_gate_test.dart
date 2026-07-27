@@ -220,8 +220,9 @@ void main() {
       final replacement = databaseFile(replacementRoot);
       final raw = sqlite.sqlite3.open(replacement.path);
       raw.execute(
-        'INSERT INTO tool_event_rows (message_id, events_json) VALUES (?, ?);',
-        ['missing-message', '[]'],
+        'INSERT INTO conversation_mcp_server_rows '
+        '(conversation_id, server_id, ordinal) VALUES (?, ?, ?);',
+        ['missing-conversation', 'server', 0],
       );
       raw.close();
       await databaseFile(directory).delete();
