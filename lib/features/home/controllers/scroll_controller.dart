@@ -767,15 +767,9 @@ class ChatScrollController {
   }
 
   /// Jump to the message immediately before the current indexed anchor.
-  ///
-  /// [messages] and [indexOfId] are in message space, while the indexed list
-  /// may prepend [leadingRowCount] fixed non-message rows (e.g. the
-  /// loading-before sentinel row in `MessageListView`). The offset is applied
-  /// so anchors, targets, and the jump cursor stay in list space.
   Future<bool> jumpToPreviousQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
-    int leadingRowCount = 0,
   }) async {
     try {
       if (!_scrollController.hasClients || !_messageListController.isAttached) {
@@ -789,18 +783,16 @@ class ChatScrollController {
           ? -1
           : indexOfId(_lastJumpUserMessageId!);
       final anchor = cursorIndex >= 0
-          ? cursorIndex + leadingRowCount
-          : (_firstVisibleMessageBelowTopOverlay() ??
-              leadingRowCount + messages.length - 1);
+          ? cursorIndex
+          : (_firstVisibleMessageBelowTopOverlay() ?? messages.length - 1);
 
       final target = anchor - 1;
-      final messageIndex = target - leadingRowCount;
-      if (messageIndex < 0) {
+      if (target < 0) {
         _lastJumpUserMessageId = null;
         return false;
       }
 
-      _lastJumpUserMessageId = messages[messageIndex].id;
+      _lastJumpUserMessageId = messages[target].id;
       await _animateToMessageIndex(index: target, alignment: 0);
       return true;
     } catch (_) {
@@ -809,14 +801,9 @@ class ChatScrollController {
   }
 
   /// Jump to the message immediately after the current indexed anchor.
-  ///
-  /// Index-space rules match [jumpToPreviousQuestion]: [messages] and
-  /// [indexOfId] are message-space, [leadingRowCount] counts fixed rows
-  /// prepended by the list.
   Future<bool> jumpToNextQuestion({
     required List<dynamic> messages,
     required int Function(String id) indexOfId,
-    int leadingRowCount = 0,
   }) async {
     try {
       if (!_scrollController.hasClients || !_messageListController.isAttached) {
@@ -830,17 +817,16 @@ class ChatScrollController {
           ? -1
           : indexOfId(_lastJumpUserMessageId!);
       final anchor = cursorIndex >= 0
-          ? cursorIndex + leadingRowCount
-          : (_firstVisibleMessageBelowTopOverlay() ?? leadingRowCount);
+          ? cursorIndex
+          : (_firstVisibleMessageBelowTopOverlay() ?? 0);
 
       final target = anchor + 1;
-      final messageIndex = target - leadingRowCount;
-      if (messageIndex >= messages.length) {
+      if (target >= messages.length) {
         _lastJumpUserMessageId = null;
         return false;
       }
 
-      _lastJumpUserMessageId = messages[messageIndex].id;
+      _lastJumpUserMessageId = messages[target].id;
       await _animateToMessageIndex(index: target, alignment: 0);
       return true;
     } catch (_) {
@@ -850,44 +836,36 @@ class ChatScrollController {
 
   /// Scroll to a specific message by index (from mini map or search).
   ///
-  /// [targetIndex] is in message space (an index into the conversation's
-  /// collapsed messages). [leadingRowCount] must match the number of fixed
-  /// non-message rows the list prepends (e.g. the loading-before sentinel row
-  /// in `MessageListView`), so the target lands on the message rather than on
-  /// its predecessor or the sentinel.
-  ///
   /// Direct index positioning mirrors RikkaHub's `scrollToItem`: distant
   /// targets do not build or animate through every intermediate message.
   Future<void> scrollToMessageId({
     required String targetId,
     required int targetIndex,
-    int leadingRowCount = 0,
   }) async {
     try {
       if (!_scrollController.hasClients || !_messageListController.isAttached) {
         return;
       }
       if (targetIndex < 0) return;
-      final listIndex = targetIndex + leadingRowCount;
-      if (listIndex >= _messageListController.numberOfItems) return;
+      if (targetIndex >= _messageListController.numberOfItems) return;
       _cancelProgrammaticNavigation(stopDrivenScroll: true);
       final request = ++_indexedNavigationRequest;
       _messageListController.jumpToItem(
-        index: listIndex,
+        index: targetIndex,
         scrollController: _scrollController,
         alignment: 0,
       );
-      _correctMessageReveal(listIndex, 0);
+      _correctMessageReveal(targetIndex, 0);
       for (var pass = 0; pass < 3; pass++) {
         await WidgetsBinding.instance.endOfFrame;
         if (request != _indexedNavigationRequest ||
             !_scrollController.hasClients ||
             !_messageListController.isAttached ||
-            listIndex >= _messageListController.numberOfItems) {
+            targetIndex >= _messageListController.numberOfItems) {
           return;
         }
-        _correctMessageReveal(listIndex, 0);
-        final estimated = _messageListController.extentForIndex(listIndex).$2;
+        _correctMessageReveal(targetIndex, 0);
+        final estimated = _messageListController.extentForIndex(targetIndex).$2;
         if (!estimated && pass > 0) break;
       }
       _lastJumpUserMessageId = targetId;

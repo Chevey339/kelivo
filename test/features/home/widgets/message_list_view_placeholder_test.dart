@@ -58,22 +58,13 @@ void main() {
         find.byKey(MessageListView.windowSkeletonKey),
         findsOneWidget,
       );
-      expect(
-        find.byKey(MessageListView.emptyConversationKey),
-        findsNothing,
-      );
       expect(find.byType(SuperListView), findsOneWidget);
 
-      // The skeleton pulses; it must survive further frames without
-      // transitioning to the empty state.
+      // The skeleton pulses; it must survive further frames.
       await tester.pump(const Duration(milliseconds: 400));
       expect(
         find.byKey(MessageListView.windowSkeletonKey),
         findsOneWidget,
-      );
-      expect(
-        find.byKey(MessageListView.emptyConversationKey),
-        findsNothing,
       );
     } finally {
       scrollController.dispose();
@@ -82,7 +73,7 @@ void main() {
     }
   });
 
-  testWidgets('空会话显示空状态占位而非骨架', (tester) async {
+  testWidgets('空窗口非加载态保持空白（无占位）', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
     final isProcessingFiles = ValueNotifier<bool>(false);
@@ -113,10 +104,6 @@ void main() {
         ),
       );
 
-      expect(
-        find.byKey(MessageListView.emptyConversationKey),
-        findsOneWidget,
-      );
       expect(find.byKey(MessageListView.windowSkeletonKey), findsNothing);
       expect(find.byType(SuperListView), findsOneWidget);
     } finally {
@@ -132,13 +119,11 @@ void main() {
     final state = key.currentState!;
 
     expect(find.byKey(MessageListView.windowSkeletonKey), findsOneWidget);
-    expect(find.byKey(MessageListView.emptyConversationKey), findsNothing);
 
     state.finishLoad();
     await tester.pump();
 
     expect(find.byKey(MessageListView.windowSkeletonKey), findsNothing);
-    expect(find.byKey(MessageListView.emptyConversationKey), findsNothing);
     expect(find.text('loaded message content'), findsOneWidget);
   });
 
@@ -151,125 +136,8 @@ void main() {
     for (var i = 0; i < 5; i++) {
       await tester.pump(const Duration(milliseconds: 60));
       expect(find.byKey(MessageListView.windowSkeletonKey), findsNothing);
-      expect(find.byKey(MessageListView.emptyConversationKey), findsNothing);
     }
     expect(find.text('loaded message content'), findsOneWidget);
-  });
-
-  testWidgets('hasMoreBefore 时列表顶部显示固定高度 loading 行', (tester) async {
-    final key = GlobalKey<_PlaceholderHarnessState>();
-    await tester.pumpWidget(
-      _PlaceholderHarness(
-        key: key,
-        initialLoading: false,
-        withMessages: true,
-        hasMoreBefore: true,
-      ),
-    );
-    await tester.pump();
-
-    final loadingRow = find.byKey(
-      const ValueKey<String>(MessageListView.loadingBeforeSlotKey),
-    );
-    expect(loadingRow, findsOneWidget);
-    expect(tester.getSize(loadingRow).height, 56);
-    // The row sits above the first message slot.
-    final firstMessage = find.byKey(const ValueKey<String>('history-message-0'));
-    expect(firstMessage, findsOneWidget);
-    expect(
-      tester.getTopLeft(loadingRow).dy,
-      lessThan(tester.getTopLeft(firstMessage).dy),
-    );
-  });
-
-  testWidgets('翻页保留 loading 行时前置插入保持滚动位置稳定', (tester) async {
-    final key = GlobalKey<_PlaceholderHarnessState>();
-    await tester.pumpWidget(
-      _PlaceholderHarness(
-        key: key,
-        initialLoading: false,
-        withMessages: true,
-        hasMoreBefore: true,
-        messageCount: 30,
-      ),
-    );
-    final state = key.currentState!;
-
-    state.listController.jumpToItem(
-      index: 16,
-      scrollController: state.scrollController,
-      alignment: 0.2,
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    final target = find.byKey(const ValueKey<String>('history-message-15'));
-    expect(target, findsOneWidget);
-    final topBeforePrepend = tester.getTopLeft(target).dy;
-
-    state.prependMessages(keepHasMoreBefore: true);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(target, findsOneWidget);
-    expect(
-      tester.getTopLeft(target).dy,
-      moreOrLessEquals(topBeforePrepend, epsilon: 1),
-    );
-
-    // The loading row survives the prepend at the top of the list.
-    state.scrollController.jumpTo(0);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(
-      find.byKey(const ValueKey<String>(MessageListView.loadingBeforeSlotKey)),
-      findsOneWidget,
-    );
-  });
-
-  testWidgets('最后一页载入后移除 loading 行且滚动位置稳定', (tester) async {
-    final key = GlobalKey<_PlaceholderHarnessState>();
-    await tester.pumpWidget(
-      _PlaceholderHarness(
-        key: key,
-        initialLoading: false,
-        withMessages: true,
-        hasMoreBefore: true,
-        messageCount: 30,
-      ),
-    );
-    final state = key.currentState!;
-
-    state.listController.jumpToItem(
-      index: 16,
-      scrollController: state.scrollController,
-      alignment: 0.2,
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    final target = find.byKey(const ValueKey<String>('history-message-15'));
-    expect(target, findsOneWidget);
-    final topBeforeFinalPage = tester.getTopLeft(target).dy;
-
-    state.prependMessages(keepHasMoreBefore: false);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(target, findsOneWidget);
-    expect(
-      tester.getTopLeft(target).dy,
-      moreOrLessEquals(topBeforeFinalPage, epsilon: 1),
-    );
-
-    // The loading row is gone once the final page has been prepended.
-    state.scrollController.jumpTo(0);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(
-      find.byKey(const ValueKey<String>(MessageListView.loadingBeforeSlotKey)),
-      findsNothing,
-    );
   });
 }
 
@@ -278,14 +146,10 @@ class _PlaceholderHarness extends StatefulWidget {
     super.key,
     this.initialLoading = true,
     this.withMessages = false,
-    this.hasMoreBefore = false,
-    this.messageCount = 1,
   });
 
   final bool initialLoading;
   final bool withMessages;
-  final bool hasMoreBefore;
-  final int messageCount;
 
   @override
   State<_PlaceholderHarness> createState() => _PlaceholderHarnessState();
@@ -297,59 +161,25 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
   final isProcessingFiles = ValueNotifier<bool>(false);
 
   late bool isLoading = widget.initialLoading;
-  late bool hasMoreBefore = widget.hasMoreBefore;
   late List<ChatMessage> messages = widget.withMessages
-      ? _buildMessages(widget.messageCount)
+      ? _buildMessages()
       : const <ChatMessage>[];
 
-  static List<ChatMessage> _buildMessages(int count) {
-    if (count == 1) {
-      return <ChatMessage>[
-        ChatMessage(
-          id: 'history-message-0',
-          role: 'assistant',
-          content: 'loaded message content',
-          conversationId: 'conversation-1',
-        ),
-      ];
-    }
+  static List<ChatMessage> _buildMessages() {
     return <ChatMessage>[
-      for (var index = 0; index < count; index++)
-        ChatMessage(
-          id: 'history-message-$index',
-          role: index.isEven ? 'user' : 'assistant',
-          content: List<String>.filled(
-            1 + index % 5,
-            'variable height line $index',
-          ).join('\n'),
-          conversationId: 'conversation-1',
-        ),
+      ChatMessage(
+        id: 'history-message-0',
+        role: 'assistant',
+        content: 'loaded message content',
+        conversationId: 'conversation-1',
+      ),
     ];
   }
 
   void finishLoad() {
     setState(() {
       isLoading = false;
-      messages = _buildMessages(1);
-    });
-  }
-
-  void prependMessages({required bool keepHasMoreBefore}) {
-    setState(() {
-      hasMoreBefore = keepHasMoreBefore;
-      messages = <ChatMessage>[
-        for (var index = 0; index < 5; index++)
-          ChatMessage(
-            id: 'prepended-message-$index',
-            role: index.isEven ? 'user' : 'assistant',
-            content: List<String>.filled(
-              6 - index,
-              'prepended variable height line $index',
-            ).join('\n'),
-            conversationId: 'conversation-1',
-          ),
-        ...messages,
-      ];
+      messages = _buildMessages();
     });
   }
 
@@ -377,8 +207,7 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
               TtsProvider(preferences: createBusinessTestPreferences()),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              UserProvider(preferences: createBusinessTestPreferences()),
+          create: (_) => UserProvider(preferences: createBusinessTestPreferences()),
         ),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),
@@ -403,7 +232,6 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
             dividerPadding: EdgeInsets.zero,
             isProcessingFiles: isProcessingFiles,
             isLoadingWindow: isLoading,
-            hasMoreBefore: hasMoreBefore,
           ),
         ),
       ),

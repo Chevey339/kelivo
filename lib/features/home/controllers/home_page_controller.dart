@@ -1970,7 +1970,6 @@ class HomePageController extends ChangeNotifier {
       await _scrollCtrl.scrollToMessageId(
         targetId: targetId,
         targetIndex: index,
-        leadingRowCount: _leadingListRowCount,
       );
     } finally {
       if (useRikkaTransition) {
@@ -1980,12 +1979,6 @@ class HomePageController extends ChangeNotifier {
       }
     }
   }
-
-  /// Fixed non-message rows `MessageListView` prepends while history before
-  /// the loaded window is still available (the loading-before sentinel row).
-  /// Message indices from `indexOfCollapsedMessageId` must be shifted by this
-  /// many rows before addressing the indexed list.
-  int get _leadingListRowCount => _chatController.hasMoreBefore ? 1 : 0;
 
   Future<void> jumpToPreviousQuestion() =>
       _jumpToAdjacentMessage(previous: true);
@@ -1997,12 +1990,10 @@ class HomePageController extends ChangeNotifier {
         ? _scrollCtrl.jumpToPreviousQuestion(
             messages: _chatController.collapsedMessages,
             indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-            leadingRowCount: _leadingListRowCount,
           )
         : _scrollCtrl.jumpToNextQuestion(
             messages: _chatController.collapsedMessages,
             indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-            leadingRowCount: _leadingListRowCount,
           ));
     if (!moved) {
       await _jumpToAdjacentMessageOutsideWindow(previous: previous);
@@ -2039,12 +2030,10 @@ class HomePageController extends ChangeNotifier {
           ? _scrollCtrl.jumpToPreviousQuestion(
               messages: updatedWindow,
               indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-              leadingRowCount: _leadingListRowCount,
             )
           : _scrollCtrl.jumpToNextQuestion(
               messages: updatedWindow,
               indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
-              leadingRowCount: _leadingListRowCount,
             ));
       return;
     }
