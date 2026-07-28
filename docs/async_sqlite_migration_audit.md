@@ -131,7 +131,7 @@ legacy 备份（无 manifest 的 zip）恢复路径新增的 `_validateBackupRef
 | 17 | legacy 双表退役一揽子（迁移/恢复改物化 parts → merge 指纹改读 parts → 删双写/回退 → 删表 → 校验清单再生成）；分 4-5 个顺序提交 | C2 | 中-大 |
 | 18 | 删 `restoreDatabaseSnapshot` 路径 + migration 表族 + 回执版本号归一；同步更新测试与 schema 固件 | C3 | 小-中 |
 | 19 | （可选）asset 五表从运行时裸 SQL 懒建收编进 drift schema v1，纳入 `_validateRawStructure` | 机会项 | 中 |
-| 20 | （可选）`PortableNdjsonV2` 去留决策：保留则补 UI 入口，删除则级联清理专属 API | C3 关联 | 小-中 |
+| 20 | 删除 portable NDJSON v2 实现、`ChatService` 专属导入/导出 API 与专项测试 | C3 关联 | 已完成 |
 
 ## 5. 验收与测试建议
 

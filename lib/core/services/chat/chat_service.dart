@@ -17,7 +17,6 @@ import '../../models/chat_message.dart';
 import '../../models/conversation.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../utils/app_directories.dart';
-import '../backup/portable_ndjson_v2.dart';
 
 final class LoadedTimelineSlot {
   const LoadedTimelineSlot({required this.identity, required this.message});
@@ -1988,31 +1987,6 @@ class ChatService extends ChangeNotifier {
   Future<BackupMergeReport> mergeDatabaseSnapshot(File snapshotFile) async {
     if (!_initialized) await init();
     final report = await _repo.mergeBackupSnapshot(snapshotFile);
-    _messagesCache.clear();
-    await _backfillAssetReferencesForCurrentRoot();
-    await _loadConversationsCache();
-    notifyListeners();
-    return report;
-  }
-
-  Future<PortableChatExportResult> exportPortableChats(
-    File destination, {
-    PortableChatScope scope = PortableChatScope.selectedVersionsCompleted,
-  }) async {
-    if (!_initialized) await init();
-    return PortableNdjsonV2.exportToFile(
-      repository: _repo,
-      destination: destination,
-      scope: scope,
-    );
-  }
-
-  Future<BackupMergeReport> importPortableChats(File source) async {
-    if (!_initialized) await init();
-    final report = await PortableNdjsonV2.importFromFile(
-      target: _repo,
-      source: source,
-    );
     _messagesCache.clear();
     await _backfillAssetReferencesForCurrentRoot();
     await _loadConversationsCache();
