@@ -183,7 +183,6 @@ class Lucide {
   static const IconData FileQuestion = lucide.LucideIcons.fileQuestionMark;
   static const IconData FileClock = lucide.LucideIcons.fileClock;
   static const IconData Folder = lucide.LucideIcons.folder;
-  static const IconData FolderPlus = lucide.LucideIcons.folderPlus;
   static const IconData FolderMinus = lucide.LucideIcons.folderMinus;
   static const IconData FolderX = lucide.LucideIcons.folderX;
   static const IconData CornerDownLeft = lucide.LucideIcons.cornerDownLeft;

@@ -10,7 +10,6 @@ import 'package:path/path.dart' as p;
 import '../../../core/models/assistant.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/skills/skill_service.dart';
-import '../../../core/services/skills/skill_models.dart';
 import '../../../core/services/workspace/workspace_service.dart';
 
 typedef TextToSpeechStarter = Future<void> Function(String text);
@@ -269,7 +268,9 @@ class LocalToolsService {
       });
     }
 
-    final activeSkills = await _getActiveSkillsForConversation(conversation);
+    final activeSkills = await SkillService.instance.listActiveSkills(
+      conversation?.enabledSkillNames,
+    );
     if (activeSkills.isNotEmpty) {
       tools.add({
         'type': 'function',
@@ -316,19 +317,6 @@ class LocalToolsService {
     return tools;
   }
 
-  static Future<List<SkillMeta>> _getActiveSkillsForConversation(
-    Conversation? conversation,
-  ) async {
-    final all = await SkillService.instance.listSkills();
-    final enabled = all.where((s) => s.globalEnabled).toList();
-    if (conversation == null || conversation.enabledSkillNames.isEmpty) {
-      return enabled;
-    }
-    return enabled
-        .where((s) => conversation.enabledSkillNames.contains(s.name))
-        .toList();
-  }
-
   static Future<String?> tryHandleToolCall(
     String name,
     Map<String, dynamic> args,
@@ -337,14 +325,18 @@ class LocalToolsService {
     Conversation? conversation,
   }) async {
     final conversationId = conversation?.id;
-    // Workspace tools are gated by conversation.workspaceEnabled, NOT by
-    // assistant.localToolIds. Dispatch them before the localToolIds guard.
+    // Workspace tools are independent of assistant local-tool toggles, but
+    // must be enabled for this specific conversation before execution.
     if (name == LocalToolNames.workspaceFile) {
-      if (conversationId == null) return null;
+      if (conversationId == null || conversation?.workspaceEnabled != true) {
+        return null;
+      }
       return _handleWorkspaceFileTool(conversationId, args);
     }
     if (name == LocalToolNames.gitClone) {
-      if (conversationId == null) return null;
+      if (conversationId == null || conversation?.workspaceEnabled != true) {
+        return null;
+      }
       return _handleGitCloneTool(conversationId, args);
     }
     if (name == LocalToolNames.useSkill) {
@@ -384,7 +376,9 @@ class LocalToolsService {
         'message': 'skill_name is required',
       });
     }
-    final active = await _getActiveSkillsForConversation(conversation);
+    final active = await SkillService.instance.listActiveSkills(
+      conversation.enabledSkillNames,
+    );
     if (!active.any((s) => s.name == skillName)) {
       return jsonEncode({
         'error': 'skill_not_enabled',
@@ -413,7 +407,9 @@ class LocalToolsService {
         'message': 'skill_name and path are required',
       });
     }
-    final active = await _getActiveSkillsForConversation(conversation);
+    final active = await SkillService.instance.listActiveSkills(
+      conversation.enabledSkillNames,
+    );
     if (!active.any((s) => s.name == skillName)) {
       return jsonEncode({
         'error': 'skill_not_enabled',
@@ -917,10 +913,8 @@ class LocalToolsService {
               'file': m.relativePath,
               'line': m.lineNumber,
               'content': m.lineContent,
-              if (m.contextBefore.isNotEmpty)
-                'contextBefore': m.contextBefore,
-              if (m.contextAfter.isNotEmpty)
-                'contextAfter': m.contextAfter,
+              if (m.contextBefore.isNotEmpty) 'contextBefore': m.contextBefore,
+              if (m.contextAfter.isNotEmpty) 'contextAfter': m.contextAfter,
             },
           )
           .toList(),

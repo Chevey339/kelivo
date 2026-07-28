@@ -44,11 +44,11 @@ class SkillParser {
   SkillParser._();
 
   /// Separates YAML frontmatter from the markdown body.
-  /// Matches the leading `---\n`, the frontmatter, the closing `\n---\n`,
-  /// and the rest of the file as the body. Input is line-ending-normalized
+  /// Matches the leading `---\n`, the frontmatter, an optional markdown body
+  /// after the closing `\n---` delimiter. Input is line-ending-normalized
   /// before matching, so this regex only needs to handle `\n`.
   static final RegExp _frontmatterPattern = RegExp(
-    r'^---\n([\s\S]*?)\n---\n([\s\S]*)$',
+    r'^---\n([\s\S]*?)\n---(?:\n([\s\S]*))?$',
   );
 
   /// Validates the skill `name` per the open standard.
@@ -79,12 +79,12 @@ class SkillParser {
     final match = _frontmatterPattern.firstMatch(normalized);
     if (match == null) {
       return SkillParseResult.error(
-        'Missing YAML frontmatter. Expected leading "---\\n...\\n---\\n".',
+        'Missing YAML frontmatter. Expected leading "---\\n...\\n---".',
       );
     }
 
     final frontmatter = match.group(1)!;
-    final body = match.group(2)!;
+    final body = match.group(2) ?? '';
 
     final parsed = _parseFrontmatter(frontmatter);
     if (parsed.error != null) {

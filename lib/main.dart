@@ -861,10 +861,17 @@ class MyApp extends StatelessWidget {
                       if (prefs.getBool(_defaultSkillsImportedKey) != true) {
                         final result = await SkillService.instance
                             .installBundledDefaults();
-                        debugPrint(result);
-                        await prefs.setBool(_defaultSkillsImportedKey, true);
+                        debugPrint('$result');
+                        if (result.isComplete) {
+                          await prefs.setBool(_defaultSkillsImportedKey, true);
+                        }
                       }
-                    } catch (_) {}
+                    } catch (error, stackTrace) {
+                      debugPrint(
+                        'Failed to install bundled default skills: '
+                        '$error\n$stackTrace',
+                      );
+                    }
                   });
 
                   // Desktop tray + close behaviour (minimize to tray) sync

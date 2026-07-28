@@ -314,6 +314,17 @@ void main() {
       );
     });
 
+    test('workspace tools require an enabled workspace', () async {
+      final result = await LocalToolsService.tryHandleToolCall(
+        LocalToolNames.workspaceFile,
+        const {'action': 'list', 'path': ''},
+        localToolsAssistant,
+        conversation: Conversation(id: 'workspace-test', title: 'Test'),
+      );
+
+      expect(result, isNull);
+    });
+
     group('skill tools', () {
       const skillName = 'test-skill';
       late Conversation conversation;

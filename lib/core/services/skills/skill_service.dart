@@ -26,6 +26,27 @@ class SkillImportResult {
   const SkillImportResult.error(this.error) : meta = null, success = false;
 }
 
+/// Summary of installing the skills bundled with the application.
+class BundledSkillInstallResult {
+  const BundledSkillInstallResult({
+    required this.imported,
+    required this.skipped,
+    required this.failed,
+  });
+
+  final int imported;
+  final int skipped;
+  final int failed;
+
+  /// A failed installation must be retried on a later startup.
+  bool get isComplete => failed == 0;
+
+  @override
+  String toString() =>
+      'Bundled defaults: $imported imported, $skipped skipped, '
+      '$failed failed.';
+}
+
 /// Imports, registers and reads Agent Skills (https://agentskills.io).
 ///
 /// Skills live on disk under `<app_support>/skills/<name>/`. A skill folder
@@ -357,6 +378,19 @@ class SkillService {
     return skills.where((s) => !removedSet.contains(s.name)).toList();
   }
 
+  /// Lists globally enabled skills, optionally narrowed to [enabledNames].
+  /// An omitted or empty selection preserves the conversation default of using
+  /// every globally enabled skill.
+  Future<List<SkillMeta>> listActiveSkills(
+    Iterable<String>? enabledNames,
+  ) async {
+    final enabled = (await listSkills()).where((s) => s.globalEnabled).toList();
+    if (enabledNames == null) return enabled;
+    final names = enabledNames.toSet();
+    if (names.isEmpty) return enabled;
+    return enabled.where((s) => names.contains(s.name)).toList();
+  }
+
   /// Returns the registered [SkillMeta] for [name], or `null` if not found.
   Future<SkillMeta?> getSkill(String name) async {
     final box = await _ensureBox();
@@ -450,12 +484,13 @@ class SkillService {
   /// imported via [importFromSkillMd]. Skills that are already registered are
   /// skipped silently. The temporary files are cleaned up afterwards.
   ///
-  /// Returns a human-readable summary of how many were imported vs skipped.
-  Future<String> installBundledDefaults() async {
+  /// Returns import counts so callers can retry after a partial failure.
+  Future<BundledSkillInstallResult> installBundledDefaults() async {
     int imported = 0;
     int skipped = 0;
-    final tempRoot = Directory(
-      p.join(Directory.systemTemp.path, 'kelivo_default_skills'),
+    int failed = 0;
+    final tempRoot = await Directory.systemTemp.createTemp(
+      'kelivo_default_skills_',
     );
 
     try {
@@ -476,7 +511,7 @@ class SkillService {
         }
         if (skillMdPath == null) {
           debugPrint('SkillService: no SKILL.md in bundled skill "$name"');
-          skipped++;
+          failed++;
           continue;
         }
         final result = await importFromSkillMd(skillMdPath);
@@ -492,7 +527,7 @@ class SkillService {
           }
           imported++;
         } else {
-          skipped++;
+          failed++;
           debugPrint(
             'SkillService: failed to install default skill "$name": '
             '${result.error}',
@@ -504,7 +539,11 @@ class SkillService {
         await tempRoot.delete(recursive: true);
       }
     }
-    return 'Bundled defaults: $imported imported, $skipped skipped.';
+    return BundledSkillInstallResult(
+      imported: imported,
+      skipped: skipped,
+      failed: failed,
+    );
   }
 
   // ---------------------------------------------------------------------------

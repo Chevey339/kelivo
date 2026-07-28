@@ -18,7 +18,6 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
-import '../../../core/services/skills/skill_models.dart';
 import '../../../core/services/skills/skill_service.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
@@ -222,10 +221,7 @@ class MessageBuilderService {
       }
       if (content.isEmpty) continue;
       final role = m.role == 'assistant' ? 'assistant' : 'user';
-      final message = <String, dynamic>{
-        'role': role,
-        'content': content,
-      };
+      final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
       }
@@ -384,7 +380,10 @@ class MessageBuilderService {
     // WorldBook lore may also use role=user and must not be treated as chat input.
     bool isPersistedUserMessage(Map<String, dynamic> message) {
       if (message['role'] != 'user') return false;
-      return (message[internalRevisionIdKey] ?? '').toString().trim().isNotEmpty;
+      return (message[internalRevisionIdKey] ?? '')
+          .toString()
+          .trim()
+          .isNotEmpty;
     }
 
     // Find last real user message index (skip injected lore).
@@ -654,8 +653,8 @@ class MessageBuilderService {
     List<Map<String, dynamic>> apiMessages, {
     required Conversation? currentConversation,
   }) async {
-    final activeSkills = await _getActiveSkillsForConversation(
-      currentConversation,
+    final activeSkills = await SkillService.instance.listActiveSkills(
+      currentConversation?.enabledSkillNames,
     );
     if (activeSkills.isEmpty) return;
 
@@ -667,19 +666,6 @@ class MessageBuilderService {
     buffer.write('</available_skills>');
 
     _appendToSystemMessage(apiMessages, buffer.toString());
-  }
-
-  Future<List<SkillMeta>> _getActiveSkillsForConversation(
-    Conversation? conversation,
-  ) async {
-    final all = await SkillService.instance.listSkills();
-    final enabled = all.where((s) => s.globalEnabled).toList();
-    if (conversation == null || conversation.enabledSkillNames.isEmpty) {
-      return enabled;
-    }
-    return enabled
-        .where((s) => conversation.enabledSkillNames.contains(s.name))
-        .toList();
   }
 
   /// Inject memory prompts and recent chats reference into apiMessages.

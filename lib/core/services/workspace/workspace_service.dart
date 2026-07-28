@@ -58,8 +58,18 @@ abstract final class WorkspaceService {
   ///
   /// Does not create the directory.
   static Future<String> getWorkspaceRoot(String conversationId) async {
-    final root = await AppDirectories.getAppDataDirectory();
-    return p.join(root.path, 'workspaces', conversationId);
+    _validateConversationId(conversationId);
+    final appData = await AppDirectories.getAppDataDirectory();
+    final workspacesRoot = p.normalize(p.join(appData.path, 'workspaces'));
+    final workspaceRoot = p.normalize(p.join(workspacesRoot, conversationId));
+    if (!p.isWithin(workspacesRoot, workspaceRoot)) {
+      throw ArgumentError.value(
+        conversationId,
+        'conversationId',
+        'must resolve inside the workspaces directory',
+      );
+    }
+    return workspaceRoot;
   }
 
   /// Returns the workspace root, creating it (recursive) when missing.
@@ -221,8 +231,10 @@ abstract final class WorkspaceService {
     final matches = <GrepMatch>[];
     final lowerQuery = query.toLowerCase();
 
-    await for (final entity
-        in rootDir.list(recursive: true, followLinks: false)) {
+    await for (final entity in rootDir.list(
+      recursive: true,
+      followLinks: false,
+    )) {
       if (entity is! File) continue;
       if (matches.length >= maxResults) break;
 
@@ -267,5 +279,23 @@ abstract final class WorkspaceService {
     final b = s.codeUnitAt(1);
     final isAlpha = (a >= 65 && a <= 90) || (a >= 97 && a <= 122); // A-Z / a-z
     return isAlpha && b == 58; // ':'
+  }
+
+  static void _validateConversationId(String conversationId) {
+    final normalized = conversationId.trim();
+    if (normalized.isEmpty ||
+        normalized != conversationId ||
+        normalized == '.' ||
+        normalized == '..' ||
+        normalized.contains('/') ||
+        normalized.contains(r'\') ||
+        p.isAbsolute(normalized) ||
+        _looksLikeWindowsDrivePath(normalized)) {
+      throw ArgumentError.value(
+        conversationId,
+        'conversationId',
+        'must be a non-empty path segment',
+      );
+    }
   }
 }
