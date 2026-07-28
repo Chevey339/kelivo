@@ -2946,6 +2946,26 @@ class ChatDatabaseRepository {
       await markMessageAssetReferencesDirty(message.id);
     }
     final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
+    // A mid-stream reasoning pause is not a reasoning removal: the checkpoint
+    // snapshot still carries the pre-allocated reasoningStartAt timestamp, so
+    // keep the persisted reasoning part until a timestamp-free message proves
+    // the reasoning is gone (full rebuild, edit, finalize).
+    final effectiveReasoningText =
+        message.reasoningText == null && message.reasoningStartAt != null
+        ? (await (_db.select(_db.messagePartRows)
+                  ..where(
+                    (row) =>
+                        row.revisionId.equals(message.id) &
+                        row.kind.equals('reasoning'),
+                  )
+                  ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
+                .get())
+            .map((part) => part.payload)
+            .join()
+        : null;
+    if (effectiveReasoningText != null && effectiveReasoningText.isNotEmpty) {
+      message = message.copyWith(reasoningText: effectiveReasoningText);
+    }
     if (preserveUnchangedToolParts && preservedToolEvents.isNotEmpty) {
       final keptToolParts = await _unchangedToolPartCount(
         message,
@@ -4602,16 +4622,23 @@ class ChatDatabaseRepository {
       // Streaming checkpoints defer the content shadow to finalize, so an
       // interrupted stream leaves it behind the authoritative parts; resync
       // it here to keep search/backup snapshots consistent after a crash.
+      // The reasoning shadow gets the same treatment for paused-reasoning
+      // streams whose reasoning part outlives the shadow column.
       final staleRows = await (_db.select(
         _db.messageRows,
       )..where((row) => row.isStreaming.equals(true))).get();
       for (final row in staleRows) {
         final resolved = await getMessage(row.id);
-        if (resolved != null && resolved.content != row.content) {
+        if (resolved != null &&
+            (resolved.content != row.content ||
+                resolved.reasoningText != row.reasoningText)) {
           await (_db.update(
             _db.messageRows,
           )..where((t) => t.id.equals(row.id))).write(
-            MessageRowsCompanion(content: Value(resolved.content)),
+            MessageRowsCompanion(
+              content: Value(resolved.content),
+              reasoningText: Value(resolved.reasoningText),
+            ),
           );
         }
       }

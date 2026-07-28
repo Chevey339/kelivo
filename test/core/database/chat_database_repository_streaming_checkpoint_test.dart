@@ -418,5 +418,94 @@ void main() {
       final run = await repository.getGenerationRun('crashed-run');
       expect(run?.state, GenerationRunState.interrupted);
     });
+
+    test('reasoning finishing mid-stream keeps earlier tool parts', () async {
+      // Gemini pattern: reasoning streams first and stops updating once tool
+      // calls begin. The reasoning part must not be treated as "gone" just
+      // because the checkpoint message still carries the pre-allocated
+      // reasoningStartAt timestamp with null text.
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: 'conv-gemini',
+            title: 'Gemini',
+            messageIds: const ['assistant-1'],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: 'assistant-1',
+              conversationId: 'conv-gemini',
+              role: 'assistant',
+              content: '',
+              isStreaming: true,
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      // Checkpoint 1: reasoning actively streaming.
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'assistant-1',
+          conversationId: 'conv-gemini',
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+          reasoningText: 'let me think',
+          reasoningStartAt: DateTime.utc(2026, 7, 28, 10),
+        ),
+        const [],
+      );
+
+      // Checkpoint 2: reasoning done, tool call arrives.
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'assistant-1',
+          conversationId: 'conv-gemini',
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+          reasoningText: 'let me think',
+          reasoningStartAt: DateTime.utc(2026, 7, 28, 10),
+          reasoningFinishedAt: DateTime.utc(2026, 7, 28, 10, 0, 3),
+        ),
+        const [
+          {'id': 'call-1', 'name': 'search', 'arguments': '{"q":"x"}'},
+        ],
+      );
+
+      // Checkpoint 3 (the Gemini regression): reasoning text null but the
+      // pre-allocated reasoningStartAt timestamp still set; tool result in.
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'assistant-1',
+          conversationId: 'conv-gemini',
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+          reasoningText: null,
+          reasoningStartAt: DateTime.utc(2026, 7, 28, 10),
+          reasoningFinishedAt: DateTime.utc(2026, 7, 28, 10, 0, 3),
+        ),
+        const [
+          {'id': 'call-1', 'name': 'search', 'arguments': '{"q":"x"}'},
+          {
+            'id': 'call-1',
+            'name': 'search',
+            'content': 'result payload',
+          },
+        ],
+      );
+
+      expect(await repository.getToolEvents('assistant-1'), hasLength(2));
+      final message = await repository.getMessage('assistant-1');
+      expect(message?.reasoningText, 'let me think');
+    });
   });
 }
+
