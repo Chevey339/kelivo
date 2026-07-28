@@ -1088,6 +1088,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
   // Accumulate built-in search citations across stream rounds
   final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
+  int malformedResponseRetryCount = 0;
 
   List<Map<String, dynamic>> parseCitations(dynamic gm) {
     final out = <Map<String, dynamic>>[];
@@ -1199,6 +1200,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     final List<Map<String, dynamic>> roundModelParts = <Map<String, dynamic>>[];
     // Counter for server-side code execution tool cards
     int codeExecCounter = 0;
+    bool retryMalformedResponse = false;
 
     // Capture thought signatures for history (Gemini 3 image/editing)
     String? responseTextThoughtSigKey;
@@ -1605,8 +1607,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               }
             }
 
+            if (finishReason == 'MALFORMED_RESPONSE' && calls.isEmpty) {
+              retryMalformedResponse = true;
+            }
+
             // When finishing, emit any buffered inline image (and trailing text) in one batch to avoid partial base64 during streaming.
-            if (finishReason != null) {
+            if (finishReason != null && !retryMalformedResponse) {
               final pendingImage = await takeBufferedImageMarkdown();
               if (pendingImage.isNotEmpty) {
                 textDelta += pendingImage;
@@ -1634,6 +1640,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
 
             // If server signaled finish, end stream immediately
             if (finishReason != null &&
+                !retryMalformedResponse &&
                 calls.isEmpty &&
                 (!expectImage || receivedImage)) {
               // Emit final citations if any not emitted
@@ -1684,6 +1691,18 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
     }
 
+    if (retryMalformedResponse) {
+      // This is a transient model-generation failure, so retry the unchanged
+      // round once without adding the malformed candidate to conversation.
+      if (malformedResponseRetryCount == 0) {
+        malformedResponseRetryCount++;
+        continue;
+      }
+      throw const HttpException(
+        'Gemini response generation failed (MALFORMED_RESPONSE)',
+      );
+    }
+
     // Flush any buffered inline image (e.g., when stream ends without explicit finishReason)
     final pendingImage = await takeBufferedImageMarkdown();
     if (pendingImage.isNotEmpty) {
@@ -1723,6 +1742,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     }
 
     // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
+    malformedResponseRetryCount = 0;
     if (isGemini3) {
       // Gemini 3: preserve the original model parts order exactly.
       convo.add({'role': 'model', 'parts': roundModelParts});
