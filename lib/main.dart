@@ -59,6 +59,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:system_fonts/system_fonts.dart';
 import 'dart:io'
     show
+        Directory,
         File,
         Platform,
         stderr; // kept for global override usage inside provider
@@ -123,54 +124,79 @@ Future<void> main() async {
       await SandboxPathResolver.init();
       ChatDatabaseLease? processDatabaseLease;
       BusinessPreferences? businessPreferences;
-      try {
-        final migrationDecision = await HiveToSqliteMigrationService.check();
-        if (migrationDecision.needsMigration) {
+      var recoveryAttempted = false;
+      while (true) {
+        try {
+          final migrationDecision = await HiveToSqliteMigrationService.check();
+          if (migrationDecision.needsMigration) {
+            runApp(
+              MigrationApp(
+                service: HiveToSqliteMigrationService(migrationDecision),
+                restoreOutcome: restoreOutcome?.state,
+              ),
+            );
+            return;
+          }
+          await DatabaseInstallationGate.ensureReady(
+            appDataDirectory: appDataDirectory,
+            allowDatabaseIdentityChange:
+                restoreOutcome?.selectedComponents.contains(
+                  RestoreComponent.database,
+                ) ??
+                false,
+          );
+          final databaseFile = File(
+            '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
+          );
+          final databaseLease = await ChatDatabaseGateway.instance.acquire(
+            databaseFile,
+          );
+          try {
+            final legacyPreferences =
+                await SharedPreferencesLegacyBusinessPreferences.open();
+            final loadedBusinessPreferences =
+                await BusinessStartupGate.migrateAndLoad(
+                  repository: databaseLease.businessRepository,
+                  legacyPreferences: legacyPreferences,
+                );
+            processDatabaseLease = databaseLease;
+            businessPreferences = loadedBusinessPreferences;
+          } catch (_) {
+            await databaseLease.release();
+            rethrow;
+          }
+          break;
+        } catch (error, stackTrace) {
+          stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
+          if (!recoveryAttempted) {
+            recoveryAttempted = true;
+            final recovery = await _recoverFailedAdmission(
+              appDataDirectory,
+              error,
+            );
+            if (recovery == _AdmissionRecovery.remigrate) {
+              runApp(
+                MigrationApp(
+                  service: HiveToSqliteMigrationService(
+                    _legacyMigrationDecision(appDataDirectory),
+                  ),
+                  restoreOutcome: restoreOutcome?.state,
+                ),
+              );
+              return;
+            }
+            if (recovery == _AdmissionRecovery.rebuilt) {
+              continue;
+            }
+          }
+          await _initRestoreFailureWindow();
           runApp(
-            MigrationApp(
-              service: HiveToSqliteMigrationService(migrationDecision),
-              restoreOutcome: restoreOutcome?.state,
+            _RestoreFailureApp(
+              diagnosticCode: restoreFailureDiagnosticCode(error),
             ),
           );
           return;
         }
-        await DatabaseInstallationGate.ensureReady(
-          appDataDirectory: appDataDirectory,
-          allowDatabaseIdentityChange:
-              restoreOutcome?.selectedComponents.contains(
-                RestoreComponent.database,
-              ) ??
-              false,
-        );
-        final databaseFile = File(
-          '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
-        );
-        final databaseLease = await ChatDatabaseGateway.instance.acquire(
-          databaseFile,
-        );
-        try {
-          final legacyPreferences =
-              await SharedPreferencesLegacyBusinessPreferences.open();
-          final loadedBusinessPreferences =
-              await BusinessStartupGate.migrateAndLoad(
-                repository: databaseLease.businessRepository,
-                legacyPreferences: legacyPreferences,
-              );
-          processDatabaseLease = databaseLease;
-          businessPreferences = loadedBusinessPreferences;
-        } catch (_) {
-          await databaseLease.release();
-          rethrow;
-        }
-      } catch (error, stackTrace) {
-        stderr.writeln('[DatabaseAdmission] $error\n$stackTrace');
-        await _initRestoreFailureWindow();
-        runApp(
-          _RestoreFailureApp(
-            diagnosticCode: restoreFailureDiagnosticCode(error),
-          ),
-        );
-        return;
       }
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -189,6 +215,67 @@ Future<void> main() async {
         parent.print(zone, line);
       },
     ),
+  );
+}
+
+enum _AdmissionRecovery { none, rebuilt, remigrate }
+
+/// Names must mirror HiveToSqliteMigrationService.check().
+const _legacyHiveSourceNames = <String>[
+  'conversations.hive',
+  'messages.hive',
+  'tool_events_v1.hive',
+];
+
+bool _legacyHiveSourcesExist(Directory appDataDirectory) =>
+    _legacyHiveSourceNames.any(
+      (name) => File('${appDataDirectory.path}/$name').existsSync(),
+    );
+
+Future<_AdmissionRecovery> _recoverFailedAdmission(
+  Directory appDataDirectory,
+  Object error,
+) async {
+  final action = await DatabaseInstallationGate.recoveryActionFor(
+    appDataDirectory: appDataDirectory,
+    error: error,
+    legacyHiveDataPresent: _legacyHiveSourcesExist(appDataDirectory),
+  );
+  switch (action) {
+    case DatabaseRecoveryAction.rebuildAutomatically:
+      try {
+        await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: appDataDirectory,
+        );
+        return _AdmissionRecovery.rebuilt;
+      } catch (rebuildError, rebuildStack) {
+        stderr.writeln(
+          '[DatabaseAdmission] rebuild failed: $rebuildError\n$rebuildStack',
+        );
+        return _AdmissionRecovery.none;
+      }
+    case DatabaseRecoveryAction.promptRemigration:
+      return _AdmissionRecovery.remigrate;
+    case DatabaseRecoveryAction.promptUpgrade:
+    case DatabaseRecoveryAction.none:
+      return _AdmissionRecovery.none;
+  }
+}
+
+HiveToSqliteMigrationDecision _legacyMigrationDecision(
+  Directory appDataDirectory,
+) {
+  return HiveToSqliteMigrationDecision(
+    needsMigration: true,
+    appDataDir: appDataDirectory,
+    sqliteFile: File(
+      '${appDataDirectory.path}/${AppDatabase.databaseFileName}',
+    ),
+    hiveFiles: [
+      for (final name in _legacyHiveSourceNames)
+        if (File('${appDataDirectory.path}/$name').existsSync())
+          File('${appDataDirectory.path}/$name'),
+    ],
   );
 }
 
@@ -234,9 +321,95 @@ class _RestoreFailureApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       theme: buildLightThemeForScheme(palette.light),
       darkTheme: buildDarkThemeForScheme(palette.dark),
-      home: RestoreFailureScreen(
-        diagnosticCode: diagnosticCode,
-        restart: PlatformUtils.restartApp,
+      home: diagnosticCode == 'database_schema_too_new'
+          ? _UpdateRequiredScreen(diagnosticCode: diagnosticCode)
+          : RestoreFailureScreen(
+              diagnosticCode: diagnosticCode,
+              restart: PlatformUtils.restartApp,
+            ),
+    );
+  }
+}
+
+/// Shown when the installed database was written by a newer app version;
+/// restarting cannot help, so the only action is updating Kelivo.
+class _UpdateRequiredScreen extends StatelessWidget {
+  const _UpdateRequiredScreen({required this.diagnosticCode});
+
+  final String diagnosticCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Material(
+                color: colors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: colors.primaryContainer,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          Icons.system_update_alt_rounded,
+                          size: 30,
+                          color: colors.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        l10n.startupDatabaseUpdateRequiredTitle,
+                        style: textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        l10n.startupDatabaseUpdateRequiredContent,
+                        style: textTheme.bodyLarge?.copyWith(
+                          color: colors.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: colors.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: SelectableText(
+                          l10n.backupRestoreFailureDiagnostic(diagnosticCode),
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                            fontFamily: 'monospace',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

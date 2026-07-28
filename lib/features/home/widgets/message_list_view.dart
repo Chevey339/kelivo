@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
@@ -9,6 +10,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/assistant.dart';
+import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -130,6 +132,7 @@ class MessageListView extends StatefulWidget {
     this.onToggleReasoningSegment,
     this.buildPinnedStreamingIndicator,
     this.hasMoreBefore = false,
+    this.isLoadingWindow = false,
     this.onLoadMoreBefore,
     this.hasMoreAfter = false,
     this.onLoadMoreAfter,
@@ -207,6 +210,10 @@ class MessageListView extends StatefulWidget {
   onToggleReasoningSegment;
   final Widget Function()? buildPinnedStreamingIndicator;
   final bool hasMoreBefore;
+
+  /// True only while a cold initial window load is in flight; fast-path cache
+  /// hits resolve within one frame batch and never surface the skeleton.
+  final bool isLoadingWindow;
   final Future<bool> Function()? onLoadMoreBefore;
   final bool hasMoreAfter;
   final Future<bool> Function()? onLoadMoreAfter;
@@ -216,6 +223,22 @@ class MessageListView extends StatefulWidget {
   final bool showUserAvatar;
   final bool showTokenStats;
   final Assistant? assistant;
+
+  /// Sentinel slot id of the fixed-height loading row pinned at the top of
+  /// the list while [hasMoreBefore] is true. Must never collide with a real
+  /// message slot id (groupId/message id).
+  @visibleForTesting
+  static const String loadingBeforeSlotKey = '__timeline_loading_before__';
+
+  @visibleForTesting
+  static const Key windowSkeletonKey = ValueKey<String>(
+    'timeline-window-skeleton',
+  );
+
+  @visibleForTesting
+  static const Key emptyConversationKey = ValueKey<String>(
+    'timeline-empty-conversation',
+  );
 
   @override
   State<MessageListView> createState() => _MessageListViewState();
@@ -241,6 +264,10 @@ class _MessageListViewState extends State<MessageListView> {
   );
 
   String _slotId(ChatMessage message) => message.groupId ?? message.id;
+
+  /// Leading fixed rows before the first message slot: the loading-before
+  /// sentinel row while [MessageListView.hasMoreBefore] is true.
+  int get _leadingRowCount => widget.hasMoreBefore ? 1 : 0;
 
   @override
   void initState() {
@@ -273,7 +300,12 @@ class _MessageListViewState extends State<MessageListView> {
 
   int? _findMessageIndexByKey(Key key) {
     if (key is! ValueKey<String>) return null;
-    return _slotIndexById[key.value];
+    if (key.value == MessageListView.loadingBeforeSlotKey) {
+      return widget.hasMoreBefore ? 0 : null;
+    }
+    final slotIndex = _slotIndexById[key.value];
+    if (slotIndex == null) return null;
+    return slotIndex + _leadingRowCount;
   }
 
   void _synchronizeExtentCache(
@@ -307,40 +339,81 @@ class _MessageListViewState extends State<MessageListView> {
       return;
     }
 
-    if (oldModels.length < newModels.length &&
-        _isPrefix(oldModels, newModels)) {
+    // The list's item space is the optional loading-before sentinel row
+    // followed by the message slots; diff on slot ids so sentinel insert and
+    // removal reuse the same scroll-compensated front add/remove handling.
+    final oldSlots = <String>[
+      if (oldWidget.hasMoreBefore) MessageListView.loadingBeforeSlotKey,
+      for (final model in oldModels) model.slotId,
+    ];
+    final newSlots = <String>[
+      if (widget.hasMoreBefore) MessageListView.loadingBeforeSlotKey,
+      for (final model in newModels) model.slotId,
+    ];
+
+    var commonTail = 0;
+    while (commonTail < oldSlots.length &&
+        commonTail < newSlots.length &&
+        oldSlots[oldSlots.length - 1 - commonTail] ==
+            newSlots[newSlots.length - 1 - commonTail]) {
+      commonTail++;
+    }
+    var commonHead = 0;
+    final maxHead = math.min(
+      oldSlots.length - commonTail,
+      newSlots.length - commonTail,
+    );
+    while (commonHead < maxHead &&
+        oldSlots[commonHead] == newSlots[commonHead]) {
+      commonHead++;
+    }
+    final oldMiddle = oldSlots.length - commonHead - commonTail;
+    final newMiddle = newSlots.length - commonHead - commonTail;
+
+    if (oldMiddle == 0 && newMiddle == 0) {
+      // Identical slot sequence; only message contents may have changed.
+      final leading = _leadingRowCount;
+      final changedIndices = <int>[];
+      for (var index = leading; index < newSlots.length; index++) {
+        if (_messageExtentMayHaveChanged(
+          oldModels[index - leading].message,
+          newModels[index - leading].message,
+        )) {
+          changedIndices.add(index);
+        }
+      }
+      final visible = controller.visibleRange;
+      final scrollController = widget.scrollController;
+      if (changedIndices.length == 1 &&
+          visible != null &&
+          changedIndices.single < visible.$1 &&
+          scrollController is scroll_ctrl.ChatAutoFollowScrollController) {
+        final request = scrollController
+            .requestPreserveDistanceFromEndDuringLayout();
+        if (request != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            scrollController.finishPreserveDistanceFromEndDuringLayout(
+              request,
+            );
+          });
+        }
+      }
+      for (final index in changedIndices) {
+        controller.invalidateExtent(index);
+      }
       return;
     }
-    if (oldModels.length < newModels.length &&
-        _isSuffix(oldModels, newModels)) {
+
+    if (oldMiddle == 0) {
+      // Pure insertion. Items appended at the end do not shift extents.
+      if (commonTail == 0) return;
       final anchor = _captureVisibleAnchor(controller);
-      final added = newModels.length - oldModels.length;
-      for (var index = 0; index < added; index++) {
-        controller.addItem(index);
+      for (var index = 0; index < newMiddle; index++) {
+        controller.addItem(commonHead + index);
       }
-      if (anchor != null) {
+      if (anchor != null && anchor.index >= commonHead) {
         controller.jumpToItem(
-          index: anchor.index + added,
-          scrollController: widget.scrollController,
-          alignment: anchor.alignment,
-        );
-      }
-      return;
-    }
-    if (newModels.length < oldModels.length &&
-        _isPrefix(newModels, oldModels)) {
-      return;
-    }
-    if (newModels.length < oldModels.length &&
-        _isSuffix(newModels, oldModels)) {
-      final anchor = _captureVisibleAnchor(controller);
-      final removed = oldModels.length - newModels.length;
-      for (var index = 0; index < removed; index++) {
-        controller.removeItem(0);
-      }
-      if (anchor != null && anchor.index >= removed) {
-        controller.jumpToItem(
-          index: anchor.index - removed,
+          index: anchor.index + newMiddle,
           scrollController: widget.scrollController,
           alignment: anchor.alignment,
         );
@@ -348,40 +421,44 @@ class _MessageListViewState extends State<MessageListView> {
       return;
     }
 
-    if (oldModels.length == newModels.length) {
-      var slotsMatch = true;
-      final changedIndices = <int>[];
-      for (var index = 0; index < newModels.length; index++) {
-        if (oldModels[index].slotId != newModels[index].slotId) {
-          slotsMatch = false;
-          break;
-        }
-        if (_messageExtentMayHaveChanged(
-          oldModels[index].message,
-          newModels[index].message,
-        )) {
-          changedIndices.add(index);
-        }
+    if (newMiddle == 0) {
+      // Pure removal. Items trimmed at the end do not shift extents.
+      if (commonTail == 0) return;
+      final anchor = _captureVisibleAnchor(controller);
+      for (var index = 0; index < oldMiddle; index++) {
+        controller.removeItem(commonHead);
       }
-      if (slotsMatch) {
-        final visible = controller.visibleRange;
-        final scrollController = widget.scrollController;
-        if (changedIndices.length == 1 &&
-            visible != null &&
-            changedIndices.single < visible.$1 &&
-            scrollController is scroll_ctrl.ChatAutoFollowScrollController) {
-          final request = scrollController
-              .requestPreserveDistanceFromEndDuringLayout();
-          if (request != null) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              scrollController.finishPreserveDistanceFromEndDuringLayout(
-                request,
-              );
-            });
-          }
+      if (anchor != null && anchor.index >= commonHead + oldMiddle) {
+        controller.jumpToItem(
+          index: anchor.index - oldMiddle,
+          scrollController: widget.scrollController,
+          alignment: anchor.alignment,
+        );
+      }
+      return;
+    }
+
+    // Sentinel row removed while the final history page is prepended.
+    if (oldSlots.first == MessageListView.loadingBeforeSlotKey &&
+        (newSlots.isEmpty ||
+            newSlots.first != MessageListView.loadingBeforeSlotKey)) {
+      final oldBody = oldSlots.sublist(1);
+      if (newSlots.length >= oldBody.length && _isSuffix(oldBody, newSlots)) {
+        final anchor = _captureVisibleAnchor(controller);
+        final added = newSlots.length - oldBody.length;
+        controller.removeItem(0);
+        for (var index = 0; index < added; index++) {
+          controller.addItem(index);
         }
-        for (final index in changedIndices) {
-          controller.invalidateExtent(index);
+        if (anchor != null) {
+          final shifted = anchor.index - 1 + added;
+          if (shifted >= 0) {
+            controller.jumpToItem(
+              index: shifted,
+              scrollController: widget.scrollController,
+              alignment: anchor.alignment,
+            );
+          }
         }
         return;
       }
@@ -426,25 +503,11 @@ class _MessageListViewState extends State<MessageListView> {
         old.durationMs != current.durationMs;
   }
 
-  bool _isPrefix(
-    List<MessageRenderModel> prefix,
-    List<MessageRenderModel> values,
-  ) {
-    if (prefix.length > values.length) return false;
-    for (var index = 0; index < prefix.length; index++) {
-      if (prefix[index].slotId != values[index].slotId) return false;
-    }
-    return true;
-  }
-
-  bool _isSuffix(
-    List<MessageRenderModel> suffix,
-    List<MessageRenderModel> values,
-  ) {
+  bool _isSuffix(List<String> suffix, List<String> values) {
     if (suffix.length > values.length) return false;
     final offset = values.length - suffix.length;
     for (var index = 0; index < suffix.length; index++) {
-      if (suffix[index].slotId != values[offset + index].slotId) return false;
+      if (suffix[index] != values[offset + index]) return false;
     }
     return true;
   }
@@ -467,6 +530,27 @@ class _MessageListViewState extends State<MessageListView> {
     _deferStreamingMessageUpdates.dispose();
     _keyboardFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Fixed-height loading row pinned at the top while earlier history exists.
+  /// The fixed extent keeps the scroll position stable when the row is
+  /// inserted or removed through the prefix add/remove paths.
+  Widget _buildLoadingBeforeRow(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      key: const ValueKey<String>(MessageListView.loadingBeforeSlotKey),
+      height: 56,
+      child: Center(
+        child: SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: cs.onSurface.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+    );
   }
 
   /// Build the context divider widget shown at truncate position.
@@ -536,15 +620,20 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.bottomContentPadding +
                     (widget.isPinnedIndicatorActive ? 12 : 0),
               ),
-              itemCount: _effectiveRenderModels.length,
+              itemCount: _effectiveRenderModels.length + _leadingRowCount,
               keyboardDismissBehavior: _keyboardDismissBehavior,
               itemBuilder: (context, index) {
-                if (index < 0 || index >= _effectiveRenderModels.length) {
+                if (index < _leadingRowCount) {
+                  return _buildLoadingBeforeRow(context);
+                }
+                final modelIndex = index - _leadingRowCount;
+                if (modelIndex < 0 ||
+                    modelIndex >= _effectiveRenderModels.length) {
                   return const SizedBox.shrink();
                 }
                 return _buildMessageItem(
                   context,
-                  index: index,
+                  index: modelIndex,
                   isProcessingFiles: isProcessing,
                   presentation: presentation,
                 );
@@ -583,6 +672,20 @@ class _MessageListViewState extends State<MessageListView> {
             return Stack(
               children: [
                 userScrollAwareList,
+                if (_effectiveRenderModels.isEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: widget.isLoadingWindow
+                          ? _WindowLoadingSkeleton(
+                              key: MessageListView.windowSkeletonKey,
+                              horizontalPadding: horizontalPad,
+                              topPadding: widget.topContentPadding,
+                            )
+                          : const _EmptyConversationPlaceholder(
+                              key: MessageListView.emptyConversationKey,
+                            ),
+                    ),
+                  ),
                 if (widget.isPinnedIndicatorActive &&
                     widget.buildPinnedStreamingIndicator != null)
                   widget.buildPinnedStreamingIndicator!(),
@@ -1158,6 +1261,99 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+    );
+  }
+}
+
+/// Bubble-shaped shimmer skeleton shown only while a cold initial window
+/// load is in flight and the list has no messages yet.
+class _WindowLoadingSkeleton extends StatefulWidget {
+  const _WindowLoadingSkeleton({
+    super.key,
+    required this.horizontalPadding,
+    required this.topPadding,
+  });
+
+  final double horizontalPadding;
+  final double topPadding;
+
+  @override
+  State<_WindowLoadingSkeleton> createState() => _WindowLoadingSkeletonState();
+}
+
+class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bubbleColor = cs.onSurface.withValues(alpha: 0.08);
+
+    Widget bubble({required bool alignEnd, required double widthFactor}) {
+      return Align(
+        alignment: alignEnd ? Alignment.centerRight : Alignment.centerLeft,
+        child: FractionallySizedBox(
+          widthFactor: widthFactor,
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: bubbleColor,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        widget.horizontalPadding + 12,
+        widget.topPadding + 24,
+        widget.horizontalPadding + 12,
+        0,
+      ),
+      child: FadeTransition(
+        opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            bubble(alignEnd: false, widthFactor: 0.62),
+            const SizedBox(height: 14),
+            bubble(alignEnd: true, widthFactor: 0.48),
+            const SizedBox(height: 14),
+            bubble(alignEnd: false, widthFactor: 0.7),
+            const SizedBox(height: 14),
+            bubble(alignEnd: true, widthFactor: 0.55),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder for an empty conversation once no window load is in flight.
+class _EmptyConversationPlaceholder extends StatelessWidget {
+  const _EmptyConversationPlaceholder({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Icon(
+        Lucide.MessagesSquare,
+        size: 72,
+        color: cs.onSurface.withValues(alpha: 0.28),
+      ),
     );
   }
 }

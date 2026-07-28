@@ -968,11 +968,9 @@ class CherryImporter {
     final existingConvIds = existingConvs.map((c) => c.id).toSet();
     final existingMsgIds = <String>{};
     if (mode == RestoreMode.merge) {
+      // Ids only: full message loads would flush the LRU cache for no gain.
       for (final c in existingConvs) {
-        final msgs = await chatService.loadMessages(c.id);
-        for (final m in msgs) {
-          existingMsgIds.add(m.id);
-        }
+        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
       }
     }
 

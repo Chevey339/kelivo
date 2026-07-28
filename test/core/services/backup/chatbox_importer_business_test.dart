@@ -269,6 +269,37 @@ void main() {
       );
     });
 
+    test('merge skips conversations and messages that already exist', () async {
+      await chatService.restoreConversation(
+        Conversation(id: 'chatbox_default_assistant-1', title: 'Existing'),
+        <ChatMessage>[
+          ChatMessage(
+            id: 'message-1',
+            role: 'user',
+            content: 'Hello',
+            conversationId: 'chatbox_default_assistant-1',
+          ),
+        ],
+      );
+
+      // Merge dedup now reads ids only; existing rows must still be skipped.
+      final result = await ChatboxImporter.importFromChatbox(
+        file: backup,
+        mode: RestoreMode.merge,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      expect(result.conversations, 0);
+      expect(result.messages, 0);
+      expect(
+        (await chatService.loadMessages(
+          'chatbox_default_assistant-1',
+        )).map((message) => message.id),
+        ['message-1'],
+      );
+    });
+
     test('fails closed when chat and business repositories differ', () async {
       await chatService.restoreConversation(
         Conversation(id: 'local-chat', title: 'Keep chat'),

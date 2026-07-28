@@ -666,16 +666,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     );
     final locale = Localizations.localeOf(context).toLanguageTag();
 
-    // Content
-    final msgs = await chatService.loadMessages(conversationId);
-    final joined = msgs
-        .where((m) => m.content.isNotEmpty)
-        .map(
-          (m) =>
-              '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}',
-        )
-        .join('\n\n');
-    final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
+    // Content (shared source builder with HomeViewModel title generation;
+    // applies truncateIndex and collapses multi-version groups)
+    final content = await chatService.generateTitleSource(conversationId);
     final prompt = settings.titlePrompt
         .replaceAll('{locale}', locale)
         .replaceAll('{content}', content);
@@ -3257,6 +3250,11 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     List<_ChatGroup> groups, {
     bool includeUpdateBanner = false,
   }) {
+    // Cold start only: before ChatService init completes the lists below are
+    // empty, so render tile placeholders instead of a blank area.
+    if (!chatService.initialized) {
+      return const _ConversationListSkeleton();
+    }
     final children = <Widget>[];
     if (includeUpdateBanner) {
       children.add(
@@ -4127,6 +4125,77 @@ class _AssistantInlineTileState extends State<_AssistantInlineTile> {
           ? null
           : (details) => widget.onSecondaryTapDown!(details.globalPosition),
       child: content,
+    );
+  }
+}
+
+/// Tile-shaped shimmer skeleton shown only while ChatService is still
+/// initializing; real tiles render as soon as the first notify lands.
+class _ConversationListSkeleton extends StatefulWidget {
+  const _ConversationListSkeleton();
+
+  @override
+  State<_ConversationListSkeleton> createState() =>
+      _ConversationListSkeletonState();
+}
+
+class _ConversationListSkeletonState extends State<_ConversationListSkeleton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final barColor = cs.onSurface.withValues(alpha: 0.08);
+
+    Widget bar({required double widthFactor, required double height}) {
+      return FractionallySizedBox(
+        widthFactor: widthFactor,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: barColor,
+            borderRadius: BorderRadius.circular(height / 2),
+          ),
+        ),
+      );
+    }
+
+    Widget tile({required double titleFactor, required double metaFactor}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            bar(widthFactor: titleFactor, height: 14),
+            const SizedBox(height: 8),
+            bar(widthFactor: metaFactor, height: 10),
+          ],
+        ),
+      );
+    }
+
+    return FadeTransition(
+      opacity: _pulse.drive(Tween<double>(begin: 0.45, end: 1.0)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          tile(titleFactor: 0.72, metaFactor: 0.42),
+          tile(titleFactor: 0.56, metaFactor: 0.34),
+          tile(titleFactor: 0.66, metaFactor: 0.48),
+          tile(titleFactor: 0.5, metaFactor: 0.3),
+          tile(titleFactor: 0.62, metaFactor: 0.38),
+        ],
+      ),
     );
   }
 }

@@ -526,6 +526,36 @@ void main() {
   );
 
   test(
+    'failed migration removes the leftover .migrating database family',
+    () async {
+      _registerHiveAdapters();
+      Hive.init(tempDir.path);
+      final conversations = await Hive.openBox<Conversation>('conversations');
+      await conversations.close();
+      await Hive.close();
+      // A directory at the target path makes the final replace step fail
+      // after the temporary database was fully written.
+      await Directory('${tempDir.path}/kelivo.db').create();
+      final staleTemp = File('${tempDir.path}/kelivo.db.migrating');
+      final staleWal = File('${tempDir.path}/kelivo.db.migrating-wal');
+
+      final service = HiveToSqliteMigrationService(
+        HiveToSqliteMigrationDecision(
+          needsMigration: true,
+          appDataDir: tempDir,
+          sqliteFile: File('${tempDir.path}/kelivo.db'),
+          hiveFiles: [File('${tempDir.path}/conversations.hive')],
+        ),
+      );
+      addTearDown(service.dispose);
+
+      await expectLater(service.migrate(), throwsA(anything));
+      expect(await staleTemp.exists(), isFalse);
+      expect(await staleWal.exists(), isFalse);
+    },
+  );
+
+  test(
     'does not show empty resource directories in initial backup items',
     () async {
       final hiveFile = File('${tempDir.path}/conversations.hive');

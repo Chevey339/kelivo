@@ -1146,6 +1146,7 @@ class _HomePageState extends State<HomePage>
         spotlightMessageId: _controller.spotlightMessageId,
         spotlightToken: _controller.spotlightToken,
         hasMoreBefore: _controller.chatController.hasMoreBefore,
+        isLoadingWindow: _controller.isLoadingWindow,
         onLoadMoreBefore: _controller.loadMoreBefore,
         hasMoreAfter: _controller.chatController.hasMoreAfter,
         onLoadMoreAfter: _controller.loadMoreAfter,

@@ -361,6 +361,7 @@ class HiveToSqliteMigrationService {
     LazyBox<Conversation>? conversationsBox;
     LazyBox<ChatMessage>? messagesBox;
     LazyBox<dynamic>? toolEventsBox;
+    var published = false;
     try {
       _emit(
         HiveToSqliteMigrationStage.migrating,
@@ -541,6 +542,7 @@ class HiveToSqliteMigrationService {
       repo = null;
 
       await _replaceSqlite(tempFile, decision.sqliteFile);
+      published = true;
       _emit(
         HiveToSqliteMigrationStage.complete,
         1,
@@ -573,6 +575,13 @@ class HiveToSqliteMigrationService {
       await conversationsBox?.close();
       await messagesBox?.close();
       await toolEventsBox?.close();
+      if (!published) {
+        // A failed attempt must not leave the half-migrated database family
+        // behind; the startup gate would otherwise keep rejecting it.
+        await _deleteSqliteFamily(
+          File('${decision.sqliteFile.path}.migrating'),
+        );
+      }
     }
   }
 

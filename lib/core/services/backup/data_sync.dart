@@ -1809,11 +1809,11 @@ class DataSync {
             final existingConvs = chatService.getAllCompleteConversations();
             final existingConvIds = existingConvs.map((c) => c.id).toSet();
 
-            // Create a map of message IDs to avoid duplicates
+            // Create a map of message IDs to avoid duplicates (ids only:
+            // full message loads would flush the LRU cache for no gain)
             final existingMsgIds = <String>{};
             for (final conv in existingConvs) {
-              final messages = await chatService.loadMessages(conv.id);
-              existingMsgIds.addAll(messages.map((m) => m.id));
+              existingMsgIds.addAll(await chatService.getMessageIds(conv.id));
             }
 
             // Group messages by conversation

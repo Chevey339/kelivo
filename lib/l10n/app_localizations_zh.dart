@@ -1558,6 +1558,13 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -7169,6 +7176,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get startupDatabaseUpdateRequiredTitle => '请更新 Kelivo 以继续';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。';
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return '恢复失败：$error';
   }
@@ -12778,6 +12792,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String backupRestoreFailureDiagnostic(String code) {
     return '診斷碼：$code';
   }
+
+  @override
+  String get startupDatabaseUpdateRequiredTitle => '請更新 Kelivo 以繼續';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      '本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。';
 
   @override
   String backupPageRestoreFailedMessage(String error) {

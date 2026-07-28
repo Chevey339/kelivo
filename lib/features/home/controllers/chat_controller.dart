@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -68,6 +69,11 @@ class ChatController extends ChangeNotifier {
 
   /// Serial of the latest window load; only it may clear [_isLoadingWindow].
   int _windowLoadSerial = 0;
+
+  /// Slot budget for the idle cache backfill: the current conversation's
+  /// cache ceiling is its full history or this threshold, whichever is lower.
+  @visibleForTesting
+  static const int idleCacheBackfillSlotLimit = 5000;
 
   /// Selected version per message group (groupId -> selected version index).
   Map<String, int> _versionSelections = <String, int>{};
@@ -178,6 +184,7 @@ class ChatController extends ChangeNotifier {
     notifyListeners();
     // Cache warm-up only; failures lose nothing user-visible.
     unawaited(_preloadVisibleGroupData().catchError((Object _) {}));
+    _scheduleIdleCacheBackfill(fetched.conversation.id);
   }
 
   /// Update the current conversation reference (e.g., after title change).
@@ -254,6 +261,46 @@ class ChatController extends ChangeNotifier {
     }
     invalidateCache();
     await _preloadVisibleGroupData();
+    _scheduleIdleCacheBackfill(conversationId);
+  }
+
+  /// Queues a silent full-cache backfill for [conversationId] to run once the
+  /// UI is idle (i.e. after the first frame of a freshly opened window).
+  void _scheduleIdleCacheBackfill(String conversationId) {
+    final Future<void> task;
+    try {
+      task = SchedulerBinding.instance.scheduleTask(
+        () => backfillCurrentConversationCache(conversationId),
+        Priority.idle,
+        debugLabel: 'chat.idleCacheBackfill',
+      );
+    } catch (_) {
+      // No scheduler binding (bare unit tests): warm-up is optional.
+      return;
+    }
+    unawaited(task.catchError((Object _) {}));
+  }
+
+  /// Silently warms the full message cache for the current conversation.
+  ///
+  /// Cache warm-up only: no listeners are notified and every guard failure
+  /// just skips the load. Guards: the conversation must still be current, its
+  /// slot count must fit [idleCacheBackfillSlotLimit], and it must not be
+  /// generating (a streaming write owns the single connection queue). The
+  /// current conversation is exempt from cache eviction; if a backfill pushes
+  /// the cache over budget, tail truncation (cache plan measure 13) keeps the
+  /// newest entries.
+  @visibleForTesting
+  Future<void> backfillCurrentConversationCache(String conversationId) async {
+    if (_currentConversation?.id != conversationId) return;
+    if (_totalMessageCount > idleCacheBackfillSlotLimit) return;
+    if (isConversationLoading(conversationId)) return;
+    if (_chatService.isConversationFullyCached(conversationId)) return;
+    try {
+      await _chatService.loadMessages(conversationId);
+    } catch (_) {
+      // Warm-up failures lose nothing user-visible.
+    }
   }
 
   void _replaceWindow(LoadedTimelinePage? page) {
@@ -611,6 +658,10 @@ class ChatController extends ChangeNotifier {
   /// mutation. A send begins with a user/assistant pair, so refreshing the
   /// persisted count between those two messages would briefly create a false
   /// gap and trigger an unnecessary window reload.
+  ///
+  /// Normal path appends the already-persisted messages straight into the
+  /// loaded window with no timeline query; only a detected count gap falls
+  /// back to the full window reload.
   Future<bool> appendPersistedTailMessages(List<ChatMessage> messages) async {
     if (messages.isEmpty) return false;
     final conversation = _currentConversation;
@@ -619,6 +670,15 @@ class ChatController extends ChangeNotifier {
       return false;
     }
 
+    if (_tryAppendPersistedTail(conversation.id, messages)) {
+      invalidateCache();
+      await _preloadVisibleGroupData();
+      notifyListeners();
+      return true;
+    }
+
+    // Fallback: the window does not provably cover the persisted tail, so
+    // reload the whole tail window instead of appending blindly.
     final page = await _chatService.loadTimelinePage(
       conversation.id,
       limit: ChatService.defaultLoadedWindowMax,
@@ -627,6 +687,71 @@ class ChatController extends ChangeNotifier {
     _replaceWindow(page);
     await _preloadVisibleGroupData();
     notifyListeners();
+    return true;
+  }
+
+  /// Folds persisted tail messages into the loaded window without a timeline
+  /// query. Returns false when contiguity cannot be proven, so the caller
+  /// falls back to the full window reload.
+  bool _tryAppendPersistedTail(
+    String conversationId,
+    List<ChatMessage> messages,
+  ) {
+    // The loaded window must currently reach the persisted tail.
+    if (_loadedStartIndex + _messages.length != _totalMessageCount) {
+      return false;
+    }
+
+    // Every incoming message must open a new slot. A new version of a loaded
+    // group would change that slot's selection, which only a reload resolves.
+    final knownGroups = <String>{
+      for (final loaded in _messages) loaded.groupId ?? loaded.id,
+    };
+    final batchGroups = <String>{};
+    for (final message in messages) {
+      final groupId = message.groupId ?? message.id;
+      if (knownGroups.contains(groupId) || !batchGroups.add(groupId)) {
+        return false;
+      }
+    }
+
+    // Gap detection compares persisted row (revision) indices only — never
+    // the collapsed slot count, which multi-version conversations make
+    // diverge from the row count. The batch must occupy the final rows
+    // directly after the loaded tail; anything else means an unseen mutation
+    // landed in between.
+    final rowCount = _chatService.getMessageCount(conversationId);
+    if (rowCount < messages.length) return false;
+    final firstRowIndex = _chatService.getMessageIndex(
+      conversationId,
+      messages.first.id,
+    );
+    final lastRowIndex = _chatService.getMessageIndex(
+      conversationId,
+      messages.last.id,
+    );
+    if (firstRowIndex != rowCount - messages.length ||
+        lastRowIndex != rowCount - 1) {
+      return false;
+    }
+    if (_messages.isNotEmpty) {
+      final tailRowIndex = _chatService.getMessageIndex(
+        conversationId,
+        _messages.last.id,
+      );
+      if (tailRowIndex != firstRowIndex - 1) return false;
+    } else if (firstRowIndex != 0) {
+      return false;
+    }
+
+    _messages.addAll(messages);
+    _totalMessageCount += messages.length;
+    if (_messages.length > ChatService.defaultLoadedWindowMax) {
+      final removeCount =
+          _messages.length - ChatService.defaultLoadedWindowMax;
+      _messages.removeRange(0, removeCount);
+      _loadedStartIndex += removeCount;
+    }
     return true;
   }
 
@@ -759,6 +884,12 @@ class ChatController extends ChangeNotifier {
     }
     if (prev != loading) {
       notifyListeners();
+      if (!loading &&
+          _currentConversation?.id == conversationId &&
+          !_chatService.isConversationFullyCached(conversationId)) {
+        // Resume an idle backfill that generation paused.
+        _scheduleIdleCacheBackfill(conversationId);
+      }
     }
   }
 

@@ -534,6 +534,8 @@
       }
     }
   },
+  "startupDatabaseUpdateRequiredTitle": "請更新 Kelivo 以繼續",
+  "startupDatabaseUpdateRequiredContent": "本裝置上的聊天資料庫由更新版本的 Kelivo 建立，目前版本無法開啟。資料未被改動。請安裝最新版 Kelivo 後重新開啟。",
   "backupPageRestoreFailedMessage": "還原失敗：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",

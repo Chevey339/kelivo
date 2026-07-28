@@ -217,6 +217,69 @@ void main() {
       );
     });
 
+    test('merge re-import of the same backup adds nothing twice', () async {
+      Map<String, List<int>> entries() => <String, List<int>>{
+        'data.json': utf8.encode(
+          jsonEncode(<String, dynamic>{
+            'version': 5,
+            'localStorage': <String, dynamic>{
+              'persist:cherry-studio': _persistStateJson(),
+            },
+            'indexedDB': <String, dynamic>{
+              'topics': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 'topic-1',
+                  'messages': <Map<String, dynamic>>[
+                    <String, dynamic>{
+                      'id': 'msg-1',
+                      'role': 'user',
+                      'topicId': 'topic-1',
+                      'assistantId': 'assistant-1',
+                      'createdAt': '2026-01-01T00:00:00.000Z',
+                      'status': 'success',
+                      'blocks': <String>['block-1'],
+                    },
+                  ],
+                },
+              ],
+              'message_blocks': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 'block-1',
+                  'messageId': 'msg-1',
+                  'type': 'main_text',
+                  'createdAt': '2026-01-01T00:00:01.000Z',
+                  'status': 'success',
+                  'content': 'hello from legacy',
+                },
+              ],
+              'files': <Map<String, dynamic>>[],
+            },
+          }),
+        ),
+      };
+
+      final first = await CherryImporter.importFromCherryStudio(
+        file: await _createZip(tempDir, entries()),
+        mode: RestoreMode.merge,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+      expect(first.conversations, 1);
+      expect(first.messages, 1);
+
+      // Merge dedup now reads ids only; the second pass must still skip both
+      // the existing conversation and its existing message.
+      final second = await CherryImporter.importFromCherryStudio(
+        file: await _createZip(tempDir, entries()),
+        mode: RestoreMode.merge,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+      expect(second.conversations, 0);
+      expect(second.messages, 0);
+      expect(await chatService.loadMessages('topic-1'), hasLength(1));
+    });
+
     test('rejects v6 direct backup without persisted Cherry state', () async {
       final backup = await _createZip(tempDir, <String, List<int>>{
         'metadata.json': utf8.encode(

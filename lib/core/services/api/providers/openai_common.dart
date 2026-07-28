@@ -869,6 +869,28 @@ Stream<String> _ensureTrailingNewline(Stream<String> source) async* {
   yield '\n';
 }
 
+/// Follow-up tool-call responses are consumed inside the SSE parser's
+/// per-event catch, which tolerates malformed JSON. Convert their transport
+/// failures into [HttpException] up front so that catch cannot swallow them
+/// and let the no-[DONE] fallback persist truncated output as a completion.
+Stream<String> _rethrowFollowUpStreamErrors(Stream<String> source) {
+  return source.transform(
+    StreamTransformer<String, String>.fromHandlers(
+      handleError:
+          (Object error, StackTrace stackTrace, EventSink<String> sink) {
+            if (error is HttpException) {
+              sink.addError(error, stackTrace);
+            } else {
+              sink.addError(
+                HttpException('Follow-up stream failed: $error'),
+                stackTrace,
+              );
+            }
+          },
+    ),
+  );
+}
+
 /// Some providers (e.g. OpenRouter rate limits/moderation) report failures as
 /// an in-band `{"error": ...}` frame on an otherwise 2xx stream. Surface those
 /// as a stream error so truncated output is not persisted as a completion.
@@ -2855,12 +2877,23 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
                 req2.headers.addAll(headers2);
                 req2.body = jsonEncode(body2);
-                final resp2 = await client.send(req2);
-                if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-                  final errorBody = await resp2.stream.bytesToString();
-                  throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+                final http.StreamedResponse resp2;
+                try {
+                  resp2 = await client.send(req2);
+                  if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+                    final errorBody = await resp2.stream.bytesToString();
+                    throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+                  }
+                } on HttpException {
+                  rethrow;
+                } catch (e) {
+                  // Keep as HttpException so the per-event catch below (which
+                  // tolerates malformed JSON) cannot swallow this failure.
+                  throw HttpException('Follow-up request failed: $e');
                 }
-                final s2 = resp2.stream.transform(utf8.decoder);
+                final s2 = _rethrowFollowUpStreamErrors(
+                  resp2.stream.transform(utf8.decoder),
+                );
                 String buf2 = '';
                 final Map<int, Map<String, String>> respCalls2 =
                     <int, Map<String, String>>{};
@@ -3524,12 +3557,23 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
             req2.headers.addAll(headers2);
             req2.body = jsonEncode(body2);
-            final resp2 = await client.send(req2);
-            if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-              final errorBody = await resp2.stream.bytesToString();
-              throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+            final http.StreamedResponse resp2;
+            try {
+              resp2 = await client.send(req2);
+              if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+                final errorBody = await resp2.stream.bytesToString();
+                throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+              }
+            } on HttpException {
+              rethrow;
+            } catch (e) {
+              // Keep as HttpException so the per-event catch below (which
+              // tolerates malformed JSON) cannot swallow this failure.
+              throw HttpException('Follow-up request failed: $e');
             }
-            final s2 = resp2.stream.transform(utf8.decoder);
+            final s2 = _rethrowFollowUpStreamErrors(
+              resp2.stream.transform(utf8.decoder),
+            );
             String buf2 = '';
             final Map<int, Map<String, String>> toolAcc2 =
                 <int, Map<String, String>>{};
@@ -4038,12 +4082,23 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
                 req2.headers.addAll(headers2);
                 req2.body = jsonEncode(body2);
-                final resp2 = await client.send(req2);
-                if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-                  final errorBody = await resp2.stream.bytesToString();
-                  throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+                final http.StreamedResponse resp2;
+                try {
+                  resp2 = await client.send(req2);
+                  if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+                    final errorBody = await resp2.stream.bytesToString();
+                    throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+                  }
+                } on HttpException {
+                  rethrow;
+                } catch (e) {
+                  // Keep as HttpException so the per-event catch below (which
+                  // tolerates malformed JSON) cannot swallow this failure.
+                  throw HttpException('Follow-up request failed: $e');
                 }
-                final s2 = resp2.stream.transform(utf8.decoder);
+                final s2 = _rethrowFollowUpStreamErrors(
+                  resp2.stream.transform(utf8.decoder),
+                );
                 String buf2 = '';
                 final Map<int, Map<String, String>> toolAcc2 =
                     <int, Map<String, String>>{};

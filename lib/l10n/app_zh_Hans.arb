@@ -567,6 +567,8 @@
       }
     }
   },
+  "startupDatabaseUpdateRequiredTitle": "请更新 Kelivo 以继续",
+  "startupDatabaseUpdateRequiredContent": "本设备上的聊天数据库由更新版本的 Kelivo 创建，当前版本无法打开。数据未被改动。请安装最新版 Kelivo 后重新打开。",
   "backupPageRestoreFailedMessage": "恢复失败：{error}",
   "backupPageOK": "好的",
   "backupPageCancel": "取消",

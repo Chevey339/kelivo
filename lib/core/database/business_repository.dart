@@ -52,6 +52,7 @@ final class BusinessRepository {
       final retainedIds = rows.map((row) => row.id).toSet();
       for (final row in existing) {
         if (!retainedIds.contains(row.id)) {
+          _assertDecodablePayload(kind, row);
           await _deleteEntity(kind, row.id);
         }
       }
@@ -370,6 +371,24 @@ final class BusinessRepository {
           throw ArgumentError.value(row.payload, 'payload');
         }
       }
+    }
+  }
+
+  /// Refuses to drop an existing row whose payload no longer decodes: the
+  /// caller's snapshot may be missing the row precisely because it failed to
+  /// read it, and deleting it would physically erase the surviving data.
+  static void _assertDecodablePayload(
+    BusinessEntityKind kind,
+    BusinessEntityValue row,
+  ) {
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(row.payload);
+    } on FormatException {
+      throw StateError('business_entity_undecodable:${kind.tableName}:${row.id}');
+    }
+    if (decoded is! Map) {
+      throw StateError('business_entity_undecodable:${kind.tableName}:${row.id}');
     }
   }
 

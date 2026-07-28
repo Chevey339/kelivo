@@ -1,31 +1,22 @@
-import 'dart:convert';
-
-import '../database/business_preferences.dart';
 import '../models/quick_phrase.dart';
+import 'json_blob_store.dart';
 
-class QuickPhraseStore {
-  QuickPhraseStore(this._preferences);
+class QuickPhraseStore extends JsonBlobStore<QuickPhrase> {
+  QuickPhraseStore(super._preferences);
 
   static const String _phrasesKey = 'quick_phrases_v1';
 
-  final BusinessPreferences _preferences;
+  @override
+  String get storageKey => _phrasesKey;
 
-  Future<List<QuickPhrase>> getAll() async {
-    await _preferences.load();
-    final raw = _preferences.getString(_phrasesKey);
-    if (raw == null || raw.isEmpty) return <QuickPhrase>[];
-    try {
-      final values = jsonDecode(raw) as List;
-      return values
-          .map(
-            (value) =>
-                QuickPhrase.fromJson((value as Map).cast<String, dynamic>()),
-          )
-          .toList();
-    } catch (_) {
-      return <QuickPhrase>[];
-    }
-  }
+  @override
+  QuickPhrase decodeItem(Map<String, dynamic> json) =>
+      QuickPhrase.fromJson(json);
+
+  @override
+  Map<String, dynamic> encodeItem(QuickPhrase item) => item.toJson();
+
+  Future<List<QuickPhrase>> getAll() => readAll();
 
   Future<List<QuickPhrase>> getGlobal() async {
     final all = await getAll();
@@ -42,30 +33,33 @@ class QuickPhraseStore {
   }
 
   Future<void> save(List<QuickPhrase> phrases) {
-    return _preferences.setString(
-      _phrasesKey,
-      jsonEncode(phrases.map((phrase) => phrase.toJson()).toList()),
-    );
+    return runExclusive(() => writeAll(phrases));
   }
 
-  Future<void> add(QuickPhrase phrase) async {
-    final all = await getAll();
-    all.add(phrase);
-    await save(all);
+  Future<void> add(QuickPhrase phrase) {
+    return runExclusive(() async {
+      final all = await readAll();
+      all.add(phrase);
+      await writeAll(all);
+    });
   }
 
-  Future<void> update(QuickPhrase phrase) async {
-    final all = await getAll();
-    final index = all.indexWhere((existing) => existing.id == phrase.id);
-    if (index == -1) return;
-    all[index] = phrase;
-    await save(all);
+  Future<void> update(QuickPhrase phrase) {
+    return runExclusive(() async {
+      final all = await readAll();
+      final index = all.indexWhere((existing) => existing.id == phrase.id);
+      if (index == -1) return;
+      all[index] = phrase;
+      await writeAll(all);
+    });
   }
 
-  Future<void> delete(String id) async {
-    final all = await getAll();
-    all.removeWhere((phrase) => phrase.id == id);
-    await save(all);
+  Future<void> delete(String id) {
+    return runExclusive(() async {
+      final all = await readAll();
+      all.removeWhere((phrase) => phrase.id == id);
+      await writeAll(all);
+    });
   }
 
   Future<void> clear() => save(const <QuickPhrase>[]);

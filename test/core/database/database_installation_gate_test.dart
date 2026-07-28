@@ -144,7 +144,7 @@ void main() {
           isA<StateError>().having(
             (error) => error.message,
             'message',
-            'database_schema_version',
+            'database_schema_too_new',
           ),
         ),
       );
@@ -281,6 +281,159 @@ void main() {
       expect(receipt.databaseId, isNotEmpty);
       expect(await databaseFile(directory).exists(), isTrue);
       expect(await sessionFile.readAsString(), '{broken');
+    });
+
+    group('recoveryActionFor', () {
+      test('database_schema_too_new 映射为升级提示', () async {
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_too_new'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.promptUpgrade);
+      });
+
+      test('与数据库无关的错误不触发恢复', () async {
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('filesystem'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('已有 receipt 的损坏库不自动重建', () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_corrupt'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('无法解析的 receipt 同样阻止自动重建', () async {
+        await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
+        final receipt = directory.listSync().whereType<File>().singleWhere(
+          (file) => p.basename(file.path).startsWith(
+            'database_installation_receipt_',
+          ),
+        );
+        await receipt.writeAsString('{broken');
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_corrupt'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+
+      test('无 receipt 且 Hive 源在时引导重迁移', () async {
+        await databaseFile(directory).writeAsString('not a sqlite database');
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_corrupt'),
+          legacyHiveDataPresent: true,
+        );
+
+        expect(action, DatabaseRecoveryAction.promptRemigration);
+      });
+
+      test('原始 sqlite 错误仅在可重迁移时引导', () async {
+        final rawError = sqlite.SqliteException(
+          extendedResultCode: 11,
+          message: 'database disk image is malformed',
+        );
+
+        final withHive = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: rawError,
+          legacyHiveDataPresent: true,
+        );
+        final withoutHive = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: rawError,
+          legacyHiveDataPresent: false,
+        );
+
+        expect(withHive, DatabaseRecoveryAction.promptRemigration);
+        expect(withoutHive, DatabaseRecoveryAction.none);
+      });
+
+      test('首启半成品库（userVersion=0）可自动重建', () async {
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.close();
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.rebuildAutomatically);
+      });
+
+      test('首启垃圾文件（无法读取 userVersion）可自动重建', () async {
+        await databaseFile(directory).writeAsString('not a sqlite database');
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_corrupt'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.rebuildAutomatically);
+      });
+
+      test('已建 schema 的库即使无 receipt 也不自动重建', () async {
+        final repository = ChatDatabaseRepository.open(
+          file: databaseFile(directory),
+        );
+        try {
+          await repository.ensureReady();
+        } finally {
+          await repository.close();
+        }
+        final raw = sqlite.sqlite3.open(databaseFile(directory).path);
+        raw.userVersion = 1;
+        raw.close();
+
+        final action = await DatabaseInstallationGate.recoveryActionFor(
+          appDataDirectory: directory,
+          error: StateError('database_schema_version'),
+          legacyHiveDataPresent: false,
+        );
+
+        expect(action, DatabaseRecoveryAction.none);
+      });
+    });
+
+    group('rebuildFresh', () {
+      test('替换残缺库并签发新 receipt', () async {
+        final file = databaseFile(directory);
+        await file.writeAsString('not a sqlite database');
+        await File('${file.path}-wal').writeAsString('stale wal');
+
+        final receipt = await DatabaseInstallationGate.rebuildFresh(
+          appDataDirectory: directory,
+        );
+
+        final info = ChatDatabaseRepository.inspectInstalledDatabase(file);
+        expect(info.databaseId, receipt.databaseId);
+        expect(
+          (await DatabaseInstallationGate.read(
+            appDataDirectory: directory,
+          ))?.installationId,
+          receipt.installationId,
+        );
+      });
     });
   });
 }

@@ -660,9 +660,20 @@ class HomeViewModel extends ChangeNotifier {
     final conversation = currentConversation;
     if (conversation == null || messageIds.isEmpty) return;
 
-    final allMessages = await _chatService.loadMessages(conversation.id);
+    // Only the selected groups matter for the plan; resolve their group ids
+    // from the selected revisions, then load just those groups' versions.
+    final selected = await _chatService.loadMessagesByIds(
+      messageIds.toList(growable: false),
+    );
+    final groupIds = selected
+        .map((message) => message.groupId ?? message.id)
+        .toSet();
+    final scopedMessages = await _chatService.loadMessagesForGroups(
+      conversation.id,
+      groupIds,
+    );
     final plan = buildBatchDeletePlan(
-      messages: allMessages,
+      messages: scopedMessages,
       selectedMessageIds: messageIds,
       versionSelections: _chatController.versionSelections,
       deleteAllVersions: deleteAllVersions,
@@ -883,17 +894,23 @@ class HomeViewModel extends ChangeNotifier {
     try {
       final presets = ap.getPresetMessagesForAssistant(a?.id);
       if (presets.isNotEmpty && currentConversation != null) {
+        final injected = <ChatMessage>[];
         for (final pm in presets) {
           final role = (pm['role'] == 'assistant') ? 'assistant' : 'user';
           final content = (pm['content'] ?? '').trim();
           if (content.isEmpty) continue;
-          final presetMessage = await _chatService.addMessage(
-            conversationId: currentConversation!.id,
-            role: role,
-            content: content,
+          injected.add(
+            await _chatService.addMessage(
+              conversationId: currentConversation!.id,
+              role: role,
+              content: content,
+            ),
           );
-          await _chatController.appendPersistedTailMessage(presetMessage);
-          notifyListeners();
+        }
+        // One batch append publishes the whole preset block with a single
+        // notify instead of one per message.
+        if (injected.isNotEmpty) {
+          await _chatController.appendPersistedTailMessages(injected);
         }
       }
     } catch (_) {}
@@ -1237,21 +1254,9 @@ class HomeViewModel extends ChangeNotifier {
     );
     final locale = Localizations.localeOf(_contextProvider).toLanguageTag();
 
-    // Build content from messages (truncate to reasonable length)
-    final msgs = await _chatService.loadMessages(convo.id);
-    final tIndex = _chatService.getContextStartIndex(convo.id);
-    final List<ChatMessage> sourceAll = (tIndex >= 0 && tIndex <= msgs.length)
-        ? msgs.sublist(tIndex)
-        : msgs;
-    final List<ChatMessage> source = collapseVersions(sourceAll);
-    final joined = source
-        .where((m) => m.content.isNotEmpty)
-        .map(
-          (m) =>
-              '${m.role == 'assistant' ? 'Assistant' : 'User'}: ${m.content}',
-        )
-        .join('\n\n');
-    final content = joined.length > 3000 ? joined.substring(0, 3000) : joined;
+    // Build content from messages (shared with the side drawer title path;
+    // both cache and paging paths collect the same ~3000-char tail window)
+    final content = await _chatService.generateTitleSource(convo.id);
 
     String prompt = settings.titlePrompt
         .replaceAll('{locale}', locale)

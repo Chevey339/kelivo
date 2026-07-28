@@ -1614,6 +1614,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get startupDatabaseUpdateRequiredTitle => 'Update Kelivo to continue';
+
+  @override
+  String get startupDatabaseUpdateRequiredContent =>
+      'The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.';
+
+  @override
   String backupPageRestoreFailedMessage(String error) {
     return 'Restore failed: $error';
   }

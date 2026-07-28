@@ -195,6 +195,194 @@ void main() {
     });
   });
 
+  group('OpenAI follow-up tool-call errors', () {
+    const toolSpec = <String, dynamic>{
+      'type': 'function',
+      'function': {
+        'name': 'get_date',
+        'description': 'Get current date',
+        'parameters': {'type': 'object', 'properties': <String, dynamic>{}},
+      },
+    };
+
+    // First-round SSE: a single chunk that streams a tool_call delta together
+    // with finish_reason 'tool_calls', which triggers the in-parser follow-up
+    // request path (the one formerly swallowed by the per-event catch).
+    final toolCallChunk = jsonEncode({
+      'choices': [
+        {
+          'index': 0,
+          'delta': {
+            'role': 'assistant',
+            'tool_calls': [
+              {
+                'index': 0,
+                'id': 'call_1',
+                'type': 'function',
+                'function': {'name': 'get_date', 'arguments': '{}'},
+              },
+            ],
+          },
+          'finish_reason': 'tool_calls',
+        },
+      ],
+    });
+
+    Future<HttpServer> twoRoundServer(
+      Future<void> Function(HttpRequest request) onSecond,
+    ) async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      server.listen((request) async {
+        requestCount++;
+        if (requestCount == 1) {
+          request.response.statusCode = 200;
+          request.response.headers
+            ..contentType = ContentType('text', 'event-stream')
+            ..set('Transfer-Encoding', 'chunked');
+          request.response.write('data: $toolCallChunk\n\n');
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        } else {
+          await onSecond(request);
+        }
+      });
+      return server;
+    }
+
+    Future<({List<ChatStreamChunk> chunks, Object? error})> runTwoRounds(
+      HttpServer server,
+    ) {
+      return _drain(
+        ChatApiService.sendMessageStream(
+          config: _testConfig(
+            'http://localhost:${server.port}/v1',
+            ProviderKind.openai,
+          ),
+          modelId: 'test-model',
+          messages: [
+            {'role': 'user', 'content': 'hi'},
+          ],
+          tools: const [toolSpec],
+          onToolCall: (name, args, {toolCallId}) async => '2026-07-26',
+        ),
+      );
+    }
+
+    test('follow-up non-2xx response propagates, no fake isDone', () async {
+      final server = await twoRoundServer((request) async {
+        request.response.statusCode = 500;
+        request.response.write('server exploded');
+        await request.response.close();
+      });
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final result = await runTwoRounds(server);
+
+      expect(result.error, isA<HttpException>());
+      expect(result.error.toString(), contains('HTTP 500'));
+      expect(result.chunks.any((c) => c.toolCalls != null), isTrue);
+      expect(result.chunks.any((c) => c.isDone), isFalse);
+    });
+
+    test('follow-up request transport failure propagates, no fake isDone',
+        () async {
+      // Refuse the follow-up request by closing the server right after the
+      // first round; client.send then fails with http.ClientException, which
+      // the per-event catch used to swallow into a fake completion.
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      var requestCount = 0;
+      server.listen((request) async {
+        requestCount++;
+        request.response.statusCode = 200;
+        request.response.headers
+          ..contentType = ContentType('text', 'event-stream')
+          ..set('Transfer-Encoding', 'chunked');
+        request.response.write('data: $toolCallChunk\n\n');
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+        await server.close(force: true);
+      });
+
+      final result = await runTwoRounds(server);
+
+      expect(requestCount, 1);
+      expect(result.error, isA<HttpException>());
+      expect(result.error.toString(), contains('Follow-up request failed'));
+      expect(result.chunks.any((c) => c.isDone), isFalse);
+    });
+
+    test('follow-up in-band error frame propagates, no fake isDone', () async {
+      final errorFrame = jsonEncode({
+        'error': {'message': 'Follow-up rate limited', 'code': 429},
+      });
+      final server = await twoRoundServer((request) async {
+        request.response.statusCode = 200;
+        request.response.headers
+          ..contentType = ContentType('text', 'event-stream')
+          ..set('Transfer-Encoding', 'chunked');
+        request.response.write('data: $errorFrame\n\n');
+        await request.response.close();
+      });
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final result = await runTwoRounds(server);
+
+      expect(result.error, isA<HttpException>());
+      expect(result.error.toString(), contains('Follow-up rate limited'));
+      expect(result.chunks.any((c) => c.isDone), isFalse);
+    });
+
+    test('malformed JSON line is still skipped', () async {
+      final hello = jsonEncode({
+        'choices': [
+          {
+            'delta': {'content': 'Hel'},
+            'finish_reason': null,
+          },
+        ],
+      });
+      final lo = jsonEncode({
+        'choices': [
+          {
+            'delta': {'content': 'lo'},
+            'finish_reason': 'stop',
+          },
+        ],
+      });
+      final server = await _sseServer([
+        'data: $hello\n\n',
+        'data: {not-json\n\n',
+        'data: $lo\n\n',
+        'data: [DONE]\n\n',
+      ]);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final result = await _drain(
+        ChatApiService.sendMessageStream(
+          config: _testConfig(
+            'http://localhost:${server.port}/v1',
+            ProviderKind.openai,
+          ),
+          modelId: 'test-model',
+          messages: [
+            {'role': 'user', 'content': 'hi'},
+          ],
+        ),
+      );
+
+      expect(result.error, isNull);
+      expect(result.chunks.map((c) => c.content).join(), 'Hello');
+      expect(result.chunks.last.isDone, isTrue);
+    });
+  });
+
   group('OpenAI Responses API in-band SSE error', () {
     test('response.failed event ends stream with error, no fake isDone',
         () async {

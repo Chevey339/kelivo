@@ -211,12 +211,6 @@ class _FakeLazyChatService extends ChatService {
   }
 
   @override
-  void retainTimelineWindow(
-    String conversationId,
-    Iterable<String> revisionIds,
-  ) {}
-
-  @override
   Map<String, int> getVersionSelections(String conversationId) =>
       Map<String, int>.from(versionSelections);
 
@@ -919,23 +913,136 @@ void main() {
       },
     );
 
-    test('publishes an atomic send pair through the timeline tail', () async {
+    test('publishes an atomic send pair by appending to the tail', () async {
       await controller.setCurrentConversationAndLoad(conversation);
       final user = chatService.appendPersistedMessage(_message(100));
       final assistant = chatService.appendPersistedMessage(_message(101));
+      final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
 
-      final reloaded = await controller.appendPersistedTailMessages([
+      final appended = await controller.appendPersistedTailMessages([
         user,
         assistant,
       ]);
 
-      expect(reloaded, isTrue);
-      expect(chatService.rangeLoadCalls, 2);
+      expect(appended, isTrue);
+      // Incremental append: no extra timeline query for a contiguous tail.
+      expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend);
       expect(controller.messages.map((message) => message.id), [
-        ...messages.map((message) => message.id),
+        ...messages.sublist(60, 100).map((message) => message.id),
+        user.id,
+        assistant.id,
       ]);
+      expect(controller.loadedStartIndex, 60);
+      expect(controller.totalMessageCount, 102);
+      expect(controller.hasMoreAfter, isFalse);
+    });
+
+    test('batch append notifies listeners exactly once', () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      final user = chatService.appendPersistedMessage(_message(100));
+      final assistant = chatService.appendPersistedMessage(_message(101));
+      var notifyCount = 0;
+      controller.addListener(() => notifyCount++);
+
+      await controller.appendPersistedTailMessages([user, assistant]);
+
+      expect(notifyCount, 1);
+    });
+
+    test('a persisted gap between window tail and batch forces a reload',
+        () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      // Persist two messages but only hand the last one to the controller:
+      // the unseen row in between must trigger the full reload fallback.
+      chatService.appendPersistedMessage(_message(100));
+      final straggler = chatService.appendPersistedMessage(_message(101));
+      final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
+
+      final appended = await controller.appendPersistedTailMessages([
+        straggler,
+      ]);
+
+      expect(appended, isTrue);
+      expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
+      expect(controller.messages.last.id, straggler.id);
+      expect(
+        controller.messages.any((message) => message.id == 'message-100'),
+        isTrue,
+      );
       expect(controller.totalMessageCount, 102);
     });
+
+    test('a new version of a loaded tail group forces a reload', () async {
+      await controller.setCurrentConversationAndLoad(conversation);
+      final revision = chatService.appendPersistedMessage(
+        _versionedMessage(
+          id: 'message-99-v1',
+          role: 'assistant',
+          groupId: 'message-99',
+          version: 1,
+        ),
+      );
+      final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
+
+      final appended = await controller.appendPersistedTailMessage(revision);
+
+      expect(appended, isTrue);
+      expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
+      expect(controller.collapsedMessages.last.id, 'message-99-v1');
+      expect(controller.totalMessageCount, 100);
+    });
+
+    test(
+      'multi-version conversations append incrementally without a false gap',
+      () async {
+        final anchors = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v0',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 0,
+          ),
+        );
+        final revisions = List<ChatMessage>.generate(
+          ChatService.defaultLoadedWindowMax,
+          (index) => _versionedMessage(
+            id: 'anchor-$index-v1',
+            role: index.isEven ? 'user' : 'assistant',
+            groupId: 'anchor-$index',
+            version: 1,
+          ),
+        );
+        messages = <ChatMessage>[...anchors, ...revisions];
+        conversation = Conversation(
+          id: 'conversation-1',
+          title: 'Multi-version tail',
+          messageIds: messages.map((message) => message.id).toList(),
+        );
+        chatService = _FakeLazyChatService(messages);
+        controller.dispose();
+        controller = ChatController(chatService: chatService);
+        await controller.setCurrentConversationAndLoad(conversation);
+        expect(controller.totalMessageCount, ChatService.defaultLoadedWindowMax);
+        final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
+
+        // Slot count (360) and revision row count (721) diverge here; the gap
+        // check must use row indices and therefore must not misfire.
+        final appended = chatService.appendPersistedMessage(
+          _message(messages.length),
+        );
+        final result = await controller.appendPersistedTailMessage(appended);
+
+        expect(result, isTrue);
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend);
+        expect(controller.messages.last.id, appended.id);
+        expect(
+          controller.totalMessageCount,
+          ChatService.defaultLoadedWindowMax + 1,
+        );
+        expect(controller.hasMoreAfter, isFalse);
+      },
+    );
 
     test(
       'mini map source includes all messages without expanding chat window',

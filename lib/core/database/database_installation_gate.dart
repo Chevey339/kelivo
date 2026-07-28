@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 import 'package:uuid/uuid.dart';
 
 import '../services/backup/restore_durability.dart';
@@ -42,6 +43,16 @@ final class DatabaseInstallationReceipt {
     }
     return receipt;
   }
+}
+
+/// Recovery route for a failed startup admission. Only
+/// [rebuildAutomatically] may run without further user confirmation; every
+/// other route must be confirmed by the user first.
+enum DatabaseRecoveryAction {
+  none,
+  rebuildAutomatically,
+  promptRemigration,
+  promptUpgrade,
 }
 
 final class DatabaseInstallationGate {
@@ -89,7 +100,16 @@ final class DatabaseInstallationGate {
       }
 
       info = ChatDatabaseRepository.inspectInstalledDatabase(databaseFile);
-    } catch (_) {
+    } on StateError catch (error) {
+      // migrateInstalledDatabase reports every schema mismatch with the same
+      // code; only a newer schema means the user must update the app.
+      if (error.message == 'database_schema_version') {
+        final userVersion = _tryReadUserVersion(databaseFile);
+        if (userVersion != null &&
+            userVersion > AppDatabase.currentSchemaVersion) {
+          throw StateError('database_schema_too_new');
+        }
+      }
       rethrow;
     }
     if (info.databaseId == null) {
@@ -143,6 +163,103 @@ final class DatabaseInstallationGate {
     await _publishReceipt(receiptFile, updated, durability: resolvedDurability);
     await _removeStaleReceipts(receipts, durability: resolvedDurability);
     return updated;
+  }
+
+  /// Maps a startup admission failure to the strongest safe recovery route.
+  ///
+  /// Automatic rebuild is only returned when no installation receipt and no
+  /// legacy Hive source exist and the installed file is half-created
+  /// (userVersion 0) or unreadable, so no reachable data can be lost.
+  static Future<DatabaseRecoveryAction> recoveryActionFor({
+    required Directory appDataDirectory,
+    required Object error,
+    required bool legacyHiveDataPresent,
+  }) async {
+    if (error is StateError && error.message == 'database_schema_too_new') {
+      return DatabaseRecoveryAction.promptUpgrade;
+    }
+    final isSchemaOrCorrupt =
+        error is StateError &&
+        (error.message == 'database_schema_version' ||
+            error.message == 'database_corrupt');
+    final isRawSqliteFailure = error is sqlite.SqliteException;
+    if (!isSchemaOrCorrupt && !isRawSqliteFailure) {
+      return DatabaseRecoveryAction.none;
+    }
+    // A receipt that exists but cannot be parsed still proves a previous
+    // install, so it must block automatic rebuild like a valid one.
+    final bool hasReceipts;
+    try {
+      hasReceipts = (await _readReceipts(appDataDirectory)).isNotEmpty;
+    } catch (_) {
+      return DatabaseRecoveryAction.none;
+    }
+    if (hasReceipts) return DatabaseRecoveryAction.none;
+    if (legacyHiveDataPresent) {
+      return DatabaseRecoveryAction.promptRemigration;
+    }
+    if (isRawSqliteFailure) {
+      // A raw sqlite error never justifies deleting data automatically.
+      return DatabaseRecoveryAction.none;
+    }
+    final databaseFile = File(
+      p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+    );
+    if (await FileSystemEntity.type(databaseFile.path, followLinks: false) !=
+        FileSystemEntityType.file) {
+      return DatabaseRecoveryAction.none;
+    }
+    final userVersion = _tryReadUserVersion(databaseFile);
+    if (userVersion == null || userVersion == 0) {
+      return DatabaseRecoveryAction.rebuildAutomatically;
+    }
+    return DatabaseRecoveryAction.none;
+  }
+
+  /// Deletes the installed database family and repeats first-launch setup.
+  /// Only safe where [recoveryActionFor] returned
+  /// [DatabaseRecoveryAction.rebuildAutomatically].
+  static Future<DatabaseInstallationReceipt> rebuildFresh({
+    required Directory appDataDirectory,
+    RestoreDurability? durability,
+  }) async {
+    final resolvedDurability = durability ?? RestorePlatformDurability();
+    await appDataDirectory.create(recursive: true);
+    final databaseFile = File(
+      p.join(appDataDirectory.path, AppDatabase.databaseFileName),
+    );
+    for (final suffix in const ['', '-wal', '-shm']) {
+      final target = File('${databaseFile.path}$suffix');
+      if (await FileSystemEntity.type(target.path, followLinks: false) ==
+          FileSystemEntityType.file) {
+        await target.delete();
+      }
+    }
+    await resolvedDurability.syncDirectory(
+      appDataDirectory,
+      fullBarrier: true,
+    );
+    return ensureReady(
+      appDataDirectory: appDataDirectory,
+      durability: resolvedDurability,
+    );
+  }
+
+  static int? _tryReadUserVersion(File file) {
+    sqlite.Database? database;
+    try {
+      database = sqlite.sqlite3.open(
+        file.absolute.path,
+        mode: sqlite.OpenMode.readOnly,
+      );
+      return database.userVersion;
+    } catch (_) {
+      return null;
+    } finally {
+      try {
+        database?.close();
+      } catch (_) {}
+    }
   }
 
   static Future<DatabaseInstallationReceipt?> read({

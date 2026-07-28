@@ -3089,6 +3089,18 @@ abstract class AppLocalizations {
   /// **'Diagnostic code: {code}'**
   String backupRestoreFailureDiagnostic(String code);
 
+  /// No description provided for @startupDatabaseUpdateRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update Kelivo to continue'**
+  String get startupDatabaseUpdateRequiredTitle;
+
+  /// No description provided for @startupDatabaseUpdateRequiredContent.
+  ///
+  /// In en, this message translates to:
+  /// **'The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.'**
+  String get startupDatabaseUpdateRequiredContent;
+
   /// No description provided for @backupPageRestoreFailedMessage.
   ///
   /// In en, this message translates to:

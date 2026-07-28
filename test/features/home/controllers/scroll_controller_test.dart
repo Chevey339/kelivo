@@ -1177,6 +1177,173 @@ void main() {
       chatScrollController.dispose();
       scrollController.dispose();
     });
+
+    testWidgets('leading sentinel row shifts scrollToMessageId targets', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: i.isEven ? 'user' : 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+        getTopRevealInset: () => 100,
+      );
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+          topPadding: 108,
+          leadingRowCount: 1,
+        ),
+      );
+
+      final jump = chatScrollController.scrollToMessageId(
+        targetId: 'message-20',
+        targetIndex: 20,
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      await jump;
+
+      // The target message itself is revealed below the top overlay, not its
+      // predecessor and not the sentinel row.
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('message-20'))).dy,
+        moreOrLessEquals(100, epsilon: 1),
+      );
+      expect(chatScrollController.lastJumpUserMessageId, 'message-20');
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
+    testWidgets('leading sentinel row keeps first message off the sentinel', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: i.isEven ? 'user' : 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+      );
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+          leadingRowCount: 1,
+        ),
+      );
+      scrollController.jumpTo(scrollController.position.maxScrollExtent);
+      await tester.pump();
+
+      final jump = chatScrollController.scrollToMessageId(
+        targetId: 'message-0',
+        targetIndex: 0,
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      await jump;
+
+      // Message 0 must be revealed; the jump must not stop on the sentinel.
+      final messageTop = tester
+          .getTopLeft(find.byKey(const ValueKey('message-0')))
+          .dy;
+      expect(messageTop, moreOrLessEquals(0, epsilon: 1));
+      expect(chatScrollController.lastJumpUserMessageId, 'message-0');
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
+
+    testWidgets('leading sentinel row keeps adjacent jumps and cursor exact', (
+      tester,
+    ) async {
+      final messages = <_NavMessage>[
+        for (var i = 0; i < 40; i++)
+          _NavMessage(id: 'message-$i', role: i.isEven ? 'user' : 'assistant'),
+      ];
+      final scrollController = ChatAutoFollowScrollController();
+      final chatScrollController = ChatScrollController(
+        scrollController: scrollController,
+        onStateChanged: () {},
+        getAutoScrollEnabled: () => false,
+        getAutoScrollIdleSeconds: () => 8,
+        getTopRevealInset: () => 100,
+      );
+      await tester.pumpWidget(
+        _IndexedScrollHarness(
+          scrollController: scrollController,
+          listController: chatScrollController.messageListController,
+          messages: messages,
+          topPadding: 108,
+          leadingRowCount: 1,
+        ),
+      );
+
+      final initial = chatScrollController.scrollToMessageId(
+        targetId: 'message-20',
+        targetIndex: 20,
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      await initial;
+
+      final previous = chatScrollController.jumpToPreviousQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      expect(await previous, isTrue);
+      // Cursor records the message actually landed on, one above the anchor.
+      expect(chatScrollController.lastJumpUserMessageId, 'message-19');
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('message-19'))).dy,
+        moreOrLessEquals(100, epsilon: 1),
+      );
+
+      final next = chatScrollController.jumpToNextQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      expect(await next, isTrue);
+      expect(chatScrollController.lastJumpUserMessageId, 'message-20');
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('message-20'))).dy,
+        moreOrLessEquals(100, epsilon: 1),
+      );
+
+      // Stepping above the first message must not target the sentinel row.
+      final toFirst = chatScrollController.scrollToMessageId(
+        targetId: 'message-0',
+        targetIndex: 0,
+        leadingRowCount: 1,
+      );
+      await tester.pumpAndSettle();
+      await toFirst;
+      final beyondFirst = await chatScrollController.jumpToPreviousQuestion(
+        messages: messages,
+        indexOfId: (id) => messages.indexWhere((message) => message.id == id),
+        leadingRowCount: 1,
+      );
+      expect(beyondFirst, isFalse);
+      expect(chatScrollController.lastJumpUserMessageId, isNull);
+
+      chatScrollController.dispose();
+      scrollController.dispose();
+    });
   });
 }
 
@@ -1242,12 +1409,17 @@ class _IndexedScrollHarness extends StatelessWidget {
     required this.listController,
     required this.messages,
     this.topPadding = 0,
+    this.leadingRowCount = 0,
   });
 
   final ScrollController scrollController;
   final ListController listController;
   final List<_NavMessage> messages;
   final double topPadding;
+
+  /// Fixed non-message rows prepended to the list, mirroring the
+  /// loading-before sentinel row MessageListView adds while hasMoreBefore.
+  final int leadingRowCount;
 
   @override
   Widget build(BuildContext context) {
@@ -1258,9 +1430,16 @@ class _IndexedScrollHarness extends StatelessWidget {
           controller: scrollController,
           listController: listController,
           padding: EdgeInsets.only(top: topPadding),
-          itemCount: messages.length,
+          itemCount: messages.length + leadingRowCount,
           itemBuilder: (context, index) {
-            final message = messages[index];
+            if (index < leadingRowCount) {
+              return SizedBox(
+                key: ValueKey('__sentinel-$index'),
+                height: 56,
+                child: const Text('loading before'),
+              );
+            }
+            final message = messages[index - leadingRowCount];
             return SizedBox(
               key: ValueKey(message.id),
               height: 80,
@@ -1269,10 +1448,13 @@ class _IndexedScrollHarness extends StatelessWidget {
           },
           findChildIndexCallback: (key) {
             if (key is! ValueKey<String>) return null;
+            if (key.value.startsWith('__sentinel-')) {
+              return int.tryParse(key.value.substring('__sentinel-'.length));
+            }
             final index = messages.indexWhere(
               (message) => message.id == key.value,
             );
-            return index < 0 ? null : index;
+            return index < 0 ? null : index + leadingRowCount;
           },
         ),
       ),

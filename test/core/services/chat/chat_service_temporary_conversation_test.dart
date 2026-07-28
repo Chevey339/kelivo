@@ -81,20 +81,24 @@ void main() {
     expect(messages.single.isStreaming, isFalse);
   });
 
-  test('retained timeline cache stays appendable for the next send', () async {
+  test('windowed timeline cache stays appendable for the next send', () async {
     final service = createService();
     await service.init();
     final conversation = await service.createConversation(title: 'Chat');
-    final first = await service.addMessage(
-      conversationId: conversation.id,
-      role: 'assistant',
-      content: 'first answer',
-    );
-    await service.loadMessages(conversation.id);
+    final ids = <String>[];
+    for (var i = 0; i < 3; i++) {
+      final message = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'message $i',
+      );
+      ids.add(message.id);
+    }
 
-    service.retainTimelineWindow(conversation.id, [first.id]);
+    // Cache only a tail window so the append lands in a partial cache.
+    await service.loadTimelinePage(conversation.id, limit: 1);
     expect(service.getMessages(conversation.id).map((message) => message.id), [
-      first.id,
+      ids.last,
     ]);
 
     final result = await service.beginSendGeneration(
@@ -105,7 +109,7 @@ void main() {
     );
 
     expect(service.getMessages(conversation.id).map((message) => message.id), [
-      first.id,
+      ids.last,
       result.userMessage!.id,
       result.assistantMessage.id,
     ]);
@@ -315,10 +319,6 @@ void main() {
         expect(tail!.slots, hasLength(40));
         expect(tail.slots.first.message.content, 'temporary message 5');
         expect(tail.hasMoreBefore, isTrue);
-        service.retainTimelineWindow(
-          conversation.id,
-          tail.slots.map((slot) => slot.identity.revisionId),
-        );
 
         expect(await service.loadMessages(conversation.id), hasLength(45));
         final before = await service.loadTimelinePage(

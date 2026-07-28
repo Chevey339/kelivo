@@ -195,12 +195,10 @@ void main() {
       version: 1,
       selectVersion: true,
     );
-    await service.loadMessages(conversationId);
-    expect(service.isConversationFullyCached(conversationId), isTrue);
 
-    // Trim the cache so the selected revision of the multi-version group is
-    // no longer present; the fast path must refuse to judge and miss.
-    service.retainTimelineWindow(conversationId, ids.sublist(0, 3));
+    // Cache only a head window so the selected revision of the multi-version
+    // group is not present; the fast path must refuse to judge and miss.
+    await service.loadMessagesRange(conversationId, start: 0, limit: 3);
     expect(service.isConversationFullyCached(conversationId), isFalse);
 
     final page = await service.loadTimelinePage(conversationId);

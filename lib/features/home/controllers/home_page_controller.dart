@@ -252,6 +252,16 @@ class HomePageController extends ChangeNotifier {
   Map<String, StreamSubscription<dynamic>> get conversationStreams =>
       _chatController.conversationStreams;
 
+  /// True from app start until the initial conversation restore (or draft
+  /// creation) finishes, so the empty state never flashes during startup.
+  bool _startupConversationPending = true;
+
+  /// Drives the message-list three-state placeholder: true only while the
+  /// initial restore is pending or a cold window load is in flight. Fast-path
+  /// cache hits resolve within one frame batch and never surface a skeleton.
+  bool get isLoadingWindow =>
+      _startupConversationPending || _chatController.isLoadingWindow;
+
   // Delegate to StreamController
   Map<String, stream_ctrl.ReasoningData> get reasoning =>
       _streamController.reasoning;
@@ -629,31 +639,48 @@ class HomePageController extends ChangeNotifier {
   Future<void> initChat() async {
     final prefs = _context.read<SettingsProvider>();
     final assistantProvider = _context.read<AssistantProvider>();
-    await assistantProvider.loaded;
-    await _chatService.init();
-    if (prefs.newChatOnLaunch) {
-      await _createNewConversation();
-    } else {
-      final conversations = _chatService.getAllConversations();
-      if (conversations.isNotEmpty) {
-        final recent = conversations.first;
-        if ((recent.assistantId ?? '').isNotEmpty) {
-          try {
-            await assistantProvider.setCurrentAssistant(recent.assistantId!);
-          } catch (_) {}
-        }
-        _chatService.setCurrentConversation(recent.id);
-        await _chatController.setCurrentConversationAndLoad(recent);
-        _streamController.clearGeminiThoughtSigs();
-        _restoreMessageUiState();
-        _scrollCtrl.positionAtBottomOnNextLayout();
-        notifyListeners();
-      } else {
-        // No conversations exist — create a new empty one so the UI
-        // correctly shows the temporary-chat toggle button instead of
-        // falling back to "new conversation" button.
+    try {
+      // The two startups are independent of each other.
+      await Future.wait([assistantProvider.loaded, _chatService.init()]);
+      if (prefs.newChatOnLaunch) {
         await _createNewConversation();
+      } else {
+        final conversations = _chatService.getAllConversations();
+        if (conversations.isNotEmpty) {
+          final recent = conversations.first;
+          _chatService.setCurrentConversation(recent.id);
+          // Assistant restore and window load are independent; the message
+          // list already tolerates a one-frame missing-assistant fallback.
+          final restoreAssistant = Future<void>(() async {
+            if ((recent.assistantId ?? '').isNotEmpty) {
+              try {
+                await assistantProvider.setCurrentAssistant(
+                  recent.assistantId!,
+                );
+              } catch (_) {}
+            }
+          });
+          final loadWindow = _chatController.setCurrentConversationAndLoad(
+            recent,
+          );
+          // Rebuild while the window load is in flight so a cold load shows
+          // the skeleton instead of a blank list.
+          notifyListeners();
+          await Future.wait([restoreAssistant, loadWindow]);
+          _streamController.clearGeminiThoughtSigs();
+          _restoreMessageUiState();
+          _scrollCtrl.positionAtBottomOnNextLayout();
+          notifyListeners();
+        } else {
+          // No conversations exist — create a new empty one so the UI
+          // correctly shows the temporary-chat toggle button instead of
+          // falling back to "new conversation" button.
+          await _createNewConversation();
+        }
       }
+    } finally {
+      _startupConversationPending = false;
+      notifyListeners();
     }
   }
 
@@ -1943,6 +1970,7 @@ class HomePageController extends ChangeNotifier {
       await _scrollCtrl.scrollToMessageId(
         targetId: targetId,
         targetIndex: index,
+        leadingRowCount: _leadingListRowCount,
       );
     } finally {
       if (useRikkaTransition) {
@@ -1952,6 +1980,12 @@ class HomePageController extends ChangeNotifier {
       }
     }
   }
+
+  /// Fixed non-message rows `MessageListView` prepends while history before
+  /// the loaded window is still available (the loading-before sentinel row).
+  /// Message indices from `indexOfCollapsedMessageId` must be shifted by this
+  /// many rows before addressing the indexed list.
+  int get _leadingListRowCount => _chatController.hasMoreBefore ? 1 : 0;
 
   Future<void> jumpToPreviousQuestion() =>
       _jumpToAdjacentMessage(previous: true);
@@ -1963,10 +1997,12 @@ class HomePageController extends ChangeNotifier {
         ? _scrollCtrl.jumpToPreviousQuestion(
             messages: _chatController.collapsedMessages,
             indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+            leadingRowCount: _leadingListRowCount,
           )
         : _scrollCtrl.jumpToNextQuestion(
             messages: _chatController.collapsedMessages,
             indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+            leadingRowCount: _leadingListRowCount,
           ));
     if (!moved) {
       await _jumpToAdjacentMessageOutsideWindow(previous: previous);
@@ -2003,10 +2039,12 @@ class HomePageController extends ChangeNotifier {
           ? _scrollCtrl.jumpToPreviousQuestion(
               messages: updatedWindow,
               indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+              leadingRowCount: _leadingListRowCount,
             )
           : _scrollCtrl.jumpToNextQuestion(
               messages: updatedWindow,
               indexOfId: (id) => _chatController.indexOfCollapsedMessageId(id),
+              leadingRowCount: _leadingListRowCount,
             ));
       return;
     }

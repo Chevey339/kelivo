@@ -660,6 +660,8 @@
       }
     }
   },
+  "startupDatabaseUpdateRequiredTitle": "Update Kelivo to continue",
+  "startupDatabaseUpdateRequiredContent": "The chat database on this device was created by a newer version of Kelivo and cannot be opened by this version. Your data has not been changed. Install the latest version of Kelivo, then open it again.",
   "backupPageRestoreFailedMessage": "Restore failed: {error}",
   "@backupPageRestoreFailedMessage": {
     "placeholders": {

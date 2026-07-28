@@ -1236,9 +1236,29 @@ class ChatDatabaseRepository {
                   ),
                 ]))
                 .get();
+        // One bulk read instead of a per-conversation query; the ordinal
+        // ordering is preserved by the in-Dart bucketing below.
+        final mcpRows =
+            await (_db.select(_db.conversationMcpServerRows)..orderBy([
+                  (t) => OrderingTerm.asc(t.ordinal),
+                ]))
+                .get();
+        final mcpServerIdsByConversation = <String, List<String>>{};
+        for (final mcpRow in mcpRows) {
+          mcpServerIdsByConversation
+              .putIfAbsent(mcpRow.conversationId, () => <String>[])
+              .add(mcpRow.serverId);
+        }
         final out = <Conversation>[];
         for (final row in rows) {
-          out.add(await _conversationFromRow(row, includeMessageIds: false));
+          out.add(
+            await _conversationFromRow(
+              row,
+              includeMessageIds: false,
+              mcpServerIds:
+                  mcpServerIdsByConversation[row.id] ?? const <String>[],
+            ),
+          );
         }
         return out;
       },
@@ -3809,13 +3829,78 @@ class ChatDatabaseRepository {
     )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
   }
 
-  Future<void> updateMessageAndStreamingState(
-    ChatMessage message, {
-    required bool untrackStreaming,
-  }) async {
-    await _db.transaction(() async {
-      await _updateMessageShadow(message);
-      await _replaceMessageParts(message);
+  /// Partial-column UPDATE: only the non-null fields are written, so
+  /// concurrent writers touching disjoint columns cannot clobber each other.
+  /// Message parts are rebuilt only when content or reasoning text changes;
+  /// the other columns never affect parts. Returns the post-update message,
+  /// or null when no row matches [messageId].
+  Future<ChatMessage?> updateMessageFields(
+    String messageId, {
+    String? content,
+    int? totalTokens,
+    bool? isStreaming,
+    String? reasoningText,
+    DateTime? reasoningStartAt,
+    DateTime? reasoningFinishedAt,
+    String? translation,
+    String? reasoningSegmentsJson,
+    int? promptTokens,
+    int? completionTokens,
+    int? cachedTokens,
+    int? durationMs,
+  }) {
+    final companion = MessageRowsCompanion(
+      content: content != null ? Value(content) : const Value.absent(),
+      totalTokens: totalTokens != null
+          ? Value(totalTokens)
+          : const Value.absent(),
+      isStreaming: isStreaming != null
+          ? Value(isStreaming)
+          : const Value.absent(),
+      reasoningText: reasoningText != null
+          ? Value(reasoningText)
+          : const Value.absent(),
+      reasoningStartAt: reasoningStartAt != null
+          ? Value(reasoningStartAt)
+          : const Value.absent(),
+      reasoningFinishedAt: reasoningFinishedAt != null
+          ? Value(reasoningFinishedAt)
+          : const Value.absent(),
+      translation: translation != null
+          ? Value(translation)
+          : const Value.absent(),
+      reasoningSegmentsJson: reasoningSegmentsJson != null
+          ? Value(reasoningSegmentsJson)
+          : const Value.absent(),
+      promptTokens: promptTokens != null
+          ? Value(promptTokens)
+          : const Value.absent(),
+      completionTokens: completionTokens != null
+          ? Value(completionTokens)
+          : const Value.absent(),
+      cachedTokens: cachedTokens != null
+          ? Value(cachedTokens)
+          : const Value.absent(),
+      durationMs: durationMs != null
+          ? Value(durationMs)
+          : const Value.absent(),
+    );
+    return _db.transaction(() async {
+      await (_db.update(
+        _db.messageRows,
+      )..where((t) => t.id.equals(messageId))).write(companion);
+      final updated = await getMessage(messageId);
+      if (updated == null) return null;
+      if (content == null && reasoningText == null) return updated;
+      // getMessage resolves content/reasoning from parts, which still hold
+      // the pre-update payloads; rebuild parts from the just-written values
+      // or the stale parts would poison the new text part.
+      final corrected = updated.copyWith(
+        content: content ?? updated.content,
+        reasoningText: reasoningText ?? updated.reasoningText,
+      );
+      await _replaceMessageParts(corrected);
+      return corrected;
     });
   }
 
@@ -4493,15 +4578,21 @@ class ChatDatabaseRepository {
     }
   }
 
+  Future<List<String>> _getMcpServerIds(String conversationId) async {
+    final mcpRows =
+        await (_db.select(_db.conversationMcpServerRows)
+              ..where((t) => t.conversationId.equals(conversationId))
+              ..orderBy([(t) => OrderingTerm.asc(t.ordinal)]))
+            .get();
+    return mcpRows.map((m) => m.serverId).toList(growable: false);
+  }
+
   Future<Conversation> _conversationFromRow(
     ConversationRow row, {
     bool includeMessageIds = true,
+    List<String>? mcpServerIds,
   }) async {
-    final mcpRows =
-        await (_db.select(_db.conversationMcpServerRows)
-              ..where((t) => t.conversationId.equals(row.id))
-              ..orderBy([(t) => OrderingTerm.asc(t.ordinal)]))
-            .get();
+    final resolvedMcpServerIds = mcpServerIds ?? await _getMcpServerIds(row.id);
     final messageRows = includeMessageIds
         ? await (_db.select(_db.messageRows)
                 ..where((t) => t.conversationId.equals(row.id))
@@ -4515,7 +4606,7 @@ class ChatDatabaseRepository {
       updatedAt: row.updatedAt,
       messageIds: messageRows.map((m) => m.id).toList(growable: false),
       isPinned: row.isPinned,
-      mcpServerIds: mcpRows.map((m) => m.serverId).toList(growable: false),
+      mcpServerIds: resolvedMcpServerIds,
       assistantId: row.assistantId,
       truncateIndex: row.truncateIndex,
       versionSelections: _decodeStringIntMap(row.versionSelectionsJson),

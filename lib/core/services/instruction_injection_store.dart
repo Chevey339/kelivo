@@ -2,12 +2,12 @@ import 'dart:convert';
 
 import 'package:uuid/uuid.dart';
 
-import '../database/business_preferences.dart';
 import '../models/instruction_injection.dart';
+import 'json_blob_store.dart';
 import 'learning_mode_store.dart';
 
-class InstructionInjectionStore {
-  InstructionInjectionStore(this._preferences);
+class InstructionInjectionStore extends JsonBlobStore<InstructionInjection> {
+  InstructionInjectionStore(super._preferences);
 
   static const String _itemsKey = 'instruction_injections_v1';
   static const String _activeIdsByAssistantKey =
@@ -16,7 +16,15 @@ class InstructionInjectionStore {
   static const String _learningModePromptKey = 'learning_mode_prompt_v1';
   static const String _defaultAssistantKey = '__global__';
 
-  final BusinessPreferences _preferences;
+  @override
+  String get storageKey => _itemsKey;
+
+  @override
+  InstructionInjection decodeItem(Map<String, dynamic> json) =>
+      InstructionInjection.fromJson(json);
+
+  @override
+  Map<String, dynamic> encodeItem(InstructionInjection item) => item.toJson();
 
   static String assistantKey(String? assistantId) {
     final id = (assistantId ?? '').trim();
@@ -40,41 +48,37 @@ class InstructionInjectionStore {
     };
   }
 
-  Future<List<InstructionInjection>> getAll() async {
-    await _preferences.load();
-    final raw = _preferences.getString(_itemsKey);
+  /// Reads may seed the default item, so they join the serialized queue
+  /// alongside writes. A blob that fails to decode throws [StateError]
+  /// instead of seeding over the surviving rows.
+  Future<List<InstructionInjection>> getAll() {
+    return runExclusive(_getAllDirect);
+  }
+
+  Future<List<InstructionInjection>> _getAllDirect() async {
+    await preferences.load();
+    final raw = preferences.getString(_itemsKey);
     if (raw != null && raw.isNotEmpty) {
-      try {
-        final values = jsonDecode(raw) as List;
-        final items = values
-            .map(
-              (value) => InstructionInjection.fromJson(
-                (value as Map).cast<String, dynamic>(),
-              ),
-            )
-            .toList(growable: true);
-        if (items.isNotEmpty) return items;
-        final activeIds = await _loadActiveIdsMap();
-        if (activeIds[_defaultAssistantKey]?.isEmpty ?? false) return items;
-      } catch (_) {
-        return const <InstructionInjection>[];
-      }
+      final items = decodeAll(raw);
+      if (items.isNotEmpty) return items;
+      final activeIds = await _loadActiveIdsMap();
+      if (activeIds[_defaultAssistantKey]?.isEmpty ?? false) return items;
     }
     return _seedDefaultFromLearningMode();
   }
 
   Future<List<InstructionInjection>> _seedDefaultFromLearningMode() async {
-    final rawPrompt = _preferences.getString(_learningModePromptKey);
+    final rawPrompt = preferences.getString(_learningModePromptKey);
     final prompt = rawPrompt == null || rawPrompt.trim().isEmpty
         ? LearningModeStore.defaultPrompt
         : rawPrompt;
-    final enabled = _preferences.getBool(_learningModeEnabledKey) ?? false;
+    final enabled = preferences.getBool(_learningModeEnabledKey) ?? false;
     final item = InstructionInjection(
       id: const Uuid().v4(),
       title: '',
       prompt: prompt,
     );
-    await save(<InstructionInjection>[item]);
+    await _writeItems(<InstructionInjection>[item]);
     if (enabled) {
       await _persistActiveIdsMap(<String, List<String>>{
         _defaultAssistantKey: <String>[item.id],
@@ -83,69 +87,82 @@ class InstructionInjectionStore {
     return <InstructionInjection>[item];
   }
 
-  Future<void> save(List<InstructionInjection> items) async {
+  Future<void> save(List<InstructionInjection> items) {
+    return runExclusive(() => _writeItems(items));
+  }
+
+  Future<void> _writeItems(List<InstructionInjection> items) async {
     if (items.isEmpty) {
       final activeIds = await _loadActiveIdsMap();
       activeIds[_defaultAssistantKey] = const <String>[];
       await _persistActiveIdsMap(activeIds);
     }
-    await _preferences.setString(
-      _itemsKey,
-      jsonEncode(items.map((item) => item.toJson()).toList(growable: false)),
-    );
+    await writeAll(items);
   }
 
-  Future<void> add(InstructionInjection item) async {
-    final all = await getAll();
-    all.add(item);
-    await save(all);
+  Future<void> add(InstructionInjection item) {
+    return runExclusive(() async {
+      final all = await _getAllDirect();
+      all.add(item);
+      await _writeItems(all);
+    });
   }
 
   Future<void> addMany(List<InstructionInjection> items) async {
     if (items.isEmpty) return;
-    final all = await getAll();
-    all.addAll(items);
-    await save(all);
-  }
-
-  Future<void> update(InstructionInjection item) async {
-    final all = await getAll();
-    final index = all.indexWhere((existing) => existing.id == item.id);
-    if (index == -1) return;
-    all[index] = item;
-    await save(all);
-  }
-
-  Future<void> delete(String id) async {
-    final all = await getAll();
-    all.removeWhere((item) => item.id == id);
-    await save(all);
-
-    final map = await _loadActiveIdsMap();
-    var removed = false;
-    final next = <String, List<String>>{};
-    for (final entry in map.entries) {
-      final filtered = entry.value.where((value) => value != id).toList();
-      if (filtered.length != entry.value.length) removed = true;
-      next[entry.key] = filtered;
-    }
-    if (removed) await _persistActiveIdsMap(next);
-  }
-
-  Future<void> clear() async {
-    await save(const <InstructionInjection>[]);
-    await _persistActiveIdsMap(const <String, List<String>>{
-      _defaultAssistantKey: <String>[],
+    return runExclusive(() async {
+      final all = await _getAllDirect();
+      all.addAll(items);
+      await _writeItems(all);
     });
   }
 
-  Future<void> reorder({required int oldIndex, required int newIndex}) async {
-    final list = await getAll();
-    if (oldIndex < 0 || oldIndex >= list.length) return;
-    if (newIndex < 0 || newIndex >= list.length) return;
-    final item = list.removeAt(oldIndex);
-    list.insert(newIndex, item);
-    await save(list);
+  Future<void> update(InstructionInjection item) {
+    return runExclusive(() async {
+      final all = await _getAllDirect();
+      final index = all.indexWhere((existing) => existing.id == item.id);
+      if (index == -1) return;
+      all[index] = item;
+      await _writeItems(all);
+    });
+  }
+
+  Future<void> delete(String id) {
+    return runExclusive(() async {
+      final all = await _getAllDirect();
+      all.removeWhere((item) => item.id == id);
+      await _writeItems(all);
+
+      final map = await _loadActiveIdsMap();
+      var removed = false;
+      final next = <String, List<String>>{};
+      for (final entry in map.entries) {
+        final filtered = entry.value.where((value) => value != id).toList();
+        if (filtered.length != entry.value.length) removed = true;
+        next[entry.key] = filtered;
+      }
+      if (removed) await _persistActiveIdsMap(next);
+    });
+  }
+
+  Future<void> clear() {
+    return runExclusive(() async {
+      await _writeItems(const <InstructionInjection>[]);
+      await _persistActiveIdsMap(const <String, List<String>>{
+        _defaultAssistantKey: <String>[],
+      });
+    });
+  }
+
+  Future<void> reorder({required int oldIndex, required int newIndex}) {
+    return runExclusive(() async {
+      final list = await _getAllDirect();
+      if (oldIndex < 0 || oldIndex >= list.length) return;
+      if (newIndex < 0 || newIndex >= list.length) return;
+      final item = list.removeAt(oldIndex);
+      list.insert(newIndex, item);
+      await _writeItems(list);
+    });
   }
 
   Future<String?> getActiveId({String? assistantId}) async {
@@ -204,8 +221,8 @@ class InstructionInjectionStore {
   }
 
   Future<Map<String, List<String>>> _loadActiveIdsMap() async {
-    await _preferences.load();
-    final raw = _preferences.getString(_activeIdsByAssistantKey);
+    await preferences.load();
+    final raw = preferences.getString(_activeIdsByAssistantKey);
     if (raw == null || raw.isEmpty) return <String, List<String>>{};
     try {
       final decoded = jsonDecode(raw) as Map;
@@ -221,6 +238,6 @@ class InstructionInjectionStore {
   }
 
   Future<void> _persistActiveIdsMap(Map<String, List<String>> map) {
-    return _preferences.setString(_activeIdsByAssistantKey, jsonEncode(map));
+    return preferences.setString(_activeIdsByAssistantKey, jsonEncode(map));
   }
 }
