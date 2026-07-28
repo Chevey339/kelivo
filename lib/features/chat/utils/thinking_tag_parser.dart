@@ -16,7 +16,11 @@ class ThinkingTagParser {
     caseSensitive: false,
   );
 
+  /// Test hook: number of [parseLegacyInlineBlocks] executions.
+  static int debugParseCount = 0;
+
   static ThinkingTagParseResult parseLegacyInlineBlocks(String input) {
+    debugParseCount++;
     final visible = StringBuffer();
     final thinkingTexts = <String>[];
     var cursor = 0;

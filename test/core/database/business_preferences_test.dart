@@ -308,4 +308,18 @@ void main() {
       expect(payloads.last['content'], 'third');
     },
   );
+
+  test('flushPendingWrites drains the serialized write queue', () async {
+    final preferences = BusinessPreferences(repository);
+    await preferences.load();
+
+    final write = preferences.setString('theme_mode_v1', 'dark');
+    // Let the accepted write reach the serialized queue before flushing.
+    await pumpEventQueue();
+    await preferences.flushPendingWrites();
+
+    final snapshot = await repository.readSnapshot();
+    expect(snapshot.preferences['theme_mode_v1'], 'dark');
+    await expectLater(write, completion(isTrue));
+  });
 }

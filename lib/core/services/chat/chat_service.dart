@@ -79,6 +79,7 @@ class ChatService extends ChangeNotifier {
   static bool timelineCacheFastPathEnabled = true;
   static const int _assetReferenceBackfillVersion = 2;
   static const Duration _assetGcDelay = Duration(days: 7);
+  static const int _imageContentHashCacheMaxEntries = 256;
 
   late ChatDatabaseRepository _repo;
   late File _databaseFile;
@@ -103,6 +104,13 @@ class ChatService extends ChangeNotifier {
   final Map<String, int> _messageCounts = {};
   final Map<String, List<String>> _messageOrderIds = {};
 
+  // OCR identity memo: avoids re-reading image bytes on every send. Validated
+  // by length + mtime so a replaced file is re-hashed; the asset registry's
+  // path→hash rows stay untrusted (a path may point at different historical
+  // assets after content replacement).
+  final Map<String, ({int length, int mtimeMs, String hash})>
+  _imageContentHashCache = {};
+
   int _timelineFastPathHitCount = 0;
 
   @visibleForTesting
@@ -120,6 +128,19 @@ class ChatService extends ChangeNotifier {
   bool get initialized => _initialized;
   int _statisticsRevision = 0;
   int get statisticsRevision => _statisticsRevision;
+
+  // Bumped only when sidebar list semantics change (conversation add/remove,
+  // rename, pin, ordering via updatedAt, assistant/MCP association). Message
+  // content and streaming updates must not bump it.
+  int _conversationListRevision = 0;
+  int get conversationListRevision => _conversationListRevision;
+
+  List<Conversation>? _sortedConversationsCache;
+  int _sortedConversationsCacheRevision = -1;
+
+  void _bumpConversationListRevision() {
+    _conversationListRevision++;
+  }
 
   String? get currentConversationId => _currentConversationId;
 
@@ -241,6 +262,7 @@ class ChatService extends ChangeNotifier {
           (conversation) => MapEntry(conversation.id, conversation),
         ),
       );
+    _bumpConversationListRevision();
   }
 
   Future<List<String>> _loadMessageOrder(String conversationId) async {
@@ -774,9 +796,16 @@ class ChatService extends ChangeNotifier {
 
   List<Conversation> getAllConversations() {
     if (!_initialized) return [];
+    final cached = _sortedConversationsCache;
+    if (cached != null &&
+        _sortedConversationsCacheRevision == _conversationListRevision) {
+      return List<Conversation>.of(cached);
+    }
     final conversations = _conversationsCache.values.toList();
     conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return conversations;
+    _sortedConversationsCache = conversations;
+    _sortedConversationsCacheRevision = _conversationListRevision;
+    return List<Conversation>.of(conversations);
   }
 
   List<Conversation> getAllCompleteConversations() {
@@ -1415,6 +1444,7 @@ class ChatService extends ChangeNotifier {
     await _saveConversation(conversation);
     _currentConversationId = conversation.id;
     _enforceMessageCacheLimits();
+    _bumpConversationListRevision();
     notifyListeners();
     return conversation;
   }
@@ -1529,6 +1559,7 @@ class ChatService extends ChangeNotifier {
     if (_currentConversationId == id) {
       _currentConversationId = null;
     }
+    _bumpConversationListRevision();
     return true;
   }
 
@@ -1876,6 +1907,7 @@ class ChatService extends ChangeNotifier {
         .map((message) => message.id)
         .toList(growable: true);
     _messageCounts[restored.id] = messages.length;
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -2063,6 +2095,7 @@ class ChatService extends ChangeNotifier {
     c.mcpServerIds = List.of(serverIds);
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -2097,6 +2130,7 @@ class ChatService extends ChangeNotifier {
     conversation.title = newTitle;
     conversation.updatedAt = DateTime.now();
     await _saveConversation(conversation);
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -2221,6 +2255,7 @@ class ChatService extends ChangeNotifier {
 
     conversation.isPinned = !conversation.isPinned;
     await _saveConversation(conversation);
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -2304,6 +2339,9 @@ class ChatService extends ChangeNotifier {
       );
       if (!order.contains(message.id)) order.add(message.id);
       _messageCounts[conversationId] = order.length;
+      // Persisted append touches updatedAt (list order) and may promote a
+      // draft into the persisted list.
+      _bumpConversationListRevision();
     }
 
     // Update cache
@@ -2421,6 +2459,7 @@ class ChatService extends ChangeNotifier {
       _messagesCache[conversationId]!.addAll(messages);
     }
     _touchMessageCache(conversationId);
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -2898,6 +2937,7 @@ class ChatService extends ChangeNotifier {
     final arr = _messagesCache[cid];
     if (arr != null) arr.add(newMsg);
     _touchMessageCache(cid);
+    _bumpConversationListRevision();
     notifyListeners();
     return newMsg;
   }
@@ -2931,7 +2971,24 @@ class ChatService extends ChangeNotifier {
             FileSystemEntityType.file) {
           continue;
         }
-        result[path] = await _assetContentHash(file);
+        final stat = await file.stat();
+        final cached = _imageContentHashCache[file.path];
+        if (cached != null &&
+            cached.length == stat.size &&
+            cached.mtimeMs == stat.modified.millisecondsSinceEpoch) {
+          result[path] = cached.hash;
+          continue;
+        }
+        final hash = await _assetContentHash(file);
+        if (_imageContentHashCache.length >= _imageContentHashCacheMaxEntries) {
+          _imageContentHashCache.clear();
+        }
+        _imageContentHashCache[file.path] = (
+          length: stat.size,
+          mtimeMs: stat.modified.millisecondsSinceEpoch,
+          hash: hash,
+        );
+        result[path] = hash;
       } catch (_) {
         // Skip unreadable sources; caller will treat them as cache misses.
       }
@@ -3053,6 +3110,7 @@ class ChatService extends ChangeNotifier {
     );
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -3074,6 +3132,7 @@ class ChatService extends ChangeNotifier {
     );
     if (conversation == null) return;
     _conversationsCache[conversationId] = conversation;
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -3110,6 +3169,7 @@ class ChatService extends ChangeNotifier {
     if ((defaultTitle ?? '').isNotEmpty) c.title = defaultTitle!;
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
+    _bumpConversationListRevision();
     notifyListeners();
     return c;
   }
@@ -3192,6 +3252,7 @@ class ChatService extends ChangeNotifier {
     _firstGroupIndicesCache.remove(conversationId);
     await _loadMessageOrder(conversationId);
     await _cleanupOrphanUploads();
+    _bumpConversationListRevision();
     notifyListeners();
     return Set<String>.unmodifiable(deletedIds);
   }
@@ -3222,6 +3283,7 @@ class ChatService extends ChangeNotifier {
     _firstGroupIndicesCache.clear();
     _currentConversationId = null;
     if (deleteUploads) await _deleteUploadDirectory();
+    _bumpConversationListRevision();
     notifyListeners();
   }
 
@@ -3277,6 +3339,7 @@ class ChatService extends ChangeNotifier {
     c.assistantId = assistantId;
     c.updatedAt = DateTime.now();
     await _saveConversation(c);
+    _bumpConversationListRevision();
     notifyListeners();
   }
 }

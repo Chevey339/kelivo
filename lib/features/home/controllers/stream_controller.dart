@@ -115,6 +115,22 @@ class StreamController {
   final Map<String, dynamic> _reasoningDetails = <String, dynamic>{};
   Map<String, dynamic> get reasoningDetails => _reasoningDetails;
 
+  /// Decoded reasoningSegmentsJson payloads memoized per message so repeated
+  /// restores share a single JSON decode.
+  final Map<String, _DecodedReasoningPayload> _decodedReasoningPayloads =
+      <String, _DecodedReasoningPayload>{};
+
+  /// Assistant message IDs whose persisted UI state has already been restored;
+  /// repeat restores (e.g. paging re-walks the whole window) skip them until
+  /// their state is cleared.
+  final Set<String> _restoredUiMessageIds = <String>{};
+
+  int _reasoningPayloadDecodeCount = 0;
+
+  /// Number of reasoningSegmentsJson payload decodes actually performed.
+  @visibleForTesting
+  int get reasoningPayloadDecodeCount => _reasoningPayloadDecodeCount;
+
   /// Store the latest reasoning details snapshot for a message.
   void setReasoningDetails(String messageId, dynamic details) {
     if (details == null) return;
@@ -229,6 +245,8 @@ class StreamController {
     _toolParts.remove(messageId);
     _geminiThoughtSigs.remove(messageId);
     _reasoningDetails.remove(messageId);
+    _decodedReasoningPayloads.remove(messageId);
+    _restoredUiMessageIds.remove(messageId);
     _cleanupStreamTimers(messageId);
   }
 
@@ -240,6 +258,8 @@ class StreamController {
     _toolParts.clear();
     _geminiThoughtSigs.clear();
     _reasoningDetails.clear();
+    _decodedReasoningPayloads.clear();
+    _restoredUiMessageIds.clear();
     _cancelAllTimers();
     streamingContentNotifier.clear();
   }
@@ -355,75 +375,19 @@ class StreamController {
   /// Extract persisted vendor reasoning details (if any) from a serialized
   /// reasoningSegmentsJson payload.
   dynamic deserializeReasoningDetails(String? json) {
-    if (json == null || json.isEmpty) return null;
-    try {
-      final decoded = _decodeJson(json);
-      if (decoded is! Map<String, dynamic>) return null;
-      final details = decoded['reasoningDetails'];
-      if (details is List && details.isNotEmpty) return details;
-      return null;
-    } catch (_) {
-      return null;
-    }
+    return _DecodedReasoningPayload.decode(json).reasoningDetails;
   }
 
   /// Deserialize reasoning segments from JSON string.
   List<ReasoningSegmentData> deserializeReasoningSegments(String? json) {
-    if (json == null || json.isEmpty) return [];
-    try {
-      final decoded = _decodeJson(json);
-      final list = decoded is Map<String, dynamic>
-          ? (decoded['segments'] as List? ?? const [])
-          : decoded as List;
-      return list.map((item) {
-        final s = ReasoningSegmentData();
-        s.text = item['text'] ?? '';
-        s.startAt = item['startAt'] != null
-            ? DateTime.parse(item['startAt'])
-            : null;
-        final parsedFinished = item['finishedAt'] != null
-            ? DateTime.parse(item['finishedAt'])
-            : null;
-        // If finishedAt is null but startAt exists, the stream was interrupted;
-        // treat segment as finished to avoid an infinite timer on restore.
-        s.finishedAt = parsedFinished ?? s.startAt;
-        s.expanded = item['expanded'] ?? false;
-        s.toolStartIndex = (item['toolStartIndex'] as int?) ?? 0;
-        return s;
-      }).toList();
-    } catch (_) {
-      return [];
-    }
+    return _DecodedReasoningPayload.decode(json).segments;
   }
 
   ContentSplitData? deserializeContentSplits(String? json) {
-    if (json == null || json.isEmpty) return null;
-    try {
-      final decoded = _decodeJson(json);
-      if (decoded is! Map<String, dynamic>) return null;
-      final contentSplits = (decoded['contentSplits'] as Map?)
-          ?.cast<String, dynamic>();
-      if (contentSplits == null) return null;
-      return _normalizeContentSplitData(
-        ContentSplitData(
-          offsets: (contentSplits['offsets'] as List? ?? const [])
-              .map((item) => item as int)
-              .toList(),
-          reasoningCounts:
-              (contentSplits['reasoningCounts'] as List? ?? const [])
-                  .map((item) => item as int)
-                  .toList(),
-          toolCounts: (contentSplits['toolCounts'] as List? ?? const [])
-              .map((item) => item as int)
-              .toList(),
-        ),
-      );
-    } catch (_) {
-      return null;
-    }
+    return _DecodedReasoningPayload.decode(json).contentSplits;
   }
 
-  ContentSplitData _normalizeContentSplitData(ContentSplitData data) {
+  static ContentSplitData _normalizeContentSplitData(ContentSplitData data) {
     final length = math.min(
       data.offsets.length,
       math.min(data.reasoningCounts.length, data.toolCounts.length),
@@ -438,10 +402,6 @@ class StreamController {
   // Simple JSON encode/decode to avoid importing dart:convert in this file
   String _encodeJson(dynamic obj) {
     return _jsonEncode(obj);
-  }
-
-  dynamic _decodeJson(String json) {
-    return _jsonDecode(json);
   }
 
   // ============================================================================
@@ -1259,6 +1219,10 @@ class StreamController {
   // ============================================================================
 
   /// Restore UI state for a message from its persisted data.
+  ///
+  /// Runs only on the first restore per message (until its state is cleared),
+  /// so paging passes that re-walk the whole window only process messages that
+  /// newly entered it.
   void restoreMessageUiState(
     ChatMessage message, {
     required List<Map<String, dynamic>> Function(String messageId)
@@ -1266,6 +1230,7 @@ class StreamController {
     required String? Function(String messageId) getGeminiThoughtSigFromDb,
   }) {
     if (message.role != 'assistant') return;
+    if (!_restoredUiMessageIds.add(message.id)) return;
 
     final messageId = message.id;
 
@@ -1313,25 +1278,40 @@ class StreamController {
       }
     } catch (_) {}
 
-    // Restore reasoning segments
-    final segments = deserializeReasoningSegments(
+    // Restore reasoning segments (single JSON decode shared by all views)
+    final payload = _decodedReasoningPayloadFor(
+      messageId,
       message.reasoningSegmentsJson,
     );
-    if (segments.isNotEmpty) {
-      _reasoningSegments[messageId] = segments;
+    if (payload.segments.isNotEmpty) {
+      // Copy: stream handlers mutate the stored list in place, which must not
+      // leak back into the memoized payload.
+      _reasoningSegments[messageId] = List<ReasoningSegmentData>.of(
+        payload.segments,
+      );
     }
-    final contentSplits = deserializeContentSplits(
-      message.reasoningSegmentsJson,
-    );
+    final contentSplits = payload.contentSplits;
     if (contentSplits != null) {
       _contentSplits[messageId] = contentSplits;
     }
 
     // Restore vendor reasoning details (thinking signatures) for API replays
-    final details = deserializeReasoningDetails(message.reasoningSegmentsJson);
+    final details = payload.reasoningDetails;
     if (details != null) {
       _reasoningDetails[messageId] = details;
     }
+  }
+
+  _DecodedReasoningPayload _decodedReasoningPayloadFor(
+    String messageId,
+    String? json,
+  ) {
+    final cached = _decodedReasoningPayloads[messageId];
+    if (cached != null && cached.source == json) return cached;
+    final payload = _DecodedReasoningPayload.decode(json);
+    _reasoningPayloadDecodeCount++;
+    _decodedReasoningPayloads[messageId] = payload;
+    return payload;
   }
 
   // ============================================================================
@@ -1445,6 +1425,92 @@ class ContentSplitData {
   final List<int> offsets;
   final List<int> reasoningCounts;
   final List<int> toolCounts;
+}
+
+/// All views over a persisted reasoningSegmentsJson payload, produced by a
+/// single JSON decode.
+class _DecodedReasoningPayload {
+  const _DecodedReasoningPayload._(
+    this.source,
+    this.segments,
+    this.contentSplits,
+    this.reasoningDetails,
+  );
+
+  static const _DecodedReasoningPayload _empty = _DecodedReasoningPayload._(
+    null,
+    <ReasoningSegmentData>[],
+    null,
+    null,
+  );
+
+  factory _DecodedReasoningPayload.decode(String? source) {
+    if (source == null || source.isEmpty) return _empty;
+    try {
+      final decoded = _jsonDecode(source);
+      if (decoded is Map<String, dynamic>) {
+        final list = decoded['segments'] as List? ?? const [];
+        final contentSplits = (decoded['contentSplits'] as Map?)
+            ?.cast<String, dynamic>();
+        final details = decoded['reasoningDetails'];
+        return _DecodedReasoningPayload._(
+          source,
+          _parseSegments(list),
+          contentSplits == null ? null : _parseContentSplits(contentSplits),
+          details is List && details.isNotEmpty ? details : null,
+        );
+      }
+      if (decoded is List) {
+        return _DecodedReasoningPayload._(
+          source,
+          _parseSegments(decoded),
+          null,
+          null,
+        );
+      }
+    } catch (_) {}
+    return _empty;
+  }
+
+  final String? source;
+  final List<ReasoningSegmentData> segments;
+  final ContentSplitData? contentSplits;
+  final dynamic reasoningDetails;
+
+  static List<ReasoningSegmentData> _parseSegments(List list) {
+    return list.map((item) {
+      final s = ReasoningSegmentData();
+      s.text = item['text'] ?? '';
+      s.startAt = item['startAt'] != null
+          ? DateTime.parse(item['startAt'])
+          : null;
+      final parsedFinished = item['finishedAt'] != null
+          ? DateTime.parse(item['finishedAt'])
+          : null;
+      // If finishedAt is null but startAt exists, the stream was interrupted;
+      // treat segment as finished to avoid an infinite timer on restore.
+      s.finishedAt = parsedFinished ?? s.startAt;
+      s.expanded = item['expanded'] ?? false;
+      s.toolStartIndex = (item['toolStartIndex'] as int?) ?? 0;
+      return s;
+    }).toList();
+  }
+
+  static ContentSplitData _parseContentSplits(Map<String, dynamic> json) {
+    return StreamController._normalizeContentSplitData(
+      ContentSplitData(
+        offsets: (json['offsets'] as List? ?? const [])
+            .map((item) => item as int)
+            .toList(),
+        reasoningCounts: (json['reasoningCounts'] as List? ?? const [])
+            .map((item) => item as int)
+            .toList(),
+        toolCounts: (json['toolCounts'] as List? ?? const [])
+            .map((item) => item as int)
+            .toList(),
+      ),
+    );
+  }
 }
 
 class _StreamSmoothState {

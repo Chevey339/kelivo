@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart'
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../core/services/app_exit_flush.dart';
 import '../l10n/app_localizations.dart';
 
 /// Desktop tray + window close behaviour controller.
@@ -133,6 +134,18 @@ class DesktopTrayController with TrayListener, WindowListener {
   Future<void> _exitApp() async {
     if (!_isDesktop) return;
     try {
+      // Drain pending writes before exiting. On macOS/Linux destroy()
+      // routes through the engine's exit-request channel (which flushes
+      // again — flush handlers are idempotent), but on Windows the
+      // destroy() fallback posts WM_QUIT directly and bypasses WM_CLOSE,
+      // so without this the fallback exit would skip the flush entirely.
+      // The timeout keeps a stuck write queue from hanging tray exit.
+      try {
+        await AppExitFlush.flushAll().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {},
+        );
+      } catch (_) {}
       // On Windows we may have `preventClose` enabled to support
       // "close to tray". Temporarily disable it and send a normal
       // close so the window can exit immediately without being

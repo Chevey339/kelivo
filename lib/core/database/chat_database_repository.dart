@@ -2939,12 +2939,23 @@ class ChatDatabaseRepository {
   Future<void> _replaceMessageParts(
     ChatMessage message, {
     List<Map<String, dynamic>>? toolEvents,
+    bool preserveUnchangedToolParts = false,
   }) async {
     if (message.content.contains('[image:') ||
         message.content.contains('[file:')) {
       await markMessageAssetReferencesDirty(message.id);
     }
     final preservedToolEvents = toolEvents ?? await getToolEvents(message.id);
+    if (preserveUnchangedToolParts && preservedToolEvents.isNotEmpty) {
+      final keptToolParts = await _unchangedToolPartCount(
+        message,
+        preservedToolEvents,
+      );
+      if (keptToolParts != null) {
+        await _replaceTextAndReasoningParts(message, keptToolParts);
+        return;
+      }
+    }
     await (_db.delete(
       _db.messagePartRows,
     )..where((row) => row.revisionId.equals(message.id))).go();
@@ -3000,6 +3011,107 @@ class ChatDatabaseRepository {
             );
       }
     }
+    await _db
+        .into(_db.messagePartRows)
+        .insert(
+          MessagePartRowsCompanion.insert(
+            conversationId: message.conversationId,
+            revisionId: message.id,
+            ordinal: ordinal,
+            kind: 'text',
+            payload: message.content,
+            createdAt: message.timestamp,
+            updatedAt: updatedAt,
+          ),
+        );
+  }
+
+  /// Returns the number of persisted tool parts when they already match what
+  /// a full rebuild would write for [toolEvents] (kind, payload and ordinal),
+  /// or null when any difference forces the full delete-and-reinsert. A
+  /// reasoning presence change renumbers tool ordinals, so it also forces a
+  /// full rebuild.
+  Future<int?> _unchangedToolPartCount(
+    ChatMessage message,
+    List<Map<String, dynamic>> toolEvents,
+  ) async {
+    final existing =
+        await (_db.select(_db.messagePartRows)
+              ..where((row) => row.revisionId.equals(message.id))
+              ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
+            .get();
+    if (existing.isEmpty) return null;
+    final reasoning = message.reasoningText;
+    final hasReasoning = reasoning != null && reasoning.isNotEmpty;
+    final hasPersistedReasoning = existing.any(
+      (part) => part.kind == 'reasoning',
+    );
+    if (hasReasoning != hasPersistedReasoning) return null;
+    final expectedKinds = <String>[];
+    final expectedPayloads = <String>[];
+    for (final event in toolEvents) {
+      expectedKinds.add('tool_call');
+      expectedPayloads.add(jsonEncode(event));
+      if (event['content'] != null) {
+        expectedKinds.add('tool_result');
+        expectedPayloads.add(
+          jsonEncode({
+            if (event['id'] != null) 'id': event['id'],
+            'content': event['content'],
+          }),
+        );
+      }
+    }
+    final persistedToolParts = existing
+        .where((part) => part.kind == 'tool_call' || part.kind == 'tool_result')
+        .toList(growable: false);
+    if (persistedToolParts.length != expectedKinds.length) return null;
+    final firstToolOrdinal = hasReasoning ? 1 : 0;
+    for (var i = 0; i < persistedToolParts.length; i++) {
+      final part = persistedToolParts[i];
+      if (part.kind != expectedKinds[i] ||
+          part.payload != expectedPayloads[i] ||
+          part.ordinal != firstToolOrdinal + i) {
+        return null;
+      }
+    }
+    return persistedToolParts.length;
+  }
+
+  /// Rewrites only the text/reasoning parts; the [toolPartCount] persisted
+  /// tool parts keep their rows, ordinals and timestamps.
+  Future<void> _replaceTextAndReasoningParts(
+    ChatMessage message,
+    int toolPartCount,
+  ) async {
+    await (_db.delete(
+      _db.messagePartRows,
+    )..where(
+          (row) =>
+              row.revisionId.equals(message.id) &
+              (row.kind.equals('text') | row.kind.equals('reasoning')),
+        ))
+        .go();
+    final now = DateTime.now().toUtc();
+    final updatedAt = now.isBefore(message.timestamp) ? message.timestamp : now;
+    var ordinal = 0;
+    final reasoning = message.reasoningText;
+    if (reasoning != null && reasoning.isNotEmpty) {
+      await _db
+          .into(_db.messagePartRows)
+          .insert(
+            MessagePartRowsCompanion.insert(
+              conversationId: message.conversationId,
+              revisionId: message.id,
+              ordinal: ordinal++,
+              kind: 'reasoning',
+              payload: reasoning,
+              createdAt: message.timestamp,
+              updatedAt: updatedAt,
+            ),
+          );
+    }
+    ordinal += toolPartCount;
     await _db
         .into(_db.messagePartRows)
         .insert(
@@ -3823,10 +3935,15 @@ class ChatDatabaseRepository {
     });
   }
 
-  Future<void> _updateMessageShadow(ChatMessage message) async {
+  Future<void> _updateMessageShadow(
+    ChatMessage message, {
+    bool includeContent = true,
+  }) async {
     await (_db.update(
       _db.messageRows,
-    )..where((t) => t.id.equals(message.id))).write(_messageUpdate(message));
+    )..where((t) => t.id.equals(message.id))).write(
+      _messageUpdate(message, includeContent: includeContent),
+    );
   }
 
   /// Partial-column UPDATE: only the non-null fields are written, so
@@ -3933,8 +4050,15 @@ class ChatDatabaseRepository {
     int? checkpointSeq,
   }) async {
     await _db.transaction(() async {
-      await _updateMessageShadow(message);
-      await _replaceMessageParts(message, toolEvents: toolEvents);
+      // The content shadow is only a search/backup mirror; parts are the
+      // persistence authority, so streaming checkpoints defer it to the
+      // terminal (isStreaming == false) write.
+      await _updateMessageShadow(message, includeContent: !message.isStreaming);
+      await _replaceMessageParts(
+        message,
+        toolEvents: toolEvents,
+        preserveUnchangedToolParts: true,
+      );
       if (generationRunId != null && checkpointSeq != null) {
         await GenerationRunCommands(_db).checkpoint(
           id: generationRunId,
@@ -4475,6 +4599,22 @@ class ChatDatabaseRepository {
           updates: {_db.generationRunRows},
         );
       }
+      // Streaming checkpoints defer the content shadow to finalize, so an
+      // interrupted stream leaves it behind the authoritative parts; resync
+      // it here to keep search/backup snapshots consistent after a crash.
+      final staleRows = await (_db.select(
+        _db.messageRows,
+      )..where((row) => row.isStreaming.equals(true))).get();
+      for (final row in staleRows) {
+        final resolved = await getMessage(row.id);
+        if (resolved != null && resolved.content != row.content) {
+          await (_db.update(
+            _db.messageRows,
+          )..where((t) => t.id.equals(row.id))).write(
+            MessageRowsCompanion(content: Value(resolved.content)),
+          );
+        }
+      }
       await (_db.update(_db.messageRows)
             ..where((row) => row.isStreaming.equals(true)))
           .write(const MessageRowsCompanion(isStreaming: Value(false)));
@@ -4742,9 +4882,12 @@ class ChatDatabaseRepository {
     );
   }
 
-  MessageRowsCompanion _messageUpdate(ChatMessage message) {
+  MessageRowsCompanion _messageUpdate(
+    ChatMessage message, {
+    bool includeContent = true,
+  }) {
     return MessageRowsCompanion(
-      content: Value(message.content),
+      content: includeContent ? Value(message.content) : const Value.absent(),
       totalTokens: Value(message.totalTokens),
       isStreaming: Value(message.isStreaming),
       reasoningText: Value(message.reasoningText),

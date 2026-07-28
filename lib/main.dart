@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:async';
+import 'dart:ui' show AppExitResponse;
 import 'l10n/app_localizations.dart';
 import 'features/home/pages/home_page.dart';
 import 'features/migration/hive_to_sqlite_migration_page.dart';
@@ -41,6 +42,8 @@ import 'core/database/business_repository.dart';
 import 'core/database/business_startup_gate.dart';
 import 'core/database/chat_database_gateway.dart';
 import 'core/services/chat/chat_service.dart';
+import 'core/services/app_exit_flush.dart';
+import 'core/services/backup/restore_archive_pruner.dart';
 import 'core/services/backup/restore_business_lease.dart';
 import 'core/services/backup/restore_startup_gate.dart';
 import 'core/services/backup/restore_receipt.dart';
@@ -198,6 +201,10 @@ Future<void> main() async {
           return;
         }
       }
+      // Desktop exit hook: drain queued preference writes before process exit.
+      _installExitFlush(businessPreferences);
+      // Best-effort trim of archived restore runs after a few cold starts.
+      unawaited(_pruneRestoreArchive(appDataDirectory));
       // Enable edge-to-edge to allow content under system bars (Android)
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       // Start app (Flutter log capture is toggleable and off by default)
@@ -430,6 +437,46 @@ Future<void> _initDesktopWindow() async {
 }
 
 // Removed eager system font preloading to reduce memory footprint at launch.
+
+AppLifecycleListener? _exitFlushListener;
+
+/// Desktop-only: mobile process kills cannot be intercepted, and SQLite WAL
+/// already protects committed transactions, so only Dart-side write queues
+/// need draining before exit.
+void _installExitFlush(BusinessPreferences businessPreferences) {
+  if (kIsWeb) return;
+  final isDesktop =
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.linux;
+  if (!isDesktop || _exitFlushListener != null) return;
+  AppExitFlush.register(businessPreferences.flushPendingWrites);
+  _exitFlushListener = AppLifecycleListener(
+    onExitRequested: () async {
+      try {
+        // Bound the wait: a stuck write transaction must not leave the
+        // process unkillable after macOS answers NSTerminateLater.
+        await AppExitFlush.flushAll().timeout(
+          const Duration(seconds: 2),
+          onTimeout: () {},
+        );
+      } catch (_) {}
+      return AppExitResponse.exit;
+    },
+  );
+}
+
+Future<void> _pruneRestoreArchive(Directory appDataDirectory) async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    const key = RestoreArchivePruner.coldStartsKey;
+    await RestoreArchivePruner(
+      appDataDirectory: appDataDirectory,
+      readColdStarts: () async => prefs.getInt(key) ?? 0,
+      writeColdStarts: (count) => prefs.setInt(key, count),
+    ).pruneAfterSuccessfulColdStart();
+  } catch (_) {}
+}
 
 class MigrationApp extends StatelessWidget {
   const MigrationApp({super.key, required this.service, this.restoreOutcome});

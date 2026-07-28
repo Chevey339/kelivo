@@ -785,6 +785,15 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       _reasoningTick.value++; // Only notify reasoning section, not full rebuild
     }
   });
+  // Memoized think-tag parse, keyed by source string equality. The parser is
+  // a pure function of message content, so a single slot is enough.
+  String? _inlineThinkMemoSource;
+  ThinkingTagParseResult? _inlineThinkMemoResult;
+  // Memoized assistant visual-regex results, keyed by scope + input string.
+  // Cleared when the rule signature changes; skipped while streaming because
+  // the content changes every frame anyway.
+  final Map<String, String> _visualRegexMemo = <String, String>{};
+  String _visualRegexMemoSignature = '';
 
   @override
   void initState() {
@@ -888,7 +897,59 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         thinkingTexts: const <String>[],
       );
     }
-    return ThinkingTagParser.parseLegacyInlineBlocks(widget.message.content);
+    final source = widget.message.content;
+    final memo = _inlineThinkMemoResult;
+    if (memo != null && _inlineThinkMemoSource == source) return memo;
+    final parsed = ThinkingTagParser.parseLegacyInlineBlocks(source);
+    _inlineThinkMemoSource = source;
+    _inlineThinkMemoResult = parsed;
+    return parsed;
+  }
+
+  String _visualRegexSignature(Assistant assistant) {
+    // String signature (not a hash) so rule edits can never collide into a
+    // stale memo hit.
+    return assistant.regexRules
+        .map(
+          (rule) =>
+              '${rule.enabled}|${rule.pattern}|${rule.replacement}|'
+              '${rule.visualOnly}|${rule.replaceOnly}|'
+              '${rule.scopes.map((scope) => scope.index).join(',')}',
+        )
+        .join(';');
+  }
+
+  String _applyVisualAssistantRegexes(
+    String input, {
+    required Assistant? assistant,
+    required AssistantRegexScope scope,
+  }) {
+    if (input.isEmpty ||
+        assistant == null ||
+        assistant.regexRules.isEmpty ||
+        widget.message.isStreaming) {
+      return applyAssistantRegexes(
+        input,
+        assistant: assistant,
+        scope: scope,
+        target: AssistantRegexTransformTarget.visual,
+      );
+    }
+    final signature = _visualRegexSignature(assistant);
+    if (signature != _visualRegexMemoSignature) {
+      _visualRegexMemo.clear();
+      _visualRegexMemoSignature = signature;
+    }
+    if (_visualRegexMemo.length >= 8) _visualRegexMemo.clear();
+    return _visualRegexMemo.putIfAbsent(
+      '${scope.index} $input',
+      () => applyAssistantRegexes(
+        input,
+        assistant: assistant,
+        scope: scope,
+        target: AssistantRegexTransformTarget.visual,
+      ),
+    );
   }
 
   String _assistantNameFallback() {
@@ -1288,11 +1349,10 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final settings = context.watch<SettingsProvider>();
     final parsed = _parseUserContent(widget.message.content);
     final assistant = _assistantForMessage();
-    final visualText = applyAssistantRegexes(
+    final visualText = _applyVisualAssistantRegexes(
       parsed.text,
       assistant: assistant,
       scope: AssistantRegexScope.user,
-      target: AssistantRegexTransformTarget.visual,
     );
     final showUserActions = settings.showUserMessageActions;
     final showVersionSwitcher = (widget.versionCount ?? 1) > 1;
@@ -2089,18 +2149,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final parsedInlineThinking = _legacyInlineThinkingFor(widget);
     final extractedThinking = parsedInlineThinking.thinkingTexts.join('\n\n');
     final contentWithoutThink = parsedInlineThinking.visibleContent;
-    final visualContent = applyAssistantRegexes(
+    final visualContent = _applyVisualAssistantRegexes(
       contentWithoutThink,
       assistant: assistant,
       scope: AssistantRegexScope.assistant,
-      target: AssistantRegexTransformTarget.visual,
     );
     final visualTranslation = widget.message.translation != null
-        ? applyAssistantRegexes(
+        ? _applyVisualAssistantRegexes(
             widget.message.translation!,
             assistant: assistant,
             scope: AssistantRegexScope.assistant,
-            target: AssistantRegexTransformTarget.visual,
           )
         : null;
     final translationText = visualTranslation ?? widget.message.translation;

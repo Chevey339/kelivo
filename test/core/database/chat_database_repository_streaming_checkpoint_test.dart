@@ -217,5 +217,206 @@ void main() {
         raw.close();
       }
     });
+
+    test('tool parts 未变化时 checkpoint 跳过重写且内容等价', () async {
+      const toolEvents = [
+        {
+          'id': 'tool-1',
+          'name': 'search',
+          'arguments': {'q': 'kelivo'},
+          'content': 'result',
+        },
+      ];
+      ChatMessage snapshot(String content) => ChatMessage(
+        id: 'streaming',
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation',
+        isStreaming: true,
+        reasoningText: 'thinking',
+      );
+
+      await repository.updateStreamingCheckpoint(snapshot('draft one'), toolEvents);
+      List<Map<String, Object?>> toolPartRows() {
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          return raw
+              .select(
+                "SELECT kind, payload, ordinal, updated_at FROM "
+                "message_part_rows WHERE revision_id = 'streaming' AND "
+                "kind IN ('tool_call', 'tool_result') ORDER BY ordinal;",
+              )
+              .map(
+                (row) => <String, Object?>{
+                  'kind': row['kind'],
+                  'payload': row['payload'],
+                  'ordinal': row['ordinal'],
+                  'updated_at': row['updated_at'],
+                },
+              )
+              .toList();
+        } finally {
+          raw.close();
+        }
+      }
+
+      final before = toolPartRows();
+      expect(before.map((row) => row['kind']), const [
+        'tool_call',
+        'tool_result',
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      await repository.updateStreamingCheckpoint(
+        snapshot('draft two is longer'),
+        toolEvents,
+      );
+
+      // Unchanged tool parts keep their rows (updated_at untouched); only the
+      // text part is rewritten.
+      expect(toolPartRows(), before);
+      final persisted = await repository.getMessage('streaming');
+      expect(persisted?.content, 'draft two is longer');
+      expect(persisted?.reasoningText, 'thinking');
+      expect(await repository.getToolEvents('streaming'), toolEvents);
+    });
+
+    test('tool events 变化时回退全量重建', () async {
+      ChatMessage snapshot(String content) => ChatMessage(
+        id: 'streaming',
+        role: 'assistant',
+        content: content,
+        conversationId: 'conversation',
+        isStreaming: true,
+      );
+
+      await repository.updateStreamingCheckpoint(snapshot('draft'), const [
+        {'id': 'tool-1', 'content': 'first'},
+      ]);
+      int firstToolUpdatedAt() {
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          return raw.select(
+                "SELECT updated_at FROM message_part_rows WHERE "
+                "revision_id = 'streaming' AND kind = 'tool_call' "
+                "ORDER BY ordinal LIMIT 1;",
+              ).single['updated_at']
+              as int;
+        } finally {
+          raw.close();
+        }
+      }
+
+      final before = firstToolUpdatedAt();
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+
+      await repository.updateStreamingCheckpoint(snapshot('draft two'), const [
+        {'id': 'tool-1', 'content': 'first'},
+        {'id': 'tool-2', 'content': 'second'},
+      ]);
+
+      expect(firstToolUpdatedAt(), isNot(before));
+      expect(await repository.getToolEvents('streaming'), const [
+        {'id': 'tool-1', 'content': 'first'},
+        {'id': 'tool-2', 'content': 'second'},
+      ]);
+      expect((await repository.getMessage('streaming'))?.content, 'draft two');
+    });
+
+    test('流式 checkpoint 推迟 content shadow 到 finalize 一次性写', () async {
+      String rawShadow() {
+        final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+        try {
+          return raw.select(
+                "SELECT content FROM message_rows WHERE id = 'streaming';",
+              ).single['content']
+              as String;
+        } finally {
+          raw.close();
+        }
+      }
+
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          content: 'partial answer',
+          conversationId: 'conversation',
+          isStreaming: true,
+        ),
+        const [],
+      );
+      expect(rawShadow(), '');
+      expect((await repository.getMessage('streaming'))?.content, 'partial answer');
+
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          content: 'final answer',
+          conversationId: 'conversation',
+          isStreaming: false,
+        ),
+        const [],
+      );
+      expect(rawShadow(), 'final answer');
+      expect((await repository.getMessage('streaming'))?.content, 'final answer');
+    });
+
+    test('崩溃恢复用 parts 回补 deferred content shadow', () async {
+      final createdAt = DateTime.now().toUtc();
+      await repository.createGenerationRun(
+        id: 'crashed-run',
+        conversationId: 'conversation',
+        targetRevisionId: 'streaming',
+        createdAt: createdAt,
+      );
+      await repository.transitionGenerationRun(
+        id: 'crashed-run',
+        expectedState: GenerationRunState.preparing,
+        expectedStateRevision: 0,
+        nextState: GenerationRunState.requesting,
+        updatedAt: createdAt.add(const Duration(milliseconds: 1)),
+      );
+      final requesting = await repository.getGenerationRun('crashed-run');
+      await repository.transitionGenerationRun(
+        id: 'crashed-run',
+        expectedState: GenerationRunState.requesting,
+        expectedStateRevision: requesting!.stateRevision,
+        nextState: GenerationRunState.streaming,
+        updatedAt: createdAt.add(const Duration(milliseconds: 2)),
+      );
+      await repository.updateStreamingCheckpoint(
+        ChatMessage(
+          id: 'streaming',
+          role: 'assistant',
+          content: 'interrupted partial',
+          conversationId: 'conversation',
+          isStreaming: true,
+        ),
+        const [],
+        generationRunId: 'crashed-run',
+        checkpointSeq: 1,
+      );
+
+      expect(await repository.resetStaleStreamingState(), 1);
+
+      final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
+      try {
+        expect(
+          raw.select(
+                "SELECT content FROM message_rows WHERE id = 'streaming';",
+              ).single['content'],
+          'interrupted partial',
+        );
+      } finally {
+        raw.close();
+      }
+      final message = await repository.getMessage('streaming');
+      expect(message?.isStreaming, isFalse);
+      expect(message?.content, 'interrupted partial');
+      final run = await repository.getGenerationRun('crashed-run');
+      expect(run?.state, GenerationRunState.interrupted);
+    });
   });
 }

@@ -79,6 +79,9 @@ class _ImageProcessingTask {
   final int id;
   final String sourcePath;
   final ImageCompressConfig config;
+
+  /// Only ever true for app-owned temp sources (clipboard paste temps);
+  /// user-picked files must never be flagged for deletion.
   final bool deleteSourceAfterProcessing;
 }
 
@@ -355,7 +358,11 @@ class _ChatInputBarState extends State<ChatInputBar>
           )) {
         try {
           await File(task.sourcePath).delete();
-        } catch (_) {}
+        } catch (error) {
+          debugPrint(
+            '[ChatInputBar] Failed to delete processed source ${task.sourcePath}: $error',
+          );
+        }
       }
     } catch (_) {
       savedPath = null;
@@ -375,7 +382,11 @@ class _ChatInputBarState extends State<ChatInputBar>
         )) {
       try {
         await File(savedPath).delete();
-      } catch (_) {}
+      } catch (error) {
+        debugPrint(
+          '[ChatInputBar] Failed to delete discarded compressed image $savedPath: $error',
+        );
+      }
     }
 
     if (!mounted) return;

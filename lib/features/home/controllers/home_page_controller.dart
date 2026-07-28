@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -151,6 +152,21 @@ class HomePageController extends ChangeNotifier {
   /// Serial of the latest animated conversation transition; superseded
   /// transitions check it to discard their pre-commit work.
   int _switchSerial = 0;
+
+  // Startup warm-up (cache plan measure 14): after the initial restore
+  // completes, an idle-time serial prefetch of the most recent conversations.
+  // Any user operation bumps _warmupSerial, abandoning the remaining queue.
+  static const int startupWarmupConversationCount = 4;
+  int _warmupSerial = 0;
+  bool _startupWarmupScheduled = false;
+
+  @visibleForTesting
+  int get debugWarmupSerial => _warmupSerial;
+
+  @visibleForTesting
+  void debugAbandonStartupWarmup() {
+    _warmupSerial++;
+  }
 
   // ============================================================================
   // State Fields
@@ -671,6 +687,7 @@ class HomePageController extends ChangeNotifier {
           _restoreMessageUiState();
           _scrollCtrl.positionAtBottomOnNextLayout();
           notifyListeners();
+          _scheduleStartupWarmup();
         } else {
           // No conversations exist — create a new empty one so the UI
           // correctly shows the temporary-chat toggle button instead of
@@ -681,6 +698,60 @@ class HomePageController extends ChangeNotifier {
     } finally {
       _startupConversationPending = false;
       notifyListeners();
+    }
+  }
+
+  /// Queues an idle-time warm-up of the most recent conversations after the
+  /// initial restore (cache plan measure 14). Runs once per launch.
+  void _scheduleStartupWarmup() {
+    if (_startupWarmupScheduled) return;
+    _startupWarmupScheduled = true;
+    final serial = _warmupSerial;
+    final currentId = _chatService.currentConversationId;
+    final ids = _chatService
+        .getAllConversations()
+        .take(startupWarmupConversationCount)
+        .map((c) => c.id)
+        .where(
+          (id) => id != currentId && !_chatService.isTemporaryConversation(id),
+        )
+        .toList(growable: false);
+    if (ids.isEmpty) return;
+    final Future<void> task;
+    try {
+      task = SchedulerBinding.instance.scheduleTask(
+        () => warmUpRecentConversations(ids, serial),
+        Priority.idle,
+        debugLabel: 'home.startupWarmup',
+      );
+    } catch (_) {
+      // No scheduler binding (bare unit tests): warm-up is optional.
+      return;
+    }
+    unawaited(task.catchError((Object _) {}));
+  }
+
+  /// Cache-only warm-up: fills the service message cache (counted against the
+  /// regular cache budget) and never notifies listeners. The remaining queue
+  /// is abandoned once [serial] no longer matches the current warm-up serial,
+  /// i.e. after any user operation.
+  @visibleForTesting
+  Future<void> warmUpRecentConversations(
+    List<String> conversationIds,
+    int serial,
+  ) async {
+    for (final id in conversationIds) {
+      if (serial != _warmupSerial || !_context.mounted) return;
+      // A streaming conversation owns the single connection queue.
+      if (loadingConversationIds.contains(id)) continue;
+      try {
+        await _chatService.loadTimelinePage(
+          id,
+          limit: ChatService.defaultTimelineInitialSlots,
+        );
+      } catch (_) {
+        // Warm-up failures lose nothing user-visible.
+      }
     }
   }
 
@@ -714,6 +785,7 @@ class HomePageController extends ChangeNotifier {
         input.documents.isEmpty) {
       return ChatInputSubmissionResult.rejected;
     }
+    _warmupSerial++;
     final editState = _userMessageEditState;
     if (editState != null) {
       final newMsg = await _saveEditedUserMessageVersion(input, editState);
@@ -790,6 +862,7 @@ class HomePageController extends ChangeNotifier {
     bool assistantAsNewReply = false,
   }) async {
     if (currentConversation == null) return;
+    _warmupSerial++;
 
     final settings = _context.read<SettingsProvider>();
     if (settings.regenerateDeleteTrailingMessages) {
@@ -873,6 +946,7 @@ class HomePageController extends ChangeNotifier {
 
   Future<void> switchConversationAnimated(String id) async {
     final serial = ++_switchSerial;
+    _warmupSerial++;
     if (currentConversation?.id == id) {
       // Already on the target: the serial bump above cancels any in-flight
       // switch; reveal the current list again in case a fade-out is pending
@@ -961,6 +1035,7 @@ class HomePageController extends ChangeNotifier {
   Future<void> createNewConversationAnimated() async {
     // Cancel any in-flight conversation switch fetch.
     _switchSerial++;
+    _warmupSerial++;
     try {
       await _viewModel.flushCurrentConversationProgress();
     } catch (_) {}
@@ -1937,9 +2012,15 @@ class HomePageController extends ChangeNotifier {
         postSwitchDelay: _postSwitchScrollDelay,
       );
 
-  Future<bool> loadMoreBefore() => _viewModel.loadMoreBefore();
+  Future<bool> loadMoreBefore() {
+    _warmupSerial++;
+    return _viewModel.loadMoreBefore();
+  }
 
-  Future<bool> loadMoreAfter() => _viewModel.loadMoreAfter();
+  Future<bool> loadMoreAfter() {
+    _warmupSerial++;
+    return _viewModel.loadMoreAfter();
+  }
 
   List<ChatMessage> allCollapsedMessagesForCurrentConversation() =>
       _chatController.allCollapsedMessagesForCurrentConversation();
@@ -1951,6 +2032,7 @@ class HomePageController extends ChangeNotifier {
     String targetId, {
     bool useRikkaTransition = false,
   }) async {
+    _warmupSerial++;
     if (useRikkaTransition) {
       try {
         await _messageJumpTransitionController.reverse();

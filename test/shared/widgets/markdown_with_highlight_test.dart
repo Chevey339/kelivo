@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter_math_fork/tex.dart' show TexEncoderExt;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gpt_markdown/gpt_markdown.dart' show GptMarkdown;
 import 'package:provider/provider.dart';
 
 Finder _findMathWidget() {
@@ -3367,6 +3368,169 @@ void main() {
       );
       expect(plainText, isNot(contains('<details>')));
       expect(plainText, isNot(contains('<a href=')));
+    },
+  );
+
+  testWidgets(
+    'SelectableHighlightView reuses parsed highlight nodes across remounts',
+    (tester) async {
+      debugResetHighlightNodeCache();
+      addTearDown(debugResetHighlightNodeCache);
+
+      Widget view(String source) => MaterialApp(
+        home: Scaffold(
+          body: SelectableHighlightView(
+            source,
+            language: 'dart',
+            theme: const {},
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(view('final lruCachedAlpha = 1;'));
+      expect(debugHighlightParseCount, 1);
+
+      await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+      await tester.pumpWidget(view('final lruCachedAlpha = 1;'));
+      expect(debugHighlightParseCount, 1);
+
+      await tester.pumpWidget(view('final lruCachedBeta = 2;'));
+      expect(debugHighlightParseCount, 2);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight reuses built markdown until theme or font changes',
+    (tester) async {
+      late StateSetter rebuild;
+      var dark = false;
+      var fontSize = 15.5;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: buildLightThemeForScheme(
+                  ThemePalettes.defaultPalette.light,
+                ),
+                darkTheme: buildDarkThemeForScheme(
+                  ThemePalettes.defaultPalette.dark,
+                ),
+                themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+                home: Scaffold(
+                  body: MarkdownWithCodeHighlight(
+                    text: 'cached body text',
+                    baseStyle: TextStyle(fontSize: fontSize, height: 1.5),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      GptMarkdown builtMarkdown() =>
+          tester.widget<GptMarkdown>(find.byType(GptMarkdown));
+
+      final initial = builtMarkdown();
+
+      rebuild(() {});
+      await tester.pump();
+      expect(identical(initial, builtMarkdown()), isTrue);
+
+      rebuild(() => dark = true);
+      await tester.pump();
+      // MaterialApp animates theme changes; let the lerp finish.
+      await tester.pump(const Duration(milliseconds: 300));
+      final darkMarkdown = builtMarkdown();
+      expect(identical(initial, darkMarkdown), isFalse);
+      expect(find.textContaining('cached body text'), findsOneWidget);
+
+      rebuild(() {});
+      await tester.pump();
+      expect(identical(darkMarkdown, builtMarkdown()), isTrue);
+
+      rebuild(() => fontSize = 16.5);
+      await tester.pump();
+      expect(identical(darkMarkdown, builtMarkdown()), isFalse);
+      expect(find.textContaining('cached body text'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'MarkdownWithCodeHighlight rethemes code without reparsing highlight nodes',
+    (tester) async {
+      debugResetHighlightNodeCache();
+      addTearDown(debugResetHighlightNodeCache);
+
+      late StateSetter rebuild;
+      var dark = false;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return MaterialApp(
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: buildLightThemeForScheme(
+                  ThemePalettes.defaultPalette.light,
+                ),
+                darkTheme: buildDarkThemeForScheme(
+                  ThemePalettes.defaultPalette.dark,
+                ),
+                themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+                home: const Scaffold(
+                  body: MarkdownWithCodeHighlight(
+                    text: '```dart\nfinal rethemedValue = 42;\n```',
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+
+      Set<Color?> codeSpanColors() {
+        final richText = tester.widget<SelectableText>(
+          find.descendant(
+            of: find.byType(SelectableHighlightView),
+            matching: find.byType(SelectableText),
+          ),
+        );
+        final colors = <Color?>{};
+        void walk(InlineSpan span) {
+          if (span is! TextSpan) return;
+          if (span.style?.color != null) colors.add(span.style!.color);
+          span.children?.forEach(walk);
+        }
+
+        walk(richText.textSpan!);
+        return colors;
+      }
+
+      final lightColors = codeSpanColors();
+      expect(lightColors, isNotEmpty);
+      expect(debugHighlightParseCount, 1);
+
+      rebuild(() => dark = true);
+      await tester.pump();
+      // MaterialApp animates theme changes; let the lerp finish.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final darkColors = codeSpanColors();
+      expect(debugHighlightParseCount, 1);
+      expect(darkColors, isNotEmpty);
+      expect(darkColors, isNot(lightColors));
     },
   );
 }

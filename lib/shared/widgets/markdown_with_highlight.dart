@@ -45,6 +45,24 @@ const int _maxInlineMathBodyLength = 512;
 const String _codeDollarMask = '___CODE_DOLLAR_MASK___';
 const String _fencedHtmlTagStartMask = '\uE002';
 
+/// Global LRU of parsed highlight node trees, keyed by language + source.
+/// Node trees are theme-independent (the theme is applied while converting
+/// nodes to spans), so entries survive theme switches and widget disposal.
+final ByteLruCache<String, List<Node>> _highlightNodeCache =
+    ByteLruCache<String, List<Node>>(
+      maxBytes: 8 << 20,
+      sizeOf: (key, value) => key.length * 2 + value.length * 64,
+    );
+
+/// Test hook: number of real `highlight.parse` executions.
+int debugHighlightParseCount = 0;
+
+/// Test hook: clear the highlight node cache and reset the parse counter.
+void debugResetHighlightNodeCache() {
+  _highlightNodeCache.clear();
+  debugHighlightParseCount = 0;
+}
+
 /// gpt_markdown with custom code block highlight and inline code styling.
 class MarkdownWithCodeHighlight extends StatefulWidget {
   const MarkdownWithCodeHighlight({
@@ -280,8 +298,11 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
 
     final appFontFamily = resolveAppFont();
 
+    // Everything baked into the memoized markdown widget below must be part of
+    // this signature (theme colors, math flags, fonts, font metrics, streaming
+    // mode), otherwise a theme/settings change would keep stale rendering.
     final themeSignature =
-        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}';
+        '${Theme.of(context).brightness.index}-${cs.surface.toARGB32()}-${cs.onSurface.toARGB32()}-${cs.primary.toARGB32()}-${cs.outlineVariant.toARGB32()}-${settings.enableMathRendering}-${settings.enableDollarLatex}-${widget.streaming}-${baseTextStyle?.fontSize}-${baseTextStyle?.height}-${baseTextStyle?.letterSpacing}-${baseTextStyle?.fontFamily}-$codeFontFamily-$appFontFamily';
 
     Widget buildMarkdown(String markdown, Key key) => GptMarkdown(
       key: key,
@@ -546,9 +567,10 @@ class _MarkdownWithCodeHighlightState extends State<MarkdownWithCodeHighlight> {
                 ),
             ],
           )
-        : buildMarkdown(
-            normalized!,
-            ValueKey('markdown-whole-$themeSignature'),
+        : _CachedMarkdownBlock(
+            content: normalized!,
+            signature: themeSignature,
+            builder: buildMarkdown,
           );
 
     final result = appFontFamily.isEmpty
@@ -5810,9 +5832,15 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
     if (!widget.enableHighlight) {
       return <TextSpan>[TextSpan(text: widget.source)];
     }
+    final cacheKey = '${widget.language ?? ''} ${widget.source}';
+    final cached = _highlightNodeCache.get(cacheKey);
+    if (cached != null) return _convertNodes(cached);
     try {
+      debugHighlightParseCount++;
       final result = highlight.parse(widget.source, language: widget.language);
-      return _convertNodes(result.nodes ?? const []);
+      final nodes = result.nodes ?? const <Node>[];
+      _highlightNodeCache.put(cacheKey, nodes);
+      return _convertNodes(nodes);
     } catch (_) {
       return const [];
     }
