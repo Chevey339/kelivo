@@ -1,4 +1,5 @@
 import "../../../support/business_test_harness.dart";
+import 'dart:async';
 import 'dart:io';
 
 import 'package:Kelivo/core/models/chat_input_data.dart';
@@ -270,13 +271,28 @@ void main() {
 
     late File source;
     final cleanupObserved = await tester.runAsync(() async {
-      // Large payload stretches the copy window so the test can observe the
-      // product file existing before the discard cleanup removes it.
       source = await writeUserImage(
         'inflight_user.png',
         byteCount: 8 * 1024 * 1024,
       );
-      final product = File('${appSupportDir.path}/upload/inflight_user.png');
+      final uploadDir = Directory('${appSupportDir.path}/upload');
+      await uploadDir.create(recursive: true);
+      final product = File('${uploadDir.path}/inflight_user.png');
+      var sawProductCreated = false;
+      final productDeleted = Completer<void>();
+      final subscription = uploadDir.watch(
+        events: FileSystemEvent.create | FileSystemEvent.delete,
+      ).listen((event) {
+        if (event.path != product.path) return;
+        if (event.type == FileSystemEvent.create) {
+          sawProductCreated = true;
+        } else if (event.type == FileSystemEvent.delete &&
+            sawProductCreated &&
+            !productDeleted.isCompleted) {
+          productDeleted.complete();
+        }
+      });
+      addTearDown(subscription.cancel);
 
       mediaController.enqueueImages(
         [source.path],
@@ -286,17 +302,8 @@ void main() {
       // Discard synchronously while the task is in flight.
       mediaController.clearImages();
 
-      var sawProduct = false;
-      final deadline = DateTime.now().add(const Duration(seconds: 10));
-      while (DateTime.now().isBefore(deadline)) {
-        if (await product.exists()) {
-          sawProduct = true;
-        } else if (sawProduct) {
-          return true;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 2));
-      }
-      return false;
+      await productDeleted.future.timeout(const Duration(seconds: 10));
+      return !await product.exists();
     });
 
     expect(
