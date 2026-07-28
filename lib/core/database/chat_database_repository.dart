@@ -817,6 +817,25 @@ class ChatDatabaseRepository {
       throw StateError('index_schema:$assetIndexName');
     }
 
+    final hasUniqueAssetContentHash = database
+        .select('PRAGMA index_list(asset_rows);')
+        .where(
+          (row) => row['unique'] == 1 && (row['partial'] as int? ?? 0) == 0,
+        )
+        .any((row) {
+          final indexName = row['name'] as String?;
+          if (indexName == null) return false;
+          final columns = database.select(
+            'SELECT name FROM pragma_index_info(?) ORDER BY seqno;',
+            [indexName],
+          );
+          return columns.length == 1 &&
+              columns.single['name'] == 'content_hash';
+        });
+    if (!hasUniqueAssetContentHash) {
+      throw StateError('index_schema:asset_rows.content_hash');
+    }
+
     const expectedForeignKeys = <String, Set<String>>{
       'conversation_mcp_server_rows': {
         'conversation_id->conversation_rows.id:CASCADE',

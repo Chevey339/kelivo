@@ -363,6 +363,47 @@ CREATE TABLE message_asset_rows (
     });
 
     test(
+      'rejects a same-version asset table without unique content hashes',
+      () async {
+        await sourceRepository.close();
+        sourceClosed = true;
+        final raw = sqlite.sqlite3.open(sourceFile.path);
+        try {
+          raw.execute('DROP TABLE asset_rows;');
+          raw.execute('''
+CREATE TABLE asset_rows (
+  id TEXT NOT NULL PRIMARY KEY,
+  content_hash TEXT NOT NULL,
+  path TEXT NOT NULL,
+  byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
+  width INTEGER CHECK(width > 0),
+  height INTEGER CHECK(height > 0),
+  thumbnail_path TEXT,
+  created_at INTEGER NOT NULL,
+  last_referenced_at INTEGER NOT NULL
+);
+''');
+        } finally {
+          raw.close();
+        }
+
+        expect(
+          () => ChatDatabaseRepository.inspectInstalledDatabase(
+            sourceFile,
+            validateContents: true,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'index_schema:asset_rows.content_hash',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
       'rejects a same-version asset table without its foreign key',
       () async {
         await sourceRepository.close();
