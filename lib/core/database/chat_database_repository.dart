@@ -110,7 +110,6 @@ class ChatDatabaseRepository {
   final File? _databaseFile;
   final ChatDatabaseObserver _observer;
   bool _messageSearchFtsReady = false;
-  bool _assetGcSchemaReady = false;
 
   static ChatDatabaseRepository open({
     File? file,
@@ -544,6 +543,11 @@ class ChatDatabaseRepository {
       'message_part_rows',
       'generation_run_rows',
       'provider_artifact_rows',
+      'asset_rows',
+      'message_asset_rows',
+      'asset_gc_rows',
+      'gc_audit_rows',
+      'asset_reference_dirty_rows',
       'assistant_rows',
       'provider_rows',
       'provider_group_rows',
@@ -651,6 +655,26 @@ class ChatDatabaseRepository {
         'created_at',
         'updated_at',
       ],
+      'asset_rows': [
+        'id',
+        'content_hash',
+        'path',
+        'byte_size',
+        'width',
+        'height',
+        'thumbnail_path',
+        'created_at',
+        'last_referenced_at',
+      ],
+      'message_asset_rows': [
+        'conversation_id',
+        'revision_id',
+        'asset_id',
+        'kind',
+      ],
+      'asset_gc_rows': ['asset_id', 'not_before', 'attempts', 'generation'],
+      'gc_audit_rows': ['id', 'kind', 'entity_id', 'completed_at'],
+      'asset_reference_dirty_rows': ['revision_id'],
       'assistant_rows': ['id', 'sort_order', 'payload', 'updated_at'],
       'provider_rows': ['provider_key', 'sort_order', 'payload', 'updated_at'],
       'provider_group_rows': ['id', 'sort_order', 'payload', 'updated_at'],
@@ -686,7 +710,12 @@ class ChatDatabaseRepository {
       }
     }
 
-    const businessPrimaryKeys = <String, List<String>>{
+    const expectedPrimaryKeys = <String, List<String>>{
+      'asset_rows': ['id'],
+      'message_asset_rows': ['revision_id', 'asset_id', 'kind'],
+      'asset_gc_rows': ['asset_id'],
+      'gc_audit_rows': ['id'],
+      'asset_reference_dirty_rows': ['revision_id'],
       'assistant_rows': ['id'],
       'provider_rows': ['provider_key'],
       'provider_group_rows': ['id'],
@@ -700,7 +729,20 @@ class ChatDatabaseRepository {
       'assistant_tag_rows': ['id'],
       'preference_rows': ['key'],
     };
-    for (final entry in businessPrimaryKeys.entries) {
+    const sortOrderTables = {
+      'assistant_rows',
+      'provider_rows',
+      'provider_group_rows',
+      'mcp_server_rows',
+      'world_book_rows',
+      'assistant_memory_rows',
+      'quick_phrase_rows',
+      'search_service_rows',
+      'tts_service_rows',
+      'instruction_injection_rows',
+      'assistant_tag_rows',
+    };
+    for (final entry in expectedPrimaryKeys.entries) {
       final primaryRows =
           database
               .select('PRAGMA table_info(${entry.key});')
@@ -717,7 +759,7 @@ class ChatDatabaseRepository {
       if (!_sameOrderedStrings(actual, entry.value)) {
         throw StateError('primary_key_schema:${entry.key}');
       }
-      if (entry.key != 'preference_rows') {
+      if (sortOrderTables.contains(entry.key)) {
         final schemaRow = database.select(
           "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?;",
           [entry.key],
@@ -753,6 +795,28 @@ class ChatDatabaseRepository {
       throw StateError('index_schema:$memoryIndexName');
     }
 
+    const assetIndexName = 'idx_message_assets_asset';
+    final assetIndexRows = database.select(
+      'PRAGMA index_list(message_asset_rows);',
+    );
+    final assetIndex = assetIndexRows.where(
+      (row) => row['name'] == assetIndexName,
+    );
+    if (assetIndex.length != 1 || assetIndex.single['unique'] != 0) {
+      throw StateError('index_schema:$assetIndexName');
+    }
+    final assetIndexColumns = database
+        .select('PRAGMA index_info($assetIndexName);')
+        .map((row) => row['name'])
+        .whereType<String>()
+        .toList(growable: false);
+    if (!_sameOrderedStrings(assetIndexColumns, const [
+      'asset_id',
+      'revision_id',
+    ])) {
+      throw StateError('index_schema:$assetIndexName');
+    }
+
     const expectedForeignKeys = <String, Set<String>>{
       'conversation_mcp_server_rows': {
         'conversation_id->conversation_rows.id:CASCADE',
@@ -764,6 +828,14 @@ class ChatDatabaseRepository {
         'target_revision_id->message_rows.id:NO ACTION',
       },
       'provider_artifact_rows': {'revision_id->message_rows.id:CASCADE'},
+      'asset_rows': <String>{},
+      'message_asset_rows': {
+        'revision_id->message_rows.id:CASCADE',
+        'asset_id->asset_rows.id:CASCADE',
+      },
+      'asset_gc_rows': {'asset_id->asset_rows.id:CASCADE'},
+      'gc_audit_rows': <String>{},
+      'asset_reference_dirty_rows': {'revision_id->message_rows.id:CASCADE'},
       'assistant_rows': <String>{},
       'provider_rows': <String>{},
       'provider_group_rows': <String>{},
@@ -1062,7 +1134,6 @@ class ChatDatabaseRepository {
     int limit = 360,
   }) async {
     if (limit <= 0) return const <ChatMessage>[];
-    await _ensureAssetGcSchema();
     final rows = await _db
         .customSelect(
           '''
@@ -1096,7 +1167,6 @@ class ChatDatabaseRepository {
   }
 
   Future<bool> hasPendingAssetReferenceSync() async {
-    await _ensureAssetGcSchema();
     return await _db
             .customSelect('SELECT 1 FROM asset_reference_dirty_rows LIMIT 1;')
             .getSingleOrNull() !=
@@ -1104,7 +1174,6 @@ class ChatDatabaseRepository {
   }
 
   Future<void> markMessageAssetReferencesDirty(String revisionId) async {
-    await _ensureAssetGcSchema();
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'VALUES (?);',
@@ -1121,7 +1190,6 @@ class ChatDatabaseRepository {
     List<String> revisionIds,
   ) async {
     if (revisionIds.isEmpty) return;
-    await _ensureAssetGcSchema();
     const chunkSize = 200;
     for (var start = 0; start < revisionIds.length; start += chunkSize) {
       final end = start + chunkSize < revisionIds.length
@@ -2262,7 +2330,6 @@ class ChatDatabaseRepository {
     String? thumbnailPath,
     DateTime? createdAt,
   }) async {
-    await _ensureAssetGcSchema();
     final timestamp = (createdAt ?? DateTime.now()).microsecondsSinceEpoch;
     await _db.customStatement(
       '''
@@ -2298,7 +2365,6 @@ class ChatDatabaseRepository {
     required String assetId,
     required String kind,
   }) async {
-    await _ensureAssetGcSchema();
     await _db.transaction(() async {
       await _db.customStatement(
         '''
@@ -2325,7 +2391,6 @@ class ChatDatabaseRepository {
     required String revisionId,
     required List<MessageAssetRegistration> assets,
   }) async {
-    await _ensureAssetGcSchema();
     await _db.transaction(() async {
       await _db.customStatement(
         'DELETE FROM message_asset_rows WHERE revision_id = ?;',
@@ -2386,7 +2451,6 @@ class ChatDatabaseRepository {
     required String revisionId,
     required String assetId,
   }) async {
-    await _ensureAssetGcSchema();
     await _db.customStatement(
       'DELETE FROM message_asset_rows WHERE revision_id = ? AND asset_id = ?;',
       [revisionId, assetId],
@@ -2394,7 +2458,6 @@ class ChatDatabaseRepository {
   }
 
   Future<int> scheduleUnreferencedAssetGc({required DateTime notBefore}) async {
-    await _ensureAssetGcSchema();
     await _db.customStatement(
       '''
       INSERT OR IGNORE INTO asset_gc_rows(
@@ -2417,7 +2480,6 @@ class ChatDatabaseRepository {
     required DateTime now,
     int limit = 50,
   }) async {
-    await _ensureAssetGcSchema();
     if (limit <= 0) return const <AssetGcCandidate>[];
     return _db.transaction(() async {
       final dueRows = await _db
@@ -2477,7 +2539,6 @@ class ChatDatabaseRepository {
   }
 
   Future<bool> isAssetGcClaimStillValid(AssetGcCandidate candidate) async {
-    await _ensureAssetGcSchema();
     final row = await _db
         .customSelect(
           '''
@@ -2509,7 +2570,6 @@ class ChatDatabaseRepository {
     required int expectedGeneration,
     DateTime? completedAt,
   }) async {
-    await _ensureAssetGcSchema();
     return _db.transaction(() async {
       final claim = await _db
           .customSelect(
@@ -2551,73 +2611,6 @@ class ChatDatabaseRepository {
       );
       return true;
     });
-  }
-
-  Future<void> _ensureAssetGcSchema() async {
-    if (_assetGcSchemaReady) return;
-    await _db.customStatement('''
-      CREATE TABLE IF NOT EXISTS asset_rows(
-        id TEXT PRIMARY KEY NOT NULL,
-        content_hash TEXT NOT NULL UNIQUE,
-        path TEXT NOT NULL,
-        byte_size INTEGER NOT NULL CHECK(byte_size >= 0),
-        width INTEGER CHECK(width IS NULL OR width > 0),
-        height INTEGER CHECK(height IS NULL OR height > 0),
-        thumbnail_path TEXT,
-        created_at INTEGER NOT NULL,
-        last_referenced_at INTEGER NOT NULL
-      );
-    ''');
-    await _db.customStatement('''
-      CREATE TABLE IF NOT EXISTS message_asset_rows(
-        conversation_id TEXT NOT NULL,
-        revision_id TEXT NOT NULL,
-        asset_id TEXT NOT NULL REFERENCES asset_rows(id) ON DELETE CASCADE,
-        kind TEXT NOT NULL CHECK(kind <> ''),
-        PRIMARY KEY(revision_id, asset_id, kind),
-        FOREIGN KEY(revision_id)
-          REFERENCES message_rows(id) ON DELETE CASCADE
-      );
-    ''');
-    await _db.customStatement(
-      'CREATE INDEX IF NOT EXISTS idx_message_assets_asset '
-      'ON message_asset_rows(asset_id, revision_id);',
-    );
-    await _db.customStatement('''
-      CREATE TABLE IF NOT EXISTS asset_gc_rows(
-        asset_id TEXT PRIMARY KEY NOT NULL
-          REFERENCES asset_rows(id) ON DELETE CASCADE,
-        not_before INTEGER NOT NULL,
-        attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),
-        generation INTEGER NOT NULL DEFAULT 0 CHECK(generation >= 0)
-      );
-    ''');
-    final assetGcColumns = await _db
-        .customSelect('PRAGMA table_info(asset_gc_rows);')
-        .get();
-    if (!assetGcColumns.any(
-      (row) => row.read<String>('name') == 'generation',
-    )) {
-      await _db.customStatement(
-        'ALTER TABLE asset_gc_rows ADD COLUMN generation '
-        'INTEGER NOT NULL DEFAULT 0 CHECK(generation >= 0);',
-      );
-    }
-    await _db.customStatement('''
-      CREATE TABLE IF NOT EXISTS gc_audit_rows(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        kind TEXT NOT NULL,
-        entity_id TEXT NOT NULL,
-        completed_at INTEGER NOT NULL
-      );
-    ''');
-    await _db.customStatement('''
-      CREATE TABLE IF NOT EXISTS asset_reference_dirty_rows(
-        revision_id TEXT PRIMARY KEY NOT NULL
-          REFERENCES message_rows(id) ON DELETE CASCADE
-      );
-    ''');
-    _assetGcSchemaReady = true;
   }
 
   bool _requiresCjkFallback(String token) {
@@ -3871,7 +3864,6 @@ class ChatDatabaseRepository {
     // Merged revisions bypass _replaceMessageParts, so queue the
     // attachment-bearing ones for the asset-reference backfill before GC can
     // treat their files as unreferenced.
-    await _ensureAssetGcSchema();
     await _db.customStatement(
       'INSERT OR IGNORE INTO asset_reference_dirty_rows(revision_id) '
       'SELECT id FROM main.message_rows WHERE conversation_id = ? '
@@ -4132,7 +4124,6 @@ class ChatDatabaseRepository {
     return _observer.measure(
       ChatDatabaseOperation.commandDeleteMessages,
       () async {
-        await _ensureAssetGcSchema();
         return _deleteMessages(
           conversationId: conversationId,
           messageIds: messageIds,
@@ -4453,7 +4444,6 @@ class ChatDatabaseRepository {
         .toSet()
         .toList(growable: false);
     if (normalized.isEmpty) return const {};
-    await _ensureAssetGcSchema();
     final placeholders = List.filled(normalized.length, '?').join(', ');
     final rows = await _db
         .customSelect(
@@ -4483,7 +4473,6 @@ class ChatDatabaseRepository {
   Future<Set<String>> getMessageImageContentHashes(String revisionId) async {
     final id = revisionId.trim();
     if (id.isEmpty) return const {};
-    await _ensureAssetGcSchema();
     final rows = await _db
         .customSelect(
           '''

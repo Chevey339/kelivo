@@ -226,6 +226,82 @@ class ProviderArtifactRows extends Table {
   ];
 }
 
+class AssetRows extends Table {
+  TextColumn get id => text()();
+  TextColumn get contentHash => text().unique()();
+  TextColumn get path => text()();
+  IntColumn get byteSize =>
+      integer()
+      // ignore: recursive_getters
+      .check(byteSize.isBiggerOrEqualValue(0))();
+  IntColumn get width => integer()
+      // ignore: recursive_getters
+      .check(width.isBiggerThanValue(0))
+      .nullable()();
+  IntColumn get height => integer()
+      // ignore: recursive_getters
+      .check(height.isBiggerThanValue(0))
+      .nullable()();
+  TextColumn get thumbnailPath => text().nullable()();
+  IntColumn get createdAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get lastReferencedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+@TableIndex(name: 'idx_message_assets_asset', columns: {#assetId, #revisionId})
+class MessageAssetRows extends Table {
+  TextColumn get conversationId => text()();
+  TextColumn get revisionId =>
+      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get assetId =>
+      text().references(AssetRows, #id, onDelete: KeyAction.cascade)();
+  TextColumn get kind =>
+      text()
+      // ignore: recursive_getters
+      .check(kind.isNotValue(''))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {revisionId, assetId, kind};
+}
+
+class AssetGcRows extends Table {
+  TextColumn get assetId =>
+      text().references(AssetRows, #id, onDelete: KeyAction.cascade)();
+  IntColumn get notBefore =>
+      integer().map(const MicrosecondDateTimeConverter())();
+  IntColumn get attempts => integer()
+      // ignore: recursive_getters
+      .check(attempts.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+  IntColumn get generation => integer()
+      // ignore: recursive_getters
+      .check(generation.isBiggerOrEqualValue(0))
+      .withDefault(const Constant(0))();
+
+  @override
+  Set<Column<Object>> get primaryKey => {assetId};
+}
+
+class GcAuditRows extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get kind => text()();
+  TextColumn get entityId => text()();
+  IntColumn get completedAt =>
+      integer().map(const MicrosecondDateTimeConverter())();
+}
+
+class AssetReferenceDirtyRows extends Table {
+  TextColumn get revisionId =>
+      text().references(MessageRows, #id, onDelete: KeyAction.cascade)();
+
+  @override
+  Set<Column<Object>> get primaryKey => {revisionId};
+}
+
 @TableIndex.sql(
   'CREATE UNIQUE INDEX idx_generation_runs_active_target '
   'ON generation_run_rows (conversation_id, target_revision_id) '
@@ -465,6 +541,11 @@ class PreferenceRows extends Table {
     ChatStorageMetaRows,
     MessagePartRows,
     ProviderArtifactRows,
+    AssetRows,
+    MessageAssetRows,
+    AssetGcRows,
+    GcAuditRows,
+    AssetReferenceDirtyRows,
     GenerationRunRows,
     AssistantRows,
     ProviderRows,

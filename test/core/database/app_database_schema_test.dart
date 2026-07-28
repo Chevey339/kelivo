@@ -32,7 +32,7 @@ void main() {
     }
   });
 
-  test('schema 1 creates every business persistence table', () async {
+  test('schema 1 creates every business and asset persistence table', () async {
     final database = AppDatabase(NativeDatabase.memory());
     try {
       final rows = await database
@@ -55,6 +55,11 @@ void main() {
           'instruction_injection_rows',
           'assistant_tag_rows',
           'preference_rows',
+          'asset_rows',
+          'message_asset_rows',
+          'asset_gc_rows',
+          'gc_audit_rows',
+          'asset_reference_dirty_rows',
         }),
       );
     } finally {

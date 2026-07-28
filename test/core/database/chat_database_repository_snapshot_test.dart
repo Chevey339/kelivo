@@ -208,6 +208,31 @@ void main() {
       );
     });
 
+    test('rejects current schema missing an asset table', () async {
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('DROP TABLE asset_reference_dirty_rows;');
+      } finally {
+        raw.close();
+      }
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(
+          sourceFile,
+          validateContents: true,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'required_tables',
+          ),
+        ),
+      );
+    });
+
     test(
       'rejects a same-version business table without its primary key',
       () async {
@@ -245,6 +270,48 @@ CREATE TABLE provider_rows (
       },
     );
 
+    test(
+      'rejects a same-version asset table without its primary key',
+      () async {
+        await sourceRepository.close();
+        sourceClosed = true;
+        final raw = sqlite.sqlite3.open(sourceFile.path);
+        try {
+          raw.execute('DROP TABLE message_asset_rows;');
+          raw.execute('''
+CREATE TABLE message_asset_rows (
+  conversation_id TEXT NOT NULL,
+  revision_id TEXT NOT NULL
+    REFERENCES message_rows(id) ON DELETE CASCADE,
+  asset_id TEXT NOT NULL
+    REFERENCES asset_rows(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind <> '')
+);
+''');
+          raw.execute(
+            'CREATE INDEX idx_message_assets_asset '
+            'ON message_asset_rows(asset_id, revision_id);',
+          );
+        } finally {
+          raw.close();
+        }
+
+        expect(
+          () => ChatDatabaseRepository.inspectInstalledDatabase(
+            sourceFile,
+            validateContents: true,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'primary_key_schema:message_asset_rows',
+            ),
+          ),
+        );
+      },
+    );
+
     test('rejects a same-version database missing the memory index', () async {
       await sourceRepository.close();
       sourceClosed = true;
@@ -269,6 +336,64 @@ CREATE TABLE provider_rows (
         ),
       );
     });
+
+    test('rejects a same-version database missing the asset index', () async {
+      await sourceRepository.close();
+      sourceClosed = true;
+      final raw = sqlite.sqlite3.open(sourceFile.path);
+      try {
+        raw.execute('DROP INDEX idx_message_assets_asset;');
+      } finally {
+        raw.close();
+      }
+
+      expect(
+        () => ChatDatabaseRepository.inspectInstalledDatabase(
+          sourceFile,
+          validateContents: true,
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            'index_schema:idx_message_assets_asset',
+          ),
+        ),
+      );
+    });
+
+    test(
+      'rejects a same-version asset table without its foreign key',
+      () async {
+        await sourceRepository.close();
+        sourceClosed = true;
+        final raw = sqlite.sqlite3.open(sourceFile.path);
+        try {
+          raw.execute('DROP TABLE asset_reference_dirty_rows;');
+          raw.execute('''
+CREATE TABLE asset_reference_dirty_rows (
+  revision_id TEXT PRIMARY KEY NOT NULL
+);
+''');
+        } finally {
+          raw.close();
+        }
+
+        expect(
+          () => ChatDatabaseRepository.inspectInstalledDatabase(
+            sourceFile,
+            validateContents: true,
+          ),
+          throwsA(
+            isA<StateError>().having(
+              (error) => error.message,
+              'message',
+              'foreign_key_schema:asset_reference_dirty_rows',
+            ),
+          ),
+        );
+      },
+    );
   });
 }
 
