@@ -35,7 +35,9 @@ Future<void> _writeSizedFile(Directory root, String name, int size) async {
 }
 
 void _markMigrationComplete(Directory root) {
-  final database = sqlite3.open(p.join(root.path, AppDatabase.databaseFileName));
+  final database = sqlite3.open(
+    p.join(root.path, AppDatabase.databaseFileName),
+  );
   try {
     database.execute(
       'CREATE TABLE IF NOT EXISTS chat_storage_meta_rows '
@@ -169,10 +171,7 @@ void main() {
         ),
         isEmpty,
       );
-      expect(
-        File(p.join(tempDir.path, 'messages.hive')).existsSync(),
-        isFalse,
-      );
+      expect(File(p.join(tempDir.path, 'messages.hive')).existsSync(), isFalse);
     },
   );
 

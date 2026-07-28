@@ -629,10 +629,9 @@ class _DesktopAssistantCardState extends State<_DesktopAssistantCard> {
                               final ok = await _confirmDeleteDesktop(context);
                               if (ok == true) {
                                 if (!context.mounted) return;
-                                await ChatActions
-                                    .cancelActiveGenerationsForAssistant(
-                                      widget.item.id,
-                                    );
+                                await ChatActions.cancelActiveGenerationsForAssistant(
+                                  widget.item.id,
+                                );
                                 if (!context.mounted) return;
                                 final success = await assistantProvider
                                     .deleteAssistant(widget.item.id);

@@ -116,7 +116,10 @@ void main() {
         store.add(assistantId: 'assistant-a', content: 'new'),
         throwsStateError,
       );
-      await expectLater(store.deleteForAssistant('assistant-a'), throwsStateError);
+      await expectLater(
+        store.deleteForAssistant('assistant-a'),
+        throwsStateError,
+      );
 
       final rows = await repository.readEntities(
         BusinessEntityKind.assistantMemory,
@@ -125,23 +128,28 @@ void main() {
       expect(rows.single.id, 'corrupt');
     });
 
-    test('quick phrase store refuses writes and preserves stored rows', () async {
-      await seedCorruptRow(BusinessEntityKind.quickPhrase);
-      final store = QuickPhraseStore(preferences);
+    test(
+      'quick phrase store refuses writes and preserves stored rows',
+      () async {
+        await seedCorruptRow(BusinessEntityKind.quickPhrase);
+        final store = QuickPhraseStore(preferences);
 
-      await expectLater(store.getAll(), throwsStateError);
-      await expectLater(
-        store.add(
-          const QuickPhrase(id: 'new', title: 'title', content: 'content'),
-        ),
-        throwsStateError,
-      );
-      await expectLater(store.delete('corrupt'), throwsStateError);
+        await expectLater(store.getAll(), throwsStateError);
+        await expectLater(
+          store.add(
+            const QuickPhrase(id: 'new', title: 'title', content: 'content'),
+          ),
+          throwsStateError,
+        );
+        await expectLater(store.delete('corrupt'), throwsStateError);
 
-      final rows = await repository.readEntities(BusinessEntityKind.quickPhrase);
-      expect(rows, hasLength(1));
-      expect(rows.single.id, 'corrupt');
-    });
+        final rows = await repository.readEntities(
+          BusinessEntityKind.quickPhrase,
+        );
+        expect(rows, hasLength(1));
+        expect(rows.single.id, 'corrupt');
+      },
+    );
 
     test(
       'instruction injection store refuses writes and preserves stored rows',
@@ -196,7 +204,10 @@ void main() {
         final rows = await repository.readEntities(
           BusinessEntityKind.quickPhrase,
         );
-        expect(rows.map((row) => row.id), containsAll(<String>['kept', 'broken']));
+        expect(
+          rows.map((row) => row.id),
+          containsAll(<String>['kept', 'broken']),
+        );
       },
     );
   });

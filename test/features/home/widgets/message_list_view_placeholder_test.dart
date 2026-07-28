@@ -54,18 +54,12 @@ void main() {
         ),
       );
 
-      expect(
-        find.byKey(MessageListView.windowSkeletonKey),
-        findsOneWidget,
-      );
+      expect(find.byKey(MessageListView.windowSkeletonKey), findsOneWidget);
       expect(find.byType(SuperListView), findsOneWidget);
 
       // The skeleton pulses; it must survive further frames.
       await tester.pump(const Duration(milliseconds: 400));
-      expect(
-        find.byKey(MessageListView.windowSkeletonKey),
-        findsOneWidget,
-      );
+      expect(find.byKey(MessageListView.windowSkeletonKey), findsOneWidget);
     } finally {
       scrollController.dispose();
       listController.dispose();
@@ -207,7 +201,8 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
               TtsProvider(preferences: createBusinessTestPreferences()),
         ),
         ChangeNotifierProvider(
-          create: (_) => UserProvider(preferences: createBusinessTestPreferences()),
+          create: (_) =>
+              UserProvider(preferences: createBusinessTestPreferences()),
         ),
         ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
         ChangeNotifierProvider(create: (_) => ToolApprovalService()),

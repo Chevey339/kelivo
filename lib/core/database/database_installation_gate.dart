@@ -235,10 +235,7 @@ final class DatabaseInstallationGate {
         await target.delete();
       }
     }
-    await resolvedDurability.syncDirectory(
-      appDataDirectory,
-      fullBarrier: true,
-    );
+    await resolvedDurability.syncDirectory(appDataDirectory, fullBarrier: true);
     return ensureReady(
       appDataDirectory: appDataDirectory,
       durability: resolvedDurability,

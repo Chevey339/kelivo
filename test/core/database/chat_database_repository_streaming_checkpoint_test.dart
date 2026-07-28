@@ -236,7 +236,10 @@ void main() {
         reasoningText: 'thinking',
       );
 
-      await repository.updateStreamingCheckpoint(snapshot('draft one'), toolEvents);
+      await repository.updateStreamingCheckpoint(
+        snapshot('draft one'),
+        toolEvents,
+      );
       List<Map<String, Object?>> toolPartRows() {
         final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
         try {
@@ -296,11 +299,13 @@ void main() {
       int firstToolUpdatedAt() {
         final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
         try {
-          return raw.select(
-                "SELECT updated_at FROM message_part_rows WHERE "
-                "revision_id = 'streaming' AND kind = 'tool_call' "
-                "ORDER BY ordinal LIMIT 1;",
-              ).single['updated_at']
+          return raw
+                  .select(
+                    "SELECT updated_at FROM message_part_rows WHERE "
+                    "revision_id = 'streaming' AND kind = 'tool_call' "
+                    "ORDER BY ordinal LIMIT 1;",
+                  )
+                  .single['updated_at']
               as int;
         } finally {
           raw.close();
@@ -327,9 +332,11 @@ void main() {
       String rawShadow() {
         final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
         try {
-          return raw.select(
-                "SELECT content FROM message_rows WHERE id = 'streaming';",
-              ).single['content']
+          return raw
+                  .select(
+                    "SELECT content FROM message_rows WHERE id = 'streaming';",
+                  )
+                  .single['content']
               as String;
         } finally {
           raw.close();
@@ -347,7 +354,10 @@ void main() {
         const [],
       );
       expect(rawShadow(), '');
-      expect((await repository.getMessage('streaming'))?.content, 'partial answer');
+      expect(
+        (await repository.getMessage('streaming'))?.content,
+        'partial answer',
+      );
 
       await repository.updateStreamingCheckpoint(
         ChatMessage(
@@ -360,7 +370,10 @@ void main() {
         const [],
       );
       expect(rawShadow(), 'final answer');
-      expect((await repository.getMessage('streaming'))?.content, 'final answer');
+      expect(
+        (await repository.getMessage('streaming'))?.content,
+        'final answer',
+      );
     });
 
     test('崩溃恢复用 parts 回补 deferred content shadow', () async {
@@ -404,9 +417,11 @@ void main() {
       final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');
       try {
         expect(
-          raw.select(
+          raw
+              .select(
                 "SELECT content FROM message_rows WHERE id = 'streaming';",
-              ).single['content'],
+              )
+              .single['content'],
           'interrupted partial',
         );
       } finally {
@@ -494,11 +509,7 @@ void main() {
         ),
         const [
           {'id': 'call-1', 'name': 'search', 'arguments': '{"q":"x"}'},
-          {
-            'id': 'call-1',
-            'name': 'search',
-            'content': 'result payload',
-          },
+          {'id': 'call-1', 'name': 'search', 'content': 'result payload'},
         ],
       );
 
@@ -508,4 +519,3 @@ void main() {
     });
   });
 }
-

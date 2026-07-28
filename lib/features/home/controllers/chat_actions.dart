@@ -841,7 +841,10 @@ class ChatActions {
     }
     _sendInFlightClaims[conversation.id] = claimToken;
     try {
-      return await _sendMessageClaimed(input: input, conversation: conversation);
+      return await _sendMessageClaimed(
+        input: input,
+        conversation: conversation,
+      );
     } finally {
       if (_sendInFlightClaims[conversation.id] == claimToken) {
         _sendInFlightClaims.remove(conversation.id);

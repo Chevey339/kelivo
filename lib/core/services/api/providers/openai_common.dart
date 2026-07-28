@@ -955,7 +955,9 @@ void _throwOnInBandStreamError(Object? error) {
     final code = (error['code'] ?? error['type'] ?? '').toString().trim();
     final detail = message.isNotEmpty ? message : jsonEncode(error);
     throw HttpException(
-      code.isEmpty ? 'Provider error: $detail' : 'Provider error ($code): $detail',
+      code.isEmpty
+          ? 'Provider error: $detail'
+          : 'Provider error ($code): $detail',
     );
   }
   if (error is String && error.trim().isNotEmpty) {

@@ -60,8 +60,7 @@ final class LegacyDataRetirementService {
   final Future<void> Function()? afterDeletingReceiptPublished;
   final DateTime Function()? clock;
 
-  File get _markerFile =>
-      File(p.join(appDataDirectory.path, _markerFileName));
+  File get _markerFile => File(p.join(appDataDirectory.path, _markerFileName));
 
   Future<List<LegacyHiveArtifact>> inspectHiveArtifacts() async {
     final artifacts = <LegacyHiveArtifact>[];

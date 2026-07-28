@@ -747,8 +747,7 @@ class ChatController extends ChangeNotifier {
     _messages.addAll(messages);
     _totalMessageCount += messages.length;
     if (_messages.length > ChatService.defaultLoadedWindowMax) {
-      final removeCount =
-          _messages.length - ChatService.defaultLoadedWindowMax;
+      final removeCount = _messages.length - ChatService.defaultLoadedWindowMax;
       _messages.removeRange(0, removeCount);
       _loadedStartIndex += removeCount;
     }

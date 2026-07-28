@@ -129,71 +129,73 @@ void main() {
     );
   });
 
-  test('summaries match full loads field-by-field with ordered MCP ids',
-      () async {
-    final now = DateTime.utc(2026, 7, 12);
-    final conversations = [
-      Conversation(
-        id: 'c-1',
-        title: 'One',
-        createdAt: now,
-        updatedAt: now.add(const Duration(minutes: 3)),
-        mcpServerIds: const ['server-a', 'server-b'],
-        isPinned: true,
-        assistantId: 'assistant-1',
-        truncateIndex: 2,
-        versionSelections: const {'slot': 1},
-        summary: 'summary',
-        lastSummarizedMessageCount: 4,
-        chatSuggestions: const ['hint'],
-      ),
-      Conversation(
-        id: 'c-2',
-        title: 'Two',
-        createdAt: now,
-        updatedAt: now.add(const Duration(minutes: 2)),
-      ),
-      Conversation(
-        id: 'c-3',
-        title: 'Three',
-        createdAt: now,
-        updatedAt: now.add(const Duration(minutes: 1)),
-        mcpServerIds: const ['server-c'],
-      ),
-    ];
-    await repository.putMigrationBatch(
-      conversations: conversations,
-      messages: const [],
-      toolEventsByMessageId: const {},
-      geminiSignaturesByMessageId: const {},
-    );
-
-    final summaries = await repository.getAllConversationSummaries();
-    final full = await repository.getAllConversations();
-
-    expect(summaries.map((c) => c.id), full.map((c) => c.id));
-    for (var i = 0; i < summaries.length; i++) {
-      final summary = summaries[i];
-      final reference = full[i];
-      expect(summary.messageIds, isEmpty);
-      expect(summary.title, reference.title);
-      expect(summary.createdAt, reference.createdAt);
-      expect(summary.updatedAt, reference.updatedAt);
-      expect(summary.isPinned, reference.isPinned);
-      expect(summary.mcpServerIds, reference.mcpServerIds);
-      expect(summary.assistantId, reference.assistantId);
-      expect(summary.truncateIndex, reference.truncateIndex);
-      expect(summary.versionSelections, reference.versionSelections);
-      expect(summary.summary, reference.summary);
-      expect(
-        summary.lastSummarizedMessageCount,
-        reference.lastSummarizedMessageCount,
+  test(
+    'summaries match full loads field-by-field with ordered MCP ids',
+    () async {
+      final now = DateTime.utc(2026, 7, 12);
+      final conversations = [
+        Conversation(
+          id: 'c-1',
+          title: 'One',
+          createdAt: now,
+          updatedAt: now.add(const Duration(minutes: 3)),
+          mcpServerIds: const ['server-a', 'server-b'],
+          isPinned: true,
+          assistantId: 'assistant-1',
+          truncateIndex: 2,
+          versionSelections: const {'slot': 1},
+          summary: 'summary',
+          lastSummarizedMessageCount: 4,
+          chatSuggestions: const ['hint'],
+        ),
+        Conversation(
+          id: 'c-2',
+          title: 'Two',
+          createdAt: now,
+          updatedAt: now.add(const Duration(minutes: 2)),
+        ),
+        Conversation(
+          id: 'c-3',
+          title: 'Three',
+          createdAt: now,
+          updatedAt: now.add(const Duration(minutes: 1)),
+          mcpServerIds: const ['server-c'],
+        ),
+      ];
+      await repository.putMigrationBatch(
+        conversations: conversations,
+        messages: const [],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
       );
-      expect(summary.chatSuggestions, reference.chatSuggestions);
-    }
-    expect(
-      summaries.firstWhere((c) => c.id == 'c-1').mcpServerIds,
-      ['server-a', 'server-b'],
-    );
-  });
+
+      final summaries = await repository.getAllConversationSummaries();
+      final full = await repository.getAllConversations();
+
+      expect(summaries.map((c) => c.id), full.map((c) => c.id));
+      for (var i = 0; i < summaries.length; i++) {
+        final summary = summaries[i];
+        final reference = full[i];
+        expect(summary.messageIds, isEmpty);
+        expect(summary.title, reference.title);
+        expect(summary.createdAt, reference.createdAt);
+        expect(summary.updatedAt, reference.updatedAt);
+        expect(summary.isPinned, reference.isPinned);
+        expect(summary.mcpServerIds, reference.mcpServerIds);
+        expect(summary.assistantId, reference.assistantId);
+        expect(summary.truncateIndex, reference.truncateIndex);
+        expect(summary.versionSelections, reference.versionSelections);
+        expect(summary.summary, reference.summary);
+        expect(
+          summary.lastSummarizedMessageCount,
+          reference.lastSummarizedMessageCount,
+        );
+        expect(summary.chatSuggestions, reference.chatSuggestions);
+      }
+      expect(summaries.firstWhere((c) => c.id == 'c-1').mcpServerIds, [
+        'server-a',
+        'server-b',
+      ]);
+    },
+  );
 }

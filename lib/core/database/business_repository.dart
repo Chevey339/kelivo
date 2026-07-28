@@ -385,10 +385,14 @@ final class BusinessRepository {
     try {
       decoded = jsonDecode(row.payload);
     } on FormatException {
-      throw StateError('business_entity_undecodable:${kind.tableName}:${row.id}');
+      throw StateError(
+        'business_entity_undecodable:${kind.tableName}:${row.id}',
+      );
     }
     if (decoded is! Map) {
-      throw StateError('business_entity_undecodable:${kind.tableName}:${row.id}');
+      throw StateError(
+        'business_entity_undecodable:${kind.tableName}:${row.id}',
+      );
     }
   }
 

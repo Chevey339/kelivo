@@ -949,28 +949,30 @@ void main() {
       expect(notifyCount, 1);
     });
 
-    test('a persisted gap between window tail and batch forces a reload',
-        () async {
-      await controller.setCurrentConversationAndLoad(conversation);
-      // Persist two messages but only hand the last one to the controller:
-      // the unseen row in between must trigger the full reload fallback.
-      chatService.appendPersistedMessage(_message(100));
-      final straggler = chatService.appendPersistedMessage(_message(101));
-      final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
+    test(
+      'a persisted gap between window tail and batch forces a reload',
+      () async {
+        await controller.setCurrentConversationAndLoad(conversation);
+        // Persist two messages but only hand the last one to the controller:
+        // the unseen row in between must trigger the full reload fallback.
+        chatService.appendPersistedMessage(_message(100));
+        final straggler = chatService.appendPersistedMessage(_message(101));
+        final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
 
-      final appended = await controller.appendPersistedTailMessages([
-        straggler,
-      ]);
+        final appended = await controller.appendPersistedTailMessages([
+          straggler,
+        ]);
 
-      expect(appended, isTrue);
-      expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
-      expect(controller.messages.last.id, straggler.id);
-      expect(
-        controller.messages.any((message) => message.id == 'message-100'),
-        isTrue,
-      );
-      expect(controller.totalMessageCount, 102);
-    });
+        expect(appended, isTrue);
+        expect(chatService.timelinePageCalls, timelineLoadsBeforeAppend + 1);
+        expect(controller.messages.last.id, straggler.id);
+        expect(
+          controller.messages.any((message) => message.id == 'message-100'),
+          isTrue,
+        );
+        expect(controller.totalMessageCount, 102);
+      },
+    );
 
     test('a new version of a loaded tail group forces a reload', () async {
       await controller.setCurrentConversationAndLoad(conversation);
@@ -1023,7 +1025,10 @@ void main() {
         controller.dispose();
         controller = ChatController(chatService: chatService);
         await controller.setCurrentConversationAndLoad(conversation);
-        expect(controller.totalMessageCount, ChatService.defaultLoadedWindowMax);
+        expect(
+          controller.totalMessageCount,
+          ChatService.defaultLoadedWindowMax,
+        );
         final timelineLoadsBeforeAppend = chatService.timelinePageCalls;
 
         // Slot count (360) and revision row count (721) diverge here; the gap

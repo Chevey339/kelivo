@@ -32,9 +32,7 @@ void main() {
   final services = <ChatService>[];
 
   setUp(() async {
-    tempDir = await Directory.systemTemp.createTemp(
-      'kelivo_chat_cache_test_',
-    );
+    tempDir = await Directory.systemTemp.createTemp('kelivo_chat_cache_test_');
     PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
   });
 
@@ -78,21 +76,24 @@ void main() {
     return (reader, conversation.id, ids);
   }
 
-  test('first loadTimelinePage on a cold service populates the cache', () async {
-    final (service, conversationId, ids) = await seedRestartedService();
+  test(
+    'first loadTimelinePage on a cold service populates the cache',
+    () async {
+      final (service, conversationId, ids) = await seedRestartedService();
 
-    final page = await service.loadTimelinePage(conversationId);
-    expect(page, isNotNull);
-    expect(page!.slots.map((slot) => slot.message.id), orderedEquals(ids));
+      final page = await service.loadTimelinePage(conversationId);
+      expect(page, isNotNull);
+      expect(page!.slots.map((slot) => slot.message.id), orderedEquals(ids));
 
-    // The regression wrote an empty list here: without the order skeleton the
-    // intersection in _cacheLoadedMessages dropped every loaded message.
-    expect(
-      service.getMessages(conversationId).map((message) => message.id),
-      orderedEquals(ids),
-    );
-    expect(service.getMessageCount(conversationId), ids.length);
-  });
+      // The regression wrote an empty list here: without the order skeleton the
+      // intersection in _cacheLoadedMessages dropped every loaded message.
+      expect(
+        service.getMessages(conversationId).map((message) => message.id),
+        orderedEquals(ids),
+      );
+      expect(service.getMessageCount(conversationId), ids.length);
+    },
+  );
 
   test('loadMessages backfills the order skeleton', () async {
     final (service, conversationId, ids) = await seedRestartedService();
@@ -125,41 +126,38 @@ void main() {
     );
   });
 
-  test(
-    'addMessage racing a loadMessages in flight is not dropped from the '
-    'order skeleton',
-    () async {
-      final (service, conversationId, ids) = await seedRestartedService();
+  test('addMessage racing a loadMessages in flight is not dropped from the '
+      'order skeleton', () async {
+    final (service, conversationId, ids) = await seedRestartedService();
 
-      // Start the full load, then append while its reads are still in
-      // flight; the write-back must merge instead of replacing the order
-      // skeleton with the pre-append snapshot.
-      final loadFuture = service.loadMessages(conversationId);
-      final added = await service.addMessage(
-        conversationId: conversationId,
-        role: 'user',
-        content: 'concurrent message',
-      );
-      await loadFuture;
+    // Start the full load, then append while its reads are still in
+    // flight; the write-back must merge instead of replacing the order
+    // skeleton with the pre-append snapshot.
+    final loadFuture = service.loadMessages(conversationId);
+    final added = await service.addMessage(
+      conversationId: conversationId,
+      role: 'user',
+      content: 'concurrent message',
+    );
+    await loadFuture;
 
-      expect(service.getMessageCount(conversationId), ids.length + 1);
-      // Pre-fix, the write-back replaced the order skeleton with the
-      // pre-append snapshot; _loadMessageOrder short-circuits on the cached
-      // skeleton, so the appended id stayed lost (count back at 3 and the
-      // reload below returned without it) until a restart rebuilt the order.
-      final reloaded = await service.loadMessages(conversationId);
-      expect(
-        reloaded.map((message) => message.id),
-        orderedEquals([...ids, added.id]),
-      );
-      expect(
-        service
-            .getMessagesRange(conversationId, start: 0, limit: 10)
-            .map((message) => message.id),
-        orderedEquals([...ids, added.id]),
-      );
-    },
-  );
+    expect(service.getMessageCount(conversationId), ids.length + 1);
+    // Pre-fix, the write-back replaced the order skeleton with the
+    // pre-append snapshot; _loadMessageOrder short-circuits on the cached
+    // skeleton, so the appended id stayed lost (count back at 3 and the
+    // reload below returned without it) until a restart rebuilt the order.
+    final reloaded = await service.loadMessages(conversationId);
+    expect(
+      reloaded.map((message) => message.id),
+      orderedEquals([...ids, added.id]),
+    );
+    expect(
+      service
+          .getMessagesRange(conversationId, start: 0, limit: 10)
+          .map((message) => message.id),
+      orderedEquals([...ids, added.id]),
+    );
+  });
 
   test('deleteMessages keeps cache, order, and count consistent', () async {
     final service = createService();

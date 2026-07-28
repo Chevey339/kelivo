@@ -449,7 +449,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final part = _googleFunctionCallPartFromToolCall(tc);
           if (part != null) parts.add(part);
         }
-        if (persistGeminiThoughtSigs) _ensureGeminiFunctionCallThoughtSig(parts);
+        if (persistGeminiThoughtSigs) {
+          _ensureGeminiFunctionCallThoughtSig(parts);
+        }
         if (parts.isNotEmpty) contents.add({'role': 'model', 'parts': parts});
         continue;
       }

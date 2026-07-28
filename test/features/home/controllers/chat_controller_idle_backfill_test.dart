@@ -32,8 +32,9 @@ class _BackfillChatService extends ChatService {
       _messages(conversationId).length;
 
   @override
-  int getMessageIndex(String conversationId, String messageId) =>
-      _messages(conversationId).indexWhere((message) => message.id == messageId);
+  int getMessageIndex(String conversationId, String messageId) => _messages(
+    conversationId,
+  ).indexWhere((message) => message.id == messageId);
 
   @override
   Future<LoadedTimelinePage?> loadTimelinePage(
@@ -205,7 +206,10 @@ void main() {
       await _flushIdleTasks();
 
       expect(chatService.loadCallsFor('conv-a'), 0);
-      expect(controller.messages.length, ChatService.defaultTimelineInitialSlots);
+      expect(
+        controller.messages.length,
+        ChatService.defaultTimelineInitialSlots,
+      );
     });
 
     test('pauses while generating and resumes when generation ends', () async {

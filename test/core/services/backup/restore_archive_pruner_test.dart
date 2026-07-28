@@ -46,14 +46,17 @@ void main() {
     if (await root.exists()) await root.delete(recursive: true);
   });
 
-  test('keeps the archive and counts cold starts below the threshold', () async {
-    final pruner = buildPruner();
-    await pruner.pruneAfterSuccessfulColdStart();
-    await pruner.pruneAfterSuccessfulColdStart();
+  test(
+    'keeps the archive and counts cold starts below the threshold',
+    () async {
+      final pruner = buildPruner();
+      await pruner.pruneAfterSuccessfulColdStart();
+      await pruner.pruneAfterSuccessfulColdStart();
 
-    expect(coldStarts, 2);
-    expect(await completedRun.exists(), isTrue);
-  });
+      expect(coldStarts, 2);
+      expect(await completedRun.exists(), isTrue);
+    },
+  );
 
   test('clears the archive once the threshold is reached and resets', () async {
     final pruner = buildPruner();

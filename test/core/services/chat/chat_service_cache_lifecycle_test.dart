@@ -84,110 +84,106 @@ void main() {
         );
         await service.loadMessages(small.id);
 
-        expect(
-          service.getMessages(large.id).map((message) => message.id),
-          [largeIds.last],
-        );
+        expect(service.getMessages(large.id).map((message) => message.id), [
+          largeIds.last,
+        ]);
         expect(service.isConversationFullyCached(large.id), isFalse);
         expect(service.getMessageCount(large.id), 3);
-        expect(
-          service.getMessages(small.id).map((message) => message.id),
-          [smallMessage.id],
-        );
+        expect(service.getMessages(small.id).map((message) => message.id), [
+          smallMessage.id,
+        ]);
       },
     );
 
-    test('write paths refresh the LRU position of a cached conversation',
-        () async {
-      final service = createService();
-      await service.init();
-      final first = await service.createConversation(title: 'A');
-      await service.addMessage(
-        conversationId: first.id,
-        role: 'user',
-        content: 'a' * (2 * 1024 * 1024),
-      );
-      await service.loadMessages(first.id);
-
-      final second = await service.createConversation(title: 'B');
-      await service.addMessage(
-        conversationId: second.id,
-        role: 'user',
-        content: 'b' * (2 * 1024 * 1024),
-      );
-      await service.loadMessages(second.id);
-
-      // Both fit exactly under the byte budget; a write against the first
-      // conversation must count as an access so it survives the next
-      // enforcement round.
-      await service.addMessage(
-        conversationId: first.id,
-        role: 'user',
-        content: 'x',
-      );
-
-      final third = await service.createConversation(title: 'C');
-      final cMessage = await service.addMessage(
-        conversationId: third.id,
-        role: 'user',
-        content: 'c' * (2 * 1024 * 1024),
-      );
-      await service.loadMessages(third.id);
-
-      expect(service.getMessages(first.id), isNotEmpty);
-      expect(service.getMessages(second.id), isEmpty);
-      expect(
-        service.getMessages(third.id).map((message) => message.id),
-        [cMessage.id],
-      );
-    });
-
     test(
-      'deleteConversation clears cached order, count, artifacts, and group '
-      'indices',
+      'write paths refresh the LRU position of a cached conversation',
       () async {
         final service = createService();
         await service.init();
-        final conversation = await service.createConversation(title: 'Chat');
-        final user = await service.addMessage(
-          conversationId: conversation.id,
+        final first = await service.createConversation(title: 'A');
+        await service.addMessage(
+          conversationId: first.id,
           role: 'user',
-          content: 'question',
+          content: 'a' * (2 * 1024 * 1024),
         );
-        final assistant = await service.addMessage(
-          conversationId: conversation.id,
-          role: 'assistant',
-          content: 'answer',
+        await service.loadMessages(first.id);
+
+        final second = await service.createConversation(title: 'B');
+        await service.addMessage(
+          conversationId: second.id,
+          role: 'user',
+          content: 'b' * (2 * 1024 * 1024),
         );
-        await service.loadMessages(conversation.id);
-        await service.setToolEvents(assistant.id, [
-          <String, dynamic>{
-            'id': 'tool-1',
-            'name': 'search',
-            'arguments': <String, dynamic>{},
-            'content': 'result',
-          },
+        await service.loadMessages(second.id);
+
+        // Both fit exactly under the byte budget; a write against the first
+        // conversation must count as an access so it survives the next
+        // enforcement round.
+        await service.addMessage(
+          conversationId: first.id,
+          role: 'user',
+          content: 'x',
+        );
+
+        final third = await service.createConversation(title: 'C');
+        final cMessage = await service.addMessage(
+          conversationId: third.id,
+          role: 'user',
+          content: 'c' * (2 * 1024 * 1024),
+        );
+        await service.loadMessages(third.id);
+
+        expect(service.getMessages(first.id), isNotEmpty);
+        expect(service.getMessages(second.id), isEmpty);
+        expect(service.getMessages(third.id).map((message) => message.id), [
+          cMessage.id,
         ]);
-        await service.setGeminiThoughtSignature(assistant.id, 'sig');
-        final indices = await service.loadFirstMessageIndicesForGroups(
-          conversation.id,
-          [user.id],
-        );
-        expect(indices, isNotEmpty);
-
-        await service.deleteConversation(conversation.id);
-
-        expect(service.getMessageCount(conversation.id), 0);
-        expect(service.getMessages(conversation.id), isEmpty);
-        expect(service.getMessageIndex(conversation.id, user.id), -1);
-        expect(service.getToolEvents(assistant.id), isEmpty);
-        expect(service.getGeminiThoughtSignature(assistant.id), isNull);
-        expect(
-          service.getFirstMessageIndicesForGroups(conversation.id, [user.id]),
-          isEmpty,
-        );
       },
     );
+
+    test('deleteConversation clears cached order, count, artifacts, and group '
+        'indices', () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Chat');
+      final user = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'question',
+      );
+      final assistant = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'answer',
+      );
+      await service.loadMessages(conversation.id);
+      await service.setToolEvents(assistant.id, [
+        <String, dynamic>{
+          'id': 'tool-1',
+          'name': 'search',
+          'arguments': <String, dynamic>{},
+          'content': 'result',
+        },
+      ]);
+      await service.setGeminiThoughtSignature(assistant.id, 'sig');
+      final indices = await service.loadFirstMessageIndicesForGroups(
+        conversation.id,
+        [user.id],
+      );
+      expect(indices, isNotEmpty);
+
+      await service.deleteConversation(conversation.id);
+
+      expect(service.getMessageCount(conversation.id), 0);
+      expect(service.getMessages(conversation.id), isEmpty);
+      expect(service.getMessageIndex(conversation.id, user.id), -1);
+      expect(service.getToolEvents(assistant.id), isEmpty);
+      expect(service.getGeminiThoughtSignature(assistant.id), isNull);
+      expect(
+        service.getFirstMessageIndicesForGroups(conversation.id, [user.id]),
+        isEmpty,
+      );
+    });
 
     test('deleteMessages invalidates cached group indices', () async {
       final service = createService();
@@ -233,33 +229,35 @@ void main() {
   });
 
   group('generateTitleSource', () {
-    test('serves a fully cached conversation with version collapsing',
-        () async {
-      final service = createService();
-      await service.init();
-      final conversation = await service.createConversation(title: 'Chat');
-      await service.addMessage(
-        conversationId: conversation.id,
-        role: 'user',
-        content: 'hello',
-      );
-      final original = await service.addMessage(
-        conversationId: conversation.id,
-        role: 'assistant',
-        content: 'old answer',
-      );
-      final regenerated = await service.appendMessageVersion(
-        messageId: original.id,
-        content: 'new answer',
-      );
-      expect(regenerated, isNotNull);
-      await service.loadMessages(conversation.id);
-      expect(service.isConversationFullyCached(conversation.id), isTrue);
+    test(
+      'serves a fully cached conversation with version collapsing',
+      () async {
+        final service = createService();
+        await service.init();
+        final conversation = await service.createConversation(title: 'Chat');
+        await service.addMessage(
+          conversationId: conversation.id,
+          role: 'user',
+          content: 'hello',
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          content: 'old answer',
+        );
+        final regenerated = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'new answer',
+        );
+        expect(regenerated, isNotNull);
+        await service.loadMessages(conversation.id);
+        expect(service.isConversationFullyCached(conversation.id), isTrue);
 
-      final source = await service.generateTitleSource(conversation.id);
+        final source = await service.generateTitleSource(conversation.id);
 
-      expect(source, 'User: hello\n\nAssistant: new answer');
-    });
+        expect(source, 'User: hello\n\nAssistant: new answer');
+      },
+    );
 
     test('honors the conversation truncateIndex', () async {
       final service = createService();
@@ -288,39 +286,40 @@ void main() {
       expect(source, 'User: visible question\n\nAssistant: visible answer');
     });
 
-    test('pages from the tail on a cold cache and stops at 3000 chars',
-        () async {
-      final writer = createService();
-      await writer.init();
-      final conversation = await writer.createConversation(title: 'Chat');
-      for (var i = 0; i < 40; i++) {
-        await writer.addMessage(
-          conversationId: conversation.id,
-          role: i.isEven ? 'user' : 'assistant',
-          content: 'message-$i-${'x' * 180}',
-        );
-      }
-      await writer.close();
-      services.remove(writer);
+    test(
+      'pages from the tail on a cold cache and stops at 3000 chars',
+      () async {
+        final writer = createService();
+        await writer.init();
+        final conversation = await writer.createConversation(title: 'Chat');
+        for (var i = 0; i < 40; i++) {
+          await writer.addMessage(
+            conversationId: conversation.id,
+            role: i.isEven ? 'user' : 'assistant',
+            content: 'message-$i-${'x' * 180}',
+          );
+        }
+        await writer.close();
+        services.remove(writer);
 
-      final service = createService();
-      await service.init();
-      expect(service.isConversationFullyCached(conversation.id), isFalse);
+        final service = createService();
+        await service.init();
+        expect(service.isConversationFullyCached(conversation.id), isFalse);
 
-      final source = await service.generateTitleSource(conversation.id);
+        final source = await service.generateTitleSource(conversation.id);
 
-      expect(source.length, lessThanOrEqualTo(3000));
-      expect(source, contains('message-2'));
-      expect(source, isNot(contains('message-0-')));
-      // Only a tail window was loaded into the cache, not the whole history.
-      final cached = service.getMessages(conversation.id);
-      expect(cached, isNotEmpty);
-      expect(cached.length, lessThan(40));
-      expect(service.isConversationFullyCached(conversation.id), isFalse);
-    });
+        expect(source.length, lessThanOrEqualTo(3000));
+        expect(source, contains('message-2'));
+        expect(source, isNot(contains('message-0-')));
+        // Only a tail window was loaded into the cache, not the whole history.
+        final cached = service.getMessages(conversation.id);
+        expect(cached, isNotEmpty);
+        expect(cached.length, lessThan(40));
+        expect(service.isConversationFullyCached(conversation.id), isFalse);
+      },
+    );
 
-    test('cold and fully cached loads produce the same short source',
-        () async {
+    test('cold and fully cached loads produce the same short source', () async {
       final writer = createService();
       await writer.init();
       final conversation = await writer.createConversation(title: 'Chat');

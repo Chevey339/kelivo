@@ -146,20 +146,26 @@ void main() {
   });
 
   group('sorted conversation cache', () {
-    test('returns equal lists across calls and caller mutation is isolated', () async {
-      final service = createService();
-      await service.init();
-      await service.createConversation(title: 'A');
-      await service.createConversation(title: 'B');
+    test(
+      'returns equal lists across calls and caller mutation is isolated',
+      () async {
+        final service = createService();
+        await service.init();
+        await service.createConversation(title: 'A');
+        await service.createConversation(title: 'B');
 
-      final first = service.getAllConversations();
-      final second = service.getAllConversations();
-      expect(second.map((c) => c.id), first.map((c) => c.id));
-      expect(service.conversationListRevision, service.conversationListRevision);
+        final first = service.getAllConversations();
+        final second = service.getAllConversations();
+        expect(second.map((c) => c.id), first.map((c) => c.id));
+        expect(
+          service.conversationListRevision,
+          service.conversationListRevision,
+        );
 
-      first.clear();
-      expect(service.getAllConversations(), hasLength(2));
-    });
+        first.clear();
+        expect(service.getAllConversations(), hasLength(2));
+      },
+    );
 
     test('rename invalidates the cached order', () async {
       final service = createService();

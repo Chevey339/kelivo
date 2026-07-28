@@ -151,47 +151,47 @@ void main() {
       expect(controller.isLoadingWindow, isTrue);
     });
 
-    test('late page from conversation A is discarded after switching to B',
-        () async {
-      var notifyCount = 0;
-      controller.addListener(() => notifyCount++);
+    test(
+      'late page from conversation A is discarded after switching to B',
+      () async {
+        var notifyCount = 0;
+        controller.addListener(() => notifyCount++);
 
-      final switchA = controller.setCurrentConversationAndLoad(
-        service.getConversation('conv-a')!,
-      );
-      final switchB = controller.setCurrentConversationAndLoad(
-        service.getConversation('conv-b')!,
-      );
-      expect(service.pageRequests, hasLength(2));
+        final switchA = controller.setCurrentConversationAndLoad(
+          service.getConversation('conv-a')!,
+        );
+        final switchB = controller.setCurrentConversationAndLoad(
+          service.getConversation('conv-b')!,
+        );
+        expect(service.pageRequests, hasLength(2));
 
-      // A's page arrives late and must not touch the current window.
-      service.completePage(
-        service.pageRequests[0],
-        [_message('conv-a', 3), _message('conv-a', 4)],
-        startIndex: 3,
-        totalSlotCount: 5,
-      );
-      await switchA;
-      expect(controller.currentConversation?.id, 'conv-b');
-      expect(controller.messages, isEmpty);
-      expect(controller.isLoadingWindow, isTrue);
-      expect(notifyCount, 0);
+        // A's page arrives late and must not touch the current window.
+        service.completePage(
+          service.pageRequests[0],
+          [_message('conv-a', 3), _message('conv-a', 4)],
+          startIndex: 3,
+          totalSlotCount: 5,
+        );
+        await switchA;
+        expect(controller.currentConversation?.id, 'conv-b');
+        expect(controller.messages, isEmpty);
+        expect(controller.isLoadingWindow, isTrue);
+        expect(notifyCount, 0);
 
-      service.completePage(
-        service.pageRequests[1],
-        [for (var i = 0; i < 3; i++) _message('conv-b', i)],
-        startIndex: 0,
-      );
-      await switchB;
-      expect(controller.messages.map((m) => m.conversationId).toSet(),
-          {'conv-b'});
-      expect(controller.messages, hasLength(3));
-      expect(controller.isLoadingWindow, isFalse);
-      expect(notifyCount, 1);
-    });
+        service.completePage(service.pageRequests[1], [
+          for (var i = 0; i < 3; i++) _message('conv-b', i),
+        ], startIndex: 0);
+        await switchB;
+        expect(controller.messages.map((m) => m.conversationId).toSet(), {
+          'conv-b',
+        });
+        expect(controller.messages, hasLength(3));
+        expect(controller.isLoadingWindow, isFalse);
+        expect(notifyCount, 1);
+      },
+    );
 
-    test('loadMoreBefore applies normally for the same conversation',
-        () async {
+    test('loadMoreBefore applies normally for the same conversation', () async {
       final open = controller.setCurrentConversationAndLoad(
         service.getConversation('conv-a')!,
       );
@@ -250,14 +250,13 @@ void main() {
       expect(notifyCount, 0);
       expect(controller.messages, isEmpty);
 
-      service.completePage(
-        service.pageRequests[2],
-        [for (var i = 0; i < 3; i++) _message('conv-b', i)],
-        startIndex: 0,
-      );
+      service.completePage(service.pageRequests[2], [
+        for (var i = 0; i < 3; i++) _message('conv-b', i),
+      ], startIndex: 0);
       await switchB;
-      expect(controller.messages.map((m) => m.conversationId).toSet(),
-          {'conv-b'});
+      expect(controller.messages.map((m) => m.conversationId).toSet(), {
+        'conv-b',
+      });
       expect(controller.messages, hasLength(3));
     });
   });

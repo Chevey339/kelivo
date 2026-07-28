@@ -1325,11 +1325,9 @@ class ChatDatabaseRepository {
                 .get();
         // One bulk read instead of a per-conversation query; the ordinal
         // ordering is preserved by the in-Dart bucketing below.
-        final mcpRows =
-            await (_db.select(_db.conversationMcpServerRows)..orderBy([
-                  (t) => OrderingTerm.asc(t.ordinal),
-                ]))
-                .get();
+        final mcpRows = await (_db.select(
+          _db.conversationMcpServerRows,
+        )..orderBy([(t) => OrderingTerm.asc(t.ordinal)])).get();
         final mcpServerIdsByConversation = <String, List<String>>{};
         for (final mcpRow in mcpRows) {
           mcpServerIdsByConversation
@@ -2965,15 +2963,15 @@ class ChatDatabaseRepository {
     final effectiveReasoningText =
         message.reasoningText == null && message.reasoningStartAt != null
         ? (await (_db.select(_db.messagePartRows)
-                  ..where(
-                    (row) =>
-                        row.revisionId.equals(message.id) &
-                        row.kind.equals('reasoning'),
-                  )
-                  ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
-                .get())
-            .map((part) => part.payload)
-            .join()
+                    ..where(
+                      (row) =>
+                          row.revisionId.equals(message.id) &
+                          row.kind.equals('reasoning'),
+                    )
+                    ..orderBy([(row) => OrderingTerm.asc(row.ordinal)]))
+                  .get())
+              .map((part) => part.payload)
+              .join()
         : null;
     if (effectiveReasoningText != null && effectiveReasoningText.isNotEmpty) {
       message = message.copyWith(reasoningText: effectiveReasoningText);
@@ -3116,9 +3114,7 @@ class ChatDatabaseRepository {
     ChatMessage message,
     int toolPartCount,
   ) async {
-    await (_db.delete(
-      _db.messagePartRows,
-    )..where(
+    await (_db.delete(_db.messagePartRows)..where(
           (row) =>
               row.revisionId.equals(message.id) &
               (row.kind.equals('text') | row.kind.equals('reasoning')),
@@ -3936,7 +3932,8 @@ class ChatDatabaseRepository {
       batchMessageIds.add(id);
       await _replaceMessageParts(
         entry.message,
-        toolEvents: toolEventsByMessageId[id] ??
+        toolEvents:
+            toolEventsByMessageId[id] ??
             (freshParts ? const <Map<String, dynamic>>[] : null),
       );
     }
@@ -3970,11 +3967,8 @@ class ChatDatabaseRepository {
     ChatMessage message, {
     bool includeContent = true,
   }) async {
-    await (_db.update(
-      _db.messageRows,
-    )..where((t) => t.id.equals(message.id))).write(
-      _messageUpdate(message, includeContent: includeContent),
-    );
+    await (_db.update(_db.messageRows)..where((t) => t.id.equals(message.id)))
+        .write(_messageUpdate(message, includeContent: includeContent));
   }
 
   /// Partial-column UPDATE: only the non-null fields are written, so
@@ -4029,9 +4023,7 @@ class ChatDatabaseRepository {
       cachedTokens: cachedTokens != null
           ? Value(cachedTokens)
           : const Value.absent(),
-      durationMs: durationMs != null
-          ? Value(durationMs)
-          : const Value.absent(),
+      durationMs: durationMs != null ? Value(durationMs) : const Value.absent(),
     );
     return _db.transaction(() async {
       await (_db.update(
@@ -4357,7 +4349,10 @@ class ChatDatabaseRepository {
   Future<Map<String, Map<String, String>>> getImageOcrArtifacts(
     Iterable<String> revisionIds,
   ) async {
-    final ids = revisionIds.map((id) => id.trim()).where((id) => id.isNotEmpty).toSet();
+    final ids = revisionIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
     if (ids.isEmpty) return const {};
     final rows =
         await (_db.select(_db.providerArtifactRows)..where(
@@ -4532,10 +4527,7 @@ class ChatDatabaseRepository {
   }
 
   String _encodeImageOcrPayload(Map<String, String> items) {
-    return jsonEncode({
-      'version': 1,
-      'items': items,
-    });
+    return jsonEncode({'version': 1, 'items': items});
   }
 
   Future<void> _upsertGeminiThoughtSignature(

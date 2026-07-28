@@ -93,55 +93,56 @@ void main() {
       expect(result.chunks.any((c) => c.isDone), isFalse);
     });
 
-    test('null/empty error placeholders on healthy chunks do not throw',
-        () async {
-      final delta = jsonEncode({
-        'error': null,
-        'choices': [
-          {
-            'delta': {'content': 'Hello'},
-            'finish_reason': null,
-          },
-        ],
-      });
-      final emptyError = jsonEncode({
-        'error': <String, dynamic>{},
-        'choices': [
-          {
-            'delta': {'content': ' World'},
-            'finish_reason': 'stop',
-          },
-        ],
-      });
-      final server = await _sseServer([
-        'data: $delta\n\n',
-        'data: $emptyError\n\n',
-        'data: [DONE]\n\n',
-      ]);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
-
-      final result = await _drain(
-        ChatApiService.sendMessageStream(
-          config: _testConfig(
-            'http://localhost:${server.port}/v1',
-            ProviderKind.openai,
-          ),
-          modelId: 'test-model',
-          messages: [
-            {'role': 'user', 'content': 'hi'},
-          ],
-        ),
-      );
-
-      expect(result.error, isNull);
-      expect(result.chunks.map((c) => c.content).join(), 'Hello World');
-      expect(result.chunks.last.isDone, isTrue);
-    });
-
     test(
-        'OpenRouter mid-stream error frame with non-empty choices '
+      'null/empty error placeholders on healthy chunks do not throw',
+      () async {
+        final delta = jsonEncode({
+          'error': null,
+          'choices': [
+            {
+              'delta': {'content': 'Hello'},
+              'finish_reason': null,
+            },
+          ],
+        });
+        final emptyError = jsonEncode({
+          'error': <String, dynamic>{},
+          'choices': [
+            {
+              'delta': {'content': ' World'},
+              'finish_reason': 'stop',
+            },
+          ],
+        });
+        final server = await _sseServer([
+          'data: $delta\n\n',
+          'data: $emptyError\n\n',
+          'data: [DONE]\n\n',
+        ]);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        final result = await _drain(
+          ChatApiService.sendMessageStream(
+            config: _testConfig(
+              'http://localhost:${server.port}/v1',
+              ProviderKind.openai,
+            ),
+            modelId: 'test-model',
+            messages: [
+              {'role': 'user', 'content': 'hi'},
+            ],
+          ),
+        );
+
+        expect(result.error, isNull);
+        expect(result.chunks.map((c) => c.content).join(), 'Hello World');
+        expect(result.chunks.last.isDone, isTrue);
+      },
+    );
+
+    test('OpenRouter mid-stream error frame with non-empty choices '
         'ends stream with error, no fake isDone', () async {
       final delta = jsonEncode({
         'choices': [
@@ -186,10 +187,7 @@ void main() {
       );
 
       expect(result.error, isA<HttpException>());
-      expect(
-        result.error.toString(),
-        contains('Provider ran out of capacity'),
-      );
+      expect(result.error.toString(), contains('Provider ran out of capacity'));
       expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
       expect(result.chunks.any((c) => c.isDone), isFalse);
     });
@@ -287,32 +285,34 @@ void main() {
       expect(result.chunks.any((c) => c.isDone), isFalse);
     });
 
-    test('follow-up request transport failure propagates, no fake isDone',
-        () async {
-      // Refuse the follow-up request by closing the server right after the
-      // first round; client.send then fails with http.ClientException, which
-      // the per-event catch used to swallow into a fake completion.
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      var requestCount = 0;
-      server.listen((request) async {
-        requestCount++;
-        request.response.statusCode = 200;
-        request.response.headers
-          ..contentType = ContentType('text', 'event-stream')
-          ..set('Transfer-Encoding', 'chunked');
-        request.response.write('data: $toolCallChunk\n\n');
-        request.response.write('data: [DONE]\n\n');
-        await request.response.close();
-        await server.close(force: true);
-      });
+    test(
+      'follow-up request transport failure propagates, no fake isDone',
+      () async {
+        // Refuse the follow-up request by closing the server right after the
+        // first round; client.send then fails with http.ClientException, which
+        // the per-event catch used to swallow into a fake completion.
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        var requestCount = 0;
+        server.listen((request) async {
+          requestCount++;
+          request.response.statusCode = 200;
+          request.response.headers
+            ..contentType = ContentType('text', 'event-stream')
+            ..set('Transfer-Encoding', 'chunked');
+          request.response.write('data: $toolCallChunk\n\n');
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+          await server.close(force: true);
+        });
 
-      final result = await runTwoRounds(server);
+        final result = await runTwoRounds(server);
 
-      expect(requestCount, 1);
-      expect(result.error, isA<HttpException>());
-      expect(result.error.toString(), contains('Follow-up request failed'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
-    });
+        expect(requestCount, 1);
+        expect(result.error, isA<HttpException>());
+        expect(result.error.toString(), contains('Follow-up request failed'));
+        expect(result.chunks.any((c) => c.isDone), isFalse);
+      },
+    );
 
     test('follow-up in-band error frame propagates, no fake isDone', () async {
       final errorFrame = jsonEncode({
@@ -384,46 +384,48 @@ void main() {
   });
 
   group('OpenAI Responses API in-band SSE error', () {
-    test('response.failed event ends stream with error, no fake isDone',
-        () async {
-      final delta = jsonEncode({
-        'type': 'response.output_text.delta',
-        'delta': 'Partial',
-      });
-      final failed = jsonEncode({
-        'type': 'response.failed',
-        'response': {
-          'status': 'failed',
-          'error': {'code': 'server_error', 'message': 'The model crashed'},
-        },
-      });
-      final server = await _sseServer([
-        'data: $delta\n\n',
-        'data: $failed\n\n',
-      ]);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
+    test(
+      'response.failed event ends stream with error, no fake isDone',
+      () async {
+        final delta = jsonEncode({
+          'type': 'response.output_text.delta',
+          'delta': 'Partial',
+        });
+        final failed = jsonEncode({
+          'type': 'response.failed',
+          'response': {
+            'status': 'failed',
+            'error': {'code': 'server_error', 'message': 'The model crashed'},
+          },
+        });
+        final server = await _sseServer([
+          'data: $delta\n\n',
+          'data: $failed\n\n',
+        ]);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      final result = await _drain(
-        ChatApiService.sendMessageStream(
-          config: _testConfig(
-            'http://localhost:${server.port}/v1',
-            ProviderKind.openai,
-            useResponseApi: true,
+        final result = await _drain(
+          ChatApiService.sendMessageStream(
+            config: _testConfig(
+              'http://localhost:${server.port}/v1',
+              ProviderKind.openai,
+              useResponseApi: true,
+            ),
+            modelId: 'test-model',
+            messages: [
+              {'role': 'user', 'content': 'hi'},
+            ],
           ),
-          modelId: 'test-model',
-          messages: [
-            {'role': 'user', 'content': 'hi'},
-          ],
-        ),
-      );
+        );
 
-      expect(result.error, isA<HttpException>());
-      expect(result.error.toString(), contains('The model crashed'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
-    });
+        expect(result.error, isA<HttpException>());
+        expect(result.error.toString(), contains('The model crashed'));
+        expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
+        expect(result.chunks.any((c) => c.isDone), isFalse);
+      },
+    );
 
     test('response.incomplete event ends stream with error', () async {
       final incomplete = jsonEncode({
@@ -467,9 +469,7 @@ void main() {
         'param': null,
         'sequence_number': 1,
       });
-      final server = await _sseServer([
-        'event: error\ndata: $errorFrame\n\n',
-      ]);
+      final server = await _sseServer(['event: error\ndata: $errorFrame\n\n']);
       addTearDown(() async {
         await server.close(force: true);
       });
@@ -495,8 +495,7 @@ void main() {
   });
 
   group('Claude in-band SSE error', () {
-    test('event: error frame ends stream with error, no fake isDone',
-        () async {
+    test('event: error frame ends stream with error, no fake isDone', () async {
       final start = jsonEncode({
         'type': 'content_block_start',
         'index': 0,
@@ -541,52 +540,57 @@ void main() {
   });
 
   group('Gemini in-band SSE error', () {
-    test('top-level error frame ends stream with error, no fake isDone',
-        () async {
-      final delta = jsonEncode({
-        'candidates': [
-          {
-            'content': {
-              'parts': [
-                {'text': 'Partial'},
-              ],
+    test(
+      'top-level error frame ends stream with error, no fake isDone',
+      () async {
+        final delta = jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': 'Partial'},
+                ],
+              },
             },
-          },
-        ],
-      });
-      final errorFrame = jsonEncode({
-        'error': {
-          'code': 429,
-          'message': 'Resource has been exhausted',
-          'status': 'RESOURCE_EXHAUSTED',
-        },
-      });
-      final server = await _sseServer([
-        'data: $delta\n\n',
-        'data: $errorFrame\n\n',
-      ]);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
-
-      final result = await _drain(
-        ChatApiService.sendMessageStream(
-          config: _testConfig(
-            'http://localhost:${server.port}',
-            ProviderKind.google,
-          ),
-          modelId: 'gemini-test',
-          messages: [
-            {'role': 'user', 'content': 'hi'},
           ],
-        ),
-      );
+        });
+        final errorFrame = jsonEncode({
+          'error': {
+            'code': 429,
+            'message': 'Resource has been exhausted',
+            'status': 'RESOURCE_EXHAUSTED',
+          },
+        });
+        final server = await _sseServer([
+          'data: $delta\n\n',
+          'data: $errorFrame\n\n',
+        ]);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
 
-      expect(result.error, isA<HttpException>());
-      expect(result.error.toString(), contains('Resource has been exhausted'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
-    });
+        final result = await _drain(
+          ChatApiService.sendMessageStream(
+            config: _testConfig(
+              'http://localhost:${server.port}',
+              ProviderKind.google,
+            ),
+            modelId: 'gemini-test',
+            messages: [
+              {'role': 'user', 'content': 'hi'},
+            ],
+          ),
+        );
+
+        expect(result.error, isA<HttpException>());
+        expect(
+          result.error.toString(),
+          contains('Resource has been exhausted'),
+        );
+        expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
+        expect(result.chunks.any((c) => c.isDone), isFalse);
+      },
+    );
 
     test('promptFeedback.blockReason ends stream with error', () async {
       final blocked = jsonEncode({
@@ -615,8 +619,7 @@ void main() {
       expect(result.chunks.any((c) => c.isDone), isFalse);
     });
 
-    test(
-        'candidate finishReason SAFETY mid-generation ends stream with '
+    test('candidate finishReason SAFETY mid-generation ends stream with '
         'error, no fake isDone', () async {
       final delta = jsonEncode({
         'candidates': [

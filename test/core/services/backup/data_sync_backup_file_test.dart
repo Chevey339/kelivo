@@ -2761,65 +2761,62 @@ void main() {
       },
     );
 
-    test(
-      'sanitizes an orphan-message candidate into an empty chat restore '
-      'while settings still apply',
-      () async {
-        await BusinessRestoreService(
-          businessRepository,
-        ).overwrite({'preserved_setting': 'old'});
-        final chatService = ChatService();
-        await chatService.init();
-        addTearDown(chatService.close);
-        final existingConversation = await chatService.createConversation(
-          title: 'Existing',
-        );
+    test('sanitizes an orphan-message candidate into an empty chat restore '
+        'while settings still apply', () async {
+      await BusinessRestoreService(
+        businessRepository,
+      ).overwrite({'preserved_setting': 'old'});
+      final chatService = ChatService();
+      await chatService.init();
+      addTearDown(chatService.close);
+      final existingConversation = await chatService.createConversation(
+        title: 'Existing',
+      );
 
-        final settingsFile = File('${root.path}/candidate_settings.json');
-        await settingsFile.writeAsString(
-          jsonEncode({'preserved_setting': 'new'}),
-        );
-        final chatsFile = File('${root.path}/invalid_candidate_chats.json');
-        await chatsFile.writeAsString(
-          jsonEncode({
-            'conversations': <Map<String, dynamic>>[],
-            'messages': [
-              ChatMessage(
-                id: 'orphan-message',
-                role: 'user',
-                content: 'orphan',
-                conversationId: 'missing-conversation',
-              ).toJson(),
-            ],
-          }),
-        );
-        final zipFile = File('${root.path}/invalid_candidate_restore.zip');
-        final encoder = ZipFileEncoder();
-        encoder.create(zipFile.path);
-        encoder.addFileSync(settingsFile, 'settings.json');
-        encoder.addFileSync(chatsFile, 'chats.json');
-        encoder.closeSync();
+      final settingsFile = File('${root.path}/candidate_settings.json');
+      await settingsFile.writeAsString(
+        jsonEncode({'preserved_setting': 'new'}),
+      );
+      final chatsFile = File('${root.path}/invalid_candidate_chats.json');
+      await chatsFile.writeAsString(
+        jsonEncode({
+          'conversations': <Map<String, dynamic>>[],
+          'messages': [
+            ChatMessage(
+              id: 'orphan-message',
+              role: 'user',
+              content: 'orphan',
+              conversationId: 'missing-conversation',
+            ).toJson(),
+          ],
+        }),
+      );
+      final zipFile = File('${root.path}/invalid_candidate_restore.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(settingsFile, 'settings.json');
+      encoder.addFileSync(chatsFile, 'chats.json');
+      encoder.closeSync();
 
-        final sync = DataSync(
-          businessRepository: businessRepository,
-          chatService: chatService,
-        );
+      final sync = DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
 
-        // 1.1.17 silently tolerated messages whose conversation is missing:
-        // they were simply invisible. The sanitizer now prunes the orphan and
-        // the overwrite restore proceeds with an empty chat payload.
-        await sync.restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+      // 1.1.17 silently tolerated messages whose conversation is missing:
+      // they were simply invisible. The sanitizer now prunes the orphan and
+      // the overwrite restore proceeds with an empty chat payload.
+      await sync.restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+      );
 
-        final after = await BusinessRestoreService(
-          businessRepository,
-        ).exportSettings();
-        expect(after['preserved_setting'], 'new');
-        expect(chatService.getConversation(existingConversation.id), isNull);
-      },
-    );
+      final after = await BusinessRestoreService(
+        businessRepository,
+      ).exportSettings();
+      expect(after['preserved_setting'], 'new');
+      expect(chatService.getConversation(existingConversation.id), isNull);
+    });
 
     test('prunes a dangling declared message and restores the conversation '
         'empty', () async {
@@ -2918,103 +2915,99 @@ void main() {
       },
     );
 
-    test(
-      'reassigns duplicate (groupId, version) pairs a 1.1.17 runtime '
-      'tolerated instead of rejecting the backup',
-      () async {
-        final chatsFile = File('${root.path}/duplicate_group_versions.json');
-        await chatsFile.writeAsString(
-          jsonEncode({
-            'conversations': [
-              Conversation(
-                id: 'conversation',
-                title: 'Conversation',
-                messageIds: const [
-                  'grouped-a',
-                  'grouped-b',
-                  'empty-group-a',
-                  'empty-group-b',
-                ],
-              ).toJson(),
-            ],
-            'messages': [
-              ChatMessage(
-                id: 'grouped-a',
-                role: 'assistant',
-                content: 'first take',
-                conversationId: 'conversation',
-                groupId: 'group',
-                version: 0,
-              ).toJson(),
-              ChatMessage(
-                id: 'grouped-b',
-                role: 'assistant',
-                content: 'second take',
-                conversationId: 'conversation',
-                groupId: 'group',
-                version: 0,
-              ).toJson(),
-              ChatMessage(
-                id: 'empty-group-a',
-                role: 'assistant',
-                content: 'empty group first',
-                conversationId: 'conversation',
-                groupId: '',
-                version: 0,
-              ).toJson(),
-              ChatMessage(
-                id: 'empty-group-b',
-                role: 'assistant',
-                content: 'empty group second',
-                conversationId: 'conversation',
-                groupId: '',
-                version: 0,
-              ).toJson(),
-            ],
-          }),
-        );
-        final zipFile = File('${root.path}/duplicate_group_versions.zip');
-        final encoder = ZipFileEncoder();
-        encoder.create(zipFile.path);
-        encoder.addFileSync(validSettingsFile, 'settings.json');
-        encoder.addFileSync(chatsFile, 'chats.json');
-        encoder.closeSync();
-        final chatService = _RecordingClearChatService();
+    test('reassigns duplicate (groupId, version) pairs a 1.1.17 runtime '
+        'tolerated instead of rejecting the backup', () async {
+      final chatsFile = File('${root.path}/duplicate_group_versions.json');
+      await chatsFile.writeAsString(
+        jsonEncode({
+          'conversations': [
+            Conversation(
+              id: 'conversation',
+              title: 'Conversation',
+              messageIds: const [
+                'grouped-a',
+                'grouped-b',
+                'empty-group-a',
+                'empty-group-b',
+              ],
+            ).toJson(),
+          ],
+          'messages': [
+            ChatMessage(
+              id: 'grouped-a',
+              role: 'assistant',
+              content: 'first take',
+              conversationId: 'conversation',
+              groupId: 'group',
+              version: 0,
+            ).toJson(),
+            ChatMessage(
+              id: 'grouped-b',
+              role: 'assistant',
+              content: 'second take',
+              conversationId: 'conversation',
+              groupId: 'group',
+              version: 0,
+            ).toJson(),
+            ChatMessage(
+              id: 'empty-group-a',
+              role: 'assistant',
+              content: 'empty group first',
+              conversationId: 'conversation',
+              groupId: '',
+              version: 0,
+            ).toJson(),
+            ChatMessage(
+              id: 'empty-group-b',
+              role: 'assistant',
+              content: 'empty group second',
+              conversationId: 'conversation',
+              groupId: '',
+              version: 0,
+            ).toJson(),
+          ],
+        }),
+      );
+      final zipFile = File('${root.path}/duplicate_group_versions.zip');
+      final encoder = ZipFileEncoder();
+      encoder.create(zipFile.path);
+      encoder.addFileSync(validSettingsFile, 'settings.json');
+      encoder.addFileSync(chatsFile, 'chats.json');
+      encoder.closeSync();
+      final chatService = _RecordingClearChatService();
 
-        // message_rows has unique(conversationId, groupId, version) and the
-        // restore writes with INSERT OR REPLACE, so without version repair a
-        // duplicate pair silently swallows the earlier row and the overwrite
-        // candidate validation rejects the whole archive.
-        await DataSync(
-          businessRepository: businessRepository,
-          chatService: chatService,
-        ).restoreFromLocalFile(
-          zipFile,
-          const WebDavConfig(includeChats: true, includeFiles: false),
-        );
+      // message_rows has unique(conversationId, groupId, version) and the
+      // restore writes with INSERT OR REPLACE, so without version repair a
+      // duplicate pair silently swallows the earlier row and the overwrite
+      // candidate validation rejects the whole archive.
+      await DataSync(
+        businessRepository: businessRepository,
+        chatService: chatService,
+      ).restoreFromLocalFile(
+        zipFile,
+        const WebDavConfig(includeChats: true, includeFiles: false),
+      );
 
-        expect(chatService.replaced, isTrue);
-        final messages = chatService.replacedMessages!;
-        expect(messages.map((m) => m.id).toList(), [
-          'grouped-a',
-          'grouped-b',
-          'empty-group-a',
-          'empty-group-b',
-        ]);
-        final groupedVersions = {
-          for (final m in messages.where((m) => m.groupId == 'group'))
-            m.id: m.version,
-        };
-        expect(groupedVersions['grouped-a'], 0);
-        expect(groupedVersions['grouped-b'], 1);
-        final emptyGroupVersions = {
-          for (final m in messages.where((m) => m.groupId == ''))
-            m.id: m.version,
-        };
-        expect(emptyGroupVersions['empty-group-a'], 0);
-        expect(emptyGroupVersions['empty-group-b'], 1);
-      },
-    );
+      expect(chatService.replaced, isTrue);
+      final messages = chatService.replacedMessages!;
+      expect(messages.map((m) => m.id).toList(), [
+        'grouped-a',
+        'grouped-b',
+        'empty-group-a',
+        'empty-group-b',
+      ]);
+      final groupedVersions = {
+        for (final m in messages.where((m) => m.groupId == 'group'))
+          m.id: m.version,
+      };
+      expect(groupedVersions['grouped-a'], 0);
+      expect(groupedVersions['grouped-b'], 1);
+      final emptyGroupVersions = {
+        for (final m in messages.where((m) => m.groupId == '')) m.id: m.version,
+      };
+      expect(emptyGroupVersions['empty-group-a'], 0);
+      expect(emptyGroupVersions['empty-group-b'], 1);
+    });
 
     test('deduplicates MCP server relations in a candidate', () async {
       final chatsFile = File('${root.path}/duplicate_mcp_relations.json');

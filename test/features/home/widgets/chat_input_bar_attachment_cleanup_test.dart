@@ -52,8 +52,12 @@ void main() {
     appSupportDir = await Directory.systemTemp.createTemp(
       'kelivo_input_cleanup_app_',
     );
-    userDir = await Directory.systemTemp.createTemp('kelivo_input_cleanup_user_');
-    PathProviderPlatform.instance = _FakePathProviderPlatform(appSupportDir.path);
+    userDir = await Directory.systemTemp.createTemp(
+      'kelivo_input_cleanup_user_',
+    );
+    PathProviderPlatform.instance = _FakePathProviderPlatform(
+      appSupportDir.path,
+    );
   });
 
   tearDown(() async {
@@ -280,18 +284,18 @@ void main() {
       final product = File('${uploadDir.path}/inflight_user.png');
       var sawProductCreated = false;
       final productDeleted = Completer<void>();
-      final subscription = uploadDir.watch(
-        events: FileSystemEvent.create | FileSystemEvent.delete,
-      ).listen((event) {
-        if (event.path != product.path) return;
-        if (event.type == FileSystemEvent.create) {
-          sawProductCreated = true;
-        } else if (event.type == FileSystemEvent.delete &&
-            sawProductCreated &&
-            !productDeleted.isCompleted) {
-          productDeleted.complete();
-        }
-      });
+      final subscription = uploadDir
+          .watch(events: FileSystemEvent.create | FileSystemEvent.delete)
+          .listen((event) {
+            if (event.path != product.path) return;
+            if (event.type == FileSystemEvent.create) {
+              sawProductCreated = true;
+            } else if (event.type == FileSystemEvent.delete &&
+                sawProductCreated &&
+                !productDeleted.isCompleted) {
+              productDeleted.complete();
+            }
+          });
       addTearDown(subscription.cancel);
 
       mediaController.enqueueImages(
@@ -355,65 +359,61 @@ void main() {
     focusNode.dispose();
   });
 
-  testWidgets(
-    '源文件删除失败会记录日志且保留源文件',
-    (tester) async {
-      final logs = <String>[];
-      final previousDebugPrint = debugPrint;
-      debugPrint = (String? message, {int? wrapWidth}) {
-        if (message != null) logs.add(message);
-      };
+  testWidgets('源文件删除失败会记录日志且保留源文件', (tester) async {
+    final logs = <String>[];
+    final previousDebugPrint = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) logs.add(message);
+    };
 
-      final controller = TextEditingController();
-      final focusNode = FocusNode();
-      final mediaController = ChatInputBarController();
+    final controller = TextEditingController();
+    final focusNode = FocusNode();
+    final mediaController = ChatInputBarController();
 
-      try {
-        await tester.pumpWidget(
-          buildHarness(
-            controller: controller,
-            focusNode: focusNode,
-            mediaController: mediaController,
-            onSend: (_) async => ChatInputSubmissionResult.rejected,
-          ),
+    try {
+      await tester.pumpWidget(
+        buildHarness(
+          controller: controller,
+          focusNode: focusNode,
+          mediaController: mediaController,
+          onSend: (_) async => ChatInputSubmissionResult.rejected,
+        ),
+      );
+
+      late File source;
+      await tester.runAsync(() async {
+        final readOnlyDir = Directory('${userDir.path}/readonly');
+        await readOnlyDir.create(recursive: true);
+        source = await writeUserImage('locked_temp.png', parent: readOnlyDir);
+        await Process.run('chmod', ['0555', readOnlyDir.path]);
+
+        mediaController.enqueueImages(
+          [source.path],
+          _config,
+          deleteSourcesAfterProcessing: true,
         );
+      });
+      addTearDown(() async {
+        await Process.run('chmod', ['-R', '0755', userDir.path]);
+      });
+      expect(
+        await pumpUntil(tester, () => !mediaController.hasUnreadyImages),
+        isTrue,
+      );
 
-        late File source;
-        await tester.runAsync(() async {
-          final readOnlyDir = Directory('${userDir.path}/readonly');
-          await readOnlyDir.create(recursive: true);
-          source = await writeUserImage('locked_temp.png', parent: readOnlyDir);
-          await Process.run('chmod', ['0555', readOnlyDir.path]);
+      expect(
+        logs.any((line) => line.contains('[ChatInputBar] Failed to delete')),
+        isTrue,
+        reason: 'deletion failure must be diagnosable via logs',
+      );
+      expect(await fileExists(tester, source), isTrue);
+    } finally {
+      debugPrint = previousDebugPrint;
+    }
 
-          mediaController.enqueueImages(
-            [source.path],
-            _config,
-            deleteSourcesAfterProcessing: true,
-          );
-        });
-        addTearDown(() async {
-          await Process.run('chmod', ['-R', '0755', userDir.path]);
-        });
-        expect(
-          await pumpUntil(tester, () => !mediaController.hasUnreadyImages),
-          isTrue,
-        );
-
-        expect(
-          logs.any((line) => line.contains('[ChatInputBar] Failed to delete')),
-          isTrue,
-          reason: 'deletion failure must be diagnosable via logs',
-        );
-        expect(await fileExists(tester, source), isTrue);
-      } finally {
-        debugPrint = previousDebugPrint;
-      }
-
-      controller.dispose();
-      focusNode.dispose();
-    },
-    skip: !(Platform.isMacOS || Platform.isLinux),
-  );
+    controller.dispose();
+    focusNode.dispose();
+  }, skip: !(Platform.isMacOS || Platform.isLinux));
 
   testWidgets('压缩失败会记录日志且保留用户源文件', (tester) async {
     final logs = <String>[];

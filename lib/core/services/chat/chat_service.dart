@@ -597,7 +597,10 @@ class ChatService extends ChangeNotifier {
     return latest;
   }
 
-  void _debugVerifyCachedTailPage(LoadedTimelinePage page, {required int limit}) {
+  void _debugVerifyCachedTailPage(
+    LoadedTimelinePage page, {
+    required int limit,
+  }) {
     if (!kDebugMode && !kProfileMode) return;
     final conversationId = page.conversationId;
     unawaited(() async {
@@ -613,9 +616,12 @@ class ChatService extends ChangeNotifier {
             current.updatedAt.microsecondsSinceEpoch != page.stateRevision) {
           return;
         }
-        String describe(String groupId, String revisionId, int versionCount,
-                int logicalIndex) =>
-            '$groupId/$revisionId/$versionCount/$logicalIndex';
+        String describe(
+          String groupId,
+          String revisionId,
+          int versionCount,
+          int logicalIndex,
+        ) => '$groupId/$revisionId/$versionCount/$logicalIndex';
         final expected = [
           for (final slot in window.slots)
             describe(
@@ -1012,10 +1018,7 @@ class ChatService extends ChangeNotifier {
 
     final List<ChatMessage> source;
     if (isConversationFullyCached(conversationId)) {
-      source = _titleSourceTailWindow(
-        _messagesCache[conversationId]!,
-        start,
-      );
+      source = _titleSourceTailWindow(_messagesCache[conversationId]!, start);
     } else {
       source = await _loadTitleSourceTail(
         conversationId,
@@ -1094,10 +1097,12 @@ class ChatService extends ChangeNotifier {
     final order = <String>[];
     for (final message in messages) {
       final groupId = message.groupId ?? message.id;
-      byGroup.putIfAbsent(groupId, () {
-        order.add(groupId);
-        return <ChatMessage>[];
-      }).add(message);
+      byGroup
+          .putIfAbsent(groupId, () {
+            order.add(groupId);
+            return <ChatMessage>[];
+          })
+          .add(message);
     }
     return [
       for (final groupId in order)
@@ -2981,9 +2986,7 @@ class ChatService extends ChangeNotifier {
       if (meta.contains(';base64')) {
         return sha256.convert(base64Decode(payload)).toString();
       }
-      return sha256
-          .convert(utf8.encode(Uri.decodeFull(payload)))
-          .toString();
+      return sha256.convert(utf8.encode(Uri.decodeFull(payload))).toString();
     });
   }
 

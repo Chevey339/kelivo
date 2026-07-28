@@ -78,8 +78,7 @@ void main() {
       expect(ThinkingTagParser.debugParseCount, 0);
 
       rebuild(
-        () => content =
-            '<think>new reasoning</think>updated think answer',
+        () => content = '<think>new reasoning</think>updated think answer',
       );
       await tester.pump();
       expect(ThinkingTagParser.debugParseCount, greaterThan(0));

@@ -88,9 +88,7 @@ void main() {
       jsonEncode({
         'choices': [
           {
-            'message': {
-              'content': '- suggestion one\n- suggestion two',
-            },
+            'message': {'content': '- suggestion one\n- suggestion two'},
           },
         ],
       }),
@@ -195,10 +193,7 @@ void main() {
     return convo;
   }
 
-  Future<void> waitFor(
-    bool Function() condition,
-    String description,
-  ) async {
+  Future<void> waitFor(bool Function() condition, String description) async {
     for (var i = 0; i < 200; i++) {
       if (condition()) return;
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -212,16 +207,16 @@ void main() {
     final controller = await pumpHarness(tester);
     await tester.runAsync(() async {
       final convo = await openConversation(controller);
-      final first = controller
-          .sendMessage(ChatInputData(text: 'hello'))
-          .then((r) {
-            return r;
-          });
-      final second = controller
-          .sendMessage(ChatInputData(text: 'hello'))
-          .then((r) {
-            return r;
-          });
+      final first = controller.sendMessage(ChatInputData(text: 'hello')).then((
+        r,
+      ) {
+        return r;
+      });
+      final second = controller.sendMessage(ChatInputData(text: 'hello')).then((
+        r,
+      ) {
+        return r;
+      });
       await Future.wait([first, second]);
       // sendMessage resolves once the pair is persisted; the streamed reply
       // keeps running in the background, so wait for it to finish.
@@ -284,9 +279,7 @@ void main() {
       );
       final before = await service.loadMessages(convo.id);
       expect(before, hasLength(2));
-      final assistantMessage = before.firstWhere(
-        (m) => m.role == 'assistant',
-      );
+      final assistantMessage = before.firstWhere((m) => m.role == 'assistant');
 
       final first = controller.regenerateAtMessage(assistantMessage);
       final second = controller.regenerateAtMessage(assistantMessage);
@@ -325,9 +318,7 @@ void main() {
         'initial streaming to finish',
       );
       final before = await service.loadMessages(convo.id);
-      final assistantMessage = before.firstWhere(
-        (m) => m.role == 'assistant',
-      );
+      final assistantMessage = before.firstWhere((m) => m.role == 'assistant');
 
       // Make the conversation multi-version, then wait for the automatic
       // suggestion generation that follows the regenerated reply.

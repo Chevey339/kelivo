@@ -319,9 +319,9 @@ void main() {
       test('无法解析的 receipt 同样阻止自动重建', () async {
         await DatabaseInstallationGate.ensureReady(appDataDirectory: directory);
         final receipt = directory.listSync().whereType<File>().singleWhere(
-          (file) => p.basename(file.path).startsWith(
-            'database_installation_receipt_',
-          ),
+          (file) => p
+              .basename(file.path)
+              .startsWith('database_installation_receipt_'),
         );
         await receipt.writeAsString('{broken');
 

@@ -591,9 +591,7 @@ class HiveToSqliteMigrationService {
   /// stay on disk for manual recovery.
   Future<void> skipMigrationAndStartFresh() async {
     for (final hiveFile in decision.hiveFiles) {
-      final lockFile = File(
-        '${p.withoutExtension(hiveFile.path)}.lock',
-      );
+      final lockFile = File('${p.withoutExtension(hiveFile.path)}.lock');
       try {
         if (await lockFile.exists()) {
           await lockFile.rename('${lockFile.path}.retired');
@@ -748,7 +746,8 @@ class HiveToSqliteMigrationService {
       // Drop the checklist row entirely; the manifest reset below would
       // otherwise leave it pending forever.
       items = [
-        for (final item in (_lastBackupItems.isEmpty ? items : _lastBackupItems))
+        for (final item
+            in (_lastBackupItems.isEmpty ? items : _lastBackupItems))
           if (item.name != _chatsBackupName) item,
       ];
       _lastBackupItems = items;

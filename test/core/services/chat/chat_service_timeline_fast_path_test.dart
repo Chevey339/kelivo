@@ -112,16 +112,18 @@ void main() {
     );
   });
 
-  test('cold service misses the fast path and loads from the database',
-      () async {
-    final (service, conversationId, ids) = await seedRestartedService();
+  test(
+    'cold service misses the fast path and loads from the database',
+    () async {
+      final (service, conversationId, ids) = await seedRestartedService();
 
-    expect(service.isConversationFullyCached(conversationId), isFalse);
-    final page = await service.loadTimelinePage(conversationId);
-    expect(service.debugTimelineFastPathHitCount, 0);
-    expect(page, isNotNull);
-    expect(page!.slots.map((slot) => slot.message.id), orderedEquals(ids));
-  });
+      expect(service.isConversationFullyCached(conversationId), isFalse);
+      final page = await service.loadTimelinePage(conversationId);
+      expect(service.debugTimelineFastPathHitCount, 0);
+      expect(page, isNotNull);
+      expect(page!.slots.map((slot) => slot.message.id), orderedEquals(ids));
+    },
+  );
 
   test('partial tail coverage misses the fast path', () async {
     final (service, conversationId, ids) = await seedRestartedService();
@@ -135,10 +137,7 @@ void main() {
 
     final second = await service.loadTimelinePage(conversationId, limit: 2);
     expect(service.debugTimelineFastPathHitCount, 0);
-    expect(
-      pageSignature(second),
-      orderedEquals(pageSignature(first)),
-    );
+    expect(pageSignature(second), orderedEquals(pageSignature(first)));
     expect(
       second!.slots.map((slot) => slot.message.id),
       orderedEquals(ids.sublist(ids.length - 2)),
@@ -147,41 +146,43 @@ void main() {
     expect(second.totalSlotCount, ids.length);
   });
 
-  test('multi-version group honors the selected revision from memory',
-      () async {
-    final (service, conversationId, ids) = await seedRestartedService();
+  test(
+    'multi-version group honors the selected revision from memory',
+    () async {
+      final (service, conversationId, ids) = await seedRestartedService();
 
-    // Add a second version for the last message's group and select the older
-    // version, so the selected revision is not the latest one.
-    final groupId = ids.last;
-    final newer = await service.addMessage(
-      conversationId: conversationId,
-      role: 'assistant',
-      content: 'regenerated',
-      groupId: groupId,
-      version: 1,
-      selectVersion: true,
-    );
-    await service.setSelectedVersion(conversationId, groupId, 0);
+      // Add a second version for the last message's group and select the older
+      // version, so the selected revision is not the latest one.
+      final groupId = ids.last;
+      final newer = await service.addMessage(
+        conversationId: conversationId,
+        role: 'assistant',
+        content: 'regenerated',
+        groupId: groupId,
+        version: 1,
+        selectVersion: true,
+      );
+      await service.setSelectedVersion(conversationId, groupId, 0);
 
-    ChatService.timelineCacheFastPathEnabled = false;
-    final dbPage = await service.loadTimelinePage(conversationId);
-    ChatService.timelineCacheFastPathEnabled = true;
-    expect(service.debugTimelineFastPathHitCount, 0);
+      ChatService.timelineCacheFastPathEnabled = false;
+      final dbPage = await service.loadTimelinePage(conversationId);
+      ChatService.timelineCacheFastPathEnabled = true;
+      expect(service.debugTimelineFastPathHitCount, 0);
 
-    await service.loadMessages(conversationId);
-    final cachedPage = await service.loadTimelinePage(conversationId);
-    expect(service.debugTimelineFastPathHitCount, 1);
-    expect(pageSignature(cachedPage), orderedEquals(pageSignature(dbPage)));
+      await service.loadMessages(conversationId);
+      final cachedPage = await service.loadTimelinePage(conversationId);
+      expect(service.debugTimelineFastPathHitCount, 1);
+      expect(pageSignature(cachedPage), orderedEquals(pageSignature(dbPage)));
 
-    final tailSlot = cachedPage!.slots.last;
-    expect(tailSlot.identity.slotId, groupId);
-    expect(tailSlot.identity.revisionId, ids.last);
-    expect(tailSlot.identity.versionCount, 2);
-    expect(tailSlot.message.content, 'message 4');
-    expect(cachedPage.totalSlotCount, ids.length);
-    expect(newer.id, isNot(tailSlot.identity.revisionId));
-  });
+      final tailSlot = cachedPage!.slots.last;
+      expect(tailSlot.identity.slotId, groupId);
+      expect(tailSlot.identity.revisionId, ids.last);
+      expect(tailSlot.identity.versionCount, 2);
+      expect(tailSlot.message.content, 'message 4');
+      expect(cachedPage.totalSlotCount, ids.length);
+      expect(newer.id, isNot(tailSlot.identity.revisionId));
+    },
+  );
 
   test('missing selected revision falls back to the database', () async {
     final (service, conversationId, ids) = await seedRestartedService();
