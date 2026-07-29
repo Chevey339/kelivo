@@ -588,6 +588,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
+    if (s is DoubaoOptions) return 'doubao';
     return 'search';
   }
 

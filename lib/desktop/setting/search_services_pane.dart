@@ -604,6 +604,7 @@ class _BrandBadge extends StatelessWidget {
     if (s is SerperOptions) return 'serper';
     if (s is QueritOptions) return 'querit';
     if (s is GrokOptions) return 'grok';
+    if (s is DoubaoOptions) return 'doubao';
     return 'search';
   }
 
@@ -920,6 +921,7 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
       case 'ollama':
       case 'perplexity':
       case 'bocha':
+      case 'doubao':
         return [
           TextField(
             controller: _controllers['apiKey'],
@@ -1104,6 +1106,8 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
         return PerplexityOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'bocha':
         return BochaOptions(id: id, apiKey: _controllers['apiKey']!.text);
+      case 'doubao':
+        return DoubaoOptions(id: id, apiKey: _controllers['apiKey']!.text);
       case 'serper':
         final page = int.tryParse(_controllers['page']!.text.trim());
         return SerperOptions(
@@ -1186,6 +1190,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     } else if (s is PerplexityOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is BochaOptions) {
+      _controllers['apiKey'] = TextEditingController(text: s.apiKey);
+    } else if (s is DoubaoOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
     } else if (s is SerperOptions) {
       _controllers['apiKey'] = TextEditingController(text: s.apiKey);
@@ -1329,7 +1335,8 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
         s is JinaOptions ||
         s is OllamaOptions ||
         s is PerplexityOptions ||
-        s is BochaOptions) {
+        s is BochaOptions ||
+        s is DoubaoOptions) {
       return [
         TextField(
           controller: _controllers['apiKey'],
@@ -1530,6 +1537,9 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
     if (s is BochaOptions) {
       return BochaOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
     }
+    if (s is DoubaoOptions) {
+      return DoubaoOptions(id: s.id, apiKey: _controllers['apiKey']!.text);
+    }
     if (s is SerperOptions) {
       final page = int.tryParse(_controllers['page']!.text.trim());
       return SerperOptions(
@@ -1595,6 +1605,7 @@ class _ServiceTypeChipsState extends State<_ServiceTypeChips> {
     (type: 'serper', brand: 'serper'),
     (type: 'querit', brand: 'querit'),
     (type: 'grok', brand: 'grok'),
+    (type: 'doubao', brand: 'doubao'),
   ];
   @override
   Widget build(BuildContext context) {
@@ -1679,6 +1690,8 @@ String _serviceTypeName(BuildContext context, String type) {
       return l10n.searchServiceNameQuerit;
     case 'grok':
       return l10n.searchServiceNameGrok;
+    case 'doubao':
+      return l10n.searchServiceNameDoubao;
     default:
       return type;
   }
