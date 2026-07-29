@@ -11,6 +11,16 @@ class TokenUsage {
     this.totalTokens = 0,
   });
 
+  factory TokenUsage.fromGeminiUsageMetadata(Map<String, dynamic>? um) {
+    if (um == null) return const TokenUsage();
+    return TokenUsage(
+      promptTokens: (um['promptTokenCount'] as int? ?? 0),
+      completionTokens: (um['candidatesTokenCount'] as int? ?? 0),
+      cachedTokens: (um['cachedContentTokenCount'] as int? ?? 0),
+      totalTokens: (um['totalTokenCount'] as int? ?? 0),
+    );
+  }
+
   TokenUsage merge(TokenUsage other) {
     // For streaming responses:
     // - prompt tokens: take max (usually stays constant after initial value)
