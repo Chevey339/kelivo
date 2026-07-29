@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/conversation.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -120,13 +121,14 @@ class GenerationController {
 
   /// Prepare tool definitions for API call.
   /// Delegates to ToolHandlerService.buildToolDefinitions.
-  List<Map<String, dynamic>> buildToolDefinitions(
+  Future<List<Map<String, dynamic>>> buildToolDefinitions(
     SettingsProvider settings,
     Assistant? assistant,
     String providerKey,
     String modelId,
-    bool hasBuiltInSearch,
-  ) {
+    bool hasBuiltInSearch, {
+    Conversation? conversation,
+  }) async {
     return toolHandlerService.buildToolDefinitions(
       settings,
       assistant,
@@ -134,6 +136,7 @@ class GenerationController {
       modelId,
       hasBuiltInSearch,
       isToolModel: isToolModel,
+      conversation: conversation,
     );
   }
 
@@ -144,6 +147,7 @@ class GenerationController {
     Assistant? assistant, {
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    Conversation? conversation,
     String? conversationId,
   }) {
     return toolHandlerService.buildToolCallHandler(
@@ -151,6 +155,7 @@ class GenerationController {
       assistant,
       approvalService: approvalService,
       askUserService: askUserService,
+      conversation: conversation,
       conversationId: conversationId,
     );
   }

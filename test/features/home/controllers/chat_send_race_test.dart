@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:drift/drift.dart' show driftRuntimeOptions;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 // ignore: depend_on_referenced_packages
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:provider/provider.dart';
@@ -100,6 +101,7 @@ void main() {
     directory = await Directory.systemTemp.createTemp('kelivo_send_race_');
     previousPathProvider = PathProviderPlatform.instance;
     PathProviderPlatform.instance = _FakePathProviderPlatform(directory.path);
+    Hive.init(directory.path);
     // The widget-test binding replaces HttpClient with a 400-only mock; the
     // loopback API server below needs real networking.
     HttpOverrides.global = null;
@@ -125,6 +127,7 @@ void main() {
     try {
       await repository.close().timeout(const Duration(seconds: 10));
     } catch (_) {}
+    await Hive.close();
     if (await directory.exists()) await directory.delete(recursive: true);
   });
 

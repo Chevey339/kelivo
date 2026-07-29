@@ -18,6 +18,7 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/skills/skill_service.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -634,8 +635,9 @@ class MessageBuilderService {
   void injectSystemPrompt(
     List<Map<String, dynamic>> apiMessages,
     Assistant? assistant,
-    String modelId,
-  ) {
+    String modelId, {
+    Conversation? currentConversation,
+  }) {
     if ((assistant?.systemPrompt.trim().isNotEmpty ?? false)) {
       final vars = PromptTransformer.buildPlaceholders(
         context: contextProvider,
@@ -650,6 +652,26 @@ class MessageBuilderService {
       );
       apiMessages.insert(0, {'role': 'system', 'content': sys});
     }
+  }
+
+  /// Inject active skill metadata into the system prompt.
+  Future<void> injectSkillPrompts(
+    List<Map<String, dynamic>> apiMessages, {
+    required Conversation? currentConversation,
+  }) async {
+    final activeSkills = await SkillService.instance.listActiveSkills(
+      currentConversation?.enabledSkillNames,
+    );
+    if (activeSkills.isEmpty) return;
+
+    final buffer = StringBuffer();
+    buffer.writeln('\n<available_skills>');
+    for (final skill in activeSkills) {
+      buffer.writeln('- ${skill.name}: ${skill.description}');
+    }
+    buffer.write('</available_skills>');
+
+    _appendToSystemMessage(apiMessages, buffer.toString());
   }
 
   /// Inject memory prompts and recent chats reference into apiMessages.

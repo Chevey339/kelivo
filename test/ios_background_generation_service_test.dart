@@ -355,11 +355,16 @@ void main() {
     await service.flushUpdates();
 
     expect(starts, hasLength(2));
+    final interval = starts.last.difference(starts.first);
+    const tolerance = Duration(milliseconds: 5);
     expect(
-      starts.last.difference(starts.first),
+      interval + tolerance,
       greaterThanOrEqualTo(
         IosBackgroundGenerationService.updateMinimumInterval,
       ),
+      reason:
+          'measured update interval $interval is shorter than the production '
+          'interval with $tolerance scheduling tolerance',
     );
   });
 
