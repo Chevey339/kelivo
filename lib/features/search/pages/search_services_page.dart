@@ -762,6 +762,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       {'type': 'serper', 'name': l10n.searchServiceNameSerper},
       {'type': 'querit', 'name': l10n.searchServiceNameQuerit},
       {'type': 'grok', 'name': l10n.searchServiceNameGrok},
+      {'type': 'doubao', 'name': l10n.searchServiceNameDoubao},
     ];
     return ListView.builder(
       key: const ValueKey('service_list'),
@@ -828,6 +829,8 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
         return l10n.searchServiceNameQuerit;
       case 'grok':
         return l10n.searchServiceNameGrok;
+      case 'doubao':
+        return l10n.searchServiceNameDoubao;
       default:
         return '';
     }
@@ -1008,6 +1011,7 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
       case 'ollama':
       case 'perplexity':
       case 'bocha':
+      case 'doubao':
         return [
           buildTextField(
             key: 'apiKey',
@@ -1272,6 +1276,11 @@ class _AddServiceBottomSheetState extends State<_AddServiceBottomSheet> {
           customUrl: _controllers['customUrl']!.text.trim(),
           systemPrompt: _controllers['systemPrompt']!.text,
         );
+      case 'doubao':
+        return DoubaoOptions(
+          id: id,
+          apiKey: _controllers['apiKey']!.text,
+        );
       default:
         return BingLocalOptions(id: id);
     }
@@ -1366,6 +1375,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
       _controllers['systemPrompt'] = TextEditingController(
         text: service.systemPrompt,
       );
+    } else if (service is DoubaoOptions) {
+      _controllers['apiKey'] = TextEditingController(text: service.apiKey);
     }
   }
 
@@ -1561,7 +1572,8 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         service is MetasoOptions ||
         service is OllamaOptions ||
         service is JinaOptions ||
-        service is BochaOptions) {
+        service is BochaOptions ||
+        service is DoubaoOptions) {
       return [
         buildTextField(
           key: 'apiKey',
@@ -1839,6 +1851,11 @@ class _EditServiceSheetState extends State<_EditServiceSheet> {
         reasoningEffort: _controllers['reasoningEffort']!.text,
         customUrl: _controllers['customUrl']!.text.trim(),
         systemPrompt: _controllers['systemPrompt']!.text,
+      );
+    } else if (service is DoubaoOptions) {
+      return DoubaoOptions(
+        id: service.id,
+        apiKey: _controllers['apiKey']!.text,
       );
     }
 

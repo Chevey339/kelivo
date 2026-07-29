@@ -4654,6 +4654,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.';
 
   @override
+  String get searchServiceNameDoubao => 'Doubao Search';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      'Volcengine Doubao Search API. Returns real-time web search results with titles, snippets, and source information.';
+
+  @override
   String get searchServicesDialogCountryOptional => 'Country/region (optional)';
 
   @override

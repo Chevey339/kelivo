@@ -8606,6 +8606,18 @@ abstract class AppLocalizations {
   /// **'Grok search via xAI Responses API. Uses web and X search tools and returns cited sources.'**
   String get searchProviderGrokDescription;
 
+  /// No description provided for @searchServiceNameDoubao.
+  ///
+  /// In en, this message translates to:
+  /// **'Doubao Search'**
+  String get searchServiceNameDoubao;
+
+  /// No description provided for @searchProviderDoubaoDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Volcengine Doubao Search API. Returns real-time web search results with titles, snippets, and source information.'**
+  String get searchProviderDoubaoDescription;
+
   /// No description provided for @searchServicesDialogCountryOptional.
   ///
   /// In en, this message translates to:

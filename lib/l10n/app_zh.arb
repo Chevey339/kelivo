@@ -1546,6 +1546,8 @@
   "searchProviderQueritDescription": "面向 LLM 应用的 Querit 搜索 API。返回实时网页结果，并支持站点、时间、国家和语言过滤。",
   "searchServiceNameGrok": "Grok",
   "searchProviderGrokDescription": "通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。",
+  "searchServiceNameDoubao": "豆包搜索",
+  "searchProviderDoubaoDescription": "火山引擎豆包搜索 API。返回实时网页搜索结果，包含标题、摘要和来源信息。",
   "searchServicesDialogCountryOptional": "国家/地区（可选）",
   "searchServicesDialogLanguageOptional": "语言（可选）",
   "searchServicesDialogTimeFilterOptional": "时间过滤（可选）",
