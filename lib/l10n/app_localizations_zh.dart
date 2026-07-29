@@ -2556,6 +2556,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
 
   @override
+  String get chatInputBarImageWarning => '将忽略图片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
+
+  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -8174,6 +8180,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get chatInputBarDisableImageModeTooltip => '关闭绘图模式';
 
   @override
+  String get chatInputBarImageWarning => '将忽略图片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
+
+  @override
   String get chatInputBarQueuedPending => '排队中';
 
   @override
@@ -13789,6 +13801,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get chatInputBarDisableImageModeTooltip => '關閉繪圖模式';
+
+  @override
+  String get chatInputBarImageWarning => '將忽略圖片';
+
+  @override
+  String get chatInputBarDisableImageWarningTooltip => '忽略';
 
   @override
   String get chatInputBarQueuedPending => '排隊中';
