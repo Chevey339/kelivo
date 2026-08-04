@@ -16,6 +16,7 @@ import 'providers/duckduckgo_search_service.dart';
 import 'providers/serper_search_service.dart';
 import 'providers/grok_search_service.dart';
 import 'providers/querit_search_service.dart';
+import 'providers/doubao_search_service.dart';
 
 // Base interface for all search services
 abstract class SearchService<T extends SearchServiceOptions> {
@@ -64,6 +65,8 @@ abstract class SearchService<T extends SearchServiceOptions> {
         return GrokSearchService() as SearchService;
       case QueritOptions _:
         return QueritSearchService() as SearchService;
+      case DoubaoOptions _:
+        return DoubaoSearchService() as SearchService;
       default:
         return BingSearchService() as SearchService;
     }
@@ -185,6 +188,8 @@ abstract class SearchServiceOptions {
         return GrokOptions.fromJson(json);
       case 'querit':
         return QueritOptions.fromJson(json);
+      case 'doubao':
+        return DoubaoOptions.fromJson(json);
       default:
         return BingLocalOptions(id: json['id']);
     }
@@ -630,4 +635,20 @@ class QueritOptions extends SearchServiceOptions {
     countries: json['countries'] ?? '',
     languages: json['languages'] ?? '',
   );
+}
+
+class DoubaoOptions extends SearchServiceOptions {
+  final String apiKey;
+
+  DoubaoOptions({required super.id, required this.apiKey});
+
+  @override
+  Map<String, dynamic> toJson() => {
+    'type': 'doubao',
+    'id': id,
+    'apiKey': apiKey,
+  };
+
+  factory DoubaoOptions.fromJson(Map<String, dynamic> json) =>
+      DoubaoOptions(id: json['id'], apiKey: json['apiKey'] ?? '');
 }

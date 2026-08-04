@@ -4467,6 +4467,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
   @override
+  String get searchServiceNameDoubao => '豆包搜索';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      '火山引擎豆包搜索 API。返回实时网页搜索结果，包含标题、摘要和来源信息。';
+
+  @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
 
   @override
@@ -10085,6 +10092,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '通过 xAI Responses API 使用 Grok 搜索。调用网页和 X 搜索工具，并返回带引用的来源。';
 
   @override
+  String get searchServiceNameDoubao => '豆包搜索';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      '火山引擎豆包搜索 API。返回实时网页搜索结果，包含标题、摘要和来源信息。';
+
+  @override
   String get searchServicesDialogCountryOptional => '国家/地区（可选）';
 
   @override
@@ -15700,6 +15714,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get searchProviderGrokDescription =>
       '透過 xAI Responses API 使用 Grok 搜尋。呼叫網頁和 X 搜尋工具，並返回帶引用的來源。';
+
+  @override
+  String get searchServiceNameDoubao => '豆包搜尋';
+
+  @override
+  String get searchProviderDoubaoDescription =>
+      '火山引擎豆包搜尋 API。返回即時網頁搜尋結果，包含標題、摘要和來源資訊。';
 
   @override
   String get searchServicesDialogCountryOptional => '國家/地區（可選）';
