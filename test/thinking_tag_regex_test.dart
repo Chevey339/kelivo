@@ -19,6 +19,22 @@ void main() {
       expect(parsed.thinkingTexts, const ['reasoning here']);
     });
 
+    test('extracts closed thinking block', () {
+      const input = '<thinking>reasoning here</thinking>answer';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, 'answer');
+      expect(parsed.thinkingTexts, const ['reasoning here']);
+    });
+
+    test('extracts mixed-case thinking block', () {
+      const input = '<THINKING>reasoning here</THINKING>answer';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, 'answer');
+      expect(parsed.thinkingTexts, const ['reasoning here']);
+    });
+
     test('extracts multiple closed blocks', () {
       const input = '<think>a</think>mid<thought>b</thought>end';
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
@@ -35,8 +51,24 @@ void main() {
       expect(parsed.thinkingTexts, isEmpty);
     });
 
+    test('keeps unclosed thinking tag visible', () {
+      const input = '<thinking>partial reasoning';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, input);
+      expect(parsed.thinkingTexts, isEmpty);
+    });
+
     test('keeps mismatched thinking tags visible', () {
       const input = '<think>reasoning</thought>answer';
+      final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
+
+      expect(parsed.visibleContent, input);
+      expect(parsed.thinkingTexts, isEmpty);
+    });
+
+    test('keeps mismatched long thinking tags visible', () {
+      const input = '<thinking>reasoning</think>answer';
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(input);
 
       expect(parsed.visibleContent, input);
