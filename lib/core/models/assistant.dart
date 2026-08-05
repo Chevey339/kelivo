@@ -15,6 +15,24 @@ class Assistant {
     50,
   ];
 
+  /// Default prompt for guiding the model on how to actively record user info.
+  static const String defaultMemoryRecordPrompt = '''请勿在记忆中存储敏感信息，敏感信息包括：用户的民族、宗教信仰、性取向、政治观点及党派归属、性生活、犯罪记录等。
+
+在与用户聊天过程中，你可以像一个私人秘书一样**主动的**记录用户相关的信息到记忆里，包括但不限于：
+- 用户昵称/姓名
+- 年龄/性别/兴趣爱好
+- 计划事项等
+- 聊天风格偏好
+- 工作相关
+- 首次聊天时间
+- ...
+请主动调用工具记录，而不是需要用户要求。
+记忆如果包含日期信息，请包含在内，请使用绝对时间格式，并且当前时间是{current_hour}。
+无需告知用户你已更改记忆记录，也不要在对话中直接显示记忆内容，除非用户主动要求。
+相似或相关的记忆应合并为一条记录，而不要重复记录，过时记录应删除。
+你可以在和用户闲聊的时候暗示用户你能记住东西。
+''';
+
   final String id;
   final String name;
   final String? avatar; // path/url/base64, null for initial-letter avatar
@@ -46,6 +64,7 @@ class Assistant {
   final bool enableRecentChatsReference; // include recent chat titles in prompt
   final int
   recentChatsSummaryMessageCount; // refresh summary after N new messages
+  final String memoryRecordPrompt; // custom prompt for active memory recording
   // Preset conversation messages (ordered)
   final List<PresetMessage> presetMessages;
   // Regex replacement rules
@@ -77,6 +96,7 @@ class Assistant {
     this.enableMemory = false,
     this.enableRecentChatsReference = false,
     this.recentChatsSummaryMessageCount = defaultRecentChatsSummaryMessageCount,
+    this.memoryRecordPrompt = defaultMemoryRecordPrompt,
     this.presetMessages = const <PresetMessage>[],
     this.regexRules = const <AssistantRegex>[],
   });
@@ -107,6 +127,7 @@ class Assistant {
     bool? enableMemory,
     bool? enableRecentChatsReference,
     int? recentChatsSummaryMessageCount,
+    String? memoryRecordPrompt,
     List<PresetMessage>? presetMessages,
     List<AssistantRegex>? regexRules,
     bool clearChatModel = false,
@@ -149,6 +170,7 @@ class Assistant {
           enableRecentChatsReference ?? this.enableRecentChatsReference,
       recentChatsSummaryMessageCount:
           recentChatsSummaryMessageCount ?? this.recentChatsSummaryMessageCount,
+      memoryRecordPrompt: memoryRecordPrompt ?? this.memoryRecordPrompt,
       presetMessages: presetMessages ?? this.presetMessages,
       regexRules: regexRules ?? this.regexRules,
     );
@@ -180,6 +202,7 @@ class Assistant {
     'enableMemory': enableMemory,
     'enableRecentChatsReference': enableRecentChatsReference,
     'recentChatsSummaryMessageCount': recentChatsSummaryMessageCount,
+    'memoryRecordPrompt': memoryRecordPrompt,
     'presetMessages': PresetMessage.encodeList(presetMessages),
     'regexRules': regexRules.map((e) => e.toJson()).toList(),
   };
@@ -247,6 +270,7 @@ class Assistant {
       }
       return raw;
     })(),
+    memoryRecordPrompt: (json['memoryRecordPrompt'] as String?) ?? defaultMemoryRecordPrompt,
     presetMessages: (() {
       try {
         return PresetMessage.decodeList(json['presetMessages']);
