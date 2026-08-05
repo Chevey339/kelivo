@@ -13,6 +13,9 @@ class WebDavConfig {
   final String userAgent;
   final bool includeChats; // Hive boxes
   final bool includeFiles; // uploads/
+  final bool autoBackupEnabled;
+  final int autoBackupIntervalDays;
+  final int? autoBackupMinuteOfDay;
 
   const WebDavConfig({
     this.url = '',
@@ -22,6 +25,9 @@ class WebDavConfig {
     this.userAgent = '',
     this.includeChats = true,
     this.includeFiles = true,
+    this.autoBackupEnabled = false,
+    this.autoBackupIntervalDays = 7,
+    this.autoBackupMinuteOfDay,
   });
 
   WebDavConfig copyWith({
@@ -32,6 +38,10 @@ class WebDavConfig {
     String? userAgent,
     bool? includeChats,
     bool? includeFiles,
+    bool? autoBackupEnabled,
+    int? autoBackupIntervalDays,
+    int? autoBackupMinuteOfDay,
+    bool clearAutoBackupMinuteOfDay = false,
   }) {
     return WebDavConfig(
       url: url ?? this.url,
@@ -41,6 +51,12 @@ class WebDavConfig {
       userAgent: userAgent ?? this.userAgent,
       includeChats: includeChats ?? this.includeChats,
       includeFiles: includeFiles ?? this.includeFiles,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      autoBackupIntervalDays:
+          autoBackupIntervalDays ?? this.autoBackupIntervalDays,
+      autoBackupMinuteOfDay: clearAutoBackupMinuteOfDay
+          ? null
+          : autoBackupMinuteOfDay ?? this.autoBackupMinuteOfDay,
     );
   }
 
@@ -52,6 +68,9 @@ class WebDavConfig {
     'userAgent': userAgent,
     'includeChats': includeChats,
     'includeFiles': includeFiles,
+    'autoBackupEnabled': autoBackupEnabled,
+    'autoBackupIntervalDays': autoBackupIntervalDays,
+    'autoBackupMinuteOfDay': autoBackupMinuteOfDay,
   };
 
   static WebDavConfig fromJson(Map<String, dynamic> json) {
@@ -65,6 +84,9 @@ class WebDavConfig {
       userAgent: (json['userAgent'] as String?) ?? '',
       includeChats: json['includeChats'] as bool? ?? true,
       includeFiles: json['includeFiles'] as bool? ?? true,
+      autoBackupEnabled: json['autoBackupEnabled'] as bool? ?? false,
+      autoBackupIntervalDays: json['autoBackupIntervalDays'] as int? ?? 7,
+      autoBackupMinuteOfDay: json['autoBackupMinuteOfDay'] as int?,
     );
   }
 

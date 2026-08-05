@@ -3,9 +3,16 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../database/business_preferences.dart';
+import '../models/backup.dart';
+import 'backup_provider.dart';
 
 class BackupReminderProvider extends ChangeNotifier {
-  BackupReminderProvider({required this.preferences, bool autoLoad = true}) {
+  BackupReminderProvider({
+    required this.preferences,
+    this.backupProvider,
+    this.webDavConfig,
+    bool autoLoad = true,
+  }) {
     if (autoLoad) {
       unawaited(load());
     }
@@ -18,8 +25,15 @@ class BackupReminderProvider extends ChangeNotifier {
   static const String _minutesOfDayKey = 'backup_reminder_minutes_of_day_v1';
   static const String _enabledAtKey = 'backup_reminder_enabled_at_v1';
   static const String _lastBackupAtKey = 'backup_reminder_last_backup_at_v1';
+  static const String _autoEnabledKey = 'backup_auto_enabled_v1';
+  static const String _autoIntervalDaysKey = 'backup_auto_interval_days_v1';
+  static const String _autoMinutesOfDayKey = 'backup_auto_minutes_of_day_v1';
+  static const String _autoEnabledAtKey = 'backup_auto_enabled_at_v1';
+  static const String _autoLastBackupAtKey = 'backup_auto_last_backup_at_v1';
 
   final BusinessPreferences preferences;
+  final BackupProvider? backupProvider;
+  WebDavConfig? webDavConfig;
   bool _loaded = false;
   bool _enabled = false;
   int _intervalDays = 7;
@@ -28,6 +42,13 @@ class BackupReminderProvider extends ChangeNotifier {
   DateTime? _lastBackupAt;
   bool _snoozedForSession = false;
   bool _shouldShowReminder = false;
+
+  bool _autoEnabled = false;
+  int _autoIntervalDays = 7;
+  int? _autoMinutesOfDay;
+  DateTime? _autoEnabledAt;
+  DateTime? _autoLastBackupAt;
+  bool _autoBackupInProgress = false;
   Timer? _timer;
 
   bool get loaded => _loaded;
@@ -38,12 +59,29 @@ class BackupReminderProvider extends ChangeNotifier {
   DateTime? get lastBackupAt => _lastBackupAt;
   bool get shouldShowReminder => _shouldShowReminder;
 
+  bool get autoEnabled => _autoEnabled;
+  int get autoIntervalDays => _autoIntervalDays;
+  int? get autoMinutesOfDay => _autoMinutesOfDay;
+  DateTime? get autoEnabledAt => _autoEnabledAt;
+  DateTime? get autoLastBackupAt => _autoLastBackupAt;
+
   DateTime? get nextReminderAt {
     if (!_enabled || _reminderMinutesOfDay == null) return null;
     final anchor = _lastBackupAt ?? _enabledAt;
     if (anchor == null) return null;
-    return _dateWithReminderTime(
+    return _dateWithTime(
       DateTime(anchor.year, anchor.month, anchor.day + _intervalDays),
+      _reminderMinutesOfDay!,
+    );
+  }
+
+  DateTime? get nextAutoBackupAt {
+    if (!_autoEnabled || _autoMinutesOfDay == null) return null;
+    final anchor = _autoLastBackupAt ?? _autoEnabledAt;
+    if (anchor == null) return null;
+    return _dateWithTime(
+      DateTime(anchor.year, anchor.month, anchor.day + _autoIntervalDays),
+      _autoMinutesOfDay!,
     );
   }
 
@@ -58,6 +96,19 @@ class BackupReminderProvider extends ChangeNotifier {
     );
     _enabledAt = _parseDate(preferences.getString(_enabledAtKey));
     _lastBackupAt = _parseDate(preferences.getString(_lastBackupAtKey));
+
+    _autoEnabled = preferences.getBool(_autoEnabledKey) ?? false;
+    _autoIntervalDays = _normalizeIntervalDays(
+      preferences.getInt(_autoIntervalDaysKey) ?? 7,
+    );
+    _autoMinutesOfDay = _normalizeMinutesOfDay(
+      preferences.getInt(_autoMinutesOfDayKey),
+    );
+    _autoEnabledAt = _parseDate(preferences.getString(_autoEnabledAtKey));
+    _autoLastBackupAt = _parseDate(
+      preferences.getString(_autoLastBackupAtKey),
+    );
+
     _loaded = true;
     evaluateDue(DateTime.now(), notify: false);
     if (startTimer) _startTimer();
@@ -121,13 +172,89 @@ class BackupReminderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveAutoBackupSchedule({
+    required bool enabled,
+    required int intervalDays,
+    required int reminderMinutesOfDay,
+    DateTime? now,
+  }) async {
+    final normalizedInterval = _validateIntervalDays(intervalDays);
+    final normalizedMinutes = _validateMinutesOfDay(reminderMinutesOfDay);
+    final currentTime = now ?? DateTime.now();
+    final wasEnabled = _autoEnabled;
+
+    _autoEnabled = enabled;
+    _autoIntervalDays = normalizedInterval;
+    _autoMinutesOfDay = normalizedMinutes;
+    if (enabled && !wasEnabled) {
+      _autoEnabledAt = currentTime;
+    }
+
+    await _persistAuto();
+    notifyListeners();
+  }
+
+  Future<void> setAutoEnabled(bool value, {DateTime? now}) async {
+    if (value) {
+      final minutes = _autoMinutesOfDay;
+      if (minutes == null) {
+        throw StateError('Auto backup time must be selected before enabling.');
+      }
+      await saveAutoBackupSchedule(
+        enabled: true,
+        intervalDays: _autoIntervalDays,
+        reminderMinutesOfDay: minutes,
+        now: now,
+      );
+      return;
+    }
+
+    _autoEnabled = false;
+    await _persistAuto();
+    notifyListeners();
+  }
+
+  Future<void> recordAutoBackupCompleted({DateTime? now}) async {
+    _autoLastBackupAt = now ?? DateTime.now();
+    await _persistAuto();
+    notifyListeners();
+  }
+
   void evaluateDue(DateTime now, {bool notify = true}) {
     final next = nextReminderAt;
     final nextShouldShow =
         _enabled && !_snoozedForSession && next != null && !now.isBefore(next);
-    if (_shouldShowReminder == nextShouldShow) return;
-    _shouldShowReminder = nextShouldShow;
-    if (notify) notifyListeners();
+    if (_shouldShowReminder != nextShouldShow) {
+      _shouldShowReminder = nextShouldShow;
+      if (notify) notifyListeners();
+    }
+
+    _triggerAutoBackupIfDue(now);
+  }
+
+  void _triggerAutoBackupIfDue(DateTime now) {
+    if (!_autoEnabled || _autoMinutesOfDay == null) return;
+    if (_autoBackupInProgress) return;
+    final bp = backupProvider;
+    final cfg = webDavConfig;
+    if (bp == null || cfg == null) return;
+    if (cfg.url.trim().isEmpty) return;
+
+    final next = nextAutoBackupAt;
+    if (next == null) return;
+    if (now.isBefore(next)) return;
+
+    _autoBackupInProgress = true;
+    unawaited(() async {
+      try {
+        final success = await bp.silentBackup();
+        if (success) {
+          await recordAutoBackupCompleted(now: DateTime.now());
+        }
+      } finally {
+        _autoBackupInProgress = false;
+      }
+    }());
   }
 
   void snoozeForSession() {
@@ -155,6 +282,18 @@ class BackupReminderProvider extends ChangeNotifier {
     await _setDate(_lastBackupAtKey, _lastBackupAt);
   }
 
+  Future<void> _persistAuto() async {
+    await preferences.setBool(_autoEnabledKey, _autoEnabled);
+    await preferences.setInt(_autoIntervalDaysKey, _autoIntervalDays);
+    if (_autoMinutesOfDay == null) {
+      await preferences.remove(_autoMinutesOfDayKey);
+    } else {
+      await preferences.setInt(_autoMinutesOfDayKey, _autoMinutesOfDay!);
+    }
+    await _setDate(_autoEnabledAtKey, _autoEnabledAt);
+    await _setDate(_autoLastBackupAtKey, _autoLastBackupAt);
+  }
+
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(minutes: 1), (_) {
@@ -162,14 +301,13 @@ class BackupReminderProvider extends ChangeNotifier {
     });
   }
 
-  DateTime _dateWithReminderTime(DateTime date) {
-    final minutes = _reminderMinutesOfDay!;
+  DateTime _dateWithTime(DateTime date, int minutesOfDay) {
     return DateTime(
       date.year,
       date.month,
       date.day,
-      minutes ~/ 60,
-      minutes % 60,
+      minutesOfDay ~/ 60,
+      minutesOfDay % 60,
     );
   }
 

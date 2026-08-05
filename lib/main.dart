@@ -579,10 +579,6 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => MemoryProvider(preferences: businessPreferences),
         ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              BackupReminderProvider(preferences: businessPreferences),
-        ),
         // Desktop hotkeys provider
         ChangeNotifierProvider(create: (_) => HotkeyProvider()),
         ChangeNotifierProvider(
@@ -599,6 +595,13 @@ class MyApp extends StatelessWidget {
             businessRepository: databaseLease.businessRepository,
             businessPreferences: businessPreferences,
             initialConfig: ctx.read<SettingsProvider>().s3Config,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (ctx) => BackupReminderProvider(
+            preferences: businessPreferences,
+            backupProvider: ctx.read<BackupProvider>(),
+            webDavConfig: ctx.read<SettingsProvider>().webDavConfig,
           ),
         ),
       ],
