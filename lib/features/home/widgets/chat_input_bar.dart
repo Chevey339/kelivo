@@ -220,6 +220,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   static const double _imageRemoveButtonSize = 18;
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
+  Timer? _contextMenuResumeTimer;
   bool _isSubmitting = false;
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
@@ -487,28 +488,34 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // When app resumes from background, suppress context menu briefly to avoid flickering
     if (state == AppLifecycleState.resumed) {
-      _suppressContextMenu = true;
-      // Also unfocus to reset any stuck toolbar state
-      widget.focusNode?.unfocus();
-      // Re-enable context menu after a short delay
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          setState(() => _suppressContextMenu = false);
-        }
-      });
+      _suppressContextMenuForLifecycle(restoreAfterTransition: true);
     } else if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
-      // When going to background, hide any open toolbar
-      _suppressContextMenu = true;
-      widget.focusNode?.unfocus();
+      _suppressContextMenuForLifecycle(restoreAfterTransition: false);
     }
+  }
+
+  void _suppressContextMenuForLifecycle({
+    required bool restoreAfterTransition,
+  }) {
+    _contextMenuResumeTimer?.cancel();
+    _contextMenuResumeTimer = null;
+    _suppressContextMenu = true;
+    ContextMenuController.removeAny();
+    if (!restoreAfterTransition) return;
+    _contextMenuResumeTimer = Timer(const Duration(milliseconds: 300), () {
+      _contextMenuResumeTimer = null;
+      if (mounted) {
+        _suppressContextMenu = false;
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _contextMenuResumeTimer?.cancel();
     for (final timer in _repeatTimers.values) {
       try {
         timer?.cancel();
