@@ -471,20 +471,22 @@ Future<String> _openAIImagesResponseToMarkdown(
   final lines = <String>[];
   for (final item in data) {
     if (item is! Map) continue;
+    final b64 = (item['b64_json'] ?? '').toString().trim();
+    if (b64.isNotEmpty) {
+      final path = await AppDirectories.saveBase64Image(outputMime, b64);
+      if (path == null || path.isEmpty) {
+        throw const FileSystemException(
+          'Failed to save OpenAI Images API base64 image.',
+        );
+      }
+      lines.add('![image]($path)');
+      continue;
+    }
+
     final url = (item['url'] ?? '').toString().trim();
     if (url.isNotEmpty) {
       lines.add('![image]($url)');
-      continue;
     }
-    final b64 = (item['b64_json'] ?? '').toString().trim();
-    if (b64.isEmpty) continue;
-    final path = await AppDirectories.saveBase64Image(outputMime, b64);
-    if (path == null || path.isEmpty) {
-      throw const FileSystemException(
-        'Failed to save OpenAI Images API base64 image.',
-      );
-    }
-    lines.add('![image]($path)');
   }
   return lines.join('\n\n');
 }
