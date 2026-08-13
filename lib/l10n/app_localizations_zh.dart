@@ -662,6 +662,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageLanguageEnglishLabel => 'English';
 
   @override
+  String get displaySettingsPageLanguageKoreanLabel => '한국어';
+
+  @override
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
@@ -7766,6 +7769,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageLanguageEnglishLabel => 'English';
 
   @override
+  String get displaySettingsPageLanguageKoreanLabel => '한국어';
+
+  @override
   String get homePagePleaseSelectModel => '请先选择模型';
 
   @override
@@ -14794,6 +14800,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageLanguageEnglishLabel => 'English';
+
+  @override
+  String get displaySettingsPageLanguageKoreanLabel => '한국어';
 
   @override
   String get homePagePleaseSelectModel => '請先選擇模型';
