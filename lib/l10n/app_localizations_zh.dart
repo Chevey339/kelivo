@@ -1804,6 +1804,150 @@ class AppLocalizationsZh extends AppLocalizations {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get lanSyncTitle => '局域网同步';
+
+  @override
+  String get lanSyncSecurityNotice =>
+      '数据仅在同一局域网的设备间直接传输。共享使用临时私密链接，离开本页即停止。请只与可信设备共享。';
+
+  @override
+  String get lanSyncPairingCodeLabel => '配对码';
+
+  @override
+  String get lanSyncPairingCodeSendHint => '在另一台设备输入此数字，即可在局域网内找到本次共享。';
+
+  @override
+  String get lanSyncBroadcastUnavailable => '此设备无法使用局域网广播，仍可扫描二维码或使用链接。';
+
+  @override
+  String get lanSyncPairingCodeInputLabel => '6 位配对码';
+
+  @override
+  String get lanSyncPairingCodeInputHint => '输入发送设备显示的数字，Kelivo 将在局域网内查找该设备。';
+
+  @override
+  String get lanSyncFindDevice => '查找设备';
+
+  @override
+  String get lanSyncSearchingDevice => '正在查找…';
+
+  @override
+  String get lanSyncDeviceMatched => '设备匹配成功，现在可以接收并导入数据。';
+
+  @override
+  String get lanSyncOrUseLink => '或扫描/粘贴链接';
+
+  @override
+  String get lanSyncSendTitle => '发送本机数据';
+
+  @override
+  String get lanSyncSendDescription => '创建经过校验的备份，并在局域网内临时共享。';
+
+  @override
+  String get lanSyncStartShare => '开始共享';
+
+  @override
+  String get lanSyncPreparing => '正在准备数据…';
+
+  @override
+  String get lanSyncScanOnOtherDevice => '请在另一台设备打开“局域网同步”并扫描此二维码。';
+
+  @override
+  String get lanSyncCopyLink => '复制链接';
+
+  @override
+  String get lanSyncLinkCopied => '同步链接已复制';
+
+  @override
+  String lanSyncAlternateAddresses(String addresses) {
+    return '其他本地地址：$addresses';
+  }
+
+  @override
+  String get lanSyncWaiting => '正在等待另一台设备…';
+
+  @override
+  String lanSyncTransfersCompleted(int count) {
+    return '已完成传输：$count 次';
+  }
+
+  @override
+  String get lanSyncStopShare => '停止共享';
+
+  @override
+  String get lanSyncReceiveTitle => '接收数据';
+
+  @override
+  String get lanSyncReceiveDescription => '扫描或粘贴另一台 Kelivo 设备的链接，然后校验并导入数据。';
+
+  @override
+  String get lanSyncLinkLabel => '同步链接';
+
+  @override
+  String get lanSyncPasteLink => '粘贴链接';
+
+  @override
+  String get lanSyncScanQr => '扫描二维码';
+
+  @override
+  String get lanSyncImportMode => '导入模式';
+
+  @override
+  String get lanSyncReceiving => '正在接收并校验…';
+
+  @override
+  String get lanSyncReceiveAction => '接收并导入';
+
+  @override
+  String lanSyncReceivingProgress(String received, String total) {
+    return '已接收 $received / $total';
+  }
+
+  @override
+  String get lanSyncOverwriteConfirmTitle => '替换本机数据？';
+
+  @override
+  String get lanSyncOverwriteConfirmMessage =>
+      '覆盖模式会用接收的数据替换本机当前数据。除非另有备份，否则此操作无法撤销。';
+
+  @override
+  String get lanSyncContinue => '继续';
+
+  @override
+  String get lanSyncErrorNoLocalAddress =>
+      '未找到局域网地址。请将两台设备连接到同一 Wi-Fi 或局域网后重试。';
+
+  @override
+  String get lanSyncErrorInvalidLink => '这不是有效的 Kelivo 局域网同步链接。';
+
+  @override
+  String get lanSyncErrorNonLocalAddress => '为保障安全，局域网同步只接受私有局域网地址。';
+
+  @override
+  String get lanSyncErrorTimeout => '连接超时。请保持发送端共享页面开启，并确认两台设备位于同一网络。';
+
+  @override
+  String get lanSyncErrorConnectionFailed =>
+      '无法连接另一台设备。请保持其共享页面开启，并检查局域网或防火墙设置。';
+
+  @override
+  String get lanSyncErrorInvalidArchive => '传输的备份不完整或无效。';
+
+  @override
+  String get lanSyncErrorInvalidPairingCode => '请输入完整的 6 位配对码。';
+
+  @override
+  String get lanSyncErrorPairingNotFound =>
+      '未找到使用该配对码的设备。请保持发送页面开启，并确认两台设备位于同一局域网。';
+
+  @override
+  String get lanSyncErrorPairingRateLimited => '错误配对次数过多，请等待一分钟后重试。';
+
+  @override
+  String get lanSyncErrorDiscoveryUnavailable =>
+      '局域网发现不可用。请检查防火墙或本地网络权限，也可以改用二维码或链接。';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
@@ -8908,6 +9052,150 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get backupPageLocalBackup => '本地备份';
 
   @override
+  String get lanSyncTitle => '局域网同步';
+
+  @override
+  String get lanSyncSecurityNotice =>
+      '数据仅在同一局域网的设备间直接传输。共享使用临时私密链接，离开本页即停止。请只与可信设备共享。';
+
+  @override
+  String get lanSyncPairingCodeLabel => '配对码';
+
+  @override
+  String get lanSyncPairingCodeSendHint => '在另一台设备输入此数字，即可在局域网内找到本次共享。';
+
+  @override
+  String get lanSyncBroadcastUnavailable => '此设备无法使用局域网广播，仍可扫描二维码或使用链接。';
+
+  @override
+  String get lanSyncPairingCodeInputLabel => '6 位配对码';
+
+  @override
+  String get lanSyncPairingCodeInputHint => '输入发送设备显示的数字，Kelivo 将在局域网内查找该设备。';
+
+  @override
+  String get lanSyncFindDevice => '查找设备';
+
+  @override
+  String get lanSyncSearchingDevice => '正在查找…';
+
+  @override
+  String get lanSyncDeviceMatched => '设备匹配成功，现在可以接收并导入数据。';
+
+  @override
+  String get lanSyncOrUseLink => '或扫描/粘贴链接';
+
+  @override
+  String get lanSyncSendTitle => '发送本机数据';
+
+  @override
+  String get lanSyncSendDescription => '创建经过校验的备份，并在局域网内临时共享。';
+
+  @override
+  String get lanSyncStartShare => '开始共享';
+
+  @override
+  String get lanSyncPreparing => '正在准备数据…';
+
+  @override
+  String get lanSyncScanOnOtherDevice => '请在另一台设备打开“局域网同步”并扫描此二维码。';
+
+  @override
+  String get lanSyncCopyLink => '复制链接';
+
+  @override
+  String get lanSyncLinkCopied => '同步链接已复制';
+
+  @override
+  String lanSyncAlternateAddresses(String addresses) {
+    return '其他本地地址：$addresses';
+  }
+
+  @override
+  String get lanSyncWaiting => '正在等待另一台设备…';
+
+  @override
+  String lanSyncTransfersCompleted(int count) {
+    return '已完成传输：$count 次';
+  }
+
+  @override
+  String get lanSyncStopShare => '停止共享';
+
+  @override
+  String get lanSyncReceiveTitle => '接收数据';
+
+  @override
+  String get lanSyncReceiveDescription => '扫描或粘贴另一台 Kelivo 设备的链接，然后校验并导入数据。';
+
+  @override
+  String get lanSyncLinkLabel => '同步链接';
+
+  @override
+  String get lanSyncPasteLink => '粘贴链接';
+
+  @override
+  String get lanSyncScanQr => '扫描二维码';
+
+  @override
+  String get lanSyncImportMode => '导入模式';
+
+  @override
+  String get lanSyncReceiving => '正在接收并校验…';
+
+  @override
+  String get lanSyncReceiveAction => '接收并导入';
+
+  @override
+  String lanSyncReceivingProgress(String received, String total) {
+    return '已接收 $received / $total';
+  }
+
+  @override
+  String get lanSyncOverwriteConfirmTitle => '替换本机数据？';
+
+  @override
+  String get lanSyncOverwriteConfirmMessage =>
+      '覆盖模式会用接收的数据替换本机当前数据。除非另有备份，否则此操作无法撤销。';
+
+  @override
+  String get lanSyncContinue => '继续';
+
+  @override
+  String get lanSyncErrorNoLocalAddress =>
+      '未找到局域网地址。请将两台设备连接到同一 Wi-Fi 或局域网后重试。';
+
+  @override
+  String get lanSyncErrorInvalidLink => '这不是有效的 Kelivo 局域网同步链接。';
+
+  @override
+  String get lanSyncErrorNonLocalAddress => '为保障安全，局域网同步只接受私有局域网地址。';
+
+  @override
+  String get lanSyncErrorTimeout => '连接超时。请保持发送端共享页面开启，并确认两台设备位于同一网络。';
+
+  @override
+  String get lanSyncErrorConnectionFailed =>
+      '无法连接另一台设备。请保持其共享页面开启，并检查局域网或防火墙设置。';
+
+  @override
+  String get lanSyncErrorInvalidArchive => '传输的备份不完整或无效。';
+
+  @override
+  String get lanSyncErrorInvalidPairingCode => '请输入完整的 6 位配对码。';
+
+  @override
+  String get lanSyncErrorPairingNotFound =>
+      '未找到使用该配对码的设备。请保持发送页面开启，并确认两台设备位于同一局域网。';
+
+  @override
+  String get lanSyncErrorPairingRateLimited => '错误配对次数过多，请等待一分钟后重试。';
+
+  @override
+  String get lanSyncErrorDiscoveryUnavailable =>
+      '局域网发现不可用。请检查防火墙或本地网络权限，也可以改用二维码或链接。';
+
+  @override
   String get backupPageImportFromCherryStudio => '从 Cherry Studio 导入';
 
   @override
@@ -15936,6 +16224,150 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get backupPageLocalBackup => '本機備份';
+
+  @override
+  String get lanSyncTitle => '區域網路同步';
+
+  @override
+  String get lanSyncSecurityNotice =>
+      '資料僅在同一區域網路的裝置間直接傳輸。共享使用臨時私密連結，離開本頁即停止。請只與可信裝置共享。';
+
+  @override
+  String get lanSyncPairingCodeLabel => '配對碼';
+
+  @override
+  String get lanSyncPairingCodeSendHint => '在另一台裝置輸入此數字，即可在區域網路內找到本次共享。';
+
+  @override
+  String get lanSyncBroadcastUnavailable => '此裝置無法使用區域網路廣播，仍可掃描 QR Code 或使用連結。';
+
+  @override
+  String get lanSyncPairingCodeInputLabel => '6 位配對碼';
+
+  @override
+  String get lanSyncPairingCodeInputHint => '輸入傳送裝置顯示的數字，Kelivo 將在區域網路內尋找該裝置。';
+
+  @override
+  String get lanSyncFindDevice => '尋找裝置';
+
+  @override
+  String get lanSyncSearchingDevice => '正在尋找…';
+
+  @override
+  String get lanSyncDeviceMatched => '裝置配對成功，現在可以接收並匯入資料。';
+
+  @override
+  String get lanSyncOrUseLink => '或掃描/貼上連結';
+
+  @override
+  String get lanSyncSendTitle => '傳送本機資料';
+
+  @override
+  String get lanSyncSendDescription => '建立經過驗證的備份，並在區域網路內臨時共享。';
+
+  @override
+  String get lanSyncStartShare => '開始共享';
+
+  @override
+  String get lanSyncPreparing => '正在準備資料…';
+
+  @override
+  String get lanSyncScanOnOtherDevice => '請在另一台裝置開啟「區域網路同步」並掃描此 QR Code。';
+
+  @override
+  String get lanSyncCopyLink => '複製連結';
+
+  @override
+  String get lanSyncLinkCopied => '同步連結已複製';
+
+  @override
+  String lanSyncAlternateAddresses(String addresses) {
+    return '其他本機位址：$addresses';
+  }
+
+  @override
+  String get lanSyncWaiting => '正在等待另一台裝置…';
+
+  @override
+  String lanSyncTransfersCompleted(int count) {
+    return '已完成傳輸：$count 次';
+  }
+
+  @override
+  String get lanSyncStopShare => '停止共享';
+
+  @override
+  String get lanSyncReceiveTitle => '接收資料';
+
+  @override
+  String get lanSyncReceiveDescription => '掃描或貼上另一台 Kelivo 裝置的連結，然後驗證並匯入資料。';
+
+  @override
+  String get lanSyncLinkLabel => '同步連結';
+
+  @override
+  String get lanSyncPasteLink => '貼上連結';
+
+  @override
+  String get lanSyncScanQr => '掃描 QR Code';
+
+  @override
+  String get lanSyncImportMode => '匯入模式';
+
+  @override
+  String get lanSyncReceiving => '正在接收並驗證…';
+
+  @override
+  String get lanSyncReceiveAction => '接收並匯入';
+
+  @override
+  String lanSyncReceivingProgress(String received, String total) {
+    return '已接收 $received / $total';
+  }
+
+  @override
+  String get lanSyncOverwriteConfirmTitle => '取代本機資料？';
+
+  @override
+  String get lanSyncOverwriteConfirmMessage =>
+      '覆蓋模式會以接收的資料取代本機目前資料。除非另有備份，否則此操作無法復原。';
+
+  @override
+  String get lanSyncContinue => '繼續';
+
+  @override
+  String get lanSyncErrorNoLocalAddress =>
+      '找不到區域網路位址。請將兩台裝置連接到同一 Wi-Fi 或區域網路後重試。';
+
+  @override
+  String get lanSyncErrorInvalidLink => '這不是有效的 Kelivo 區域網路同步連結。';
+
+  @override
+  String get lanSyncErrorNonLocalAddress => '為保障安全，區域網路同步只接受私有區域網路位址。';
+
+  @override
+  String get lanSyncErrorTimeout => '連線逾時。請保持傳送端共享頁面開啟，並確認兩台裝置位於同一網路。';
+
+  @override
+  String get lanSyncErrorConnectionFailed =>
+      '無法連接另一台裝置。請保持其共享頁面開啟，並檢查區域網路或防火牆設定。';
+
+  @override
+  String get lanSyncErrorInvalidArchive => '傳輸的備份不完整或無效。';
+
+  @override
+  String get lanSyncErrorInvalidPairingCode => '請輸入完整的 6 位配對碼。';
+
+  @override
+  String get lanSyncErrorPairingNotFound =>
+      '找不到使用該配對碼的裝置。請保持傳送頁面開啟，並確認兩台裝置位於同一區域網路。';
+
+  @override
+  String get lanSyncErrorPairingRateLimited => '錯誤配對次數過多，請等待一分鐘後重試。';
+
+  @override
+  String get lanSyncErrorDiscoveryUnavailable =>
+      '區域網路探索不可用。請檢查防火牆或本機網路權限，也可以改用 QR Code 或連結。';
 
   @override
   String get backupPageImportFromCherryStudio => '從 Cherry Studio 匯入';

@@ -21,6 +21,7 @@ import '../../shared/widgets/snackbar.dart';
 import '../../features/backup/backup_restore_error_message.dart';
 import '../../features/backup/backup_restart_dialog.dart';
 import '../../features/backup/widgets/backup_reminder_helpers.dart';
+import '../../features/backup/pages/lan_sync_page.dart';
 import '../../utils/platform_utils.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
@@ -854,6 +855,14 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
             spacing: 6,
             runSpacing: 6,
             children: [
+              _DeskIosButton(
+                label: l10n.lanSyncTitle,
+                filled: false,
+                dense: true,
+                onTap: () => Navigator.of(
+                  context,
+                ).push(MaterialPageRoute(builder: (_) => const LanSyncPage())),
+              ),
               _DeskIosButton(
                 label: l10n.backupPageExportToFile,
                 filled: false,
