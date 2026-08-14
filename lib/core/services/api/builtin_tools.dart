@@ -205,7 +205,8 @@ abstract class BuiltInToolsHelper {
         m.startsWith('o4-mini') ||
         m == 'o3' ||
         m.startsWith('o3-') ||
-        m.startsWith('gpt-5');
+        m.startsWith('gpt-5') ||
+        m.startsWith('deepseek-v4-');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {

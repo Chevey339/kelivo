@@ -4,9 +4,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 
-ProviderConfig _deepSeekConfig(String baseUrl, {bool useResponseApi = false}) {
+ProviderConfig _deepSeekConfig(
+  String baseUrl, {
+  bool useResponseApi = false,
+  Map<String, dynamic> modelOverrides = const <String, dynamic>{},
+}) {
   return ProviderConfig(
     id: 'DeepSeekCompatTest',
     enabled: true,
@@ -15,6 +20,7 @@ ProviderConfig _deepSeekConfig(String baseUrl, {bool useResponseApi = false}) {
     baseUrl: baseUrl,
     providerType: ProviderKind.openai,
     useResponseApi: useResponseApi,
+    modelOverrides: modelOverrides,
   );
 }
 
@@ -410,5 +416,99 @@ void main() {
         expect(history[3]['reasoning_content'], 'summarize the tool result');
       },
     );
+
+    test(
+      'Responses API supports built-in search for the DeepSeek V4 family',
+      () {
+        for (final modelId in const [
+          'deepseek-v4-pro',
+          'deepseek-v4-flash',
+        ]) {
+          final modelOverrides = <String, dynamic>{
+            modelId: <String, dynamic>{
+              'builtInTools': const <String>[BuiltInToolNames.search],
+            },
+          };
+          final responsesConfig = _deepSeekConfig(
+            'https://api.deepseek.com/v1',
+            useResponseApi: true,
+            modelOverrides: modelOverrides,
+          );
+          final chatConfig = _deepSeekConfig(
+            'https://api.deepseek.com/v1',
+            modelOverrides: modelOverrides,
+          );
+
+          expect(
+            BuiltInToolsHelper.supportsBuiltInSearchForModel(
+              cfg: responsesConfig,
+              modelId: modelId,
+            ),
+            isTrue,
+            reason: modelId,
+          );
+          expect(
+            BuiltInToolsHelper.supportsBuiltInSearchForModel(
+              cfg: chatConfig,
+              modelId: modelId,
+            ),
+            isFalse,
+            reason: modelId,
+          );
+        }
+      },
+    );
+
+    test('Responses request injects web_search for DeepSeek V4', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      Map<String, dynamic>? requestBody;
+      server.listen((request) async {
+        requestBody =
+            jsonDecode(await utf8.decoder.bind(request).join())
+                as Map<String, dynamic>;
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'output_text': 'ok',
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _deepSeekConfig(
+          'http://${server.address.address}:${server.port}/v1',
+          useResponseApi: true,
+          modelOverrides: const <String, dynamic>{
+            'deepseek-v4-pro': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.search],
+            },
+          },
+        ),
+        modelId: 'deepseek-v4-pro',
+        messages: const [
+          {'role': 'user', 'content': 'search for the latest news'},
+        ],
+        stream: false,
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(requestBody, isNotNull);
+      expect(requestBody!['model'], 'deepseek-v4-pro');
+      expect(
+        requestBody!['tools'],
+        contains(
+          predicate<Map<String, dynamic>>(
+            (tool) => tool['type'] == 'web_search',
+          ),
+        ),
+      );
+    });
   });
 }
