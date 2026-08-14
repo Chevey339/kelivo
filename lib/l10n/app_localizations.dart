@@ -6115,6 +6115,18 @@ abstract class AppLocalizations {
   /// **'Enable OpenRouter web fetch server tool'**
   String get modelDetailSheetOpenrouterWebFetchToolDescription;
 
+  /// No description provided for @modelDetailSheetOpenrouterShellTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Shell'**
+  String get modelDetailSheetOpenrouterShellTool;
+
+  /// No description provided for @modelDetailSheetOpenrouterShellToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Run Shell commands in a hosted, isolated sandbox'**
+  String get modelDetailSheetOpenrouterShellToolDescription;
+
   /// No description provided for @modelDetailSheetOpenaiCodeInterpreterTool.
   ///
   /// In en, this message translates to:

@@ -1074,6 +1074,8 @@
   "modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint": "需要啟用 OpenAI Responses API。",
   "modelDetailSheetOpenrouterWebFetchTool": "網頁擷取",
   "modelDetailSheetOpenrouterWebFetchToolDescription": "啟用 OpenRouter 網頁擷取伺服器工具",
+  "modelDetailSheetOpenrouterShellTool": "Shell",
+  "modelDetailSheetOpenrouterShellToolDescription": "在託管的隔離沙箱中執行 Shell 命令",
   "modelDetailSheetOpenaiCodeInterpreterTool": "程式碼解譯器",
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "啟用程式碼解譯器工具（容器自動，記憶體上限 4g）",
   "modelDetailSheetOpenaiImageGenerationTool": "圖像生成",

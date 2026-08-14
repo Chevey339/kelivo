@@ -523,6 +523,13 @@ abstract class BuiltInToolsHelper {
       tools.add(tool);
     }
 
+    if (configured.contains(BuiltInToolNames.codeInterpreter)) {
+      add({
+        'type': 'code_interpreter',
+        'container': {'type': 'auto', 'memory_limit': '4g'},
+      });
+    }
+
     if (isOpenRouterProvider(cfg)) {
       const supported = <String>{
         BuiltInToolNames.search,
@@ -538,12 +545,6 @@ abstract class BuiltInToolsHelper {
       return BuiltInToolsRequestPayload(tools: tools);
     }
 
-    if (configured.contains(BuiltInToolNames.codeInterpreter)) {
-      add({
-        'type': 'code_interpreter',
-        'container': {'type': 'auto', 'memory_limit': '4g'},
-      });
-    }
     if (configured.contains(BuiltInToolNames.imageGeneration)) {
       add({'type': 'image_generation'});
     }
@@ -804,6 +805,7 @@ abstract class BuiltInToolsHelper {
       return <String>{
         BuiltInToolNames.webFetch,
         BuiltInToolNames.imageGeneration,
+        if (cfg.useResponseApi == true) BuiltInToolNames.codeInterpreter,
         if (cfg.useResponseApi == true) BuiltInToolNames.shell,
       };
     }
@@ -820,20 +822,9 @@ abstract class BuiltInToolsHelper {
   }) {
     final editable = modelSettingsToolNames(cfg);
     final result = BuiltInToolNames.parseAndNormalize(current);
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
-    if (kind == ProviderKind.openai) {
-      result.removeAll(const <String>{
-        BuiltInToolNames.codeInterpreter,
-        BuiltInToolNames.imageGeneration,
-        BuiltInToolNames.webFetch,
-        BuiltInToolNames.shell,
-      });
-    } else {
-      result.removeAll(editable);
-    }
+    // Only clear what this API mode can edit, so tools hidden by the current
+    // mode (e.g. OpenRouter code_interpreter on Chat Completions) survive a save.
+    result.removeAll(editable);
     result.addAll(
       selected.map(BuiltInToolNames.normalize).where(editable.contains),
     );

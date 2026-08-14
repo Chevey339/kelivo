@@ -43,6 +43,34 @@ Future<String> _saveResponsesImageGenerationMarkdown(
   return '\n![image]($uri)\n';
 }
 
+String _responsesImageGenerationSource(Map<dynamic, dynamic> item) {
+  for (final key in const <String>[
+    'imageUrl',
+    'image_url',
+    'imageB64',
+    'image_b64',
+    'result',
+  ]) {
+    final raw = item[key];
+    final value = raw is Map ? raw['url'] : raw;
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+  }
+  return '';
+}
+
+Future<String> _responsesImageGenerationMarkdown(
+  Map<dynamic, dynamic> item,
+) async {
+  final source = _responsesImageGenerationSource(item);
+  if (source.isEmpty) return '';
+  if (_isRemoteHttpUrl(source)) return '\n![image]($source)\n';
+  return _saveResponsesImageGenerationMarkdown(
+    source,
+    outputFormat: (item['output_format'] ?? item['outputFormat'] ?? '')
+        .toString(),
+  );
+}
+
 bool _isResponsesImageGenerationType(dynamic type) {
   return type == 'image_generation_call' ||
       type == 'openrouter:image_generation';
@@ -61,9 +89,25 @@ void _applyChatCompletionsBuiltInTools(
     upstreamModelId: upstreamModelId,
     configuredTools: configuredTools,
   );
-  body.addAll(payload.body);
+  for (final entry in payload.body.entries) {
+    body.putIfAbsent(entry.key, () => entry.value);
+  }
   for (final tool in payload.tools) {
     _appendChatTool(body, tool);
+  }
+  final migratesWebPlugin =
+      BuiltInToolsHelper.isOpenRouterProvider(config) &&
+      payload.tools.any((tool) => tool['type'] == 'openrouter:web_search');
+  if (migratesWebPlugin && body['plugins'] is List) {
+    final plugins = (body['plugins'] as List).where((plugin) {
+      return plugin is! Map ||
+          (plugin['id'] ?? '').toString().trim().toLowerCase() != 'web';
+    }).toList();
+    if (plugins.isEmpty) {
+      body.remove('plugins');
+    } else {
+      body['plugins'] = plugins;
+    }
   }
 }
 
@@ -1757,14 +1801,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     host: info.host,
   );
   if (config.useResponseApi != true) {
-    _applyChatCompletionsBuiltInTools(
-      body,
-      config: config,
-      modelId: modelId,
-      upstreamModelId: upstreamModelId,
-    );
-  }
-  if (config.useResponseApi != true) {
     formulaToolNames.addAll(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
     );
@@ -1779,6 +1815,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final extraBodyCfg = _customBody(config, modelId, assistantBody: extraBody);
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
+  }
+  if (config.useResponseApi != true) {
+    _applyChatCompletionsBuiltInTools(
+      body,
+      config: config,
+      modelId: modelId,
+      upstreamModelId: upstreamModelId,
+    );
   }
   _sanitizeOpenAIGpt5SamplingParams(
     body,
@@ -1826,14 +1870,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             for (final it in out) {
               if (it is! Map) continue;
               if (_isResponsesImageGenerationType(it['type'])) {
-                final b64 = (it['result'] ?? '').toString();
-                if (b64.isNotEmpty) {
-                  final mdImg = await _saveResponsesImageGenerationMarkdown(
-                    b64,
-                    outputFormat: (it['output_format'] ?? '').toString(),
-                  );
-                  if (mdImg.isNotEmpty) buf.write(mdImg);
-                }
+                final mdImg = await _responsesImageGenerationMarkdown(it);
+                if (mdImg.isNotEmpty) buf.write(mdImg);
                 continue;
               }
               if (!shouldReadOutputText) continue;
@@ -2255,12 +2293,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
 
             // Ask for usage in streaming (when supported)
-            _applyChatCompletionsBuiltInTools(
-              body2,
-              config: config,
-              modelId: modelId,
-              upstreamModelId: upstreamModelId,
-            );
             _maybeAddStreamingUsageOptions(
               body2,
               stream: true,
@@ -2272,6 +2304,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
+            _applyChatCompletionsBuiltInTools(
+              body2,
+              config: config,
+              modelId: modelId,
+              upstreamModelId: upstreamModelId,
+            );
 
             _sanitizeOpenAIGpt5SamplingParams(
               body2,
@@ -2652,9 +2690,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 };
               } else if (item is Map &&
                   _isResponsesImageGenerationType(item['type'])) {
-                responsesImagesByIndex.putIfAbsent(
-                  idx,
-                  () => const _ResponsesImageGenerationResult(),
+                responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
+                  source: _responsesImageGenerationSource(item),
+                  outputFormat:
+                      (item['output_format'] ?? item['outputFormat'] ?? '')
+                          .toString(),
                 );
               }
             } catch (_) {}
@@ -2664,7 +2704,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               if (b64.isNotEmpty) {
                 final idx = (json['output_index'] ?? 0) as int;
                 responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
-                  base64: b64,
+                  source: b64,
                   outputFormat: (json['output_format'] ?? '').toString(),
                 );
               }
@@ -2698,11 +2738,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 if (args.isNotEmpty) entry['args'] = args;
               } else if (item is Map &&
                   _isResponsesImageGenerationType(item['type'])) {
-                final b64 = (item['result'] ?? '').toString();
-                if (b64.isNotEmpty) {
+                final source = _responsesImageGenerationSource(item);
+                if (source.isNotEmpty) {
                   responsesImagesByIndex[idx] = _ResponsesImageGenerationResult(
-                    base64: b64,
-                    outputFormat: (item['output_format'] ?? '').toString(),
+                    source: source,
+                    outputFormat:
+                        (item['output_format'] ?? item['outputFormat'] ?? '')
+                            .toString(),
                   );
                 }
               }
@@ -2781,23 +2823,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                       }
                     }
                   } else if (_isResponsesImageGenerationType(it['type'])) {
-                    // Handle image generation output from OpenAI Responses API
-                    // it['result'] contains base64 image data or a data URL.
-                    final b64 = (it['result'] ?? '').toString();
-                    if (b64.isNotEmpty) {
+                    final mdImg = await _responsesImageGenerationMarkdown(it);
+                    if (mdImg.isNotEmpty) {
                       completedImageIndexes.add(outputIndex);
-                      final mdImg = await _saveResponsesImageGenerationMarkdown(
-                        b64,
-                        outputFormat: (it['output_format'] ?? '').toString(),
+                      yield ChatStreamChunk(
+                        content: mdImg,
+                        isDone: false,
+                        totalTokens: totalTokens,
+                        usage: usage,
                       );
-                      if (mdImg.isNotEmpty) {
-                        yield ChatStreamChunk(
-                          content: mdImg,
-                          isDone: false,
-                          totalTokens: totalTokens,
-                          usage: usage,
-                        );
-                      }
                     }
                   }
                 }
@@ -2808,11 +2842,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 for (final index in sortedIndexes) {
                   if (completedImageIndexes.contains(index)) continue;
                   final image = responsesImagesByIndex[index];
-                  if (image == null || image.base64.isEmpty) continue;
-                  final mdImg = await _saveResponsesImageGenerationMarkdown(
-                    image.base64,
-                    outputFormat: image.outputFormat,
-                  );
+                  if (image == null || image.source.isEmpty) continue;
+                  final mdImg = await _responsesImageGenerationMarkdown({
+                    'result': image.source,
+                    'output_format': image.outputFormat,
+                  });
                   if (mdImg.isNotEmpty) {
                     yield ChatStreamChunk(
                       content: mdImg,
@@ -3643,12 +3677,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               isReasoning: isReasoning,
               thinkingBudget: thinkingBudget,
             );
-            _applyChatCompletionsBuiltInTools(
-              body2,
-              config: config,
-              modelId: modelId,
-              upstreamModelId: upstreamModelId,
-            );
             _maybeAddStreamingUsageOptions(
               body2,
               stream: true,
@@ -3658,6 +3686,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             if (extraBodyCfg.isNotEmpty) {
               body2.addAll(extraBodyCfg);
             }
+            _applyChatCompletionsBuiltInTools(
+              body2,
+              config: config,
+              modelId: modelId,
+              upstreamModelId: upstreamModelId,
+            );
             _sanitizeOpenAIGpt5SamplingParams(
               body2,
               upstreamModelId,
@@ -4154,12 +4188,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isReasoning: isReasoning,
                   thinkingBudget: thinkingBudget,
                 );
-                _applyChatCompletionsBuiltInTools(
-                  body2,
-                  config: config,
-                  modelId: modelId,
-                  upstreamModelId: upstreamModelId,
-                );
                 _maybeAddStreamingUsageOptions(
                   body2,
                   stream: true,
@@ -4169,6 +4197,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 if (extraBodyCfg.isNotEmpty) {
                   body2.addAll(extraBodyCfg);
                 }
+                _applyChatCompletionsBuiltInTools(
+                  body2,
+                  config: config,
+                  modelId: modelId,
+                  upstreamModelId: upstreamModelId,
+                );
                 _sanitizeOpenAIGpt5SamplingParams(
                   body2,
                   upstreamModelId,

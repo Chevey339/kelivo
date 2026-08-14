@@ -945,7 +945,7 @@ void main() {
   });
 
   group('OpenAI Responses image generation', () {
-    test('renders OpenRouter image generation data URL', () async {
+    test('renders OpenRouter imageUrl and imageB64 outputs', () async {
       final tempDir = await Directory.systemTemp.createTemp(
         'kelivo_openrouter_responses_image_',
       );
@@ -975,8 +975,11 @@ void main() {
             'output': [
               {
                 'type': 'openrouter:image_generation',
-                'result':
-                    'data:image/png;base64,${base64Encode(const [1, 2, 3, 4])}',
+                'imageUrl': 'https://example.com/generated.png',
+              },
+              {
+                'type': 'openrouter:image_generation',
+                'imageB64': base64Encode(const [1, 2, 3, 4]),
               },
             ],
             'usage': {'input_tokens': 1, 'output_tokens': 1},
@@ -996,9 +999,13 @@ void main() {
 
       final content = chunks.map((chunk) => chunk.content).join();
       expect(content, contains('Done'));
-      final imageUri = RegExp(
+      expect(content, contains('![image](https://example.com/generated.png)'));
+      final imageUris = RegExp(
         r'!\[image\]\(([^)]+)\)',
-      ).firstMatch(content)!.group(1)!;
+      ).allMatches(content).map((match) => match.group(1)!).toList();
+      final imageUri = imageUris.singleWhere(
+        (uri) => uri.startsWith('kelivo-file:///'),
+      );
       expect(imageUri, startsWith('kelivo-file:///'));
       expect(imageUri.endsWith('.png'), isTrue);
       expect(
@@ -1098,6 +1105,54 @@ void main() {
       expect(imageUri.endsWith('.png'), isTrue);
       final imagePath = SandboxPathResolver.fix(imageUri);
       expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
+      expect(chunks.last.isDone, isTrue);
+    });
+
+    test('renders streamed OpenRouter result URL', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.output_item.done',
+            'item': {'id': 'ig_1', 'type': 'openrouter:image_generation', 'status': 'completed', 'result': 'https://example.com/streamed.png'},
+            'output_index': 0,
+          })}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.completed',
+            'response': {
+              'output': [],
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            },
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+        modelId: 'gpt-5.6-luna',
+        messages: const [
+          {'role': 'user', 'content': 'draw a skyline'},
+        ],
+      ).toList();
+
+      expect(
+        chunks.map((chunk) => chunk.content).join(),
+        contains('![image](https://example.com/streamed.png)'),
+      );
       expect(chunks.last.isDone, isTrue);
     });
   });

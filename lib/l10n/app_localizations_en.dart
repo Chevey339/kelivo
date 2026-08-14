@@ -3291,6 +3291,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable OpenRouter web fetch server tool';
 
   @override
+  String get modelDetailSheetOpenrouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenrouterShellToolDescription =>
+      'Run Shell commands in a hosted, isolated sandbox';
+
+  @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => 'Code Interpreter';
 
   @override

@@ -3170,6 +3170,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
+  String get modelDetailSheetOpenrouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenrouterShellToolDescription =>
+      '在托管的隔离沙箱中运行 Shell 命令';
+
+  @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '代码解释器';
 
   @override
@@ -10281,6 +10288,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
+  String get modelDetailSheetOpenrouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenrouterShellToolDescription =>
+      '在托管的隔离沙箱中运行 Shell 命令';
+
+  @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '代码解释器';
 
   @override
@@ -17315,6 +17329,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
+
+  @override
+  String get modelDetailSheetOpenrouterShellTool => 'Shell';
+
+  @override
+  String get modelDetailSheetOpenrouterShellToolDescription =>
+      '在託管的隔離沙箱中執行 Shell 命令';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '程式碼解譯器';

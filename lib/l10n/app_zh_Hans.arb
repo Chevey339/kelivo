@@ -1116,6 +1116,8 @@
   "modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint": "需要启用 OpenAI Responses API。",
   "modelDetailSheetOpenrouterWebFetchTool": "网页抓取",
   "modelDetailSheetOpenrouterWebFetchToolDescription": "启用 OpenRouter 网页抓取服务端工具",
+  "modelDetailSheetOpenrouterShellTool": "Shell",
+  "modelDetailSheetOpenrouterShellToolDescription": "在托管的隔离沙箱中运行 Shell 命令",
   "modelDetailSheetOpenaiCodeInterpreterTool": "代码解释器",
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "启用代码解释器工具（容器自动，内存上限 4g）",
   "modelDetailSheetOpenaiImageGenerationTool": "图像生成",

@@ -780,6 +780,15 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       ] else if (_providerKind == ProviderKind.openai) ...[
         if (isOpenRouter) ...[
           _ToolTile(
+            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
+            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
+            value: cfg.useResponseApi == true && _openaiCodeInterpreterTool,
+            onChanged: disableTools || cfg.useResponseApi != true
+                ? null
+                : (v) => setState(() => _openaiCodeInterpreterTool = v),
+          ),
+          const SizedBox(height: 8),
+          _ToolTile(
             title: l10n.modelDetailSheetOpenrouterWebFetchTool,
             desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
             value: _openrouterWebFetchTool,
@@ -798,8 +807,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
           ),
           const SizedBox(height: 8),
           _ToolTile(
-            title: l10n.modelDetailSheetCodeExecutionTool,
-            desc: l10n.modelDetailSheetCodeExecutionToolDescription,
+            title: l10n.modelDetailSheetOpenrouterShellTool,
+            desc: l10n.modelDetailSheetOpenrouterShellToolDescription,
             value: cfg.useResponseApi == true && _openrouterShellTool,
             onChanged: disableTools || cfg.useResponseApi != true
                 ? null
@@ -895,6 +904,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       }
     } else if (_providerKind == ProviderKind.openai) {
       if (BuiltInToolsHelper.isOpenRouterProvider(old)) {
+        if (old.useResponseApi == true && _openaiCodeInterpreterTool) {
+          selectedBuiltIns.add(BuiltInToolNames.codeInterpreter);
+        }
         if (_openaiImageGenerationTool) {
           selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
         }

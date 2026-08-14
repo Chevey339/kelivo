@@ -1432,6 +1432,8 @@
   "modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint": "Requires OpenAI Responses API.",
   "modelDetailSheetOpenrouterWebFetchTool": "Web Fetch",
   "modelDetailSheetOpenrouterWebFetchToolDescription": "Enable OpenRouter web fetch server tool",
+  "modelDetailSheetOpenrouterShellTool": "Shell",
+  "modelDetailSheetOpenrouterShellToolDescription": "Run Shell commands in a hosted, isolated sandbox",
   "modelDetailSheetOpenaiCodeInterpreterTool": "Code Interpreter",
   "modelDetailSheetOpenaiCodeInterpreterToolDescription": "Enable code interpreter tool (container auto, memory limit 4g)",
   "modelDetailSheetOpenaiImageGenerationTool": "Image Generation",

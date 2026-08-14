@@ -800,18 +800,6 @@ class ChatApiService {
               'reasoning_effort': effort,
           };
         }
-        if (config.useResponseApi != true) {
-          _applyChatCompletionsBuiltInTools(
-            body,
-            config: config,
-            modelId: modelId,
-            upstreamModelId: upstreamModelId,
-            configuredTools: _builtInTools(
-              config,
-              modelId,
-            ).where((name) => name == BuiltInToolNames.search),
-          );
-        }
         _applyOpenRouterClaudePromptCaching(
           body,
           config: config,
@@ -836,6 +824,18 @@ class ChatApiService {
         );
         final extra = _customBody(config, modelId, assistantBody: extraBody);
         if (extra.isNotEmpty) body.addAll(extra);
+        if (config.useResponseApi != true) {
+          _applyChatCompletionsBuiltInTools(
+            body,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            configuredTools: _builtInTools(
+              config,
+              modelId,
+            ).where((name) => name == BuiltInToolNames.search),
+          );
+        }
         // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
         if (config.useResponseApi != true) {
           _applyVendorReasoningKnobs(
@@ -1439,10 +1439,10 @@ class _GeminiSignatureMeta {
 }
 
 class _ResponsesImageGenerationResult {
-  final String base64;
+  final String source;
   final String? outputFormat;
 
-  const _ResponsesImageGenerationResult({this.base64 = '', this.outputFormat});
+  const _ResponsesImageGenerationResult({this.source = '', this.outputFormat});
 }
 
 class ChatStreamChunk {
