@@ -1992,7 +1992,8 @@ class SettingsProvider extends ChangeNotifier {
   String? _appLocaleTag; // 'system', 'zh_CN', 'zh_Hant', 'en_US'
   static String _readAppLocaleTag(BusinessPreferences preferences) {
     final value = preferences.get(_appLocaleKey);
-    return value is String && value.isNotEmpty ? value : 'system';
+    const supportedTags = {'system', 'zh_CN', 'zh_Hant', 'en_US'};
+    return value is String && supportedTags.contains(value) ? value : 'system';
   }
 
   Locale get appLocale => _parseLocaleTag(_appLocaleTag ?? 'en_US');

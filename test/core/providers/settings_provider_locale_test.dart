@@ -20,6 +20,8 @@ void main() {
 
   for (final testCase in <({String name, Object value})>[
     (name: 'empty string', value: ''),
+    (name: 'whitespace string', value: ' '),
+    (name: 'unknown string', value: 'fr_FR'),
     (name: 'non-string value', value: 1),
   ]) {
     test('follows the system before loading for ${testCase.name}', () async {
