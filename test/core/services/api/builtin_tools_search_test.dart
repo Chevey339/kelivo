@@ -24,7 +24,7 @@ ProviderConfig _cfg({
 }
 
 void main() {
-  group('DashScope Responses search whitelist 3.7/3.8', () {
+  group('Built-in search tools', () {
     test('enables 3.7 max/plus and 3.8-max-preview only', () {
       expect(
         BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
@@ -107,6 +107,72 @@ void main() {
           modelId: 'kimi-k3',
         ),
         isTrue,
+      );
+    });
+
+    test('Chat builder preserves provider-specific search formats', () {
+      final grok = _cfg(
+        baseUrl: 'https://api.x.ai/v1',
+        useResponseApi: false,
+        modelId: 'grok-4',
+      );
+      final dashScope = _cfg(
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        useResponseApi: false,
+        modelId: 'qwen-max-latest',
+      );
+      final mimo = _cfg(
+        baseUrl: 'https://api.xiaomimimo.com/v1',
+        useResponseApi: false,
+        modelId: 'mimo-v2.5-pro',
+      );
+      final zhipu = _cfg(
+        baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+        useResponseApi: false,
+        modelId: 'glm-5',
+      );
+
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: grok,
+          modelId: 'grok-4',
+          upstreamModelId: 'grok-4',
+        ).body['search_parameters'],
+        <String, dynamic>{'mode': 'auto', 'return_citations': true},
+      );
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: dashScope,
+          modelId: 'qwen-max-latest',
+          upstreamModelId: 'qwen-max-latest',
+        ).body['enable_search'],
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: mimo,
+          modelId: 'mimo-v2.5-pro',
+          upstreamModelId: 'mimo-v2.5-pro',
+        ).tools,
+        <Map<String, dynamic>>[
+          <String, dynamic>{'type': 'web_search'},
+        ],
+      );
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: zhipu,
+          modelId: 'glm-5',
+          upstreamModelId: 'glm-5',
+        ).tools,
+        <Map<String, dynamic>>[
+          <String, dynamic>{
+            'type': 'web_search',
+            'web_search': <String, dynamic>{
+              'enable': true,
+              'search_result': true,
+            },
+          },
+        ],
       );
     });
   });

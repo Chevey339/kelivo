@@ -6040,7 +6040,7 @@ abstract class AppLocalizations {
   /// No description provided for @modelDetailSheetBuiltinToolsDescription.
   ///
   /// In en, this message translates to:
-  /// **'Built-in tools only support official APIs.'**
+  /// **'Built-in tools depend on the provider and API mode.'**
   String get modelDetailSheetBuiltinToolsDescription;
 
   /// No description provided for @modelDetailSheetBuiltinToolsUnsupportedHint.
@@ -6102,6 +6102,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Requires OpenAI Responses API.'**
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint;
+
+  /// No description provided for @modelDetailSheetOpenrouterWebFetchTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Web Fetch'**
+  String get modelDetailSheetOpenrouterWebFetchTool;
+
+  /// No description provided for @modelDetailSheetOpenrouterWebFetchToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable OpenRouter web fetch server tool'**
+  String get modelDetailSheetOpenrouterWebFetchToolDescription;
 
   /// No description provided for @modelDetailSheetOpenaiCodeInterpreterTool.
   ///

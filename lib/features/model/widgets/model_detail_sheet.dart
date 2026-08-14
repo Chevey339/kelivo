@@ -117,6 +117,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   bool _googleYoutubeTool = false;
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
+  bool _openrouterWebFetchTool = false;
+  bool _openrouterShellTool = false;
 
   @override
   void initState() {
@@ -229,6 +231,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       _openaiImageGenerationTool = builtInSet.contains(
         BuiltInToolNames.imageGeneration,
       );
+      _openrouterWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _openrouterShellTool =
+          cfg.useResponseApi == true &&
+          builtInSet.contains(BuiltInToolNames.shell);
 
       final rawTools = ov['tools'];
       final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
@@ -692,6 +698,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
     final bool disableTools = _type == ModelType.embedding;
+    final bool isOpenRouter = BuiltInToolsHelper.isOpenRouterProvider(cfg);
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -738,7 +745,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
           ),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
-        if (cfg.useResponseApi != true)
+        if (!isOpenRouter && cfg.useResponseApi != true)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Text(
@@ -749,32 +756,64 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
               ),
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-            value: _openaiCodeInterpreterTool,
-            onChanged: disableTools
-                ? null
-                : ((cfg.useResponseApi == true)
-                      ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-                      : null),
+        if (isOpenRouter) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenrouterWebFetchTool,
+              desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
+              value: _openrouterWebFetchTool,
+              onChanged: disableTools
+                  ? null
+                  : (v) => setState(() => _openrouterWebFetchTool = v),
+            ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-            value: _openaiImageGenerationTool,
-            onChanged: disableTools
-                ? null
-                : ((cfg.useResponseApi == true)
-                      ? (v) => setState(() => _openaiImageGenerationTool = v)
-                      : null),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+              desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+              value: _openaiImageGenerationTool,
+              onChanged: disableTools
+                  ? null
+                  : (v) => setState(() => _openaiImageGenerationTool = v),
+            ),
           ),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetCodeExecutionTool,
+              desc: l10n.modelDetailSheetCodeExecutionToolDescription,
+              value: cfg.useResponseApi == true && _openrouterShellTool,
+              onChanged: disableTools || cfg.useResponseApi != true
+                  ? null
+                  : (v) => setState(() => _openrouterShellTool = v),
+            ),
+          ),
+        ] else ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
+              desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
+              value: _openaiCodeInterpreterTool,
+              onChanged: disableTools || cfg.useResponseApi != true
+                  ? null
+                  : (v) => setState(() => _openaiCodeInterpreterTool = v),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: _ToolTile(
+              title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+              desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+              value: _openaiImageGenerationTool,
+              onChanged: disableTools || cfg.useResponseApi != true
+                  ? null
+                  : (v) => setState(() => _openaiImageGenerationTool = v),
+            ),
+          ),
+        ],
       ] else
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -865,28 +904,42 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     final prev = (prevKey.isNotEmpty && ov[prevKey] is Map)
         ? (ov[prevKey] as Map).cast<String, dynamic>()
         : const <String, dynamic>{};
-    final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
+    final selectedBuiltIns = <String>{};
     if (_providerKind == ProviderKind.google) {
-      builtInSet.remove(BuiltInToolNames.urlContext);
-      builtInSet.remove(BuiltInToolNames.codeExecution);
-      builtInSet.remove(BuiltInToolNames.youtube);
-      if (_googleUrlContextTool) builtInSet.add(BuiltInToolNames.urlContext);
+      if (_googleUrlContextTool) {
+        selectedBuiltIns.add(BuiltInToolNames.urlContext);
+      }
       if (_googleCodeExecutionTool) {
-        builtInSet.add(BuiltInToolNames.codeExecution);
+        selectedBuiltIns.add(BuiltInToolNames.codeExecution);
       }
       if (_googleYoutubeTool) {
-        builtInSet.add(BuiltInToolNames.youtube);
+        selectedBuiltIns.add(BuiltInToolNames.youtube);
       }
     } else if (_providerKind == ProviderKind.openai) {
-      builtInSet.remove(BuiltInToolNames.codeInterpreter);
-      builtInSet.remove(BuiltInToolNames.imageGeneration);
-      if (_openaiCodeInterpreterTool) {
-        builtInSet.add(BuiltInToolNames.codeInterpreter);
-      }
-      if (_openaiImageGenerationTool) {
-        builtInSet.add(BuiltInToolNames.imageGeneration);
+      if (BuiltInToolsHelper.isOpenRouterProvider(old)) {
+        if (_openaiImageGenerationTool) {
+          selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
+        }
+        if (_openrouterWebFetchTool) {
+          selectedBuiltIns.add(BuiltInToolNames.webFetch);
+        }
+        if (old.useResponseApi == true && _openrouterShellTool) {
+          selectedBuiltIns.add(BuiltInToolNames.shell);
+        }
+      } else {
+        if (_openaiCodeInterpreterTool) {
+          selectedBuiltIns.add(BuiltInToolNames.codeInterpreter);
+        }
+        if (_openaiImageGenerationTool) {
+          selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
+        }
       }
     }
+    final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(
+      cfg: old,
+      current: BuiltInToolNames.parseAndNormalize(prev['builtInTools']),
+      selected: selectedBuiltIns,
+    );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
     // Decide which logical key to use for this instance
     final String key = (prevKey.isEmpty || widget.isNew)

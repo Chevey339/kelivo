@@ -48,76 +48,22 @@ bool _isResponsesImageGenerationType(dynamic type) {
       type == 'openrouter:image_generation';
 }
 
-void _applyCompatibleBuiltInSearch(
+void _applyChatCompletionsBuiltInTools(
   Map<String, dynamic> body, {
   required ProviderConfig config,
   required String modelId,
   required String upstreamModelId,
+  Iterable<String>? configuredTools,
 }) {
-  final builtIns = _builtInTools(config, modelId);
-  if (!builtIns.contains(BuiltInToolNames.search)) return;
-
-  if (BuiltInToolsHelper.isOpenRouterProvider(config)) {
-    if (config.useResponseApi == true) return;
-    final plugins = <Map<String, dynamic>>[];
-    final existingPlugins = body['plugins'];
-    if (existingPlugins is List) {
-      for (final plugin in existingPlugins) {
-        if (plugin is Map) {
-          plugins.add(plugin.cast<String, dynamic>());
-        }
-      }
-    }
-    final hasWebPlugin = plugins.any(
-      (plugin) => (plugin['id'] ?? '').toString() == 'web',
-    );
-    if (!hasWebPlugin) {
-      plugins.add({'id': 'web'});
-    }
-    body['plugins'] = plugins;
-    return;
-  }
-
-  if (BuiltInToolsHelper.isGrokModel(upstreamModelId)) {
-    body['search_parameters'] = {'mode': 'auto', 'return_citations': true};
-    return;
-  }
-
-  if (config.useResponseApi == true) return;
-
-  if (BuiltInToolsHelper.isDashScopeProvider(config)) {
-    if (!BuiltInToolsHelper.isDashScopeChatBuiltInSearchSupportedModel(
-      upstreamModelId,
-    )) {
-      return;
-    }
-    body['enable_search'] = true;
-    final options = BuiltInToolsHelper.dashScopeSearchOptionsFromOverride(
-      config.modelOverrides[modelId],
-    );
-    if (options.isNotEmpty) {
-      body['search_options'] = options;
-    } else {
-      body.remove('search_options');
-    }
-    return;
-  }
-
-  // MiMo: native chat Completions `web_search` tool (+ optional web_search_usage).
-  if (BuiltInToolsHelper.isMimoProvider(config) &&
-      BuiltInToolsHelper.isMimoBuiltInSearchSupportedModel(upstreamModelId)) {
-    _appendChatTool(body, {'type': 'web_search'});
-    return;
-  }
-
-  // GLM / Zhipu: native chat web_search tool structure.
-  if (BuiltInToolsHelper.isZhipuProvider(config) &&
-      BuiltInToolsHelper.isGlmBuiltInSearchSupportedModel(upstreamModelId)) {
-    _appendChatTool(body, {
-      'type': 'web_search',
-      'web_search': {'enable': true, 'search_result': true},
-    });
-    return;
+  final payload = BuiltInToolsHelper.buildChatCompletionsTools(
+    cfg: config,
+    modelId: modelId,
+    upstreamModelId: upstreamModelId,
+    configuredTools: configuredTools,
+  );
+  body.addAll(payload.body);
+  for (final tool in payload.tools) {
+    _appendChatTool(body, tool);
   }
 }
 
@@ -1405,7 +1351,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     final input = <Map<String, dynamic>>[];
     // Extract system messages into `instructions` (Responses API best practice)
     String instructions = '';
-    // Prepare tools list for Responses path (may be augmented with built-in web search)
+    // Prepare tools list for Responses path (may be augmented with built-ins).
     final List<Map<String, dynamic>> toolList = [];
     if (tools != null && tools.isNotEmpty) {
       for (final t in tools) {
@@ -1413,7 +1359,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       }
     }
 
-    final builtIns = _builtInTools(config, modelId);
     void addResponsesBuiltInTool(Map<String, dynamic> entry) {
       final type = (entry['type'] ?? '').toString();
       if (type.isEmpty) return;
@@ -1421,81 +1366,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       if (!exists) toolList.add(entry);
     }
 
-    // OpenAI built-in tools (Responses API)
-    if (builtIns.contains(BuiltInToolNames.codeInterpreter)) {
-      addResponsesBuiltInTool({
-        'type': 'code_interpreter',
-        'container': {'type': 'auto', 'memory_limit': '4g'},
-      });
-    }
-    if (builtIns.contains(BuiltInToolNames.imageGeneration)) {
-      addResponsesBuiltInTool({'type': 'image_generation'});
-    }
-
-    // Built-in web search for Responses API when enabled on supported models
-    bool isResponsesWebSearchSupported(String id) {
-      if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(id)) {
-        return true;
-      }
-      if (BuiltInToolsHelper.isDashScopeProvider(config)) {
-        return BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-          id,
-        );
-      }
-      if (BuiltInToolsHelper.isArkProvider(config)) {
-        return BuiltInToolsHelper.isDoubaoResponsesBuiltInSearchSupportedModel(
-          id,
-        );
-      }
-      return false;
-    }
-
-    if (isResponsesWebSearchSupported(upstreamModelId)) {
-      if (builtIns.contains(BuiltInToolNames.search)) {
-        if (BuiltInToolsHelper.isDashScopeProvider(config) ||
-            BuiltInToolsHelper.isArkProvider(config)) {
-          addResponsesBuiltInTool({'type': 'web_search'});
-        } else {
-          // Optional per-model configuration under modelOverrides[modelId]['webSearch']
-          Map<String, dynamic> ws = const <String, dynamic>{};
-          try {
-            final ov = config.modelOverrides[modelId];
-            if (ov is Map && ov['webSearch'] is Map) {
-              ws = (ov['webSearch'] as Map).cast<String, dynamic>();
-            }
-          } catch (_) {}
-          final usePreview =
-              (ws['preview'] == true) ||
-              ((ws['tool'] ?? '').toString() == 'preview');
-          final entry = <String, dynamic>{
-            'type': usePreview ? 'web_search_preview' : 'web_search',
-          };
-          // Domain filters
-          if (ws['allowed_domains'] is List &&
-              (ws['allowed_domains'] as List).isNotEmpty) {
-            entry['filters'] = {
-              'allowed_domains': List<String>.from(
-                (ws['allowed_domains'] as List).map((e) => e.toString()),
-              ),
-            };
-          }
-          // User location
-          if (ws['user_location'] is Map) {
-            entry['user_location'] = (ws['user_location'] as Map)
-                .cast<String, dynamic>();
-          }
-          // Search context size (preview tool only)
-          if (usePreview && ws['search_context_size'] is String) {
-            entry['search_context_size'] = ws['search_context_size'];
-          }
-          addResponsesBuiltInTool(entry);
-          // Optionally request sources in output
-          if (ws['include_sources'] == true) {
-            // Merge/append include array
-            // We'll add this after input loop when building body
-          }
-        }
-      }
+    final builtInPayload = BuiltInToolsHelper.buildResponsesTools(
+      cfg: config,
+      modelId: modelId,
+      upstreamModelId: upstreamModelId,
+    );
+    for (final tool in builtInPayload.tools) {
+      addResponsesBuiltInTool(tool);
     }
     // Collect assistant images to attach to the last user message.
     // Use last *user* index so tool follow-ups still receive stashed media.
@@ -1758,6 +1635,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       'model': upstreamModelId,
       'input': input,
       'stream': stream,
+      ...builtInPayload.body,
       if (instructions.isNotEmpty) 'instructions': instructions,
       if (temperature != null) 'temperature': temperature,
       if (topP != null) 'top_p': topP,
@@ -1778,8 +1656,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       isReasoning: isReasoning,
       thinkingBudget: thinkingBudget,
     );
-    // Append include parameter if we opted into sources via overrides
-    if (!BuiltInToolsHelper.isDashScopeProvider(config)) {
+    // OpenAI-compatible native search can optionally expose source details.
+    if (!BuiltInToolsHelper.isDashScopeProvider(config) &&
+        !BuiltInToolsHelper.isOpenRouterProvider(config)) {
       try {
         final ov = config.modelOverrides[modelId];
         final ws = (ov is Map ? ov['webSearch'] : null);
@@ -1877,12 +1756,14 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
     config: config,
     host: info.host,
   );
-  _applyCompatibleBuiltInSearch(
-    body,
-    config: config,
-    modelId: modelId,
-    upstreamModelId: upstreamModelId,
-  );
+  if (config.useResponseApi != true) {
+    _applyChatCompletionsBuiltInTools(
+      body,
+      config: config,
+      modelId: modelId,
+      upstreamModelId: upstreamModelId,
+    );
+  }
   if (config.useResponseApi != true) {
     formulaToolNames.addAll(
       KimiFormulaSearch.mergeTools(body, kimiFormulaTools),
@@ -2374,7 +2255,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
 
             // Ask for usage in streaming (when supported)
-            _applyCompatibleBuiltInSearch(
+            _applyChatCompletionsBuiltInTools(
               body2,
               config: config,
               modelId: modelId,
@@ -3762,7 +3643,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               isReasoning: isReasoning,
               thinkingBudget: thinkingBudget,
             );
-            _applyCompatibleBuiltInSearch(
+            _applyChatCompletionsBuiltInTools(
               body2,
               config: config,
               modelId: modelId,
@@ -4273,7 +4154,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   isReasoning: isReasoning,
                   thinkingBudget: thinkingBudget,
                 );
-                _applyCompatibleBuiltInSearch(
+                _applyChatCompletionsBuiltInTools(
                   body2,
                   config: config,
                   modelId: modelId,

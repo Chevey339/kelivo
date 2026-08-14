@@ -763,72 +763,23 @@ class ChatApiService {
           upstreamModelId: upstreamModelId,
         );
         if (config.useResponseApi == true) {
-          // Inject built-in web_search tool when enabled and supported
-          final toolsList = <Map<String, dynamic>>[];
-          bool isResponsesWebSearchSupported(String id) {
-            if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
-              id,
-            )) {
-              return true;
-            }
-            if (BuiltInToolsHelper.isDashScopeProvider(config)) {
-              return BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            if (BuiltInToolsHelper.isArkProvider(config)) {
-              return BuiltInToolsHelper.isDoubaoResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            return false;
-          }
-
-          if (isResponsesWebSearchSupported(upstreamModelId)) {
-            final builtIns = _builtInTools(config, modelId);
-            if (builtIns.contains(BuiltInToolNames.search)) {
-              if (BuiltInToolsHelper.isDashScopeProvider(config) ||
-                  BuiltInToolsHelper.isArkProvider(config)) {
-                toolsList.add({'type': 'web_search'});
-              } else {
-                Map<String, dynamic> ws = const <String, dynamic>{};
-                try {
-                  final ov = config.modelOverrides[modelId];
-                  if (ov is Map && ov['webSearch'] is Map) {
-                    ws = (ov['webSearch'] as Map).cast<String, dynamic>();
-                  }
-                } catch (_) {}
-                final usePreview =
-                    (ws['preview'] == true) ||
-                    ((ws['tool'] ?? '').toString() == 'preview');
-                final entry = <String, dynamic>{
-                  'type': usePreview ? 'web_search_preview' : 'web_search',
-                };
-                if (ws['allowed_domains'] is List &&
-                    (ws['allowed_domains'] as List).isNotEmpty) {
-                  entry['filters'] = {
-                    'allowed_domains': List<String>.from(
-                      (ws['allowed_domains'] as List).map((e) => e.toString()),
-                    ),
-                  };
-                }
-                if (ws['user_location'] is Map) {
-                  entry['user_location'] = (ws['user_location'] as Map)
-                      .cast<String, dynamic>();
-                }
-                if (usePreview && ws['search_context_size'] is String) {
-                  entry['search_context_size'] = ws['search_context_size'];
-                }
-                toolsList.add(entry);
-              }
-            }
-          }
+          final builtInPayload = BuiltInToolsHelper.buildResponsesTools(
+            cfg: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            configuredTools: _builtInTools(
+              config,
+              modelId,
+            ).where((name) => name == BuiltInToolNames.search),
+          );
+          final toolsList = builtInPayload.tools;
           body = {
             'model': upstreamModelId,
             'stream': false,
             'input': [
               {'role': 'user', 'content': safePrompt},
             ],
+            ...builtInPayload.body,
             if (toolsList.isNotEmpty)
               'tools': _toResponsesToolsFormat(toolsList),
             if (toolsList.isNotEmpty) 'tool_choice': 'auto',
@@ -849,12 +800,18 @@ class ChatApiService {
               'reasoning_effort': effort,
           };
         }
-        _applyCompatibleBuiltInSearch(
-          body,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-        );
+        if (config.useResponseApi != true) {
+          _applyChatCompletionsBuiltInTools(
+            body,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            configuredTools: _builtInTools(
+              config,
+              modelId,
+            ).where((name) => name == BuiltInToolNames.search),
+          );
+        }
         _applyOpenRouterClaudePromptCaching(
           body,
           config: config,

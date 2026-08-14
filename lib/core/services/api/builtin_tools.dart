@@ -1,10 +1,24 @@
 import '../../providers/settings_provider.dart';
 
+class BuiltInToolsRequestPayload {
+  final List<Map<String, dynamic>> tools;
+  final Map<String, dynamic> body;
+
+  const BuiltInToolsRequestPayload({
+    this.tools = const <Map<String, dynamic>>[],
+    this.body = const <String, dynamic>{},
+  });
+}
+
 /// Built-in tool name constants for API integrations.
 /// Use these constants instead of raw strings to ensure consistency.
 abstract class BuiltInToolNames {
   // Common
   static const search = 'search';
+
+  // OpenRouter server tools
+  static const webFetch = 'web_fetch';
+  static const shell = 'shell';
 
   // Google/Gemini specific
   static const urlContext = 'url_context';
@@ -28,6 +42,8 @@ abstract class BuiltInToolNames {
         return codeInterpreter;
       case 'imagegeneration':
         return imageGeneration;
+      case 'webfetch':
+        return webFetch;
       default:
         return lower;
     }
@@ -82,6 +98,8 @@ abstract class BuiltInToolNames {
       BuiltInToolNames.youtube,
       BuiltInToolNames.codeInterpreter,
       BuiltInToolNames.imageGeneration,
+      BuiltInToolNames.webFetch,
+      BuiltInToolNames.shell,
     ];
     final out = <String>[
       for (final k in preferredOrder)
@@ -214,6 +232,24 @@ abstract class BuiltInToolsHelper {
     final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
     final providerId = cfg.id.toLowerCase();
     return host.contains('openrouter.ai') || providerId.contains('openrouter');
+  }
+
+  static Map<String, dynamic>? _openRouterServerTool(String toolName) {
+    switch (BuiltInToolNames.normalize(toolName)) {
+      case BuiltInToolNames.search:
+        return {'type': 'openrouter:web_search'};
+      case BuiltInToolNames.webFetch:
+        return {'type': 'openrouter:web_fetch'};
+      case BuiltInToolNames.imageGeneration:
+        return {'type': 'openrouter:image_generation'};
+      case BuiltInToolNames.shell:
+        return {
+          'type': 'openrouter:shell',
+          'parameters': {'engine': 'openrouter'},
+        };
+      default:
+        return null;
+    }
   }
 
   static bool isDeepSeekProvider(ProviderConfig? cfg) {
@@ -417,7 +453,7 @@ abstract class BuiltInToolsHelper {
         return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
         if (isOpenRouterProvider(cfg)) {
-          return cfg.useResponseApi != true;
+          return true;
         }
         if (isGrokModel(upstreamModelId)) return true;
         if (cfg.useResponseApi == true) {
@@ -450,6 +486,179 @@ abstract class BuiltInToolsHelper {
         }
         return false;
     }
+  }
+
+  static Set<String> _configuredTools(
+    ProviderConfig cfg,
+    String modelId,
+    Iterable<String>? override,
+  ) {
+    return override == null
+        ? BuiltInToolNames.parseFromOverride(cfg.modelOverrides[modelId])
+        : BuiltInToolNames.parseAndNormalize(override);
+  }
+
+  /// Builds provider-native tools and top-level fields for a Responses request.
+  static BuiltInToolsRequestPayload buildResponsesTools({
+    required ProviderConfig cfg,
+    required String modelId,
+    required String upstreamModelId,
+    Iterable<String>? configuredTools,
+  }) {
+    final configured = _configuredTools(cfg, modelId, configuredTools);
+    final tools = <Map<String, dynamic>>[];
+    final body = <String, dynamic>{};
+
+    void add(Map<String, dynamic> tool) {
+      final type = (tool['type'] ?? '').toString();
+      if (type.isEmpty || tools.any((item) => item['type'] == type)) return;
+      tools.add(tool);
+    }
+
+    if (isOpenRouterProvider(cfg)) {
+      const supported = <String>{
+        BuiltInToolNames.search,
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.imageGeneration,
+        BuiltInToolNames.shell,
+      };
+      for (final name in configured) {
+        if (!supported.contains(name)) continue;
+        final tool = _openRouterServerTool(name);
+        if (tool != null) add(tool);
+      }
+      return BuiltInToolsRequestPayload(tools: tools);
+    }
+
+    if (configured.contains(BuiltInToolNames.codeInterpreter)) {
+      add({
+        'type': 'code_interpreter',
+        'container': {'type': 'auto', 'memory_limit': '4g'},
+      });
+    }
+    if (configured.contains(BuiltInToolNames.imageGeneration)) {
+      add({'type': 'image_generation'});
+    }
+    if (!configured.contains(BuiltInToolNames.search)) {
+      return BuiltInToolsRequestPayload(tools: tools);
+    }
+    if (isGrokModel(upstreamModelId)) {
+      body['search_parameters'] = {'mode': 'auto', 'return_citations': true};
+      return BuiltInToolsRequestPayload(tools: tools, body: body);
+    }
+
+    final supportsSearch =
+        isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId) ||
+        (isDashScopeProvider(cfg) &&
+            isDashScopeResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
+        (isArkProvider(cfg) &&
+            isDoubaoResponsesBuiltInSearchSupportedModel(upstreamModelId));
+    if (!supportsSearch) return BuiltInToolsRequestPayload(tools: tools);
+    if (isDashScopeProvider(cfg) || isArkProvider(cfg)) {
+      add({'type': 'web_search'});
+      return BuiltInToolsRequestPayload(tools: tools);
+    }
+
+    final rawOverride = cfg.modelOverrides[modelId];
+    final override = rawOverride is Map ? rawOverride : null;
+    final rawSearch = override?['webSearch'];
+    final search = rawSearch is Map
+        ? rawSearch.cast<String, dynamic>()
+        : const <String, dynamic>{};
+    final usePreview =
+        search['preview'] == true ||
+        (search['tool'] ?? '').toString() == 'preview';
+    final tool = <String, dynamic>{
+      'type': usePreview ? 'web_search_preview' : 'web_search',
+    };
+    final allowedDomains = search['allowed_domains'];
+    if (allowedDomains is List && allowedDomains.isNotEmpty) {
+      tool['filters'] = {
+        'allowed_domains': List<String>.from(
+          allowedDomains.map((value) => value.toString()),
+        ),
+      };
+    }
+    if (search['user_location'] is Map) {
+      tool['user_location'] = (search['user_location'] as Map)
+          .cast<String, dynamic>();
+    }
+    if (usePreview && search['search_context_size'] is String) {
+      tool['search_context_size'] = search['search_context_size'];
+    }
+    add(tool);
+    return BuiltInToolsRequestPayload(tools: tools);
+  }
+
+  /// Builds provider-native tools and top-level fields for Chat Completions.
+  static BuiltInToolsRequestPayload buildChatCompletionsTools({
+    required ProviderConfig cfg,
+    required String modelId,
+    required String upstreamModelId,
+    Iterable<String>? configuredTools,
+  }) {
+    final configured = _configuredTools(cfg, modelId, configuredTools);
+    if (isOpenRouterProvider(cfg)) {
+      const supported = <String>{
+        BuiltInToolNames.search,
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.imageGeneration,
+      };
+      return BuiltInToolsRequestPayload(
+        tools: <Map<String, dynamic>>[
+          for (final name in configured)
+            if (supported.contains(name)) _openRouterServerTool(name)!,
+        ],
+      );
+    }
+    if (!configured.contains(BuiltInToolNames.search)) {
+      return const BuiltInToolsRequestPayload();
+    }
+    if (isGrokModel(upstreamModelId)) {
+      return const BuiltInToolsRequestPayload(
+        body: <String, dynamic>{
+          'search_parameters': <String, dynamic>{
+            'mode': 'auto',
+            'return_citations': true,
+          },
+        },
+      );
+    }
+    if (isDashScopeProvider(cfg) &&
+        isDashScopeChatBuiltInSearchSupportedModel(upstreamModelId)) {
+      final options = dashScopeSearchOptionsFromOverride(
+        cfg.modelOverrides[modelId],
+      );
+      return BuiltInToolsRequestPayload(
+        body: <String, dynamic>{
+          'enable_search': true,
+          if (options.isNotEmpty) 'search_options': options,
+        },
+      );
+    }
+    if (isMimoProvider(cfg) &&
+        isMimoBuiltInSearchSupportedModel(upstreamModelId)) {
+      return const BuiltInToolsRequestPayload(
+        tools: <Map<String, dynamic>>[
+          <String, dynamic>{'type': 'web_search'},
+        ],
+      );
+    }
+    if (isZhipuProvider(cfg) &&
+        isGlmBuiltInSearchSupportedModel(upstreamModelId)) {
+      return const BuiltInToolsRequestPayload(
+        tools: <Map<String, dynamic>>[
+          <String, dynamic>{
+            'type': 'web_search',
+            'web_search': <String, dynamic>{
+              'enable': true,
+              'search_result': true,
+            },
+          },
+        ],
+      );
+    }
+    return const BuiltInToolsRequestPayload();
   }
 
   static bool isBuiltInSearchEnabled({
@@ -566,6 +775,61 @@ abstract class BuiltInToolsHelper {
     return kind == ProviderKind.google || kind == ProviderKind.openai;
   }
 
+  /// Tool names edited in a model's built-in tools tab. Search is excluded
+  /// because it is controlled from the chat search switch.
+  static Set<String> modelSettingsToolNames(ProviderConfig cfg) {
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind == ProviderKind.google) {
+      return const <String>{
+        BuiltInToolNames.urlContext,
+        BuiltInToolNames.codeExecution,
+        BuiltInToolNames.youtube,
+      };
+    }
+    if (kind != ProviderKind.openai) return const <String>{};
+    if (isOpenRouterProvider(cfg)) {
+      return <String>{
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.imageGeneration,
+        if (cfg.useResponseApi == true) BuiltInToolNames.shell,
+      };
+    }
+    return const <String>{
+      BuiltInToolNames.codeInterpreter,
+      BuiltInToolNames.imageGeneration,
+    };
+  }
+
+  static Set<String> replaceModelSettingsTools({
+    required ProviderConfig cfg,
+    required Iterable<String> current,
+    required Iterable<String> selected,
+  }) {
+    final editable = modelSettingsToolNames(cfg);
+    final result = BuiltInToolNames.parseAndNormalize(current);
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind == ProviderKind.openai) {
+      result.removeAll(const <String>{
+        BuiltInToolNames.codeInterpreter,
+        BuiltInToolNames.imageGeneration,
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.shell,
+      });
+    } else {
+      result.removeAll(editable);
+    }
+    result.addAll(
+      selected.map(BuiltInToolNames.normalize).where(editable.contains),
+    );
+    return result;
+  }
+
   /// Check if the provider/model combination supports search tool.
   static bool supportsSearch({
     required ProviderKind kind,
@@ -609,10 +873,6 @@ abstract class BuiltInToolsHelper {
       return const BuiltInToolsState();
     }
 
-    final kind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
     final rawOv = cfg.modelOverrides[modelId];
     final builtInSet = BuiltInToolNames.parseFromOverride(rawOv);
 
@@ -620,32 +880,15 @@ abstract class BuiltInToolsHelper {
       cfg: cfg,
       modelId: modelId,
     );
-    bool codeExecutionActive = false;
-    bool urlContextActive = false;
-    bool youtubeActive = false;
-    bool codeInterpreterActive = false;
-    bool imageGenerationActive = false;
-
-    if (kind == ProviderKind.google) {
-      codeExecutionActive = builtInSet.contains(BuiltInToolNames.codeExecution);
-      urlContextActive = builtInSet.contains(BuiltInToolNames.urlContext);
-      youtubeActive = builtInSet.contains(BuiltInToolNames.youtube);
-    } else if (kind == ProviderKind.openai) {
-      codeInterpreterActive = builtInSet.contains(
-        BuiltInToolNames.codeInterpreter,
-      );
-      imageGenerationActive = builtInSet.contains(
-        BuiltInToolNames.imageGeneration,
-      );
-    }
+    final active = builtInSet.intersection(modelSettingsToolNames(cfg));
 
     return BuiltInToolsState(
       searchActive: searchActive,
-      codeExecutionActive: codeExecutionActive,
-      urlContextActive: urlContextActive,
-      youtubeActive: youtubeActive,
-      codeInterpreterActive: codeInterpreterActive,
-      imageGenerationActive: imageGenerationActive,
+      codeExecutionActive: active.contains(BuiltInToolNames.codeExecution),
+      urlContextActive: active.contains(BuiltInToolNames.urlContext),
+      youtubeActive: active.contains(BuiltInToolNames.youtube),
+      codeInterpreterActive: active.contains(BuiltInToolNames.codeInterpreter),
+      imageGenerationActive: active.contains(BuiltInToolNames.imageGeneration),
     );
   }
 }

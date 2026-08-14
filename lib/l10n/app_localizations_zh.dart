@@ -3128,7 +3128,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetAddBody => '添加 Body';
 
   @override
-  String get modelDetailSheetBuiltinToolsDescription => '内置工具仅支持官方 API。';
+  String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
@@ -3161,6 +3161,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint =>
       '需要启用 OpenAI Responses API。';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchToolDescription =>
+      '启用 OpenRouter 网页抓取服务端工具';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '代码解释器';
@@ -10232,7 +10239,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetAddBody => '添加 Body';
 
   @override
-  String get modelDetailSheetBuiltinToolsDescription => '内置工具仅支持官方 API。';
+  String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
@@ -10265,6 +10272,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   @override
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint =>
       '需要启用 OpenAI Responses API。';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchToolDescription =>
+      '启用 OpenRouter 网页抓取服务端工具';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '代码解释器';
@@ -17261,7 +17275,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetAddBody => '新增 Body';
 
   @override
-  String get modelDetailSheetBuiltinToolsDescription => '內建工具僅支援官方 API。';
+  String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';
@@ -17294,6 +17308,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint =>
       '需要啟用 OpenAI Responses API。';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchTool => '網頁擷取';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchToolDescription =>
+      '啟用 OpenRouter 網頁擷取伺服器工具';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => '程式碼解譯器';

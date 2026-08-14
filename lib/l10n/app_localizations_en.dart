@@ -3245,7 +3245,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription =>
-      'Built-in tools only support official APIs.';
+      'Built-in tools depend on the provider and API mode.';
 
   @override
   String get modelDetailSheetBuiltinToolsUnsupportedHint =>
@@ -3282,6 +3282,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint =>
       'Requires OpenAI Responses API.';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchTool => 'Web Fetch';
+
+  @override
+  String get modelDetailSheetOpenrouterWebFetchToolDescription =>
+      'Enable OpenRouter web fetch server tool';
 
   @override
   String get modelDetailSheetOpenaiCodeInterpreterTool => 'Code Interpreter';

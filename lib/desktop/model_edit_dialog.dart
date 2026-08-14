@@ -116,6 +116,8 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
   // OpenAI built-in tools
   bool _openaiCodeInterpreterTool = false;
   bool _openaiImageGenerationTool = false;
+  bool _openrouterWebFetchTool = false;
+  bool _openrouterShellTool = false;
 
   @override
   void initState() {
@@ -230,6 +232,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       _openaiImageGenerationTool = builtInSet.contains(
         BuiltInToolNames.imageGeneration,
       );
+      _openrouterWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _openrouterShellTool =
+          cfg.useResponseApi == true &&
+          builtInSet.contains(BuiltInToolNames.shell);
     }
   }
 
@@ -703,6 +709,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
     final bool disableTools = _type == ModelType.embedding;
+    final bool isOpenRouter = BuiltInToolsHelper.isOpenRouterProvider(cfg);
     final bool hasTiles =
         _providerKind == ProviderKind.google ||
         _providerKind == ProviderKind.openai;
@@ -719,6 +726,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               ),
             ),
             if (_providerKind == ProviderKind.openai &&
+                !isOpenRouter &&
                 cfg.useResponseApi != true) ...[
               const SizedBox(height: 6),
               Text(
@@ -770,27 +778,52 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               : (v) => setState(() => _googleYoutubeTool = v),
         ),
       ] else if (_providerKind == ProviderKind.openai) ...[
-        _ToolTile(
-          title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-          desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-          value: _openaiCodeInterpreterTool,
-          onChanged: disableTools
-              ? null
-              : ((cfg.useResponseApi == true)
-                    ? (v) => setState(() => _openaiCodeInterpreterTool = v)
-                    : null),
-        ),
-        const SizedBox(height: 8),
-        _ToolTile(
-          title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-          desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-          value: _openaiImageGenerationTool,
-          onChanged: disableTools
-              ? null
-              : ((cfg.useResponseApi == true)
-                    ? (v) => setState(() => _openaiImageGenerationTool = v)
-                    : null),
-        ),
+        if (isOpenRouter) ...[
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenrouterWebFetchTool,
+            desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
+            value: _openrouterWebFetchTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _openrouterWebFetchTool = v),
+          ),
+          const SizedBox(height: 8),
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+            value: _openaiImageGenerationTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _openaiImageGenerationTool = v),
+          ),
+          const SizedBox(height: 8),
+          _ToolTile(
+            title: l10n.modelDetailSheetCodeExecutionTool,
+            desc: l10n.modelDetailSheetCodeExecutionToolDescription,
+            value: cfg.useResponseApi == true && _openrouterShellTool,
+            onChanged: disableTools || cfg.useResponseApi != true
+                ? null
+                : (v) => setState(() => _openrouterShellTool = v),
+          ),
+        ] else ...[
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
+            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
+            value: _openaiCodeInterpreterTool,
+            onChanged: disableTools || cfg.useResponseApi != true
+                ? null
+                : (v) => setState(() => _openaiCodeInterpreterTool = v),
+          ),
+          const SizedBox(height: 8),
+          _ToolTile(
+            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
+            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
+            value: _openaiImageGenerationTool,
+            onChanged: disableTools || cfg.useResponseApi != true
+                ? null
+                : (v) => setState(() => _openaiImageGenerationTool = v),
+          ),
+        ],
       ],
     ];
   }
@@ -849,30 +882,42 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
               e.key.toString(): e.value,
           }
         : const <String, dynamic>{};
-    final builtInSet = BuiltInToolNames.parseAndNormalize(prev['builtInTools']);
+    final selectedBuiltIns = <String>{};
     if (_providerKind == ProviderKind.google) {
-      builtInSet.remove(BuiltInToolNames.urlContext);
-      builtInSet.remove(BuiltInToolNames.codeExecution);
-      builtInSet.remove(BuiltInToolNames.youtube);
       if (_googleUrlContextTool) {
-        builtInSet.add(BuiltInToolNames.urlContext);
+        selectedBuiltIns.add(BuiltInToolNames.urlContext);
       }
       if (_googleCodeExecutionTool) {
-        builtInSet.add(BuiltInToolNames.codeExecution);
+        selectedBuiltIns.add(BuiltInToolNames.codeExecution);
       }
       if (_googleYoutubeTool) {
-        builtInSet.add(BuiltInToolNames.youtube);
+        selectedBuiltIns.add(BuiltInToolNames.youtube);
       }
     } else if (_providerKind == ProviderKind.openai) {
-      builtInSet.remove(BuiltInToolNames.codeInterpreter);
-      builtInSet.remove(BuiltInToolNames.imageGeneration);
-      if (_openaiCodeInterpreterTool) {
-        builtInSet.add(BuiltInToolNames.codeInterpreter);
-      }
-      if (_openaiImageGenerationTool) {
-        builtInSet.add(BuiltInToolNames.imageGeneration);
+      if (BuiltInToolsHelper.isOpenRouterProvider(old)) {
+        if (_openaiImageGenerationTool) {
+          selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
+        }
+        if (_openrouterWebFetchTool) {
+          selectedBuiltIns.add(BuiltInToolNames.webFetch);
+        }
+        if (old.useResponseApi == true && _openrouterShellTool) {
+          selectedBuiltIns.add(BuiltInToolNames.shell);
+        }
+      } else {
+        if (_openaiCodeInterpreterTool) {
+          selectedBuiltIns.add(BuiltInToolNames.codeInterpreter);
+        }
+        if (_openaiImageGenerationTool) {
+          selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
+        }
       }
     }
+    final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(
+      cfg: old,
+      current: BuiltInToolNames.parseAndNormalize(prev['builtInTools']),
+      selected: selectedBuiltIns,
+    );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);
 
     final String key = (prevKey.isEmpty || widget.isNew)
