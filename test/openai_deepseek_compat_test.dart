@@ -459,6 +459,40 @@ void main() {
       },
     );
 
+    test('Responses search requires a DeepSeek provider for V4 models', () {
+      const modelId = 'deepseek-v4-pro';
+      final cfg = ProviderConfig(
+        id: 'CustomOpenAI',
+        enabled: true,
+        name: 'Custom OpenAI',
+        apiKey: 'test-key',
+        baseUrl: 'https://proxy.example/v1',
+        providerType: ProviderKind.openai,
+        useResponseApi: true,
+        modelOverrides: const <String, dynamic>{
+          modelId: <String, dynamic>{
+            'builtInTools': <String>[BuiltInToolNames.search],
+          },
+        },
+      );
+
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: cfg,
+          modelId: modelId,
+        ),
+        isFalse,
+      );
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: cfg,
+          modelId: modelId,
+          upstreamModelId: modelId,
+        ).tools,
+        isEmpty,
+      );
+    });
+
     test('Responses request injects web_search for DeepSeek V4', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {

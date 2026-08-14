@@ -223,8 +223,7 @@ abstract class BuiltInToolsHelper {
         m.startsWith('o4-mini') ||
         m == 'o3' ||
         m.startsWith('o3-') ||
-        m.startsWith('gpt-5') ||
-        m.startsWith('deepseek-v4-');
+        m.startsWith('gpt-5');
   }
 
   static bool isOpenRouterProvider(ProviderConfig? cfg) {
@@ -260,6 +259,10 @@ abstract class BuiltInToolsHelper {
     return host.contains('deepseek.com') ||
         providerId.contains('deepseek') ||
         providerName.contains('deepseek');
+  }
+
+  static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
+    return _normalizedModelId(modelId).startsWith('deepseek-v4-');
   }
 
   static bool isDashScopeChatBuiltInSearchSupportedModel(String? modelId) {
@@ -460,6 +463,11 @@ abstract class BuiltInToolsHelper {
           if (isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId)) {
             return true;
           }
+          if (isDeepSeekProvider(cfg)) {
+            return isDeepSeekResponsesBuiltInSearchSupportedModel(
+              upstreamModelId,
+            );
+          }
           if (isDashScopeProvider(cfg)) {
             return isDashScopeResponsesBuiltInSearchSupportedModel(
               upstreamModelId,
@@ -549,6 +557,8 @@ abstract class BuiltInToolsHelper {
 
     final supportsSearch =
         isOpenAIResponsesBuiltInSearchSupportedModel(upstreamModelId) ||
+        (isDeepSeekProvider(cfg) &&
+            isDeepSeekResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
         (isDashScopeProvider(cfg) &&
             isDashScopeResponsesBuiltInSearchSupportedModel(upstreamModelId)) ||
         (isArkProvider(cfg) &&
