@@ -17,4 +17,22 @@ void main() {
     expect(settings.appLocaleForMaterialApp, const Locale('zh', 'CN'));
     await settings.loaded;
   });
+
+  for (final testCase in <({String name, Object value})>[
+    (name: 'empty string', value: ''),
+    (name: 'non-string value', value: 1),
+  ]) {
+    test('follows the system before loading for ${testCase.name}', () async {
+      final harness = await createBusinessTestHarness(
+        initial: {'app_locale_v1': testCase.value},
+      );
+
+      final settings = SettingsProvider(harness.preferences);
+
+      expect(settings.appLocaleForMaterialApp, isNull);
+      await settings.loaded;
+      expect(settings.appLocaleForMaterialApp, isNull);
+      expect(harness.preferences.get('app_locale_v1'), 'system');
+    });
+  }
 }
