@@ -667,6 +667,7 @@ class SettingsProvider extends ChangeNotifier {
   int get appLaunchCount => _appLaunchCount;
 
   SettingsProvider(this._preferences) {
+    _appLocaleTag = _preferences.getString(_appLocaleKey);
     _loaded = _load();
   }
 
