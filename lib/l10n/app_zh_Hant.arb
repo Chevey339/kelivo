@@ -637,6 +637,8 @@
   "lanSyncLinkCopied": "同步連結已複製",
   "lanSyncAlternateAddresses": "其他本機位址：{addresses}",
   "@lanSyncAlternateAddresses": {"placeholders": {"addresses": {"type": "String"}}},
+  "lanSyncLocalAddressLabel": "共用位址",
+  "lanSyncLocalAddressHint": "選擇後將重新整理上方的 QR Code 和共用連結。",
   "lanSyncWaiting": "正在等待另一台裝置…",
   "lanSyncTransfersCompleted": "已完成傳輸：{count} 次",
   "@lanSyncTransfersCompleted": {"placeholders": {"count": {"type": "int"}}},

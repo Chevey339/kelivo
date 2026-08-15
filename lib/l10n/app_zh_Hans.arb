@@ -670,6 +670,8 @@
   "lanSyncLinkCopied": "同步链接已复制",
   "lanSyncAlternateAddresses": "其他本地地址：{addresses}",
   "@lanSyncAlternateAddresses": {"placeholders": {"addresses": {"type": "String"}}},
+  "lanSyncLocalAddressLabel": "共享地址",
+  "lanSyncLocalAddressHint": "选择后将刷新上方的二维码和共享链接。",
   "lanSyncWaiting": "正在等待另一台设备…",
   "lanSyncTransfersCompleted": "已完成传输：{count} 次",
   "@lanSyncTransfersCompleted": {"placeholders": {"count": {"type": "int"}}},

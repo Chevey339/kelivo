@@ -772,6 +772,8 @@
   "lanSyncLinkCopied": "Sync link copied",
   "lanSyncAlternateAddresses": "Other local addresses: {addresses}",
   "@lanSyncAlternateAddresses": {"placeholders": {"addresses": {"type": "String"}}},
+  "lanSyncLocalAddressLabel": "Local address",
+  "lanSyncLocalAddressHint": "Choose an address to refresh the QR code and link above.",
   "lanSyncWaiting": "Waiting for another device…",
   "lanSyncTransfersCompleted": "Transfers completed: {count}",
   "@lanSyncTransfersCompleted": {"placeholders": {"count": {"type": "int"}}},

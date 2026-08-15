@@ -3670,6 +3670,18 @@ abstract class AppLocalizations {
   /// **'Other local addresses: {addresses}'**
   String lanSyncAlternateAddresses(String addresses);
 
+  /// No description provided for @lanSyncLocalAddressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Local address'**
+  String get lanSyncLocalAddressLabel;
+
+  /// No description provided for @lanSyncLocalAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an address to refresh the QR code and link above.'**
+  String get lanSyncLocalAddressHint;
+
   /// No description provided for @lanSyncWaiting.
   ///
   /// In en, this message translates to:

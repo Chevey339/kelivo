@@ -27,6 +27,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
   final TextEditingController _linkController = TextEditingController();
   final TextEditingController _pairingCodeController = TextEditingController();
   LanSyncShareSession? _session;
+  Uri? _selectedShareUrl;
   StreamSubscription<int>? _transferSubscription;
   RestoreMode _restoreMode = RestoreMode.merge;
   bool _starting = false;
@@ -41,6 +42,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
     _transferSubscription?.cancel();
     final session = _session;
     _session = null;
+    _selectedShareUrl = null;
     if (session != null) unawaited(session.close());
     _linkController.dispose();
     _pairingCodeController.dispose();
@@ -53,6 +55,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
     try {
       final previous = _session;
       _session = null;
+      _selectedShareUrl = null;
       await _transferSubscription?.cancel();
       if (previous != null) await previous.close();
       if (!mounted) return;
@@ -67,6 +70,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
       });
       setState(() {
         _session = session;
+        _selectedShareUrl = session.primaryUrl;
         _completedTransfers = 0;
       });
     } catch (error) {
@@ -84,7 +88,10 @@ class _LanSyncPageState extends State<LanSyncPage> {
   Future<void> _stopShare() async {
     final session = _session;
     if (session == null) return;
-    setState(() => _session = null);
+    setState(() {
+      _session = null;
+      _selectedShareUrl = null;
+    });
     await _transferSubscription?.cancel();
     _transferSubscription = null;
     await session.close();
@@ -276,6 +283,11 @@ class _LanSyncPageState extends State<LanSyncPage> {
     ColorScheme colors,
   ) {
     final session = _session;
+    final selectedShareUrl = session == null
+        ? null
+        : session.shareUrls.contains(_selectedShareUrl)
+        ? _selectedShareUrl!
+        : session.primaryUrl;
     return _card(
       context,
       title: l10n.lanSyncSendTitle,
@@ -342,7 +354,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: PrettyQrView.data(
-                    data: session.primaryUrl.toString(),
+                    data: selectedShareUrl!.toString(),
                     decoration: const PrettyQrDecoration(
                       shape: PrettyQrSmoothSymbol(roundFactor: 1),
                     ),
@@ -366,7 +378,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
                     children: [
                       Expanded(
                         child: SelectableText(
-                          session.primaryUrl.toString(),
+                          selectedShareUrl.toString(),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
@@ -374,7 +386,7 @@ class _LanSyncPageState extends State<LanSyncPage> {
                         tooltip: l10n.lanSyncCopyLink,
                         onPressed: () async {
                           await Clipboard.setData(
-                            ClipboardData(text: session.primaryUrl.toString()),
+                            ClipboardData(text: selectedShareUrl.toString()),
                           );
                           if (!context.mounted) return;
                           showAppSnackBar(
@@ -390,12 +402,23 @@ class _LanSyncPageState extends State<LanSyncPage> {
                 ),
                 if (session.shareUrls.length > 1) ...[
                   const SizedBox(height: 8),
-                  Text(
-                    l10n.lanSyncAlternateAddresses(
-                      session.shareUrls.skip(1).map((e) => e.host).join(', '),
+                  DropdownButtonFormField<Uri>(
+                    key: ValueKey('lan-sync-address-${session.sessionId}'),
+                    initialValue: selectedShareUrl,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: l10n.lanSyncLocalAddressLabel,
+                      helperText: l10n.lanSyncLocalAddressHint,
+                      prefixIcon: const Icon(Lucide.Network),
+                      border: const OutlineInputBorder(),
                     ),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
+                    items: [
+                      for (final url in session.shareUrls)
+                        DropdownMenuItem(value: url, child: Text(url.host)),
+                    ],
+                    onChanged: (url) {
+                      if (url != null) setState(() => _selectedShareUrl = url);
+                    },
                   ),
                 ],
                 const SizedBox(height: 10),

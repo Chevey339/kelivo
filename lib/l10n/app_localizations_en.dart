@@ -1931,6 +1931,13 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get lanSyncLocalAddressLabel => 'Local address';
+
+  @override
+  String get lanSyncLocalAddressHint =>
+      'Choose an address to refresh the QR code and link above.';
+
+  @override
   String get lanSyncWaiting => 'Waiting for another device…';
 
   @override
