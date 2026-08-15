@@ -2054,6 +2054,12 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get lanSyncLocalAddressLabel => '共享地址';
+
+  @override
+  String get lanSyncLocalAddressHint => '选择后将刷新上方的二维码和共享链接。';
+
+  @override
   String get lanSyncWaiting => '正在等待另一台设备…';
 
   @override
@@ -13524,6 +13530,12 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   }
 
   @override
+  String get lanSyncLocalAddressLabel => '共享地址';
+
+  @override
+  String get lanSyncLocalAddressHint => '选择后将刷新上方的二维码和共享链接。';
+
+  @override
   String get lanSyncWaiting => '正在等待另一台设备…';
 
   @override
@@ -24919,6 +24931,12 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String lanSyncAlternateAddresses(String addresses) {
     return '其他本機位址：$addresses';
   }
+
+  @override
+  String get lanSyncLocalAddressLabel => '共用位址';
+
+  @override
+  String get lanSyncLocalAddressHint => '選擇後將重新整理上方的 QR Code 和共用連結。';
 
   @override
   String get lanSyncWaiting => '正在等待另一台裝置…';
