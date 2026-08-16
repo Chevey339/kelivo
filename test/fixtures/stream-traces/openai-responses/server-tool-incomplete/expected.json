@@ -2,9 +2,132 @@
   "text": "The latest stable release of Kotlin is **Kotlin 1.9.22**, which was published on **December 21, 2023**. You can find more details about this release on the official GitHub page [here](https://github.com/JetBrains/kotlin/releases/tag/v1.9.22). \n\nAdditionally, prior to this, Kotlin 1.9.20 was released on **November 1, 2023**, marking an important milestone with the K2 compiler for all targets now in Beta and Kotlin Multiplatform becoming stable. More information can be found on the JetBrains blog [here](https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/).",
   "reasoning": "",
   "toolCalls": [],
-  "serverTools": [],
+  "serverTools": [
+    {
+      "id": "st_tmp_kd8zoiwvg1o",
+      "name": "search_web",
+      "phase": "start"
+    },
+    {
+      "id": "st_tmp_kd8zoiwvg1o",
+      "status": "completed",
+      "phase": "end",
+      "output": {
+        "query": "latest stable Kotlin release 2023",
+        "sources": [
+          {
+            "type": "url",
+            "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/"
+          },
+          {
+            "type": "url",
+            "url": "https://kotlinlang.org/docs/whatsnew1920.html"
+          },
+          {
+            "type": "url",
+            "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.22"
+          },
+          {
+            "type": "url",
+            "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-multiplatform-stable/"
+          },
+          {
+            "type": "url",
+            "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.21"
+          }
+        ],
+        "type": "search"
+      }
+    }
+  ],
   "images": [],
   "chunks": [
+    {
+      "type": "server_tool_start",
+      "id": "st_tmp_kd8zoiwvg1o",
+      "name": "search_web"
+    },
+    {
+      "type": "server_tool_end",
+      "id": "st_tmp_kd8zoiwvg1o",
+      "status": "completed",
+      "output": {
+        "query": "latest stable Kotlin release 2023",
+        "sources": [
+          {
+            "type": "url",
+            "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/"
+          },
+          {
+            "type": "url",
+            "url": "https://kotlinlang.org/docs/whatsnew1920.html"
+          },
+          {
+            "type": "url",
+            "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.22"
+          },
+          {
+            "type": "url",
+            "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-multiplatform-stable/"
+          },
+          {
+            "type": "url",
+            "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.21"
+          }
+        ],
+        "type": "search"
+      }
+    },
+    {
+      "type": "annotations",
+      "items": [
+        {
+          "type": "url_citation",
+          "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/",
+          "title": "Kotlin 1.9.20 Released - The JetBrains Blog"
+        }
+      ]
+    },
+    {
+      "type": "annotations",
+      "items": [
+        {
+          "type": "url_citation",
+          "url": "https://kotlinlang.org/docs/whatsnew1920.html",
+          "title": "What's new in Kotlin 1.9.20 | Kotlin Documentation"
+        }
+      ]
+    },
+    {
+      "type": "annotations",
+      "items": [
+        {
+          "type": "url_citation",
+          "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.22",
+          "title": "Kotlin 1.9.22"
+        }
+      ]
+    },
+    {
+      "type": "annotations",
+      "items": [
+        {
+          "type": "url_citation",
+          "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-multiplatform-stable/",
+          "title": "Kotlin Multiplatform Is Stable and Production-Ready - The JetBrains Blog"
+        }
+      ]
+    },
+    {
+      "type": "annotations",
+      "items": [
+        {
+          "type": "url_citation",
+          "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.21",
+          "title": "Kotlin 1.9.21"
+        }
+      ]
+    },
     {
       "type": "text_delta",
       "id": "stream:text-1",

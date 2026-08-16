@@ -31,6 +31,9 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   final Map<int, Map<String, String>> toolCalls = <int, Map<String, String>>{};
 
   final List<dynamic> _details = <dynamic>[];
+  final Map<int, String> _toolIdsByIndex = <int, String>{};
+  final Set<String> _openToolIds = <String>{};
+  final Set<String> _endedToolIds = <String>{};
   bool _snapshotMode = false;
   bool _closed = false;
   bool _completed = false;
@@ -46,7 +49,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     if (data.isEmpty) return const DecodeResult();
     if (data == '[DONE]') {
       _completed = true;
-      return const DecodeResult(completed: true);
+      return DecodeResult(chunks: _endOpenTools(), completed: true);
     }
 
     late final Map<String, dynamic> obj;
@@ -67,7 +70,8 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   List<StreamChunk> onClosed() {
     if (_closed) return const <StreamChunk>[];
     _closed = true;
-    return const <StreamChunk>[];
+    if (_completed) return const <StreamChunk>[];
+    return _endOpenTools();
   }
 
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
@@ -99,7 +103,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
           if (wantsImageOutput) {
             content += _imageMarkdown(delta);
           }
-          _accumulateToolCalls(delta['tool_calls']);
+          _accumulateToolCalls(delta['tool_calls'], chunks);
         }
         if (message is Map) {
           final rdMsg = message['reasoning_details'];
@@ -143,17 +147,17 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         final argsStr = (func['arguments'] ?? '').toString();
         if (name.isEmpty) continue;
         final idx = toolCalls.length;
+        final eventId = _toolSeriesId(idx, vendorId: id);
         final entry = toolCalls.putIfAbsent(
           idx,
-          () => <String, String>{
-            'id': _effectiveToolCallId(id, 'call', idx),
-            'name': name,
-            'args': argsStr,
-          },
+          () => <String, String>{'id': '', 'name': '', 'args': ''},
         );
-        if (id.isNotEmpty) entry['id'] = id;
+        entry['id'] = id.isNotEmpty ? id : eventId;
         entry['name'] = name;
         entry['args'] = argsStr;
+        chunks.addAll(
+          _emitCompleteToolCall(eventId, name: name, args: argsStr),
+        );
       }
       if (rootToolCalls.isNotEmpty) {
         finishReason = 'tool_calls';
@@ -188,27 +192,87 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
       assistantContent += content;
       chunks.add(TextDelta(id: _ids.text(), text: content));
     }
+    if (finishReason == 'tool_calls') {
+      chunks.addAll(_endOpenTools());
+    }
   }
 
-  void _accumulateToolCalls(dynamic raw) {
+  void _accumulateToolCalls(dynamic raw, List<StreamChunk> chunks) {
     if (raw is! List) return;
     for (final t in raw) {
       if (t is! Map) continue;
       final idx = (t['index'] as int?) ?? 0;
-      final id = t['id'] as String?;
+      final vendorId = (t['id'] as String?)?.trim() ?? '';
       final func = t['function'];
       final name = func is Map ? func['name'] as String? : null;
       final argsDelta = func is Map ? func['arguments'] as String? : null;
+      final firstSeen = !toolCalls.containsKey(idx);
       final entry = toolCalls.putIfAbsent(
         idx,
         () => <String, String>{'id': '', 'name': '', 'args': ''},
       );
-      if (id != null) entry['id'] = id;
+      final eventId = _toolSeriesId(idx, vendorId: vendorId);
+      if (vendorId.isNotEmpty) {
+        entry['id'] = vendorId;
+      } else if ((entry['id'] ?? '').isEmpty) {
+        entry['id'] = eventId;
+      }
+      final hadName = (entry['name'] ?? '').isNotEmpty;
       if (name != null && name.isNotEmpty) entry['name'] = name;
       if (argsDelta != null && argsDelta.isNotEmpty) {
         entry['args'] = (entry['args'] ?? '') + argsDelta;
       }
+      if (_openToolIds.add(eventId) && !_endedToolIds.contains(eventId)) {
+        chunks.add(
+          ToolCallStart(id: eventId, toolName: entry['name'] ?? name ?? ''),
+        );
+      } else if (!firstSeen && !hadName && name != null && name.isNotEmpty) {
+        chunks.add(ToolCallDelta(id: eventId, toolNameDelta: name));
+      }
+      if (argsDelta != null && argsDelta.isNotEmpty) {
+        chunks.add(ToolCallDelta(id: eventId, inputDelta: argsDelta));
+      }
     }
+  }
+
+  String _toolSeriesId(int index, {String vendorId = ''}) {
+    final existing = _toolIdsByIndex[index];
+    if (existing != null) return existing;
+    final id = vendorId.isNotEmpty ? vendorId : _ids.next('tool');
+    _toolIdsByIndex[index] = id;
+    return id;
+  }
+
+  List<StreamChunk> _emitCompleteToolCall(
+    String id, {
+    required String name,
+    required String args,
+  }) {
+    if (_endedToolIds.contains(id)) return const <StreamChunk>[];
+    final chunks = <StreamChunk>[];
+    if (_openToolIds.add(id)) {
+      chunks.add(ToolCallStart(id: id, toolName: name));
+    }
+    if (args.isNotEmpty) {
+      chunks.add(ToolCallDelta(id: id, inputDelta: args));
+    }
+    chunks.addAll(_endTool(id));
+    return chunks;
+  }
+
+  List<StreamChunk> _endTool(String id) {
+    _openToolIds.remove(id);
+    if (!_endedToolIds.add(id)) return const <StreamChunk>[];
+    return <StreamChunk>[ToolCallEnd(id)];
+  }
+
+  List<StreamChunk> _endOpenTools() {
+    if (_openToolIds.isEmpty) return const <StreamChunk>[];
+    final chunks = <StreamChunk>[];
+    for (final id in _openToolIds.toList()) {
+      chunks.addAll(_endTool(id));
+    }
+    return chunks;
   }
 
   void _addReasoningDetails(List<dynamic> incoming) {
@@ -338,14 +402,4 @@ int _readInt(dynamic value) {
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
-}
-
-String _effectiveToolCallId(
-  dynamic rawId,
-  String fallbackPrefix,
-  Object index,
-) {
-  final id = rawId?.toString().trim() ?? '';
-  if (id.isNotEmpty) return id;
-  return '${fallbackPrefix}_${DateTime.now().microsecondsSinceEpoch}_$index';
 }

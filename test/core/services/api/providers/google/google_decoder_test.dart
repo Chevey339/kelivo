@@ -89,6 +89,8 @@ void main() {
       ),
     );
 
+    expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_1');
+    expect(result.chunks.whereType<ToolCallStart>().single.toolName, 'lookup');
     expect(result.chunks.whereType<ToolCallEnd>().single.id, 'call_1');
     final call = decoder.functionCallById('call_1')!;
     expect(call.name, 'lookup');
@@ -101,10 +103,14 @@ void main() {
     final mapped = <ChatStreamChunk>[
       for (final chunk in result.chunks) ...adapter.handle(chunk),
     ];
-    expect(mapped.single.toolCalls!.single.name, 'lookup');
-    expect(mapped.single.toolCalls!.single.arguments['q'], 'kelivo');
+    final toolChunks = mapped
+        .where((c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty)
+        .toList();
+    expect(toolChunks, hasLength(2));
+    expect(toolChunks.last.toolCalls!.single.name, 'lookup');
+    expect(toolChunks.last.toolCalls!.single.arguments['q'], 'kelivo');
     expect(
-      mapped.single.toolCalls!.single.metadata!['google']['thoughtSigVal'],
+      toolChunks.last.toolCalls!.single.metadata!['google']['thoughtSigVal'],
       'sig-1',
     );
   });
@@ -149,7 +155,7 @@ void main() {
     expect(
       mapped
           .where((c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty)
-          .single
+          .last
           .toolCalls!
           .single
           .name,
@@ -185,7 +191,7 @@ void main() {
 
   test('replaces a complete preview frame instead of appending', () {
     final decoder = GoogleStreamDecoder();
-    decoder.accept(
+    final first = decoder.accept(
       _event(
         _candidate(
           parts: [
@@ -199,7 +205,7 @@ void main() {
         ),
       ),
     );
-    decoder.accept(
+    final second = decoder.accept(
       _event(
         _candidate(
           parts: [
@@ -214,6 +220,13 @@ void main() {
       ),
     );
 
+    expect(first.chunks.whereType<ImageStart>().single.mimeType, 'image/png');
+    expect(first.chunks.whereType<ImageDelta>().single.data, 'iVBORw0KGgo=');
+    expect(
+      second.chunks.whereType<ImageSnapshot>().single.data,
+      'iVBORw0KGgoAAA=',
+    );
+    expect(decoder.onClosed().whereType<ImageEnd>(), isNotEmpty);
     final pending = decoder.takeBufferedImage()!;
     expect(pending.data, 'iVBORw0KGgoAAA=');
     expect(decoder.receivedImage, isTrue);

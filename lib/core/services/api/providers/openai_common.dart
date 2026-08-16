@@ -2240,17 +2240,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           toolMsgs.add({'__name': name, '__id': id, '__args': args});
         });
 
-        if (callInfos.isNotEmpty) {
-          final approxTotal =
-              approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield* emitToolCalls(
-            callInfos,
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? approxTotal,
-          );
-        }
-
-        // Execute tools and emit results
+        // Execute tools and emit results. ToolCall* already left the decoder.
         final results = <Map<String, dynamic>>[];
         final resultsInfo = <ToolResultInfo>[];
         for (final m in toolMsgs) {
@@ -2434,13 +2424,6 @@ Stream<StreamChunk> _sendOpenAIStream(
               });
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
-            if (callInfos2.isNotEmpty) {
-              yield* emitToolCalls(
-                callInfos2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
             final results2 = <Map<String, dynamic>>[];
             final resultsInfo2 = <ToolResultInfo>[];
             for (final m in toolMsgs2) {
@@ -2542,21 +2525,23 @@ Stream<StreamChunk> _sendOpenAIStream(
                 'args': call.args,
               },
           });
-        for (final image in decoder.takeImages()) {
-          if (image.base64.isEmpty) continue;
-          final mdImg = await _saveResponsesImageGenerationMarkdown(
-            image.base64,
-            outputFormat: image.outputFormat,
-          );
-          if (mdImg.isNotEmpty) {
-            yield* emitDelta(
-              content: mdImg,
-              usage: usage,
-              totalTokens: totalTokens,
+        if (!decoder.emittedImageEvents) {
+          for (final image in decoder.takeImages()) {
+            if (image.base64.isEmpty) continue;
+            final mdImg = await _saveResponsesImageGenerationMarkdown(
+              image.base64,
+              outputFormat: image.outputFormat,
             );
+            if (mdImg.isNotEmpty) {
+              yield* emitDelta(
+                content: mdImg,
+                usage: usage,
+                totalTokens: totalTokens,
+              );
+            }
           }
         }
-        if (decoder.citations.isNotEmpty) {
+        if (!decoder.emittedCitationEvents && decoder.citations.isNotEmpty) {
           final payload = jsonEncode({'items': decoder.citations});
           yield* emitToolResults(
             [
@@ -2616,16 +2601,6 @@ Stream<StreamChunk> _sendOpenAIStream(
               });
               idx += 1;
             });
-          }
-          if (callInfos.isNotEmpty) {
-            final approxTotal =
-                approxPromptTokens +
-                approxTokensFromChars(approxCompletionChars);
-            yield* emitToolCalls(
-              callInfos,
-              usage: usage,
-              totalTokens: usage?.totalTokens ?? approxTotal,
-            );
           }
           final responseOutputItems = _withResponsesFunctionCallItems(
             lastResponseOutputItems,
@@ -2836,16 +2811,6 @@ Stream<StreamChunk> _sendOpenAIStream(
               );
               msgs2.add({'__id': id2, '__name': name2, '__args': args2});
             }
-            if (callInfos2.isNotEmpty) {
-              final approxTotal =
-                  approxPromptTokens +
-                  approxTokensFromChars(approxCompletionChars);
-              yield* emitToolCalls(
-                callInfos2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? approxTotal,
-              );
-            }
             final responseOutputItems2 = _withResponsesFunctionCallItems(
               outItems2,
               callInfos2,
@@ -2956,16 +2921,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           });
           toolMsgs.add({'__name': name, '__id': id, '__args': args});
         });
-        if (callInfos.isNotEmpty) {
-          final approxTotal =
-              approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield* emitToolCalls(
-            callInfos,
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? approxTotal,
-          );
-        }
-        // Execute tools and emit results
+        // Execute tools and emit results. ToolCall* already left the decoder.
         final results = <Map<String, dynamic>>[];
         final resultsInfo = <ToolResultInfo>[];
         for (final m in toolMsgs) {
@@ -3149,13 +3105,6 @@ Stream<StreamChunk> _sendOpenAIStream(
               });
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
-            if (callInfos2.isNotEmpty) {
-              yield* emitToolCalls(
-                callInfos2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
             final results2 = <Map<String, dynamic>>[];
             final resultsInfo2 = <ToolResultInfo>[];
             for (final m in toolMsgs2) {
@@ -3248,17 +3197,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               });
               toolMsgs.add({'__name': name, '__id': id, '__args': args});
             });
-            if (callInfos.isNotEmpty) {
-              final approxTotal =
-                  approxPromptTokens +
-                  approxTokensFromChars(approxCompletionChars);
-              yield* emitToolCalls(
-                callInfos,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? approxTotal,
-              );
-            }
-            // Execute tools and emit results
+            // Execute tools and emit results. ToolCall* already left the decoder.
             final results = <Map<String, dynamic>>[];
             final resultsInfo = <ToolResultInfo>[];
             for (final m in toolMsgs) {
@@ -3451,13 +3390,6 @@ Stream<StreamChunk> _sendOpenAIStream(
                   });
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
-                if (callInfos2.isNotEmpty) {
-                  yield* emitToolCalls(
-                    callInfos2,
-                    usage: usage,
-                    totalTokens: usage?.totalTokens ?? 0,
-                  );
-                }
                 final results2 = <Map<String, dynamic>>[];
                 final resultsInfo2 = <ToolResultInfo>[];
                 for (final m in toolMsgs2) {
@@ -3522,16 +3454,6 @@ Stream<StreamChunk> _sendOpenAIStream(
               }
             }
           }
-        } else if (info.isOpenRouter) {
-        } else {
-          // final approxTotal = approxPromptTokens + _approxTokensFromChars(approxCompletionChars);
-          // yield ChatStreamChunk(
-          //   content: '',
-          //   isDone: false,
-          //   totalTokens: usage?.totalTokens ?? approxTotal,
-          //   usage: usage,
-          // );
-          // return;
         }
       }
     } on HttpException {

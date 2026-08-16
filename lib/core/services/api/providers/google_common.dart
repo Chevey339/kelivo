@@ -1235,12 +1235,14 @@ Stream<StreamChunk> _sendGoogleStream(
       for (final remote in decoder.takePendingRemoteImages()) {
         try {
           final b64 = await _downloadRemoteAsBase64(client, config, remote.uri);
-          decoder.ingestImageData(
+          for (final chunk in decoder.ingestImageData(
             remote.mimeType,
             b64,
             thoughtSigKey: remote.thoughtSigKey,
             thoughtSigVal: remote.thoughtSigVal,
-          );
+          )) {
+            yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+          }
         } catch (_) {}
       }
       for (final chunk in decoder.takeOrphanedTrailingText()) {
@@ -1325,34 +1327,21 @@ Stream<StreamChunk> _sendGoogleStream(
       );
     }
 
-    // Flush any buffered inline image (e.g., when stream ends without explicit finishReason)
-    final pendingImage = await takeBufferedImageMarkdown();
-    if (pendingImage.isNotEmpty) {
-      final sanitized = await sanitizeTextIfNeeded(pendingImage);
-      yield* emitDelta(
-        content: sanitized,
-        usage: usage,
-        totalTokens: totalTokens,
-      );
-    }
-
-    if (calls.isEmpty) {
-      // No tool calls; this round finished
-      if (decoder.canFinishNow && builtinCitations.isNotEmpty) {
-        final payload = jsonEncode({'items': builtinCitations});
-        yield* emitToolResults(
-          [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content: payload,
-            ),
-          ],
+    // Flush any buffered inline image that never became Image* events.
+    if (!decoder.emittedImageEvents) {
+      final pendingImage = await takeBufferedImageMarkdown();
+      if (pendingImage.isNotEmpty) {
+        final sanitized = await sanitizeTextIfNeeded(pendingImage);
+        yield* emitDelta(
+          content: sanitized,
           usage: usage,
           totalTokens: totalTokens,
         );
       }
+    }
+
+    if (calls.isEmpty) {
+      // No tool calls; this round finished. Citations already left the decoder.
       if (persistGeminiThoughtSigs) {
         final metaComment = _buildGeminiThoughtSigComment(
           textKey: responseTextThoughtSigKey,

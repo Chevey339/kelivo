@@ -3,7 +3,23 @@
   "reasoning": "**Crafting the Scene**\n\nI'm now zeroing in on the environment. I'm focusing on creating a luxurious space-themed restaurant, envisioning dark blues, gold accents, and celestial patterns. The goal is to convey sophistication, and so far I'm making progress, though refinement is key. The banana dish needs to be the focal point within this imagined scene.\n\n\n**Constructing the Vision**\n\nI am now focusing on refining the specifics of the composition. I'm visualizing the \"Gemini Nano Banana\" dish: the caramelized banana and chocolate ganache, and the tiny edible flowers. I'm prioritizing the plate, runner, and table setting, making the image high-end. I am aiming for low light and an intimate feel, with a candid focus on the dessert plate.\n\n\n",
   "toolCalls": [],
   "serverTools": [],
-  "images": [],
+  "images": [
+    {
+      "id": "stream:image-2",
+      "mimeType": "image/png",
+      "phase": "start"
+    },
+    {
+      "id": "stream:image-2",
+      "phase": "delta",
+      "byteCount": 79,
+      "sha256": "204f864f62153665a75f20ece9f0fd4ece67de16f87a63690a96898ebb1eef9c"
+    },
+    {
+      "id": "stream:image-2",
+      "phase": "end"
+    }
+  ],
   "chunks": [
     {
       "type": "usage",
@@ -39,11 +55,27 @@
       "totalTokens": 498
     },
     {
+      "type": "image_start",
+      "id": "stream:image-2",
+      "mimeType": "image/png"
+    },
+    {
+      "id": "stream:image-2",
+      "phase": "delta",
+      "byteCount": 79,
+      "sha256": "204f864f62153665a75f20ece9f0fd4ece67de16f87a63690a96898ebb1eef9c",
+      "type": "image_delta"
+    },
+    {
       "type": "usage",
       "promptTokens": 17,
       "completionTokens": 481,
       "cachedTokens": 0,
       "totalTokens": 498
+    },
+    {
+      "type": "image_end",
+      "id": "stream:image-2"
     }
   ],
   "finishCount": 0,

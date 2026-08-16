@@ -98,8 +98,13 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   final List<GoogleRemoteImage> _pendingRemoteImages = <GoogleRemoteImage>[];
   bool _holdTextForImage = false;
   String? _lastCodeExecId;
+  String? _imageId;
+  bool _imageStarted = false;
+  bool _imageEnded = false;
   int _syntheticPartIndex = 0;
   bool _closed = false;
+
+  bool get emittedImageEvents => _imageStarted;
 
   bool isClientFunctionCall(String id) =>
       functionCalls.any((call) => call.id == id);
@@ -123,7 +128,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     return out;
   }
 
-  void ingestImageData(
+  List<StreamChunk> ingestImageData(
     String mime,
     String data, {
     String? thoughtSigKey,
@@ -132,22 +137,25 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     if (persistThoughtSigs && thoughtSigKey != null && thoughtSigVal != null) {
       _rememberImageSig(thoughtSigKey, thoughtSigVal);
     }
-    bufferInlineImage(mime, data);
+    final chunks = bufferInlineImage(mime, data);
     if (canFinishNow) streamComplete = true;
+    return chunks;
   }
 
-  void bufferInlineImage(String mime, String data) {
+  List<StreamChunk> bufferInlineImage(String mime, String data) {
     imageMime = mime.isNotEmpty ? mime : 'image/png';
     final hasExisting = pendingImageData.isNotEmpty;
     final prevLooksComplete = hasExisting && pendingImageData.endsWith('=');
     final newFrame = hasExisting && _looksLikeImageStart(data);
-    if (prevLooksComplete || newFrame) {
+    final replaced = prevLooksComplete || newFrame;
+    if (replaced) {
       pendingImageData = data;
     } else {
       pendingImageData += data;
     }
     bufferingInlineImage = true;
     receivedImage = true;
+    return _imageChunks(replaced: replaced, appended: replaced ? '' : data);
   }
 
   /// Text held after a `fileData` URI when the provider failed to download it.
@@ -196,7 +204,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     if (data.isEmpty) return const DecodeResult();
     if (data == '[DONE]') {
       streamComplete = true;
-      return const DecodeResult(completed: true);
+      return DecodeResult(chunks: _closeOpenImage(), completed: true);
     }
 
     late final Map<String, dynamic> obj;
@@ -226,7 +234,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
   List<StreamChunk> onClosed() {
     if (_closed) return const <StreamChunk>[];
     _closed = true;
-    return const <StreamChunk>[];
+    return _closeOpenImage();
   }
 
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
@@ -347,7 +355,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
             partThoughtSigVal != null) {
           _rememberImageSig(partThoughtSigKey, partThoughtSigVal);
         }
-        bufferInlineImage(mime, data);
+        chunks.addAll(bufferInlineImage(mime, data));
       }
     }
 
@@ -379,10 +387,10 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       if (code.isNotEmpty) {
         final ceId = _ids.next('code_exec');
         _lastCodeExecId = ceId;
+        chunks.add(ToolCallStart(id: ceId, toolName: 'code_execution'));
         chunks.add(
           ToolCallDelta(
             id: ceId,
-            toolNameDelta: 'code_execution',
             inputDelta: jsonEncode(<String, dynamic>{
               'language': lang,
               'code': code,
@@ -448,16 +456,38 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
           part: rawPart,
         ),
       );
+      chunks.add(ToolCallStart(id: id, toolName: name, metadata: metadata));
       chunks.add(
-        ToolCallDelta(
-          id: id,
-          toolNameDelta: name,
-          inputDelta: jsonEncode(args),
-          metadata: metadata,
-        ),
+        ToolCallDelta(id: id, inputDelta: jsonEncode(args), metadata: metadata),
       );
       chunks.add(ToolCallEnd(id));
     }
+  }
+
+  List<StreamChunk> _imageChunks({
+    required bool replaced,
+    required String appended,
+  }) {
+    final chunks = <StreamChunk>[];
+    _imageId ??= _ids.next('image');
+    if (!_imageStarted) {
+      _imageStarted = true;
+      chunks.add(ImageStart(id: _imageId!, mimeType: imageMime));
+    }
+    if (replaced) {
+      chunks.add(ImageSnapshot(id: _imageId!, data: pendingImageData));
+    } else if (appended.isNotEmpty) {
+      chunks.add(ImageDelta(id: _imageId!, data: appended));
+    }
+    return chunks;
+  }
+
+  List<StreamChunk> _closeOpenImage() {
+    if (!_imageStarted || _imageEnded || _imageId == null) {
+      return const <StreamChunk>[];
+    }
+    _imageEnded = true;
+    return <StreamChunk>[ImageEnd(_imageId!)];
   }
 
   void _rememberImageSig(String key, dynamic value) {

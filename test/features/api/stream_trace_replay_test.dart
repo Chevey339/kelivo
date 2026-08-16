@@ -73,6 +73,12 @@ void main() {
     );
     _assertCommon(replayed);
     expect(replayed.chunks.whereType<ReasoningDelta>(), isNotEmpty);
+    expect(replayed.chunks.whereType<ImageStart>(), isNotEmpty);
+    expect(
+      replayed.chunks.where((c) => c is ImageDelta || c is ImageSnapshot),
+      isNotEmpty,
+    );
+    expect(replayed.chunks.whereType<ImageEnd>(), isNotEmpty);
     expect(decoder.receivedImage, isTrue);
     expect(decoder.imageThoughtSigs, isNotEmpty);
     expect(decoder.imageThoughtSigs.first['v'].toString(), isNotEmpty);
@@ -104,14 +110,13 @@ void main() {
     _assertCommon(replayed);
     expect(decoder.reasoningEcho, isNotEmpty);
     expect(decoder.reasoningDetails, isNotEmpty);
-    expect(decoder.toolCalls.length, greaterThanOrEqualTo(2));
     expect(
-      decoder.toolCalls.values.map((call) => call['id']).toSet().length,
-      greaterThanOrEqualTo(2),
+      replayed.chunks.whereType<ToolCallStart>().map((c) => c.toolName),
+      everyElement('search_web'),
     );
     expect(
-      decoder.toolCalls.values.map((call) => call['name']),
-      everyElement('search_web'),
+      replayed.chunks.whereType<ToolCallEnd>().map((c) => c.id).toSet().length,
+      greaterThanOrEqualTo(2),
     );
     expect(decoder.finishReason, 'tool_calls');
   });
@@ -131,8 +136,19 @@ void main() {
     );
     _assertCommon(replayed);
     expect(decoder.completed, isTrue);
-    expect(decoder.citations, isNotEmpty);
-    expect(decoder.citations.first['url'].toString(), startsWith('http'));
+    expect(
+      replayed.chunks.whereType<ServerToolStart>().map((c) => c.toolName),
+      contains('search_web'),
+    );
+    expect(replayed.chunks.whereType<ServerToolEnd>(), isNotEmpty);
+    expect(
+      replayed.chunks
+          .whereType<Annotations>()
+          .expand((c) => c.annotations)
+          .whereType<UrlCitationAnnotation>()
+          .map((a) => a.url),
+      everyElement(startsWith('http')),
+    );
     expect(
       decoder.outputItems.map((item) => item['type']?.toString() ?? ''),
       anyElement(contains('search')),

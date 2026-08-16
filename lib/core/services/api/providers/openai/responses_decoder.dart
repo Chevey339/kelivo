@@ -62,7 +62,22 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   final Map<int, ResponsesPendingImage> imagesByIndex =
       <int, ResponsesPendingImage>{};
 
+  final Map<int, String> _toolEventIdsByIndex = <int, String>{};
+  final Map<String, String> _toolEventIdsByKey = <String, String>{};
+  final Set<String> _openToolIds = <String>{};
+  final Set<String> _endedToolIds = <String>{};
+  final Map<int, String> _imageIdsByIndex = <int, String>{};
+  final Set<String> _openImageIds = <String>{};
+  final Set<String> _endedImageIds = <String>{};
+  final Set<String> _openServerToolIds = <String>{};
+  final Set<String> _endedServerToolIds = <String>{};
+  final Set<String> _seenCitationUrls = <String>{};
+  bool _emittedCitationEvents = false;
   bool _closed = false;
+
+  bool get emittedImageEvents =>
+      _openImageIds.isNotEmpty || _endedImageIds.isNotEmpty;
+  bool get emittedCitationEvents => _emittedCitationEvents;
 
   bool get hasFunctionCalls =>
       toolCallsByIndex.isNotEmpty || toolCallsByKey.isNotEmpty;
@@ -98,7 +113,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     if (data.isEmpty) return const DecodeResult();
     if (data == '[DONE]') {
       completed = true;
-      return const DecodeResult(completed: true);
+      return DecodeResult(chunks: _closeOpenSeries(), completed: true);
     }
 
     late final Map<String, dynamic> obj;
@@ -123,7 +138,8 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   List<StreamChunk> onClosed() {
     if (_closed) return const <StreamChunk>[];
     _closed = true;
-    return const <StreamChunk>[];
+    if (completed) return const <StreamChunk>[];
+    return _closeOpenSeries();
   }
 
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
@@ -148,16 +164,28 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final item = obj['item'];
       final idx = (obj['output_index'] ?? 0) as int;
       if (item is Map && (item['type'] ?? '') == 'function_call') {
+        final callId = (item['call_id'] ?? '').toString();
+        final name = (item['name'] ?? '').toString();
+        final args = (item['arguments'] ?? '').toString();
         toolCallsByIndex[idx] = ResponsesFunctionCall(
           index: idx,
-          callId: (item['call_id'] ?? '').toString(),
-          name: (item['name'] ?? '').toString(),
+          callId: callId,
+          name: name,
+          args: args,
         );
+        final eventId = _toolSeriesId(
+          idx,
+          vendorId: callId.isNotEmpty ? callId : (item['id'] ?? '').toString(),
+        );
+        chunks.addAll(_startTool(eventId, name: name, args: args));
       } else if (item is Map && _isImageGenerationType(item['type'])) {
         imagesByIndex.putIfAbsent(
           idx,
           () => ResponsesPendingImage(index: idx, base64: ''),
         );
+        chunks.addAll(_startImage(idx, itemId: (item['id'] ?? '').toString()));
+      } else if (item is Map && _isResponsesServerTool(item['type'])) {
+        chunks.addAll(_startServerTool(item.cast<String, dynamic>()));
       }
       return;
     }
@@ -170,6 +198,12 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
           base64: b64,
           outputFormat: (obj['output_format'] ?? '').toString(),
         );
+        final imageId = _imageSeriesId(
+          idx,
+          itemId: (obj['item_id'] ?? '').toString(),
+        );
+        chunks.addAll(_startImage(idx, itemId: imageId));
+        chunks.add(ImageSnapshot(id: imageId, data: _rawImageBase64(b64)));
       }
       return;
     }
@@ -181,6 +215,13 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         () => ResponsesFunctionCall(index: idx, callId: '', name: ''),
       );
       if (delta.isNotEmpty) entry.args += delta;
+      final eventId = _toolSeriesId(idx, vendorId: entry.callId);
+      if (_openToolIds.add(eventId) && !_endedToolIds.contains(eventId)) {
+        chunks.add(ToolCallStart(id: eventId, toolName: entry.name));
+      }
+      if (delta.isNotEmpty) {
+        chunks.add(ToolCallDelta(id: eventId, inputDelta: delta));
+      }
       return;
     }
     if (type == 'response.output_item.done') {
@@ -203,6 +244,16 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         if (entry.name.isEmpty) {
           entry.name = (item['name'] ?? '').toString();
         }
+        final eventId = _toolSeriesId(
+          idx,
+          vendorId: entry.callId.isNotEmpty
+              ? entry.callId
+              : (item['id'] ?? '').toString(),
+        );
+        if (args.isNotEmpty && !_openToolIds.contains(eventId)) {
+          chunks.addAll(_startTool(eventId, name: entry.name, args: args));
+        }
+        chunks.addAll(_endTool(eventId));
       } else if (item is Map && _isImageGenerationType(item['type'])) {
         final b64 = (item['result'] ?? '').toString();
         if (b64.isNotEmpty) {
@@ -212,10 +263,36 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
             outputFormat: (item['output_format'] ?? '').toString(),
           );
         }
+        final imageId = _imageSeriesId(
+          idx,
+          itemId: (item['id'] ?? '').toString(),
+        );
+        chunks.addAll(_startImage(idx, itemId: imageId));
+        if (b64.isNotEmpty) {
+          chunks.add(ImageSnapshot(id: imageId, data: _rawImageBase64(b64)));
+        }
+        chunks.addAll(_endImage(imageId));
+      } else if (item is Map && _isResponsesServerTool(item['type'])) {
+        chunks.addAll(
+          _endServerTool(
+            item.cast<String, dynamic>(),
+            fallbackStatus: ServerToolStatus.completed,
+          ),
+        );
       }
       return;
     }
-    if (type is String && type.contains('function_call')) {
+    if (type == 'response.output_text.annotation.added') {
+      _emitCitationAnnotation(obj['annotation'], chunks);
+      return;
+    }
+    if (type == 'response.incomplete' || type == 'response.failed') {
+      _onTerminal(obj, chunks, failed: true);
+      return;
+    }
+    if (type is String &&
+        type.contains('function_call') &&
+        type != 'response.function_call_arguments.done') {
       final id = (obj['id'] ?? obj['call_id'] ?? '').toString();
       final name = (obj['name'] ?? obj['function']?['name'] ?? '').toString();
       final argsDelta =
@@ -229,11 +306,16 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         );
         if (name.isNotEmpty) entry.name = name;
         if (argsDelta.isNotEmpty) entry.args += argsDelta;
+        final eventId = _toolEventIdsByKey.putIfAbsent(
+          key,
+          () => id.isNotEmpty ? id : _ids.next('tool'),
+        );
+        chunks.addAll(_startTool(eventId, name: entry.name, args: argsDelta));
       }
       return;
     }
     if (type == 'response.completed') {
-      _onCompleted(obj, chunks);
+      _onTerminal(obj, chunks, failed: false);
       return;
     }
 
@@ -251,7 +333,11 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     }
   }
 
-  void _onCompleted(Map<String, dynamic> obj, List<StreamChunk> chunks) {
+  void _onTerminal(
+    Map<String, dynamic> obj,
+    List<StreamChunk> chunks, {
+    required bool failed,
+  }) {
     final response = obj['response'];
     if (response is Map) {
       final u = response['usage'];
@@ -270,8 +356,27 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
           _collectCitations(output);
           _collectCompletedImages(output);
         } catch (_) {}
+        _emitCollectedImages(chunks);
+        _emitCollectedCitations(chunks);
+        for (final item in outputItems) {
+          if (_isResponsesServerTool(item['type']) &&
+              !_endedServerToolIds.contains((item['id'] ?? '').toString())) {
+            chunks.addAll(
+              _endServerTool(
+                item,
+                fallbackStatus: failed
+                    ? ServerToolStatus.failed
+                    : ServerToolStatus.completed,
+              ),
+            );
+          }
+        }
       }
     }
+    final status = failed
+        ? ServerToolStatus.failed
+        : ServerToolStatus.completed;
+    chunks.addAll(_closeOpenSeries(serverStatus: status));
     completed = true;
   }
 
@@ -315,8 +420,226 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         base64: b64,
         outputFormat: (it['output_format'] ?? '').toString(),
       );
+      final itemId = (it['id'] ?? '').toString();
+      if (itemId.isNotEmpty) {
+        _imageIdsByIndex.putIfAbsent(outputIndex, () => itemId);
+      }
     }
   }
+
+  void _emitCitationAnnotation(dynamic annotation, List<StreamChunk> chunks) {
+    if (annotation is! Map) return;
+    if ((annotation['type'] ?? '') != 'url_citation') return;
+    final url = (annotation['url'] ?? '').toString();
+    if (url.isEmpty || _seenCitationUrls.contains(url)) return;
+    final title = (annotation['title'] ?? '').toString();
+    citations.add(<String, dynamic>{
+      'index': citations.length + 1,
+      'url': url,
+      if (title.isNotEmpty) 'title': title,
+    });
+    _seenCitationUrls.add(url);
+    _emittedCitationEvents = true;
+    chunks.add(
+      Annotations(<StreamAnnotation>[
+        UrlCitationAnnotation(url: url, title: title),
+      ]),
+    );
+  }
+
+  void _emitCollectedCitations(List<StreamChunk> chunks) {
+    if (citations.isEmpty || _emittedCitationEvents) return;
+    _emittedCitationEvents = true;
+    chunks.add(
+      Annotations([
+        for (final item in citations)
+          UrlCitationAnnotation(
+            url: (item['url'] ?? '').toString(),
+            title: (item['title'] ?? '').toString(),
+          ),
+      ]),
+    );
+  }
+
+  void _emitCollectedImages(List<StreamChunk> chunks) {
+    final sorted = imagesByIndex.keys.toList()..sort();
+    for (final idx in sorted) {
+      final image = imagesByIndex[idx]!;
+      if (image.base64.isEmpty) continue;
+      final id = _imageSeriesId(idx);
+      chunks.addAll(_startImage(idx, itemId: id));
+      if (!_endedImageIds.contains(id)) {
+        chunks.add(ImageSnapshot(id: id, data: _rawImageBase64(image.base64)));
+        chunks.addAll(_endImage(id));
+      }
+    }
+  }
+
+  String _toolSeriesId(int index, {String vendorId = ''}) {
+    final existing = _toolEventIdsByIndex[index];
+    if (existing != null) return existing;
+    final id = vendorId.isNotEmpty ? vendorId : _ids.next('tool');
+    _toolEventIdsByIndex[index] = id;
+    return id;
+  }
+
+  List<StreamChunk> _startTool(
+    String id, {
+    required String name,
+    String args = '',
+  }) {
+    if (_endedToolIds.contains(id)) return const <StreamChunk>[];
+    final chunks = <StreamChunk>[];
+    if (_openToolIds.add(id)) {
+      chunks.add(ToolCallStart(id: id, toolName: name));
+    }
+    if (args.isNotEmpty) {
+      chunks.add(ToolCallDelta(id: id, inputDelta: args));
+    }
+    return chunks;
+  }
+
+  List<StreamChunk> _endTool(String id) {
+    _openToolIds.remove(id);
+    if (!_endedToolIds.add(id)) return const <StreamChunk>[];
+    return <StreamChunk>[ToolCallEnd(id)];
+  }
+
+  String _imageSeriesId(int index, {String itemId = ''}) {
+    final existing = _imageIdsByIndex[index];
+    if (existing != null) return existing;
+    final id = itemId.isNotEmpty ? itemId : _ids.next('image');
+    _imageIdsByIndex[index] = id;
+    return id;
+  }
+
+  List<StreamChunk> _startImage(int index, {String itemId = ''}) {
+    final id = _imageSeriesId(index, itemId: itemId);
+    if (_endedImageIds.contains(id) || !_openImageIds.add(id)) {
+      return const <StreamChunk>[];
+    }
+    return <StreamChunk>[ImageStart(id: id)];
+  }
+
+  List<StreamChunk> _endImage(String id) {
+    _openImageIds.remove(id);
+    if (!_endedImageIds.add(id)) return const <StreamChunk>[];
+    return <StreamChunk>[ImageEnd(id)];
+  }
+
+  List<StreamChunk> _startServerTool(Map<String, dynamic> item) {
+    final id = (item['id'] ?? '').toString();
+    if (id.isEmpty) return const <StreamChunk>[];
+    if (_endedServerToolIds.contains(id) || !_openServerToolIds.add(id)) {
+      return const <StreamChunk>[];
+    }
+    return <StreamChunk>[
+      ServerToolStart(
+        id: id,
+        toolName: _serverToolName((item['type'] ?? '').toString()),
+        input: item['action'],
+      ),
+    ];
+  }
+
+  List<StreamChunk> _endServerTool(
+    Map<String, dynamic> item, {
+    required ServerToolStatus fallbackStatus,
+  }) {
+    final id = (item['id'] ?? '').toString();
+    if (id.isEmpty) return const <StreamChunk>[];
+    if (!_openServerToolIds.contains(id) && !_endedServerToolIds.contains(id)) {
+      return <StreamChunk>[
+        ..._startServerTool(item),
+        ..._finishServerTool(id, item, fallbackStatus),
+      ];
+    }
+    return _finishServerTool(id, item, fallbackStatus);
+  }
+
+  List<StreamChunk> _finishServerTool(
+    String id,
+    Map<String, dynamic> item,
+    ServerToolStatus fallbackStatus,
+  ) {
+    _openServerToolIds.remove(id);
+    if (!_endedServerToolIds.add(id)) return const <StreamChunk>[];
+    return <StreamChunk>[
+      ServerToolEnd(
+        id: id,
+        input: item['action'],
+        output: item['output'] ?? item['result'] ?? item['action'],
+        status: _serverToolStatus(
+          (item['status'] ?? '').toString(),
+          fallback: fallbackStatus,
+        ),
+      ),
+    ];
+  }
+
+  List<StreamChunk> _closeOpenSeries({
+    ServerToolStatus serverStatus = ServerToolStatus.completed,
+  }) {
+    final chunks = <StreamChunk>[];
+    for (final id in _openToolIds.toList()) {
+      chunks.addAll(_endTool(id));
+    }
+    for (final id in _openImageIds.toList()) {
+      chunks.addAll(_endImage(id));
+    }
+    for (final id in _openServerToolIds.toList()) {
+      chunks.addAll(
+        _finishServerTool(id, <String, dynamic>{'id': id}, serverStatus),
+      );
+    }
+    return chunks;
+  }
+}
+
+bool _isResponsesServerTool(dynamic type) {
+  final value = (type ?? '').toString();
+  if (value.isEmpty ||
+      value == 'function_call' ||
+      value == 'message' ||
+      value == 'reasoning' ||
+      _isImageGenerationType(value)) {
+    return false;
+  }
+  if (value.contains('search')) return true;
+  const excluded = <String>{
+    'custom_tool_call',
+    'computer_call',
+    'local_shell_call',
+    'shell_call',
+  };
+  return value.endsWith('_call') && !excluded.contains(value);
+}
+
+String _serverToolName(String type) {
+  final local = type.contains(':') ? type.split(':').last : type;
+  if (local.contains('web_search') || local == 'search') return 'search_web';
+  return local.replaceAll(RegExp(r'_call$'), '');
+}
+
+ServerToolStatus _serverToolStatus(
+  String raw, {
+  required ServerToolStatus fallback,
+}) {
+  return switch (raw) {
+    'failed' || 'incomplete' || 'cancelled' => ServerToolStatus.failed,
+    'completed' => ServerToolStatus.completed,
+    'in_progress' => ServerToolStatus.inProgress,
+    _ => fallback,
+  };
+}
+
+String _rawImageBase64(String raw) {
+  final marker = ';base64,';
+  final index = raw.indexOf(marker);
+  if (raw.startsWith('data:') && index >= 0) {
+    return raw.substring(index + marker.length);
+  }
+  return raw;
 }
 
 bool _isImageGenerationType(dynamic type) {

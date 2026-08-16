@@ -1110,10 +1110,11 @@ void main() {
         r'!\[image\]\(([^)]+)\)',
       ).firstMatch(content)!.group(1)!;
       expect(content, contains('![image]('));
-      expect(imageUri, startsWith('kelivo-file:///'));
-      expect(imageUri.endsWith('.png'), isTrue);
-      final imagePath = SandboxPathResolver.fix(imageUri);
-      expect(await File(imagePath).readAsBytes(), const [1, 2, 3, 4]);
+      expect(imageUri, startsWith('data:image/png;base64,'));
+      expect(
+        base64Decode(imageUri.substring(imageUri.indexOf(',') + 1)),
+        const [1, 2, 3, 4],
+      );
       expect(chunks.last.isDone, isTrue);
     });
   });

@@ -73,7 +73,7 @@ void main() {
 
   test('accumulates indexed tool calls and XinLiu root-level tool_calls', () {
     final decoder = ChatCompletionsStreamDecoder();
-    decoder.accept(
+    final start = decoder.accept(
       _event(
         _choice(
           delta: <String, dynamic>{
@@ -91,7 +91,7 @@ void main() {
         ),
       ),
     );
-    decoder.accept(
+    final end = decoder.accept(
       _event(
         _choice(
           delta: <String, dynamic>{
@@ -111,9 +111,18 @@ void main() {
     expect(decoder.toolCalls[0]!['id'], 'call_1');
     expect(decoder.toolCalls[0]!['name'], 'lookup');
     expect(decoder.toolCalls[0]!['args'], '{"q":"kelivo"}');
+    expect(start.chunks.whereType<ToolCallStart>().single.id, 'call_1');
+    expect(start.chunks.whereType<ToolCallStart>().single.toolName, 'lookup');
+    expect(start.chunks.whereType<ToolCallDelta>().single.inputDelta, '{"q":');
+    expect(
+      end.chunks.whereType<ToolCallDelta>().single.inputDelta,
+      '"kelivo"}',
+    );
+    expect(end.chunks.whereType<ToolCallEnd>().single.id, 'call_1');
+    expect(decoder.onClosed(), isEmpty);
 
     final xinliu = ChatCompletionsStreamDecoder();
-    xinliu.accept(
+    final root = xinliu.accept(
       _event(<String, dynamic>{
         'tool_calls': [
           <String, dynamic>{
@@ -133,6 +142,55 @@ void main() {
     expect(xinliu.finishReason, 'tool_calls');
     expect(xinliu.toolCalls[0]!['id'], 'root_1');
     expect(xinliu.toolCalls[0]!['name'], 'search');
+    expect(root.chunks.whereType<ToolCallStart>().single.id, 'root_1');
+    expect(root.chunks.whereType<ToolCallEnd>().single.id, 'root_1');
+  });
+
+  test('uses StreamChunkIds when a tool call has no vendor id', () {
+    final decoder = ChatCompletionsStreamDecoder(sourceId: 'round-0');
+    final first = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'tool_calls': [
+              <String, dynamic>{
+                'index': 0,
+                'function': <String, dynamic>{
+                  'name': 'lookup',
+                  'arguments': '{',
+                },
+              },
+            ],
+          },
+        ),
+      ),
+    );
+    final id = first.chunks.whereType<ToolCallStart>().single.id;
+    expect(id, 'round-0:tool-1');
+    decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'tool_calls': [
+              <String, dynamic>{
+                'index': 0,
+                'id': 'call_late',
+                'function': <String, dynamic>{'arguments': '}'},
+              },
+            ],
+          },
+          finishReason: 'tool_calls',
+        ),
+      ),
+    );
+    expect(decoder.toolCalls[0]!['id'], 'call_late');
+    expect(
+      decoder
+          .accept(const SseEvent(data: '[DONE]'))
+          .chunks
+          .whereType<ToolCallEnd>(),
+      isEmpty,
+    );
   });
 
   test('overwrites finishReason from the current choices chunk', () {

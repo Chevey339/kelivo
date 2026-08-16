@@ -1,7 +1,26 @@
 {
   "text": "",
   "reasoning": "The user is asking me to call search_web twice in the same turn - once with \"Kotlin\" and once with \"Ktor\". They specifically said:\n1. Do not ask questions\n2. Do not compare yet \n3. Emit both tool calls together before any other work\n\nSo I need to make both function calls at the start of my response, then I can provide any additional context or information afterward.",
-  "toolCalls": [],
+  "toolCalls": [
+    {
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
+      "name": "search_web",
+      "phase": "start"
+    },
+    {
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
+      "name": "search_web",
+      "phase": "start"
+    },
+    {
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
+      "phase": "end"
+    },
+    {
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
+      "phase": "end"
+    }
+  ],
   "serverTools": [],
   "images": [],
   "chunks": [
@@ -172,6 +191,44 @@
       "id": "stream:reasoning-1",
       "text": "d.",
       "reasoningType": "reasoningText"
+    },
+    {
+      "type": "tool_call_start",
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
+      "name": "search_web"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
+      "inputDelta": "{\"query\": \"Kotlin"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
+      "inputDelta": "\"}"
+    },
+    {
+      "type": "tool_call_start",
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
+      "name": "search_web"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
+      "inputDelta": "{\"query\": \"Ktor"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
+      "inputDelta": "\"}"
+    },
+    {
+      "type": "tool_call_end",
+      "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb"
+    },
+    {
+      "type": "tool_call_end",
+      "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN"
     }
   ],
   "finishCount": 0,
