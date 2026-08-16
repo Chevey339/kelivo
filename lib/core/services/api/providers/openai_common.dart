@@ -586,15 +586,24 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   required bool allowRemoteImages,
   required _ReasoningContentReplayPolicy reasoningContentReplayPolicy,
   bool stripReasoningContent = false,
+  bool dashScopeQwenImageMode = false,
 }) async {
+  // DashScope's Qwen Image models are exposed through the Chat Completions
+  // endpoint, but differ from regular OpenAI-compatible chat models in two
+  // important ways: text must be a content-part array, and history cannot
+  // include assistant/tool messages. Keep only the current user turn so a
+  // follow-up generation does not fail after Kelivo has stored an image reply.
+  final requestMessages = dashScopeQwenImageMode
+      ? _lastUserMessageOnly(messages)
+      : messages;
   final out = <Map<String, dynamic>>[];
   // Assistant turns cannot carry image_url/video_url; stash for the last user
   // message (same pattern as Responses shouldAttachAssistantImage).
   // Use last *user* index — not array-tail — so tool follow-ups that append
   // assistant tool_calls / tool results still receive stashed assistant media.
   int lastUserIndex = -1;
-  for (int i = messages.length - 1; i >= 0; i--) {
-    if ((messages[i]['role'] ?? '').toString() == 'user') {
+  for (int i = requestMessages.length - 1; i >= 0; i--) {
+    if ((requestMessages[i]['role'] ?? '').toString() == 'user') {
       lastUserIndex = i;
       break;
     }
@@ -604,7 +613,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   final toolTurnIds = <int>{};
   final messageTurnIds = <int>[];
   var currentTurnId = -1;
-  for (final message in messages) {
+  for (final message in requestMessages) {
     final messageRole = (message['role'] ?? 'user').toString();
     if (messageRole == 'user') currentTurnId++;
     messageTurnIds.add(currentTurnId);
@@ -616,8 +625,8 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       toolTurnIds.add(currentTurnId);
     }
   }
-  for (int i = 0; i < messages.length; i++) {
-    final m = messages[i];
+  for (int i = 0; i < requestMessages.length; i++) {
+    final m = requestMessages[i];
     final originalContent = m['content'];
     final raw = originalContent is List
         ? ChatApiService._textFromContentParts(originalContent)
@@ -861,7 +870,11 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
         !hasAttachedImages &&
         !hasInternalMedia &&
         !shouldAttachAssistantMedia) {
-      outMsg['content'] = raw;
+      outMsg['content'] = dashScopeQwenImageMode
+          ? [
+              {'type': 'text', 'text': raw},
+            ]
+          : raw;
       out.add(outMsg);
       continue;
     }
@@ -1011,11 +1024,43 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
         outMsg['content'] = textOnly.isEmpty ? raw : textOnly;
       }
     } else {
-      outMsg['content'] = parts.isEmpty ? raw : parts;
+      outMsg['content'] = parts.isEmpty
+          ? (dashScopeQwenImageMode
+                ? [
+                    {'type': 'text', 'text': raw},
+                  ]
+                : raw)
+          : parts;
     }
     out.add(outMsg);
   }
   return out;
+}
+
+List<Map<String, dynamic>> _lastUserMessageOnly(
+  List<Map<String, dynamic>> messages,
+) {
+  for (var i = messages.length - 1; i >= 0; i--) {
+    if ((messages[i]['role'] ?? '').toString() == 'user') {
+      return [messages[i]];
+    }
+  }
+  // Preserve the original request if it is malformed rather than silently
+  // sending an empty messages array.
+  return messages;
+}
+
+bool _isDashScopeQwenImageModel(
+  ProviderConfig config,
+  String upstreamModelId,
+) {
+  final providerLabel = '${config.id} ${config.name}'.toLowerCase();
+  final looksLikeDashScope =
+      BuiltInToolsHelper.isDashScopeProvider(config) ||
+      providerLabel.contains('dashscope') ||
+      providerLabel.contains('aliyun');
+  return looksLikeDashScope &&
+      upstreamModelId.trim().toLowerCase().startsWith('qwen-image');
 }
 
 String _extractOpenAICompatibleDeltaText(Map? delta) {
@@ -1748,6 +1793,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       allowRemoteImages: allowRemoteImages,
       reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
       stripReasoningContent: isClaudeUpstream,
+      dashScopeQwenImageMode: _isDashScopeQwenImageModel(
+        config,
+        upstreamModelId,
+      ),
     );
     body = {
       'model': upstreamModelId,
@@ -2067,6 +2116,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             allowRemoteImages: allowRemoteImages,
             reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
             stripReasoningContent: isClaudeUpstream,
+            dashScopeQwenImageMode: _isDashScopeQwenImageModel(
+              config,
+              upstreamModelId,
+            ),
           );
           reqBody.remove('stream');
           req.body = jsonEncode(reqBody);
@@ -2273,6 +2326,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 allowRemoteImages: allowRemoteImages,
                 reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
                 stripReasoningContent: isClaudeUpstream,
+                dashScopeQwenImageMode: _isDashScopeQwenImageModel(
+                  config,
+                  upstreamModelId,
+                ),
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -3660,6 +3717,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 allowRemoteImages: allowRemoteImages,
                 reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
                 stripReasoningContent: isClaudeUpstream,
+                dashScopeQwenImageMode: _isDashScopeQwenImageModel(
+                  config,
+                  upstreamModelId,
+                ),
               ),
               'stream': true,
               if (temperature != null) 'temperature': temperature,
@@ -4171,6 +4232,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                     reasoningContentReplayPolicy:
                         info.reasoningContentReplayPolicy,
                     stripReasoningContent: isClaudeUpstream,
+                    dashScopeQwenImageMode: _isDashScopeQwenImageModel(
+                      config,
+                      upstreamModelId,
+                    ),
                   ),
                   'stream': true,
                   if (temperature != null) 'temperature': temperature,

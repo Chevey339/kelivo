@@ -176,6 +176,68 @@ void main() {
       expect(openRouterBody['top_p'], 0.8);
     });
 
+    test('DashScope Qwen Image sends only the latest user turn as parts',
+        () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody = (jsonDecode(await utf8.decoder.bind(request).join())
+                as Map)
+            .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'choices': [
+              {
+                'index': 0,
+                'delta': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final config = ProviderConfig(
+        id: 'Aliyun',
+        enabled: true,
+        name: 'Aliyun',
+        apiKey: 'test-key',
+        baseUrl: 'http://${server.address.address}:${server.port}/v1',
+        providerType: ProviderKind.openai,
+      );
+      final chunks = await ChatApiService.sendMessageStream(
+        config: config,
+        modelId: 'qwen-image-3.0-pro',
+        messages: const [
+          {'role': 'user', 'content': 'old prompt'},
+          {'role': 'assistant', 'content': 'old generated image'},
+          {'role': 'user', 'content': 'draw a sunset cottage'},
+        ],
+      ).toList();
+
+      expect(chunks.last.isDone, isTrue);
+      expect(requestBody['messages'], [
+        {
+          'role': 'user',
+          'content': [
+            {'type': 'text', 'text': 'draw a sunset cottage'},
+          ],
+        },
+      ]);
+    });
+
     test('GPT-5.6 auto effort omits incompatible sampling params', () async {
       final body = await _captureChatBody(
         modelId: 'openai/gpt-5.6-terra',
