@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../core/models/chat_message.dart';
 import '../models/message_edit_result.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -49,6 +51,12 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
+    // Edit field font scaling: the input font scale stacks on the app-wide
+    // UI scale from main.dart.
+    final mqData = MediaQuery.of(context);
+    final effectiveScale =
+        MediaQuery.textScalerOf(context).scale(1) *
+        context.watch<SettingsProvider>().inputFontScale;
     return Padding(
       // Ensure keyboard-safe bottom inset for the sheet
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
@@ -152,28 +160,37 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
               Expanded(
                 child: SingleChildScrollView(
                   controller: sc,
-                  child: TextField(
-                    controller: _controller,
-                    autofocus: false,
-                    keyboardType: TextInputType.multiline,
-                    minLines: 8,
-                    maxLines: null,
-                    decoration: InputDecoration(
-                      hintText: l10n.messageEditPageHint,
-                      filled: true,
-                      fillColor: context.appColors.surfaceFill,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.transparent),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide(
-                          color: cs.primary.withValues(alpha: 0.45),
+                  child: MediaQuery(
+                    data: mqData.copyWith(
+                      textScaler: TextScaler.linear(effectiveScale),
+                    ),
+                    child: TextField(
+                      controller: _controller,
+                      autofocus: false,
+                      keyboardType: TextInputType.multiline,
+                      minLines: 8,
+                      maxLines: null,
+                      decoration: InputDecoration(
+                        hintText: l10n.messageEditPageHint,
+                        filled: true,
+                        fillColor: context.appColors.surfaceFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(
+                            color: Colors.transparent,
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(
+                            color: Colors.transparent,
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: BorderSide(
+                            color: cs.primary.withValues(alpha: 0.45),
+                          ),
                         ),
                       ),
                     ),
