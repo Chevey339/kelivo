@@ -670,6 +670,27 @@ class ChatActions {
     required String errorText,
   }) => partialContent.isEmpty ? errorText : partialContent;
 
+  /// Assemble the assistant part list after a stream error.
+  ///
+  /// When no visible text arrived, the error string is written through
+  /// [ChatMessage.partsWithReplacedText] so reasoning / tool / image parts
+  /// already accumulated stay in place.
+  @visibleForTesting
+  static List<MessagePart> assistantPartsForStreamError({
+    required List<MessagePart> parts,
+    required String partialContent,
+    required String errorText,
+  }) {
+    final displayContent = resolveStreamErrorContent(
+      partialContent: partialContent,
+      errorText: errorText,
+    );
+    if (partialContent.isEmpty) {
+      return ChatMessage.partsWithReplacedText(parts, displayContent);
+    }
+    return List<MessagePart>.of(parts);
+  }
+
   @visibleForTesting
   static StreamSubscription<T> listenSequentiallyToStream<T>({
     required Stream<T> stream,
@@ -2271,14 +2292,12 @@ class ChatActions {
     final partialContent = state.fullContentRaw.isEmpty
         ? ''
         : _transformAssistantContent(state, state.fullContentRaw);
-    final displayContent = resolveStreamErrorContent(
-      partialContent: partialContent,
-      errorText: errorText,
-    );
     final errorParts = await _sanitizeAssistantImageParts(
-      partialContent.isEmpty
-          ? <MessagePart>[TextPart(displayContent)]
-          : _assistantPartsForState(state),
+      assistantPartsForStreamError(
+        parts: _assistantPartsForState(state),
+        partialContent: partialContent,
+        errorText: errorText,
+      ),
     );
     final errorMessage = _streamingMessageSnapshot(state).copyWith(
       parts: errorParts,

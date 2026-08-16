@@ -95,4 +95,58 @@ void main() {
     expect(find.textContaining('lookup'), findsWidgets);
     expect(find.textContaining('done'), findsWidgets);
   });
+
+  testWidgets('ChatBox imported reasoning-then-text parts render both blocks', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildHarness(
+        child: ChatMessageWidget(
+          message: ChatMessage(
+            id: 'chatbox-reasoning',
+            role: 'assistant',
+            conversationId: 'c1',
+            parts: const [
+              ReasoningPart('first thought\nsecond thought'),
+              TextPart('Because.'),
+            ],
+          ),
+          showModelIcon: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('first thought'), findsWidgets);
+    expect(find.textContaining('second thought'), findsWidgets);
+    expect(find.textContaining('Because.'), findsWidgets);
+  });
+
+  testWidgets(
+    'ChatBox imported text-reasoning-text loads as thinking then body',
+    (tester) async {
+      await tester.pumpWidget(
+        _buildHarness(
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              id: 'chatbox-split',
+              role: 'assistant',
+              conversationId: 'c1',
+              parts: const [
+                ReasoningPart('think'),
+                TextPart('before'),
+                TextPart('\nafter'),
+              ],
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.textContaining('think'), findsWidgets);
+      expect(find.textContaining('before'), findsWidgets);
+      expect(find.textContaining('after'), findsWidgets);
+    },
+  );
 }
