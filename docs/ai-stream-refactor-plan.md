@@ -258,13 +258,14 @@ P4 独立一周，含真机验证。P5/P6 属于清理，可以延后但别无�
 | P4b-4 | #893 | `e9ad1f12` | 删除 adapter / `ChatStreamChunk` / shadow，对应计划 P4.3 |
 | P5-1 | #894 | `f520847a` | 工具循环上提。OpenAI 仍是 follow-up 入口，Claude/Gemini 是整轮入口，合不了，runner 里写了原因 |
 | P5-2 | #895 | `c830b85a` | `TextGenerationResult` + 共用 handler。`generation/` 清掉协议名 |
-| P6 | 本文件 | — | 拆 part、删 shims、`partsHandler`、`docs/ai-stream.md` |
+| P6 | #896 | `eb82f7aa` | 拆 part、删 shims、`partsHandler`、`docs/ai-stream.md` |
+| P7 | 本文件 | — | 按协议切开 `openai_common.dart`。纯移动，不改 heuristic |
 
 **`openai_common` 的 ~1500 行目标是错的，不要再朝这个数字改。**
 
 P6 原文写「从 4667 降到 ~1500（只剩请求体构造与 vendor heuristics）」。响应侧搬走之后，这个文件停在 ~3000 行，不降反升过十几行。剩下的几乎全是请求体构造和 vendor 兼容性 heuristics（Kimi / Zhipu / LongCat / GPT-5 sampling / OpenRouter Claude cache / built-in search / reasoning knobs）。第三节已经写了「请求体构造不动，这次只碰响应侧」——~1500 是误把响应侧当成了这个文件的大头。
 
-这些 heuristics 没有轨迹测试兜底，是全项目最不该在收尾阶段动的代码。后人不要为了凑行数去拆或「清理」它们。
+这些 heuristics 没有轨迹测试兜底，不要改它们的逻辑。P7 只是按协议把原文搬到 `providers/openai/`：`chat_completions_api.dart`、`responses_api.dart`、`openai_vendor_compat.dart`、`openai_provider.dart`。下次某个 vendor 又出怪癖时，改 `openai_vendor_compat.dart`。
 
 正确的终点指标：
 

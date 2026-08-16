@@ -17,7 +17,7 @@ import 'providers/claude_official.dart';
 import 'providers/google_gemini.dart';
 import 'providers/google_vertex.dart';
 import 'providers/openai_chat_completions.dart';
-import 'providers/openai_common.dart';
+import 'providers/openai/openai_vendor_compat.dart';
 import 'providers/openai_images.dart';
 import 'providers/openai_responses.dart';
 

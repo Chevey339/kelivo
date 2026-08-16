@@ -1,7 +1,7 @@
 # Kelivo AI 流
 
 协议无关的流式事件、decoder 契约、轨迹回放，以及如何加一个新 provider。
-请求体构造和 vendor heuristics 不在这里——那是 `providers/*_common.dart` 的资产。
+请求体构造和 vendor heuristics 不在这里——那是各 provider 请求文件和 `providers/openai/openai_vendor_compat.dart` 的资产。
 
 ## 事件语义与生命周期
 
