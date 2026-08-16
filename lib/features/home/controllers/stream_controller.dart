@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
@@ -6,6 +7,7 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../chat/widgets/chat_message_widget.dart';
@@ -895,9 +897,9 @@ class StreamController {
     }
   }
 
-  /// Process tool calls chunk from stream.
+  /// Process a tool-call [StreamChunk] (Start placeholder or End with args).
   Future<void> handleToolCallsChunk(
-    List<EmitToolCall> toolCalls,
+    StreamChunk chunk,
     StreamingState state, {
     required Future<void> Function(String messageId, String json)
     updateReasoningSegmentsInDb,
@@ -909,7 +911,8 @@ class StreamController {
     required List<Map<String, dynamic>> Function(String messageId)
     getToolEventsFromDb,
   }) async {
-    if (toolCalls.isEmpty) return;
+    final call = _toolCallUiFromChunk(chunk, state);
+    if (call == null) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
@@ -932,21 +935,17 @@ class StreamController {
       );
     }
 
-    // Add tool call placeholders
     final existing = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final c in toolCalls) {
-      existing.add(
-        ToolUIPart(
-          id: c.id,
-          toolName: c.name,
-          arguments: c.arguments,
-          loading: true,
-        ),
-      );
-    }
+    existing.add(
+      ToolUIPart(
+        id: call.id,
+        toolName: call.name,
+        arguments: call.arguments,
+        loading: true,
+      ),
+    );
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(existing);
-      // Notify via StreamingContentNotifier for real-time UI updates
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
         contentSplitOffsets: state.contentSplitOffsets,
@@ -955,28 +954,26 @@ class StreamController {
       );
     }
 
-    // Persist tool events
     try {
       final prev = getToolEventsFromDb(messageId);
       final newEvents = <Map<String, dynamic>>[
         ...prev,
-        for (final c in toolCalls)
-          {
-            'id': c.id,
-            'name': c.name,
-            'arguments': c.arguments,
-            'content': null,
-            if (c.metadata != null && c.metadata!.isNotEmpty)
-              'metadata': c.metadata,
-          },
+        {
+          'id': call.id,
+          'name': call.name,
+          'arguments': call.arguments,
+          'content': null,
+          if (call.metadata != null && call.metadata!.isNotEmpty)
+            'metadata': call.metadata,
+        },
       ];
       await setToolEventsInDb(messageId, dedupeToolEvents(newEvents));
     } catch (_) {}
   }
 
-  /// Process tool results chunk from stream.
+  /// Process a tool-result [StreamChunk] (local result, server tool, or citations).
   Future<void> handleToolResultsChunk(
-    List<EmitToolResult> toolResults,
+    StreamChunk chunk,
     StreamingState state, {
     required Future<void> Function(
       String messageId, {
@@ -988,64 +985,69 @@ class StreamController {
     })
     upsertToolEventInDb,
   }) async {
-    if (toolResults.isEmpty) return;
+    final result = _toolResultUiFromChunk(chunk, state);
+    if (result == null) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     state.hadThinkingBlock = true;
 
     final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final r in toolResults) {
-      int idx = -1;
+    int idx = -1;
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i].loading &&
+          (parts[i].id == result.id ||
+              (parts[i].id.isEmpty && parts[i].toolName == result.name))) {
+        idx = i;
+        break;
+      }
+    }
+    if (idx < 0 && result.id.isNotEmpty) {
       for (int i = 0; i < parts.length; i++) {
-        if (parts[i].loading &&
-            (parts[i].id == r.id ||
-                (parts[i].id.isEmpty && parts[i].toolName == r.name))) {
+        if (parts[i].id == result.id) {
           idx = i;
           break;
         }
       }
-      if (idx >= 0) {
-        parts[idx] = ToolUIPart(
-          id: parts[idx].id,
-          toolName: parts[idx].toolName,
-          arguments: r.arguments.isNotEmpty
-              ? Map<String, dynamic>.from(r.arguments)
-              : parts[idx].arguments,
-          content: r.content,
-          loading: false,
-        );
-      } else if (r.id == 'builtin_search' &&
-          parts.any((part) => part.id != r.id && part.toolName == r.name)) {
-        // Annotations map to a synthetic search result. The
-        // server tool already carries those citations.
-        continue;
-      } else {
-        parts.add(
-          ToolUIPart(
-            id: r.id,
-            toolName: r.name,
-            arguments: r.arguments,
-            content: r.content,
-            loading: false,
-          ),
-        );
-      }
-      try {
-        final args = Map<String, dynamic>.from(r.arguments);
-        await upsertToolEventInDb(
-          messageId,
-          id: r.id,
-          name: r.name,
-          arguments: args,
-          content: r.content,
-          metadata: r.metadata,
-        );
-      } catch (_) {}
     }
+    if (idx >= 0) {
+      parts[idx] = ToolUIPart(
+        id: parts[idx].id,
+        toolName: parts[idx].toolName,
+        arguments: result.arguments.isNotEmpty
+            ? Map<String, dynamic>.from(result.arguments)
+            : parts[idx].arguments,
+        content: result.content,
+        loading: false,
+      );
+    } else if (result.id == 'builtin_search' &&
+        parts.any(
+          (part) => part.id != result.id && part.toolName == result.name,
+        )) {
+      return;
+    } else {
+      parts.add(
+        ToolUIPart(
+          id: result.id,
+          toolName: result.name,
+          arguments: result.arguments,
+          content: result.content,
+          loading: false,
+        ),
+      );
+    }
+    try {
+      await upsertToolEventInDb(
+        messageId,
+        id: result.id,
+        name: result.name,
+        arguments: Map<String, dynamic>.from(result.arguments),
+        content: result.content,
+        metadata: result.metadata,
+      );
+    } catch (_) {}
     if (getCurrentConversationId() == conversationId) {
       _toolParts[messageId] = dedupeToolPartsList(parts);
-      // Notify via StreamingContentNotifier for real-time UI updates
       final splits = _contentSplits[messageId];
       streamingContentNotifier.notifyToolPartsUpdated(
         messageId,
@@ -1054,6 +1056,149 @@ class StreamController {
         toolCountAtSplit: splits?.toolCounts,
       );
     }
+  }
+
+  ({
+    String id,
+    String name,
+    Map<String, dynamic> arguments,
+    Map<String, dynamic>? metadata,
+  })?
+  _toolCallUiFromChunk(StreamChunk chunk, StreamingState state) {
+    switch (chunk) {
+      case ToolCallStart(:final id, :final toolName, :final metadata):
+        return (
+          id: id,
+          name: toolName.isNotEmpty
+              ? toolName
+              : (state.pendingToolNames[id] ?? ''),
+          arguments: const <String, dynamic>{},
+          metadata: metadata,
+        );
+      case ToolCallEnd(:final id):
+        final fromHandler = _toolPayloadFromHandler(state, id);
+        return (
+          id: id,
+          name: (fromHandler?['name'] ?? state.pendingToolNames[id] ?? '')
+              .toString(),
+          arguments: _mapOrEmpty(fromHandler?['arguments']),
+          metadata: _mapOrNull(fromHandler?['metadata']),
+        );
+      default:
+        return null;
+    }
+  }
+
+  ({
+    String id,
+    String name,
+    Map<String, dynamic> arguments,
+    String content,
+    Map<String, dynamic>? metadata,
+  })?
+  _toolResultUiFromChunk(StreamChunk chunk, StreamingState state) {
+    switch (chunk) {
+      case ServerToolEnd(
+        :final id,
+        :final input,
+        :final output,
+        :final metadata,
+      ):
+        return (
+          id: id,
+          name: _toolResultName(state, id),
+          arguments: _mapOrEmpty(input),
+          content: _toolOutputText(output),
+          metadata: metadata,
+        );
+      case ToolCallResult(:final id, :final output, :final metadata):
+        final fromHandler = _toolPayloadFromHandler(state, id);
+        return (
+          id: id,
+          name: _toolResultName(
+            state,
+            id,
+            fromHandler: (fromHandler?['name'] ?? '').toString(),
+          ),
+          arguments: _mapOrEmpty(fromHandler?['arguments']),
+          content: _toolOutputText(output),
+          metadata: metadata,
+        );
+      case Annotations(:final annotations):
+        if (annotations.isEmpty) return null;
+        return (
+          id: 'builtin_search',
+          name: 'search_web',
+          arguments: const <String, dynamic>{},
+          content: jsonEncode(<String, dynamic>{
+            'items': [
+              for (final citation
+                  in annotations.whereType<UrlCitationAnnotation>())
+                <String, dynamic>{
+                  'url': citation.url,
+                  if (citation.title.isNotEmpty) 'title': citation.title,
+                },
+            ],
+          }),
+          metadata: null,
+        );
+      default:
+        return null;
+    }
+  }
+
+  Map<String, dynamic>? _toolPayloadFromHandler(
+    StreamingState state,
+    String id,
+  ) {
+    for (final part in state.shadowHandler.parts.reversed) {
+      if (part is! ToolCallPart) continue;
+      try {
+        final decoded = jsonDecode(part.payloadJson);
+        if (decoded is Map && (decoded['id'] ?? '').toString() == id) {
+          return decoded.cast<String, dynamic>();
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  String _toolResultName(
+    StreamingState state,
+    String id, {
+    String? fromHandler,
+  }) {
+    final name =
+        state.pendingToolNames.remove(id) ??
+        (fromHandler != null && fromHandler.isNotEmpty ? fromHandler : null) ??
+        _existingToolName(state, id) ??
+        '';
+    if (name.isNotEmpty) return name;
+    if (id == 'builtin_search') return 'builtin_search';
+    return '';
+  }
+
+  String? _existingToolName(StreamingState state, String id) {
+    for (final part in _toolParts[state.messageId] ?? const <ToolUIPart>[]) {
+      if (part.id == id && part.toolName.isNotEmpty) return part.toolName;
+    }
+    return null;
+  }
+
+  static Map<String, dynamic> _mapOrEmpty(Object? value) {
+    if (value is Map) return value.cast<String, dynamic>();
+    return const <String, dynamic>{};
+  }
+
+  static Map<String, dynamic>? _mapOrNull(Object? value) {
+    if (value is Map) return value.cast<String, dynamic>();
+    return null;
+  }
+
+  static String _toolOutputText(Object? output) {
+    if (output == null) return '';
+    if (output is String) return output;
+    return jsonEncode(output);
   }
 
   /// Finish reasoning segment when content starts arriving.

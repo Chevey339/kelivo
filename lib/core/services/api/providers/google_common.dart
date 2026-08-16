@@ -667,202 +667,189 @@ Stream<StreamChunk> _sendGoogleStream(
     TokenUsage? totalUsage;
     List<Map<String, dynamic>> currentContents =
         List<Map<String, dynamic>>.from(contents);
-    while (true) {
-      final req = http.Request('POST', Uri.parse(url));
-      req.headers.addAll(headers);
-      final body = Map<String, dynamic>.from(baseBody);
-      body['contents'] = _googleApiContents(currentContents);
-      req.body = jsonEncode(body);
-      final resp = await client.send(req);
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        final errorBody = await resp.stream.bytesToString();
-        throw HttpException('HTTP ${resp.statusCode}: $errorBody');
-      }
-      final txt = await resp.stream.bytesToString();
-      final obj = jsonDecode(txt) as Map<String, dynamic>;
-      try {
-        final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
-        if (u != null) {
-          final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
-          final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(
-            TokenUsage(
-              promptTokens: prompt,
-              completionTokens: completion,
-              cachedTokens: 0,
-            ),
-          );
+    var pendingCalls = <EmitToolCall>[];
+    var lastParts = <dynamic>[];
+    var lastFunctionCallParts = <dynamic>[];
+    var lastText = '';
+
+    yield* runProviderToolRounds(
+      sendRound: () async* {
+        pendingCalls = [];
+        lastParts = [];
+        lastFunctionCallParts = [];
+        lastText = '';
+        final req = http.Request('POST', Uri.parse(url));
+        req.headers.addAll(headers);
+        final body = Map<String, dynamic>.from(baseBody);
+        body['contents'] = _googleApiContents(currentContents);
+        req.body = jsonEncode(body);
+        final resp = await client.send(req);
+        if (resp.statusCode < 200 || resp.statusCode >= 300) {
+          final errorBody = await resp.stream.bytesToString();
+          throw HttpException('HTTP ${resp.statusCode}: $errorBody');
         }
-      } catch (_) {}
-      final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
-      if (candidates.isEmpty) {
-        yield* emitDone(
-          usage: totalUsage,
-          totalTokens: totalUsage?.totalTokens ?? 0,
-        );
-        return;
-      }
-      final cand = (candidates.first as Map).cast<String, dynamic>();
-      final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
-      final functionCallParts = parts
-          .where((e) => e is Map && e.containsKey('functionCall'))
-          .toList();
-      if (functionCallParts.isNotEmpty && onToolCall != null) {
-        final responseParts = <Map<String, dynamic>>[];
-        for (int idx = 0; idx < functionCallParts.length; idx++) {
-          final fc = functionCallParts[idx] as Map;
-          final call = (fc['functionCall'] as Map).cast<String, dynamic>();
-          final name = (call['name'] ?? '').toString();
-          final args =
-              (call['args'] as Map?)?.cast<String, dynamic>() ??
-              const <String, dynamic>{};
-          // Prefer API-provided functionCall id, fall back to synthetic.
-          final partId = _effectiveToolCallId(call['id'], 'fn', idx);
-          // Preserve the raw part (incl. thoughtSignature) so the tool event
-          // metadata can replay this model turn exactly on later requests.
-          final rawPart = fc.cast<String, dynamic>();
-          String? thoughtSigKey;
-          dynamic thoughtSigVal;
-          if (fc.containsKey('thoughtSignature')) {
-            thoughtSigKey = 'thoughtSignature';
-            thoughtSigVal = fc['thoughtSignature'];
-          } else if (fc.containsKey('thought_signature')) {
-            thoughtSigKey = 'thought_signature';
-            thoughtSigVal = fc['thought_signature'];
+        final txt = await resp.stream.bytesToString();
+        final obj = jsonDecode(txt) as Map<String, dynamic>;
+        try {
+          final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
+          if (u != null) {
+            final prompt = (u['promptTokenCount'] ?? 0) as int? ?? 0;
+            final completion = (u['candidatesTokenCount'] ?? 0) as int? ?? 0;
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
+              TokenUsage(
+                promptTokens: prompt,
+                completionTokens: completion,
+                cachedTokens: 0,
+              ),
+            );
           }
-          final googleMetadata = <String, dynamic>{
-            'google': {
-              'part': rawPart,
-              if (thoughtSigKey != null && thoughtSigVal != null)
-                'thoughtSigKey': thoughtSigKey,
-              if (thoughtSigKey != null && thoughtSigVal != null)
-                'thoughtSigVal': thoughtSigVal,
-            },
-          };
-          yield* emitToolCalls(
-            [
-              emitToolCall(
-                id: partId,
-                name: name,
-                arguments: args,
-                metadata: googleMetadata,
-              ),
-            ],
-            usage: totalUsage,
-            totalTokens: totalUsage?.totalTokens ?? 0,
-          );
-          final res = await onToolCall(name, args, toolCallId: partId);
-          yield* emitToolResults(
-            [
-              emitToolResult(
-                id: partId,
-                name: name,
-                arguments: args,
-                content: res,
-                metadata: googleMetadata,
-              ),
-            ],
-            usage: totalUsage,
-            totalTokens: totalUsage?.totalTokens ?? 0,
-          );
-          final frPart = <String, dynamic>{
-            'functionResponse': {
-              'name': name,
-              'response': {'result': res},
-              if (call.containsKey('id')) 'id': call['id'],
-            },
-          };
-          responseParts.add(frPart);
+        } catch (_) {}
+        final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
+        if (candidates.isEmpty) return;
+        final cand = (candidates.first as Map).cast<String, dynamic>();
+        final parts = (cand['content']?['parts'] as List?) ?? const <dynamic>[];
+        final functionCallParts = parts
+            .where((e) => e is Map && e.containsKey('functionCall'))
+            .toList();
+        lastParts = parts;
+        lastFunctionCallParts = functionCallParts;
+        if (functionCallParts.isNotEmpty && onToolCall != null) {
+          pendingCalls = [
+            for (var idx = 0; idx < functionCallParts.length; idx++)
+              () {
+                final fc = functionCallParts[idx] as Map;
+                final call = (fc['functionCall'] as Map)
+                    .cast<String, dynamic>();
+                String? thoughtSigKey;
+                dynamic thoughtSigVal;
+                if (fc.containsKey('thoughtSignature')) {
+                  thoughtSigKey = 'thoughtSignature';
+                  thoughtSigVal = fc['thoughtSignature'];
+                } else if (fc.containsKey('thought_signature')) {
+                  thoughtSigKey = 'thought_signature';
+                  thoughtSigVal = fc['thought_signature'];
+                }
+                return emitToolCall(
+                  id: _effectiveToolCallId(call['id'], 'fn', idx),
+                  name: (call['name'] ?? '').toString(),
+                  arguments:
+                      (call['args'] as Map?)?.cast<String, dynamic>() ??
+                      const <String, dynamic>{},
+                  metadata: {
+                    'google': {
+                      'part': fc.cast<String, dynamic>(),
+                      if (thoughtSigKey != null && thoughtSigVal != null)
+                        'thoughtSigKey': thoughtSigKey,
+                      if (thoughtSigKey != null && thoughtSigVal != null)
+                        'thoughtSigVal': thoughtSigVal,
+                    },
+                  },
+                );
+              }(),
+          ];
+          return;
         }
-        currentContents = [
-          ...currentContents,
-          // Pass ALL parts from model response (preserves server-side tool parts,
-          // thought signatures, and other fields)
-          {'role': 'model', 'parts': parts},
-          {'role': 'user', 'parts': responseParts},
-        ];
-        continue;
-      }
-      // Emit server-side code execution parts as tool cards.
-      // Assumes executableCode and codeExecutionResult alternate in 1:1 pairs
-      // (matching current Gemini API behavior).
-      int codeExecIdx = 0;
-      for (final p in parts) {
-        if (p is! Map) continue;
-        final ec = p['executableCode'] ?? p['executable_code'];
-        if (ec is Map) {
-          final lang = (ec['language'] ?? '').toString().toLowerCase();
-          final code = (ec['code'] ?? '').toString();
-          if (code.isNotEmpty) {
-            final ceId = 'code_exec_$codeExecIdx';
-            codeExecIdx++;
-            yield* emitToolCalls(
-              [
-                emitToolCall(
-                  id: ceId,
-                  name: 'code_execution',
-                  arguments: {'language': lang, 'code': code},
-                ),
-              ],
-              usage: totalUsage,
-              totalTokens: totalUsage?.totalTokens ?? 0,
+        // Provider-hosted code execution stays on ServerTool*, not ToolCallResult.
+        var codeExecIdx = 0;
+        for (final p in parts) {
+          if (p is! Map) continue;
+          final ec = p['executableCode'] ?? p['executable_code'];
+          if (ec is Map) {
+            final lang = (ec['language'] ?? '').toString().toLowerCase();
+            final code = (ec['code'] ?? '').toString();
+            if (code.isNotEmpty) {
+              final ceId = 'code_exec_$codeExecIdx';
+              codeExecIdx++;
+              yield ToolCallStart(id: ceId, toolName: 'code_execution');
+              yield ToolCallDelta(
+                id: ceId,
+                inputDelta: jsonEncode({'language': lang, 'code': code}),
+              );
+              yield ToolCallEnd(ceId);
+            }
+          }
+          final cr = p['codeExecutionResult'] ?? p['code_execution_result'];
+          if (cr is Map) {
+            final outcome = (cr['outcome'] ?? '').toString();
+            final output = (cr['output'] ?? '').toString();
+            final resultId = codeExecIdx > 0
+                ? 'code_exec_${codeExecIdx - 1}'
+                : 'code_exec_0';
+            yield ServerToolStart(id: resultId, toolName: 'code_execution');
+            yield ServerToolEnd(
+              id: resultId,
+              output: output.isEmpty ? outcome : output,
             );
           }
         }
-        final cr = p['codeExecutionResult'] ?? p['code_execution_result'];
-        if (cr is Map) {
-          final outcome = (cr['outcome'] ?? '').toString();
-          final output = (cr['output'] ?? '').toString();
-          final resultId = codeExecIdx > 0
-              ? 'code_exec_${codeExecIdx - 1}'
-              : 'code_exec_0';
-          yield* emitToolResults(
-            [
-              emitToolResult(
-                id: resultId,
-                name: 'code_execution',
-                arguments: const <String, dynamic>{},
-                content: output.isEmpty ? outcome : output,
-              ),
-            ],
+        final buf = StringBuffer();
+        final reasoningBuf = StringBuffer();
+        for (final p in parts) {
+          if (p is! Map) continue;
+          final text = p['text'];
+          if (text is! String || text.isEmpty) continue;
+          final thought = p['thought'] as bool? ?? false;
+          if (thought) {
+            reasoningBuf.write(text);
+          } else {
+            buf.write(text);
+          }
+        }
+        final reasoningStr = reasoningBuf.toString();
+        if (reasoningStr.isNotEmpty) {
+          yield* emitDelta(
+            reasoning: reasoningStr,
             usage: totalUsage,
             totalTokens: totalUsage?.totalTokens ?? 0,
           );
         }
-      }
-      final buf = StringBuffer();
-      final reasoningBuf = StringBuffer();
-      for (final p in parts) {
-        if (p is! Map) continue;
-        final text = p['text'];
-        if (text is! String || text.isEmpty) continue;
-        final thought = p['thought'] as bool? ?? false;
-        if (thought) {
-          reasoningBuf.write(text);
-        } else {
-          buf.write(text);
+        var contentStr = buf.toString();
+        if (persistGeminiThoughtSigs) {
+          final metaComment = _collectThoughtSigCommentFromParts(parts);
+          if (metaComment.isNotEmpty) contentStr += metaComment;
         }
-      }
-      final reasoningStr = reasoningBuf.toString();
-      if (reasoningStr.isNotEmpty) {
-        yield* emitDelta(
-          reasoning: reasoningStr,
-          usage: totalUsage,
-          totalTokens: totalUsage?.totalTokens ?? 0,
-        );
-      }
-      var contentStr = buf.toString();
-      if (persistGeminiThoughtSigs) {
-        final metaComment = _collectThoughtSigCommentFromParts(parts);
-        if (metaComment.isNotEmpty) contentStr += metaComment;
-      }
-      yield* emitDone(
-        content: contentStr,
+        lastText = contentStr;
+      },
+      takeCalls: () => pendingCalls,
+      continueWithoutCalls: () => false,
+      executeAfterRound: true,
+      emitCalls: true,
+      onToolCall: onToolCall,
+      append: (executed) {
+        currentContents = [
+          ...currentContents,
+          {'role': 'model', 'parts': lastParts},
+          {
+            'role': 'user',
+            'parts': [
+              for (var i = 0; i < executed.length; i++)
+                <String, dynamic>{
+                  'functionResponse': {
+                    'name': executed[i].call.name,
+                    'response': {'result': executed[i].content},
+                    if (i < lastFunctionCallParts.length &&
+                        lastFunctionCallParts[i] is Map &&
+                        ((lastFunctionCallParts[i] as Map)['functionCall']
+                                    as Map?)
+                                ?.containsKey('id') ==
+                            true)
+                      'id':
+                          ((lastFunctionCallParts[i] as Map)['functionCall']
+                              as Map)['id'],
+                  },
+                },
+            ],
+          },
+        ];
+      },
+      finish: () => emitDone(
+        content: lastText,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
-      );
-      return;
-    }
+      ),
+      usageOf: () => totalUsage,
+    );
+    return;
   }
 
   // Implement SSE streaming via :streamGenerateContent with alt=sse
@@ -1106,295 +1093,325 @@ Stream<StreamChunk> _sendGoogleStream(
   final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
   int malformedResponseRetryCount = 0;
   var streamRound = 0;
+  var pendingCalls = <EmitToolCall>[];
+  var lastRoundCalls = <Map<String, dynamic>>[];
+  var lastRoundModelParts = <dynamic>[];
+  var retryMalformed = false;
 
-  while (true) {
-    final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
-      upstreamModelId,
-    );
-    final omitSamplingParams = _shouldOmitGeminiSamplingParams(upstreamModelId);
-    final gen = <String, dynamic>{
-      if (!omitSamplingParams && temperature != null)
-        'temperature': temperature,
-      if (!omitSamplingParams && topP != null) 'topP': topP,
-      if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
-        'maxOutputTokens': resolvedMaxTokens,
-      // Enable IMAGE+TEXT output modalities when model is configured to output images
-      if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
-      if (isReasoning)
-        ...() {
-          final thinkingConfig = _googleThinkingConfig(
-            upstreamModelId,
-            thinkingBudget,
-          );
-          if (thinkingConfig.isEmpty) return const <String, dynamic>{};
-          return {'thinkingConfig': thinkingConfig};
-        }(),
-    };
-    final body = <String, dynamic>{
-      'contents': convo,
-      if (systemPrompt.isNotEmpty)
-        'systemInstruction': {
-          'parts': [
-            {'text': systemPrompt},
-          ],
-        },
-      if (gen.isNotEmpty) 'generationConfig': gen,
-      if (toolsArr.isNotEmpty) 'tools': toolsArr,
-      if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
-    };
+  yield* runProviderToolRounds(
+    sendRound: () async* {
+      pendingCalls = [];
+      lastRoundCalls = [];
+      lastRoundModelParts = [];
+      retryMalformed = false;
+      final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
+        upstreamModelId,
+      );
+      final omitSamplingParams = _shouldOmitGeminiSamplingParams(
+        upstreamModelId,
+      );
+      final gen = <String, dynamic>{
+        if (!omitSamplingParams && temperature != null)
+          'temperature': temperature,
+        if (!omitSamplingParams && topP != null) 'topP': topP,
+        if (maxTokens ?? defaultMaxOutputTokens case final resolvedMaxTokens?)
+          'maxOutputTokens': resolvedMaxTokens,
+        // Enable IMAGE+TEXT output modalities when model is configured to output images
+        if (wantsImageOutput) 'responseModalities': ['TEXT', 'IMAGE'],
+        if (isReasoning)
+          ...() {
+            final thinkingConfig = _googleThinkingConfig(
+              upstreamModelId,
+              thinkingBudget,
+            );
+            if (thinkingConfig.isEmpty) return const <String, dynamic>{};
+            return {'thinkingConfig': thinkingConfig};
+          }(),
+      };
+      final body = <String, dynamic>{
+        'contents': convo,
+        if (systemPrompt.isNotEmpty)
+          'systemInstruction': {
+            'parts': [
+              {'text': systemPrompt},
+            ],
+          },
+        if (gen.isNotEmpty) 'generationConfig': gen,
+        if (toolsArr.isNotEmpty) 'tools': toolsArr,
+        if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
+      };
 
-    final request = http.Request('POST', uri);
-    final requestHeaders = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'text/event-stream',
-    };
-    if (config.vertexAI == true) {
-      final token = await _maybeVertexAccessToken(config);
-      if (token != null && token.isNotEmpty) {
-        requestHeaders['Authorization'] = 'Bearer $token';
-      }
-      final proj = (config.projectId ?? '').trim();
-      if (proj.isNotEmpty) requestHeaders['X-Goog-User-Project'] = proj;
-    } else {
-      final apiKey = _effectiveApiKey(config);
-      if (apiKey.isNotEmpty) {
-        requestHeaders['x-goog-api-key'] = apiKey;
-      }
-    }
-    final headers = _customHeaders(
-      config,
-      modelId,
-      baseHeaders: requestHeaders,
-      assistantHeaders: extraHeaders,
-    );
-    request.headers.addAll(headers);
-    final extra = _customBody(config, modelId, assistantBody: extraBody);
-    if (extra.isNotEmpty) {
-      body.addAll(extra);
-    }
-    body['contents'] = _googleApiContents(convo);
-    request.body = jsonEncode(body);
-
-    final resp = await client.send(request);
-    if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      final errorBody = await resp.stream.bytesToString();
-      throw HttpException('HTTP ${resp.statusCode}: $errorBody');
-    }
-
-    final sse = resp.stream.transform(utf8.decoder);
-    final decoder = GoogleStreamDecoder(
-      isGemini3: isGemini3,
-      persistThoughtSigs: persistGeminiThoughtSigs,
-      expectImage: expectImage,
-      receivedImage: receivedImage,
-      initialUsage: usage,
-      citations: builtinCitations,
-      sourceId: 'round-${streamRound++}',
-    );
-    Future<String> sanitizeTextIfNeeded(String input) async {
-      if (input.isEmpty) return input;
-      if (input.contains('data:image') && input.contains('base64,')) {
-        try {
-          return await MarkdownMediaSanitizer.replaceInlineBase64Images(input);
-        } catch (_) {
-          return input;
+      final request = http.Request('POST', uri);
+      final requestHeaders = <String, String>{
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      };
+      if (config.vertexAI == true) {
+        final token = await _maybeVertexAccessToken(config);
+        if (token != null && token.isNotEmpty) {
+          requestHeaders['Authorization'] = 'Bearer $token';
+        }
+        final proj = (config.projectId ?? '').trim();
+        if (proj.isNotEmpty) requestHeaders['X-Goog-User-Project'] = proj;
+      } else {
+        final apiKey = _effectiveApiKey(config);
+        if (apiKey.isNotEmpty) {
+          requestHeaders['x-goog-api-key'] = apiKey;
         }
       }
-      return input;
-    }
-
-    Future<String> takeBufferedImageMarkdown() async {
-      final pending = decoder.takeBufferedImage();
-      if (pending == null) return '';
-      final path = await AppDirectories.saveBase64Image(
-        pending.mimeType,
-        pending.data,
+      final headers = _customHeaders(
+        config,
+        modelId,
+        baseHeaders: requestHeaders,
+        assistantHeaders: extraHeaders,
       );
-      if (path == null || path.isEmpty) return '';
-      final uri = SandboxPathResolver.canonicalize(path);
-      final sb = StringBuffer()
-        ..write('\n\n![image](')
-        ..write(uri)
-        ..write(')');
-      if (pending.trailingText.isNotEmpty) {
-        sb.write(pending.trailingText);
+      request.headers.addAll(headers);
+      final extra = _customBody(config, modelId, assistantBody: extraBody);
+      if (extra.isNotEmpty) {
+        body.addAll(extra);
       }
-      return sb.toString();
-    }
+      body['contents'] = _googleApiContents(convo);
+      request.body = jsonEncode(body);
 
-    await for (final event in parseSseEventStrings(sse)) {
-      final data = event.data;
-      if (data.isEmpty) continue;
-      // Gemini can deliver {"error":{code,message,status}}, a prompt-level
-      // block, or a candidate-level content-filter finish in-band on a 2xx
-      // stream; raise before the malformed-chunk guard below can swallow it.
-      _throwIfInBandStreamError(data);
-      _throwIfGeminiPromptBlocked(data);
-      _throwIfGeminiCandidateBlocked(data);
-      final decoded = decoder.accept(event);
-      for (final remote in decoder.takePendingRemoteImages()) {
-        try {
-          final b64 = await _downloadRemoteAsBase64(client, config, remote.uri);
-          for (final chunk in decoder.ingestImageData(
-            remote.mimeType,
-            b64,
-            thoughtSigKey: remote.thoughtSigKey,
-            thoughtSigVal: remote.thoughtSigVal,
-          )) {
-            yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
-          }
-        } catch (_) {}
+      final resp = await client.send(request);
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        final errorBody = await resp.stream.bytesToString();
+        throw HttpException('HTTP ${resp.statusCode}: $errorBody');
       }
-      for (final chunk in decoder.takeOrphanedTrailingText()) {
-        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
-      }
-      for (final chunk in decoded.chunks) {
-        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
-        if (chunk is ToolCallEnd &&
-            decoder.isClientFunctionCall(chunk.id) &&
-            onToolCall != null) {
-          final call = decoder.functionCallById(chunk.id)!;
-          if (call.result.isEmpty) {
-            final resText = await onToolCall(
-              call.name,
-              call.args,
-              toolCallId: call.id,
+
+      final sse = resp.stream.transform(utf8.decoder);
+      final decoder = GoogleStreamDecoder(
+        isGemini3: isGemini3,
+        persistThoughtSigs: persistGeminiThoughtSigs,
+        expectImage: expectImage,
+        receivedImage: receivedImage,
+        initialUsage: usage,
+        citations: builtinCitations,
+        sourceId: 'round-${streamRound++}',
+      );
+      Future<String> sanitizeTextIfNeeded(String input) async {
+        if (input.isEmpty) return input;
+        if (input.contains('data:image') && input.contains('base64,')) {
+          try {
+            return await MarkdownMediaSanitizer.replaceInlineBase64Images(
+              input,
             );
-            call.result = resText;
-            yield* emitToolResults(
-              [
-                emitToolResult(
-                  id: call.id,
-                  name: call.name,
-                  arguments: call.args,
-                  content: resText,
-                  metadata: {
-                    'google': {
-                      'part': call.part,
-                      if (call.thoughtSigKey != null &&
-                          call.thoughtSigVal != null)
-                        'thoughtSigKey': call.thoughtSigKey,
-                      if (call.thoughtSigKey != null &&
-                          call.thoughtSigVal != null)
-                        'thoughtSigVal': call.thoughtSigVal,
-                    },
+          } catch (_) {
+            return input;
+          }
+        }
+        return input;
+      }
+
+      Future<String> takeBufferedImageMarkdown() async {
+        final pending = decoder.takeBufferedImage();
+        if (pending == null) return '';
+        final path = await AppDirectories.saveBase64Image(
+          pending.mimeType,
+          pending.data,
+        );
+        if (path == null || path.isEmpty) return '';
+        final uri = SandboxPathResolver.canonicalize(path);
+        final sb = StringBuffer()
+          ..write('\n\n![image](')
+          ..write(uri)
+          ..write(')');
+        if (pending.trailingText.isNotEmpty) {
+          sb.write(pending.trailingText);
+        }
+        return sb.toString();
+      }
+
+      await for (final event in parseSseEventStrings(sse)) {
+        final data = event.data;
+        if (data.isEmpty) continue;
+        // Gemini can deliver {"error":{code,message,status}}, a prompt-level
+        // block, or a candidate-level content-filter finish in-band on a 2xx
+        // stream; raise before the malformed-chunk guard below can swallow it.
+        _throwIfInBandStreamError(data);
+        _throwIfGeminiPromptBlocked(data);
+        _throwIfGeminiCandidateBlocked(data);
+        final decoded = decoder.accept(event);
+        for (final remote in decoder.takePendingRemoteImages()) {
+          try {
+            final b64 = await _downloadRemoteAsBase64(
+              client,
+              config,
+              remote.uri,
+            );
+            for (final chunk in decoder.ingestImageData(
+              remote.mimeType,
+              b64,
+              thoughtSigKey: remote.thoughtSigKey,
+              thoughtSigVal: remote.thoughtSigVal,
+            )) {
+              yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+            }
+          } catch (_) {}
+        }
+        for (final chunk in decoder.takeOrphanedTrailingText()) {
+          yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+        }
+        for (final chunk in decoded.chunks) {
+          yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+          if (chunk is ToolCallEnd &&
+              decoder.isClientFunctionCall(chunk.id) &&
+              onToolCall != null) {
+            final call = decoder.functionCallById(chunk.id)!;
+            if (call.result.isEmpty) {
+              final emitCall = emitToolCall(
+                id: call.id,
+                name: call.name,
+                arguments: call.args,
+                metadata: {
+                  'google': {
+                    'part': call.part,
+                    if (call.thoughtSigKey != null &&
+                        call.thoughtSigVal != null)
+                      'thoughtSigKey': call.thoughtSigKey,
+                    if (call.thoughtSigKey != null &&
+                        call.thoughtSigVal != null)
+                      'thoughtSigVal': call.thoughtSigVal,
                   },
-                ),
-              ],
-              usage: decoder.usage,
-              totalTokens: decoder.usage?.totalTokens ?? 0,
-            );
+                },
+              );
+              await for (final resultChunk in executeClientTools(
+                calls: [emitCall],
+                onToolCall: onToolCall,
+                usage: decoder.usage,
+                totalTokens: decoder.usage?.totalTokens ?? 0,
+              )) {
+                if (resultChunk is ToolCallResult) {
+                  call.result = (resultChunk.output ?? '').toString();
+                }
+                yield resultChunk;
+              }
+            }
           }
         }
+        if (decoded.completed || decoder.canFinishNow) break;
       }
-      if (decoded.completed || decoder.canFinishNow) break;
-    }
-    for (final chunk in decoder.onClosed()) {
-      yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
-    }
-
-    receivedImage = decoder.receivedImage;
-    usage = decoder.usage ?? usage;
-    totalTokens = usage?.totalTokens ?? totalTokens;
-    final calls = [
-      for (final call in decoder.functionCalls)
-        <String, dynamic>{
-          'id': call.id,
-          'apiId': call.apiId,
-          'name': call.name,
-          'args': call.args,
-          'result': call.result,
-          'thoughtSigKey': call.thoughtSigKey,
-          'thoughtSigVal': call.thoughtSigVal,
-          'part': call.part,
-        },
-    ];
-    final roundModelParts = decoder.roundModelParts;
-    final retryMalformedResponse = decoder.retryMalformedResponse;
-    final responseTextThoughtSigKey = decoder.textThoughtSigKey;
-    final responseTextThoughtSigVal = decoder.textThoughtSigVal;
-    final responseImageThoughtSigs = decoder.imageThoughtSigs;
-
-    if (retryMalformedResponse) {
-      // This is a transient model-generation failure, so retry the unchanged
-      // round once without adding the malformed candidate to conversation.
-      if (malformedResponseRetryCount == 0) {
-        malformedResponseRetryCount++;
-        continue;
+      for (final chunk in decoder.onClosed()) {
+        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
       }
-      throw const HttpException(
-        'Gemini response generation failed (MALFORMED_RESPONSE)',
-      );
-    }
 
-    // Flush any buffered inline image that never became Image* events.
-    if (!decoder.emittedImageEvents) {
-      final pendingImage = await takeBufferedImageMarkdown();
-      if (pendingImage.isNotEmpty) {
-        _logImageFallback(
-          provider: config.id,
-          model: modelId,
-          reason: 'google_decoder_missed_image',
-        );
-        final sanitized = await sanitizeTextIfNeeded(pendingImage);
-        yield* emitDelta(
-          content: sanitized,
-          usage: usage,
-          totalTokens: totalTokens,
+      receivedImage = decoder.receivedImage;
+      usage = decoder.usage ?? usage;
+      totalTokens = usage?.totalTokens ?? totalTokens;
+      final calls = [
+        for (final call in decoder.functionCalls)
+          <String, dynamic>{
+            'id': call.id,
+            'apiId': call.apiId,
+            'name': call.name,
+            'args': call.args,
+            'result': call.result,
+            'thoughtSigKey': call.thoughtSigKey,
+            'thoughtSigVal': call.thoughtSigVal,
+            'part': call.part,
+          },
+      ];
+      final roundModelParts = decoder.roundModelParts;
+      final retryMalformedResponse = decoder.retryMalformedResponse;
+      final responseTextThoughtSigKey = decoder.textThoughtSigKey;
+      final responseTextThoughtSigVal = decoder.textThoughtSigVal;
+      final responseImageThoughtSigs = decoder.imageThoughtSigs;
+
+      if (retryMalformedResponse) {
+        // This is a transient model-generation failure, so retry the unchanged
+        // round once without adding the malformed candidate to conversation.
+        if (malformedResponseRetryCount == 0) {
+          malformedResponseRetryCount++;
+          retryMalformed = true;
+          return;
+        }
+        throw const HttpException(
+          'Gemini response generation failed (MALFORMED_RESPONSE)',
         );
       }
-    }
 
-    if (calls.isEmpty) {
-      // No tool calls; this round finished. Citations already left the decoder.
-      if (persistGeminiThoughtSigs) {
-        final metaComment = _buildGeminiThoughtSigComment(
-          textKey: responseTextThoughtSigKey,
-          textValue: responseTextThoughtSigVal,
-          imageSigs: responseImageThoughtSigs,
-        );
-        if (metaComment.isNotEmpty) {
+      // Flush any buffered inline image that never became Image* events.
+      if (!decoder.emittedImageEvents) {
+        final pendingImage = await takeBufferedImageMarkdown();
+        if (pendingImage.isNotEmpty) {
+          _logImageFallback(
+            provider: config.id,
+            model: modelId,
+            reason: 'google_decoder_missed_image',
+          );
+          final sanitized = await sanitizeTextIfNeeded(pendingImage);
           yield* emitDelta(
-            content: metaComment,
+            content: sanitized,
             usage: usage,
             totalTokens: totalTokens,
           );
         }
       }
-      yield* emitDone(usage: usage, totalTokens: totalTokens);
-      return;
-    }
 
-    // Append model functionCall(s) and user functionResponse(s) to conversation, then loop
-    malformedResponseRetryCount = 0;
-    if (isGemini3) {
-      // Gemini 3: preserve the original model parts order exactly.
-      convo.add({'role': 'model', 'parts': roundModelParts});
-
-      // 4. All functionResponses in one user turn
-      final responseParts = <Map<String, dynamic>>[];
-      for (final c in calls) {
-        final name = (c['name'] ?? '').toString();
-        final resText = (c['result'] ?? '').toString();
-        final apiId = c['apiId'] as String?;
-        Map<String, dynamic> responseObj;
-        try {
-          responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
-        } catch (_) {
-          responseObj = {'result': resText};
+      if (calls.isEmpty) {
+        // No tool calls; this round finished. Citations already left the decoder.
+        if (persistGeminiThoughtSigs) {
+          final metaComment = _buildGeminiThoughtSigComment(
+            textKey: responseTextThoughtSigKey,
+            textValue: responseTextThoughtSigVal,
+            imageSigs: responseImageThoughtSigs,
+          );
+          if (metaComment.isNotEmpty) {
+            yield* emitDelta(
+              content: metaComment,
+              usage: usage,
+              totalTokens: totalTokens,
+            );
+          }
         }
-        responseParts.add({
-          'functionResponse': {
-            'name': name,
-            'response': responseObj,
-            if (apiId != null) 'id': apiId,
-          },
-        });
+        return;
       }
-      convo.add({'role': 'user', 'parts': responseParts});
-    } else {
-      // Gemini 2.x: existing per-call reconstruction
-      for (final c in calls) {
+
+      malformedResponseRetryCount = 0;
+      lastRoundCalls = calls;
+      lastRoundModelParts = roundModelParts;
+      pendingCalls = [
+        for (final c in calls)
+          emitToolCall(
+            id: (c['id'] ?? '').toString(),
+            name: (c['name'] ?? '').toString(),
+            arguments:
+                (c['args'] as Map<String, dynamic>?) ??
+                const <String, dynamic>{},
+          ),
+      ];
+    },
+    takeCalls: () => pendingCalls,
+    continueWithoutCalls: () => retryMalformed,
+    executeAfterRound: false,
+    onToolCall: onToolCall,
+    append: (executed) {
+      if (retryMalformed) return;
+      if (isGemini3) {
+        convo.add({'role': 'model', 'parts': lastRoundModelParts});
+        final responseParts = <Map<String, dynamic>>[];
+        for (final c in lastRoundCalls) {
+          final name = (c['name'] ?? '').toString();
+          final resText = (c['result'] ?? '').toString();
+          final apiId = c['apiId'] as String?;
+          Map<String, dynamic> responseObj;
+          try {
+            responseObj = (jsonDecode(resText) as Map).cast<String, dynamic>();
+          } catch (_) {
+            responseObj = {'result': resText};
+          }
+          responseParts.add({
+            'functionResponse': {
+              'name': name,
+              'response': responseObj,
+              if (apiId != null) 'id': apiId,
+            },
+          });
+        }
+        convo.add({'role': 'user', 'parts': responseParts});
+        return;
+      }
+      for (final c in lastRoundCalls) {
         final name = (c['name'] ?? '').toString();
         final args =
             (c['args'] as Map<String, dynamic>? ?? const <String, dynamic>{});
@@ -1428,7 +1445,8 @@ Stream<StreamChunk> _sendGoogleStream(
           ],
         });
       }
-    }
-    // Continue while(true) for next round
-  }
+    },
+    finish: () => emitDone(usage: usage, totalTokens: totalTokens),
+    usageOf: () => usage,
+  );
 }

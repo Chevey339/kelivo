@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
@@ -1878,70 +1877,22 @@ class ChatActions {
           await _handleReasoningChunk(text, state);
         }
         _scheduleStreamingCheckpoint(state);
-      case ToolCallStart(:final id, :final toolName, :final metadata):
+      case ToolCallStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-        await _handleToolCallsChunk([
-          emitToolCall(
-            id: id,
-            name: state.pendingToolNames[id] ?? toolName,
-            arguments: const <String, dynamic>{},
-            metadata: metadata,
-          ),
-        ], state);
+        await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ToolCallDelta(:final id, :final toolNameDelta):
         if (toolNameDelta.isNotEmpty) {
           state.pendingToolNames[id] =
               '${state.pendingToolNames[id] ?? ''}$toolNameDelta';
         }
-      case ToolCallEnd(:final id):
-        await _handleToolCallsChunk([
-          _emitToolCallFromHandler(state, id),
-        ], state);
+      case ToolCallEnd():
+        await _handleToolCallsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case ServerToolStart(:final id, :final toolName):
         if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
-      case ServerToolEnd(
-        :final id,
-        :final input,
-        :final output,
-        :final metadata,
-      ):
-        await _handleToolResultsChunk([
-          emitToolResult(
-            id: id,
-            name: state.pendingToolNames.remove(id) ?? '',
-            arguments: input is Map
-                ? input.cast<String, dynamic>()
-                : const <String, dynamic>{},
-            content: output == null
-                ? ''
-                : output is String
-                ? output
-                : jsonEncode(output),
-            metadata: metadata,
-          ),
-        ], state);
-        _scheduleStreamingCheckpoint(state);
-      case Annotations(:final annotations):
-        if (annotations.isEmpty) return;
-        await _handleToolResultsChunk([
-          emitToolResult(
-            id: 'builtin_search',
-            name: 'search_web',
-            arguments: const <String, dynamic>{},
-            content: jsonEncode(<String, dynamic>{
-              'items': [
-                for (final citation
-                    in annotations.whereType<UrlCitationAnnotation>())
-                  <String, dynamic>{
-                    'url': citation.url,
-                    if (citation.title.isNotEmpty) 'title': citation.title,
-                  },
-              ],
-            }),
-          ),
-        ], state);
+      case ServerToolEnd() || ToolCallResult() || Annotations():
+        await _handleToolResultsChunk(chunk, state);
         _scheduleStreamingCheckpoint(state);
       case Usage(:final usage):
         _applyUsage(state, usage);
@@ -1963,37 +1914,6 @@ class ChatActions {
   void _applyUsage(stream_ctrl.StreamingState state, TokenUsage usage) {
     state.usage = (state.usage ?? const TokenUsage()).merge(usage);
     state.totalTokens = state.usage!.totalTokens;
-  }
-
-  EmitToolCall _emitToolCallFromHandler(
-    stream_ctrl.StreamingState state,
-    String id,
-  ) {
-    for (final part in state.shadowHandler.parts.reversed) {
-      if (part is! ToolCallPart) continue;
-      try {
-        final decoded = jsonDecode(part.payloadJson);
-        if (decoded is! Map) continue;
-        if ((decoded['id'] ?? '').toString() != id) continue;
-        final args = decoded['arguments'];
-        return emitToolCall(
-          id: id,
-          name: (decoded['name'] ?? state.pendingToolNames[id] ?? '')
-              .toString(),
-          arguments: args is Map
-              ? args.cast<String, dynamic>()
-              : const <String, dynamic>{},
-          metadata: decoded['metadata'] is Map
-              ? (decoded['metadata'] as Map).cast<String, dynamic>()
-              : null,
-        );
-      } catch (_) {}
-    }
-    return emitToolCall(
-      id: id,
-      name: state.pendingToolNames[id] ?? '',
-      arguments: const <String, dynamic>{},
-    );
   }
 
   Future<void> _markGenerationStreaming(
@@ -2034,11 +1954,11 @@ class ChatActions {
 
   /// Handle tool calls chunk from stream.
   Future<void> _handleToolCallsChunk(
-    List<EmitToolCall> toolCalls,
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolCallsChunk(
-      toolCalls,
+      chunk,
       state,
       updateReasoningSegmentsInDb: (String messageId, String json) async {
         // The complete reasoning snapshot is coalesced after this chunk.
@@ -2056,11 +1976,11 @@ class ChatActions {
 
   /// Handle tool results chunk from stream.
   Future<void> _handleToolResultsChunk(
-    List<EmitToolResult> toolResults,
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolResultsChunk(
-      toolResults,
+      chunk,
       state,
       upsertToolEventInDb:
           (

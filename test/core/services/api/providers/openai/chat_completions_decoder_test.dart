@@ -201,31 +201,28 @@ void main() {
     expect(decoder.finishReason, isNull);
   });
 
-  test(
-    'emits grok citations as search_web ServerTool events',
-    () {
-      final decoder = ChatCompletionsStreamDecoder();
-      final result = decoder.accept(
-        _event(<String, dynamic>{
-          ..._choice(delta: <String, dynamic>{'content': 'see'}),
-          'citations': <String>['https://example.com'],
-        }),
-      );
+  test('emits grok citations as search_web ServerTool events', () {
+    final decoder = ChatCompletionsStreamDecoder();
+    final result = decoder.accept(
+      _event(<String, dynamic>{
+        ..._choice(delta: <String, dynamic>{'content': 'see'}),
+        'citations': <String>['https://example.com'],
+      }),
+    );
 
-      expect(
-        result.chunks.whereType<ServerToolStart>().single.toolName,
-        'search_web',
-      );
-      final end = result.chunks.whereType<ServerToolEnd>().single;
-      expect(end.id, 'stream:search-1');
-      final items = (end.output as Map)['items'] as List;
-      expect(items.single, <String, dynamic>{
-        'index': 1,
-        'url': 'https://example.com',
-        'title': 'https://example.com',
-      });
-    },
-  );
+    expect(
+      result.chunks.whereType<ServerToolStart>().single.toolName,
+      'search_web',
+    );
+    final end = result.chunks.whereType<ServerToolEnd>().single;
+    expect(end.id, 'stream:search-1');
+    final items = (end.output as Map)['items'] as List;
+    expect(items.single, <String, dynamic>{
+      'index': 1,
+      'url': 'https://example.com',
+      'title': 'https://example.com',
+    });
+  });
 
   test('emits Image events only when image output is requested', () {
     final off = ChatCompletionsStreamDecoder();

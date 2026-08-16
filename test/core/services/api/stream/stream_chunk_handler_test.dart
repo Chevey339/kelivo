@@ -146,6 +146,25 @@ void main() {
     },
   );
 
+  test('fills a local ToolCallResult without marking the part server-side', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ToolCallStart(id: 'call_1', toolName: 'lookup'));
+    handler.handle(
+      const ToolCallDelta(id: 'call_1', inputDelta: '{"q":"kelivo"}'),
+    );
+    handler.handle(const ToolCallEnd('call_1'));
+    handler.handle(const ToolCallResult(id: 'call_1', output: '{"ok":true}'));
+
+    final payload = jsonDecode(
+      (handler.parts.single as ToolCallPart).payloadJson,
+    );
+    expect(payload['id'], 'call_1');
+    expect(payload['name'], 'lookup');
+    expect(payload['arguments'], <String, dynamic>{'q': 'kelivo'});
+    expect(payload['content'], '{"ok":true}');
+    expect(payload['server'], isFalse);
+  });
+
   test('maps a server tool result onto a tool_call part', () {
     final handler = StreamChunkHandler();
     handler.handle(

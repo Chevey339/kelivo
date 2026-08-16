@@ -2,7 +2,7 @@ import "../../../support/business_test_harness.dart";
 import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart'
     show ToolUIPart;
@@ -376,27 +376,19 @@ void main() {
       }) async {}
 
       await controller.handleToolResultsChunk(
-        [
-          emitToolResult(
-            id: 'builtin_search',
-            name: 'builtin_search',
-            arguments: const <String, dynamic>{},
-            content: '{"items":[{"title":"First"}]}',
-          ),
-        ],
+        const ToolCallResult(
+          id: 'builtin_search',
+          output: '{"items":[{"title":"First"}]}',
+        ),
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
 
       await controller.handleToolResultsChunk(
-        [
-          emitToolResult(
-            id: 'builtin_search',
-            name: 'builtin_search',
-            arguments: const <String, dynamic>{},
-            content: '{"items":[{"title":"First"},{"title":"Second"}]}',
-          ),
-        ],
+        const ToolCallResult(
+          id: 'builtin_search',
+          output: '{"items":[{"title":"First"},{"title":"Second"}]}',
+        ),
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
@@ -429,27 +421,14 @@ void main() {
         Map<String, dynamic>? metadata,
       }) async {}
 
+      state.pendingToolNames['st_1'] = 'search_web';
       await controller.handleToolResultsChunk(
-        [
-          emitToolResult(
-            id: 'st_1',
-            name: 'search_web',
-            arguments: const <String, dynamic>{},
-            content: '{"query":"kotlin"}',
-          ),
-        ],
+        const ServerToolEnd(id: 'st_1', output: '{"query":"kotlin"}'),
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
       await controller.handleToolResultsChunk(
-        [
-          emitToolResult(
-            id: 'builtin_search',
-            name: 'search_web',
-            arguments: const <String, dynamic>{},
-            content: '{"items":[{"url":"https://example.com"}]}',
-          ),
-        ],
+        const Annotations([UrlCitationAnnotation(url: 'https://example.com')]),
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );

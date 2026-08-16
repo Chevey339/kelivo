@@ -114,6 +114,19 @@ final class ToolCallEnd extends StreamChunk {
   final String id;
 }
 
+/// Local (Kelivo-executed) tool result.
+///
+/// Fills the matching [ToolCallPart] `content` without marking the part as a
+/// provider-hosted server tool. Provider-hosted search / code execution keep
+/// using [ServerToolEnd].
+final class ToolCallResult extends StreamChunk {
+  const ToolCallResult({required this.id, this.output, this.metadata});
+
+  final String id;
+  final Object? output;
+  final Map<String, dynamic>? metadata;
+}
+
 final class ServerToolStart extends StreamChunk {
   const ServerToolStart({
     required this.id,

@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
@@ -282,28 +282,20 @@ void main() {
         }) async {}
 
         await controller.handleToolResultsChunk(
-          [
-            emitToolResult(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content:
-                  '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
-            ),
-          ],
+          const ToolCallResult(
+            id: 'builtin_search',
+            output:
+                '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
+          ),
           state,
           upsertToolEventInDb: upsertToolEventInDb,
         );
         await controller.handleToolResultsChunk(
-          [
-            emitToolResult(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content:
-                  '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
-            ),
-          ],
+          const ToolCallResult(
+            id: 'builtin_search',
+            output:
+                '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+          ),
           state,
           upsertToolEventInDb: upsertToolEventInDb,
         );

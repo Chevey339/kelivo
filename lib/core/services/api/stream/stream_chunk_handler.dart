@@ -63,6 +63,8 @@ class StreamChunkHandler {
         );
       case ToolCallEnd(:final id):
         _upsertTool(id);
+      case ToolCallResult(:final id, :final output, :final metadata):
+        _upsertTool(id, content: output ?? '', metadata: metadata);
       case ServerToolStart(
         :final id,
         :final toolName,

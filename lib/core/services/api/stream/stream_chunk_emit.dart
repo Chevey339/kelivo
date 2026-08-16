@@ -143,8 +143,6 @@ Stream<StreamChunk> emitToolCalls(
   }
 }
 
-// Local Kelivo-executed results reuse ServerTool until P5 lifts the tool
-// loop. Handler payload `server` is therefore true for these too.
 Stream<StreamChunk> emitToolResults(
   List<EmitToolResult> results, {
   TokenUsage? usage,
@@ -152,14 +150,8 @@ Stream<StreamChunk> emitToolResults(
 }) async* {
   yield* emitUsage(_usageOrApprox(usage, totalTokens));
   for (final result in results) {
-    yield ServerToolStart(
+    yield ToolCallResult(
       id: result.id,
-      toolName: result.name,
-      metadata: result.metadata,
-    );
-    yield ServerToolEnd(
-      id: result.id,
-      input: result.arguments,
       output: result.content,
       metadata: result.metadata,
     );

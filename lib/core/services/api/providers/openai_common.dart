@@ -414,6 +414,126 @@ Map<String, dynamic> _buildAssistantToolCallMessage({
   return msg;
 }
 
+Map<String, dynamic>? _openaiFirstChoice(Map<String, dynamic> obj) {
+  try {
+    final choices = obj['choices'] as List?;
+    if (choices != null && choices.isNotEmpty) {
+      return (choices.first as Map).cast<String, dynamic>();
+    }
+  } catch (_) {}
+  return null;
+}
+
+Map<String, dynamic>? _openaiFirstChoiceMessage(Map<String, dynamic> obj) {
+  return (_openaiFirstChoice(obj)?['message'] as Map?)?.cast<String, dynamic>();
+}
+
+List<EmitToolCall> _openaiCallsFromCompletionMessage(
+  Map<String, dynamic>? msg,
+) {
+  final tcs = (msg?['tool_calls'] as List?) ?? const <dynamic>[];
+  final calls = <EmitToolCall>[];
+  for (var i = 0; i < tcs.length; i++) {
+    final raw = tcs[i];
+    if (raw is! Map) continue;
+    final t = raw.cast<String, dynamic>();
+    final id = _effectiveToolCallId(t['id'], 'call', i);
+    final f =
+        (t['function'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{};
+    final name = (f['name'] ?? '').toString();
+    Map<String, dynamic> args;
+    try {
+      args = (jsonDecode((f['arguments'] ?? '{}').toString()) as Map)
+          .cast<String, dynamic>();
+    } catch (_) {
+      args = <String, dynamic>{};
+    }
+    calls.add(emitToolCall(id: id, name: name, arguments: args));
+  }
+  return calls;
+}
+
+TokenUsage? _openaiUsageFromObj(Map<String, dynamic> obj) {
+  try {
+    final u = obj['usage'];
+    if (u is! Map) return null;
+    final prompt = (u['prompt_tokens'] ?? 0) as int? ?? 0;
+    final completion = (u['completion_tokens'] ?? 0) as int? ?? 0;
+    final cached =
+        (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ?? 0;
+    return TokenUsage(
+      promptTokens: prompt,
+      completionTokens: completion,
+      cachedTokens: cached,
+      totalTokens: prompt + completion,
+    );
+  } catch (_) {
+    return null;
+  }
+}
+
+({String content, List<({String uri, String mimeType})> images})
+_openaiVisibleOutputFromMessage(Map<String, dynamic>? cmsg) {
+  var content = '';
+  final images = <({String uri, String mimeType})>[];
+  if (cmsg == null) return (content: content, images: images);
+  final cc = cmsg['content'];
+  if (cc is String) {
+    content = cc;
+  } else if (cc is List) {
+    final buf = StringBuffer();
+    for (final it in cc) {
+      if (it is Map && (it['type'] == 'text')) {
+        final t = (it['text'] ?? '').toString();
+        if (t.isNotEmpty) buf.write(t);
+      } else if (it is Map &&
+          (it['type'] == 'image_url' || it['type'] == 'image')) {
+        dynamic iu = it['image_url'];
+        String? url;
+        if (iu is String) {
+          url = iu;
+        } else if (iu is Map) {
+          final u2 = iu['url'];
+          if (u2 is String) url = u2;
+        }
+        if (url != null && url.isNotEmpty) {
+          images.add((
+            uri: url,
+            mimeType: mimeTypeFromImageUri(url) ?? 'image/png',
+          ));
+        }
+      }
+    }
+    content = buf.toString();
+  }
+  return (content: content, images: images);
+}
+
+List<EmitToolCall> _responsesCallsFromIndexMap(
+  Map<int, Map<String, String>> byIndex,
+) {
+  final calls = <EmitToolCall>[];
+  final sorted = byIndex.keys.toList()..sort();
+  for (final idx in sorted) {
+    final m = byIndex[idx]!;
+    Map<String, dynamic> args;
+    try {
+      args = (jsonDecode(m['args'] ?? '{}') as Map).cast<String, dynamic>();
+    } catch (_) {
+      args = <String, dynamic>{};
+    }
+    calls.add(
+      emitToolCall(
+        id: _effectiveToolCallId(m['call_id'], 'call', idx),
+        name: (m['name'] ?? '').toString(),
+        arguments: args,
+      ),
+    );
+  }
+  return calls;
+}
+
 String _openAIEffortForBudget(int? budget, String upstreamModelId) {
   final baseEffort = _effortForBudget(budget);
   var requestedEffort = baseEffort;
@@ -1053,6 +1173,495 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
 /// per-event catch, which tolerates malformed JSON. Convert their transport
 /// failures into [HttpException] up front so that catch cannot swallow them
 /// and let the no-[DONE] fallback persist truncated output as a completion.
+Stream<StreamChunk> _runOpenAIChatCompletionsToolFollowUps({
+  required http.Client client,
+  required ProviderConfig config,
+  required String modelId,
+  required String upstreamModelId,
+  required Uri url,
+  required _OpenAIProviderInfo info,
+  required List<Map<String, dynamic>> messages,
+  required Map<dynamic, dynamic> firstToolAcc,
+  required String firstAssistantContent,
+  required String firstReasoning,
+  required dynamic firstReasoningDetails,
+  required ToolCallHandler onToolCall,
+  required List<String>? userImagePaths,
+  required bool canImageInput,
+  required bool allowRemoteImages,
+  required bool isClaudeUpstream,
+  required bool isReasoning,
+  required String effort,
+  required int? thinkingBudget,
+  required double? temperature,
+  required double? topP,
+  required List<Map<String, dynamic>>? tools,
+  required Map<String, dynamic> extraBodyCfg,
+  required Map<String, String>? extraHeaders,
+  required bool wantsImageOutput,
+  required bool needsReasoningEcho,
+  required bool reasoningDetailsAllowSnapshots,
+  required void Function(Map<String, dynamic> body) applyMaxTokens,
+  required TokenUsage? initialUsage,
+  required int streamRound,
+  required int approxPromptTokens,
+  required int approxCompletionChars,
+  required bool includeReasoningDetailsOnDone,
+}) async* {
+  var usage = initialUsage;
+  var chars = approxCompletionChars;
+  var round = streamRound;
+  ChatCompletionsStreamDecoder? lastRound;
+  var currentMessages = [
+    for (final message in messages) _copyChatCompletionMessage(message),
+  ];
+
+  String assistantContent() =>
+      lastRound?.assistantContent ?? firstAssistantContent;
+  String reasoning() => lastRound?.reasoningEcho ?? firstReasoning;
+  dynamic reasoningDetails() =>
+      lastRound?.reasoningDetails ?? firstReasoningDetails;
+
+  yield* runClientToolFollowUps(
+    initialCalls: clientToolCallsFromChatAcc(firstToolAcc),
+    onToolCall: onToolCall,
+    append: (executed) {
+      currentMessages = [
+        ...currentMessages,
+        _buildAssistantToolCallMessage(
+          calls: openaiToolCallMaps([for (final item in executed) item.call]),
+          content: assistantContent(),
+          reasoningContent: needsReasoningEcho ? reasoning() : null,
+          includeEmptyReasoningContent: needsReasoningEcho,
+          reasoningDetails: reasoningDetails(),
+        ),
+        ...openaiToolResultMessages(executed),
+      ];
+    },
+    sendFollowUp: () async* {
+      final body2 = <String, dynamic>{
+        'model': upstreamModelId,
+        'messages': await _buildOpenAIChatCompletionMessages(
+          currentMessages,
+          userMediaPaths: userImagePaths,
+          canImageInput: canImageInput,
+          allowRemoteImages: allowRemoteImages,
+          reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+          stripReasoningContent: isClaudeUpstream,
+        ),
+        'stream': true,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
+        if (isReasoning && effort != 'off' && effort != 'auto')
+          'reasoning_effort': effort,
+        if (tools != null && tools.isNotEmpty)
+          'tools': _cleanToolsForCompatibility(tools),
+        if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
+      };
+      applyMaxTokens(body2);
+      _applyVendorReasoningKnobs(
+        body2,
+        info: info,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
+      _applyCompatibleBuiltInSearch(
+        body2,
+        config: config,
+        modelId: modelId,
+        upstreamModelId: upstreamModelId,
+      );
+      _maybeAddStreamingUsageOptions(
+        body2,
+        stream: true,
+        config: config,
+        host: info.host,
+      );
+      if (extraBodyCfg.isNotEmpty) {
+        body2.addAll(extraBodyCfg);
+      }
+      _sanitizeOpenAIGpt5SamplingParams(
+        body2,
+        upstreamModelId,
+        fallbackEffort: effort,
+        isOpenRouter: info.isOpenRouter,
+      );
+      _normalizeMoonshotKimiChatBody(
+        body2,
+        upstreamModelId: upstreamModelId,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
+      final req2 = http.Request('POST', url);
+      req2.headers.addAll(
+        _customHeaders(
+          config,
+          modelId,
+          baseHeaders: <String, String>{
+            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+          assistantHeaders: extraHeaders,
+        ),
+      );
+      req2.body = jsonEncode(body2);
+      final http.StreamedResponse resp2;
+      try {
+        resp2 = await client.send(req2);
+        if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+          final errorBody = await resp2.stream.bytesToString();
+          throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+        }
+      } on HttpException {
+        rethrow;
+      } catch (e) {
+        throw HttpException('Follow-up request failed: $e');
+      }
+      final s2 = _rethrowFollowUpStreamErrors(
+        resp2.stream.transform(utf8.decoder),
+      );
+      final roundDecoder = ChatCompletionsStreamDecoder(
+        wantsImageOutput: wantsImageOutput,
+        needsReasoningEcho: needsReasoningEcho,
+        allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
+        initialUsage: usage,
+        sourceId: 'round-${round++}',
+      );
+      await for (final event in parseSseEventStrings(s2)) {
+        final data = event.data;
+        if (data == '[DONE]') continue;
+        _throwIfInBandStreamError(data);
+        try {
+          for (final chunk in roundDecoder.accept(event).chunks) {
+            yield chunk;
+          }
+        } catch (_) {}
+      }
+      usage = roundDecoder.usage ?? usage;
+      chars = roundDecoder.approxCompletionChars;
+      lastRound = roundDecoder;
+    },
+    takeCallsAfterRound: () {
+      final decoder = lastRound;
+      if (decoder == null) return const <EmitToolCall>[];
+      if (decoder.finishReason == 'tool_calls' ||
+          decoder.toolCalls.isNotEmpty) {
+        return clientToolCallsFromChatAcc(decoder.toolCalls);
+      }
+      return const <EmitToolCall>[];
+    },
+    finish: () {
+      final approxTotal = approxPromptTokens + (chars / 4).round();
+      return emitDone(
+        reasoningDetails: includeReasoningDetailsOnDone
+            ? lastRound?.reasoningDetails ?? firstReasoningDetails
+            : null,
+        usage: usage,
+        totalTokens: usage?.totalTokens ?? approxTotal,
+      );
+    },
+    usageOf: () => usage,
+  );
+}
+
+Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
+  required http.Client client,
+  required ProviderConfig config,
+  required String modelId,
+  required String upstreamModelId,
+  required Uri url,
+  required _OpenAIProviderInfo info,
+  required List<Map<String, dynamic>> messages,
+  required Map<String, dynamic> requestBody,
+  required Map<String, dynamic> firstObj,
+  required List<EmitToolCall> initialCalls,
+  required ToolCallHandler onToolCall,
+  required List<String>? userImagePaths,
+  required bool canImageInput,
+  required bool allowRemoteImages,
+  required bool isClaudeUpstream,
+  required bool needsReasoningEcho,
+  required Map<String, String>? extraHeaders,
+  required TokenUsage? initialUsage,
+}) async* {
+  var usage = initialUsage;
+  var lastObj = firstObj;
+  var currentMessages = [
+    for (final message in messages) _copyChatCompletionMessage(message),
+  ];
+
+  yield* runClientToolFollowUps(
+    initialCalls: initialCalls,
+    onToolCall: onToolCall,
+    emitCalls: true,
+    append: (executed) {
+      final msg =
+          _openaiFirstChoiceMessage(lastObj) ?? const <String, dynamic>{};
+      final reasoningForTools =
+          (msg['reasoning_content'] ?? msg['reasoning'])?.toString() ?? '';
+      currentMessages = [
+        ...currentMessages,
+        _buildAssistantToolCallMessage(
+          calls: openaiToolCallMaps([for (final item in executed) item.call]),
+          content: msg['content'],
+          reasoningContent: needsReasoningEcho ? reasoningForTools : null,
+          includeEmptyReasoningContent: needsReasoningEcho,
+          reasoningDetails: msg['reasoning_details'],
+        ),
+        ...openaiToolResultMessages(executed),
+      ];
+    },
+    sendFollowUp: () async* {
+      final req = http.Request('POST', url);
+      req.headers.addAll(
+        _customHeaders(
+          config,
+          modelId,
+          baseHeaders: <String, String>{
+            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          assistantHeaders: extraHeaders,
+        ),
+      );
+      final reqBody = Map<String, dynamic>.from(requestBody);
+      reqBody['messages'] = await _buildOpenAIChatCompletionMessages(
+        currentMessages,
+        userMediaPaths: userImagePaths,
+        canImageInput: canImageInput,
+        allowRemoteImages: allowRemoteImages,
+        reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
+        stripReasoningContent: isClaudeUpstream,
+      );
+      reqBody.remove('stream');
+      req.body = jsonEncode(reqBody);
+      final resp2 = await client.send(req);
+      if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+        final errorBody = await resp2.stream.bytesToString();
+        throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+      }
+      lastObj =
+          jsonDecode(await resp2.stream.bytesToString())
+              as Map<String, dynamic>;
+      final roundUsage = _openaiUsageFromObj(lastObj);
+      if (roundUsage != null) {
+        usage = (usage ?? const TokenUsage()).merge(roundUsage);
+      }
+    },
+    takeCallsAfterRound: () =>
+        _openaiCallsFromCompletionMessage(_openaiFirstChoiceMessage(lastObj)),
+    finish: () async* {
+      final choice = _openaiFirstChoice(lastObj);
+      if (choice == null) {
+        yield* emitDone(
+          content: (lastObj['output_text'] ?? '').toString(),
+          usage: usage,
+          totalTokens: usage?.totalTokens ?? 0,
+        );
+        return;
+      }
+      final visible = _openaiVisibleOutputFromMessage(
+        (choice['message'] as Map?)?.cast<String, dynamic>(),
+      );
+      yield* emitImages(visible.images);
+      yield* emitDone(
+        content: visible.content,
+        reasoningDetails: _openaiFirstChoiceMessage(
+          lastObj,
+        )?['reasoning_details'],
+        usage: usage,
+        totalTokens: usage?.totalTokens ?? 0,
+      );
+    },
+    usageOf: () => usage,
+  );
+}
+
+Stream<StreamChunk> _runOpenAIResponsesToolFollowUps({
+  required http.Client client,
+  required ProviderConfig config,
+  required String modelId,
+  required String upstreamModelId,
+  required Uri url,
+  required _OpenAIProviderInfo info,
+  required List<Map<String, dynamic>> initialInput,
+  required List<Map<String, dynamic>> firstOutputItems,
+  required List<EmitToolCall> initialCalls,
+  required List<Map<String, dynamic>> responsesToolsSpec,
+  required String responsesInstructions,
+  required List<dynamic>? responsesIncludeParam,
+  required ToolCallHandler onToolCall,
+  required Map<String, String>? extraHeaders,
+  required Map<String, dynamic>? extraBody,
+  required double? temperature,
+  required double? topP,
+  required int? maxTokens,
+  required bool isReasoning,
+  required String effort,
+  required int? thinkingBudget,
+  required TokenUsage? initialUsage,
+  required int streamRound,
+  required int approxPromptTokens,
+  required int approxCompletionChars,
+}) async* {
+  var usage = initialUsage;
+  var chars = approxCompletionChars;
+  var round = streamRound;
+  var currentInput = <Map<String, dynamic>>[...initialInput];
+  var outputItemsForAppend = firstOutputItems;
+  var lastCalls = const <EmitToolCall>[];
+  String? lastToolSignature;
+  var consecutiveDupeCount = 0;
+
+  yield* runClientToolFollowUps(
+    initialCalls: initialCalls,
+    onToolCall: onToolCall,
+    append: (executed) {
+      currentInput = [
+        ...currentInput,
+        ..._withResponsesFunctionCallItems(outputItemsForAppend, [
+          for (final item in executed) item.call,
+        ]),
+        for (final item in executed)
+          <String, dynamic>{
+            'type': 'function_call_output',
+            'call_id': item.call.id,
+            'output': item.content,
+          },
+      ];
+    },
+    sendFollowUp: () async* {
+      final body2 = <String, dynamic>{
+        'model': upstreamModelId,
+        'input': currentInput,
+        'stream': true,
+        if (responsesToolsSpec.isNotEmpty) 'tools': responsesToolsSpec,
+        if (responsesToolsSpec.isNotEmpty) 'tool_choice': 'auto',
+        if (responsesInstructions.isNotEmpty)
+          'instructions': responsesInstructions,
+        if (temperature != null) 'temperature': temperature,
+        if (topP != null) 'top_p': topP,
+        if (maxTokens != null) 'max_output_tokens': maxTokens,
+        if (isReasoning && effort != 'off')
+          'reasoning': {
+            'summary': 'auto',
+            if (effort != 'auto') 'effort': effort,
+          },
+        if (responsesIncludeParam != null) 'include': responsesIncludeParam,
+      };
+      _applyCompatibleResponsesReasoning(
+        body2,
+        config: config,
+        modelId: modelId,
+        upstreamModelId: upstreamModelId,
+        isReasoning: isReasoning,
+        thinkingBudget: thinkingBudget,
+      );
+      final extraCfg = _customBody(config, modelId, assistantBody: extraBody);
+      if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
+      try {
+        if (body2['tools'] is List) {
+          final raw = (body2['tools'] as List).cast<dynamic>();
+          body2['tools'] = _toResponsesToolsFormat(
+            raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
+          );
+        }
+      } catch (_) {}
+      _sanitizeOpenAIGpt5SamplingParams(
+        body2,
+        upstreamModelId,
+        fallbackEffort: effort,
+        isOpenRouter: info.isOpenRouter,
+      );
+
+      final req2 = http.Request('POST', url);
+      req2.headers.addAll(
+        _customHeaders(
+          config,
+          modelId,
+          baseHeaders: <String, String>{
+            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+          },
+          assistantHeaders: extraHeaders,
+        ),
+      );
+      req2.body = jsonEncode(body2);
+      final http.StreamedResponse resp2;
+      try {
+        resp2 = await client.send(req2);
+        if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
+          final errorBody = await resp2.stream.bytesToString();
+          throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
+        }
+      } on HttpException {
+        rethrow;
+      } catch (e) {
+        throw HttpException('Follow-up request failed: $e');
+      }
+      final s2 = _rethrowFollowUpStreamErrors(
+        resp2.stream.transform(utf8.decoder),
+      );
+      final followUpDecoder = ResponsesStreamDecoder(
+        initialUsage: usage,
+        sourceId: 'round-${round++}',
+      );
+      await for (final event in parseSseEventStrings(s2)) {
+        final d = event.data;
+        if (d == '[DONE]') {
+          followUpDecoder.accept(event);
+          break;
+        }
+        _throwIfInBandStreamError(d);
+        final decoded = followUpDecoder.accept(event);
+        for (final chunk in decoded.chunks) {
+          yield chunk;
+        }
+        if (decoded.completed) break;
+      }
+      usage = followUpDecoder.usage ?? usage;
+      chars += followUpDecoder.approxCompletionChars;
+      outputItemsForAppend = followUpDecoder.outputItems;
+      final respCalls2 = <int, Map<String, String>>{
+        for (final call in followUpDecoder.takeFunctionCalls())
+          call.index: <String, String>{
+            'call_id': call.callId,
+            'name': call.name,
+            'args': call.args,
+          },
+      };
+      lastCalls = _responsesCallsFromIndexMap(respCalls2);
+      if (lastCalls.isEmpty) return;
+      final sorted2 = respCalls2.keys.toList()..sort();
+      final currentSig = [
+        for (final idx2 in sorted2)
+          '${respCalls2[idx2]!['name'] ?? ''}:${respCalls2[idx2]!['args'] ?? ''}',
+      ].join('|');
+      if (currentSig == lastToolSignature) {
+        consecutiveDupeCount += 1;
+        if (consecutiveDupeCount >= 3) {
+          lastCalls = const <EmitToolCall>[];
+        }
+      } else {
+        lastToolSignature = currentSig;
+        consecutiveDupeCount = 1;
+      }
+    },
+    takeCallsAfterRound: () => lastCalls,
+    finish: () {
+      final approxTotal = approxPromptTokens + (chars / 4).round();
+      return emitDone(
+        usage: usage,
+        totalTokens: usage?.totalTokens ?? approxTotal,
+      );
+    },
+    usageOf: () => usage,
+  );
+}
+
 Stream<String> _rethrowFollowUpStreamErrors(Stream<String> source) {
   return source.transform(
     StreamTransformer<String, String>.fromHandlers(
@@ -1979,215 +2588,58 @@ Stream<StreamChunk> _sendOpenAIStream(
       }
 
       // Chat Completions non-stream with tool-calls follow-ups
-      TokenUsage? aggUsage;
-      Map<String, dynamic> lastObj = obj is Map
+      final lastObj = obj is Map
           ? Map<String, dynamic>.from(obj)
           : <String, dynamic>{};
-      while (true) {
-        Map<String, dynamic>? c0;
-        try {
-          final choices = lastObj['choices'] as List?;
-          if (choices != null && choices.isNotEmpty) {
-            c0 = (choices.first as Map).cast<String, dynamic>();
-          }
-        } catch (_) {}
-        if (c0 == null) {
-          final s = (lastObj['output_text'] ?? '').toString();
-          yield* emitDone(
-            content: s,
-            usage: aggUsage,
-            totalTokens: aggUsage?.totalTokens ?? 0,
-          );
-          return;
-        }
-        // usage
-        try {
-          final u = lastObj['usage'];
-          if (u is Map) {
-            final prompt = (u['prompt_tokens'] ?? 0) as int? ?? 0;
-            final completion = (u['completion_tokens'] ?? 0) as int? ?? 0;
-            final cached =
-                (u['prompt_tokens_details']?['cached_tokens'] ?? 0) as int? ??
-                0;
-            final round = TokenUsage(
-              promptTokens: prompt,
-              completionTokens: completion,
-              cachedTokens: cached,
-              totalTokens: prompt + completion,
-            );
-            aggUsage = (aggUsage ?? const TokenUsage()).merge(round);
-          }
-        } catch (_) {}
-
-        final msg =
-            (c0['message'] as Map?)?.cast<String, dynamic>() ??
-            const <String, dynamic>{};
-        final reasoningForTools =
-            (msg['reasoning_content'] ?? msg['reasoning'])?.toString() ?? '';
-        final reasoningDetailsForTools = msg['reasoning_details'];
-        final tcs = (msg['tool_calls'] as List?) ?? const <dynamic>[];
-        if (tcs.isNotEmpty && effectiveOnToolCall != null) {
-          final calls = <Map<String, dynamic>>[];
-          final callInfos = <EmitToolCall>[];
-          for (int i = 0; i < tcs.length; i++) {
-            final t = (tcs[i] as Map).cast<String, dynamic>();
-            final id = _effectiveToolCallId(t['id'], 'call', i);
-            final f =
-                (t['function'] as Map?)?.cast<String, dynamic>() ??
-                const <String, dynamic>{};
-            final name = (f['name'] ?? '').toString();
-            Map<String, dynamic> args;
-            try {
-              args = (jsonDecode((f['arguments'] ?? '{}').toString()) as Map)
-                  .cast<String, dynamic>();
-            } catch (_) {
-              args = <String, dynamic>{};
-            }
-            callInfos.add(emitToolCall(id: id, name: name, arguments: args));
-            calls.add({
-              'id': id,
-              'type': 'function',
-              'function': {'name': name, 'arguments': jsonEncode(args)},
-            });
-          }
-          if (callInfos.isNotEmpty) {
-            yield* emitToolCalls(
-              callInfos,
-              usage: aggUsage,
-              totalTokens: aggUsage?.totalTokens ?? 0,
-            );
-          }
-          final results = <Map<String, dynamic>>[];
-          final resultsInfo = <EmitToolResult>[];
-          for (final c in callInfos) {
-            final res = await effectiveOnToolCall(
-              c.name,
-              c.arguments,
-              toolCallId: c.id,
-            );
-            results.add({'tool_call_id': c.id, 'content': res});
-            resultsInfo.add(
-              emitToolResult(
-                id: c.id,
-                name: c.name,
-                arguments: c.arguments,
-                content: res,
-              ),
-            );
-          }
-          if (resultsInfo.isNotEmpty) {
-            yield* emitToolResults(
-              resultsInfo,
-              usage: aggUsage,
-              totalTokens: aggUsage?.totalTokens ?? 0,
-            );
-          }
-          // Follow-up request
-          final req = http.Request('POST', url);
-          final headers2 = _customHeaders(
-            config,
-            modelId,
-            baseHeaders: <String, String>{
-              'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-            assistantHeaders: extraHeaders,
-          );
-          req.headers.addAll(headers2);
-          final next = <Map<String, dynamic>>[];
-          for (final m in messages) {
-            next.add(_copyChatCompletionMessage(m));
-          }
-          final assistantToolCallMsg = _buildAssistantToolCallMessage(
-            calls: calls,
-            content: msg['content'],
-            reasoningContent: needsReasoningEcho ? reasoningForTools : null,
-            includeEmptyReasoningContent: needsReasoningEcho,
-            reasoningDetails: reasoningDetailsForTools,
-          );
-          next.add(assistantToolCallMsg);
-          for (final r in results) {
-            final id = r['tool_call_id'];
-            final name = calls.firstWhere(
-              (c) => c['id'] == id,
-              orElse: () => const {
-                'function': {'name': ''},
-              },
-            )['function']['name'];
-            next.add({
-              'role': 'tool',
-              'tool_call_id': id,
-              'name': name,
-              'content': r['content'],
-            });
-          }
-          final reqBody = Map<String, dynamic>.from(body);
-          reqBody['messages'] = await _buildOpenAIChatCompletionMessages(
-            next,
-            userMediaPaths: userImagePaths,
-            canImageInput: canImageInput,
-            allowRemoteImages: allowRemoteImages,
-            reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
-            stripReasoningContent: isClaudeUpstream,
-          );
-          reqBody.remove('stream');
-          req.body = jsonEncode(reqBody);
-          final resp2 = await client.send(req);
-          if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-            final errorBody = await resp2.stream.bytesToString();
-            throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
-          }
-          final txt2 = await resp2.stream.bytesToString();
-          lastObj = jsonDecode(txt2) as Map<String, dynamic>;
-          messages = next; // update transcript for next round
-          continue;
-        }
-
-        // No tool calls -> final content
-        String content = '';
-        final images = <({String uri, String mimeType})>[];
-        final cmsg = (c0['message'] as Map?)?.cast<String, dynamic>();
-        if (cmsg != null) {
-          final cc = cmsg['content'];
-          if (cc is String) {
-            content = cc;
-          } else if (cc is List) {
-            final buf = StringBuffer();
-            for (final it in cc) {
-              if (it is Map && (it['type'] == 'text')) {
-                final t = (it['text'] ?? '').toString();
-                if (t.isNotEmpty) buf.write(t);
-              } else if (it is Map &&
-                  (it['type'] == 'image_url' || it['type'] == 'image')) {
-                dynamic iu = it['image_url'];
-                String? url;
-                if (iu is String) {
-                  url = iu;
-                } else if (iu is Map) {
-                  final u2 = iu['url'];
-                  if (u2 is String) url = u2;
-                }
-                if (url != null && url.isNotEmpty) {
-                  images.add((
-                    uri: url,
-                    mimeType: mimeTypeFromImageUri(url) ?? 'image/png',
-                  ));
-                }
-              }
-            }
-            content = buf.toString();
-          }
-        }
-        yield* emitImages(images);
+      final firstUsage = _openaiUsageFromObj(lastObj);
+      final firstChoice = _openaiFirstChoice(lastObj);
+      if (firstChoice == null) {
         yield* emitDone(
-          content: content,
-          reasoningDetails: cmsg?['reasoning_details'],
-          usage: aggUsage,
-          totalTokens: aggUsage?.totalTokens ?? 0,
+          content: (lastObj['output_text'] ?? '').toString(),
+          usage: firstUsage,
+          totalTokens: firstUsage?.totalTokens ?? 0,
         );
         return;
       }
+      final firstCalls = _openaiCallsFromCompletionMessage(
+        (firstChoice['message'] as Map?)?.cast<String, dynamic>(),
+      );
+      if (firstCalls.isNotEmpty && effectiveOnToolCall != null) {
+        yield* _runOpenAIChatCompletionsNonStreamToolFollowUps(
+          client: client,
+          config: config,
+          modelId: modelId,
+          upstreamModelId: upstreamModelId,
+          url: url,
+          info: info,
+          messages: messages,
+          requestBody: body,
+          firstObj: lastObj,
+          initialCalls: firstCalls,
+          onToolCall: effectiveOnToolCall,
+          userImagePaths: userImagePaths,
+          canImageInput: canImageInput,
+          allowRemoteImages: allowRemoteImages,
+          isClaudeUpstream: isClaudeUpstream,
+          needsReasoningEcho: needsReasoningEcho,
+          extraHeaders: extraHeaders,
+          initialUsage: firstUsage,
+        );
+        return;
+      }
+      final visible = _openaiVisibleOutputFromMessage(
+        (firstChoice['message'] as Map?)?.cast<String, dynamic>(),
+      );
+      yield* emitImages(visible.images);
+      yield* emitDone(
+        content: visible.content,
+        reasoningDetails: _openaiFirstChoiceMessage(
+          lastObj,
+        )?['reasoning_details'],
+        usage: firstUsage,
+        totalTokens: firstUsage?.totalTokens ?? 0,
+      );
+      return;
     } catch (e) {
       throw HttpException('Invalid JSON: $e');
     }
@@ -2246,275 +2698,44 @@ Stream<StreamChunk> _sendOpenAIStream(
       // If model streamed tool_calls but didn't include finish_reason on prior chunks,
       // execute tool flow now and start follow-up request.
       if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
-        final calls = <Map<String, dynamic>>[];
-        final callInfos = <EmitToolCall>[];
-        final toolMsgs = <Map<String, dynamic>>[];
-        toolAcc.forEach((idx, m) {
-          final id = _effectiveToolCallId(m['id'], 'call', idx);
-          final name = (m['name'] ?? '');
-          Map<String, dynamic> args;
-          try {
-            args = (jsonDecode(m['args'] ?? '{}') as Map)
-                .cast<String, dynamic>();
-          } catch (_) {
-            args = <String, dynamic>{};
-          }
-          callInfos.add(emitToolCall(id: id, name: name, arguments: args));
-          calls.add({
-            'id': id,
-            'type': 'function',
-            'function': {'name': name, 'arguments': jsonEncode(args)},
-          });
-          toolMsgs.add({'__name': name, '__id': id, '__args': args});
-        });
-
-        // Execute tools and emit results. ToolCall* already left the decoder.
-        final results = <Map<String, dynamic>>[];
-        final resultsInfo = <EmitToolResult>[];
-        for (final m in toolMsgs) {
-          final name = m['__name'] as String;
-          final id = m['__id'] as String;
-          final args = (m['__args'] as Map<String, dynamic>);
-          final res = await effectiveOnToolCall(name, args, toolCallId: id);
-          results.add({'tool_call_id': id, 'content': res});
-          resultsInfo.add(
-            emitToolResult(id: id, name: name, arguments: args, content: res),
-          );
-        }
-        if (resultsInfo.isNotEmpty) {
-          yield* emitToolResults(
-            resultsInfo,
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? 0,
-          );
-        }
-
-        // Build follow-up messages
-        final mm2 = <Map<String, dynamic>>[];
-        for (final m in messages) {
-          mm2.add(_copyChatCompletionMessage(m));
-        }
-        final assistantToolCallMsg = _buildAssistantToolCallMessage(
-          calls: calls,
-          content: assistantContentBuffer,
-          reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
-          includeEmptyReasoningContent: needsReasoningEcho,
-          reasoningDetails:
+        yield* _runOpenAIChatCompletionsToolFollowUps(
+          client: client,
+          config: config,
+          modelId: modelId,
+          upstreamModelId: upstreamModelId,
+          url: url,
+          info: info,
+          messages: messages,
+          firstToolAcc: toolAcc,
+          firstAssistantContent: assistantContentBuffer,
+          firstReasoning: reasoningBuffer,
+          firstReasoningDetails:
               chatDecoder?.reasoningDetails ??
               reasoningDetailsBuffer.detailsOrNull,
+          onToolCall: effectiveOnToolCall,
+          userImagePaths: userImagePaths,
+          canImageInput: canImageInput,
+          allowRemoteImages: allowRemoteImages,
+          isClaudeUpstream: isClaudeUpstream,
+          isReasoning: isReasoning,
+          effort: effort,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          tools: tools,
+          extraBodyCfg: extraBodyCfg,
+          extraHeaders: extraHeaders,
+          wantsImageOutput: wantsImageOutput,
+          needsReasoningEcho: needsReasoningEcho,
+          reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+          applyMaxTokens: setMaxTokens,
+          initialUsage: usage,
+          streamRound: streamRound,
+          approxPromptTokens: approxPromptTokens,
+          approxCompletionChars: approxCompletionChars,
+          includeReasoningDetailsOnDone: true,
         );
-        mm2.add(assistantToolCallMsg);
-        for (final r in results) {
-          final id = r['tool_call_id'];
-          final name = calls.firstWhere(
-            (c) => c['id'] == id,
-            orElse: () => const {
-              'function': {'name': ''},
-            },
-          )['function']['name'];
-          mm2.add({
-            'role': 'tool',
-            'tool_call_id': id,
-            'name': name,
-            'content': r['content'],
-          });
-        }
-
-        // Follow-up request(s) with multi-round tool calls
-        var currentMessages = mm2;
-        while (true) {
-          final Map<String, dynamic> body2 = {
-            'model': upstreamModelId,
-            'messages': await _buildOpenAIChatCompletionMessages(
-              currentMessages,
-              userMediaPaths: userImagePaths,
-              canImageInput: canImageInput,
-              allowRemoteImages: allowRemoteImages,
-              reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
-              stripReasoningContent: isClaudeUpstream,
-            ),
-            'stream': true,
-            if (temperature != null) 'temperature': temperature,
-            if (topP != null) 'top_p': topP,
-            if (isReasoning && effort != 'off' && effort != 'auto')
-              'reasoning_effort': effort,
-            if (tools != null && tools.isNotEmpty)
-              'tools': _cleanToolsForCompatibility(tools),
-            if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-          };
-          setMaxTokens(body2);
-
-          _applyVendorReasoningKnobs(
-            body2,
-            info: info,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-
-          // Ask for usage in streaming (when supported)
-          _applyCompatibleBuiltInSearch(
-            body2,
-            config: config,
-            modelId: modelId,
-            upstreamModelId: upstreamModelId,
-          );
-          _maybeAddStreamingUsageOptions(
-            body2,
-            stream: true,
-            config: config,
-            host: info.host,
-          );
-
-          // Apply custom body overrides
-          if (extraBodyCfg.isNotEmpty) {
-            body2.addAll(extraBodyCfg);
-          }
-
-          _sanitizeOpenAIGpt5SamplingParams(
-            body2,
-            upstreamModelId,
-            fallbackEffort: effort,
-            isOpenRouter: info.isOpenRouter,
-          );
-          _normalizeMoonshotKimiChatBody(
-            body2,
-            upstreamModelId: upstreamModelId,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-
-          final req2 = http.Request('POST', url);
-          final headers2 = _customHeaders(
-            config,
-            modelId,
-            baseHeaders: <String, String>{
-              'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream',
-            },
-            assistantHeaders: extraHeaders,
-          );
-          req2.headers.addAll(headers2);
-          req2.body = jsonEncode(body2);
-          final resp2 = await client.send(req2);
-          if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-            final errorBody = await resp2.stream.bytesToString();
-            throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
-          }
-          final s2 = resp2.stream.transform(utf8.decoder);
-          final roundDecoder = ChatCompletionsStreamDecoder(
-            wantsImageOutput: wantsImageOutput,
-            needsReasoningEcho: needsReasoningEcho,
-            allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
-            initialUsage: usage,
-            sourceId: 'round-${streamRound++}',
-          );
-          await for (final event in parseSseEventStrings(s2)) {
-            final d = event.data;
-            if (d == '[DONE]') {
-              continue;
-            }
-            _throwIfInBandStreamError(d);
-            try {
-              for (final chunk in roundDecoder.accept(event).chunks) {
-                yield chunk;
-              }
-            } catch (_) {}
-          }
-          usage = roundDecoder.usage ?? usage;
-          if (usage != null) totalTokens = usage.totalTokens;
-          final toolAcc2 = roundDecoder.toolCalls;
-          final finishReason2 = roundDecoder.finishReason;
-          final contentAccum = roundDecoder.assistantContent;
-          final reasoningAccum = roundDecoder.reasoningEcho;
-          final reasoningDetailsAccum = roundDecoder.reasoningDetails;
-
-          // After this follow-up round finishes: if tool calls again, execute and loop
-          if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
-            final calls2 = <Map<String, dynamic>>[];
-            final callInfos2 = <EmitToolCall>[];
-            final toolMsgs2 = <Map<String, dynamic>>[];
-            toolAcc2.forEach((idx, m) {
-              final id = _effectiveToolCallId(m['id'], 'call', idx);
-              final name = (m['name'] ?? '');
-              Map<String, dynamic> args;
-              try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              callInfos2.add(emitToolCall(id: id, name: name, arguments: args));
-              calls2.add({
-                'id': id,
-                'type': 'function',
-                'function': {'name': name, 'arguments': jsonEncode(args)},
-              });
-              toolMsgs2.add({'__name': name, '__id': id, '__args': args});
-            });
-            final results2 = <Map<String, dynamic>>[];
-            final resultsInfo2 = <EmitToolResult>[];
-            for (final m in toolMsgs2) {
-              final name = m['__name'] as String;
-              final id = m['__id'] as String;
-              final args = (m['__args'] as Map<String, dynamic>);
-              final res = await effectiveOnToolCall(name, args, toolCallId: id);
-              results2.add({'tool_call_id': id, 'content': res});
-              resultsInfo2.add(
-                emitToolResult(
-                  id: id,
-                  name: name,
-                  arguments: args,
-                  content: res,
-                ),
-              );
-            }
-            if (resultsInfo2.isNotEmpty) {
-              yield* emitToolResults(
-                resultsInfo2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
-            // Append for next loop - including any content accumulated in this round
-            final nextAssistantToolCall = _buildAssistantToolCallMessage(
-              calls: calls2,
-              content: contentAccum,
-              reasoningContent: needsReasoningEcho ? reasoningAccum : null,
-              includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails: reasoningDetailsAccum,
-            );
-            currentMessages = [
-              ...currentMessages,
-              nextAssistantToolCall,
-              for (final r in results2)
-                {
-                  'role': 'tool',
-                  'tool_call_id': r['tool_call_id'],
-                  'name': calls2.firstWhere(
-                    (c) => c['id'] == r['tool_call_id'],
-                    orElse: () => const {
-                      'function': {'name': ''},
-                    },
-                  )['function']['name'],
-                  'content': r['content'],
-                },
-            ];
-            // Continue loop
-            continue;
-          } else {
-            // No further tool calls; finish
-            final approxTotal =
-                approxPromptTokens +
-                approxTokensFromChars(approxCompletionChars);
-            yield* emitDone(
-              reasoningDetails: reasoningDetailsAccum,
-              usage: usage,
-              totalTokens: usage?.totalTokens ?? approxTotal,
-            );
-            return;
-          }
-        }
+        return;
       }
 
       final approxTotal =
@@ -2578,324 +2799,65 @@ Stream<StreamChunk> _sendOpenAIStream(
           }
         }
         if (!decoder.emittedCitationEvents && decoder.citations.isNotEmpty) {
-          final payload = jsonEncode({'items': decoder.citations});
-          yield* emitToolResults(
-            [
-              emitToolResult(
-                id: 'builtin_search',
-                name: 'search_web',
-                arguments: const <String, dynamic>{},
-                content: payload,
-              ),
-            ],
-            usage: usage,
-            totalTokens: totalTokens,
+          yield ServerToolStart(id: 'builtin_search', toolName: 'search_web');
+          yield ServerToolEnd(
+            id: 'builtin_search',
+            output: <String, dynamic>{'items': decoder.citations},
           );
         }
         // Responses tool calling follow-up handling
         final bool hasRespCalls =
             respToolCallsByIndex.isNotEmpty || toolAccResp.isNotEmpty;
         if (effectiveOnToolCall != null && hasRespCalls) {
-          // Prefer the indexed calls (with call_id); fallback to toolAccResp
-          final callInfos = <EmitToolCall>[];
-          final msgs = <Map<String, dynamic>>[]; // for executing tools
-          if (respToolCallsByIndex.isNotEmpty) {
-            final sorted = respToolCallsByIndex.keys.toList()..sort();
-            for (final idx in sorted) {
-              final m = respToolCallsByIndex[idx]!;
-              final callId = (m['call_id'] ?? '').toString();
-              final name = (m['name'] ?? '').toString();
-              Map<String, dynamic> args;
-              try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              final id = _effectiveToolCallId(callId, 'call', idx);
-              callInfos.add(emitToolCall(id: id, name: name, arguments: args));
-              msgs.add({'__id': id, '__name': name, '__args': args});
-            }
-          } else {
-            int idx = 0;
-            toolAccResp.forEach((key, m) {
-              Map<String, dynamic> args;
-              try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              final id2 = _effectiveToolCallId(key, 'call', idx);
-              callInfos.add(
-                emitToolCall(id: id2, name: (m['name'] ?? ''), arguments: args),
-              );
-              msgs.add({
-                '__id': id2,
-                '__name': (m['name'] ?? ''),
-                '__args': args,
-              });
-              idx += 1;
-            });
-          }
-          final responseOutputItems = _withResponsesFunctionCallItems(
-            lastResponseOutputItems,
-            callInfos,
-          );
-          final resultsInfo = <EmitToolResult>[];
-          final followUpOutputs = <Map<String, dynamic>>[];
-          for (final m in msgs) {
-            final nm = m['__name'] as String;
-            final id2 = m['__id'] as String;
-            final args = (m['__args'] as Map<String, dynamic>);
-            final res = await effectiveOnToolCall(nm, args, toolCallId: id2);
-            resultsInfo.add(
-              emitToolResult(id: id2, name: nm, arguments: args, content: res),
-            );
-            followUpOutputs.add({
-              'type': 'function_call_output',
-              'call_id': id2,
-              'output': res,
-            });
-          }
-          if (resultsInfo.isNotEmpty) {
-            yield* emitToolResults(
-              resultsInfo,
-              usage: usage,
-              totalTokens: usage?.totalTokens ?? 0,
-            );
-          }
-
-          // Build follow-up Responses request input
-          List<Map<String, dynamic>> currentInput = <Map<String, dynamic>>[
-            ...responsesInitialInput,
-          ];
-          if (responseOutputItems.isNotEmpty) {
-            currentInput.addAll(responseOutputItems);
-          }
-          currentInput.addAll(followUpOutputs);
-
-          // Iteratively request until the model stops issuing tool calls,
-          // consistent with how Claude, Gemini and OpenAI Chat Completions
-          // providers handle the tool-call loop (while-true until done).
-          // Guard: break if the exact same tool-call set repeats 3 times
-          // consecutively, which indicates the model is stuck in a loop.
-          const int maxConsecutiveDupes = 3;
-          String? lastToolSignature;
-          int consecutiveDupeCount = 0;
-          while (true) {
-            final body2 = <String, dynamic>{
-              'model': upstreamModelId,
-              'input': currentInput,
-              'stream': true,
-              if (responsesToolsSpec.isNotEmpty) 'tools': responsesToolsSpec,
-              if (responsesToolsSpec.isNotEmpty) 'tool_choice': 'auto',
-              if (responsesInstructions.isNotEmpty)
-                'instructions': responsesInstructions,
-              if (temperature != null) 'temperature': temperature,
-              if (topP != null) 'top_p': topP,
-              if (maxTokens != null) 'max_output_tokens': maxTokens,
-              if (isReasoning && effort != 'off')
-                'reasoning': {
-                  'summary': 'auto',
-                  if (effort != 'auto') 'effort': effort,
-                },
-              if (responsesIncludeParam != null)
-                'include': responsesIncludeParam,
-            };
-            _applyCompatibleResponsesReasoning(
-              body2,
-              config: config,
-              modelId: modelId,
-              upstreamModelId: upstreamModelId,
-              isReasoning: isReasoning,
-              thinkingBudget: thinkingBudget,
-            );
-
-            // Apply overrides
-            final extraCfg = _customBody(
-              config,
-              modelId,
-              assistantBody: extraBody,
-            );
-            if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
-            // Ensure tools are flattened
-            try {
-              if (body2['tools'] is List) {
-                final raw = (body2['tools'] as List).cast<dynamic>();
-                body2['tools'] = _toResponsesToolsFormat(
-                  raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
-                );
-              }
-            } catch (_) {}
-
-            _sanitizeOpenAIGpt5SamplingParams(
-              body2,
-              upstreamModelId,
-              fallbackEffort: effort,
-              isOpenRouter: info.isOpenRouter,
-            );
-
-            final req2 = http.Request('POST', url);
-            final headers2 = _customHeaders(
-              config,
-              modelId,
-              baseHeaders: <String, String>{
-                'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-                'Content-Type': 'application/json',
-                'Accept': 'text/event-stream',
-              },
-              assistantHeaders: extraHeaders,
-            );
-            req2.headers.addAll(headers2);
-            req2.body = jsonEncode(body2);
-            final http.StreamedResponse resp2;
-            try {
-              resp2 = await client.send(req2);
-              if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-                final errorBody = await resp2.stream.bytesToString();
-                throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
-              }
-            } on HttpException {
-              rethrow;
-            } catch (e) {
-              // Keep as HttpException so the per-event catch below (which
-              // tolerates malformed JSON) cannot swallow this failure.
-              throw HttpException('Follow-up request failed: $e');
-            }
-            final s2 = _rethrowFollowUpStreamErrors(
-              resp2.stream.transform(utf8.decoder),
-            );
-            final followUpDecoder = ResponsesStreamDecoder(
-              initialUsage: usage,
-              sourceId: 'round-${streamRound++}',
-            );
-            await for (final event in parseSseEventStrings(s2)) {
-              final d = event.data;
-              if (d == '[DONE]') {
-                followUpDecoder.accept(event);
-                break;
-              }
-              _throwIfInBandStreamError(d);
-              final decoded = followUpDecoder.accept(event);
-              for (final chunk in decoded.chunks) {
-                yield chunk;
-              }
-              if (decoded.completed) break;
-            }
-            usage = followUpDecoder.usage ?? usage;
-            totalTokens = usage?.totalTokens ?? totalTokens;
-            approxCompletionChars += followUpDecoder.approxCompletionChars;
-            final respCalls2 = <int, Map<String, String>>{
-              for (final call in followUpDecoder.takeFunctionCalls())
-                call.index: <String, String>{
-                  'call_id': call.callId,
-                  'name': call.name,
-                  'args': call.args,
-                },
-            };
-            final outItems2 = followUpDecoder.outputItems;
-
-            if (respCalls2.isEmpty) {
-              // No further tool calls; finalize
-              final approxTotal2 =
-                  approxPromptTokens +
-                  approxTokensFromChars(approxCompletionChars);
-              yield* emitDone(
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? approxTotal2,
-              );
-              return;
-            }
-
-            // Detect consecutive duplicate tool-call patterns
-            final sorted2 = respCalls2.keys.toList()..sort();
-            final sigParts = <String>[];
-            for (final idx2 in sorted2) {
-              final m2 = respCalls2[idx2]!;
-              sigParts.add('${m2['name'] ?? ''}:${m2['args'] ?? ''}');
-            }
-            final currentSig = sigParts.join('|');
-            if (currentSig == lastToolSignature) {
-              consecutiveDupeCount += 1;
-              if (consecutiveDupeCount >= maxConsecutiveDupes) {
-                // Break out of loop – model is stuck repeating the same calls
-                break;
-              }
-            } else {
-              lastToolSignature = currentSig;
-              consecutiveDupeCount = 1;
-            }
-
-            // Execute next round of tool calls
-            final callInfos2 = <EmitToolCall>[];
-            final msgs2 = <Map<String, dynamic>>[];
-            for (final idx2 in sorted2) {
-              final m2 = respCalls2[idx2]!;
-              final callId2 = (m2['call_id'] ?? '').toString();
-              final name2 = (m2['name'] ?? '').toString();
-              Map<String, dynamic> args2;
-              try {
-                args2 = (jsonDecode(m2['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args2 = <String, dynamic>{};
-              }
-              final id2 = _effectiveToolCallId(callId2, 'call', idx2);
-              callInfos2.add(
-                emitToolCall(id: id2, name: name2, arguments: args2),
-              );
-              msgs2.add({'__id': id2, '__name': name2, '__args': args2});
-            }
-            final responseOutputItems2 = _withResponsesFunctionCallItems(
-              outItems2,
-              callInfos2,
-            );
-            final resultsInfo2 = <EmitToolResult>[];
-            final followUpOutputs2 = <Map<String, dynamic>>[];
-            for (final m in msgs2) {
-              final nm = m['__name'] as String;
-              final id2 = m['__id'] as String;
-              final args2 = (m['__args'] as Map<String, dynamic>);
-              final res2 = await effectiveOnToolCall(
-                nm,
-                args2,
-                toolCallId: id2,
-              );
-              resultsInfo2.add(
-                emitToolResult(
-                  id: id2,
-                  name: nm,
-                  arguments: args2,
-                  content: res2,
-                ),
-              );
-              followUpOutputs2.add({
-                'type': 'function_call_output',
-                'call_id': id2,
-                'output': res2,
-              });
-            }
-            if (resultsInfo2.isNotEmpty) {
-              yield* emitToolResults(
-                resultsInfo2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
-            // Extend current input with this round's model output and our outputs
-            if (responseOutputItems2.isNotEmpty) {
-              currentInput.addAll(responseOutputItems2);
-            }
-            currentInput.addAll(followUpOutputs2);
-          }
-
-          // Safety
-          final approxTotal =
-              approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield* emitDone(
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? approxTotal,
+          final callInfos = respToolCallsByIndex.isNotEmpty
+              ? _responsesCallsFromIndexMap(respToolCallsByIndex)
+              : [
+                  for (final entry
+                      in toolAccResp.entries.toList().asMap().entries)
+                    emitToolCall(
+                      id: _effectiveToolCallId(
+                        entry.value.key,
+                        'call',
+                        entry.key,
+                      ),
+                      name: (entry.value.value['name'] ?? '').toString(),
+                      arguments: () {
+                        try {
+                          return (jsonDecode(entry.value.value['args'] ?? '{}')
+                                  as Map)
+                              .cast<String, dynamic>();
+                        } catch (_) {
+                          return <String, dynamic>{};
+                        }
+                      }(),
+                    ),
+                ];
+          yield* _runOpenAIResponsesToolFollowUps(
+            client: client,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            url: url,
+            info: info,
+            initialInput: responsesInitialInput,
+            firstOutputItems: lastResponseOutputItems,
+            initialCalls: callInfos,
+            responsesToolsSpec: responsesToolsSpec,
+            responsesInstructions: responsesInstructions,
+            responsesIncludeParam: responsesIncludeParam,
+            onToolCall: effectiveOnToolCall,
+            extraHeaders: extraHeaders,
+            extraBody: extraBody,
+            temperature: temperature,
+            topP: topP,
+            maxTokens: maxTokens,
+            isReasoning: isReasoning,
+            effort: effort,
+            thinkingBudget: thinkingBudget,
+            initialUsage: usage,
+            streamRound: streamRound,
+            approxPromptTokens: approxPromptTokens,
+            approxCompletionChars: approxCompletionChars,
           );
           return;
         }
@@ -2933,274 +2895,44 @@ Stream<StreamChunk> _sendOpenAIStream(
           finishReason == 'tool_calls' &&
           toolAcc.isNotEmpty &&
           effectiveOnToolCall != null) {
-        // print('[ChatApi/XinLiu] Executing tools immediately (finishReason=tool_calls, toolAcc.size=${toolAcc.length})');
-        // Some providers (like XinLiu) return tool_calls with finish_reason='tool_calls' but no [DONE]
-        // Execute tools immediately in this case
-        final calls = <Map<String, dynamic>>[];
-        final callInfos = <EmitToolCall>[];
-        final toolMsgs = <Map<String, dynamic>>[];
-        toolAcc.forEach((idx, m) {
-          final id = _effectiveToolCallId(m['id'], 'call', idx);
-          final name = (m['name'] ?? '');
-          Map<String, dynamic> args;
-          try {
-            args = (jsonDecode(m['args'] ?? '{}') as Map)
-                .cast<String, dynamic>();
-          } catch (_) {
-            args = <String, dynamic>{};
-          }
-          callInfos.add(emitToolCall(id: id, name: name, arguments: args));
-          calls.add({
-            'id': id,
-            'type': 'function',
-            'function': {'name': name, 'arguments': jsonEncode(args)},
-          });
-          toolMsgs.add({'__name': name, '__id': id, '__args': args});
-        });
-        // Execute tools and emit results. ToolCall* already left the decoder.
-        final results = <Map<String, dynamic>>[];
-        final resultsInfo = <EmitToolResult>[];
-        for (final m in toolMsgs) {
-          final name = m['__name'] as String;
-          final id = m['__id'] as String;
-          final args = (m['__args'] as Map<String, dynamic>);
-          final res = await effectiveOnToolCall(name, args, toolCallId: id);
-          results.add({'tool_call_id': id, 'content': res});
-          resultsInfo.add(
-            emitToolResult(id: id, name: name, arguments: args, content: res),
-          );
-        }
-        if (resultsInfo.isNotEmpty) {
-          yield* emitToolResults(
-            resultsInfo,
-            usage: usage,
-            totalTokens: usage?.totalTokens ?? 0,
-          );
-        }
-        // Build follow-up messages
-        final mm2 = <Map<String, dynamic>>[];
-        for (final m in messages) {
-          mm2.add(_copyChatCompletionMessage(m));
-        }
-        final assistantToolCallMsg = _buildAssistantToolCallMessage(
-          calls: calls,
-          content: assistantContentBuffer,
-          reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
-          includeEmptyReasoningContent: needsReasoningEcho,
-          reasoningDetails:
+        yield* _runOpenAIChatCompletionsToolFollowUps(
+          client: client,
+          config: config,
+          modelId: modelId,
+          upstreamModelId: upstreamModelId,
+          url: url,
+          info: info,
+          messages: messages,
+          firstToolAcc: toolAcc,
+          firstAssistantContent: assistantContentBuffer,
+          firstReasoning: reasoningBuffer,
+          firstReasoningDetails:
               chatDecoder.reasoningDetails ??
               reasoningDetailsBuffer.detailsOrNull,
+          onToolCall: effectiveOnToolCall,
+          userImagePaths: userImagePaths,
+          canImageInput: canImageInput,
+          allowRemoteImages: allowRemoteImages,
+          isClaudeUpstream: isClaudeUpstream,
+          isReasoning: isReasoning,
+          effort: effort,
+          thinkingBudget: thinkingBudget,
+          temperature: temperature,
+          topP: topP,
+          tools: tools,
+          extraBodyCfg: extraBodyCfg,
+          extraHeaders: extraHeaders,
+          wantsImageOutput: wantsImageOutput,
+          needsReasoningEcho: needsReasoningEcho,
+          reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+          applyMaxTokens: setMaxTokens,
+          initialUsage: usage,
+          streamRound: streamRound,
+          approxPromptTokens: approxPromptTokens,
+          approxCompletionChars: approxCompletionChars,
+          includeReasoningDetailsOnDone: true,
         );
-        mm2.add(assistantToolCallMsg);
-        for (final r in results) {
-          final id = r['tool_call_id'];
-          final name = calls.firstWhere(
-            (c) => c['id'] == id,
-            orElse: () => const {
-              'function': {'name': ''},
-            },
-          )['function']['name'];
-          mm2.add({
-            'role': 'tool',
-            'tool_call_id': id,
-            'name': name,
-            'content': r['content'],
-          });
-        }
-        // Continue streaming with follow-up request
-        var currentMessages = mm2;
-        while (true) {
-          final Map<String, dynamic> body2 = {
-            'model': upstreamModelId,
-            'messages': await _buildOpenAIChatCompletionMessages(
-              currentMessages,
-              userMediaPaths: userImagePaths,
-              canImageInput: canImageInput,
-              allowRemoteImages: allowRemoteImages,
-              reasoningContentReplayPolicy: info.reasoningContentReplayPolicy,
-              stripReasoningContent: isClaudeUpstream,
-            ),
-            'stream': true,
-            if (temperature != null) 'temperature': temperature,
-            if (topP != null) 'top_p': topP,
-            if (isReasoning && effort != 'off' && effort != 'auto')
-              'reasoning_effort': effort,
-            if (tools != null && tools.isNotEmpty)
-              'tools': _cleanToolsForCompatibility(tools),
-            if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-          };
-          setMaxTokens(body2);
-          _applyVendorReasoningKnobs(
-            body2,
-            info: info,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-          _applyCompatibleBuiltInSearch(
-            body2,
-            config: config,
-            modelId: modelId,
-            upstreamModelId: upstreamModelId,
-          );
-          _maybeAddStreamingUsageOptions(
-            body2,
-            stream: true,
-            config: config,
-            host: info.host,
-          );
-          if (extraBodyCfg.isNotEmpty) {
-            body2.addAll(extraBodyCfg);
-          }
-          _sanitizeOpenAIGpt5SamplingParams(
-            body2,
-            upstreamModelId,
-            fallbackEffort: effort,
-            isOpenRouter: info.isOpenRouter,
-          );
-          _normalizeMoonshotKimiChatBody(
-            body2,
-            upstreamModelId: upstreamModelId,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-          final req2 = http.Request('POST', url);
-          final headers2 = _customHeaders(
-            config,
-            modelId,
-            baseHeaders: <String, String>{
-              'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-              'Content-Type': 'application/json',
-              'Accept': 'text/event-stream',
-            },
-            assistantHeaders: extraHeaders,
-          );
-          req2.headers.addAll(headers2);
-          req2.body = jsonEncode(body2);
-          final http.StreamedResponse resp2;
-          try {
-            resp2 = await client.send(req2);
-            if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-              final errorBody = await resp2.stream.bytesToString();
-              throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
-            }
-          } on HttpException {
-            rethrow;
-          } catch (e) {
-            // Keep as HttpException so the per-event catch below (which
-            // tolerates malformed JSON) cannot swallow this failure.
-            throw HttpException('Follow-up request failed: $e');
-          }
-          final s2 = _rethrowFollowUpStreamErrors(
-            resp2.stream.transform(utf8.decoder),
-          );
-          final roundDecoder = ChatCompletionsStreamDecoder(
-            wantsImageOutput: wantsImageOutput,
-            needsReasoningEcho: needsReasoningEcho,
-            allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
-            initialUsage: usage,
-            sourceId: 'round-${streamRound++}',
-          );
-          await for (final event in parseSseEventStrings(s2)) {
-            final d = event.data;
-            if (d == '[DONE]') {
-              continue;
-            }
-            _throwIfInBandStreamError(d);
-            try {
-              for (final chunk in roundDecoder.accept(event).chunks) {
-                yield chunk;
-              }
-            } catch (_) {}
-          }
-          usage = roundDecoder.usage ?? usage;
-          if (usage != null) totalTokens = usage.totalTokens;
-          final toolAcc2 = roundDecoder.toolCalls;
-          final finishReason2 = roundDecoder.finishReason;
-          final contentAccum = roundDecoder.assistantContent;
-          final reasoningAccum = roundDecoder.reasoningEcho;
-          final reasoningDetailsAccum = roundDecoder.reasoningDetails;
-          if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
-            final calls2 = <Map<String, dynamic>>[];
-            final callInfos2 = <EmitToolCall>[];
-            final toolMsgs2 = <Map<String, dynamic>>[];
-            toolAcc2.forEach((idx, m) {
-              final id = _effectiveToolCallId(m['id'], 'call', idx);
-              final name = (m['name'] ?? '');
-              Map<String, dynamic> args;
-              try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              callInfos2.add(emitToolCall(id: id, name: name, arguments: args));
-              calls2.add({
-                'id': id,
-                'type': 'function',
-                'function': {'name': name, 'arguments': jsonEncode(args)},
-              });
-              toolMsgs2.add({'__name': name, '__id': id, '__args': args});
-            });
-            final results2 = <Map<String, dynamic>>[];
-            final resultsInfo2 = <EmitToolResult>[];
-            for (final m in toolMsgs2) {
-              final name = m['__name'] as String;
-              final id = m['__id'] as String;
-              final args = (m['__args'] as Map<String, dynamic>);
-              final res = await effectiveOnToolCall(name, args, toolCallId: id);
-              results2.add({'tool_call_id': id, 'content': res});
-              resultsInfo2.add(
-                emitToolResult(
-                  id: id,
-                  name: name,
-                  arguments: args,
-                  content: res,
-                ),
-              );
-            }
-            if (resultsInfo2.isNotEmpty) {
-              yield* emitToolResults(
-                resultsInfo2,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
-            final nextAssistantToolCall = _buildAssistantToolCallMessage(
-              calls: calls2,
-              content: contentAccum,
-              reasoningContent: needsReasoningEcho ? reasoningAccum : null,
-              includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails: reasoningDetailsAccum,
-            );
-            currentMessages = [
-              ...currentMessages,
-              nextAssistantToolCall,
-              for (final r in results2)
-                {
-                  'role': 'tool',
-                  'tool_call_id': r['tool_call_id'],
-                  'name': calls2.firstWhere(
-                    (c) => c['id'] == r['tool_call_id'],
-                    orElse: () => const {
-                      'function': {'name': ''},
-                    },
-                  )['function']['name'],
-                  'content': r['content'],
-                },
-            ];
-            continue;
-          } else {
-            final approxTotal =
-                approxPromptTokens +
-                approxTokensFromChars(approxCompletionChars);
-            yield* emitDone(
-              reasoningDetails: reasoningDetailsAccum,
-              usage: usage,
-              totalTokens: usage?.totalTokens ?? approxTotal,
-            );
-            return;
-          }
-        }
+        return;
       }
       // XinLiu compatibility: Don't end early if we have accumulated tool calls
       if (config.useResponseApi != true &&
@@ -3208,288 +2940,48 @@ Stream<StreamChunk> _sendOpenAIStream(
           finishReason != 'tool_calls') {
         final bool hasPendingToolCalls =
             toolAcc.isNotEmpty || toolAccResp.isNotEmpty;
-        if (hasPendingToolCalls) {
+        final pendingHandler = effectiveOnToolCall;
+        if (hasPendingToolCalls && pendingHandler != null) {
           // Some providers (like XinLiu/iflow.cn) may return tool_calls with finish_reason='stop'
           // and may not send a [DONE] marker. Execute tools immediately in this case.
-          if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
-            final calls = <Map<String, dynamic>>[];
-            final callInfos = <EmitToolCall>[];
-            final toolMsgs = <Map<String, dynamic>>[];
-            toolAcc.forEach((idx, m) {
-              final id = _effectiveToolCallId(m['id'], 'call', idx);
-              final name = (m['name'] ?? '');
-              Map<String, dynamic> args;
-              try {
-                args = (jsonDecode(m['args'] ?? '{}') as Map)
-                    .cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              callInfos.add(emitToolCall(id: id, name: name, arguments: args));
-              calls.add({
-                'id': id,
-                'type': 'function',
-                'function': {'name': name, 'arguments': jsonEncode(args)},
-              });
-              toolMsgs.add({'__name': name, '__id': id, '__args': args});
-            });
-            // Execute tools and emit results. ToolCall* already left the decoder.
-            final results = <Map<String, dynamic>>[];
-            final resultsInfo = <EmitToolResult>[];
-            for (final m in toolMsgs) {
-              final name = m['__name'] as String;
-              final id = m['__id'] as String;
-              final args = (m['__args'] as Map<String, dynamic>);
-              final res = await effectiveOnToolCall(name, args, toolCallId: id);
-              results.add({'tool_call_id': id, 'content': res});
-              resultsInfo.add(
-                emitToolResult(
-                  id: id,
-                  name: name,
-                  arguments: args,
-                  content: res,
-                ),
-              );
-            }
-            if (resultsInfo.isNotEmpty) {
-              yield* emitToolResults(
-                resultsInfo,
-                usage: usage,
-                totalTokens: usage?.totalTokens ?? 0,
-              );
-            }
-            // Build follow-up messages
-            final mm2 = <Map<String, dynamic>>[];
-            for (final m in messages) {
-              mm2.add(_copyChatCompletionMessage(m));
-            }
-            final assistantToolCallMsg = _buildAssistantToolCallMessage(
-              calls: calls,
-              content: assistantContentBuffer,
-              reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
-              includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails:
-                  chatDecoder.reasoningDetails ??
-                  reasoningDetailsBuffer.detailsOrNull,
-            );
-            mm2.add(assistantToolCallMsg);
-            for (final r in results) {
-              final id = r['tool_call_id'];
-              final name = calls.firstWhere(
-                (c) => c['id'] == id,
-                orElse: () => const {
-                  'function': {'name': ''},
-                },
-              )['function']['name'];
-              mm2.add({
-                'role': 'tool',
-                'tool_call_id': id,
-                'name': name,
-                'content': r['content'],
-              });
-            }
-            // Continue streaming with follow-up request - reuse existing multi-round logic from [DONE] handler
-            var currentMessages = mm2;
-            while (true) {
-              final Map<String, dynamic> body2 = {
-                'model': upstreamModelId,
-                'messages': await _buildOpenAIChatCompletionMessages(
-                  currentMessages,
-                  userMediaPaths: userImagePaths,
-                  canImageInput: canImageInput,
-                  allowRemoteImages: allowRemoteImages,
-                  reasoningContentReplayPolicy:
-                      info.reasoningContentReplayPolicy,
-                  stripReasoningContent: isClaudeUpstream,
-                ),
-                'stream': true,
-                if (temperature != null) 'temperature': temperature,
-                if (topP != null) 'top_p': topP,
-                if (isReasoning && effort != 'off' && effort != 'auto')
-                  'reasoning_effort': effort,
-                if (tools != null && tools.isNotEmpty)
-                  'tools': _cleanToolsForCompatibility(tools),
-                if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
-              };
-              setMaxTokens(body2);
-              _applyVendorReasoningKnobs(
-                body2,
-                info: info,
-                isReasoning: isReasoning,
-                thinkingBudget: thinkingBudget,
-              );
-              _applyCompatibleBuiltInSearch(
-                body2,
-                config: config,
-                modelId: modelId,
-                upstreamModelId: upstreamModelId,
-              );
-              _maybeAddStreamingUsageOptions(
-                body2,
-                stream: true,
-                config: config,
-                host: info.host,
-              );
-              if (extraBodyCfg.isNotEmpty) {
-                body2.addAll(extraBodyCfg);
-              }
-              _sanitizeOpenAIGpt5SamplingParams(
-                body2,
-                upstreamModelId,
-                fallbackEffort: effort,
-                isOpenRouter: info.isOpenRouter,
-              );
-              _normalizeMoonshotKimiChatBody(
-                body2,
-                upstreamModelId: upstreamModelId,
-                isReasoning: isReasoning,
-                thinkingBudget: thinkingBudget,
-              );
-              final req2 = http.Request('POST', url);
-              final headers2 = _customHeaders(
-                config,
-                modelId,
-                baseHeaders: <String, String>{
-                  'Authorization':
-                      'Bearer ${_apiKeyForRequest(config, modelId)}',
-                  'Content-Type': 'application/json',
-                  'Accept': 'text/event-stream',
-                },
-                assistantHeaders: extraHeaders,
-              );
-              req2.headers.addAll(headers2);
-              req2.body = jsonEncode(body2);
-              final http.StreamedResponse resp2;
-              try {
-                resp2 = await client.send(req2);
-                if (resp2.statusCode < 200 || resp2.statusCode >= 300) {
-                  final errorBody = await resp2.stream.bytesToString();
-                  throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
-                }
-              } on HttpException {
-                rethrow;
-              } catch (e) {
-                // Keep as HttpException so the per-event catch below (which
-                // tolerates malformed JSON) cannot swallow this failure.
-                throw HttpException('Follow-up request failed: $e');
-              }
-              final s2 = _rethrowFollowUpStreamErrors(
-                resp2.stream.transform(utf8.decoder),
-              );
-              final roundDecoder = ChatCompletionsStreamDecoder(
-                wantsImageOutput: wantsImageOutput,
-                needsReasoningEcho: needsReasoningEcho,
-                allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
-                initialUsage: usage,
-                sourceId: 'round-${streamRound++}',
-              );
-              await for (final event in parseSseEventStrings(s2)) {
-                final d = event.data;
-                if (d == '[DONE]') {
-                  continue;
-                }
-                _throwIfInBandStreamError(d);
-                try {
-                  for (final chunk in roundDecoder.accept(event).chunks) {
-                    yield chunk;
-                  }
-                } catch (_) {}
-              }
-              usage = roundDecoder.usage ?? usage;
-              if (usage != null) totalTokens = usage.totalTokens;
-              final toolAcc2 = roundDecoder.toolCalls;
-              final finishReason2 = roundDecoder.finishReason;
-              final contentAccum = roundDecoder.assistantContent;
-              final reasoningAccum = roundDecoder.reasoningEcho;
-              final reasoningDetailsAccum = roundDecoder.reasoningDetails;
-              if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
-                final calls2 = <Map<String, dynamic>>[];
-                final callInfos2 = <EmitToolCall>[];
-                final toolMsgs2 = <Map<String, dynamic>>[];
-                toolAcc2.forEach((idx, m) {
-                  final id = _effectiveToolCallId(m['id'], 'call', idx);
-                  final name = (m['name'] ?? '');
-                  Map<String, dynamic> args;
-                  try {
-                    args = (jsonDecode(m['args'] ?? '{}') as Map)
-                        .cast<String, dynamic>();
-                  } catch (_) {
-                    args = <String, dynamic>{};
-                  }
-                  callInfos2.add(
-                    emitToolCall(id: id, name: name, arguments: args),
-                  );
-                  calls2.add({
-                    'id': id,
-                    'type': 'function',
-                    'function': {'name': name, 'arguments': jsonEncode(args)},
-                  });
-                  toolMsgs2.add({'__name': name, '__id': id, '__args': args});
-                });
-                final results2 = <Map<String, dynamic>>[];
-                final resultsInfo2 = <EmitToolResult>[];
-                for (final m in toolMsgs2) {
-                  final name = m['__name'] as String;
-                  final id = m['__id'] as String;
-                  final args = (m['__args'] as Map<String, dynamic>);
-                  final res = await effectiveOnToolCall(
-                    name,
-                    args,
-                    toolCallId: id,
-                  );
-                  results2.add({'tool_call_id': id, 'content': res});
-                  resultsInfo2.add(
-                    emitToolResult(
-                      id: id,
-                      name: name,
-                      arguments: args,
-                      content: res,
-                    ),
-                  );
-                }
-                if (resultsInfo2.isNotEmpty) {
-                  yield* emitToolResults(
-                    resultsInfo2,
-                    usage: usage,
-                    totalTokens: usage?.totalTokens ?? 0,
-                  );
-                }
-                final nextAssistantToolCall = _buildAssistantToolCallMessage(
-                  calls: calls2,
-                  content: contentAccum,
-                  reasoningContent: needsReasoningEcho ? reasoningAccum : null,
-                  includeEmptyReasoningContent: needsReasoningEcho,
-                  reasoningDetails: reasoningDetailsAccum,
-                );
-                currentMessages = [
-                  ...currentMessages,
-                  nextAssistantToolCall,
-                  for (final r in results2)
-                    {
-                      'role': 'tool',
-                      'tool_call_id': r['tool_call_id'],
-                      'name': calls2.firstWhere(
-                        (c) => c['id'] == r['tool_call_id'],
-                        orElse: () => const {
-                          'function': {'name': ''},
-                        },
-                      )['function']['name'],
-                      'content': r['content'],
-                    },
-                ];
-                continue;
-              } else {
-                final approxTotal =
-                    approxPromptTokens +
-                    approxTokensFromChars(approxCompletionChars);
-                yield* emitDone(
-                  usage: usage,
-                  totalTokens: usage?.totalTokens ?? approxTotal,
-                );
-                return;
-              }
-            }
-          }
+          yield* _runOpenAIChatCompletionsToolFollowUps(
+            client: client,
+            config: config,
+            modelId: modelId,
+            upstreamModelId: upstreamModelId,
+            url: url,
+            info: info,
+            messages: messages,
+            firstToolAcc: toolAcc,
+            firstAssistantContent: assistantContentBuffer,
+            firstReasoning: reasoningBuffer,
+            firstReasoningDetails:
+                chatDecoder.reasoningDetails ??
+                reasoningDetailsBuffer.detailsOrNull,
+            onToolCall: pendingHandler,
+            userImagePaths: userImagePaths,
+            canImageInput: canImageInput,
+            allowRemoteImages: allowRemoteImages,
+            isClaudeUpstream: isClaudeUpstream,
+            isReasoning: isReasoning,
+            effort: effort,
+            thinkingBudget: thinkingBudget,
+            temperature: temperature,
+            topP: topP,
+            tools: tools,
+            extraBodyCfg: extraBodyCfg,
+            extraHeaders: extraHeaders,
+            wantsImageOutput: wantsImageOutput,
+            needsReasoningEcho: needsReasoningEcho,
+            reasoningDetailsAllowSnapshots: reasoningDetailsAllowSnapshots,
+            applyMaxTokens: setMaxTokens,
+            initialUsage: usage,
+            streamRound: streamRound,
+            approxPromptTokens: approxPromptTokens,
+            approxCompletionChars: approxCompletionChars,
+            includeReasoningDetailsOnDone: false,
+          );
+          return;
         }
       }
     } on HttpException {

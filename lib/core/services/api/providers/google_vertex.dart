@@ -429,244 +429,246 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
   );
   TokenUsage? totalUsage;
   var streamRound = 0;
+  var pendingCalls = <EmitToolCall>[];
+  var lastAssistantBlocks = <Map<String, dynamic>>[];
+  var lastStreamResults = <Map<String, dynamic>>[];
+  var lastText = '';
+  var pauseTurn = false;
 
-  while (true) {
-    final omitSamplingParams = _claudeShouldOmitSamplingParams(
-      upstreamId,
-      effectiveThinkingBudget,
-    );
-    final compatibleTopP = _claudeCompatibleTopP(
-      upstreamId,
-      effectiveThinkingBudget,
-      topP,
-    );
-    final thinking = isReasoning
-        ? _claudeThinkingConfig(upstreamId, effectiveThinkingBudget)
-        : null;
-    final outputConfig = isReasoning
-        ? _claudeOutputConfig(upstreamId, effectiveThinkingBudget)
-        : null;
-    final body = <String, dynamic>{
-      'anthropic_version': 'vertex-2023-10-16',
-      'messages': convo,
-      'stream': stream,
-      'max_tokens': effectiveMaxTokens,
-      if (systemPrompt.isNotEmpty) 'system': systemPrompt,
-      if (!omitSamplingParams &&
-          !_isClaudeReasoningEnabled(effectiveThinkingBudget) &&
-          temperature != null)
-        'temperature': temperature,
-      if (compatibleTopP != null) 'top_p': compatibleTopP,
-      if (allTools.isNotEmpty) 'tools': allTools,
-      if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
-      if (thinking != null) 'thinking': thinking,
-      if (outputConfig != null) 'output_config': outputConfig,
-    };
-    body.addAll(_customBody(config, modelId, assistantBody: extraBody));
-
-    final request = http.Request('POST', url);
-    request.headers.addAll(headers);
-    request.body = jsonEncode(body);
-
-    final response = await client.send(request);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      final errorBody = await response.stream.bytesToString();
-      throw HttpException('HTTP ${response.statusCode}: $errorBody');
-    }
-
-    if (!stream) {
-      // Vertex rawPredict response is same as Anthropic non-stream response
-      final txt = await response.stream.bytesToString();
-      final obj = jsonDecode(txt) as Map;
-      // Usage
-      try {
-        final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
-        if (u != null) {
-          totalUsage = (totalUsage ?? const TokenUsage()).merge(
-            _claudeUsageFromMap(u),
-          );
-        }
-      } catch (_) {}
-      final content = (obj['content'] as List?) ?? const <dynamic>[];
-      final List<Map<String, dynamic>> assistantBlocks =
-          <Map<String, dynamic>>[];
-      final Map<String, Map<String, dynamic>> toolUses =
-          <String, Map<String, dynamic>>{}; // id -> {name,args}
-      final buf = StringBuffer();
-      for (final it in content) {
-        if (it is! Map) continue;
-        final type = (it['type'] ?? '').toString();
-        if (type == 'text') {
-          final t = (it['text'] ?? '').toString();
-          if (t.isNotEmpty) {
-            assistantBlocks.add({'type': 'text', 'text': t});
-            buf.write(t);
-          }
-        } else if (type == 'thinking' || type == 'redacted_thinking') {
-          try {
-            assistantBlocks.add(
-              Map<String, dynamic>.from(it.cast<String, dynamic>()),
-            );
-          } catch (_) {}
-        } else if (type == 'tool_use') {
-          final id = (it['id'] ?? '').toString();
-          final name = (it['name'] ?? '').toString();
-          final args =
-              (it['input'] as Map?)?.cast<String, dynamic>() ??
-              const <String, dynamic>{};
-          if (id.isNotEmpty) {
-            toolUses[id] = {'name': name, 'args': args};
-            assistantBlocks.add({
-              'type': 'tool_use',
-              'id': id,
-              'name': name,
-              'input': args,
-            });
-          }
-        }
-      }
-      if (toolUses.isNotEmpty && onToolCall != null) {
-        final callInfos = <EmitToolCall>[];
-        for (final e in toolUses.entries) {
-          callInfos.add(
-            emitToolCall(
-              id: e.key,
-              name: (e.value['name'] ?? '').toString(),
-              arguments: (e.value['args'] as Map<String, dynamic>),
-            ),
-          );
-        }
-        yield* emitToolCalls(
-          callInfos,
-          usage: totalUsage,
-          totalTokens: (totalUsage?.totalTokens ?? 0),
-        );
-        final results = <Map<String, dynamic>>[];
-        final resultsInfo = <EmitToolResult>[];
-        for (final e in toolUses.entries) {
-          final name = (e.value['name'] ?? '').toString();
-          final args = (e.value['args'] as Map<String, dynamic>);
-          final res = await onToolCall(name, args, toolCallId: e.key);
-          results.add({
-            'type': 'tool_result',
-            'tool_use_id': e.key,
-            'content': res,
-          });
-          resultsInfo.add(
-            emitToolResult(
-              id: e.key,
-              name: name,
-              arguments: args,
-              content: res,
-            ),
-          );
-        }
-        if (resultsInfo.isNotEmpty) {
-          yield* emitToolResults(
-            resultsInfo,
-            usage: totalUsage,
-            totalTokens: (totalUsage?.totalTokens ?? 0),
-          );
-        }
-        // Extend convo: assistant + user tool_result, loop
-        final assistantMsg = {'role': 'assistant', 'content': assistantBlocks};
-        final userToolMsg = {'role': 'user', 'content': results};
-        convo = [...convo, assistantMsg, userToolMsg];
-        continue; // next round
-      }
-      // No tool use -> return final text
-      yield* emitDone(
-        content: buf.toString(),
-        usage: totalUsage,
-        totalTokens: (totalUsage?.totalTokens ?? 0),
+  yield* runProviderToolRounds(
+    sendRound: () async* {
+      pendingCalls = [];
+      lastStreamResults = [];
+      lastText = '';
+      lastAssistantBlocks = [];
+      pauseTurn = false;
+      final omitSamplingParams = _claudeShouldOmitSamplingParams(
+        upstreamId,
+        effectiveThinkingBudget,
       );
-      return;
-    }
+      final compatibleTopP = _claudeCompatibleTopP(
+        upstreamId,
+        effectiveThinkingBudget,
+        topP,
+      );
+      final thinking = isReasoning
+          ? _claudeThinkingConfig(upstreamId, effectiveThinkingBudget)
+          : null;
+      final outputConfig = isReasoning
+          ? _claudeOutputConfig(upstreamId, effectiveThinkingBudget)
+          : null;
+      final body = <String, dynamic>{
+        'anthropic_version': 'vertex-2023-10-16',
+        'messages': convo,
+        'stream': stream,
+        'max_tokens': effectiveMaxTokens,
+        if (systemPrompt.isNotEmpty) 'system': systemPrompt,
+        if (!omitSamplingParams &&
+            !_isClaudeReasoningEnabled(effectiveThinkingBudget) &&
+            temperature != null)
+          'temperature': temperature,
+        if (compatibleTopP != null) 'top_p': compatibleTopP,
+        if (allTools.isNotEmpty) 'tools': allTools,
+        if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
+        if (thinking != null) 'thinking': thinking,
+        if (outputConfig != null) 'output_config': outputConfig,
+      };
+      body.addAll(_customBody(config, modelId, assistantBody: extraBody));
 
-    final sse = response.stream.transform(utf8.decoder);
-    final decoder = ClaudeStreamDecoder(sourceId: 'round-${streamRound++}');
-    final executedToolIds = <String>{};
+      final request = http.Request('POST', url);
+      request.headers.addAll(headers);
+      request.body = jsonEncode(body);
 
-    await for (final event in parseSseEventStrings(sse)) {
-      // Anthropic-on-Vertex reports failures in-band as `event: error` with
-      // {type:"error", error:{type,message}}; raise before the
-      // malformed-chunk guard below can swallow it.
-      _throwIfInBandStreamError(event.data);
-      final decoded = decoder.accept(event);
-      for (final chunk in decoded.chunks) {
-        yield chunk;
-        if (chunk is ToolCallEnd &&
-            decoder.isClientTool(chunk.id) &&
-            onToolCall != null &&
-            executedToolIds.add(chunk.id)) {
-          final tool = decoder.clientTools[chunk.id]!;
-          final args = tool.decodedArguments;
-          final res = await onToolCall(tool.name, args, toolCallId: tool.id);
-          decoder.recordToolResult(tool.id, res);
-          yield* emitToolResults(
-            [
-              emitToolResult(
-                id: tool.id,
-                name: tool.name,
-                arguments: args,
-                content: res,
+      final response = await client.send(request);
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final errorBody = await response.stream.bytesToString();
+        throw HttpException('HTTP ${response.statusCode}: $errorBody');
+      }
+
+      if (!stream) {
+        // Vertex rawPredict response is same as Anthropic non-stream response
+        final txt = await response.stream.bytesToString();
+        final obj = jsonDecode(txt) as Map;
+        // Usage
+        try {
+          final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
+          if (u != null) {
+            totalUsage = (totalUsage ?? const TokenUsage()).merge(
+              _claudeUsageFromMap(u),
+            );
+          }
+        } catch (_) {}
+        final content = (obj['content'] as List?) ?? const <dynamic>[];
+        final List<Map<String, dynamic>> assistantBlocks =
+            <Map<String, dynamic>>[];
+        final Map<String, Map<String, dynamic>> toolUses =
+            <String, Map<String, dynamic>>{}; // id -> {name,args}
+        final buf = StringBuffer();
+        for (final it in content) {
+          if (it is! Map) continue;
+          final type = (it['type'] ?? '').toString();
+          if (type == 'text') {
+            final t = (it['text'] ?? '').toString();
+            if (t.isNotEmpty) {
+              assistantBlocks.add({'type': 'text', 'text': t});
+              buf.write(t);
+            }
+          } else if (type == 'thinking' || type == 'redacted_thinking') {
+            try {
+              assistantBlocks.add(
+                Map<String, dynamic>.from(it.cast<String, dynamic>()),
+              );
+            } catch (_) {}
+          } else if (type == 'tool_use') {
+            final id = (it['id'] ?? '').toString();
+            final name = (it['name'] ?? '').toString();
+            final args =
+                (it['input'] as Map?)?.cast<String, dynamic>() ??
+                const <String, dynamic>{};
+            if (id.isNotEmpty) {
+              toolUses[id] = {'name': name, 'args': args};
+              assistantBlocks.add({
+                'type': 'tool_use',
+                'id': id,
+                'name': name,
+                'input': args,
+              });
+            }
+          }
+        }
+        lastAssistantBlocks = assistantBlocks;
+        lastText = buf.toString();
+        if (toolUses.isNotEmpty && onToolCall != null) {
+          pendingCalls = [
+            for (final e in toolUses.entries)
+              emitToolCall(
+                id: e.key,
+                name: (e.value['name'] ?? '').toString(),
+                arguments: (e.value['args'] as Map<String, dynamic>),
               ),
-            ],
-            usage: decoder.usage,
-            totalTokens: decoder.usage?.totalTokens ?? 0,
+          ];
+        }
+        return;
+      }
+
+      final sse = response.stream.transform(utf8.decoder);
+      final decoder = ClaudeStreamDecoder(sourceId: 'round-${streamRound++}');
+      final executedToolIds = <String>{};
+
+      await for (final event in parseSseEventStrings(sse)) {
+        // Anthropic-on-Vertex reports failures in-band as `event: error` with
+        // {type:"error", error:{type,message}}; raise before the
+        // malformed-chunk guard below can swallow it.
+        _throwIfInBandStreamError(event.data);
+        final decoded = decoder.accept(event);
+        for (final chunk in decoded.chunks) {
+          yield chunk;
+          if (chunk is ToolCallEnd &&
+              decoder.isClientTool(chunk.id) &&
+              onToolCall != null &&
+              executedToolIds.add(chunk.id)) {
+            final tool = decoder.clientTools[chunk.id]!;
+            final args = tool.decodedArguments;
+            final call = emitToolCall(
+              id: tool.id,
+              name: tool.name,
+              arguments: args,
+            );
+            await for (final resultChunk in executeClientTools(
+              calls: [call],
+              onToolCall: onToolCall,
+              usage: decoder.usage,
+              totalTokens: decoder.usage?.totalTokens ?? 0,
+            )) {
+              if (resultChunk is ToolCallResult) {
+                decoder.recordToolResult(
+                  tool.id,
+                  (resultChunk.output ?? '').toString(),
+                );
+              }
+              yield resultChunk;
+            }
+          }
+        }
+        if (decoded.completed) break;
+      }
+      for (final chunk in decoder.onClosed()) {
+        yield chunk;
+      }
+
+      final usage = decoder.usage;
+      final assistantBlocks = decoder.assistantBlocks;
+      final lastStopReason = decoder.lastStopReason;
+      final toolResultsContent = decoder.toolResults;
+
+      if (usage != null) {
+        totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
+      }
+
+      lastAssistantBlocks = assistantBlocks;
+      if (decoder.clientTools.isEmpty) {
+        pauseTurn = (lastStopReason ?? '') == 'pause_turn';
+        return;
+      }
+
+      pendingCalls = [
+        for (final tool in decoder.clientTools.values)
+          emitToolCall(
+            id: tool.id,
+            name: tool.name,
+            arguments: tool.decodedArguments,
+          ),
+      ];
+      for (final tool in decoder.clientTools.values) {
+        var res = toolResultsContent[tool.id] ?? '';
+        if (res.isEmpty && onToolCall != null) {
+          res = await onToolCall(
+            tool.name,
+            tool.decodedArguments,
+            toolCallId: tool.id,
           );
         }
+        lastStreamResults.add({
+          'type': 'tool_result',
+          'tool_use_id': tool.id,
+          if (res.isNotEmpty) 'content': res,
+        });
       }
-      if (decoded.completed) break;
-    }
-    for (final chunk in decoder.onClosed()) {
-      yield chunk;
-    }
-
-    final usage = decoder.usage;
-    final roundTokens = usage?.totalTokens ?? 0;
-    final assistantBlocks = decoder.assistantBlocks;
-    final lastStopReason = decoder.lastStopReason;
-    final toolResultsContent = decoder.toolResults;
-
-    if (usage != null) {
-      totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
-    }
-
-    if (decoder.clientTools.isEmpty) {
-      final sr = lastStopReason ?? '';
-      if (sr == 'pause_turn') {
+    },
+    takeCalls: () => pendingCalls,
+    continueWithoutCalls: () => pauseTurn,
+    executeAfterRound: !stream,
+    emitCalls: !stream,
+    onToolCall: onToolCall,
+    append: (executed) {
+      if (pauseTurn) {
         convo = [
           ...convo,
-          {'role': 'assistant', 'content': assistantBlocks},
+          {'role': 'assistant', 'content': lastAssistantBlocks},
         ];
-        continue;
+        return;
       }
-      yield* emitDone(
-        usage: totalUsage ?? usage,
-        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
-      );
-      return;
-    }
-
-    final toolResultsBlocks = <Map<String, dynamic>>[];
-    for (final tool in decoder.clientTools.values) {
-      final args = tool.decodedArguments;
-      var res = toolResultsContent[tool.id] ?? '';
-      if (res.isEmpty && onToolCall != null) {
-        res = await onToolCall(tool.name, args, toolCallId: tool.id);
-      }
-      toolResultsBlocks.add({
-        'type': 'tool_result',
-        'tool_use_id': tool.id,
-        if (res.isNotEmpty) 'content': res,
-      });
-    }
-
-    convo = [
-      ...convo,
-      {'role': 'assistant', 'content': assistantBlocks},
-      {'role': 'user', 'content': toolResultsBlocks},
-    ];
-  }
+      final results = stream
+          ? lastStreamResults
+          : [
+              for (final item in executed)
+                <String, dynamic>{
+                  'type': 'tool_result',
+                  'tool_use_id': item.call.id,
+                  'content': item.content,
+                },
+            ];
+      convo = [
+        ...convo,
+        {'role': 'assistant', 'content': lastAssistantBlocks},
+        {'role': 'user', 'content': results},
+      ];
+    },
+    finish: () => emitDone(
+      content: lastText,
+      usage: totalUsage,
+      totalTokens: totalUsage?.totalTokens ?? 0,
+    ),
+    usageOf: () => totalUsage,
+  );
 }

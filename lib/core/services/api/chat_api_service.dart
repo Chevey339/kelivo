@@ -37,6 +37,7 @@ import 'providers/openai/responses_decoder.dart';
 
 part 'chat_api_service_shims.dart';
 part 'stream/stream_chunk_emit.dart';
+part 'generation/tool_loop_runner.dart';
 part 'providers/openai_common.dart';
 part 'providers/openai_chat_completions.dart';
 part 'providers/openai_images.dart';

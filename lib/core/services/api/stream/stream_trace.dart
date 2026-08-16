@@ -155,6 +155,11 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
       'type': 'tool_call_end',
       'id': id,
     },
+    ToolCallResult(:final id, :final output) => <String, dynamic>{
+      'type': 'tool_call_result',
+      'id': id,
+      if (output != null) 'output': _stableJson(output),
+    },
     ServerToolStart(:final id, :final toolName) => <String, dynamic>{
       'type': 'server_tool_start',
       'id': id,
