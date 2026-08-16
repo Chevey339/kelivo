@@ -32,6 +32,7 @@ import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
 import 'providers/claude/claude_decoder.dart';
 import 'providers/google/google_decoder.dart';
+import 'providers/openai/responses_decoder.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
@@ -1486,13 +1487,6 @@ class _GeminiSignatureMeta {
   bool get hasText => (textKey ?? '').isNotEmpty && textValue != null;
   bool get hasImages => images.isNotEmpty;
   bool get hasAny => hasText || hasImages;
-}
-
-class _ResponsesImageGenerationResult {
-  final String base64;
-  final String? outputFormat;
-
-  const _ResponsesImageGenerationResult({this.base64 = '', this.outputFormat});
 }
 
 class ChatStreamChunk {
