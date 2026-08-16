@@ -27,6 +27,7 @@ import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
+import 'stream/sse_framing.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
