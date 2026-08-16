@@ -28,6 +28,7 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
+import 'legacy_content_bookkeeping.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
@@ -1957,24 +1958,7 @@ class ChatActions {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-    }
-
-    state.fullContentRaw += chunkContent;
+    _recordContentSplit(state, chunkContent);
     state.streamStartedAt ??= DateTime.now();
     if (chunk.totalTokens > 0) {
       state.totalTokens = chunk.totalTokens;
@@ -2101,26 +2085,7 @@ class ChatActions {
         ? contextProvider.read<SettingsProvider>().autoCollapseThinking
         : null;
 
-    if (state.hadThinkingBlock && chunkContent.isNotEmpty) {
-      state.contentSplitOffsets.add(state.fullContentRaw.length);
-      state.reasoningCountAtSplit.add(
-        streamController.getReasoningSegmentCount(messageId),
-      );
-      state.toolCountAtSplit.add(streamController.getToolPartsCount(messageId));
-      state.hadThinkingBlock = false;
-      streamController.setContentSplitData(
-        messageId,
-        stream_ctrl.ContentSplitData(
-          offsets: List<int>.of(state.contentSplitOffsets),
-          reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-          toolCounts: List<int>.of(state.toolCountAtSplit),
-        ),
-      );
-    }
-
-    if (chunkContent.isNotEmpty) {
-      state.fullContentRaw += chunkContent;
-    }
+    _recordContentSplit(state, chunkContent);
 
     // Don't finish if tools are still loading
     final hasLoadingTool =
@@ -2426,5 +2391,37 @@ class ChatActions {
     }
     // Ensure any inline data URLs get converted even if the user navigates away mid-stream
     onScheduleImageSanitize?.call(streaming.id, latestContent, immediate: true);
+  }
+
+  void _recordContentSplit(
+    stream_ctrl.StreamingState state,
+    String chunkContent,
+  ) {
+    final bookkeeping = LegacyContentBookkeeping(
+      hadThinkingBlock: state.hadThinkingBlock,
+      fullContentRaw: state.fullContentRaw,
+      offsets: state.contentSplitOffsets,
+      reasoningCounts: state.reasoningCountAtSplit,
+      toolCounts: state.toolCountAtSplit,
+    );
+    final recorded = bookkeeping.addContent(
+      chunkContent,
+      reasoningCount: streamController.getReasoningSegmentCount(
+        state.messageId,
+      ),
+      toolCount: streamController.getToolPartsCount(state.messageId),
+    );
+    state
+      ..hadThinkingBlock = bookkeeping.hadThinkingBlock
+      ..fullContentRaw = bookkeeping.fullContentRaw;
+    if (!recorded) return;
+    streamController.setContentSplitData(
+      state.messageId,
+      stream_ctrl.ContentSplitData(
+        offsets: List<int>.of(state.contentSplitOffsets),
+        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
+        toolCounts: List<int>.of(state.toolCountAtSplit),
+      ),
+    );
   }
 }

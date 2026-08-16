@@ -1007,6 +1007,14 @@ class StreamController {
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
+    state.hadThinkingBlock = true;
+    _contentSplits[messageId] = _normalizeContentSplitData(
+      ContentSplitData(
+        offsets: List<int>.of(state.contentSplitOffsets),
+        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
+        toolCounts: List<int>.of(state.toolCountAtSplit),
+      ),
+    );
 
     final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
     for (final r in chunk.toolResults!) {
@@ -1029,6 +1037,11 @@ class StreamController {
           content: r.content,
           loading: false,
         );
+      } else if (r.id == 'builtin_search' &&
+          parts.any((part) => part.id != r.id && part.toolName == r.name)) {
+        // Adapter maps Annotations to a synthetic search result. The
+        // server tool already carries those citations.
+        continue;
       } else {
         parts.add(
           ToolUIPart(

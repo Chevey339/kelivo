@@ -434,6 +434,67 @@ void main() {
   );
 
   test(
+    'handleToolResultsChunk does not add annotation search when a server tool exists',
+    () async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final controller = buildController(
+        settings: settings,
+        currentConversationId: 'conversation-1',
+      );
+      final state = buildStreamingState(settings);
+
+      Future<void> upsertToolEventInDb(
+        String messageId, {
+        required String id,
+        required String name,
+        required Map<String, dynamic> arguments,
+        String? content,
+        Map<String, dynamic>? metadata,
+      }) async {}
+
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'st_1',
+              name: 'search_web',
+              arguments: const <String, dynamic>{},
+              content: '{"query":"kotlin"}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+      await controller.handleToolResultsChunk(
+        ChatStreamChunk(
+          content: '',
+          isDone: false,
+          totalTokens: 0,
+          toolResults: [
+            ToolResultInfo(
+              id: 'builtin_search',
+              name: 'search_web',
+              arguments: const <String, dynamic>{},
+              content: '{"items":[{"url":"https://example.com"}]}',
+            ),
+          ],
+        ),
+        state,
+        upsertToolEventInDb: upsertToolEventInDb,
+      );
+
+      final parts = controller.toolParts[state.messageId]!;
+      expect(parts, hasLength(1));
+      expect(parts.single.id, 'st_1');
+      expect(state.hadThinkingBlock, isTrue);
+    },
+  );
+
+  test(
     'dedupeToolPartsList drops stale no-id placeholders when a completed result exists',
     () {
       final controller = buildController();
