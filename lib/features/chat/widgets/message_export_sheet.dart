@@ -178,6 +178,18 @@ class _ThinkingExportData {
 }
 
 _ThinkingExportData _thinkingExportDataForMessage(ChatMessage message) {
+  final structuredReasoning = [
+    for (final part in message.parts)
+      if (part is ReasoningPart && part.text.trim().isNotEmpty)
+        part.text.trim(),
+  ];
+  if (structuredReasoning.isNotEmpty) {
+    return _ThinkingExportData(
+      cleanedContent: message.content.trim(),
+      thinkingTexts: structuredReasoning,
+    );
+  }
+
   final thinkingTexts = <String>[];
   var cleanedContent = message.content.trim();
 

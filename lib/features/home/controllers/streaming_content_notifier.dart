@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/models/message_part.dart';
+
 /// Lightweight notifier for streaming message content updates.
 ///
 /// This class provides a way to update streaming message content without
@@ -36,6 +38,7 @@ class StreamingContentNotifier {
     String messageId,
     String content,
     int totalTokens, {
+    List<MessagePart>? parts,
     List<int>? contentSplitOffsets,
     List<int>? reasoningCountAtSplit,
     List<int>? toolCountAtSplit,
@@ -50,6 +53,7 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: content,
         totalTokens: totalTokens,
+        parts: parts ?? current.parts,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -83,6 +87,7 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
+        parts: current.parts,
         reasoningText: reasoningText ?? current.reasoningText,
         reasoningStartAt: reasoningStartAt ?? current.reasoningStartAt,
         reasoningFinishedAt: reasoningFinishedAt ?? current.reasoningFinishedAt,
@@ -114,6 +119,7 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
+        parts: current.parts,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -140,6 +146,7 @@ class StreamingContentNotifier {
       notifier.value = StreamingContentData(
         content: current.content,
         totalTokens: current.totalTokens,
+        parts: current.parts,
         reasoningText: current.reasoningText,
         reasoningStartAt: current.reasoningStartAt,
         reasoningFinishedAt: current.reasoningFinishedAt,
@@ -179,6 +186,7 @@ class StreamingContentData {
   const StreamingContentData({
     required this.content,
     required this.totalTokens,
+    this.parts,
     this.reasoningText,
     this.reasoningStartAt,
     this.reasoningFinishedAt,
@@ -195,6 +203,7 @@ class StreamingContentData {
 
   final String content;
   final int totalTokens;
+  final List<MessagePart>? parts;
   final String? reasoningText;
   final DateTime? reasoningStartAt;
   final DateTime? reasoningFinishedAt;
@@ -221,6 +230,7 @@ class StreamingContentData {
           runtimeType == other.runtimeType &&
           content == other.content &&
           totalTokens == other.totalTokens &&
+          parts == other.parts &&
           reasoningText == other.reasoningText &&
           reasoningStartAt == other.reasoningStartAt &&
           reasoningFinishedAt == other.reasoningFinishedAt &&
@@ -238,6 +248,7 @@ class StreamingContentData {
   int get hashCode =>
       content.hashCode ^
       totalTokens.hashCode ^
+      parts.hashCode ^
       reasoningText.hashCode ^
       reasoningStartAt.hashCode ^
       reasoningFinishedAt.hashCode ^

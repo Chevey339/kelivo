@@ -141,42 +141,37 @@ void main() {
     expect(state.fullContentRaw, '先确认一下。');
   });
 
-  test(
-    'finishReasoningAndPersist writes v2 payload for tool-only splits',
-    () async {
-      final controller = buildController();
-      const messageId = 'assistant-message';
-      controller.setContentSplitData(
-        messageId,
-        const ContentSplitData(
-          offsets: [8],
-          reasoningCounts: [0],
-          toolCounts: [1],
-        ),
-      );
+  test('finishReasoningAndPersist no longer writes content splits', () async {
+    final controller = buildController();
+    const messageId = 'assistant-message';
+    controller.setContentSplitData(
+      messageId,
+      const ContentSplitData(
+        offsets: [8],
+        reasoningCounts: [0],
+        toolCounts: [1],
+      ),
+    );
 
-      String? persistedJson;
-      await controller.finishReasoningAndPersist(
-        messageId,
-        updateReasoningInDb:
-            (
-              messageId, {
-              String? reasoningText,
-              DateTime? reasoningFinishedAt,
-              String? reasoningSegmentsJson,
-            }) async {
-              expect(messageId, 'assistant-message');
-              persistedJson = reasoningSegmentsJson ?? persistedJson;
-            },
-      );
+    String? persistedJson;
+    await controller.finishReasoningAndPersist(
+      messageId,
+      updateReasoningInDb:
+          (
+            messageId, {
+            String? reasoningText,
+            DateTime? reasoningFinishedAt,
+            String? reasoningSegmentsJson,
+          }) async {
+            expect(messageId, 'assistant-message');
+            persistedJson = reasoningSegmentsJson ?? persistedJson;
+          },
+    );
 
-      expect(persistedJson, isNotNull);
-      expect(controller.deserializeReasoningSegments(persistedJson), isEmpty);
-      final restoredSplits = controller.deserializeContentSplits(persistedJson);
-      expect(restoredSplits, isNotNull);
-      expect(restoredSplits!.toolCounts, const [1]);
-    },
-  );
+    expect(persistedJson, isNotNull);
+    expect(controller.deserializeReasoningSegments(persistedJson), isEmpty);
+    expect(controller.deserializeContentSplits(persistedJson), isNull);
+  });
 
   test('streaming reasoning honors disabled auto-collapse setting', () async {
     final harness = await createBusinessTestHarness(
