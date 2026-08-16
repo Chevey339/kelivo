@@ -677,7 +677,6 @@ Future<File?> _renderAndSaveMessageImage(
 }) async {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
   final chatService = context.read<ChatService>();
   final title =
@@ -699,7 +698,9 @@ Future<File?> _renderAndSaveMessageImage(
       message: message,
       title: title,
       cs: cs,
-      chatFontScale: settings.chatFontScale,
+      // main.dart already bakes chatFontScale into the app-wide
+      // TextScaler; passing it again would double-scale the export.
+      chatFontScale: 1.0,
       showThinkingAndToolCards: showThinkingAndToolCards,
       expandThinkingContent: expandThinkingContent,
       isDesktop: isDesktop,
@@ -724,7 +725,6 @@ Future<File?> _renderAndSaveChatImage(
 }) async {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final settings = context.read<SettingsProvider>();
   final l10n = AppLocalizations.of(context)!;
   // Pre-render all mermaid diagrams found in selected messages
   try {
@@ -746,7 +746,9 @@ Future<File?> _renderAndSaveChatImage(
           ? conversation.title
           : l10n.messageExportSheetDefaultTitle,
       cs: cs,
-      chatFontScale: settings.chatFontScale,
+      // main.dart already bakes chatFontScale into the app-wide
+      // TextScaler; passing it again would double-scale the export.
+      chatFontScale: 1.0,
       messages: messages,
       timestamp: conversation.updatedAt,
       showThinkingAndToolCards: showThinkingAndToolCards,
