@@ -900,7 +900,7 @@ class ChatActions {
   }
 
   List<MessagePart> _assistantPartsForState(stream_ctrl.StreamingState state) {
-    final parts = state.shadowHandler.parts;
+    final parts = state.partsHandler.parts;
     if (parts.isEmpty) {
       return <MessagePart>[TextPart(_transformAssistantContent(state))];
     }
@@ -1835,7 +1835,7 @@ class ChatActions {
           );
           state.streamStartedAt ??= DateTime.now();
           await _markGenerationStreaming(state);
-          state.shadowHandler.handleResult(result);
+          state.partsHandler.handleResult(result);
           state.fullContentRaw = result.text;
           state.bufferedReasoning = [
             for (final part in result.parts)
@@ -1896,7 +1896,7 @@ class ChatActions {
     stream_ctrl.StreamingState state,
   ) async {
     await _markGenerationStreaming(state);
-    state.shadowHandler.handle(chunk);
+    state.partsHandler.handle(chunk);
     switch (chunk) {
       case TextDelta(:final text):
         final cleaned = text.isNotEmpty

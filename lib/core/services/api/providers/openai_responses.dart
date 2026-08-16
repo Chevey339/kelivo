@@ -1,6 +1,16 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
 
-List<Map<String, dynamic>> _toResponsesToolsFormat(
+import 'package:http/http.dart' as http;
+
+import '../../../providers/settings_provider.dart';
+import '../chat_api_helpers.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+
+import 'openai_common.dart';
+
+List<Map<String, dynamic>> toResponsesToolsFormat(
   List<Map<String, dynamic>> tools,
 ) {
   return tools.map((tool) {
@@ -34,7 +44,7 @@ List<Map<String, dynamic>> _toResponsesToolsFormat(
   }).toList();
 }
 
-List<Map<String, dynamic>> _withResponsesFunctionCallItems(
+List<Map<String, dynamic>> withResponsesFunctionCallItems(
   List<Map<String, dynamic>> outputItems,
   Iterable<EmitToolCall> calls,
 ) {
@@ -65,7 +75,7 @@ List<Map<String, dynamic>> _withResponsesFunctionCallItems(
   return replayItems;
 }
 
-Stream<StreamChunk> _sendOpenAIResponsesStream(
+Stream<StreamChunk> sendOpenAIResponsesStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -82,7 +92,7 @@ Stream<StreamChunk> _sendOpenAIResponsesStream(
   bool stream = true,
 }) {
   final cfg = config.copyWith(useResponseApi: true);
-  return _sendOpenAIStream(
+  return sendOpenAIStream(
     client,
     cfg,
     modelId,

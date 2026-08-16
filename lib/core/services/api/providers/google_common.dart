@@ -1,4 +1,28 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
+import '../../../models/token_usage.dart';
+import '../../../providers/model_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../../utils/multimodal_input_utils.dart';
+import '../../../../utils/app_directories.dart';
+import '../../../../utils/markdown_media_sanitizer.dart';
+import '../../../../utils/sandbox_path_resolver.dart';
+import '../builtin_tools.dart';
+import '../chat_api_helpers.dart';
+import '../gemini_tool_config.dart';
+import '../generation/tool_loop_runner.dart';
+import '../google_service_account_auth.dart';
+import '../stream/sse_framing.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+import 'google/google_decoder.dart';
+
+import 'google_gemini.dart';
+import 'google_vertex.dart';
 
 /// Builds the Gemini tools array, handling Gemini 3 coexistence vs 2.x mutual exclusion.
 ///
@@ -80,7 +104,7 @@ Map<String, dynamic> _googleThinkingConfig(
   String upstreamModelId,
   int? budget,
 ) {
-  final off = _isOff(budget);
+  final off = isOff(budget);
   if (_isGemma4Model(upstreamModelId)) {
     if (off) return const <String, dynamic>{};
     return const <String, dynamic>{
@@ -213,7 +237,7 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
         part.containsKey('thoughtSignature') ||
         part.containsKey('thought_signature');
     if (!hasSig) {
-      part['thoughtSignature'] = _geminiDummyThoughtSignature;
+      part['thoughtSignature'] = geminiDummyThoughtSignature;
     }
     return; // Only the first functionCall part is validated.
   }
@@ -284,7 +308,7 @@ bool _shouldRequestGoogleThoughts(
     explicitType: config.providerType,
   );
   if (kind != ProviderKind.google) return false;
-  return _apiModelId(config, modelId).toLowerCase().contains('gemini');
+  return apiModelId(config, modelId).toLowerCase().contains('gemini');
 }
 
 /// Gemini reports prompt-level blocks (safety filters etc.) in-band as
@@ -352,7 +376,7 @@ void _throwIfGeminiCandidateBlocked(String data) {
   }
 }
 
-Stream<StreamChunk> _sendGoogleStream(
+Stream<StreamChunk> sendGoogleStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -372,7 +396,7 @@ Stream<StreamChunk> _sendGoogleStream(
   // If it's a Claude model on Vertex, route to special handling
   if ((config.vertexAI == true) &&
       modelId.toLowerCase().startsWith('claude-')) {
-    yield* _sendGoogleVertexClaudeStream(
+    yield* sendGoogleVertexClaudeStream(
       client: client,
       config: config,
       modelId: modelId,
@@ -391,13 +415,13 @@ Stream<StreamChunk> _sendGoogleStream(
     return;
   }
 
-  final upstreamModelId = _apiModelId(config, modelId);
+  final upstreamModelId = apiModelId(config, modelId);
   final bool isGemini3 = upstreamModelId.toLowerCase().contains('gemini-3');
   final bool persistGeminiThoughtSigs = isGemini3;
-  final builtIns = _builtInTools(config, modelId);
+  final builtIns = builtInTools(config, modelId);
   final enableYoutube = builtIns.contains(BuiltInToolNames.youtube);
   // Effective model features (includes user overrides)
-  final effective = _effectiveModelInfo(config, modelId);
+  final effective = effectiveModelInfo(config, modelId);
   final isReasoning = _shouldRequestGoogleThoughts(config, modelId, effective);
   // Non-streaming path: use generateContent
   if (!stream) {
@@ -438,7 +462,7 @@ Stream<StreamChunk> _sendGoogleStream(
       }
       if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
         final parts = <Map<String, dynamic>>[];
-        final raw = _extractGeminiThoughtMeta(
+        final raw = extractGeminiThoughtMeta(
           (msg['content'] ?? '').toString(),
         ).cleanedText;
         if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
@@ -457,7 +481,7 @@ Stream<StreamChunk> _sendGoogleStream(
       }
       final isLast = i == messages.length - 1;
       final parts = <Map<String, dynamic>>[];
-      final meta = _extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+      final meta = extractGeminiThoughtMeta((msg['content'] ?? '').toString());
       final raw = meta.cleanedText;
       final seenSources = <String>{};
       String normalizeSrc(String src) {
@@ -481,7 +505,7 @@ Stream<StreamChunk> _sendGoogleStream(
       final hasAttachedImages =
           isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
       if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-        final parsed = await _parseTextAndImages(
+        final parsed = await parseTextAndImages(
           raw,
           // Gemini API 目前无法直接拉取远程 http(s) 图片
           allowRemoteImages: false,
@@ -493,7 +517,7 @@ Stream<StreamChunk> _sendGoogleStream(
           final normalized = normalizeSrc(ref.src);
           if (!seenSources.add(normalized)) continue;
           if (ref.kind == 'data') {
-            final mime = _mimeFromDataUrl(ref.src);
+            final mime = mimeFromDataUrl(ref.src);
             final idx = ref.src.indexOf('base64,');
             if (idx > 0) {
               final b64 = ref.src.substring(idx + 7);
@@ -504,8 +528,8 @@ Stream<StreamChunk> _sendGoogleStream(
               parts.add({'text': ref.src});
             }
           } else if (ref.kind == 'path') {
-            final mime = _mimeFromPath(ref.src);
-            final b64 = await _tryEncodeBase64File(ref.src, withPrefix: false);
+            final mime = mimeFromPath(ref.src);
+            final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
             if (b64 == null) continue;
             parts.add({
               'inline_data': {'mime_type': mime, 'data': b64},
@@ -514,7 +538,7 @@ Stream<StreamChunk> _sendGoogleStream(
             parts.add({'text': '(image) ${ref.src}'});
           }
         }
-        final supplementalRefs = _supplementalMediaRefs(
+        final supplementalRefs = supplementalMediaRefs(
           internalRaw: msg[multimodalInternalMediaPathsKey],
           userPaths: userImagePaths,
           includeUserPaths: hasAttachedImages,
@@ -525,7 +549,7 @@ Stream<StreamChunk> _sendGoogleStream(
             final normalized = normalizeSrc(p);
             if (!seenSources.add(normalized)) continue;
             if (p.startsWith('data:')) {
-              final mime = _mimeForInternalMediaRef(mediaRef);
+              final mime = mimeForInternalMediaRef(mediaRef);
               final idx = p.indexOf('base64,');
               if (idx > 0) {
                 final b64 = p.substring(idx + 7);
@@ -534,8 +558,8 @@ Stream<StreamChunk> _sendGoogleStream(
                 });
               }
             } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-              final mime = _mimeForInternalMediaRef(mediaRef);
-              final b64 = await _tryEncodeBase64File(p, withPrefix: false);
+              final mime = mimeForInternalMediaRef(mediaRef);
+              final b64 = await tryEncodeBase64File(p, withPrefix: false);
               if (b64 == null) continue;
               parts.add({
                 'inline_data': {'mime_type': mime, 'data': b64},
@@ -551,7 +575,7 @@ Stream<StreamChunk> _sendGoogleStream(
       // YouTube URL ingestion as file_data parts (Gemini official API)
       // Only inject on the last user message of this request.
       if (role == 'user' && isLast && enableYoutube) {
-        final urls = _extractYouTubeUrls(raw);
+        final urls = extractYouTubeUrls(raw);
         for (final u in urls) {
           // Vertex AI requires mime_type for file_data
           if (isVertex) {
@@ -566,7 +590,7 @@ Stream<StreamChunk> _sendGoogleStream(
         }
       }
       if (role == 'model') {
-        _applyGeminiThoughtSignatures(
+        applyGeminiThoughtSignatures(
           meta,
           parts,
           attachDummyWhenMissing: persistGeminiThoughtSigs,
@@ -590,7 +614,7 @@ Stream<StreamChunk> _sendGoogleStream(
           'name': name,
           if (desc.isNotEmpty) 'description': desc,
         };
-        if (params != null) d['parameters'] = _cleanSchemaForGemini(params);
+        if (params != null) d['parameters'] = cleanSchemaForGemini(params);
         decls.add(d);
       }
       if (decls.isNotEmpty) {
@@ -611,12 +635,12 @@ Stream<StreamChunk> _sendGoogleStream(
         requestHeaders['X-Goog-User-Project'] = proj;
       }
     } else {
-      final apiKey = _effectiveApiKey(config);
+      final apiKey = effectiveApiKey(config);
       if (apiKey.isNotEmpty) {
         requestHeaders['x-goog-api-key'] = apiKey;
       }
     }
-    final headers = _customHeaders(
+    final headers = customHeaders(
       config,
       modelId,
       baseHeaders: requestHeaders,
@@ -661,7 +685,7 @@ Stream<StreamChunk> _sendGoogleStream(
       if (toolsArr.isNotEmpty) 'tools': toolsArr,
       if (geminiToolConfig != null) 'toolConfig': geminiToolConfig,
     };
-    final extraG = _customBody(config, modelId, assistantBody: extraBody);
+    final extraG = customBody(config, modelId, assistantBody: extraBody);
     if (extraG.isNotEmpty) baseBody.addAll(extraG);
 
     TokenUsage? totalUsage;
@@ -688,7 +712,7 @@ Stream<StreamChunk> _sendGoogleStream(
           final errorBody = await resp.stream.bytesToString();
           throw HttpException('HTTP ${resp.statusCode}: $errorBody');
         }
-        final txt = await _decodeUtf8Stream(resp.stream);
+        final txt = await decodeUtf8Stream(resp.stream);
         final obj = jsonDecode(txt) as Map<String, dynamic>;
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();
@@ -730,7 +754,7 @@ Stream<StreamChunk> _sendGoogleStream(
                   thoughtSigVal = fc['thought_signature'];
                 }
                 return emitToolCall(
-                  id: _effectiveToolCallId(call['id'], 'fn', idx),
+                  id: effectiveToolCallId(call['id'], 'fn', idx),
                   name: (call['name'] ?? '').toString(),
                   arguments:
                       (call['args'] as Map?)?.cast<String, dynamic>() ??
@@ -805,7 +829,7 @@ Stream<StreamChunk> _sendGoogleStream(
         }
         var contentStr = buf.toString();
         if (persistGeminiThoughtSigs) {
-          final metaComment = _collectThoughtSigCommentFromParts(parts);
+          final metaComment = collectThoughtSigCommentFromParts(parts);
           if (metaComment.isNotEmpty) contentStr += metaComment;
         }
         lastText = contentStr;
@@ -899,7 +923,7 @@ Stream<StreamChunk> _sendGoogleStream(
     }
     if (roleRaw == 'assistant' && msg['tool_calls'] is List) {
       final parts = <Map<String, dynamic>>[];
-      final raw = _extractGeminiThoughtMeta(
+      final raw = extractGeminiThoughtMeta(
         (msg['content'] ?? '').toString(),
       ).cleanedText;
       if (raw.trim().isNotEmpty && raw.trim() != '\n\n') {
@@ -916,7 +940,7 @@ Stream<StreamChunk> _sendGoogleStream(
     }
     final isLast = i == messages.length - 1;
     final parts = <Map<String, dynamic>>[];
-    final meta = _extractGeminiThoughtMeta((msg['content'] ?? '').toString());
+    final meta = extractGeminiThoughtMeta((msg['content'] ?? '').toString());
     final raw = meta.cleanedText;
     final seenSources = <String>{};
     String normalizeSrc(String src) {
@@ -942,7 +966,7 @@ Stream<StreamChunk> _sendGoogleStream(
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
 
     if (hasMarkdownImages || hasAttachedImages || hasInternalMedia) {
-      final parsed = await _parseTextAndImages(
+      final parsed = await parseTextAndImages(
         raw,
         // Gemini API 目前无法直接拉取远程 http(s) 图片
         allowRemoteImages: false,
@@ -955,7 +979,7 @@ Stream<StreamChunk> _sendGoogleStream(
         final normalized = normalizeSrc(ref.src);
         if (!seenSources.add(normalized)) continue;
         if (ref.kind == 'data') {
-          final mime = _mimeFromDataUrl(ref.src);
+          final mime = mimeFromDataUrl(ref.src);
           final idx = ref.src.indexOf('base64,');
           if (idx > 0) {
             final b64 = ref.src.substring(idx + 7);
@@ -967,8 +991,8 @@ Stream<StreamChunk> _sendGoogleStream(
             parts.add({'text': ref.src});
           }
         } else if (ref.kind == 'path') {
-          final mime = _mimeFromPath(ref.src);
-          final b64 = await _tryEncodeBase64File(ref.src, withPrefix: false);
+          final mime = mimeFromPath(ref.src);
+          final b64 = await tryEncodeBase64File(ref.src, withPrefix: false);
           if (b64 == null) continue;
           parts.add({
             'inline_data': {'mime_type': mime, 'data': b64},
@@ -978,7 +1002,7 @@ Stream<StreamChunk> _sendGoogleStream(
           parts.add({'text': '(image) ${ref.src}'});
         }
       }
-      final supplementalRefs = _supplementalMediaRefs(
+      final supplementalRefs = supplementalMediaRefs(
         internalRaw: msg[multimodalInternalMediaPathsKey],
         userPaths: userImagePaths,
         includeUserPaths: hasAttachedImages,
@@ -989,7 +1013,7 @@ Stream<StreamChunk> _sendGoogleStream(
           final normalized = normalizeSrc(p);
           if (!seenSources.add(normalized)) continue;
           if (p.startsWith('data:')) {
-            final mime = _mimeForInternalMediaRef(mediaRef);
+            final mime = mimeForInternalMediaRef(mediaRef);
             final idx = p.indexOf('base64,');
             if (idx > 0) {
               final b64 = p.substring(idx + 7);
@@ -998,8 +1022,8 @@ Stream<StreamChunk> _sendGoogleStream(
               });
             }
           } else if (!(p.startsWith('http://') || p.startsWith('https://'))) {
-            final mime = _mimeForInternalMediaRef(mediaRef);
-            final b64 = await _tryEncodeBase64File(p, withPrefix: false);
+            final mime = mimeForInternalMediaRef(mediaRef);
+            final b64 = await tryEncodeBase64File(p, withPrefix: false);
             if (b64 == null) continue;
             parts.add({
               'inline_data': {'mime_type': mime, 'data': b64},
@@ -1017,7 +1041,7 @@ Stream<StreamChunk> _sendGoogleStream(
     // YouTube URL ingestion as file_data parts (Gemini official API)
     // Only inject on the last user message of this request.
     if (role == 'user' && isLast && enableYoutube) {
-      final urls = _extractYouTubeUrls(raw);
+      final urls = extractYouTubeUrls(raw);
       for (final u in urls) {
         // Vertex AI requires mime_type for file_data
         if (isVertex) {
@@ -1032,7 +1056,7 @@ Stream<StreamChunk> _sendGoogleStream(
       }
     }
     if (role == 'model') {
-      _applyGeminiThoughtSignatures(
+      applyGeminiThoughtSignatures(
         meta,
         parts,
         attachDummyWhenMissing: persistGeminiThoughtSigs,
@@ -1063,7 +1087,7 @@ Stream<StreamChunk> _sendGoogleStream(
       if (params != null) {
         // Google Gemini requires strict JSON Schema compliance
         // Fix array properties that are missing 'items' field
-        final cleanedParams = _cleanSchemaForGemini(params);
+        final cleanedParams = cleanSchemaForGemini(params);
         d['parameters'] = cleanedParams;
       }
       decls.add(d);
@@ -1147,26 +1171,26 @@ Stream<StreamChunk> _sendGoogleStream(
         'Accept': 'text/event-stream',
       };
       if (config.vertexAI == true) {
-        final token = await _maybeVertexAccessToken(config);
+        final token = await maybeVertexAccessToken(config);
         if (token != null && token.isNotEmpty) {
           requestHeaders['Authorization'] = 'Bearer $token';
         }
         final proj = (config.projectId ?? '').trim();
         if (proj.isNotEmpty) requestHeaders['X-Goog-User-Project'] = proj;
       } else {
-        final apiKey = _effectiveApiKey(config);
+        final apiKey = effectiveApiKey(config);
         if (apiKey.isNotEmpty) {
           requestHeaders['x-goog-api-key'] = apiKey;
         }
       }
-      final headers = _customHeaders(
+      final headers = customHeaders(
         config,
         modelId,
         baseHeaders: requestHeaders,
         assistantHeaders: extraHeaders,
       );
       request.headers.addAll(headers);
-      final extra = _customBody(config, modelId, assistantBody: extraBody);
+      final extra = customBody(config, modelId, assistantBody: extraBody);
       if (extra.isNotEmpty) {
         body.addAll(extra);
       }
@@ -1228,13 +1252,13 @@ Stream<StreamChunk> _sendGoogleStream(
         // Gemini can deliver {"error":{code,message,status}}, a prompt-level
         // block, or a candidate-level content-filter finish in-band on a 2xx
         // stream; raise before the malformed-chunk guard below can swallow it.
-        _throwIfInBandStreamError(data);
+        throwIfInBandStreamError(data);
         _throwIfGeminiPromptBlocked(data);
         _throwIfGeminiCandidateBlocked(data);
         final decoded = decoder.accept(event);
         for (final remote in decoder.takePendingRemoteImages()) {
           try {
-            final b64 = await _downloadRemoteAsBase64(
+            final b64 = await downloadRemoteAsBase64(
               client,
               config,
               remote.uri,
@@ -1245,15 +1269,15 @@ Stream<StreamChunk> _sendGoogleStream(
               thoughtSigKey: remote.thoughtSigKey,
               thoughtSigVal: remote.thoughtSigVal,
             )) {
-              yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+              yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
             }
           } catch (_) {}
         }
         for (final chunk in decoder.takeOrphanedTrailingText()) {
-          yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+          yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
         }
         for (final chunk in decoded.chunks) {
-          yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+          yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
           if (chunk is ToolCallEnd &&
               decoder.isClientFunctionCall(chunk.id) &&
               onToolCall != null) {
@@ -1292,7 +1316,7 @@ Stream<StreamChunk> _sendGoogleStream(
         if (decoded.completed || decoder.canFinishNow) break;
       }
       for (final chunk in decoder.onClosed()) {
-        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
+        yield await sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
       }
 
       receivedImage = decoder.receivedImage;
@@ -1334,7 +1358,7 @@ Stream<StreamChunk> _sendGoogleStream(
       if (!decoder.emittedImageEvents) {
         final pendingImage = await takeBufferedImageMarkdown();
         if (pendingImage.isNotEmpty) {
-          _logImageFallback(
+          logImageFallback(
             provider: config.id,
             model: modelId,
             reason: 'google_decoder_missed_image',
@@ -1351,7 +1375,7 @@ Stream<StreamChunk> _sendGoogleStream(
       if (calls.isEmpty) {
         // No tool calls; this round finished. Citations already left the decoder.
         if (persistGeminiThoughtSigs) {
-          final metaComment = _buildGeminiThoughtSigComment(
+          final metaComment = buildGeminiThoughtSigComment(
             textKey: responseTextThoughtSigKey,
             textValue: responseTextThoughtSigVal,
             imageSigs: responseImageThoughtSigs,

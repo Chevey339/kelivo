@@ -1,6 +1,15 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
 
-Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
+import 'package:http/http.dart' as http;
+
+import '../../../providers/settings_provider.dart';
+import '../../../utils/multimodal_input_utils.dart';
+import '../chat_api_helpers.dart';
+import '../stream/stream_chunk.dart';
+
+import 'openai_common.dart';
+
+Map<String, dynamic> copyChatCompletionMessage(Map<String, dynamic> m) {
   final role = (m['role'] ?? 'user').toString();
   final out = <String, dynamic>{
     'role': role,
@@ -73,7 +82,7 @@ Map<String, dynamic> _copyChatCompletionMessage(Map<String, dynamic> m) {
   return out;
 }
 
-List<Map<String, dynamic>> _cleanToolsForCompatibility(
+List<Map<String, dynamic>> cleanToolsForCompatibility(
   List<Map<String, dynamic>> tools,
 ) {
   final cleaned = tools.map((tool) {
@@ -83,7 +92,7 @@ List<Map<String, dynamic>> _cleanToolsForCompatibility(
       final fnMap = Map<String, dynamic>.from(fn);
       final params = fnMap['parameters'];
       if (params is Map) {
-        fnMap['parameters'] = _cleanSchemaForGemini(
+        fnMap['parameters'] = cleanSchemaForGemini(
           Map<String, dynamic>.from(params),
         );
       }
@@ -95,7 +104,7 @@ List<Map<String, dynamic>> _cleanToolsForCompatibility(
   return cleaned;
 }
 
-Stream<StreamChunk> _sendOpenAIChatCompletionsStream(
+Stream<StreamChunk> sendOpenAIChatCompletionsStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -112,7 +121,7 @@ Stream<StreamChunk> _sendOpenAIChatCompletionsStream(
   bool stream = true,
 }) {
   final cfg = config.copyWith(useResponseApi: false);
-  return _sendOpenAIStream(
+  return sendOpenAIStream(
     client,
     cfg,
     modelId,

@@ -1,4 +1,21 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
+import '../../../models/token_usage.dart';
+import '../../../providers/model_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../../utils/multimodal_input_utils.dart';
+import '../../../../utils/sandbox_path_resolver.dart';
+import '../builtin_tools.dart';
+import '../chat_api_helpers.dart';
+import '../generation/tool_loop_runner.dart';
+import '../stream/sse_framing.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+import 'claude/claude_decoder.dart';
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
@@ -11,17 +28,14 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
-TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) =>
-    claudeUsageFromMap(usage);
-
-String _normalizeClaudeImageMime(String mime) {
+String normalizeClaudeImageMime(String mime) {
   final normalized = mime.trim().toLowerCase();
   if (normalized == 'image/jpg') return 'image/jpeg';
   return normalized;
 }
 
-bool _isClaudeSupportedImageMime(String mime) {
-  switch (_normalizeClaudeImageMime(mime)) {
+bool isClaudeSupportedImageMime(String mime) {
+  switch (normalizeClaudeImageMime(mime)) {
     case 'image/jpeg':
     case 'image/png':
     case 'image/gif':
@@ -32,7 +46,7 @@ bool _isClaudeSupportedImageMime(String mime) {
   }
 }
 
-Stream<StreamChunk> _sendClaudeStream(
+Stream<StreamChunk> sendClaudeStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -48,14 +62,14 @@ Stream<StreamChunk> _sendClaudeStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
-  final upstreamModelId = _apiModelId(config, modelId);
+  final upstreamModelId = apiModelId(config, modelId);
   // Endpoint and headers (constant across rounds)
   final base = config.baseUrl.endsWith('/')
       ? config.baseUrl.substring(0, config.baseUrl.length - 1)
       : config.baseUrl;
   final url = Uri.parse('$base/messages');
 
-  final isReasoning = _effectiveModelInfo(
+  final isReasoning = effectiveModelInfo(
     config,
     modelId,
   ).abilities.contains(ModelAbility.reasoning);
@@ -264,10 +278,10 @@ Stream<StreamChunk> _sendClaudeStream(
           return;
         }
         if (source.startsWith('data:')) {
-          final mime = _normalizeClaudeImageMime(
+          final mime = normalizeClaudeImageMime(
             (explicitMime != null && explicitMime.trim().isNotEmpty)
                 ? explicitMime.trim()
-                : _mimeFromDataUrl(source),
+                : mimeFromDataUrl(source),
           );
           final idx = source.indexOf('base64,');
           if (idx > 0) {
@@ -282,12 +296,12 @@ Stream<StreamChunk> _sendClaudeStream(
           }
           return;
         }
-        final mime = _normalizeClaudeImageMime(
+        final mime = normalizeClaudeImageMime(
           (explicitMime != null && explicitMime.trim().isNotEmpty)
               ? explicitMime.trim()
-              : _mimeFromPath(source),
+              : mimeFromPath(source),
         );
-        final b64 = await _tryEncodeBase64File(source, withPrefix: false);
+        final b64 = await tryEncodeBase64File(source, withPrefix: false);
         if (b64 == null) return;
         parts.add({
           'type': 'image',
@@ -295,7 +309,7 @@ Stream<StreamChunk> _sendClaudeStream(
         });
       }
 
-      final parsed = await _parseTextAndImages(
+      final parsed = await parseTextAndImages(
         raw,
         allowRemoteImages: true,
         allowLocalImages: true,
@@ -309,18 +323,18 @@ Stream<StreamChunk> _sendClaudeStream(
           await addClaudeImage(ref.src);
         }
       }
-      final supplementalRefs = _supplementalMediaRefs(
+      final supplementalRefs = supplementalMediaRefs(
         internalRaw: m[multimodalInternalMediaPathsKey],
         userPaths: userImagePaths,
         includeUserPaths: hasAttachedImages,
       );
       for (final mediaRef in supplementalRefs) {
-        final mime = _mimeForInternalMediaRef(mediaRef);
+        final mime = mimeForInternalMediaRef(mediaRef);
         // Never emit Anthropic image blocks for video/audio or other
         // non-Claude image MIME types (e.g. video/mp4).
         if (isVideoMime(mime) ||
             isAudioMime(mime) ||
-            !_isClaudeSupportedImageMime(mime)) {
+            !isClaudeSupportedImageMime(mime)) {
           final uri = mediaRef.uri;
           final isRemote =
               uri.startsWith('http://') || uri.startsWith('https://');
@@ -378,7 +392,7 @@ Stream<StreamChunk> _sendClaudeStream(
       }
     }
   }
-  final builtIns = _builtInTools(config, modelId);
+  final builtIns = builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
@@ -422,11 +436,11 @@ Stream<StreamChunk> _sendClaudeStream(
   }
 
   // Headers (constant across rounds)
-  final baseHeaders = _customHeaders(
+  final baseHeaders = customHeaders(
     config,
     modelId,
     baseHeaders: <String, String>{
-      'x-api-key': _effectiveApiKey(config),
+      'x-api-key': effectiveApiKey(config),
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
@@ -448,24 +462,24 @@ Stream<StreamChunk> _sendClaudeStream(
 
   yield* runProviderToolRounds(
     sendRound: () async* {
-      final omitSamplingParams = _claudeShouldOmitSamplingParams(
+      final omitSamplingParams = claudeShouldOmitSamplingParams(
         upstreamModelId,
         thinkingBudget,
       );
-      final compatibleTopP = _claudeCompatibleTopP(
+      final compatibleTopP = claudeCompatibleTopP(
         upstreamModelId,
         thinkingBudget,
         topP,
       );
       final thinking = isReasoning
-          ? _claudeThinkingConfig(
+          ? claudeThinkingConfig(
               upstreamModelId,
               thinkingBudget,
               config: config,
             )
           : null;
       final outputConfig = isReasoning
-          ? _claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
+          ? claudeOutputConfig(upstreamModelId, thinkingBudget, config: config)
           : null;
 
       // Prepare request body per round
@@ -481,7 +495,7 @@ Stream<StreamChunk> _sendClaudeStream(
             config.claudePromptCachingTtl,
           ),
         if (!omitSamplingParams &&
-            !_isClaudeReasoningEnabled(thinkingBudget) &&
+            !isClaudeReasoningEnabled(thinkingBudget) &&
             temperature != null)
           'temperature': temperature,
         if (compatibleTopP != null) 'top_p': compatibleTopP,
@@ -490,11 +504,7 @@ Stream<StreamChunk> _sendClaudeStream(
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
       };
-      final extraClaude = _customBody(
-        config,
-        modelId,
-        assistantBody: extraBody,
-      );
+      final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
         body.addAll(extraClaude);
       }
@@ -517,14 +527,14 @@ Stream<StreamChunk> _sendClaudeStream(
 
       // Non-streaming path: parse full JSON, handle tool_use, then continue loop if needed.
       if (!stream) {
-        final txt = await _decodeUtf8Stream(response.stream);
+        final txt = await decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
         // Usage
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
             totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              _claudeUsageFromMap(u),
+              claudeUsageFromMap(u),
             );
           }
         } catch (_) {}
@@ -596,7 +606,7 @@ Stream<StreamChunk> _sendClaudeStream(
       final executedToolIds = <String>{};
 
       await for (final event in parseSseEventStrings(sse)) {
-        _throwIfInBandStreamError(event.data);
+        throwIfInBandStreamError(event.data);
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
           yield chunk;

@@ -1,11 +1,20 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../../../providers/settings_provider.dart';
+import '../chat_api_helpers.dart';
+import '../stream/stream_chunk.dart';
+
+import 'google_common.dart';
 
 const String _geminiThoughtSigTag = 'gemini_thought_signatures';
 
 /// Placeholder thought signature accepted by the Gemini API when the original
 /// signature is unavailable (e.g. legacy history persisted before signatures
 /// were captured). Same value used by Google's own Gemini CLI.
-const String _geminiDummyThoughtSignature =
+const String geminiDummyThoughtSignature =
     'context_engineering_is_the_way_to_go';
 final RegExp _geminiThoughtSigComment = RegExp(
   r'<!--\s*gemini_thought_signatures:(.*?)-->',
@@ -18,7 +27,7 @@ final RegExp _youtubeUrlRegex = RegExp(
   caseSensitive: false,
 );
 
-List<String> _extractYouTubeUrls(String text) {
+List<String> extractYouTubeUrls(String text) {
   final out = <String>[];
   final seen = <String>{};
   for (final m in _youtubeUrlRegex.allMatches(text)) {
@@ -34,10 +43,10 @@ List<String> _extractYouTubeUrls(String text) {
   return out;
 }
 
-_GeminiSignatureMeta _extractGeminiThoughtMeta(String raw) {
+GeminiSignatureMeta extractGeminiThoughtMeta(String raw) {
   try {
     final m = _geminiThoughtSigComment.firstMatch(raw);
-    if (m == null) return _GeminiSignatureMeta(cleanedText: raw);
+    if (m == null) return GeminiSignatureMeta(cleanedText: raw);
     final payloadRaw = (m.group(1) ?? '').trim();
     Map<String, dynamic> data = const <String, dynamic>{};
     try {
@@ -65,18 +74,18 @@ _GeminiSignatureMeta _extractGeminiThoughtMeta(String raw) {
       }
     }
     final cleaned = raw.replaceRange(m.start, m.end, '').trimRight();
-    return _GeminiSignatureMeta(
+    return GeminiSignatureMeta(
       cleanedText: cleaned,
       textKey: textKey,
       textValue: textVal,
       images: images,
     );
   } catch (_) {
-    return _GeminiSignatureMeta(cleanedText: raw);
+    return GeminiSignatureMeta(cleanedText: raw);
   }
 }
 
-String _buildGeminiThoughtSigComment({
+String buildGeminiThoughtSigComment({
   String? textKey,
   dynamic textValue,
   List<Map<String, dynamic>> imageSigs = const <Map<String, dynamic>>[],
@@ -92,8 +101,8 @@ String _buildGeminiThoughtSigComment({
   return '\n<!-- $_geminiThoughtSigTag:${jsonEncode(payload)} -->';
 }
 
-void _applyGeminiThoughtSignatures(
-  _GeminiSignatureMeta meta,
+void applyGeminiThoughtSignatures(
+  GeminiSignatureMeta meta,
   List<Map<String, dynamic>> parts, {
   bool attachDummyWhenMissing = false,
 }) {
@@ -122,7 +131,7 @@ void _applyGeminiThoughtSignatures(
       }
     }
   } else if (attachDummyWhenMissing) {
-    const dummy = _geminiDummyThoughtSignature;
+    const dummy = geminiDummyThoughtSignature;
     bool inlineFound = false;
     bool textTagged = false;
     for (final part in parts) {
@@ -149,7 +158,7 @@ void _applyGeminiThoughtSignatures(
   }
 }
 
-String _collectThoughtSigCommentFromParts(List<dynamic> parts) {
+String collectThoughtSigCommentFromParts(List<dynamic> parts) {
   String? textKey;
   dynamic textVal;
   final images = <Map<String, dynamic>>[];
@@ -178,16 +187,14 @@ String _collectThoughtSigCommentFromParts(List<dynamic> parts) {
       images.add({'k': sigKey, 'v': sigVal});
     }
   }
-  return _buildGeminiThoughtSigComment(
+  return buildGeminiThoughtSigComment(
     textKey: textKey,
     textValue: textVal,
     imageSigs: images,
   );
 }
 
-// Simple container for parsed text + image refs
-
-Stream<StreamChunk> _sendGoogleGeminiStream(
+Stream<StreamChunk> sendGoogleGeminiStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -204,7 +211,7 @@ Stream<StreamChunk> _sendGoogleGeminiStream(
   bool stream = true,
 }) {
   final cfg = config.copyWith(vertexAI: false);
-  return _sendGoogleStream(
+  return sendGoogleStream(
     client,
     cfg,
     modelId,
@@ -220,4 +227,21 @@ Stream<StreamChunk> _sendGoogleGeminiStream(
     extraBody: extraBody,
     stream: stream,
   );
+}
+
+class GeminiSignatureMeta {
+  final String cleanedText;
+  final String? textKey;
+  final dynamic textValue;
+  final List<Map<String, dynamic>> images;
+  const GeminiSignatureMeta({
+    required this.cleanedText,
+    this.textKey,
+    this.textValue,
+    this.images = const <Map<String, dynamic>>[],
+  });
+
+  bool get hasText => (textKey ?? '').isNotEmpty && textValue != null;
+  bool get hasImages => images.isNotEmpty;
+  bool get hasAny => hasText || hasImages;
 }

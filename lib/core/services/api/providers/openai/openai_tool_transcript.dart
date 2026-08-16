@@ -1,4 +1,8 @@
-part of '../../chat_api_service.dart';
+import 'dart:convert';
+
+import '../../chat_api_helpers.dart';
+import '../../generation/tool_loop_runner.dart';
+import '../../stream/stream_chunk_emit.dart';
 
 List<EmitToolCall> clientToolCallsFromChatAcc(Map<dynamic, dynamic> toolAcc) {
   final calls = <EmitToolCall>[];
@@ -11,7 +15,7 @@ List<EmitToolCall> clientToolCallsFromChatAcc(Map<dynamic, dynamic> toolAcc) {
   for (final key in keys) {
     final raw = toolAcc[key];
     if (raw is! Map) continue;
-    final id = _effectiveToolCallId(raw['id'], 'call', key);
+    final id = effectiveToolCallId(raw['id'], 'call', key);
     final name = (raw['name'] ?? '').toString();
     Map<String, dynamic> arguments;
     try {

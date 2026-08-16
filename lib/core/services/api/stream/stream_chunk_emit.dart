@@ -1,4 +1,8 @@
-part of '../chat_api_service.dart';
+import 'dart:convert';
+
+import '../../../models/token_usage.dart';
+import 'stream_chunk.dart';
+import 'stream_chunk_ids.dart';
 
 const _emitTextId = 'legacy:text';
 const _emitReasoningId = 'legacy:reasoning';
@@ -9,7 +13,7 @@ TokenUsage? _usageOrApprox(TokenUsage? usage, int totalTokens) {
   return null;
 }
 
-Future<StreamChunk> _sanitizeStreamChunk(
+Future<StreamChunk> sanitizeStreamChunk(
   StreamChunk chunk,
   Future<String> Function(String input) sanitize,
 ) async {

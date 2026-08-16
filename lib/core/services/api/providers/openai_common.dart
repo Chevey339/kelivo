@@ -1,4 +1,29 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:http/http.dart' as http;
+
+import '../../../models/token_usage.dart';
+import '../../../providers/model_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../../utils/multimodal_input_utils.dart';
+import '../../../utils/openai_model_compat.dart';
+import '../../../../utils/app_directories.dart';
+import '../../../../utils/sandbox_path_resolver.dart';
+import '../builtin_tools.dart';
+import '../chat_api_helpers.dart';
+import '../generation/tool_loop_runner.dart';
+import '../kimi_formula_search.dart';
+import '../stream/sse_framing.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+import 'openai/chat_completions_decoder.dart';
+import 'openai/openai_tool_transcript.dart';
+import 'openai/responses_decoder.dart';
+
+import 'openai_chat_completions.dart';
+import 'openai_responses.dart';
 
 Uri _openAICompatibleUrl(ProviderConfig config) {
   final rawBase = config.baseUrl.endsWith('/')
@@ -34,7 +59,7 @@ Future<({String uri, String mimeType})?> _saveResponsesImageGeneration(
   if (imageBase64.startsWith('data:')) {
     final commaIndex = imageBase64.indexOf(',');
     if (commaIndex < 0) return null;
-    mime = _mimeFromDataUrl(imageBase64);
+    mime = mimeFromDataUrl(imageBase64);
     imageBase64 = imageBase64.substring(commaIndex + 1);
   }
   final savedPath = await AppDirectories.saveBase64Image(mime, imageBase64);
@@ -54,16 +79,6 @@ Future<String> _saveResponsesImageGenerationMarkdown(
   return '\n![image](${saved.uri})\n';
 }
 
-void _logImageFallback({
-  required String provider,
-  required String model,
-  required String reason,
-}) {
-  final message = 'provider=$provider model=$model reason=$reason';
-  debugPrint('[ImageFallback] $message');
-  FlutterLogger.log(message, tag: 'ImageFallback');
-}
-
 bool _isResponsesImageGenerationType(dynamic type) {
   return type == 'image_generation_call' ||
       type == 'openrouter:image_generation';
@@ -75,7 +90,7 @@ void _applyCompatibleBuiltInSearch(
   required String modelId,
   required String upstreamModelId,
 }) {
-  final builtIns = _builtInTools(config, modelId);
+  final builtIns = builtInTools(config, modelId);
   if (!builtIns.contains(BuiltInToolNames.search)) return;
 
   if (BuiltInToolsHelper.isOpenRouterProvider(config)) {
@@ -171,7 +186,7 @@ void _applyCompatibleResponsesReasoning(
     body.remove('reasoning');
     if (!isReasoning) return;
 
-    final effort = _isOff(thinkingBudget)
+    final effort = isOff(thinkingBudget)
         ? 'none'
         : _openAIEffortForBudget(thinkingBudget, upstreamModelId);
     if (effort != 'auto') {
@@ -188,7 +203,7 @@ void _applyCompatibleResponsesReasoning(
   if (isDeepSeek) {
     if (!isReasoning) {
       body.remove('reasoning');
-    } else if (_isOff(thinkingBudget)) {
+    } else if (isOff(thinkingBudget)) {
       body['reasoning'] = {'effort': 'none'};
     }
     return;
@@ -202,14 +217,14 @@ void _applyCompatibleResponsesReasoning(
     return;
   }
 
-  final builtInSearchEnabled = _builtInTools(
+  final builtInSearchEnabled = builtInTools(
     config,
     modelId,
   ).contains(BuiltInToolNames.search);
   final forceThinkingForQwen3Max =
       builtInSearchEnabled &&
       upstreamModelId.toLowerCase().startsWith('qwen3-max');
-  body['enable_thinking'] = forceThinkingForQwen3Max || !_isOff(thinkingBudget);
+  body['enable_thinking'] = forceThinkingForQwen3Max || !isOff(thinkingBudget);
 }
 
 bool _isKimiK25Model(String upstreamModelId) {
@@ -320,9 +335,7 @@ void _normalizeMoonshotKimiChatBody(
   }
 
   if (_isKimiK25Model(upstreamModelId)) {
-    body['thinking'] = {
-      'type': _isOff(thinkingBudget) ? 'disabled' : 'enabled',
-    };
+    body['thinking'] = {'type': isOff(thinkingBudget) ? 'disabled' : 'enabled'};
     _removeMoonshotKimiUnsupportedSamplingParams(body);
     return;
   }
@@ -437,7 +450,7 @@ List<EmitToolCall> _openaiCallsFromCompletionMessage(
     final raw = tcs[i];
     if (raw is! Map) continue;
     final t = raw.cast<String, dynamic>();
-    final id = _effectiveToolCallId(t['id'], 'call', i);
+    final id = effectiveToolCallId(t['id'], 'call', i);
     final f =
         (t['function'] as Map?)?.cast<String, dynamic>() ??
         const <String, dynamic>{};
@@ -533,7 +546,7 @@ List<EmitToolCall> _responsesCallsFromIndexMap(
     }
     calls.add(
       emitToolCall(
-        id: _effectiveToolCallId(m['call_id'], 'call', idx),
+        id: effectiveToolCallId(m['call_id'], 'call', idx),
         name: (m['name'] ?? '').toString(),
         arguments: args,
       ),
@@ -543,7 +556,7 @@ List<EmitToolCall> _responsesCallsFromIndexMap(
 }
 
 String _openAIEffortForBudget(int? budget, String upstreamModelId) {
-  final baseEffort = _effortForBudget(budget);
+  final baseEffort = effortForBudget(budget);
   var requestedEffort = baseEffort;
   if (baseEffort == 'high' && budget != null) {
     if (budget >= 128000 && openAISupportsMaxReasoning(upstreamModelId)) {
@@ -631,7 +644,7 @@ void _sanitizeOpenAIGpt5SamplingParams(
   }
 }
 
-bool _isLongCatHost(String baseUrl) {
+bool isLongCatHost(String baseUrl) {
   // Callers may pass a full URL or a bare hostname (e.g. `api.longcat.chat`).
   // `Uri.tryParse('api.longcat.chat')?.host` is '' (not null), so never rely on
   // `??` fallback alone — normalize via an explicit https:// prefix when needed.
@@ -643,8 +656,8 @@ bool _isLongCatHost(String baseUrl) {
   return raw.contains('longcat');
 }
 
-bool _shouldIncludeStreamingUsageOptions(String host) {
-  if (_isLongCatHost(host)) {
+bool shouldIncludeStreamingUsageOptions(String host) {
+  if (isLongCatHost(host)) {
     return false;
   }
   return !host.contains('mistral.ai') && !host.contains('openrouter');
@@ -682,7 +695,7 @@ void _maybeAddStreamingUsageOptions(
   required String host,
 }) {
   if (!stream || config.useResponseApi == true) return;
-  if (_shouldIncludeStreamingUsageOptions(host)) {
+  if (shouldIncludeStreamingUsageOptions(host)) {
     body['stream_options'] = {'include_usage': true};
   }
 }
@@ -779,7 +792,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
     final m = messages[i];
     final originalContent = m['content'];
     final raw = originalContent is List
-        ? ChatApiService._textFromContentParts(originalContent)
+        ? textFromContentParts(originalContent)
         : (originalContent ?? '').toString();
     final role = (m['role'] ?? 'user').toString();
     final isAssistant = role == 'assistant';
@@ -934,7 +947,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
           }
         }
 
-        final supplementalRefs = _supplementalMediaRefs(
+        final supplementalRefs = supplementalMediaRefs(
           internalRaw: m[multimodalInternalMediaPathsKey],
           userPaths: userMediaPaths,
           includeUserPaths: hasAttachedImages,
@@ -953,12 +966,12 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
           if (!seenSources.add(normalized)) continue;
           final bool isInlineUrl =
               _isRemoteHttpUrl(mediaPath) || mediaPath.startsWith('data:');
-          final String mime = _mimeForInternalMediaRef(mediaRef);
+          final String mime = mimeForInternalMediaRef(mediaRef);
           if (isAudioMime(mime)) continue;
           final bool isVideo = isVideoMime(mime);
           final String? dataUrl = isInlineUrl
               ? mediaPath
-              : await _tryEncodeBase64DataUrl(
+              : await tryEncodeBase64DataUrl(
                   mediaPath,
                   explicitMime: mediaRef.mime,
                 );
@@ -1025,7 +1038,7 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       continue;
     }
 
-    final parsed = await _parseTextAndImages(
+    final parsed = await parseTextAndImages(
       raw,
       allowRemoteImages: canImageInput && allowRemoteImages,
       allowLocalImages: canImageInput,
@@ -1108,14 +1121,14 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       if (ref.kind == 'data') {
         url = ref.src;
       } else if (ref.kind == 'path') {
-        url = await _tryEncodeBase64DataUrl(ref.src);
+        url = await tryEncodeBase64DataUrl(ref.src);
         if (url == null) continue;
       } else {
         url = ref.src;
       }
       stashOrAddImageUrl(url);
     }
-    final supplementalRefs = _supplementalMediaRefs(
+    final supplementalRefs = supplementalMediaRefs(
       internalRaw: m[multimodalInternalMediaPathsKey],
       userPaths: userMediaPaths,
       includeUserPaths: hasAttachedImages,
@@ -1133,12 +1146,12 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
       final normalized = normalizeSrc(p);
       if (!seenSources.add(normalized)) continue;
       final bool isInlineUrl = _isRemoteHttpUrl(p) || p.startsWith('data:');
-      final String mime = _mimeForInternalMediaRef(mediaRef);
+      final String mime = mimeForInternalMediaRef(mediaRef);
       if (isAudioMime(mime)) continue;
       final bool isVideo = isVideoMime(mime);
       final String? dataUrl = isInlineUrl
           ? p
-          : await _tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
+          : await tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
       if (dataUrl == null) continue;
       if (isVideo) {
         stashOrAddVideoUrl(dataUrl);
@@ -1221,7 +1234,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsToolFollowUps({
   var round = streamRound;
   ChatCompletionsStreamDecoder? lastRound;
   var currentMessages = [
-    for (final message in messages) _copyChatCompletionMessage(message),
+    for (final message in messages) copyChatCompletionMessage(message),
   ];
 
   String assistantContent() =>
@@ -1263,7 +1276,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsToolFollowUps({
         if (isReasoning && effort != 'off' && effort != 'auto')
           'reasoning_effort': effort,
         if (tools != null && tools.isNotEmpty)
-          'tools': _cleanToolsForCompatibility(tools),
+          'tools': cleanToolsForCompatibility(tools),
         if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
       };
       applyMaxTokens(body2);
@@ -1302,11 +1315,11 @@ Stream<StreamChunk> _runOpenAIChatCompletionsToolFollowUps({
       );
       final req2 = http.Request('POST', url);
       req2.headers.addAll(
-        _customHeaders(
+        customHeaders(
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
@@ -1339,7 +1352,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsToolFollowUps({
       await for (final event in parseSseEventStrings(s2)) {
         final data = event.data;
         if (data == '[DONE]') continue;
-        _throwIfInBandStreamError(data);
+        throwIfInBandStreamError(data);
         try {
           for (final chunk in roundDecoder.accept(event).chunks) {
             yield chunk;
@@ -1396,7 +1409,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
   var usage = initialUsage;
   var lastObj = firstObj;
   var currentMessages = [
-    for (final message in messages) _copyChatCompletionMessage(message),
+    for (final message in messages) copyChatCompletionMessage(message),
   ];
 
   yield* runClientToolFollowUps(
@@ -1423,11 +1436,11 @@ Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
     sendFollowUp: () async* {
       final req = http.Request('POST', url);
       req.headers.addAll(
-        _customHeaders(
+        customHeaders(
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
@@ -1451,7 +1464,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
         throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
       }
       lastObj =
-          jsonDecode(await _decodeUtf8Stream(resp2.stream))
+          jsonDecode(await decodeUtf8Stream(resp2.stream))
               as Map<String, dynamic>;
       final roundUsage = _openaiUsageFromObj(lastObj);
       if (roundUsage != null) {
@@ -1532,7 +1545,7 @@ Stream<StreamChunk> _runOpenAIResponsesToolFollowUps({
     append: (executed) {
       currentInput = [
         ...currentInput,
-        ..._withResponsesFunctionCallItems(outputItemsForAppend, [
+        ...withResponsesFunctionCallItems(outputItemsForAppend, [
           for (final item in executed) item.call,
         ]),
         for (final item in executed)
@@ -1570,12 +1583,12 @@ Stream<StreamChunk> _runOpenAIResponsesToolFollowUps({
         isReasoning: isReasoning,
         thinkingBudget: thinkingBudget,
       );
-      final extraCfg = _customBody(config, modelId, assistantBody: extraBody);
+      final extraCfg = customBody(config, modelId, assistantBody: extraBody);
       if (extraCfg.isNotEmpty) body2.addAll(extraCfg);
       try {
         if (body2['tools'] is List) {
           final raw = (body2['tools'] as List).cast<dynamic>();
-          body2['tools'] = _toResponsesToolsFormat(
+          body2['tools'] = toResponsesToolsFormat(
             raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
           );
         }
@@ -1589,11 +1602,11 @@ Stream<StreamChunk> _runOpenAIResponsesToolFollowUps({
 
       final req2 = http.Request('POST', url);
       req2.headers.addAll(
-        _customHeaders(
+        customHeaders(
           config,
           modelId,
           baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+            'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
             'Content-Type': 'application/json',
             'Accept': 'text/event-stream',
           },
@@ -1626,7 +1639,7 @@ Stream<StreamChunk> _runOpenAIResponsesToolFollowUps({
           followUpDecoder.accept(event);
           break;
         }
-        _throwIfInBandStreamError(d);
+        throwIfInBandStreamError(d);
         final decoded = followUpDecoder.accept(event);
         for (final chunk in decoded.chunks) {
           yield chunk;
@@ -1692,79 +1705,6 @@ Stream<String> _rethrowFollowUpStreamErrors(Stream<String> source) {
 }
 
 /// Some providers (e.g. OpenRouter rate limits/moderation) report failures as
-/// an in-band `{"error": ...}` frame on an otherwise 2xx stream. Surface those
-/// as a stream error so truncated output is not persisted as a completion.
-///
-/// OpenRouter's documented mid-stream failure frame carries the top-level
-/// `error` alongside a non-empty `choices` list whose entry has
-/// `finish_reason: "error"`, so the presence of choices/candidates must not
-/// mask a non-empty error payload. Healthy chunks either lack the `error` key
-/// or carry a null/empty placeholder, which [_throwOnInBandStreamError]
-/// ignores.
-void _throwIfInBandStreamError(String data) {
-  final mayCarryError =
-      data.contains('"error"') ||
-      data.contains('response.failed') ||
-      data.contains('response.incomplete');
-  if (!mayCarryError) return;
-  Object? decoded;
-  try {
-    decoded = jsonDecode(data);
-  } catch (_) {
-    return;
-  }
-  if (decoded is! Map) return;
-  final type = (decoded['type'] ?? '').toString();
-  if (type == 'error') {
-    // `event: error` frames: Anthropic-style ones nest the payload under
-    // `error`, while the Responses API puts code/message on the frame itself
-    // ({"type":"error","code":...,"message":...}).
-    final nested = decoded['error'];
-    if (nested is Map && nested.isNotEmpty) {
-      _throwOnInBandStreamError(nested);
-    }
-    _throwOnInBandStreamError(decoded);
-  }
-  if (type == 'response.failed' || type == 'response.incomplete') {
-    // Responses API terminal failure events nest the error under `response`.
-    final response = decoded['response'];
-    if (response is Map) {
-      _throwOnInBandStreamError(response['error']);
-      final details = response['incomplete_details'];
-      if (details is Map && details.isNotEmpty) {
-        final reason = (details['reason'] ?? '').toString().trim();
-        throw HttpException(
-          reason.isEmpty
-              ? 'Provider error: response incomplete'
-              : 'Provider error: response incomplete ($reason)',
-        );
-      }
-    }
-    // A failure event without a parseable payload still must not fall
-    // through and be treated as a normal finish.
-    throw HttpException('Provider error: $type');
-  }
-  _throwOnInBandStreamError(decoded['error']);
-}
-
-/// Throws when [error] carries a provider error payload; no-op for the null or
-/// empty placeholders some providers emit on healthy chunks.
-void _throwOnInBandStreamError(Object? error) {
-  if (error is Map && error.isNotEmpty) {
-    final message = (error['message'] ?? '').toString().trim();
-    final code = (error['code'] ?? error['type'] ?? '').toString().trim();
-    final detail = message.isNotEmpty ? message : jsonEncode(error);
-    throw HttpException(
-      code.isEmpty
-          ? 'Provider error: $detail'
-          : 'Provider error ($code): $detail',
-    );
-  }
-  if (error is String && error.trim().isNotEmpty) {
-    throw HttpException('Provider error: ${error.trim()}');
-  }
-}
-
 class _OpenAIProviderInfo {
   final String host;
   final String providerId;
@@ -1826,7 +1766,7 @@ void _applyVendorReasoningKnobs(
   required bool isReasoning,
   int? thinkingBudget,
 }) {
-  final off = _isOff(thinkingBudget);
+  final off = isOff(thinkingBudget);
   if (info.isOpenRouter) {
     if (isReasoning) {
       final support = openAIReasoningSupport(info.upstreamModelId);
@@ -1909,7 +1849,7 @@ void _applyVendorReasoningKnobs(
   }
 }
 
-Stream<StreamChunk> _sendOpenAIStream(
+Stream<StreamChunk> sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -1925,13 +1865,13 @@ Stream<StreamChunk> _sendOpenAIStream(
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
-  final upstreamModelId = _apiModelId(config, modelId);
+  final upstreamModelId = apiModelId(config, modelId);
   final url = _openAICompatibleUrl(config);
   // Claude models served through OpenAI-compatible proxies require signed
   // thinking blocks; unsigned reasoning echoes are stripped before sending.
   final isClaudeUpstream = upstreamModelId.toLowerCase().contains('claude');
 
-  final effectiveInfo = _effectiveModelInfo(config, modelId);
+  final effectiveInfo = effectiveModelInfo(config, modelId);
   final isReasoning = effectiveInfo.abilities.contains(ModelAbility.reasoning);
   final wantsImageOutput = effectiveInfo.output.contains(Modality.image);
   final bool canImageInput = effectiveInfo.input.contains(Modality.image);
@@ -1958,7 +1898,7 @@ Stream<StreamChunk> _sendOpenAIStream(
   // Only names actually inserted after duplicate resolution are dispatched.
   final formulaToolNames = <String>{};
   List<Map<String, dynamic>> kimiFormulaTools = const <Map<String, dynamic>>[];
-  final builtInSearchEnabled = _builtInTools(
+  final builtInSearchEnabled = builtInTools(
     config,
     modelId,
   ).contains(BuiltInToolNames.search);
@@ -2019,7 +1959,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       }
     }
 
-    final builtIns = _builtInTools(config, modelId);
+    final builtIns = builtInTools(config, modelId);
     void addResponsesBuiltInTool(Map<String, dynamic> entry) {
       final type = (entry['type'] ?? '').toString();
       if (type.isEmpty) return;
@@ -2117,7 +2057,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       final m = messages[i];
       final originalContent = m['content'];
       final raw = originalContent is List
-          ? ChatApiService._textFromContentParts(originalContent)
+          ? textFromContentParts(originalContent)
           : (originalContent ?? '').toString();
       final roleRaw = (m['role'] ?? 'user').toString();
 
@@ -2194,7 +2134,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           hasAttachedImages ||
           hasInternalMedia ||
           shouldAttachAssistantImage) {
-        final parsed = await _parseTextAndImages(
+        final parsed = await parseTextAndImages(
           raw,
           allowRemoteImages: allowRemoteImages,
           allowLocalImages: canImageInput,
@@ -2253,7 +2193,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           if (ref.kind == 'data') {
             url = ref.src;
           } else if (ref.kind == 'path') {
-            url = await _tryEncodeBase64DataUrl(ref.src);
+            url = await tryEncodeBase64DataUrl(ref.src);
             if (url == null) continue;
           } else {
             url = ref.src; // http(s)
@@ -2268,14 +2208,14 @@ Stream<StreamChunk> _sendOpenAIStream(
           }
         }
         // Structured / attached media refs (user + assistant history turns)
-        final supplementalRefs = _supplementalMediaRefs(
+        final supplementalRefs = supplementalMediaRefs(
           internalRaw: m[multimodalInternalMediaPathsKey],
           userPaths: userImagePaths,
           includeUserPaths: hasAttachedImages,
         );
         for (final mediaRef in supplementalRefs) {
           final p = mediaRef.uri;
-          final String mime = _mimeForInternalMediaRef(mediaRef);
+          final String mime = mimeForInternalMediaRef(mediaRef);
           final bool isAv = isAudioMime(mime) || isVideoMime(mime);
           if (isAv) {
             // Responses path has no first-class A/V input parts here; never
@@ -2305,7 +2245,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           if (!seenImageSources.add(normalized)) continue;
           final dataUrl = (_isRemoteHttpUrl(p) || p.startsWith('data:'))
               ? p
-              : await _tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
+              : await tryEncodeBase64DataUrl(p, explicitMime: mediaRef.mime);
           if (dataUrl == null) continue;
           // Assistant Responses messages may only contain output_text/refusal.
           // Mirror the markdown path: stash for the following user turn.
@@ -2368,7 +2308,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       if (temperature != null) 'temperature': temperature,
       if (topP != null) 'top_p': topP,
       if (maxTokens != null) 'max_output_tokens': maxTokens,
-      if (toolList.isNotEmpty) 'tools': _toResponsesToolsFormat(toolList),
+      if (toolList.isNotEmpty) 'tools': toResponsesToolsFormat(toolList),
       if (toolList.isNotEmpty) 'tool_choice': 'auto',
       if (isReasoning && effort != 'off')
         'reasoning': {
@@ -2441,7 +2381,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       if (isReasoning && effort != 'off' && effort != 'auto')
         'reasoning_effort': effort,
       if (tools != null && tools.isNotEmpty)
-        'tools': _cleanToolsForCompatibility(tools),
+        'tools': cleanToolsForCompatibility(tools),
       if (tools != null && tools.isNotEmpty) 'tool_choice': 'auto',
     };
     setMaxTokens(body);
@@ -2466,11 +2406,11 @@ Stream<StreamChunk> _sendOpenAIStream(
   }
 
   final request = http.Request('POST', url);
-  final headers = _customHeaders(
+  final headers = customHeaders(
     config,
     modelId,
     baseHeaders: <String, String>{
-      'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
+      'Authorization': 'Bearer ${apiKeyForRequest(config, modelId)}',
       'Content-Type': 'application/json',
       'Accept': stream ? 'text/event-stream' : 'application/json',
     },
@@ -2501,7 +2441,7 @@ Stream<StreamChunk> _sendOpenAIStream(
   );
 
   // Merge custom body keys (override takes precedence)
-  final extraBodyCfg = _customBody(config, modelId, assistantBody: extraBody);
+  final extraBodyCfg = customBody(config, modelId, assistantBody: extraBody);
   if (extraBodyCfg.isNotEmpty) {
     body.addAll(extraBodyCfg);
   }
@@ -2527,7 +2467,7 @@ Stream<StreamChunk> _sendOpenAIStream(
 
   // Non-streaming path: parse one-shot JSON and optionally follow tool calls.
   if (!stream) {
-    final txt = await _decodeUtf8Stream(response.stream);
+    final txt = await decodeUtf8Stream(response.stream);
     try {
       final obj = jsonDecode(txt);
       // Responses API non-stream
@@ -2767,7 +2707,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       return;
     }
 
-    _throwIfInBandStreamError(data);
+    throwIfInBandStreamError(data);
     try {
       if (config.useResponseApi == true) {
         final decoder = responsesDecoder!;
@@ -2808,7 +2748,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             );
           }
           if (fallbackCount > 0) {
-            _logImageFallback(
+            logImageFallback(
               provider: config.id,
               model: modelId,
               reason: 'responses_decoder_missed_image count=$fallbackCount',
@@ -2832,7 +2772,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                   for (final entry
                       in toolAccResp.entries.toList().asMap().entries)
                     emitToolCall(
-                      id: _effectiveToolCallId(
+                      id: effectiveToolCallId(
                         entry.value.key,
                         'call',
                         entry.key,
@@ -3003,7 +2943,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       }
     } on HttpException {
       // In-band error frames raised inside this block (follow-up tool-call
-      // streams call _throwIfInBandStreamError in here) and failed follow-up
+      // streams call throwIfInBandStreamError in here) and failed follow-up
       // requests must surface as stream errors; swallowing them would let
       // the no-[DONE] fallback below persist truncated output as a normal
       // completion.

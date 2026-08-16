@@ -1,6 +1,27 @@
-part of '../chat_api_service.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
-Stream<StreamChunk> _sendGoogleVertexStream(
+import 'package:http/http.dart' as http;
+
+import '../../../models/token_usage.dart';
+import '../../../providers/model_provider.dart';
+import '../../../providers/settings_provider.dart';
+import '../../../utils/multimodal_input_utils.dart';
+import '../../../../utils/sandbox_path_resolver.dart';
+import '../builtin_tools.dart';
+import '../chat_api_helpers.dart';
+import '../generation/tool_loop_runner.dart';
+import '../google_service_account_auth.dart';
+import '../stream/sse_framing.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
+import 'claude/claude_decoder.dart';
+
+import 'claude_official.dart';
+import 'google_common.dart';
+
+Stream<StreamChunk> sendGoogleVertexStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -17,7 +38,7 @@ Stream<StreamChunk> _sendGoogleVertexStream(
   bool stream = true,
 }) {
   final cfg = config.copyWith(vertexAI: true);
-  return _sendGoogleStream(
+  return sendGoogleStream(
     client,
     cfg,
     modelId,
@@ -40,7 +61,7 @@ Stream<StreamChunk> _sendGoogleVertexStream(
 /// Strict Google host allowlist only — never broad *.google.com.
 /// Auth headers are HTTPS-only so tokens are never sent in cleartext on
 /// `http://storage.googleapis.com/...` (or any other allowlisted HTTP URL).
-bool _shouldAttachVertexMediaAuth(Uri uri) {
+bool shouldAttachVertexMediaAuth(Uri uri) {
   if (uri.scheme.toLowerCase() != 'https') return false;
   final host = uri.host.trim().toLowerCase();
   if (host.isEmpty) return false;
@@ -55,7 +76,7 @@ bool _shouldAttachVertexMediaAuth(Uri uri) {
   return false;
 }
 
-Future<String> _downloadRemoteAsBase64(
+Future<String> downloadRemoteAsBase64(
   http.Client client,
   ProviderConfig config,
   String url,
@@ -63,9 +84,9 @@ Future<String> _downloadRemoteAsBase64(
   final uri = Uri.parse(url);
   final req = http.Request('GET', uri);
   // Attach Vertex auth only for allowlisted Google media hosts.
-  if (config.vertexAI == true && _shouldAttachVertexMediaAuth(uri)) {
+  if (config.vertexAI == true && shouldAttachVertexMediaAuth(uri)) {
     try {
-      final token = await _maybeVertexAccessToken(config);
+      final token = await maybeVertexAccessToken(config);
       if (token != null && token.isNotEmpty) {
         req.headers['Authorization'] = 'Bearer $token';
       }
@@ -88,7 +109,7 @@ Future<String> _downloadRemoteAsBase64(
 }
 
 // Returns OAuth token for Vertex AI when serviceAccountJson is configured; otherwise null.
-Future<String?> _maybeVertexAccessToken(ProviderConfig cfg) async {
+Future<String?> maybeVertexAccessToken(ProviderConfig cfg) async {
   if (cfg.vertexAI == true) {
     final jsonStr = (cfg.serviceAccountJson ?? '').trim();
     if (jsonStr.isEmpty) {
@@ -136,7 +157,7 @@ int _getMaxOutputTokensForClaudeModel(String modelId) {
   }
 }
 
-Stream<StreamChunk> _sendGoogleVertexClaudeStream({
+Stream<StreamChunk> sendGoogleVertexClaudeStream({
   required http.Client client,
   required ProviderConfig config,
   required String modelId,
@@ -152,7 +173,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
   Map<String, dynamic>? extraBody,
   bool stream = true,
 }) async* {
-  final upstreamId = _apiModelId(config, modelId);
+  final upstreamId = apiModelId(config, modelId);
   final loc = (config.location ?? 'us-central1').trim();
   final proj = (config.projectId ?? '').trim();
   final endpoint = stream ? 'streamRawPredict' : 'rawPredict';
@@ -164,7 +185,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
     'https://$host/v1/projects/$proj/locations/$loc/publishers/anthropic/models/$upstreamId:$endpoint',
   );
 
-  final isReasoning = _effectiveModelInfo(
+  final isReasoning = effectiveModelInfo(
     config,
     modelId,
   ).abilities.contains(ModelAbility.reasoning);
@@ -188,11 +209,11 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
   }
 
   final requestHeaders = <String, String>{'Content-Type': 'application/json'};
-  final token = await _maybeVertexAccessToken(config);
+  final token = await maybeVertexAccessToken(config);
   if (token != null && token.isNotEmpty) {
     requestHeaders['Authorization'] = 'Bearer $token';
   }
-  final headers = _customHeaders(
+  final headers = customHeaders(
     config,
     modelId,
     baseHeaders: requestHeaders,
@@ -263,7 +284,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         String b64;
         if (source.startsWith('http://') || source.startsWith('https://')) {
           try {
-            b64 = await _downloadRemoteAsBase64(client, config, source);
+            b64 = await downloadRemoteAsBase64(client, config, source);
             mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
                 ? explicitMime.trim()
                 : 'image/png'; // TODO: detect mime from response or url
@@ -285,7 +306,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         } else if (source.startsWith('data:')) {
           mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
               ? explicitMime.trim()
-              : _mimeFromDataUrl(source);
+              : mimeFromDataUrl(source);
           final idx = source.indexOf('base64,');
           if (idx > 0) {
             b64 = source.substring(idx + 7);
@@ -295,8 +316,8 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         } else {
           mime = (explicitMime != null && explicitMime.trim().isNotEmpty)
               ? explicitMime.trim()
-              : _mimeFromPath(source);
-          final encoded = await _tryEncodeBase64File(source, withPrefix: false);
+              : mimeFromPath(source);
+          final encoded = await tryEncodeBase64File(source, withPrefix: false);
           if (encoded == null) return;
           b64 = encoded;
         }
@@ -305,14 +326,14 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
             'type': 'image',
             'source': {
               'type': 'base64',
-              'media_type': _normalizeClaudeImageMime(mime),
+              'media_type': normalizeClaudeImageMime(mime),
               'data': b64,
             },
           });
         }
       }
 
-      final parsed = await _parseTextAndImages(
+      final parsed = await parseTextAndImages(
         raw,
         allowRemoteImages: true,
         allowLocalImages: true,
@@ -324,18 +345,18 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
       for (final ref in parsed.images) {
         await addVertexClaudeImage(ref.src);
       }
-      final supplementalRefs = _supplementalMediaRefs(
+      final supplementalRefs = supplementalMediaRefs(
         internalRaw: m[multimodalInternalMediaPathsKey],
         userPaths: userImagePaths,
         includeUserPaths: hasAttachedImages,
       );
       for (final mediaRef in supplementalRefs) {
-        final mime = _mimeForInternalMediaRef(mediaRef);
+        final mime = mimeForInternalMediaRef(mediaRef);
         // Never emit Anthropic image blocks for video/audio or other
         // non-Claude image MIME types (e.g. video/mp4).
         if (isVideoMime(mime) ||
             isAudioMime(mime) ||
-            !_isClaudeSupportedImageMime(mime)) {
+            !isClaudeSupportedImageMime(mime)) {
           final uri = mediaRef.uri;
           final isRemote =
               uri.startsWith('http://') || uri.startsWith('https://');
@@ -391,7 +412,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
     }
   }
 
-  final builtIns = _builtInTools(config, modelId);
+  final builtIns = builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
@@ -442,20 +463,20 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
       lastText = '';
       lastAssistantBlocks = [];
       pauseTurn = false;
-      final omitSamplingParams = _claudeShouldOmitSamplingParams(
+      final omitSamplingParams = claudeShouldOmitSamplingParams(
         upstreamId,
         effectiveThinkingBudget,
       );
-      final compatibleTopP = _claudeCompatibleTopP(
+      final compatibleTopP = claudeCompatibleTopP(
         upstreamId,
         effectiveThinkingBudget,
         topP,
       );
       final thinking = isReasoning
-          ? _claudeThinkingConfig(upstreamId, effectiveThinkingBudget)
+          ? claudeThinkingConfig(upstreamId, effectiveThinkingBudget)
           : null;
       final outputConfig = isReasoning
-          ? _claudeOutputConfig(upstreamId, effectiveThinkingBudget)
+          ? claudeOutputConfig(upstreamId, effectiveThinkingBudget)
           : null;
       final body = <String, dynamic>{
         'anthropic_version': 'vertex-2023-10-16',
@@ -464,7 +485,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         'max_tokens': effectiveMaxTokens,
         if (systemPrompt.isNotEmpty) 'system': systemPrompt,
         if (!omitSamplingParams &&
-            !_isClaudeReasoningEnabled(effectiveThinkingBudget) &&
+            !isClaudeReasoningEnabled(effectiveThinkingBudget) &&
             temperature != null)
           'temperature': temperature,
         if (compatibleTopP != null) 'top_p': compatibleTopP,
@@ -473,7 +494,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
       };
-      body.addAll(_customBody(config, modelId, assistantBody: extraBody));
+      body.addAll(customBody(config, modelId, assistantBody: extraBody));
 
       final request = http.Request('POST', url);
       request.headers.addAll(headers);
@@ -487,14 +508,14 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
 
       if (!stream) {
         // Vertex rawPredict response is same as Anthropic non-stream response
-        final txt = await _decodeUtf8Stream(response.stream);
+        final txt = await decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
         // Usage
         try {
           final u = (obj['usage'] as Map?)?.cast<String, dynamic>();
           if (u != null) {
             totalUsage = (totalUsage ?? const TokenUsage()).merge(
-              _claudeUsageFromMap(u),
+              claudeUsageFromMap(u),
             );
           }
         } catch (_) {}
@@ -559,7 +580,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         // Anthropic-on-Vertex reports failures in-band as `event: error` with
         // {type:"error", error:{type,message}}; raise before the
         // malformed-chunk guard below can swallow it.
-        _throwIfInBandStreamError(event.data);
+        throwIfInBandStreamError(event.data);
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
           yield chunk;

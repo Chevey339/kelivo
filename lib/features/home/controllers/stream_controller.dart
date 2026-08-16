@@ -1151,7 +1151,7 @@ class StreamController {
     StreamingState state,
     String id,
   ) {
-    for (final part in state.shadowHandler.parts.reversed) {
+    for (final part in state.partsHandler.parts.reversed) {
       if (part is! ToolCallPart) continue;
       try {
         final decoded = jsonDecode(part.payloadJson);
@@ -1578,7 +1578,7 @@ class StreamingState {
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
-  final StreamChunkHandler shadowHandler = StreamChunkHandler();
+  final StreamChunkHandler partsHandler = StreamChunkHandler();
 
   String get messageId => ctx.assistantMessage.id;
   String get conversationId => ctx.assistantMessage.conversationId;

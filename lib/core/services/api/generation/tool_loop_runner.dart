@@ -1,4 +1,7 @@
-part of '../chat_api_service.dart';
+import '../../../models/token_usage.dart';
+import '../chat_api_helpers.dart';
+import '../stream/stream_chunk.dart';
+import '../stream/stream_chunk_emit.dart';
 
 final class ExecutedClientTool {
   const ExecutedClientTool({required this.call, required this.content});
