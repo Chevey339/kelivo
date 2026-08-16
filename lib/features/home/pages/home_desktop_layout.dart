@@ -342,9 +342,9 @@ class HomeDesktopScaffold extends StatelessWidget {
 
   Widget _buildTitle(BuildContext context, ColorScheme cs) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final useNewAssistantAvatarUx = context
-        .watch<SettingsProvider>()
-        .useNewAssistantAvatarUx;
+    final settings = context.watch<SettingsProvider>();
+    final uiScale = settings.uiFontScale;
+    final useNewAssistantAvatarUx = settings.useNewAssistantAvatarUx;
     final currentAssistant = context
         .watch<AssistantProvider>()
         .currentAssistant;
@@ -396,7 +396,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                   child: AnimatedTextSwap(
                     text: capsuleLabel,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 12 * uiScale,
                       height: 1.1,
                       color: cs.onSurface.withValues(
                         alpha: isDark ? 0.92 : 0.9,
@@ -405,6 +405,7 @@ class HomeDesktopScaffold extends StatelessWidget {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textScaler: TextScaler.noScaling,
                   ),
                 ),
               ],
@@ -449,9 +450,13 @@ class HomeDesktopScaffold extends StatelessWidget {
             curve: Curves.easeOutCubic,
             child: AnimatedTextSwap(
               text: title,
-              style: TextStyle(fontSize: 16, fontWeight: AppFontWeights.medium),
+              style: TextStyle(
+                fontSize: 16 * uiScale,
+                fontWeight: AppFontWeights.medium,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textScaler: TextScaler.noScaling,
             ),
           ),
         ),
