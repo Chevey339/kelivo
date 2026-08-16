@@ -33,14 +33,30 @@ class _DisplaySettingsBody extends StatelessWidget {
               const SizedBox(height: 16),
               _SettingsCard(
                 title: l10n.desktopSettingsFontsTitle,
-                children: const [
-                  _DesktopAppFontRow(),
-                  _RowDivider(),
-                  _DesktopCodeFontRow(),
-                  _RowDivider(),
-                  _AppLanguageRow(),
-                  _RowDivider(),
-                  _ChatFontSizeRow(),
+                children: [
+                  const _DesktopAppFontRow(),
+                  const _RowDivider(),
+                  const _DesktopCodeFontRow(),
+                  const _RowDivider(),
+                  const _AppLanguageRow(),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageUiFontSizeTitle,
+                    getter: (s) => s.uiFontScale,
+                    setter: (s, v) => s.setUiFontScale(v),
+                  ),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageChatFontSizeTitle,
+                    getter: (s) => s.chatFontScale,
+                    setter: (s, v) => s.setChatFontScale(v),
+                  ),
+                  const _RowDivider(),
+                  _FontScaleRow(
+                    label: l10n.displaySettingsPageInputFontSizeTitle,
+                    getter: (s) => s.inputFontScale,
+                    setter: (s, v) => s.setInputFontScale(v),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1599,18 +1615,25 @@ class _LanguageDropdownItemState extends State<_LanguageDropdownItem> {
   }
 }
 
-class _ChatFontSizeRow extends StatefulWidget {
-  const _ChatFontSizeRow();
+class _FontScaleRow extends StatefulWidget {
+  const _FontScaleRow({
+    required this.label,
+    required this.getter,
+    required this.setter,
+  });
+  final String label;
+  final double Function(SettingsProvider) getter;
+  final Future<void> Function(SettingsProvider, double) setter;
   @override
-  State<_ChatFontSizeRow> createState() => _ChatFontSizeRowState();
+  State<_FontScaleRow> createState() => _FontScaleRowState();
 }
 
-class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
+class _FontScaleRowState extends State<_FontScaleRow> {
   late final TextEditingController _controller;
   @override
   void initState() {
     super.initState();
-    final scale = context.read<SettingsProvider>().chatFontScale;
+    final scale = widget.getter(context.read<SettingsProvider>());
     _controller = TextEditingController(text: '${(scale * 100).round()}');
   }
 
@@ -1625,15 +1648,14 @@ class _ChatFontSizeRowState extends State<_ChatFontSizeRow> {
     final n = double.tryParse(v);
     if (n == null) return;
     final clamped = (n / 100.0).clamp(0.5, 1.5);
-    context.read<SettingsProvider>().setChatFontScale(clamped);
+    widget.setter(context.read<SettingsProvider>(), clamped);
     _controller.text = '${(clamped * 100).round()}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
     return _LabeledRow(
-      label: l10n.displaySettingsPageChatFontSizeTitle,
+      label: widget.label,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
