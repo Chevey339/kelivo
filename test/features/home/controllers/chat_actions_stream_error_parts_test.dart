@@ -39,4 +39,39 @@ void main() {
       'https://example.com/gen.png',
     ]);
   });
+
+  test(
+    'visible-text parts keep prior cards and truncate the last TextPart',
+    () {
+      final parts = ChatActions.assistantPartsForVisibleText(
+        parts: const [
+          TextPart('Hello world'),
+          ReasoningPart('plan'),
+          ToolCallPart('{"id":"call_1","name":"lookup"}'),
+          TextPart(' and more'),
+        ],
+        visibleText: 'Hello wo',
+      );
+
+      expect(parts.map((part) => part.kind).toList(), [
+        'text',
+        'reasoning',
+        'tool_call',
+      ]);
+      expect((parts.first as TextPart).text, 'Hello wo');
+      expect((parts[1] as ReasoningPart).text, 'plan');
+    },
+  );
+
+  test('visible-text parts reveal the last TextPart as the slice grows', () {
+    final parts = ChatActions.assistantPartsForVisibleText(
+      parts: const [TextPart('Hello '), TextPart('world')],
+      visibleText: 'Hello wo',
+    );
+
+    expect(parts.whereType<TextPart>().map((part) => part.text), [
+      'Hello ',
+      'wo',
+    ]);
+  });
 }

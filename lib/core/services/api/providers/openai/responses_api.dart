@@ -10,6 +10,7 @@ import '../../../../../utils/app_directories.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
+import '../../stream/sse_decode_loop.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
@@ -298,19 +299,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         initialUsage: usage,
         sourceId: 'round-${round++}',
       );
-      await for (final event in parseSseEventStrings(s2)) {
-        final d = event.data;
-        if (d == '[DONE]') {
-          followUpDecoder.accept(event);
-          break;
-        }
-        throwIfInBandStreamError(d);
-        final decoded = followUpDecoder.accept(event);
-        for (final chunk in decoded.chunks) {
-          yield chunk;
-        }
-        if (decoded.completed) break;
-      }
+      yield* decodeSseEvents(parseSseEventStrings(s2), followUpDecoder);
       usage = followUpDecoder.usage ?? usage;
       chars += followUpDecoder.approxCompletionChars;
       outputItemsForAppend = followUpDecoder.outputItems;

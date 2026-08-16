@@ -672,6 +672,35 @@ class ChatActions {
   /// When no visible text arrived, the error string is written through
   /// [ChatMessage.partsWithReplacedText] so reasoning / tool / image parts
   /// already accumulated stay in place.
+  /// Truncate [parts] so joined [TextPart]s match the typewriter slice.
+  ///
+  /// Non-text cards stay in place. Text after the visible prefix is omitted
+  /// so the consumer can keep using `content: parts == null ? display : null`.
+  @visibleForTesting
+  static List<MessagePart> assistantPartsForVisibleText({
+    required List<MessagePart> parts,
+    required String visibleText,
+  }) {
+    if (parts.isEmpty) return <MessagePart>[TextPart(visibleText)];
+    var remaining = visibleText.length;
+    final out = <MessagePart>[];
+    for (final part in parts) {
+      if (part is! TextPart) {
+        out.add(part);
+        continue;
+      }
+      if (remaining <= 0) continue;
+      if (part.text.length <= remaining) {
+        out.add(part);
+        remaining -= part.text.length;
+      } else {
+        out.add(TextPart(part.text.substring(0, remaining)));
+        remaining = 0;
+      }
+    }
+    return out;
+  }
+
   @visibleForTesting
   static List<MessagePart> assistantPartsForStreamError({
     required List<MessagePart> parts,
@@ -899,18 +928,28 @@ class ChatActions {
     );
   }
 
-  List<MessagePart> _assistantPartsForState(stream_ctrl.StreamingState state) {
+  List<MessagePart> _assistantPartsForState(
+    stream_ctrl.StreamingState state, {
+    String? visibleText,
+  }) {
     final parts = state.partsHandler.parts;
     if (parts.isEmpty) {
-      return <MessagePart>[TextPart(_transformAssistantContent(state))];
+      return <MessagePart>[
+        TextPart(visibleText ?? _transformAssistantContent(state)),
+      ];
     }
-    return [
+    final transformed = [
       for (final part in parts)
         if (part is TextPart)
           TextPart(_transformAssistantContent(state, part.text))
         else
           part,
     ];
+    if (visibleText == null) return transformed;
+    return assistantPartsForVisibleText(
+      parts: transformed,
+      visibleText: visibleText,
+    );
   }
 
   Future<List<MessagePart>> _sanitizeAssistantImageParts(
@@ -1836,9 +1875,12 @@ class ChatActions {
           state.streamStartedAt ??= DateTime.now();
           await _markGenerationStreaming(state);
           state.partsHandler.handleResult(result);
-          state.fullContentRaw = result.text;
+          state.fullContentRaw = [
+            for (final part in state.partsHandler.parts)
+              if (part is TextPart) part.text,
+          ].join();
           state.bufferedReasoning = [
-            for (final part in result.parts)
+            for (final part in state.partsHandler.parts)
               if (part is ReasoningPart && part.text.isNotEmpty) part.text,
           ].join();
           if (result.usage != null) _applyUsage(state, result.usage!);
@@ -2085,7 +2127,8 @@ class ChatActions {
         messageId,
         conversationId,
         () => _transformAssistantContent(state),
-        partsBuilder: () => _assistantPartsForState(state),
+        partsBuilder: (visibleText) =>
+            _assistantPartsForState(state, visibleText: visibleText),
         totalTokens: state.totalTokens,
         promptTokens: state.usage?.promptTokens,
         completionTokens: state.usage?.completionTokens,

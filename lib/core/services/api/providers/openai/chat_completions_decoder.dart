@@ -182,7 +182,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
             'title': citations[k].toString(),
           },
       ];
-      final searchId = _ids.search();
+      final searchId = _ids.searchSticky();
       chunks.add(ServerToolStart(id: searchId, toolName: 'search_web'));
       chunks.add(
         ServerToolEnd(id: searchId, output: <String, dynamic>{'items': items}),

@@ -10,6 +10,7 @@ import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
+import '../../stream/sse_decode_loop.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
@@ -831,16 +832,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         initialUsage: usage,
         sourceId: 'round-${round++}',
       );
-      await for (final event in parseSseEventStrings(s2)) {
-        final data = event.data;
-        if (data == '[DONE]') continue;
-        throwIfInBandStreamError(data);
-        try {
-          for (final chunk in roundDecoder.accept(event).chunks) {
-            yield chunk;
-          }
-        } catch (_) {}
-      }
+      yield* decodeSseEvents(parseSseEventStrings(s2), roundDecoder);
       usage = roundDecoder.usage ?? usage;
       chars = roundDecoder.approxCompletionChars;
       lastRound = roundDecoder;

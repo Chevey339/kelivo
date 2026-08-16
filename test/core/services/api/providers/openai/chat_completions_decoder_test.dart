@@ -403,7 +403,7 @@ void main() {
     expect(decoder.reasoningDetails, hasLength(2));
   });
 
-  test('scopes text ids per sourceId and search ids per citation burst', () {
+  test('scopes text ids per sourceId', () {
     final first = ChatCompletionsStreamDecoder(sourceId: 'round-0');
     final second = ChatCompletionsStreamDecoder(sourceId: 'round-1');
     expect(
@@ -424,31 +424,41 @@ void main() {
           .id,
       'round-1:text-1',
     );
+  });
 
-    final citations = ChatCompletionsStreamDecoder(sourceId: 'round-0');
-    final firstSearch = citations
-        .accept(
-          _event(<String, dynamic>{
-            ..._choice(delta: <String, dynamic>{'content': 'see'}),
-            'citations': <String>['https://a.example'],
-          }),
-        )
-        .chunks
-        .whereType<ServerToolStart>()
-        .single
-        .id;
-    final secondSearch = citations
-        .accept(
-          _event(<String, dynamic>{
-            'citations': <String>['https://b.example'],
-          }),
-        )
-        .chunks
-        .whereType<ServerToolStart>()
-        .single
-        .id;
-    expect(firstSearch, isNot(secondSearch));
+  test('keeps cumulative citations on one sticky search card', () {
+    final decoder = ChatCompletionsStreamDecoder(sourceId: 'round-0');
+    final handler = StreamChunkHandler();
+
+    final first = decoder.accept(
+      _event(<String, dynamic>{
+        ..._choice(delta: <String, dynamic>{'content': 'see'}),
+        'citations': <String>['https://a.example'],
+      }),
+    );
+    for (final chunk in first.chunks) {
+      handler.handle(chunk);
+    }
+    final firstSearch = first.chunks.whereType<ServerToolStart>().single.id;
+
+    final second = decoder.accept(
+      _event(<String, dynamic>{
+        'citations': <String>['https://a.example', 'https://b.example'],
+      }),
+    );
+    for (final chunk in second.chunks) {
+      handler.handle(chunk);
+    }
+    final secondSearch = second.chunks.whereType<ServerToolStart>().single.id;
+
+    expect(firstSearch, secondSearch);
     expect(firstSearch, startsWith('round-0:search-'));
+    expect(handler.parts.whereType<ToolCallPart>(), hasLength(1));
+    final payload = jsonDecode(
+      handler.parts.whereType<ToolCallPart>().single.payloadJson,
+    );
+    expect(payload['name'], 'search_web');
+    expect((payload['content'] as Map)['items'], hasLength(2));
   });
 
   test('skips malformed JSON and does not complete on onClosed', () {

@@ -90,6 +90,52 @@ void main() {
     },
   );
 
+  test(
+    'runClientToolFollowUps still emits ToolCall* on later rounds',
+    () async {
+      var rounds = 0;
+      final chunks = await runClientToolFollowUps(
+        initialCalls: [
+          emitToolCall(
+            id: 'call_1',
+            name: 'lookup',
+            arguments: const <String, dynamic>{'q': '1'},
+          ),
+        ],
+        onToolCall: (name, args, {toolCallId}) async => 'res-$toolCallId',
+        append: (_) {},
+        sendFollowUp: () async* {
+          rounds += 1;
+          yield TextDelta(id: 't-$rounds', text: 'round-$rounds');
+        },
+        takeCallsAfterRound: () => rounds == 1
+            ? [
+                emitToolCall(
+                  id: 'call_2',
+                  name: 'lookup',
+                  arguments: const <String, dynamic>{'q': '2'},
+                ),
+              ]
+            : const <EmitToolCall>[],
+        finish: () => emitFinish(),
+        emitCalls: true,
+      ).toList();
+
+      expect(chunks.whereType<ToolCallStart>().map((chunk) => chunk.id), [
+        'call_1',
+        'call_2',
+      ]);
+      expect(chunks.whereType<ToolCallStart>().map((chunk) => chunk.toolName), [
+        'lookup',
+        'lookup',
+      ]);
+      expect(chunks.whereType<ToolCallResult>().map((chunk) => chunk.id), [
+        'call_1',
+        'call_2',
+      ]);
+    },
+  );
+
   test('runProviderToolRounds continues without calls when asked', () async {
     var sends = 0;
     final chunks = await runProviderToolRounds(

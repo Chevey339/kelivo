@@ -355,6 +355,59 @@ void main() {
     expect(result.parts, hasLength(1));
   });
 
+  test('seed keeps prior parts and later ToolCallResult updates that card', () {
+    final seed = <MessagePart>[
+      const TextPart('before'),
+      const ReasoningPart('plan'),
+      ToolCallPart(
+        jsonEncode(<String, dynamic>{
+          'id': 'call_1',
+          'name': 'lookup',
+          'arguments': <String, dynamic>{'q': 'kelivo'},
+          'server': false,
+        }),
+      ),
+    ];
+    final handler = StreamChunkHandler(seed: seed);
+    handler.handle(const ToolCallResult(id: 'call_1', output: '{"ok":true}'));
+    handler.handle(const TextDelta(id: 'round-1:text-1', text: 'after'));
+
+    expect(handler.parts.map((part) => part.kind).toList(), [
+      'text',
+      'reasoning',
+      'tool_call',
+      'text',
+    ]);
+    expect((handler.parts[0] as TextPart).text, 'before');
+    expect((handler.parts[1] as ReasoningPart).text, 'plan');
+    final tool = jsonDecode((handler.parts[2] as ToolCallPart).payloadJson);
+    expect(tool['name'], 'lookup');
+    expect(tool['arguments'], <String, dynamic>{'q': 'kelivo'});
+    expect(tool['content'], '{"ok":true}');
+    expect((handler.parts[3] as TextPart).text, 'after');
+  });
+
+  test(
+    'handleResult after seed appends the new round instead of replacing',
+    () {
+      final handler = StreamChunkHandler(
+        seed: const [TextPart('before'), ReasoningPart('plan')],
+      );
+      handler.handleResult(
+        const TextGenerationResult(
+          parts: [TextPart('after')],
+          finishReason: 'stop',
+        ),
+      );
+
+      expect(handler.parts.whereType<TextPart>().map((part) => part.text), [
+        'before',
+        'after',
+      ]);
+      expect(handler.parts.whereType<ReasoningPart>().single.text, 'plan');
+    },
+  );
+
   test('handleResult keeps image URIs as-is and does not add data:', () {
     final handler = StreamChunkHandler();
     handler.handleResult(

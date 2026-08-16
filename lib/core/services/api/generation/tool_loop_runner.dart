@@ -63,12 +63,14 @@ Stream<StreamChunk> runClientToolFollowUps({
   TokenUsage? Function()? usageOf,
 }) async* {
   var calls = List<EmitToolCall>.from(initialCalls);
-  var shouldEmitCalls = emitCalls;
   while (calls.isNotEmpty) {
     final usage = usageOf?.call();
     final totalTokens = usage?.totalTokens ?? 0;
     final executed = <ExecutedClientTool>[];
-    if (shouldEmitCalls) {
+    // Do not clear [emitCalls] after the first round. OpenAI non-stream
+    // follow-ups have no decoder emitting ToolCall*, so later rounds would
+    // otherwise land as ToolCallResult-only cards with empty name/args.
+    if (emitCalls) {
       yield* emitToolCalls(calls, usage: usage, totalTokens: totalTokens);
     }
     for (final call in calls) {
@@ -100,7 +102,6 @@ Stream<StreamChunk> runClientToolFollowUps({
     append(executed);
     yield* sendFollowUp();
     calls = takeCallsAfterRound();
-    shouldEmitCalls = false;
   }
   yield* finish();
 }

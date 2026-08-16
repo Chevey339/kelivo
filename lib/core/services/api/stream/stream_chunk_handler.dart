@@ -11,6 +11,13 @@ import 'stream_chunk.dart';
 /// arrivals do not clobber the last part. Tool calls are located by tool id.
 /// One instance per response stream; do not reuse after [Finish].
 class StreamChunkHandler {
+  StreamChunkHandler({Iterable<MessagePart> seed = const <MessagePart>[]}) {
+    for (final part in seed) {
+      if (_isBlankPart(part)) continue;
+      _seedPart(part);
+    }
+  }
+
   final List<MessagePart> _parts = <MessagePart>[];
   final Map<String, int> _textIndex = <String, int>{};
   final Map<String, int> _reasoningIndex = <String, int>{};
@@ -69,6 +76,31 @@ class StreamChunkHandler {
     }
     finishReason = result.finishReason ?? finishReason;
     finished = true;
+  }
+
+  void _seedPart(MessagePart part) {
+    _parts.add(part);
+    if (part is! ToolCallPart) return;
+    try {
+      final decoded = jsonDecode(part.payloadJson);
+      if (decoded is! Map) return;
+      final id = (decoded['id'] ?? '').toString();
+      if (id.isEmpty) return;
+      final buffer = _tools.putIfAbsent(id, _ToolBuffer.new);
+      final name = (decoded['name'] ?? '').toString();
+      if (name.isNotEmpty) buffer.name = name;
+      if (decoded.containsKey('arguments')) {
+        buffer.arguments = decoded['arguments'];
+      }
+      if (decoded.containsKey('content')) {
+        buffer.content = decoded['content'];
+      }
+      buffer.server = decoded['server'] == true;
+      final metadata = decoded['metadata'];
+      if (metadata is Map) {
+        buffer.metadata = Map<String, dynamic>.from(metadata);
+      }
+    } catch (_) {}
   }
 
   void handle(StreamChunk chunk) {

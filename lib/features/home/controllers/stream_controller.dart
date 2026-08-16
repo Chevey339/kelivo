@@ -537,7 +537,7 @@ class StreamController {
     String messageId,
     String conversationId,
     String Function() contentBuilder, {
-    List<MessagePart> Function()? partsBuilder,
+    List<MessagePart> Function(String visibleText)? partsBuilder,
     required void Function(String messageId, String content, int totalTokens)
     updateMessageInList,
     required int totalTokens,
@@ -636,7 +636,7 @@ class StreamController {
       messageId,
       content,
       state.totalTokens,
-      parts: state.partsBuilder?.call(),
+      parts: state.partsBuilder?.call(content),
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,
@@ -1560,7 +1560,9 @@ class GenerationContext {
 
 /// State object for streaming message generation.
 class StreamingState {
-  StreamingState(this.ctx) : fullContentRaw = ctx.assistantMessage.content;
+  StreamingState(this.ctx)
+    : fullContentRaw = ctx.assistantMessage.content,
+      partsHandler = StreamChunkHandler(seed: ctx.assistantMessage.parts);
 
   final GenerationContext ctx;
   String fullContentRaw;
@@ -1578,7 +1580,7 @@ class StreamingState {
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
-  final StreamChunkHandler partsHandler = StreamChunkHandler();
+  final StreamChunkHandler partsHandler;
 
   String get messageId => ctx.assistantMessage.id;
   String get conversationId => ctx.assistantMessage.conversationId;
@@ -1704,7 +1706,7 @@ class _StreamSmoothState {
   String targetContent = '';
   String visibleContent = '';
   String Function()? contentBuilder;
-  List<MessagePart> Function()? partsBuilder;
+  List<MessagePart> Function(String visibleText)? partsBuilder;
   int totalTokens = 0;
   List<int>? contentSplitOffsets;
   List<int>? reasoningCountAtSplit;
