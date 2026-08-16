@@ -68,13 +68,14 @@ void main() {
         );
         expect(chunks.last.reasoningDetails, details);
 
-        final toolChunk = chunks.singleWhere(
-          (c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty,
-        );
-        expect(toolChunk.toolCalls, hasLength(1));
-        expect(toolChunk.toolCalls!.single.id, 'call_1');
-        expect(toolChunk.toolCalls!.single.name, 'search');
-        expect(toolChunk.toolCalls!.single.arguments, <String, dynamic>{
+        final toolChunks = chunks
+            .where((c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty)
+            .toList();
+        expect(toolChunks, hasLength(2));
+        expect(toolChunks.first.toolCalls!.single.arguments, isEmpty);
+        expect(toolChunks.last.toolCalls!.single.id, 'call_1');
+        expect(toolChunks.last.toolCalls!.single.name, 'search');
+        expect(toolChunks.last.toolCalls!.single.arguments, <String, dynamic>{
           'q': 'hi',
         });
 
@@ -107,6 +108,17 @@ void main() {
         '\n\n![image](data:image/png;base64,iVBORw0K)',
       );
       expect(chunks.single.content, contains('data:image'));
+    });
+
+    test('ToolCallStart emits a placeholder card before arguments arrive', () {
+      final adapter = LegacyChunkAdapter();
+      final chunks = adapter.handle(
+        const ToolCallStart(id: 'call_1', toolName: 'search'),
+      );
+
+      expect(chunks.single.toolCalls!.single.id, 'call_1');
+      expect(chunks.single.toolCalls!.single.name, 'search');
+      expect(chunks.single.toolCalls!.single.arguments, isEmpty);
     });
 
     test('tolerates a ToolCallEnd without Start', () {

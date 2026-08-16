@@ -11,25 +11,8 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
-int _readClaudeUsageInt(dynamic value) {
-  if (value is num) return value.toInt();
-  if (value is String) return int.tryParse(value) ?? 0;
-  return 0;
-}
-
-TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) {
-  final inTok = _readClaudeUsageInt(usage['input_tokens']);
-  final outTok = _readClaudeUsageInt(usage['output_tokens']);
-  final cached =
-      _readClaudeUsageInt(usage['cache_read_input_tokens']) +
-      _readClaudeUsageInt(usage['cache_creation_input_tokens']);
-  return TokenUsage(
-    promptTokens: inTok,
-    completionTokens: outTok,
-    cachedTokens: cached,
-    totalTokens: inTok + outTok,
-  );
-}
+TokenUsage _claudeUsageFromMap(Map<String, dynamic> usage) =>
+    claudeUsageFromMap(usage);
 
 String _normalizeClaudeImageMime(String mime) {
   final normalized = mime.trim().toLowerCase();
@@ -635,464 +618,96 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     }
 
     final sse = response.stream.transform(utf8.decoder);
-    int roundTokens = 0;
-    TokenUsage? usage;
-    String? lastStopReason;
-
-    // Per-round accumulation
-    final Map<String, Map<String, dynamic>> anthToolUse =
-        <String, Map<String, dynamic>>{}; // id -> {name, args}
-    final Map<int, String> cliIndexToId =
-        <int, String>{}; // client tool: index -> id
-    final Map<String, String> toolResultsContent =
-        <String, String>{}; // id -> result text
-    final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
-    final StringBuffer textBuf = StringBuffer();
-
-    // Track thinking blocks so they can be sent back for tool-use continuation.
-    final Map<int, int> thinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> thinkingText = <int, StringBuffer>{};
-    final Map<int, StringBuffer> thinkingSig = <int, StringBuffer>{};
-    final Map<int, int> redactedThinkingIndexToAssistantBlock = <int, int>{};
-    final Map<int, StringBuffer> redactedThinkingData = <int, StringBuffer>{};
-
-    int? parseIndex(dynamic raw) {
-      if (raw == null) return null;
-      if (raw is int) return raw;
-      return int.tryParse(raw.toString());
-    }
-
-    void flushTextBlock() {
-      final t = textBuf.toString();
-      if (t.isNotEmpty) {
-        assistantBlocks.add({'type': 'text', 'text': t});
-        textBuf.clear();
-      }
-    }
-
-    // Server tool helpers (web_search)
-    final Map<int, String> srvIndexToId = <int, String>{};
-    final Map<String, String> srvArgsStr = <String, String>{};
-    final Map<String, Map<String, dynamic>> srvArgs =
-        <String, Map<String, dynamic>>{};
-
-    bool messageStopped = false;
+    final decoder = ClaudeStreamDecoder(
+      skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+    );
+    final adapter = LegacyChunkAdapter();
+    final executedToolIds = <String>{};
 
     await for (final event in parseSseEventStrings(sse)) {
-      final data = event.data;
-      // Anthropic reports failures in-band as `event: error` with
-      // {type:"error", error:{type,message}}; raise before the
-      // malformed-chunk guard below can swallow it.
-      _throwIfInBandStreamError(data);
-      try {
-        final obj = jsonDecode(data);
-        final type = obj['type'];
-
-        if (type == 'content_block_start') {
-          final cb = obj['content_block'];
-          final idx = parseIndex(obj['index']);
-          if (cb is Map && (cb['type'] == 'thinking')) {
-            // Preserve thinking blocks (with signature) for tool-use continuation.
-            flushTextBlock();
-            if (idx != null) {
-              assistantBlocks.add({
-                'type': 'thinking',
-                'thinking': '',
-                'signature': '',
-              });
-              thinkingIndexToAssistantBlock[idx] = assistantBlocks.length - 1;
-              thinkingText[idx] = StringBuffer();
-              thinkingSig[idx] = StringBuffer();
-            }
-          } else if (cb is Map && (cb['type'] == 'redacted_thinking')) {
-            flushTextBlock();
-            if (!skipRedactedThinkingBlocks && idx != null) {
-              assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
-              redactedThinkingIndexToAssistantBlock[idx] =
-                  assistantBlocks.length - 1;
-              redactedThinkingData[idx] = StringBuffer();
-            }
-          } else if (cb is Map && (cb['type'] == 'tool_use')) {
-            // Flush text block before tool_use
-            flushTextBlock();
-            final id = (cb['id'] ?? '').toString();
-            final name = (cb['name'] ?? '').toString();
-            final idx2 = idx ?? -1;
-            if (id.isNotEmpty) {
-              anthToolUse.putIfAbsent(id, () => {'name': name, 'args': ''});
-              assistantBlocks.add({
-                'type': 'tool_use',
-                'id': id,
-                'name': name,
-                'input': {},
-              });
-              if (idx2 >= 0) cliIndexToId[idx2] = id;
-              // Emit placeholder tool-call card immediately
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: roundTokens,
-                usage: usage,
-                toolCalls: [
-                  ToolCallInfo(
-                    id: id,
-                    name: name,
-                    arguments: const <String, dynamic>{},
-                    metadata: {
-                      'anthropic': {'assistant_blocks': assistantBlocks},
-                    },
-                  ),
-                ],
-              );
-            }
-          } else if (cb is Map && (cb['type'] == 'server_tool_use')) {
-            final id = (cb['id'] ?? '').toString();
-            final name = (cb['name'] ?? '').toString();
-            final idx2 = idx ?? -1;
-            if (id.isNotEmpty && idx2 >= 0) {
-              srvIndexToId[idx2] = id;
-              srvArgsStr[id] = '';
-            }
-            // Emit placeholder for server tool to show card (e.g., built-in web_search)
-            if (id.isNotEmpty && name == 'web_search') {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: roundTokens,
-                usage: usage,
-                toolCalls: [
-                  ToolCallInfo(
-                    id: id,
-                    name: 'search_web',
-                    arguments: const <String, dynamic>{},
-                    metadata: {
-                      'anthropic': {'assistant_blocks': assistantBlocks},
-                    },
-                  ),
-                ],
-              );
-            }
-          } else if (cb is Map && (cb['type'] == 'web_search_tool_result')) {
-            // Emit simplified search results to UI
-            final toolUseId = (cb['tool_use_id'] ?? '').toString();
-            final contentBlock = cb['content'];
-            final items = <Map<String, dynamic>>[];
-            String? errorCode;
-            if (contentBlock is List) {
-              for (int j = 0; j < contentBlock.length; j++) {
-                final it = contentBlock[j];
-                if (it is Map && (it['type'] == 'web_search_result')) {
-                  items.add({
-                    'index': j + 1,
-                    'title': (it['title'] ?? '').toString(),
-                    'url': (it['url'] ?? '').toString(),
-                    if ((it['page_age'] ?? '').toString().isNotEmpty)
-                      'page_age': (it['page_age'] ?? '').toString(),
-                  });
-                }
-              }
-            } else if (contentBlock is Map &&
-                (contentBlock['type'] == 'web_search_tool_result_error')) {
-              errorCode = (contentBlock['error_code'] ?? '').toString();
-            }
-            Map<String, dynamic> args = const <String, dynamic>{};
-            if (srvArgs.containsKey(toolUseId)) args = srvArgs[toolUseId]!;
-            final payload = jsonEncode({
-              'items': items,
-              if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
-            });
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: roundTokens,
-              usage: usage,
-              toolResults: [
-                ToolResultInfo(
-                  id: toolUseId.isEmpty ? 'builtin_search' : toolUseId,
-                  name: 'search_web',
-                  arguments: args,
-                  content: payload,
-                  metadata: {
-                    'anthropic': {'assistant_blocks': assistantBlocks},
-                  },
-                ),
-              ],
-            );
-          }
-        } else if (type == 'content_block_delta') {
-          final delta = obj['delta'];
-          if (delta != null) {
-            if (delta['type'] == 'text_delta') {
-              final content = delta['text'] ?? '';
-              if (content is String && content.isNotEmpty) {
-                textBuf.write(content);
-                yield ChatStreamChunk(
-                  content: content,
-                  isDone: false,
-                  totalTokens: roundTokens,
-                );
-              }
-            } else if (delta['type'] == 'thinking_delta') {
-              final idx = parseIndex(obj['index']);
-              final thinking =
-                  (delta['thinking'] ?? delta['text'] ?? '') as String;
-              if (thinking.isNotEmpty) {
-                yield ChatStreamChunk(
-                  content: '',
-                  reasoning: thinking,
-                  isDone: false,
-                  totalTokens: roundTokens,
-                );
-                if (idx != null && thinkingText.containsKey(idx)) {
-                  thinkingText[idx]!.write(thinking);
-                }
-              }
-            } else if (delta['type'] == 'signature_delta') {
-              final idx = parseIndex(obj['index']);
-              final sig = (delta['signature'] ?? '').toString();
-              if (sig.isNotEmpty &&
-                  idx != null &&
-                  thinkingSig.containsKey(idx)) {
-                thinkingSig[idx]!.write(sig);
-              }
-            } else if (delta['type'] == 'redacted_thinking_delta') {
-              final idx = parseIndex(obj['index']);
-              final data = (delta['data'] ?? '').toString();
-              if (data.isNotEmpty &&
-                  idx != null &&
-                  redactedThinkingData.containsKey(idx)) {
-                redactedThinkingData[idx]!.write(data);
-              }
-            } else if (delta['type'] == 'tool_use_delta') {
-              // Client tool input fragments stream under the same content_block index
-              final idx = (obj['index'] is int)
-                  ? obj['index'] as int
-                  : int.tryParse((obj['index'] ?? '').toString());
-              final id = (idx != null && cliIndexToId.containsKey(idx))
-                  ? cliIndexToId[idx]!
-                  : '';
-              if (id.isNotEmpty) {
-                final argsDelta =
-                    (delta['partial_json'] ??
-                            delta['input'] ??
-                            delta['text'] ??
-                            '')
-                        .toString();
-                final entry = anthToolUse.putIfAbsent(
-                  id,
-                  () => {'name': '', 'args': ''},
-                );
-                if (argsDelta.isNotEmpty) {
-                  entry['args'] = (entry['args'] ?? '') + argsDelta;
-                }
-              }
-            } else if (delta['type'] == 'input_json_delta') {
-              final idxRaw = obj['index'];
-              final index = (idxRaw is int)
-                  ? idxRaw
-                  : int.tryParse((idxRaw ?? '').toString());
-              final part = (delta['partial_json'] ?? '').toString();
-              if (index != null && part.isNotEmpty) {
-                if (cliIndexToId.containsKey(index)) {
-                  final id = cliIndexToId[index]!;
-                  final entry = anthToolUse.putIfAbsent(
-                    id,
-                    () => {'name': '', 'args': ''},
-                  );
-                  entry['args'] = (entry['args'] ?? '') + part;
-                } else if (srvIndexToId.containsKey(index)) {
-                  final id = srvIndexToId[index]!;
-                  srvArgsStr[id] = (srvArgsStr[id] ?? '') + part;
-                }
-              }
-            }
-          }
-        } else if (type == 'content_block_stop') {
-          final idx = parseIndex(obj['index']);
-          // Finalize thinking blocks so they can be sent back unmodified.
-          if (idx != null && thinkingIndexToAssistantBlock.containsKey(idx)) {
-            final pos = thinkingIndexToAssistantBlock.remove(idx)!;
-            final t = thinkingText.remove(idx)?.toString() ?? '';
-            final sig = thinkingSig.remove(idx)?.toString() ?? '';
-            assistantBlocks[pos] = {
-              'type': 'thinking',
-              'thinking': t,
-              'signature': sig,
-            };
-          }
-          if (idx != null &&
-              redactedThinkingIndexToAssistantBlock.containsKey(idx)) {
-            final pos = redactedThinkingIndexToAssistantBlock.remove(idx)!;
-            final data = redactedThinkingData.remove(idx)?.toString() ?? '';
-            assistantBlocks[pos] = {'type': 'redacted_thinking', 'data': data};
-          }
-          String id = (obj['content_block']?['id'] ?? obj['id'] ?? '')
-              .toString();
-          if (id.isEmpty && idx != null && cliIndexToId.containsKey(idx)) {
-            id = cliIndexToId[idx]!;
-          }
-          if (id.isNotEmpty && anthToolUse.containsKey(id)) {
-            final name = (anthToolUse[id]!['name'] ?? '').toString();
-            Map<String, dynamic> args;
-            try {
-              args =
-                  (jsonDecode((anthToolUse[id]!['args'] ?? '{}') as String)
-                          as Map)
-                      .cast<String, dynamic>();
-            } catch (_) {
-              args = <String, dynamic>{};
-            }
-            // Update last assistant tool_use block input
-            for (int k = assistantBlocks.length - 1; k >= 0; k--) {
-              final b = assistantBlocks[k];
-              if (b['type'] == 'tool_use' &&
-                  (b['id']?.toString() ?? '') == id) {
-                assistantBlocks[k] = {
-                  'type': 'tool_use',
-                  'id': id,
-                  'name': name,
-                  'input': args,
-                };
-                break;
-              }
-            }
-            // Emit tool result to UI (placeholder was emitted at start)
-            if (onToolCall != null) {
-              final res = await onToolCall(name, args, toolCallId: id);
-              toolResultsContent[id] = res;
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: roundTokens,
-                toolResults: [
-                  ToolResultInfo(
-                    id: id,
-                    name: name,
-                    arguments: args,
-                    content: res,
-                    metadata: {
-                      'anthropic': {'assistant_blocks': assistantBlocks},
-                    },
-                  ),
-                ],
-                usage: usage,
-              );
-            }
-          } else {
-            if (idx != null && srvIndexToId.containsKey(idx)) {
-              final sid = srvIndexToId[idx]!;
-              Map<String, dynamic> args;
-              try {
-                args = jsonDecode(
-                  srvArgsStr[sid] ?? '{}',
-                ).cast<String, dynamic>();
-              } catch (_) {
-                args = <String, dynamic>{};
-              }
-              srvArgs[sid] = args;
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: roundTokens,
-                usage: usage,
-                toolCalls: [
-                  ToolCallInfo(
-                    id: sid,
-                    name: 'search_web',
-                    arguments: args,
-                    metadata: {
-                      'anthropic': {'assistant_blocks': assistantBlocks},
-                    },
-                  ),
-                ],
-              );
-            }
-          }
-        } else if (type == 'message_delta') {
-          final u = obj['usage'] ?? obj['message']?['usage'];
-          if (u is Map) {
-            usage = (usage ?? const TokenUsage()).merge(
-              _claudeUsageFromMap(u.cast<String, dynamic>()),
-            );
-            roundTokens = usage.totalTokens;
-          }
-          // Capture stop reason to handle pause_turn for server tools
-          try {
-            final d = obj['delta'];
-            final sr = (d is Map)
-                ? (d['stop_reason'] ?? d['stopReason'])
-                : null;
-            if (sr is String && sr.isNotEmpty) {
-              lastStopReason = sr;
-            }
-          } catch (_) {}
-        } else if (type == 'message_stop') {
-          // Flush remaining text
-          final t = textBuf.toString();
-          if (t.isNotEmpty) {
-            assistantBlocks.add({'type': 'text', 'text': t});
-          }
-          messageStopped = true;
+      _throwIfInBandStreamError(event.data);
+      final decoded = decoder.accept(event);
+      for (final chunk in decoded.chunks) {
+        for (final mapped in adapter.handle(chunk)) {
+          yield mapped;
         }
-      } catch (_) {
-        // ignore malformed chunk
+        if (chunk is ToolCallEnd &&
+            decoder.isClientTool(chunk.id) &&
+            onToolCall != null &&
+            executedToolIds.add(chunk.id)) {
+          final tool = decoder.clientTools[chunk.id]!;
+          final args = tool.decodedArguments;
+          final res = await onToolCall(tool.name, args, toolCallId: tool.id);
+          decoder.recordToolResult(tool.id, res);
+          yield ChatStreamChunk(
+            content: '',
+            isDone: false,
+            totalTokens: decoder.usage?.totalTokens ?? 0,
+            usage: decoder.usage,
+            toolResults: [
+              ToolResultInfo(
+                id: tool.id,
+                name: tool.name,
+                arguments: args,
+                content: res,
+                metadata: {
+                  'anthropic': {'assistant_blocks': decoder.assistantBlocks},
+                },
+              ),
+            ],
+          );
+        }
       }
-      if (messageStopped) {
-        break;
+      if (decoded.completed) break;
+    }
+    for (final chunk in decoder.onClosed()) {
+      for (final mapped in adapter.handle(chunk)) {
+        yield mapped;
       }
     }
 
-    // Merge usage across rounds for final token count
+    final usage = decoder.usage;
+    final roundTokens = usage?.totalTokens ?? 0;
+    final assistantBlocks = decoder.assistantBlocks;
+    final lastStopReason = decoder.lastStopReason;
+    final toolResultsContent = decoder.toolResults;
+
     if (usage != null) {
       totalUsage = (totalUsage ?? const TokenUsage()).merge(usage);
     }
 
-    // If no client tool calls, decide whether to continue (pause_turn/server tool) or finalize
-    if (anthToolUse.isEmpty) {
+    if (decoder.clientTools.isEmpty) {
       final sr = lastStopReason ?? '';
       if (sr == 'pause_turn') {
-        // Continue this turn with assistant content only
         convo = [
           ...convo,
           {'role': 'assistant', 'content': assistantBlocks},
         ];
-        // Loop to next round
         continue;
-      } else {
-        yield ChatStreamChunk(
-          content: '',
-          isDone: true,
-          totalTokens: (totalUsage?.totalTokens ?? roundTokens),
-          usage: totalUsage ?? usage,
-        );
-        return;
       }
+      yield ChatStreamChunk(
+        content: '',
+        isDone: true,
+        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
+        usage: totalUsage ?? usage,
+      );
+      return;
     }
 
-    // Build tool_result blocks in a single user message (parallel-safe)
     final toolResultsBlocks = <Map<String, dynamic>>[];
-    for (final entry in anthToolUse.entries) {
-      final id = entry.key;
-      final name = (entry.value['name'] ?? '').toString();
-      Map<String, dynamic> args;
-      try {
-        args = (jsonDecode((entry.value['args'] ?? '{}') as String) as Map)
-            .cast<String, dynamic>();
-      } catch (_) {
-        args = <String, dynamic>{};
-      }
-      String res = toolResultsContent[id] ?? '';
+    for (final tool in decoder.clientTools.values) {
+      final args = tool.decodedArguments;
+      var res = toolResultsContent[tool.id] ?? '';
       if (res.isEmpty && onToolCall != null) {
-        res = await onToolCall(name, args, toolCallId: id);
+        res = await onToolCall(tool.name, args, toolCallId: tool.id);
       }
       toolResultsBlocks.add({
         'type': 'tool_result',
-        'tool_use_id': id,
+        'tool_use_id': tool.id,
         if (res.isNotEmpty) 'content': res,
       });
     }
 
-    // Extend conversation: assistant content (with tool_use blocks) + user tool_results
     convo = [
       ...convo,
       {'role': 'assistant', 'content': assistantBlocks},

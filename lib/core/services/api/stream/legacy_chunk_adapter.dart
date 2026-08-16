@@ -48,7 +48,18 @@ class LegacyChunkAdapter {
         final buffer = _toolCalls.putIfAbsent(id, _ToolCallBuffer.new);
         if (toolName.isNotEmpty) buffer.name = toolName;
         if (metadata != null) buffer.metadata = metadata;
-        return const <ChatStreamChunk>[];
+        return <ChatStreamChunk>[
+          _delta(
+            toolCalls: <ToolCallInfo>[
+              ToolCallInfo(
+                id: id,
+                name: buffer.name,
+                arguments: const <String, dynamic>{},
+                metadata: buffer.metadata,
+              ),
+            ],
+          ),
+        ];
       case ToolCallDelta(
         :final id,
         :final toolNameDelta,
