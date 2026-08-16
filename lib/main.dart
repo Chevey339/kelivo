@@ -1291,12 +1291,10 @@ class MyApp extends StatelessWidget {
                   }
 
                   final mq = MediaQuery.of(ctx);
-                  // Global font scaling: apply the chat font size setting to
-                  // the whole UI so the composer, dialogs and auxiliary text
-                  // scale together with chat messages. Consumers that already
-                  // multiply in chatFontScale (message list, export preview)
-                  // pass a neutral 1.0 scale to avoid double scaling.
-                  final fontScale = settings.chatFontScale;
+                  // App-wide base font scaling from the UI font size setting.
+                  // The chat and input font scales stack on top of this for
+                  // messages and the composer respectively.
+                  final fontScale = settings.uiFontScale;
                   final scaledMq = fontScale == 1.0
                       ? mq
                       : mq.copyWith(
