@@ -1028,32 +1028,6 @@ Future<List<Map<String, dynamic>>> _buildOpenAIChatCompletionMessages(
   return out;
 }
 
-String _extractOpenAICompatibleDeltaText(Map? delta) {
-  if (delta == null) return '';
-  final deltaType = (delta['type'] ?? '').toString();
-  if (deltaType == 'response.audio.delta') {
-    return '';
-  }
-  final content = delta['content'];
-  if (content is String) {
-    return content;
-  }
-  if (content is List) {
-    final buffer = StringBuffer();
-    for (final item in content) {
-      if (item is! Map) continue;
-      final text = (item['text'] ?? item['delta'] ?? '').toString();
-      final type = (item['type'] ?? '').toString();
-      if (text.isEmpty) continue;
-      if (type.isEmpty || type == 'text') {
-        buffer.write(text);
-      }
-    }
-    return buffer.toString();
-  }
-  return '';
-}
-
 /// Follow-up tool-call responses are consumed inside the SSE parser's
 /// per-event catch, which tolerates malformed JSON. Convert their transport
 /// failures into [HttpException] up front so that catch cannot swallow them
@@ -2232,6 +2206,15 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       ? ResponsesStreamDecoder(initialUsage: usage)
       : null;
   final responsesAdapter = LegacyChunkAdapter();
+  final chatDecoder = config.useResponseApi == true
+      ? null
+      : ChatCompletionsStreamDecoder(
+          wantsImageOutput: wantsImageOutput,
+          needsReasoningEcho: needsReasoningEcho,
+          allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
+          initialUsage: usage,
+        );
+  final chatAdapter = LegacyChunkAdapter();
 
   await for (final event in parseSseEventStrings(sse)) {
     final data = event.data;
@@ -2306,7 +2289,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           content: assistantContentBuffer,
           reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
           includeEmptyReasoningContent: needsReasoningEcho,
-          reasoningDetails: reasoningDetailsBuffer.detailsOrNull,
+          reasoningDetails:
+              chatDecoder?.reasoningDetails ??
+              reasoningDetailsBuffer.detailsOrNull,
         );
         mm2.add(assistantToolCallMsg);
         for (final r in results) {
@@ -2407,191 +2392,34 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
           }
           final s2 = resp2.stream.transform(utf8.decoder);
-          // Track potential subsequent tool calls
-          final Map<int, Map<String, String>> toolAcc2 =
-              <int, Map<String, String>>{};
-          String? finishReason2;
-          String contentAccum = ''; // Accumulate content for this round
-          String reasoningAccum = '';
-          final reasoningDetailsAccum = _ReasoningDetailsAccumulator(
-            allowSnapshots: reasoningDetailsAllowSnapshots,
+          final roundDecoder = ChatCompletionsStreamDecoder(
+            wantsImageOutput: wantsImageOutput,
+            needsReasoningEcho: needsReasoningEcho,
+            allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
+            initialUsage: usage,
           );
+          final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
             final d = event.data;
             if (d == '[DONE]') {
-              // This round finished; handle below
               continue;
             }
             _throwIfInBandStreamError(d);
             try {
-              final o = jsonDecode(d);
-              if (o is Map) {
-                usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                if (usage != null) totalTokens = usage.totalTokens;
-              }
-              if (o is Map &&
-                  o['choices'] is List &&
-                  (o['choices'] as List).isNotEmpty) {
-                final c0 = (o['choices'] as List).first;
-                finishReason2 = c0['finish_reason'] as String?;
-                final delta = c0['delta'] as Map?;
-                final message = c0['message'] as Map?;
-                final txt = _extractOpenAICompatibleDeltaText(delta);
-                final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
-                // Capture Grok citations
-                final gCitations = o['citations'];
-                if (gCitations is List && gCitations.isNotEmpty) {
-                  final items = <Map<String, dynamic>>[];
-                  for (int k = 0; k < gCitations.length; k++) {
-                    final u = gCitations[k].toString();
-                    items.add({'index': k + 1, 'url': u, 'title': u});
-                  }
-                  if (items.isNotEmpty) {
-                    final payload = jsonEncode({'items': items});
-                    yield ChatStreamChunk(
-                      content: '',
-                      isDone: false,
-                      totalTokens: usage?.totalTokens ?? 0,
-                      usage: usage,
-                      toolResults: [
-                        ToolResultInfo(
-                          id: 'builtin_search',
-                          name: 'search_web',
-                          arguments: const <String, dynamic>{},
-                          content: payload,
-                        ),
-                      ],
-                    );
-                  }
-                }
-                if (rc is String && rc.isNotEmpty) {
-                  if (needsReasoningEcho) reasoningAccum += rc;
-                  yield ChatStreamChunk(
-                    content: '',
-                    reasoning: rc,
-                    isDone: false,
-                    totalTokens: 0,
-                    usage: usage,
-                  );
-                }
-                if (txt.isNotEmpty) {
-                  contentAccum += txt; // Accumulate content
-                  yield ChatStreamChunk(
-                    content: txt,
-                    isDone: false,
-                    totalTokens: 0,
-                    usage: usage,
-                  );
-                }
-                // Fallback/merge: message.content in same chunk (if any)
-                if (message != null && message['content'] != null) {
-                  final mc = message['content'];
-                  if (mc is String && mc.isNotEmpty) {
-                    contentAccum += mc;
-                    yield ChatStreamChunk(
-                      content: mc,
-                      isDone: false,
-                      totalTokens: 0,
-                      usage: usage,
-                    );
-                  }
-                }
-                if (message != null) {
-                  final rcMsg =
-                      message['reasoning_content'] ?? message['reasoning'];
-                  if (rcMsg is String &&
-                      rcMsg.isNotEmpty &&
-                      needsReasoningEcho) {
-                    reasoningAccum += rcMsg;
-                  }
-                }
-                final rd = delta?['reasoning_details'];
-                if (rd is List && rd.isNotEmpty) {
-                  reasoningDetailsAccum.add(rd);
-                }
-                final rdMsg = message?['reasoning_details'];
-                if (rdMsg is List && rdMsg.isNotEmpty) {
-                  reasoningDetailsAccum.add(rdMsg);
-                }
-                // Handle image outputs from OpenRouter-style deltas
-                // Possible shapes:
-                // - delta['images']: [ { type: 'image_url', image_url: { url: 'data:...' }, index: 0 }, ... ]
-                // - delta['content']: [ { type: 'image_url', image_url: { url: '...' } }, { type: 'text', text: '...' } ]
-                // - delta['image_url'] directly (less common)
-                if (wantsImageOutput) {
-                  final List<dynamic> imageItems = <dynamic>[];
-                  final imgs = delta?['images'];
-                  if (imgs is List) imageItems.addAll(imgs);
-                  final contentArr = delta?['content'] as List?;
-                  if (contentArr is List) {
-                    for (final it in contentArr) {
-                      if (it is Map &&
-                          (it['type'] == 'image_url' ||
-                              it['type'] == 'image')) {
-                        imageItems.add(it);
-                      }
-                    }
-                  }
-                  final singleImage = delta?['image_url'];
-                  if (singleImage is Map || singleImage is String) {
-                    imageItems.add({
-                      'type': 'image_url',
-                      'image_url': singleImage,
-                    });
-                  }
-                  if (imageItems.isNotEmpty) {
-                    final buf = StringBuffer();
-                    for (final it in imageItems) {
-                      if (it is! Map) continue;
-                      dynamic iu = it['image_url'];
-                      String? url;
-                      if (iu is String) {
-                        url = iu;
-                      } else if (iu is Map) {
-                        final u2 = iu['url'];
-                        if (u2 is String) url = u2;
-                      }
-                      if (url != null && url.isNotEmpty) {
-                        final md = '\n\n![image]($url)';
-                        buf.write(md);
-                        contentAccum += md;
-                      }
-                    }
-                    final out = buf.toString();
-                    if (out.isNotEmpty) {
-                      yield ChatStreamChunk(
-                        content: out,
-                        isDone: false,
-                        totalTokens: 0,
-                        usage: usage,
-                      );
-                    }
-                  }
-                }
-                final tcs = delta?['tool_calls'] as List?;
-                if (tcs != null) {
-                  for (final t in tcs) {
-                    final idx = (t['index'] as int?) ?? 0;
-                    final id = t['id'] as String?;
-                    final func = t['function'] as Map<String, dynamic>?;
-                    final name = func?['name'] as String?;
-                    final argsDelta = func?['arguments'] as String?;
-                    final entry = toolAcc2.putIfAbsent(
-                      idx,
-                      () => {'id': '', 'name': '', 'args': ''},
-                    );
-                    if (id != null) entry['id'] = id;
-                    if (name != null && name.isNotEmpty) {
-                      entry['name'] = name;
-                    }
-                    if (argsDelta != null && argsDelta.isNotEmpty) {
-                      entry['args'] = (entry['args'] ?? '') + argsDelta;
-                    }
-                  }
+              for (final chunk in roundDecoder.accept(event).chunks) {
+                for (final mapped in roundAdapter.handle(chunk)) {
+                  yield mapped;
                 }
               }
             } catch (_) {}
           }
+          usage = roundDecoder.usage ?? usage;
+          if (usage != null) totalTokens = usage.totalTokens;
+          final toolAcc2 = roundDecoder.toolCalls;
+          final finishReason2 = roundDecoder.finishReason;
+          final contentAccum = roundDecoder.assistantContent;
+          final reasoningAccum = roundDecoder.reasoningEcho;
+          final reasoningDetailsAccum = roundDecoder.reasoningDetails;
 
           // After this follow-up round finishes: if tool calls again, execute and loop
           if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
@@ -2657,7 +2485,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               content: contentAccum,
               reasoningContent: needsReasoningEcho ? reasoningAccum : null,
               includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails: reasoningDetailsAccum.detailsOrNull,
+              reasoningDetails: reasoningDetailsAccum,
             );
             currentMessages = [
               ...currentMessages,
@@ -2684,7 +2512,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 approxTokensFromChars(approxCompletionChars);
             yield ChatStreamChunk(
               content: '',
-              reasoningDetails: reasoningDetailsAccum.detailsOrNull,
+              reasoningDetails: reasoningDetailsAccum,
               isDone: true,
               totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
@@ -2698,7 +2526,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           approxPromptTokens + approxTokensFromChars(approxCompletionChars);
       yield ChatStreamChunk(
         content: '',
-        reasoningDetails: reasoningDetailsBuffer.detailsOrNull,
+        reasoningDetails:
+            chatDecoder?.reasoningDetails ??
+            reasoningDetailsBuffer.detailsOrNull,
         isDone: true,
         totalTokens: usage?.totalTokens ?? approxTotal,
         usage: usage,
@@ -2708,10 +2538,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 
     _throwIfInBandStreamError(data);
     try {
-      final json = jsonDecode(data);
-      String content = '';
-      String? reasoning;
-
       if (config.useResponseApi == true) {
         final decoder = responsesDecoder!;
         final decoded = decoder.accept(event);
@@ -3121,230 +2947,22 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         );
         return;
       } else {
-        // Handle standard OpenAI Chat Completions format
-        final choices = json['choices'];
-        if (choices != null && choices.isNotEmpty) {
-          final c0 = choices[0];
-          finishReason = c0['finish_reason'] as String?;
-          // if (finishReason != null) {
-          //   print('[ChatApi] Received finishReason from choices: $finishReason');
-          // }
-
-          // Some providers may include both delta and message.content in SSE chunks.
-          // Prioritize delta, then fallback to message.content; merge if both present.
-          final message = c0['message'];
-          final delta = c0['delta'];
-
-          // 1) Parse delta first
-          if (delta != null) {
-            // Streaming format: choices[0].delta.content
-            final dc = delta['content'];
-            final deltaContent = _extractOpenAICompatibleDeltaText(delta);
-            if (deltaContent.isNotEmpty) {
-              content += deltaContent;
-              approxCompletionChars += deltaContent.length;
-            }
-
-            // reasoning_content handling (unchanged)
-            final rc =
-                (delta['reasoning_content'] ?? delta['reasoning']) as String?;
-            if (rc != null && rc.isNotEmpty) {
-              reasoning = rc;
-              if (needsReasoningEcho) reasoningBuffer += rc;
-            }
-            // Capture vendor reasoning details (may carry thinking
-            // signatures) from any provider that sends them.
-            final rdDelta = delta['reasoning_details'];
-            if (rdDelta is List && rdDelta.isNotEmpty) {
-              reasoningDetailsBuffer.add(rdDelta);
-            }
-
-            // images handling from delta (unchanged)
-            if (wantsImageOutput) {
-              final List<dynamic> imageItems = <dynamic>[];
-              final imgs = delta['images'];
-              if (imgs is List) imageItems.addAll(imgs);
-              if (dc is List) {
-                for (final it in dc) {
-                  if (it is Map &&
-                      (it['type'] == 'image_url' || it['type'] == 'image')) {
-                    imageItems.add(it);
-                  }
-                }
-              }
-              final singleImage = delta['image_url'];
-              if (singleImage is Map || singleImage is String) {
-                imageItems.add({'type': 'image_url', 'image_url': singleImage});
-              }
-              if (imageItems.isNotEmpty) {
-                final buf = StringBuffer();
-                for (final it in imageItems) {
-                  if (it is! Map) continue;
-                  dynamic iu = it['image_url'];
-                  String? url;
-                  if (iu is String) {
-                    url = iu;
-                  } else if (iu is Map) {
-                    final u2 = iu['url'];
-                    if (u2 is String) url = u2;
-                  }
-                  if (url != null && url.isNotEmpty) {
-                    buf.write('\n\n![image]($url)');
-                  }
-                }
-                if (buf.isNotEmpty) content = content + buf.toString();
-              }
-            }
-
-            // tool_calls handling from delta (unchanged)
-            final tcs = delta['tool_calls'] as List?;
-            if (tcs != null) {
-              for (final t in tcs) {
-                final idx = (t['index'] as int?) ?? 0;
-                final id = t['id'] as String?;
-                final func = t['function'] as Map<String, dynamic>?;
-                final name = func?['name'] as String?;
-                final argsDelta = func?['arguments'] as String?;
-                final entry = toolAcc.putIfAbsent(
-                  idx,
-                  () => {'id': '', 'name': '', 'args': ''},
-                );
-                if (id != null) entry['id'] = id;
-                if (name != null && name.isNotEmpty) entry['name'] = name;
-                if (argsDelta != null && argsDelta.isNotEmpty) {
-                  entry['args'] = (entry['args'] ?? '') + argsDelta;
-                }
-              }
-            }
-          }
-
-          if (message != null) {
-            final rdMsg = message['reasoning_details'];
-            if (rdMsg is List && rdMsg.isNotEmpty) {
-              reasoningDetailsBuffer.add(rdMsg);
-            }
-          }
-
-          // 2) Fallback and merge: parse choices[0].message.content
-          if (message != null && message['content'] != null) {
-            final mc = message['content'];
-            String messageContent = '';
-            if (mc is String) {
-              messageContent = mc;
-            } else if (mc is List) {
-              final sb = StringBuffer();
-              for (final it in mc) {
-                if (it is Map) {
-                  final t = (it['text'] ?? '') as String? ?? '';
-                  if (t.isNotEmpty &&
-                      (it['type'] == null || it['type'] == 'text')) {
-                    sb.write(t);
-                  }
-                }
-              }
-              messageContent = sb.toString();
-            } else {
-              messageContent = (mc ?? '').toString();
-            }
-            if (messageContent.isNotEmpty) {
-              content += messageContent;
-              approxCompletionChars += messageContent.length;
-            }
-
-            // Capture reasoning_content if only present on the message object
-            if (message != null) {
-              final rcMsg =
-                  message['reasoning_content'] ?? message['reasoning'];
-              if (rcMsg is String && rcMsg.isNotEmpty) {
-                if (needsReasoningEcho) reasoningBuffer += rcMsg;
-                reasoning ??= rcMsg;
-              }
-            }
-
-            // images handling from message content (unchanged)
-            if (wantsImageOutput && mc is List) {
-              final List<dynamic> imageItems = <dynamic>[];
-              for (final it in mc) {
-                if (it is Map &&
-                    (it['type'] == 'image_url' || it['type'] == 'image')) {
-                  imageItems.add(it);
-                }
-              }
-              if (imageItems.isNotEmpty) {
-                final buf = StringBuffer();
-                for (final it in imageItems) {
-                  if (it is! Map) continue;
-                  dynamic iu = it['image_url'];
-                  String? url;
-                  if (iu is String) {
-                    url = iu;
-                  } else if (iu is Map) {
-                    final u2 = iu['url'];
-                    if (u2 is String) url = u2;
-                  }
-                  if (url != null && url.isNotEmpty) {
-                    buf.write('\n\n![image]($url)');
-                  }
-                }
-                if (buf.isNotEmpty) content = content + buf.toString();
-              }
-            }
+        final decoder = chatDecoder!;
+        final decoded = decoder.accept(event);
+        for (final chunk in decoded.chunks) {
+          for (final mapped in chatAdapter.handle(chunk)) {
+            yield mapped;
           }
         }
-        // XinLiu (iflow.cn) compatibility: tool_calls at root level instead of delta
-        final rootToolCalls = json['tool_calls'] as List?;
-        if (rootToolCalls != null) {
-          // print('[ChatApi/XinLiu] Detected root-level tool_calls, count: ${rootToolCalls.length}, original finishReason: $finishReason');
-          // print('[ChatApi/XinLiu] Full JSON keys: ${json.keys.toList()}');
-          // print('[ChatApi/XinLiu] Full JSON: ${jsonEncode(json)}');
-          for (final t in rootToolCalls) {
-            if (t is! Map) continue;
-            final id = (t['id'] ?? '').toString();
-            final type = (t['type'] ?? 'function').toString();
-            if (type != 'function') continue;
-            final func = t['function'] as Map<String, dynamic>?;
-            if (func == null) continue;
-            final name = (func['name'] ?? '').toString();
-            final argsStr = (func['arguments'] ?? '').toString();
-            if (name.isEmpty) continue;
-            // print('[ChatApi/XinLiu] Tool call: id=$id, name=$name, args=${argsStr.length} chars');
-            final idx = toolAcc.length;
-            final entry = toolAcc.putIfAbsent(
-              idx,
-              () => {
-                'id': _effectiveToolCallId(id, 'call', idx),
-                'name': name,
-                'args': argsStr,
-              },
-            );
-            if (id.isNotEmpty) entry['id'] = id;
-            entry['name'] = name;
-            entry['args'] = argsStr;
-          }
-          // When root-level tool_calls are present, always treat as tool_calls finish reason
-          // (override any other finish_reason from provider)
-          if (rootToolCalls.isNotEmpty) {
-            // print('[ChatApi/XinLiu] Overriding finishReason from "$finishReason" to "tool_calls"');
-            finishReason = 'tool_calls';
-          }
-        }
-        usage = _mergeOpenAICompatibleUsage(usage, json['usage']);
+        toolAcc
+          ..clear()
+          ..addAll(decoder.toolCalls);
+        finishReason = decoder.finishReason;
+        usage = decoder.usage ?? usage;
         if (usage != null) totalTokens = usage.totalTokens;
-      }
-
-      if (content.isNotEmpty || (reasoning?.isNotEmpty ?? false)) {
-        final approxTotal =
-            approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-        if (content.isNotEmpty) {
-          assistantContentBuffer += content;
-        }
-        yield ChatStreamChunk(
-          content: content,
-          reasoning: reasoning,
-          isDone: false,
-          totalTokens: totalTokens > 0 ? totalTokens : approxTotal,
-          usage: usage,
-        );
+        approxCompletionChars = decoder.approxCompletionChars;
+        reasoningBuffer = decoder.reasoningEcho;
+        assistantContentBuffer = decoder.assistantContent;
       }
 
       // Some providers (e.g., OpenRouter) may omit the [DONE] sentinel
@@ -3423,7 +3041,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           content: assistantContentBuffer,
           reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
           includeEmptyReasoningContent: needsReasoningEcho,
-          reasoningDetails: reasoningDetailsBuffer.detailsOrNull,
+          reasoningDetails:
+              chatDecoder.reasoningDetails ??
+              reasoningDetailsBuffer.detailsOrNull,
         );
         mm2.add(assistantToolCallMsg);
         for (final r in results) {
@@ -3527,14 +3147,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           final s2 = _rethrowFollowUpStreamErrors(
             resp2.stream.transform(utf8.decoder),
           );
-          final Map<int, Map<String, String>> toolAcc2 =
-              <int, Map<String, String>>{};
-          String? finishReason2;
-          String contentAccum = '';
-          String reasoningAccum = '';
-          final reasoningDetailsAccum = _ReasoningDetailsAccumulator(
-            allowSnapshots: reasoningDetailsAllowSnapshots,
+          final roundDecoder = ChatCompletionsStreamDecoder(
+            wantsImageOutput: wantsImageOutput,
+            needsReasoningEcho: needsReasoningEcho,
+            allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
+            initialUsage: usage,
           );
+          final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
             final d = event.data;
             if (d == '[DONE]') {
@@ -3542,200 +3161,20 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             }
             _throwIfInBandStreamError(d);
             try {
-              final o = jsonDecode(d);
-              if (o is Map) {
-                usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                if (usage != null) totalTokens = usage.totalTokens;
-              }
-              if (o is Map &&
-                  o['choices'] is List &&
-                  (o['choices'] as List).isNotEmpty) {
-                final c0 = (o['choices'] as List).first;
-                finishReason2 = c0['finish_reason'] as String?;
-                final delta = c0['delta'] as Map?;
-                final txt = _extractOpenAICompatibleDeltaText(delta);
-                final rc = delta?['reasoning_content'] ?? delta?['reasoning'];
-                // Capture Grok citations
-                final gCitations = o['citations'];
-                if (gCitations is List && gCitations.isNotEmpty) {
-                  final items = <Map<String, dynamic>>[];
-                  for (int k = 0; k < gCitations.length; k++) {
-                    final u = gCitations[k].toString();
-                    items.add({'index': k + 1, 'url': u, 'title': u});
-                  }
-                  if (items.isNotEmpty) {
-                    final payload = jsonEncode({'items': items});
-                    yield ChatStreamChunk(
-                      content: '',
-                      isDone: false,
-                      totalTokens: usage?.totalTokens ?? 0,
-                      usage: usage,
-                      toolResults: [
-                        ToolResultInfo(
-                          id: 'builtin_search',
-                          name: 'search_web',
-                          arguments: const <String, dynamic>{},
-                          content: payload,
-                        ),
-                      ],
-                    );
-                  }
-                }
-                if (rc is String && rc.isNotEmpty) {
-                  if (needsReasoningEcho) reasoningAccum += rc;
-                  yield ChatStreamChunk(
-                    content: '',
-                    reasoning: rc,
-                    isDone: false,
-                    totalTokens: 0,
-                    usage: usage,
-                  );
-                }
-                if (txt.isNotEmpty) {
-                  contentAccum += txt;
-                  yield ChatStreamChunk(
-                    content: txt,
-                    isDone: false,
-                    totalTokens: 0,
-                    usage: usage,
-                  );
-                }
-                if (wantsImageOutput) {
-                  final List<dynamic> imageItems = <dynamic>[];
-                  final imgs = delta?['images'];
-                  if (imgs is List) imageItems.addAll(imgs);
-                  final contentArr = delta?['content'] as List?;
-                  if (contentArr is List) {
-                    for (final it in contentArr) {
-                      if (it is Map &&
-                          (it['type'] == 'image_url' ||
-                              it['type'] == 'image')) {
-                        imageItems.add(it);
-                      }
-                    }
-                  }
-                  final singleImage = delta?['image_url'];
-                  if (singleImage is Map || singleImage is String) {
-                    imageItems.add({
-                      'type': 'image_url',
-                      'image_url': singleImage,
-                    });
-                  }
-                  if (imageItems.isNotEmpty) {
-                    final buf = StringBuffer();
-                    for (final it in imageItems) {
-                      if (it is! Map) continue;
-                      dynamic iu = it['image_url'];
-                      String? url;
-                      if (iu is String) {
-                        url = iu;
-                      } else if (iu is Map) {
-                        final u2 = iu['url'];
-                        if (u2 is String) url = u2;
-                      }
-                      if (url != null && url.isNotEmpty) {
-                        final md = '\n\n![image]($url)';
-                        buf.write(md);
-                        contentAccum += md;
-                      }
-                    }
-                    final out = buf.toString();
-                    if (out.isNotEmpty) {
-                      yield ChatStreamChunk(
-                        content: out,
-                        isDone: false,
-                        totalTokens: 0,
-                        usage: usage,
-                      );
-                    }
-                  }
-                }
-                final tcs = delta?['tool_calls'] as List?;
-                if (tcs != null) {
-                  for (final t in tcs) {
-                    final idx = (t['index'] as int?) ?? 0;
-                    final id = t['id'] as String?;
-                    final func = t['function'] as Map<String, dynamic>?;
-                    final name = func?['name'] as String?;
-                    final argsDelta = func?['arguments'] as String?;
-                    final entry = toolAcc2.putIfAbsent(
-                      idx,
-                      () => {'id': '', 'name': '', 'args': ''},
-                    );
-                    if (id != null) entry['id'] = id;
-                    if (name != null && name.isNotEmpty) {
-                      entry['name'] = name;
-                    }
-                    if (argsDelta != null && argsDelta.isNotEmpty) {
-                      entry['args'] = (entry['args'] ?? '') + argsDelta;
-                    }
-                  }
-                }
-
-                // Fallback/merge: message.content in same chunk (if any)
-                final message = c0['message'] as Map?;
-                if (message != null && message['content'] != null) {
-                  final mc = message['content'];
-                  if (mc is String && mc.isNotEmpty) {
-                    contentAccum += mc;
-                    yield ChatStreamChunk(
-                      content: mc,
-                      isDone: false,
-                      totalTokens: 0,
-                      usage: usage,
-                    );
-                  }
-                }
-                if (message != null) {
-                  final rcMsg =
-                      message['reasoning_content'] ?? message['reasoning'];
-                  if (rcMsg is String &&
-                      rcMsg.isNotEmpty &&
-                      needsReasoningEcho) {
-                    reasoningAccum += rcMsg;
-                  }
-                }
-                final rd = delta?['reasoning_details'];
-                if (rd is List && rd.isNotEmpty) {
-                  reasoningDetailsAccum.add(rd);
-                }
-                final rdMsg = message?['reasoning_details'];
-                if (rdMsg is List && rdMsg.isNotEmpty) {
-                  reasoningDetailsAccum.add(rdMsg);
-                }
-              }
-              // XinLiu compatibility for follow-up requests too
-              final rootToolCalls2 = o['tool_calls'] as List?;
-              if (rootToolCalls2 != null) {
-                for (final t in rootToolCalls2) {
-                  if (t is! Map) continue;
-                  final id = (t['id'] ?? '').toString();
-                  final type = (t['type'] ?? 'function').toString();
-                  if (type != 'function') continue;
-                  final func = t['function'] as Map<String, dynamic>?;
-                  if (func == null) continue;
-                  final name = (func['name'] ?? '').toString();
-                  final argsStr = (func['arguments'] ?? '').toString();
-                  if (name.isEmpty) continue;
-                  final idx = toolAcc2.length;
-                  final entry = toolAcc2.putIfAbsent(
-                    idx,
-                    () => {
-                      'id': _effectiveToolCallId(id, 'call', idx),
-                      'name': name,
-                      'args': argsStr,
-                    },
-                  );
-                  if (id.isNotEmpty) entry['id'] = id;
-                  entry['name'] = name;
-                  entry['args'] = argsStr;
-                }
-                if (rootToolCalls2.isNotEmpty) {
-                  finishReason2 = 'tool_calls';
+              for (final chunk in roundDecoder.accept(event).chunks) {
+                for (final mapped in roundAdapter.handle(chunk)) {
+                  yield mapped;
                 }
               }
             } catch (_) {}
           }
+          usage = roundDecoder.usage ?? usage;
+          if (usage != null) totalTokens = usage.totalTokens;
+          final toolAcc2 = roundDecoder.toolCalls;
+          final finishReason2 = roundDecoder.finishReason;
+          final contentAccum = roundDecoder.assistantContent;
+          final reasoningAccum = roundDecoder.reasoningEcho;
+          final reasoningDetailsAccum = roundDecoder.reasoningDetails;
           if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
             final calls2 = <Map<String, dynamic>>[];
             final callInfos2 = <ToolCallInfo>[];
@@ -3798,7 +3237,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               content: contentAccum,
               reasoningContent: needsReasoningEcho ? reasoningAccum : null,
               includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails: reasoningDetailsAccum.detailsOrNull,
+              reasoningDetails: reasoningDetailsAccum,
             );
             currentMessages = [
               ...currentMessages,
@@ -3823,7 +3262,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 approxTokensFromChars(approxCompletionChars);
             yield ChatStreamChunk(
               content: '',
-              reasoningDetails: reasoningDetailsAccum.detailsOrNull,
+              reasoningDetails: reasoningDetailsAccum,
               isDone: true,
               totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
@@ -3912,7 +3351,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               content: assistantContentBuffer,
               reasoningContent: needsReasoningEcho ? reasoningBuffer : null,
               includeEmptyReasoningContent: needsReasoningEcho,
-              reasoningDetails: reasoningDetailsBuffer.detailsOrNull,
+              reasoningDetails:
+                  chatDecoder.reasoningDetails ??
+                  reasoningDetailsBuffer.detailsOrNull,
             );
             mm2.add(assistantToolCallMsg);
             for (final r in results) {
@@ -4018,14 +3459,13 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final s2 = _rethrowFollowUpStreamErrors(
                 resp2.stream.transform(utf8.decoder),
               );
-              final Map<int, Map<String, String>> toolAcc2 =
-                  <int, Map<String, String>>{};
-              String? finishReason2;
-              String contentAccum = '';
-              String reasoningAccum = '';
-              final reasoningDetailsAccum = _ReasoningDetailsAccumulator(
-                allowSnapshots: reasoningDetailsAllowSnapshots,
+              final roundDecoder = ChatCompletionsStreamDecoder(
+                wantsImageOutput: wantsImageOutput,
+                needsReasoningEcho: needsReasoningEcho,
+                allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
+                initialUsage: usage,
               );
+              final roundAdapter = LegacyChunkAdapter();
               await for (final event in parseSseEventStrings(s2)) {
                 final d = event.data;
                 if (d == '[DONE]') {
@@ -4033,175 +3473,20 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 }
                 _throwIfInBandStreamError(d);
                 try {
-                  final o = jsonDecode(d);
-                  if (o is Map) {
-                    usage = _mergeOpenAICompatibleUsage(usage, o['usage']);
-                    if (usage != null) totalTokens = usage.totalTokens;
-                  }
-                  if (o is Map &&
-                      o['choices'] is List &&
-                      (o['choices'] as List).isNotEmpty) {
-                    final c0 = (o['choices'] as List).first;
-                    finishReason2 = c0['finish_reason'] as String?;
-                    final delta = c0['delta'] as Map?;
-                    final txt = _extractOpenAICompatibleDeltaText(delta);
-                    final rc =
-                        delta?['reasoning_content'] ?? delta?['reasoning'];
-                    if (rc is String && rc.isNotEmpty) {
-                      if (needsReasoningEcho) reasoningAccum += rc;
-                      yield ChatStreamChunk(
-                        content: '',
-                        reasoning: rc,
-                        isDone: false,
-                        totalTokens: 0,
-                        usage: usage,
-                      );
-                    }
-                    if (txt.isNotEmpty) {
-                      contentAccum += txt;
-                      yield ChatStreamChunk(
-                        content: txt,
-                        isDone: false,
-                        totalTokens: 0,
-                        usage: usage,
-                      );
-                    }
-                    if (wantsImageOutput) {
-                      final List<dynamic> imageItems = <dynamic>[];
-                      final imgs = delta?['images'];
-                      if (imgs is List) imageItems.addAll(imgs);
-                      final contentArr = delta?['content'] as List?;
-                      if (contentArr is List) {
-                        for (final it in contentArr) {
-                          if (it is Map &&
-                              (it['type'] == 'image_url' ||
-                                  it['type'] == 'image')) {
-                            imageItems.add(it);
-                          }
-                        }
-                      }
-                      final singleImage = delta?['image_url'];
-                      if (singleImage is Map || singleImage is String) {
-                        imageItems.add({
-                          'type': 'image_url',
-                          'image_url': singleImage,
-                        });
-                      }
-                      if (imageItems.isNotEmpty) {
-                        final buf = StringBuffer();
-                        for (final it in imageItems) {
-                          if (it is! Map) continue;
-                          dynamic iu = it['image_url'];
-                          String? url;
-                          if (iu is String) {
-                            url = iu;
-                          } else if (iu is Map) {
-                            final u2 = iu['url'];
-                            if (u2 is String) url = u2;
-                          }
-                          if (url != null && url.isNotEmpty) {
-                            final md = '\n\n![image]($url)';
-                            buf.write(md);
-                            contentAccum += md;
-                          }
-                        }
-                        final out = buf.toString();
-                        if (out.isNotEmpty) {
-                          yield ChatStreamChunk(
-                            content: out,
-                            isDone: false,
-                            totalTokens: 0,
-                            usage: usage,
-                          );
-                        }
-                      }
-                    }
-                    final tcs = delta?['tool_calls'] as List?;
-                    if (tcs != null) {
-                      for (final t in tcs) {
-                        final idx = (t['index'] as int?) ?? 0;
-                        final id = t['id'] as String?;
-                        final func = t['function'] as Map<String, dynamic>?;
-                        final name = func?['name'] as String?;
-                        final argsDelta = func?['arguments'] as String?;
-                        final entry = toolAcc2.putIfAbsent(
-                          idx,
-                          () => {'id': '', 'name': '', 'args': ''},
-                        );
-                        if (id != null) entry['id'] = id;
-                        if (name != null && name.isNotEmpty) {
-                          entry['name'] = name;
-                        }
-                        if (argsDelta != null && argsDelta.isNotEmpty) {
-                          entry['args'] = (entry['args'] ?? '') + argsDelta;
-                        }
-                      }
-                    }
-
-                    // Fallback/merge: message.content in same chunk (if any)
-                    final message = c0['message'] as Map?;
-                    if (message != null && message['content'] != null) {
-                      final mc = message['content'];
-                      if (mc is String && mc.isNotEmpty) {
-                        contentAccum += mc;
-                        yield ChatStreamChunk(
-                          content: mc,
-                          isDone: false,
-                          totalTokens: 0,
-                          usage: usage,
-                        );
-                      }
-                    }
-                    if (message != null) {
-                      final rcMsg =
-                          message['reasoning_content'] ?? message['reasoning'];
-                      if (rcMsg is String &&
-                          rcMsg.isNotEmpty &&
-                          needsReasoningEcho) {
-                        reasoningAccum += rcMsg;
-                      }
-                    }
-                    final rd = delta?['reasoning_details'];
-                    if (rd is List && rd.isNotEmpty) {
-                      reasoningDetailsAccum.add(rd);
-                    }
-                    final rdMsg = message?['reasoning_details'];
-                    if (rdMsg is List && rdMsg.isNotEmpty) {
-                      reasoningDetailsAccum.add(rdMsg);
-                    }
-                  }
-                  // XinLiu compatibility for follow-up requests too
-                  final rootToolCalls2 = o['tool_calls'] as List?;
-                  if (rootToolCalls2 != null) {
-                    for (final t in rootToolCalls2) {
-                      if (t is! Map) continue;
-                      final id = (t['id'] ?? '').toString();
-                      final type = (t['type'] ?? 'function').toString();
-                      if (type != 'function') continue;
-                      final func = t['function'] as Map<String, dynamic>?;
-                      if (func == null) continue;
-                      final name = (func['name'] ?? '').toString();
-                      final argsStr = (func['arguments'] ?? '').toString();
-                      if (name.isEmpty) continue;
-                      final idx = toolAcc2.length;
-                      final entry = toolAcc2.putIfAbsent(
-                        idx,
-                        () => {
-                          'id': _effectiveToolCallId(id, 'call', idx),
-                          'name': name,
-                          'args': argsStr,
-                        },
-                      );
-                      if (id.isNotEmpty) entry['id'] = id;
-                      entry['name'] = name;
-                      entry['args'] = argsStr;
-                    }
-                    if (rootToolCalls2.isNotEmpty && finishReason2 == null) {
-                      finishReason2 = 'tool_calls';
+                  for (final chunk in roundDecoder.accept(event).chunks) {
+                    for (final mapped in roundAdapter.handle(chunk)) {
+                      yield mapped;
                     }
                   }
                 } catch (_) {}
               }
+              usage = roundDecoder.usage ?? usage;
+              if (usage != null) totalTokens = usage.totalTokens;
+              final toolAcc2 = roundDecoder.toolCalls;
+              final finishReason2 = roundDecoder.finishReason;
+              final contentAccum = roundDecoder.assistantContent;
+              final reasoningAccum = roundDecoder.reasoningEcho;
+              final reasoningDetailsAccum = roundDecoder.reasoningDetails;
               if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
                 final calls2 = <Map<String, dynamic>>[];
                 final callInfos2 = <ToolCallInfo>[];
@@ -4270,7 +3555,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   content: contentAccum,
                   reasoningContent: needsReasoningEcho ? reasoningAccum : null,
                   includeEmptyReasoningContent: needsReasoningEcho,
-                  reasoningDetails: reasoningDetailsAccum.detailsOrNull,
+                  reasoningDetails: reasoningDetailsAccum,
                 );
                 currentMessages = [
                   ...currentMessages,
@@ -4333,7 +3618,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
       (approxPromptTokens + approxTokensFromChars(approxCompletionChars));
   yield ChatStreamChunk(
     content: '',
-    reasoningDetails: reasoningDetailsBuffer.detailsOrNull,
+    reasoningDetails:
+        chatDecoder?.reasoningDetails ?? reasoningDetailsBuffer.detailsOrNull,
     isDone: true,
     totalTokens: approxTotal,
     usage: usage,
