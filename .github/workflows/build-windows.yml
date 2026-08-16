@@ -31,7 +31,7 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze --fatal-infos
+        run: dart analyze --fatal-infos lib test
 
       - name: Build Windows
         run: flutter build windows --release
