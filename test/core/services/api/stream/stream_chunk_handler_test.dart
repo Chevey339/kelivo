@@ -57,6 +57,8 @@ void main() {
     expect(tool['id'], 'call_1');
     expect(tool['name'], 'lookup');
     expect(tool['arguments'], <String, dynamic>{'q': 'kelivo'});
+    expect(tool['server'], isFalse);
+    expect(tool.containsKey('metadata'), isFalse);
     expect((handler.parts[2] as TextPart).text, 'done');
   });
 
@@ -152,6 +154,37 @@ void main() {
     expect(payload['id'], 'builtin_search');
     expect(payload['name'], 'search_web');
     expect(payload['content']['items'], isNotEmpty);
+    expect(payload['server'], isTrue);
+  });
+
+  test('keeps tool metadata and merges later keys onto the same id', () {
+    final handler = StreamChunkHandler();
+    handler.handle(
+      const ToolCallStart(
+        id: 'srv_1',
+        toolName: 'web_search',
+        metadata: {
+          'server_tool_use': {'id': 'srv_1'},
+        },
+      ),
+    );
+    handler.handle(const ToolCallEnd('srv_1'));
+    handler.handle(
+      const ServerToolEnd(
+        id: 'srv_1',
+        output: {'ok': true},
+        metadata: {
+          'web_search_tool_result': {'id': 'srv_1'},
+        },
+      ),
+    );
+
+    final payload = jsonDecode(
+      (handler.parts.single as ToolCallPart).payloadJson,
+    );
+    expect(payload['server'], isTrue);
+    expect(payload['metadata']['server_tool_use']['id'], 'srv_1');
+    expect(payload['metadata']['web_search_tool_result']['id'], 'srv_1');
   });
 
   test('keeps tool name and args when ServerToolEnd follows ToolCallEnd', () {

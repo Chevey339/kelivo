@@ -47,14 +47,35 @@ class StreamChunkHandler {
         _parts[index] = ReasoningPart(current.text + text);
       case ReasoningEnd(:final id):
         _reasoningIndex.remove(id);
-      case ToolCallStart(:final id, :final toolName):
-        _upsertTool(id, name: toolName);
-      case ToolCallDelta(:final id, :final toolNameDelta, :final inputDelta):
-        _upsertTool(id, nameDelta: toolNameDelta, inputDelta: inputDelta);
+      case ToolCallStart(:final id, :final toolName, :final metadata):
+        _upsertTool(id, name: toolName, metadata: metadata);
+      case ToolCallDelta(
+        :final id,
+        :final toolNameDelta,
+        :final inputDelta,
+        :final metadata,
+      ):
+        _upsertTool(
+          id,
+          nameDelta: toolNameDelta,
+          inputDelta: inputDelta,
+          metadata: metadata,
+        );
       case ToolCallEnd(:final id):
         _upsertTool(id);
-      case ServerToolStart(:final id, :final toolName, :final input):
-        _upsertTool(id, name: toolName, argumentsObject: input, server: true);
+      case ServerToolStart(
+        :final id,
+        :final toolName,
+        :final input,
+        :final metadata,
+      ):
+        _upsertTool(
+          id,
+          name: toolName,
+          argumentsObject: input,
+          server: true,
+          metadata: metadata,
+        );
       case ServerToolInputDelta(:final id, :final inputDelta):
         _serverInput.putIfAbsent(id, StringBuffer.new).write(inputDelta);
       case ServerToolInputEnd(:final id):
@@ -62,13 +83,20 @@ class StreamChunkHandler {
         if (raw.isNotEmpty) {
           _upsertTool(id, argumentsObject: _tryDecode(raw), server: true);
         }
-      case ServerToolEnd(:final id, :final input, :final output, :final status):
+      case ServerToolEnd(
+        :final id,
+        :final input,
+        :final output,
+        :final status,
+        :final metadata,
+      ):
         final raw = _serverInput.remove(id)?.toString();
         _upsertTool(
           id,
           argumentsObject: input ?? (raw == null ? null : _tryDecode(raw)),
           content: output ?? status.name,
           server: true,
+          metadata: metadata,
         );
       case ImageStart(:final id, :final mimeType):
         _imageMime[id] = mimeType;
@@ -154,6 +182,7 @@ class StreamChunkHandler {
     Object? argumentsObject,
     Object? content,
     bool server = false,
+    Map<String, dynamic>? metadata,
   }) {
     final buffer = _tools.putIfAbsent(id, _ToolBuffer.new);
     if (name != null && name.isNotEmpty) buffer.name = name;
@@ -162,12 +191,18 @@ class StreamChunkHandler {
     if (argumentsObject != null) buffer.arguments = argumentsObject;
     if (content != null) buffer.content = content;
     buffer.server = buffer.server || server;
+    if (metadata != null && metadata.isNotEmpty) {
+      buffer.metadata = <String, dynamic>{...?buffer.metadata, ...metadata};
+    }
 
     final payload = jsonEncode(<String, dynamic>{
       'id': id,
       'name': buffer.name,
       'arguments': buffer.arguments ?? _tryDecode(buffer.input.toString()),
       'content': buffer.content,
+      'server': buffer.server,
+      if (buffer.metadata != null && buffer.metadata!.isNotEmpty)
+        'metadata': buffer.metadata,
     });
 
     final index = _parts.indexWhere(
@@ -196,6 +231,7 @@ class _ToolBuffer {
   Object? arguments;
   Object? content;
   bool server = false;
+  Map<String, dynamic>? metadata;
 }
 
 Object _tryDecode(String raw) {

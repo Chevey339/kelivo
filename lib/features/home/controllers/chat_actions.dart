@@ -12,6 +12,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/stream/legacy_chunk_adapter.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
+import '../../../core/services/api/stream/stream_chunk_shadow.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1759,7 +1761,7 @@ class ChatActions {
         await _cancelSubscriptionWithTimeout(previousSub);
       }
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
-        stream: LegacyChunkAdapter().adapt(stream),
+        stream: _adaptWithShadow(stream, state),
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
@@ -1768,6 +1770,44 @@ class ChatActions {
     } catch (e) {
       await _handleStreamError(e, state);
     }
+  }
+
+  Stream<ChatStreamChunk> _adaptWithShadow(
+    Stream<StreamChunk> raw,
+    stream_ctrl.StreamingState state,
+  ) {
+    final adapter = LegacyChunkAdapter();
+    return raw.asyncExpand((chunk) {
+      state.shadowHandler.handle(chunk);
+      return Stream.fromIterable(adapter.handle(chunk));
+    });
+  }
+
+  void _reportStreamChunkShadow(stream_ctrl.StreamingState state) {
+    final messageId = state.messageId;
+    final tools = streamController.getToolParts(messageId) ?? const [];
+    final segments = streamController.reasoningSegments[messageId] ?? const [];
+    StreamChunkShadow.reportChat(
+      conversationId: state.conversationId,
+      messageId: messageId,
+      parts: state.shadowHandler.parts,
+      fullContentRaw: state.fullContentRaw,
+      offsets: state.contentSplitOffsets,
+      reasoningCounts: state.reasoningCountAtSplit,
+      toolCounts: state.toolCountAtSplit,
+      toolIds: [for (final tool in tools) tool.id],
+      reasoningSegments: [
+        for (final segment in segments)
+          (
+            hasText: segment.text.isNotEmpty,
+            toolStartIndex: segment.toolStartIndex,
+          ),
+      ],
+      reasoningFallbackText:
+          streamController.reasoning[messageId]?.text ??
+          state.bufferedReasoning,
+      responsesImageDuplicates: state.ctx.config.useResponseApi == true,
+    );
   }
 
   // ============================================================================
@@ -2315,6 +2355,8 @@ class ChatActions {
         generateTitle: state.ctx.generateTitleOnFinish,
       );
     }
+    _reportStreamChunkShadow(state);
+
     // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call(conversationId);

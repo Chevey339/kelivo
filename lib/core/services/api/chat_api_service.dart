@@ -30,6 +30,8 @@ import '../../utils/multimodal_input_utils.dart';
 import 'stream/legacy_chunk_adapter.dart';
 import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
+import 'stream/stream_chunk_handler.dart';
+import 'stream/stream_chunk_shadow.dart';
 import 'providers/claude/claude_decoder.dart';
 import 'providers/google/google_decoder.dart';
 import 'providers/openai/chat_completions_decoder.dart';
@@ -580,7 +582,7 @@ class ChatApiService {
     bool allowImagesApiRouting = true,
     bool ocrActive = false,
   }) {
-    final adapted = LegacyChunkAdapter().adapt(
+    return _adaptLegacyWithShadow(
       sendMessageStream(
         config: config,
         modelId: modelId,
@@ -599,17 +601,59 @@ class ChatApiService {
         allowImagesApiRouting: allowImagesApiRouting,
         ocrActive: ocrActive,
       ),
+      source: 'legacy:${config.id}/$modelId',
+      stream: stream,
+      responsesImageDuplicates: config.useResponseApi == true,
     );
-    if (stream) return adapted;
-    return _coalesceLegacyChunks(adapted);
   }
 
-  static Stream<ChatStreamChunk> _coalesceLegacyChunks(
-    Stream<ChatStreamChunk> input,
-  ) async* {
-    final chunks = await input.toList();
-    if (chunks.isEmpty) return;
-    yield coalesceChatStreamChunks(chunks);
+  static Stream<ChatStreamChunk> _adaptLegacyWithShadow(
+    Stream<StreamChunk> raw, {
+    required String source,
+    required bool stream,
+    bool responsesImageDuplicates = false,
+  }) async* {
+    final handler = StreamChunkHandler();
+    final adapter = LegacyChunkAdapter();
+    final bags = <ChatStreamChunk>[];
+    await for (final chunk in raw) {
+      handler.handle(chunk);
+      for (final bag in adapter.handle(chunk)) {
+        bags.add(bag);
+        if (stream) yield bag;
+      }
+    }
+    if (bags.isEmpty) return;
+    final coalesced = coalesceChatStreamChunks(bags);
+    if (!stream) yield coalesced;
+    StreamChunkShadow.reportLegacy(
+      source: source,
+      parts: handler.parts,
+      content: coalesced.content,
+      reasoning: coalesced.reasoning ?? '',
+      toolIds: {
+        for (final call in coalesced.toolCalls ?? const <ToolCallInfo>[])
+          call.id,
+        for (final result in coalesced.toolResults ?? const <ToolResultInfo>[])
+          result.id,
+      },
+      bags: [
+        for (final bag in bags)
+          ShadowBag(
+            content: bag.content,
+            reasoning: bag.reasoning ?? '',
+            toolCallIds: [
+              for (final call in bag.toolCalls ?? const <ToolCallInfo>[])
+                call.id,
+            ],
+            toolResultIds: [
+              for (final result in bag.toolResults ?? const <ToolResultInfo>[])
+                result.id,
+            ],
+          ),
+      ],
+      responsesImageDuplicates: responsesImageDuplicates,
+    );
   }
 
   static Stream<StreamChunk> sendMessageStream({
