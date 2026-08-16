@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart'
 import 'desktop_nav_rail.dart';
 import 'desktop_chat_page.dart';
 import 'window_title_bar.dart';
+import 'macos_title_bar_drag_area.dart';
 import 'desktop_settings_page.dart';
 import 'desktop_translate_page.dart';
 import '../features/settings/pages/storage_space_page.dart';
@@ -161,6 +162,7 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
     const minHeight = 640.0;
 
     final isWindows = defaultTargetPlatform == TargetPlatform.windows;
+    final isMacOS = defaultTargetPlatform == TargetPlatform.macOS;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -256,6 +258,19 @@ class _DesktopHomePageState extends State<DesktopHomePage> {
                         if (_tabIndex == 3) const SizedBox.shrink(),
                       ],
                     ),
+                  ),
+                ],
+              )
+            : isMacOS
+            ? Stack(
+                children: [
+                  body,
+                  const Positioned(
+                    top: 0,
+                    left: 78,
+                    right: 0,
+                    height: MacOSTitleBarDragArea.defaultHeight,
+                    child: MacOSTitleBarDragArea(),
                   ),
                 ],
               )
