@@ -159,7 +159,7 @@ void main() {
         'search_web',
       );
       final end = result.chunks.whereType<ServerToolEnd>().single;
-      expect(end.id, 'builtin_search');
+      expect(end.id, 'stream:search-1');
       final items = (end.output as Map)['items'] as List;
       expect(items.single, <String, dynamic>{
         'index': 1,
@@ -274,6 +274,54 @@ void main() {
 
     expect(decoder.reasoningEcho, 'a');
     expect(decoder.reasoningDetails, hasLength(2));
+  });
+
+  test('scopes text ids per sourceId and search ids per citation burst', () {
+    final first = ChatCompletionsStreamDecoder(sourceId: 'round-0');
+    final second = ChatCompletionsStreamDecoder(sourceId: 'round-1');
+    expect(
+      first
+          .accept(_event(_choice(delta: <String, dynamic>{'content': 'a'})))
+          .chunks
+          .whereType<TextDelta>()
+          .single
+          .id,
+      'round-0:text-1',
+    );
+    expect(
+      second
+          .accept(_event(_choice(delta: <String, dynamic>{'content': 'b'})))
+          .chunks
+          .whereType<TextDelta>()
+          .single
+          .id,
+      'round-1:text-1',
+    );
+
+    final citations = ChatCompletionsStreamDecoder(sourceId: 'round-0');
+    final firstSearch = citations
+        .accept(
+          _event(<String, dynamic>{
+            ..._choice(delta: <String, dynamic>{'content': 'see'}),
+            'citations': <String>['https://a.example'],
+          }),
+        )
+        .chunks
+        .whereType<ServerToolStart>()
+        .single
+        .id;
+    final secondSearch = citations
+        .accept(
+          _event(<String, dynamic>{
+            'citations': <String>['https://b.example'],
+          }),
+        )
+        .chunks
+        .whereType<ServerToolStart>()
+        .single
+        .id;
+    expect(firstSearch, isNot(secondSearch));
+    expect(firstSearch, startsWith('round-0:search-'));
   });
 
   test('skips malformed JSON and does not complete on onClosed', () {

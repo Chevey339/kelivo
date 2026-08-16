@@ -4,6 +4,7 @@ import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
+import '../../stream/stream_chunk_ids.dart';
 
 class ResponsesFunctionCall {
   ResponsesFunctionCall({
@@ -42,9 +43,12 @@ class ResponsesPendingImage {
 
 /// Stateful OpenAI Responses SSE decoder. One instance per HTTP response.
 class ResponsesStreamDecoder implements StreamChunkDecoder {
-  ResponsesStreamDecoder({this.initialUsage}) : usage = initialUsage;
+  ResponsesStreamDecoder({this.initialUsage, String sourceId = 'stream'})
+    : usage = initialUsage,
+      _ids = StreamChunkIds(sourceId);
 
   final TokenUsage? initialUsage;
+  final StreamChunkIds _ids;
   TokenUsage? usage;
   bool completed = false;
   int approxCompletionChars = 0;
@@ -128,7 +132,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
         approxCompletionChars += delta.length;
-        chunks.add(TextDelta(id: 'text', text: delta));
+        chunks.add(TextDelta(id: _ids.text(), text: delta));
       }
       return;
     }
@@ -136,7 +140,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
         type == 'response.reasoning_text.delta') {
       final delta = obj['delta'];
       if (delta is String && delta.isNotEmpty) {
-        chunks.add(ReasoningDelta(id: 'reasoning', text: delta));
+        chunks.add(ReasoningDelta(id: _ids.reasoning(), text: delta));
       }
       return;
     }
@@ -238,7 +242,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       final content = (output['content'] ?? '').toString();
       if (content.isNotEmpty) {
         approxCompletionChars += content.length;
-        chunks.add(TextDelta(id: 'text', text: content));
+        chunks.add(TextDelta(id: _ids.text(), text: content));
       }
       if (obj['usage'] != null) {
         usage = _mergeUsage(usage, obj['usage']);

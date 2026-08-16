@@ -7,7 +7,7 @@
   "chunks": [
     {
       "type": "reasoning_delta",
-      "id": "reasoning",
+      "id": "stream:reasoning-1",
       "text": "Sketching a square.",
       "reasoningType": "reasoningText"
     },

@@ -55,26 +55,26 @@
   "chunks": [
     {
       "type": "reasoning_start",
-      "id": "thinking-0",
+      "id": "stream:thinking-0",
       "reasoningType": "reasoningText"
     },
     {
       "type": "reasoning_delta",
-      "id": "thinking-0",
+      "id": "stream:thinking-0",
       "text": "Need weather and a lookup.",
       "reasoningType": "reasoningText"
     },
     {
       "type": "reasoning_end",
-      "id": "thinking-0"
+      "id": "stream:thinking-0"
     },
     {
       "type": "text_start",
-      "id": "text-1"
+      "id": "stream:text-1"
     },
     {
       "type": "text_delta",
-      "id": "text-1",
+      "id": "stream:text-1",
       "text": "Calling tools."
     },
     {

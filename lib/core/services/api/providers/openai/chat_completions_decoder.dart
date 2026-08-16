@@ -4,6 +4,7 @@ import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
+import '../../stream/stream_chunk_ids.dart';
 
 /// Stateful OpenAI Chat Completions SSE decoder. One instance per HTTP response.
 class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
@@ -12,12 +13,15 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     this.needsReasoningEcho = false,
     this.allowReasoningSnapshots = true,
     this.initialUsage,
-  }) : usage = initialUsage;
+    String sourceId = 'stream',
+  }) : usage = initialUsage,
+       _ids = StreamChunkIds(sourceId);
 
   final bool wantsImageOutput;
   final bool needsReasoningEcho;
   final bool allowReasoningSnapshots;
   final TokenUsage? initialUsage;
+  final StreamChunkIds _ids;
 
   TokenUsage? usage;
   String? finishReason;
@@ -170,23 +174,19 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
             'title': citations[k].toString(),
           },
       ];
+      final searchId = _ids.search();
+      chunks.add(ServerToolStart(id: searchId, toolName: 'search_web'));
       chunks.add(
-        const ServerToolStart(id: 'builtin_search', toolName: 'search_web'),
-      );
-      chunks.add(
-        ServerToolEnd(
-          id: 'builtin_search',
-          output: <String, dynamic>{'items': items},
-        ),
+        ServerToolEnd(id: searchId, output: <String, dynamic>{'items': items}),
       );
     }
 
     if (reasoning != null && reasoning.isNotEmpty) {
-      chunks.add(ReasoningDelta(id: 'reasoning', text: reasoning));
+      chunks.add(ReasoningDelta(id: _ids.reasoning(), text: reasoning));
     }
     if (content.isNotEmpty) {
       assistantContent += content;
-      chunks.add(TextDelta(id: 'text', text: content));
+      chunks.add(TextDelta(id: _ids.text(), text: content));
     }
   }
 

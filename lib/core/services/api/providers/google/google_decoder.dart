@@ -4,6 +4,7 @@ import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
+import '../../stream/stream_chunk_ids.dart';
 
 /// One Gemini `functionCall` collected during a generateContent stream.
 class GoogleFunctionCall {
@@ -65,13 +66,16 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     this.receivedImage = false,
     this.initialUsage,
     List<Map<String, dynamic>>? citations,
+    String sourceId = 'stream',
   }) : usage = initialUsage,
-       builtinCitations = citations ?? <Map<String, dynamic>>[];
+       builtinCitations = citations ?? <Map<String, dynamic>>[],
+       _ids = StreamChunkIds(sourceId);
 
   final bool isGemini3;
   final bool persistThoughtSigs;
   final bool expectImage;
   final TokenUsage? initialUsage;
+  final StreamChunkIds _ids;
 
   bool receivedImage;
   TokenUsage? usage;
@@ -93,7 +97,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   final List<GoogleRemoteImage> _pendingRemoteImages = <GoogleRemoteImage>[];
   bool _holdTextForImage = false;
-  int _codeExecCounter = 0;
+  String? _lastCodeExecId;
   int _syntheticPartIndex = 0;
   bool _closed = false;
 
@@ -155,7 +159,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     final text = pendingImageTrailingText;
     pendingImageTrailingText = '';
     _holdTextForImage = false;
-    return <StreamChunk>[TextDelta(id: 'text', text: text)];
+    return <StreamChunk>[TextDelta(id: _ids.text(), text: text)];
   }
 
   GooglePendingImage? takeBufferedImage() {
@@ -173,10 +177,11 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
 
   List<StreamChunk> citationChunks() {
     if (builtinCitations.isEmpty) return const <StreamChunk>[];
+    final searchId = _ids.searchSticky();
     return <StreamChunk>[
-      const ServerToolStart(id: 'builtin_search', toolName: 'builtin_search'),
+      ServerToolStart(id: searchId, toolName: 'builtin_search'),
       ServerToolEnd(
-        id: 'builtin_search',
+        id: searchId,
         output: <String, dynamic>{'items': builtinCitations},
       ),
     ];
@@ -280,10 +285,10 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     }
 
     if (reasoningDelta.isNotEmpty) {
-      chunks.add(ReasoningDelta(id: 'reasoning', text: reasoningDelta));
+      chunks.add(ReasoningDelta(id: _ids.reasoning(), text: reasoningDelta));
     }
     if (textDelta.isNotEmpty) {
-      chunks.add(TextDelta(id: 'text', text: textDelta));
+      chunks.add(TextDelta(id: _ids.text(), text: textDelta));
     }
   }
 
@@ -372,8 +377,8 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       final lang = (codeExec['language'] ?? '').toString().toLowerCase();
       final code = (codeExec['code'] ?? '').toString();
       if (code.isNotEmpty) {
-        final ceId = 'code_exec_$_codeExecCounter';
-        _codeExecCounter++;
+        final ceId = _ids.next('code_exec');
+        _lastCodeExecId = ceId;
         chunks.add(
           ToolCallDelta(
             id: ceId,
@@ -392,9 +397,7 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
     if (codeResult is Map) {
       final outcome = (codeResult['outcome'] ?? '').toString();
       final output = (codeResult['output'] ?? '').toString();
-      final resultId = _codeExecCounter > 0
-          ? 'code_exec_${_codeExecCounter - 1}'
-          : 'code_exec_0';
+      final resultId = _lastCodeExecId ?? _ids.next('code_exec');
       chunks.add(ServerToolStart(id: resultId, toolName: 'code_execution'));
       chunks.add(
         ServerToolEnd(id: resultId, output: output.isEmpty ? outcome : output),

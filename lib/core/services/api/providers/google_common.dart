@@ -1118,6 +1118,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
   // Accumulate built-in search citations across stream rounds
   final List<Map<String, dynamic>> builtinCitations = <Map<String, dynamic>>[];
   int malformedResponseRetryCount = 0;
+  var streamRound = 0;
 
   while (true) {
     final defaultMaxOutputTokens = _defaultGeminiMaxOutputTokens(
@@ -1201,6 +1202,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       receivedImage: receivedImage,
       initialUsage: usage,
       citations: builtinCitations,
+      sourceId: 'round-${streamRound++}',
     );
     final adapter = LegacyChunkAdapter();
 

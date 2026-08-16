@@ -7,13 +7,13 @@
   "chunks": [
     {
       "type": "reasoning_delta",
-      "id": "reasoning",
+      "id": "stream:reasoning-1",
       "text": "Checking sources.",
       "reasoningType": "reasoningText"
     },
     {
       "type": "text_delta",
-      "id": "text",
+      "id": "stream:text-2",
       "text": "Kotlin "
     },
     {

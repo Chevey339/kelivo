@@ -439,6 +439,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     initialMessages,
   );
   TokenUsage? totalUsage;
+  var streamRound = 0;
 
   while (true) {
     final omitSamplingParams = _claudeShouldOmitSamplingParams(
@@ -620,6 +621,7 @@ Stream<ChatStreamChunk> _sendClaudeStream(
     final sse = response.stream.transform(utf8.decoder);
     final decoder = ClaudeStreamDecoder(
       skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+      sourceId: 'round-${streamRound++}',
     );
     final adapter = LegacyChunkAdapter();
     final executedToolIds = <String>{};

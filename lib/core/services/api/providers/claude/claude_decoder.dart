@@ -4,12 +4,17 @@ import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_decoder.dart';
+import '../../stream/stream_chunk_ids.dart';
 
 /// Stateful Claude Messages SSE decoder. One instance per HTTP response.
 class ClaudeStreamDecoder implements StreamChunkDecoder {
-  ClaudeStreamDecoder({this.skipRedactedThinkingBlocks = false});
+  ClaudeStreamDecoder({
+    this.skipRedactedThinkingBlocks = false,
+    String sourceId = 'stream',
+  }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
+  final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
   final Map<String, ClaudeClientTool> clientTools =
@@ -111,7 +116,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _thinkingBlockIndex[idx] = assistantBlocks.length - 1;
         _thinkingText[idx] = StringBuffer();
         _thinkingSig[idx] = StringBuffer();
-        chunks.add(ReasoningStart(id: 'thinking-$idx'));
+        chunks.add(ReasoningStart(id: _ids.indexed('thinking', idx)));
       }
     } else if (kind == 'redacted_thinking') {
       _flushTextBlock();
@@ -119,7 +124,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         assistantBlocks.add({'type': 'redacted_thinking', 'data': ''});
         _redactedBlockIndex[idx] = assistantBlocks.length - 1;
         _redactedData[idx] = StringBuffer();
-        chunks.add(ReasoningStart(id: 'redacted-$idx'));
+        chunks.add(ReasoningStart(id: _ids.indexed('redacted', idx)));
       }
     } else if (kind == 'tool_use') {
       _flushTextBlock();
@@ -160,7 +165,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       chunks.addAll(_webSearchResult(block));
     } else if (kind == 'text') {
       if (idx != null) {
-        chunks.add(TextStart('text-$idx'));
+        chunks.add(TextStart(_ids.indexed('text', idx)));
       }
     }
     return chunks;
@@ -179,7 +184,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       if (content is String && content.isNotEmpty) {
         _textBuf.write(content);
         chunks.add(
-          TextDelta(id: idx == null ? 'text' : 'text-$idx', text: content),
+          TextDelta(
+            id: idx == null ? _ids.text() : _ids.indexed('text', idx),
+            text: content,
+          ),
         );
       }
     } else if (kind == 'thinking_delta') {
@@ -187,7 +195,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       if (thinking.isNotEmpty) {
         chunks.add(
           ReasoningDelta(
-            id: idx == null ? 'thinking' : 'thinking-$idx',
+            id: idx == null ? _ids.reasoning() : _ids.indexed('thinking', idx),
             text: thinking,
           ),
         );
@@ -232,7 +240,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         'thinking': _thinkingText.remove(idx)?.toString() ?? '',
         'signature': _thinkingSig.remove(idx)?.toString() ?? '',
       };
-      chunks.add(ReasoningEnd(id: 'thinking-$idx'));
+      chunks.add(ReasoningEnd(id: _ids.indexed('thinking', idx)));
     }
     if (idx != null && _redactedBlockIndex.containsKey(idx)) {
       final pos = _redactedBlockIndex.remove(idx)!;
@@ -240,7 +248,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         'type': 'redacted_thinking',
         'data': _redactedData.remove(idx)?.toString() ?? '',
       };
-      chunks.add(ReasoningEnd(id: 'redacted-$idx'));
+      chunks.add(ReasoningEnd(id: _ids.indexed('redacted', idx)));
     }
 
     var id = (obj['content_block'] is Map)
@@ -316,7 +324,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         args = (jsonDecode(raw) as Map).cast<String, dynamic>();
       } catch (_) {}
     }
-    final id = toolUseId.isEmpty ? 'builtin_search' : toolUseId;
+    final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: 'search_web', input: args),

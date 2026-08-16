@@ -2202,8 +2202,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
   String? finishReason;
+  var streamRound = 0;
   final responsesDecoder = config.useResponseApi == true
-      ? ResponsesStreamDecoder(initialUsage: usage)
+      ? ResponsesStreamDecoder(
+          initialUsage: usage,
+          sourceId: 'round-${streamRound++}',
+        )
       : null;
   final responsesAdapter = LegacyChunkAdapter();
   final chatDecoder = config.useResponseApi == true
@@ -2213,6 +2217,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           needsReasoningEcho: needsReasoningEcho,
           allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
           initialUsage: usage,
+          sourceId: 'round-${streamRound++}',
         );
   final chatAdapter = LegacyChunkAdapter();
 
@@ -2397,6 +2402,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             needsReasoningEcho: needsReasoningEcho,
             allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
             initialUsage: usage,
+            sourceId: 'round-${streamRound++}',
           );
           final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
@@ -2782,7 +2788,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final s2 = _rethrowFollowUpStreamErrors(
               resp2.stream.transform(utf8.decoder),
             );
-            final followUpDecoder = ResponsesStreamDecoder(initialUsage: usage);
+            final followUpDecoder = ResponsesStreamDecoder(
+              initialUsage: usage,
+              sourceId: 'round-${streamRound++}',
+            );
             final followUpAdapter = LegacyChunkAdapter();
             await for (final event in parseSseEventStrings(s2)) {
               final d = event.data;
@@ -3152,6 +3161,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             needsReasoningEcho: needsReasoningEcho,
             allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
             initialUsage: usage,
+            sourceId: 'round-${streamRound++}',
           );
           final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
@@ -3464,6 +3474,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 needsReasoningEcho: needsReasoningEcho,
                 allowReasoningSnapshots: reasoningDetailsAllowSnapshots,
                 initialUsage: usage,
+                sourceId: 'round-${streamRound++}',
               );
               final roundAdapter = LegacyChunkAdapter();
               await for (final event in parseSseEventStrings(s2)) {

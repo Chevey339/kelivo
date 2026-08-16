@@ -428,6 +428,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     initialMessages,
   );
   TokenUsage? totalUsage;
+  var streamRound = 0;
 
   while (true) {
     final omitSamplingParams = _claudeShouldOmitSamplingParams(
@@ -588,7 +589,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
     }
 
     final sse = response.stream.transform(utf8.decoder);
-    final decoder = ClaudeStreamDecoder();
+    final decoder = ClaudeStreamDecoder(sourceId: 'round-${streamRound++}');
     final adapter = LegacyChunkAdapter();
     final executedToolIds = <String>{};
 
