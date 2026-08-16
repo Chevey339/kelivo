@@ -31,6 +31,7 @@ import 'stream/legacy_chunk_adapter.dart';
 import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
 import 'providers/claude/claude_decoder.dart';
+import 'providers/google/google_decoder.dart';
 
 part 'chat_api_service_shims.dart';
 part 'providers/openai_common.dart';
