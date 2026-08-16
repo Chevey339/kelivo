@@ -1,0 +1,23 @@
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search Kotlin and Ktor independently, then compare them."
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "search_web",
+        "description": "Search the web.",
+        "parameters": {
+          "type": "object",
+          "properties": { "query": { "type": "string" } },
+          "required": ["query"]
+        }
+      }
+    }
+  ],
+  "tool_choice": "auto"
+}

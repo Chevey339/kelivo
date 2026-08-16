@@ -1,0 +1,35 @@
+{
+  "max_tokens": 4096,
+  "thinking": { "type": "enabled", "budget_tokens": 1024 },
+  "messages": [
+    {
+      "role": "user",
+      "content": "Think, then call get_weather and lookup in parallel, and use web_search for Kyoto."
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "Get weather for a city.",
+      "input_schema": {
+        "type": "object",
+        "properties": { "city": { "type": "string" } },
+        "required": ["city"]
+      }
+    },
+    {
+      "name": "lookup",
+      "description": "Look up a topic.",
+      "input_schema": {
+        "type": "object",
+        "properties": { "q": { "type": "string" } },
+        "required": ["q"]
+      }
+    },
+    {
+      "type": "web_search_20250305",
+      "name": "web_search",
+      "max_uses": 1
+    }
+  ]
+}

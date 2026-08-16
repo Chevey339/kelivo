@@ -1,0 +1,42 @@
+{
+  "text": "",
+  "reasoning": "Plan two searches.",
+  "toolCalls": [],
+  "serverTools": [],
+  "images": [],
+  "chunks": [
+    {
+      "type": "reasoning_delta",
+      "id": "reasoning",
+      "text": "Plan two searches.",
+      "reasoningType": "reasoningText"
+    }
+  ],
+  "finishCount": 0,
+  "completed": true,
+  "extras": {
+    "finishReason": "tool_calls",
+    "toolCalls": [
+      {
+        "index": 0,
+        "id": "call_kotlin",
+        "name": "search_web",
+        "args": "{\"query\":\"Kotlin\"}"
+      },
+      {
+        "index": 1,
+        "id": "call_ktor",
+        "name": "search_web",
+        "args": "{\"query\":\"Ktor\"}"
+      }
+    ],
+    "reasoningDetails": [
+      {
+        "type": "reasoning.summary",
+        "text": "Plan two searches.",
+        "format": "openai-v1",
+        "id": "rd_1"
+      }
+    ]
+  }
+}

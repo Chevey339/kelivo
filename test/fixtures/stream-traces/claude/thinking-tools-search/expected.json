@@ -1,0 +1,157 @@
+{
+  "text": "Calling tools.",
+  "reasoning": "Need weather and a lookup.",
+  "toolCalls": [
+    {
+      "id": "toolu_weather",
+      "name": "get_weather",
+      "phase": "start"
+    },
+    {
+      "id": "toolu_weather",
+      "phase": "end"
+    },
+    {
+      "id": "toolu_lookup",
+      "name": "lookup",
+      "phase": "start"
+    },
+    {
+      "id": "toolu_lookup",
+      "phase": "end"
+    },
+    {
+      "id": "srvtoolu_search",
+      "name": "search_web",
+      "phase": "start"
+    },
+    {
+      "id": "srvtoolu_search",
+      "phase": "end"
+    }
+  ],
+  "serverTools": [
+    {
+      "id": "srvtoolu_search",
+      "name": "search_web",
+      "phase": "start"
+    },
+    {
+      "id": "srvtoolu_search",
+      "status": "completed",
+      "phase": "end",
+      "output": {
+        "items": [
+          {
+            "index": 1,
+            "title": "Kyoto",
+            "url": "https://example.com/kyoto"
+          }
+        ]
+      }
+    }
+  ],
+  "images": [],
+  "chunks": [
+    {
+      "type": "reasoning_start",
+      "id": "thinking-0",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "thinking-0",
+      "text": "Need weather and a lookup.",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_end",
+      "id": "thinking-0"
+    },
+    {
+      "type": "text_start",
+      "id": "text-1"
+    },
+    {
+      "type": "text_delta",
+      "id": "text-1",
+      "text": "Calling tools."
+    },
+    {
+      "type": "tool_call_start",
+      "id": "toolu_weather",
+      "name": "get_weather"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_weather",
+      "inputDelta": "{\"city\":\"Kyoto\"}"
+    },
+    {
+      "type": "tool_call_end",
+      "id": "toolu_weather"
+    },
+    {
+      "type": "tool_call_start",
+      "id": "toolu_lookup",
+      "name": "lookup"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_lookup",
+      "inputDelta": "{\"q\":\"kelivo\"}"
+    },
+    {
+      "type": "tool_call_end",
+      "id": "toolu_lookup"
+    },
+    {
+      "type": "server_tool_start",
+      "id": "srvtoolu_search",
+      "name": "search_web"
+    },
+    {
+      "type": "tool_call_start",
+      "id": "srvtoolu_search",
+      "name": "search_web"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "srvtoolu_search",
+      "inputDelta": "{\"query\":\"Kyoto\"}"
+    },
+    {
+      "type": "tool_call_end",
+      "id": "srvtoolu_search"
+    },
+    {
+      "type": "server_tool_end",
+      "id": "srvtoolu_search",
+      "status": "completed",
+      "output": {
+        "items": [
+          {
+            "index": 1,
+            "title": "Kyoto",
+            "url": "https://example.com/kyoto"
+          }
+        ]
+      }
+    },
+    {
+      "type": "usage",
+      "promptTokens": 0,
+      "completionTokens": 12,
+      "cachedTokens": 0,
+      "totalTokens": 12
+    }
+  ],
+  "finishCount": 0,
+  "completed": true,
+  "usage": {
+    "promptTokens": 0,
+    "completionTokens": 12,
+    "cachedTokens": 0,
+    "totalTokens": 12
+  }
+}

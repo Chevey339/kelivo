@@ -1,0 +1,12 @@
+{
+  "contents": [
+    {
+      "role": "user",
+      "parts": [{ "text": "Think briefly, then generate a tiny red square PNG." }]
+    }
+  ],
+  "generationConfig": {
+    "responseModalities": ["TEXT", "IMAGE"],
+    "thinkingConfig": { "includeThoughts": true }
+  }
+}

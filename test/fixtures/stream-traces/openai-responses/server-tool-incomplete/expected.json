@@ -1,0 +1,49 @@
+{
+  "text": "Kotlin ",
+  "reasoning": "Checking sources.",
+  "toolCalls": [],
+  "serverTools": [],
+  "images": [],
+  "chunks": [
+    {
+      "type": "reasoning_delta",
+      "id": "reasoning",
+      "text": "Checking sources.",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "text_delta",
+      "id": "text",
+      "text": "Kotlin "
+    },
+    {
+      "type": "usage",
+      "promptTokens": 15,
+      "completionTokens": 6,
+      "cachedTokens": 2,
+      "totalTokens": 21
+    }
+  ],
+  "finishCount": 0,
+  "completed": true,
+  "usage": {
+    "promptTokens": 15,
+    "completionTokens": 6,
+    "cachedTokens": 2,
+    "totalTokens": 21
+  },
+  "extras": {
+    "citations": [
+      {
+        "index": 1,
+        "url": "https://kotlinlang.org",
+        "title": "Kotlin"
+      }
+    ],
+    "functionCallCount": 0,
+    "outputItemTypes": [
+      "web_search_call",
+      "message"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+{"data":"{\"type\":\"response.reasoning_text.delta\",\"delta\":\"Checking sources.\"}"}
+{"data":"{\"type\":\"response.output_text.delta\",\"delta\":\"Kotlin \"}"}
+{"data":"{\"type\":\"response.incomplete\",\"response\":{\"id\":\"resp_trace\",\"status\":\"incomplete\",\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}"}
+{"data":"{\"type\":\"response.completed\",\"response\":{\"id\":\"resp_trace\",\"status\":\"completed\",\"usage\":{\"input_tokens\":15,\"output_tokens\":6,\"input_tokens_details\":{\"cached_tokens\":2}},\"output\":[{\"type\":\"web_search_call\",\"id\":\"ws_1\",\"status\":\"failed\",\"action\":{\"query\":\"Kotlin stable\"}},{\"type\":\"message\",\"content\":[{\"type\":\"output_text\",\"text\":\"2.1\",\"annotations\":[{\"type\":\"url_citation\",\"url\":\"https://kotlinlang.org\",\"title\":\"Kotlin\"}]}]}]}}"}

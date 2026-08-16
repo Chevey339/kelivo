@@ -1,0 +1,6 @@
+{"data":"{\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"Plan two searches.\",\"reasoning_details\":[{\"type\":\"reasoning.summary\",\"text\":\"Plan two searches.\",\"format\":\"openai-v1\",\"id\":\"rd_1\"}]},\"finish_reason\":null}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":2,\"prompt_tokens_details\":{\"cached_tokens\":1}}}"}
+{"data":"{\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_kotlin\",\"function\":{\"name\":\"search_web\",\"arguments\":\"{\\\"query\\\":\"}}]},\"finish_reason\":null}]}"}
+{"data":"{\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"Kotlin\\\"}\"}}]},\"finish_reason\":null}]}"}
+{"data":"{\"choices\":[{\"index\":0,\"delta\":{\"tool_calls\":[{\"index\":1,\"id\":\"call_ktor\",\"function\":{\"name\":\"search_web\",\"arguments\":\"{\\\"query\\\":\\\"Ktor\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}"}
+{"data":"{\"choices\":[{\"index\":0,\"delta\":{},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":11,\"completion_tokens\":9}}"}
+{"data":"[DONE]"}

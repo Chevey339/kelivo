@@ -1,0 +1,2 @@
+{"data":"{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Sketching a square.\",\"thought\":true},{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"iVBORw0KGgo=\"},\"thoughtSignature\":\"c2lnbmF0dXJl\"}]}}]}"}
+{"data":"{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"inlineData\":{\"mimeType\":\"image/png\",\"data\":\"iVBORw0KGgoAAAANSUhEUg==\"}}]},\"finishReason\":\"STOP\"}],\"usageMetadata\":{\"promptTokenCount\":8,\"candidatesTokenCount\":4,\"totalTokenCount\":12}}"}

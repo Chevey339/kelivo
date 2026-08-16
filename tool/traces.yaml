@@ -1,0 +1,39 @@
+version: 1
+defaults:
+  # Resolved relative to the repository root.
+  outputRoot: test/fixtures/stream-traces
+  timeoutMs: 120000
+
+# First-batch cases aligned with Kelivo's user-facing protocols.
+# Keys are read from the named environment variable only — never written.
+traces:
+  - name: thinking-tools-search
+    provider: claude
+    baseUrl: https://api.anthropic.com
+    endpoint: /v1/messages
+    apiKeyEnv: ANTHROPIC_API_KEY
+    model: claude-sonnet-4-20250514
+    bodyFile: tool/trace-bodies/claude-thinking-tools-search.json
+
+  - name: thinking-image
+    provider: google
+    baseUrl: https://generativelanguage.googleapis.com/v1beta
+    apiKeyEnv: GEMINI_API_KEY
+    model: gemini-2.5-flash-image
+    bodyFile: tool/trace-bodies/google-thinking-image.json
+
+  - name: reasoning-parallel-tools
+    provider: openai-chat
+    baseUrl: https://openrouter.ai/api/v1
+    endpoint: /chat/completions
+    apiKeyEnv: OPENROUTER_API_KEY
+    model: deepseek/deepseek-chat
+    bodyFile: tool/trace-bodies/openai-chat-reasoning-parallel-tools.json
+
+  - name: server-tool-incomplete
+    provider: openai-responses
+    baseUrl: https://api.openai.com/v1
+    endpoint: /responses
+    apiKeyEnv: OPENAI_API_KEY
+    model: gpt-5
+    bodyFile: tool/trace-bodies/openai-responses-server-tool-incomplete.json

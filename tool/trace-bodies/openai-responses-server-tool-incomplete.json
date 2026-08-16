@@ -1,0 +1,10 @@
+{
+  "store": false,
+  "input": [
+    {
+      "role": "user",
+      "content": "Use web search to find the latest stable Kotlin release."
+    }
+  ],
+  "tools": [{ "type": "web_search" }]
+}
