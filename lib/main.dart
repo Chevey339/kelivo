@@ -1267,10 +1267,27 @@ class MyApp extends StatelessWidget {
                     });
                   }
 
-                  final appWithOverlays = FloatingIpadPadding(
-                    child: LocalSnapshotScheduler(
-                      child: AppOverlays(
-                        child: child ?? const SizedBox.shrink(),
+                  final mq = MediaQuery.of(ctx);
+                  // Global font scaling: apply the chat font size setting to
+                  // the whole UI so the composer, dialogs and auxiliary text
+                  // scale together with chat messages. Consumers that already
+                  // multiply in chatFontScale (message list, export preview)
+                  // pass a neutral 1.0 scale to avoid double scaling.
+                  final fontScale = settings.chatFontScale;
+                  final scaledMq = fontScale == 1.0
+                      ? mq
+                      : mq.copyWith(
+                          textScaler: TextScaler.linear(
+                            mq.textScaler.scale(1) * fontScale,
+                          ),
+                        );
+                  final appWithOverlays = MediaQuery(
+                    data: scaledMq,
+                    child: FloatingIpadPadding(
+                      child: LocalSnapshotScheduler(
+                        child: AppOverlays(
+                          child: child ?? const SizedBox.shrink(),
+                        ),
                       ),
                     ),
                   );
