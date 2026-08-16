@@ -105,7 +105,9 @@ class StreamChunkHandler {
         if (data.isEmpty) return;
         final mime = _imageMime[id] ?? 'image/png';
         final index = _imageIndex[id];
-        if (index == null || _parts[index] is! ImagePart) {
+        if (isCompleteImageUri(data) ||
+            index == null ||
+            _parts[index] is! ImagePart) {
           _ensureImage(id, mimeType: mime, data: data);
         } else {
           final current = _parts[index] as ImagePart;
@@ -117,7 +119,9 @@ class StreamChunkHandler {
       case ImageSnapshot(:final id, :final data):
         final mime = _imageMime[id] ?? 'image/png';
         final index = _imageIndex[id];
-        if (index == null || _parts[index] is! ImagePart) {
+        if (isCompleteImageUri(data) ||
+            index == null ||
+            _parts[index] is! ImagePart) {
           _ensureImage(id, mimeType: mime, data: data);
         } else {
           final current = _parts[index] as ImagePart;
@@ -170,7 +174,14 @@ class StreamChunkHandler {
     required String data,
   }) {
     _imageMime[id] = mimeType;
-    _parts.add(ImagePart(uri: 'data:$mimeType;base64,$data', mime: mimeType));
+    final uri = isCompleteImageUri(data) ? data : 'data:$mimeType;base64,$data';
+    final index = _imageIndex[id];
+    final part = ImagePart(uri: uri, mime: mimeType);
+    if (index != null && _parts[index] is ImagePart) {
+      _parts[index] = part;
+      return index;
+    }
+    _parts.add(part);
     return _imageIndex[id] = _parts.length - 1;
   }
 

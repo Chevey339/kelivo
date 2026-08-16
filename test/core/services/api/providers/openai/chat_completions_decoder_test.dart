@@ -1,10 +1,12 @@
 import 'dart:convert';
 
+import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
 import 'package:Kelivo/core/services/api/stream/legacy_chunk_adapter.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 SseEvent _event(Map<String, dynamic> data) => SseEvent(data: jsonEncode(data));
@@ -241,7 +243,7 @@ void main() {
     },
   );
 
-  test('appends image markdown only when image output is requested', () {
+  test('emits Image events only when image output is requested', () {
     final off = ChatCompletionsStreamDecoder();
     off.accept(
       _event(
@@ -273,10 +275,13 @@ void main() {
         ),
       ),
     );
+    expect(result.chunks.whereType<TextDelta>().single.text, 'pic');
     expect(
-      result.chunks.whereType<TextDelta>().single.text,
-      'pic\n\n![image](https://img.example/a.png)',
+      result.chunks.whereType<ImageSnapshot>().single.data,
+      'https://img.example/a.png',
     );
+    expect(result.chunks.whereType<ImageStart>(), hasLength(1));
+    expect(result.chunks.whereType<ImageEnd>(), hasLength(1));
 
     final typeless = ChatCompletionsStreamDecoder(wantsImageOutput: true);
     final typelessResult = typeless.accept(
@@ -294,10 +299,39 @@ void main() {
         ),
       ),
     );
+    expect(typelessResult.chunks.whereType<TextDelta>(), isEmpty);
     expect(
-      typelessResult.chunks.whereType<TextDelta>().single.text,
-      '\n\n![image](https://img.example/b.png)',
+      typelessResult.chunks.whereType<ImageSnapshot>().single.data,
+      'https://img.example/b.png',
     );
+  });
+
+  test('keeps the data: prefix on Chat Completions image URLs', () {
+    const dataUri = 'data:image/png;base64,AQIDBA==';
+    final decoder = ChatCompletionsStreamDecoder(wantsImageOutput: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          delta: <String, dynamic>{
+            'images': [
+              <String, dynamic>{
+                'type': 'image_url',
+                'image_url': <String, dynamic>{'url': dataUri},
+              },
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(result.chunks.whereType<ImageSnapshot>().single.data, dataUri);
+    expect(result.chunks.whereType<ImageStart>().single.mimeType, 'image/png');
+
+    final handler = StreamChunkHandler();
+    for (final chunk in result.chunks) {
+      handler.handle(chunk);
+    }
+    expect((handler.parts.single as ImagePart).uri, dataUri);
   });
 
   test('echoes reasoning when requested and accumulates reasoning_details', () {

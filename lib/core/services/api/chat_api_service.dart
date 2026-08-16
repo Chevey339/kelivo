@@ -30,6 +30,7 @@ import '../../utils/multimodal_input_utils.dart';
 import 'stream/legacy_chunk_adapter.dart';
 import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
+import 'stream/stream_chunk_ids.dart';
 import 'stream/stream_chunk_handler.dart';
 import 'stream/stream_chunk_shadow.dart';
 import 'providers/claude/claude_decoder.dart';

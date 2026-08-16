@@ -156,6 +156,16 @@ void main() {
       });
     });
 
+    test('ImageSnapshot passes a complete URI through as markdown', () {
+      final adapter = LegacyChunkAdapter();
+      adapter.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
+      final chunks = adapter.handle(
+        const ImageSnapshot(id: 'img', data: 'https://img.example/a.png'),
+      );
+
+      expect(chunks.single.content, '\n\n![image](https://img.example/a.png)');
+    });
+
     test('ImageSnapshot uses the mime type from ImageStart', () {
       final adapter = LegacyChunkAdapter();
       adapter.handle(const ImageStart(id: 'img', mimeType: 'image/jpeg'));

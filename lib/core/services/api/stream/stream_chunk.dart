@@ -217,3 +217,35 @@ final class Finish extends StreamChunk {
   final String? responseId;
   final String? model;
 }
+
+/// True when [data] is already a renderable URI, not raw base64.
+///
+/// Image events from Gemini / Responses still carry raw base64. Chat
+/// Completions and the Images API emit a complete `data:` / `http(s):` /
+/// `kelivo-file:` URL at the source so the prefix cannot be dropped later.
+bool isCompleteImageUri(String data) {
+  final trimmed = data.trim();
+  return trimmed.startsWith('data:') ||
+      trimmed.startsWith('file:') ||
+      trimmed.contains('://');
+}
+
+String? mimeTypeFromImageUri(String uri) {
+  final trimmed = uri.trim();
+  if (trimmed.startsWith('data:')) {
+    final comma = trimmed.indexOf(',');
+    if (comma <= 5) return null;
+    final mime = trimmed.substring(5, comma).split(';').first.trim();
+    return mime.isEmpty ? null : mime;
+  }
+  final path = trimmed.split('?').first;
+  final dot = path.lastIndexOf('.');
+  if (dot < 0 || dot == path.length - 1) return null;
+  return switch (path.substring(dot + 1).toLowerCase()) {
+    'jpg' || 'jpeg' => 'image/jpeg',
+    'gif' => 'image/gif',
+    'webp' => 'image/webp',
+    'png' => 'image/png',
+    _ => null,
+  };
+}

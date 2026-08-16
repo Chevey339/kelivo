@@ -98,7 +98,7 @@ void main() {
       expect(chunks, hasLength(1));
       expect(
         chunks.single.content,
-        '![image](https://example.com/generated.png)',
+        '\n\n![image](https://example.com/generated.png)',
       );
       expect(chunks.single.usage?.totalTokens, 8);
     });
@@ -343,7 +343,10 @@ void main() {
       expect(requestBody, contains('name="image[]"'));
       expect(requestBody, contains('content-type: image/png'));
       expect(requestBody, contains('filename="source.png"'));
-      expect(chunks.single.content, '![image](https://example.com/edited.png)');
+      expect(
+        chunks.single.content,
+        '\n\n![image](https://example.com/edited.png)',
+      );
     });
 
     test('sets jpeg content type for jpg image edit uploads', () async {
@@ -728,7 +731,7 @@ void main() {
       expect(requestUri.path, '/v1/images/generations');
       expect(
         chunks.single.content,
-        '![image](https://example.com/generated.png)',
+        '\n\n![image](https://example.com/generated.png)',
       );
     });
 
@@ -918,7 +921,7 @@ void main() {
         expect(requestBody, isNot(contains('Edit request:')));
         expect(
           chunks.single.content,
-          '![image](https://example.com/follow-up-edit.png)',
+          '\n\n![image](https://example.com/follow-up-edit.png)',
         );
       },
     );

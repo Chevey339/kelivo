@@ -2123,6 +2123,7 @@ Stream<StreamChunk> _sendOpenAIStream(
 
         // No tool calls -> final content
         String content = '';
+        final images = <({String uri, String mimeType})>[];
         final cmsg = (c0['message'] as Map?)?.cast<String, dynamic>();
         if (cmsg != null) {
           final cc = cmsg['content'];
@@ -2145,13 +2146,17 @@ Stream<StreamChunk> _sendOpenAIStream(
                   if (u2 is String) url = u2;
                 }
                 if (url != null && url.isNotEmpty) {
-                  buf.write('\n\n![image]($url)');
+                  images.add((
+                    uri: url,
+                    mimeType: mimeTypeFromImageUri(url) ?? 'image/png',
+                  ));
                 }
               }
             }
             content = buf.toString();
           }
         }
+        yield* emitImages(images);
         yield* emitDone(
           content: content,
           reasoningDetails: cmsg?['reasoning_details'],

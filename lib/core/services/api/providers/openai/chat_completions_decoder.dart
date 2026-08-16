@@ -77,6 +77,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
   void _parseEvent(Map<String, dynamic> obj, List<StreamChunk> chunks) {
     var content = '';
     String? reasoning;
+    final pendingImages = <dynamic>[];
     final choices = obj['choices'];
     if (choices is List && choices.isNotEmpty) {
       final c0 = choices[0];
@@ -101,7 +102,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
             _addReasoningDetails(rdDelta);
           }
           if (wantsImageOutput) {
-            content += _imageMarkdown(delta);
+            pendingImages.addAll(_imageItems(delta));
           }
           _accumulateToolCalls(delta['tool_calls'], chunks);
         }
@@ -122,7 +123,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
               reasoning ??= rcMsg;
             }
             if (wantsImageOutput && message['content'] is List) {
-              content += _imageMarkdownFromList([
+              pendingImages.addAll([
                 for (final it in message['content'] as List)
                   if (it is Map &&
                       (it['type'] == 'image_url' || it['type'] == 'image'))
@@ -191,6 +192,9 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     if (content.isNotEmpty) {
       assistantContent += content;
       chunks.add(TextDelta(id: _ids.text(), text: content));
+    }
+    if (pendingImages.isNotEmpty) {
+      chunks.addAll(_emitImages(pendingImages));
     }
     if (finishReason == 'tool_calls') {
       chunks.addAll(_endOpenTools());
@@ -266,6 +270,29 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     return <StreamChunk>[ToolCallEnd(id)];
   }
 
+  List<StreamChunk> _emitImages(List<dynamic> imageItems) {
+    final chunks = <StreamChunk>[];
+    for (final it in imageItems) {
+      if (it is! Map) continue;
+      final iu = it['image_url'];
+      String? url;
+      if (iu is String) {
+        url = iu;
+      } else if (iu is Map) {
+        final u2 = iu['url'];
+        if (u2 is String) url = u2;
+      }
+      if (url == null || url.isEmpty) continue;
+      final id = _ids.next('image');
+      chunks.add(
+        ImageStart(id: id, mimeType: mimeTypeFromImageUri(url) ?? 'image/png'),
+      );
+      chunks.add(ImageSnapshot(id: id, data: url));
+      chunks.add(ImageEnd(id));
+    }
+    return chunks;
+  }
+
   List<StreamChunk> _endOpenTools() {
     if (_openToolIds.isEmpty) return const <StreamChunk>[];
     final chunks = <StreamChunk>[];
@@ -339,7 +366,7 @@ String _messageText(dynamic mc) {
   return (mc ?? '').toString();
 }
 
-String _imageMarkdown(Map delta) {
+List<dynamic> _imageItems(Map delta) {
   final imageItems = <dynamic>[];
   final imgs = delta['images'];
   if (imgs is List) imageItems.addAll(imgs);
@@ -358,26 +385,7 @@ String _imageMarkdown(Map delta) {
       'image_url': singleImage,
     });
   }
-  return _imageMarkdownFromList(imageItems);
-}
-
-String _imageMarkdownFromList(List<dynamic> imageItems) {
-  final buf = StringBuffer();
-  for (final it in imageItems) {
-    if (it is! Map) continue;
-    final iu = it['image_url'];
-    String? url;
-    if (iu is String) {
-      url = iu;
-    } else if (iu is Map) {
-      final u2 = iu['url'];
-      if (u2 is String) url = u2;
-    }
-    if (url != null && url.isNotEmpty) {
-      buf.write('\n\n![image]($url)');
-    }
-  }
-  return buf.toString();
+  return imageItems;
 }
 
 TokenUsage? _mergeUsage(TokenUsage? current, dynamic rawUsage) {

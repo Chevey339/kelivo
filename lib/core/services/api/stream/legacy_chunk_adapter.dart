@@ -259,12 +259,17 @@ class LegacyChunkAdapter {
   }
 
   String _imageDeltaContent(_ImageBuffer buffer, String data) {
+    if (isCompleteImageUri(data)) {
+      buffer.opened = true;
+      return _imageMarkdown(buffer.mimeType, data);
+    }
     if (buffer.opened) return data;
     buffer.opened = true;
     return '${_imageMarkdownPrefix(buffer.mimeType)}$data';
   }
 
   String _imageMarkdown(String mimeType, String data) {
+    if (isCompleteImageUri(data)) return '\n\n![image]($data)';
     return '${_imageMarkdownPrefix(mimeType)}$data)';
   }
 

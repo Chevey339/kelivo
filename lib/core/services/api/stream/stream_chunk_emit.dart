@@ -75,6 +75,19 @@ Stream<StreamChunk> emitDone({
   yield* emitFinish(usage: usage, totalTokens: totalTokens);
 }
 
+Stream<StreamChunk> emitImages(
+  Iterable<({String uri, String mimeType})> images,
+) async* {
+  final ids = StreamChunkIds('images');
+  for (final image in images) {
+    if (image.uri.isEmpty) continue;
+    final id = ids.next('image');
+    yield ImageStart(id: id, mimeType: image.mimeType);
+    yield ImageSnapshot(id: id, data: image.uri);
+    yield ImageEnd(id);
+  }
+}
+
 Stream<StreamChunk> emitToolCalls(
   List<ToolCallInfo> calls, {
   TokenUsage? usage,

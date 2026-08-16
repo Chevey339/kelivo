@@ -20,6 +20,15 @@ void main() {
     expect(chunk.reasoningType, ReasoningType.summaryText);
   });
 
+  test('isCompleteImageUri distinguishes URLs from raw base64', () {
+    expect(isCompleteImageUri('data:image/png;base64,AAA'), isTrue);
+    expect(isCompleteImageUri('https://img.example/a.png'), isTrue);
+    expect(isCompleteImageUri('kelivo-file:///images/a.png'), isTrue);
+    expect(isCompleteImageUri('iVBORw0K'), isFalse);
+    expect(mimeTypeFromImageUri('data:image/jpeg;base64,AAA'), 'image/jpeg');
+    expect(mimeTypeFromImageUri('https://img.example/a.webp'), 'image/webp');
+  });
+
   test('ImageSnapshot is a distinct replace event', () {
     const snapshot = ImageSnapshot(id: 'img', data: 'abc');
     const delta = ImageDelta(id: 'img', data: 'abc');

@@ -65,16 +65,13 @@ Stream<StreamChunk> _sendOpenAIImagesStream(
           extraHeaders: extraHeaders,
           extraBody: extraBody,
         );
-  final markdown = await _openAIImagesResponseToMarkdown(
+  final images = await _openAIImagesFromResponse(
     response,
     outputMime: outputMime,
   );
   final usage = _openAIImagesUsage(response);
-  yield* emitDone(
-    content: markdown,
-    usage: usage,
-    totalTokens: usage?.totalTokens ?? 0,
-  );
+  yield* emitImages(images);
+  yield* emitFinish(usage: usage, totalTokens: usage?.totalTokens ?? 0);
 }
 
 Future<Map<String, dynamic>> _sendOpenAIImageGeneration(
@@ -499,18 +496,20 @@ Map<String, dynamic> _decodeOpenAIImagesResponse(http.Response response) {
   return decoded.cast<String, dynamic>();
 }
 
-Future<String> _openAIImagesResponseToMarkdown(
+Future<List<({String uri, String mimeType})>> _openAIImagesFromResponse(
   Map<String, dynamic> response, {
   required String outputMime,
 }) async {
   final data = response['data'];
-  if (data is! List || data.isEmpty) return '';
-  final lines = <String>[];
+  if (data is! List || data.isEmpty) {
+    return const <({String uri, String mimeType})>[];
+  }
+  final images = <({String uri, String mimeType})>[];
   for (final item in data) {
     if (item is! Map) continue;
     final url = (item['url'] ?? '').toString().trim();
     if (url.isNotEmpty) {
-      lines.add('![image]($url)');
+      images.add((uri: url, mimeType: mimeTypeFromImageUri(url) ?? outputMime));
       continue;
     }
     final b64 = (item['b64_json'] ?? '').toString().trim();
@@ -522,9 +521,9 @@ Future<String> _openAIImagesResponseToMarkdown(
       );
     }
     final uri = SandboxPathResolver.canonicalize(path);
-    lines.add('![image]($uri)');
+    images.add((uri: uri, mimeType: outputMime));
   }
-  return lines.join('\n\n');
+  return images;
 }
 
 TokenUsage? _openAIImagesUsage(Map<String, dynamic> response) {

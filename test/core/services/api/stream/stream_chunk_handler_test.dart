@@ -98,6 +98,19 @@ void main() {
     expect((handler.parts[1] as TextPart).text, 'caption');
   });
 
+  test('keeps a complete image URI instead of wrapping it as base64', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
+    handler.handle(
+      const ImageSnapshot(id: 'img', data: 'https://img.example/a.png'),
+    );
+    handler.handle(const ImageEnd('img'));
+
+    final image = handler.parts.single as ImagePart;
+    expect(image.uri, 'https://img.example/a.png');
+    expect(image.mime, 'image/png');
+  });
+
   test('Finish is applied once and later deltas are ignored', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hi'));
