@@ -1,51 +1,76 @@
 {
-  "text": "Calling tools.",
-  "reasoning": "Need weather and a lookup.",
+  "text": "I'll gather weather data for Kyoto, look up kelivo, and search for general information about Kyoto simultaneously.",
+  "reasoning": "The user wants me to:\n1. Think in one short sentence about the plan\n2. Call get_weather for Kyoto\n3. Call lookup for kelivo \n4. Call web_search for Kyoto\n5. Do all of this in parallel in the same turn\n6. Don't ask questions or wait for results\n\nI need to make all three function calls together.",
   "toolCalls": [
     {
-      "id": "toolu_weather",
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs",
       "name": "get_weather",
       "phase": "start"
     },
     {
-      "id": "toolu_weather",
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs",
       "phase": "end"
     },
     {
-      "id": "toolu_lookup",
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF",
       "name": "lookup",
       "phase": "start"
     },
     {
-      "id": "toolu_lookup",
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF",
       "phase": "end"
     },
     {
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "name": "search_web",
       "phase": "start"
     },
     {
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "phase": "end"
     }
   ],
   "serverTools": [
     {
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "name": "search_web",
       "phase": "start"
     },
     {
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "status": "completed",
       "phase": "end",
       "output": {
         "items": [
           {
+            "cited_text": "- Keihoku Area A hideaway with exciting experiences such as farm stays that get you in touch with nature and agriculture.\n\n...\n\n- Takao Area Three mountains collectively known as the Sanbi are known for their temples and lush greenery.\n\n...\n\n- Fushimi Area An inland port town with charming canals and rows of sake breweries.\n\n...\n\n- Nishikyo Area Western Kyoto is home to quiet, unexplored bamboo forests as well as many unique cycling routes.\n\n...\n\n- Ohara Area Ancient temples, famous gardens, and spacious hot springs are quietly nestled into this relaxing rural area.\n\n...\n\n- Yamashina Area This area is dotted with temples known for beauty found both in their modern-day appearances and in their histories.\n\n...\n\nFor centuries, Kyoto has nurtured an elegant culture. Its emphasis on cleanliness, simplicity, and beauty stems from practices already integrated into daily life. These attributes are all displayed in the way guests are welcomed with Kyoto-style hospitality.\n\n...\n\n## Areas\n\n...\n\nKyoto City started in a location chosen for its harmony with the surrounding natural scenery. With the ebbs and flow of over 1000 years of history, the city changed to accommodate the new lifestyles of every age, and each area acquired its own character and charm. With a little know-how, it’s easy to find your way around the ancient capital and discover the beauty of lesser-known areas.\n\n...\n\nHome to esteemed historical sites, Kyoto is known for its profound serenity and timeless allure. The various forms of art and hospitality practiced here are intrinsically linked to Japan's culture. Understanding its value is what drives both locals and visitors to endeavor to preserve it. See what part you can play in passing down Kyoto's spirit for another thousand years.\n\n...\n\n### Getting around Kyoto\n\n...\n\n## Welcome to Kyoto\n\n...\n\nWhat makes Kyoto special? Learn more about the iconic scenery, the illustrious ancient past, the forward-looking present, and the passionately upheld heritage of the people. A deeper understanding of Kyoto makes for a more enriching journey.\n\n...\n\nAside from Kyoto’s world-famous landmarks, there are hidden gems that are waiting to be explored. You just have to be in the know! Go beyond the traditional guidebooks to experience all that Kyoto has to offer in its quieter areas.\n\n...\n\nKyoto Travel | Kyoto City Official Guide\n\n...\n\nKyoto City has established guidelines to be implemented by all those involved in tourism, hosts and visitors alike.\n\n...\n\n## Kyoto by Interests\n\n...\n\nconsiderate to the local community while you enjoy sightseeing in Kyoto.\n\n...\n\n's tourist attractions are often located near residential areas, so please be mindful that your actions can affect the lives of the citizens.\n\n...\n\n## KYOTO Living Tradition",
             "index": 1,
+            "title": "Kyoto Travel | Kyoto City Official Guide",
+            "url": "https://kyoto.travel/en/"
+          },
+          {
+            "cited_text": "inent landmarks include the Kyoto Imperial Palace, Kiyomizu-dera, Kinkaku-ji, Ginkaku-ji, and Kyoto Tower.\n\n...\n\nKyoto is considered the cultural capital of Japan and is a major tourist destination. The Agency for Cultural Affairs of the national government is headquartered in the city. It is home to numerous Buddhist temples, Shinto shrines, palaces and gardens, some of which have been designated collectively as a World Heritage Site by UNESCO.\n\n...\n\ninternationally renowned video game company Nintendo is based in Kyoto.\n\n...\n\nis also a center of higher learning in the country, and its institutions include Kyoto University, the second-oldest university in Japan.\n\n...\n\n, the city had a population of 1.46 million, making it the ninth-most populous city in Japan. More than half (56.8%) of Kyoto Prefecture's population resides in the city.\n\n...\n\nKyoto is one of the oldest municipalities in Japan, having been chosen in 794 as the new seat of Japan's imperial court by Emperor Kanmu. The original city, named Heian-kyō, was arranged in accordance with traditional Chinese feng shui following the model of the ancient Chinese capitals of Chang'an and Luoyang.\n\n...\n\ncity is the cultural anchor of the substantially larger Greater Kyoto, a metropolitan statistical area (MSA) home to a census-estimated 3.8 million people.\n\n...\n\nKyoto is served by rail transportation systems operated by several different companies and organizations. The city's main gateway terminal, Kyōto Station, connects the Tōkaidō Shinkansen bullet train line with five JR West lines, a Kintetsu line, and a municipal subway line.\n\n...\n\nis also part of the even larger Keihanshin metropolitan area, along with Osaka and Kobe.\n\n...\n\nemperors of Japan ruled from Kyoto in the following eleven centuries until 1869.\n\n...\n\nWith its 2,000 religious places – 1,600 Buddhist temples and 400 Shinto shrines, as well as palaces, gardens and architecture – intact, it is one of the best preserved cities in Japan.\n\n...\n\ncapital was relocated from Kyoto to Tokyo after the Meiji Restoration.\n\n...\n\nmodern municipality of Kyoto was established in 1889.\n\n...\n\nwas the scene of several key events of the Muromachi period, Sengoku period, and the Boshin War, such as theŌnin War, the Honnō-ji Incident, the Kinmon incident, and the Battle of Toba–Fushimi.\n\n...\n\nKyoto has a humid subtropical climate(Köppen: Cfa), featuring a marked seasonal variation in temperature and precipitation. Summers are hot and humid, but winters are relatively cold with occasional snowfall.\n\n...\n\nthe most famous temples in Japan are Kiyomizu-dera, a magnificent wooden temple supported by pillars off the slope of a mountain; Kinkaku-ji, the Temple of the Golden Pavilion; Ginkaku-ji, the Temple of the Silver Pavilion; and Ryōan-ji, famous for its rock garden.\n\n...\n\nKyoto is well known for its traditional festivals which have been held for over 1,000 years and are a major tourist attraction. The first is the Aoi Matsuri on May 15.\n\n...\n\n's rainy season begins around the middle of June and lasts until the end of July, yielding to a hot and sunny latter half of the summer.\n\n...\n\nGion Matsuri known as one of the 3 great festivals of Japan, culminating in a massive parade on July 17.\n\n...\n\nmarks the Bon Festival with the Gozan no Okuribi, lighting fires on mountains to guide the spirits home on August 16.\n\n...\n\nThe Tokaidō Shinkansen, operated by JR Central, provides high-speed rail service linking Kyoto with Nagoya, Yokohama, and Tokyo to the east and with nearby Osaka to the west.",
+            "index": 2,
             "title": "Kyoto",
-            "url": "https://example.com/kyoto"
+            "url": "https://en.wikipedia.org/wiki/Kyoto"
+          },
+          {
+            "cited_text": "Kyoto (���s, Kyōto) served as Japan's capital and the emperor's residence from 794 until 1868. It is one of the country's ten largest cities with 1.5 million inhabitants and a modern face.\n...\n, Kyoto was destroyed by many wars and fires, but due to",
+            "index": 3,
+            "title": "What to do in Kyoto City",
+            "url": "https://www.japan-guide.com/e/e2158.html"
+          },
+          {
+            "cited_text": "### It has 14 UNESCO World Cultural Heritage sites\n\n...\n\n### It was the capital for over one thousand years\n\n...\n\n### There are more than 1.4 million residents and 50 million visitors every year\n\n...\n\nThanks to its long history, Kyoto is a treasure trove of historical sites. There are 14 World Cultural Heritage sites within Kyoto City limits and 3 more in nearby locations. They include an elaborate castle that attests to the power of the shoguns, and historic shrines and temples that are home to countless precious works of art. Many other sites are National Treasures or Important Cultural Properties.\n\n...\n\nKyoto was blessed with pristine groundwater perfect for brewing green tea and sake and for letting the delicate flavors of seasonal ingredients shine. The Kyoto styles of artful kaiseki haute cuisine and handcrafted wagashi confectioneries are renowned, and there are also many famous establishments for hearty dishes like sukiyaki and ramen. The city is even a major hub for coffee shops and bakeries.\n\n...\n\n### Art & Culture\n\n...\n\nKyoto City has a living culture that has been handed down for over a thousand years. You can feel it in how the streets, kimono, shrines, and temples make you aware of the changing of the seasons.\n\n...\n\nKyoto was designed to be a capital city. Emperor Kanmu transferred the imperial court here in 794, and it remained until 1869. Being the capital also made Kyoto a cultural center. You can feel the length of Kyoto’s enduring influence in everything from the continually refined cultural practices to the buildings and gardens that have stood the test of time.\n\n...\n\n### Accommodations\n\n...\n\n### History & Religion\n\n...\n\n### Nature & Outdoors\n\n...\n\nSome of the art forms developed in Kyoto are things you can hold in your hand, like lavish kimono or refined tea bowls, while others come alive through being practiced and performed, like maiko dances, Noh theater, or flower arrangement. These are only a few examples of the many traditions, crafts, and performances that have shaped both Kyoto and Japan’s identity.\n\n...\n\n### It is a city of gastronomy, filled with edible works of art\n\n...\n\n### Food & Drink\n\n...\n\n### It is the birthplace of “Choju Jinbutsu Giga,” Japan’s first manga",
+            "index": 4,
+            "title": "Discover Kyoto | Kyoto Travel",
+            "url": "https://kyoto.travel/en/discover/"
+          },
+          {
+            "cited_text": "Kyoto Online Tourist Information Center is a website that provides access to frequently asked questions about sightseeing in Kyoto and a number of other documents.\n...\n(Kyo-Navi).Find the information that you need with the help of the chatbot or the FAQ",
+            "index": 5,
+            "title": "Kyoto Online Tourist Information Center",
+            "url": "https://kyonavi.kyoto.travel/en/"
           }
         ]
       }
@@ -61,7 +86,133 @@
     {
       "type": "reasoning_delta",
       "id": "stream:thinking-0",
-      "text": "Need weather and a lookup.",
+      "text": "The user wants me to",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": ":\n1. Think",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " in",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " one short sentence about the",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " plan\n2. Call",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " get_weather for",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " Kyoto\n3.",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " Call lookup for kelivo",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " ",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "\n4. Call web",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "_search for Ky",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "oto\n5. Do",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " all",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " of this in parallel in",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " the same turn",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "\n6. Don",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "'t ask questions or",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " wait for results",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": "\n\nI",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " need to make all",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": " three function calls together",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:thinking-0",
+      "text": ".",
       "reasoningType": "reasoningText"
     },
     {
@@ -75,83 +226,173 @@
     {
       "type": "text_delta",
       "id": "stream:text-1",
-      "text": "Calling tools."
+      "text": "I"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "'ll gather"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " weather"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " data"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " for Kyoto,"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " look"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " up kelivo,"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " and search for general"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " information about Kyoto"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " simultaneously"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
     },
     {
       "type": "tool_call_start",
-      "id": "toolu_weather",
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs",
       "name": "get_weather"
     },
     {
       "type": "tool_call_delta",
-      "id": "toolu_weather",
-      "inputDelta": "{\"city\":\"Kyoto\"}"
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs",
+      "inputDelta": "{\"city\": \"Kyoto"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs",
+      "inputDelta": "\"}"
     },
     {
       "type": "tool_call_end",
-      "id": "toolu_weather"
+      "id": "toolu_bdrk_01MEZrHmjZtEgpkELoFsvXvs"
     },
     {
       "type": "tool_call_start",
-      "id": "toolu_lookup",
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF",
       "name": "lookup"
     },
     {
       "type": "tool_call_delta",
-      "id": "toolu_lookup",
-      "inputDelta": "{\"q\":\"kelivo\"}"
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF",
+      "inputDelta": "{\"q\": \"kelivo"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF",
+      "inputDelta": "\"}"
     },
     {
       "type": "tool_call_end",
-      "id": "toolu_lookup"
+      "id": "toolu_bdrk_01CzXq3oeZp5ABFnfmAmBkiF"
     },
     {
       "type": "server_tool_start",
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "name": "search_web"
     },
     {
       "type": "tool_call_start",
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "name": "search_web"
     },
     {
       "type": "tool_call_delta",
-      "id": "srvtoolu_search",
-      "inputDelta": "{\"query\":\"Kyoto\"}"
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
+      "inputDelta": "{\"query\": \"Kyoto"
+    },
+    {
+      "type": "tool_call_delta",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
+      "inputDelta": "\"}"
     },
     {
       "type": "tool_call_end",
-      "id": "srvtoolu_search"
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA"
+    },
+    {
+      "type": "usage",
+      "promptTokens": 1038,
+      "completionTokens": 250,
+      "cachedTokens": 0,
+      "totalTokens": 1288
     },
     {
       "type": "server_tool_end",
-      "id": "srvtoolu_search",
+      "id": "toolu_bdrk_01FfN2nKYzJQQKLKHhVPn2uA",
       "status": "completed",
       "output": {
         "items": [
           {
+            "cited_text": "- Keihoku Area A hideaway with exciting experiences such as farm stays that get you in touch with nature and agriculture.\n\n...\n\n- Takao Area Three mountains collectively known as the Sanbi are known for their temples and lush greenery.\n\n...\n\n- Fushimi Area An inland port town with charming canals and rows of sake breweries.\n\n...\n\n- Nishikyo Area Western Kyoto is home to quiet, unexplored bamboo forests as well as many unique cycling routes.\n\n...\n\n- Ohara Area Ancient temples, famous gardens, and spacious hot springs are quietly nestled into this relaxing rural area.\n\n...\n\n- Yamashina Area This area is dotted with temples known for beauty found both in their modern-day appearances and in their histories.\n\n...\n\nFor centuries, Kyoto has nurtured an elegant culture. Its emphasis on cleanliness, simplicity, and beauty stems from practices already integrated into daily life. These attributes are all displayed in the way guests are welcomed with Kyoto-style hospitality.\n\n...\n\n## Areas\n\n...\n\nKyoto City started in a location chosen for its harmony with the surrounding natural scenery. With the ebbs and flow of over 1000 years of history, the city changed to accommodate the new lifestyles of every age, and each area acquired its own character and charm. With a little know-how, it’s easy to find your way around the ancient capital and discover the beauty of lesser-known areas.\n\n...\n\nHome to esteemed historical sites, Kyoto is known for its profound serenity and timeless allure. The various forms of art and hospitality practiced here are intrinsically linked to Japan's culture. Understanding its value is what drives both locals and visitors to endeavor to preserve it. See what part you can play in passing down Kyoto's spirit for another thousand years.\n\n...\n\n### Getting around Kyoto\n\n...\n\n## Welcome to Kyoto\n\n...\n\nWhat makes Kyoto special? Learn more about the iconic scenery, the illustrious ancient past, the forward-looking present, and the passionately upheld heritage of the people. A deeper understanding of Kyoto makes for a more enriching journey.\n\n...\n\nAside from Kyoto’s world-famous landmarks, there are hidden gems that are waiting to be explored. You just have to be in the know! Go beyond the traditional guidebooks to experience all that Kyoto has to offer in its quieter areas.\n\n...\n\nKyoto Travel | Kyoto City Official Guide\n\n...\n\nKyoto City has established guidelines to be implemented by all those involved in tourism, hosts and visitors alike.\n\n...\n\n## Kyoto by Interests\n\n...\n\nconsiderate to the local community while you enjoy sightseeing in Kyoto.\n\n...\n\n's tourist attractions are often located near residential areas, so please be mindful that your actions can affect the lives of the citizens.\n\n...\n\n## KYOTO Living Tradition",
             "index": 1,
+            "title": "Kyoto Travel | Kyoto City Official Guide",
+            "url": "https://kyoto.travel/en/"
+          },
+          {
+            "cited_text": "inent landmarks include the Kyoto Imperial Palace, Kiyomizu-dera, Kinkaku-ji, Ginkaku-ji, and Kyoto Tower.\n\n...\n\nKyoto is considered the cultural capital of Japan and is a major tourist destination. The Agency for Cultural Affairs of the national government is headquartered in the city. It is home to numerous Buddhist temples, Shinto shrines, palaces and gardens, some of which have been designated collectively as a World Heritage Site by UNESCO.\n\n...\n\ninternationally renowned video game company Nintendo is based in Kyoto.\n\n...\n\nis also a center of higher learning in the country, and its institutions include Kyoto University, the second-oldest university in Japan.\n\n...\n\n, the city had a population of 1.46 million, making it the ninth-most populous city in Japan. More than half (56.8%) of Kyoto Prefecture's population resides in the city.\n\n...\n\nKyoto is one of the oldest municipalities in Japan, having been chosen in 794 as the new seat of Japan's imperial court by Emperor Kanmu. The original city, named Heian-kyō, was arranged in accordance with traditional Chinese feng shui following the model of the ancient Chinese capitals of Chang'an and Luoyang.\n\n...\n\ncity is the cultural anchor of the substantially larger Greater Kyoto, a metropolitan statistical area (MSA) home to a census-estimated 3.8 million people.\n\n...\n\nKyoto is served by rail transportation systems operated by several different companies and organizations. The city's main gateway terminal, Kyōto Station, connects the Tōkaidō Shinkansen bullet train line with five JR West lines, a Kintetsu line, and a municipal subway line.\n\n...\n\nis also part of the even larger Keihanshin metropolitan area, along with Osaka and Kobe.\n\n...\n\nemperors of Japan ruled from Kyoto in the following eleven centuries until 1869.\n\n...\n\nWith its 2,000 religious places – 1,600 Buddhist temples and 400 Shinto shrines, as well as palaces, gardens and architecture – intact, it is one of the best preserved cities in Japan.\n\n...\n\ncapital was relocated from Kyoto to Tokyo after the Meiji Restoration.\n\n...\n\nmodern municipality of Kyoto was established in 1889.\n\n...\n\nwas the scene of several key events of the Muromachi period, Sengoku period, and the Boshin War, such as theŌnin War, the Honnō-ji Incident, the Kinmon incident, and the Battle of Toba–Fushimi.\n\n...\n\nKyoto has a humid subtropical climate(Köppen: Cfa), featuring a marked seasonal variation in temperature and precipitation. Summers are hot and humid, but winters are relatively cold with occasional snowfall.\n\n...\n\nthe most famous temples in Japan are Kiyomizu-dera, a magnificent wooden temple supported by pillars off the slope of a mountain; Kinkaku-ji, the Temple of the Golden Pavilion; Ginkaku-ji, the Temple of the Silver Pavilion; and Ryōan-ji, famous for its rock garden.\n\n...\n\nKyoto is well known for its traditional festivals which have been held for over 1,000 years and are a major tourist attraction. The first is the Aoi Matsuri on May 15.\n\n...\n\n's rainy season begins around the middle of June and lasts until the end of July, yielding to a hot and sunny latter half of the summer.\n\n...\n\nGion Matsuri known as one of the 3 great festivals of Japan, culminating in a massive parade on July 17.\n\n...\n\nmarks the Bon Festival with the Gozan no Okuribi, lighting fires on mountains to guide the spirits home on August 16.\n\n...\n\nThe Tokaidō Shinkansen, operated by JR Central, provides high-speed rail service linking Kyoto with Nagoya, Yokohama, and Tokyo to the east and with nearby Osaka to the west.",
+            "index": 2,
             "title": "Kyoto",
-            "url": "https://example.com/kyoto"
+            "url": "https://en.wikipedia.org/wiki/Kyoto"
+          },
+          {
+            "cited_text": "Kyoto (���s, Kyōto) served as Japan's capital and the emperor's residence from 794 until 1868. It is one of the country's ten largest cities with 1.5 million inhabitants and a modern face.\n...\n, Kyoto was destroyed by many wars and fires, but due to",
+            "index": 3,
+            "title": "What to do in Kyoto City",
+            "url": "https://www.japan-guide.com/e/e2158.html"
+          },
+          {
+            "cited_text": "### It has 14 UNESCO World Cultural Heritage sites\n\n...\n\n### It was the capital for over one thousand years\n\n...\n\n### There are more than 1.4 million residents and 50 million visitors every year\n\n...\n\nThanks to its long history, Kyoto is a treasure trove of historical sites. There are 14 World Cultural Heritage sites within Kyoto City limits and 3 more in nearby locations. They include an elaborate castle that attests to the power of the shoguns, and historic shrines and temples that are home to countless precious works of art. Many other sites are National Treasures or Important Cultural Properties.\n\n...\n\nKyoto was blessed with pristine groundwater perfect for brewing green tea and sake and for letting the delicate flavors of seasonal ingredients shine. The Kyoto styles of artful kaiseki haute cuisine and handcrafted wagashi confectioneries are renowned, and there are also many famous establishments for hearty dishes like sukiyaki and ramen. The city is even a major hub for coffee shops and bakeries.\n\n...\n\n### Art & Culture\n\n...\n\nKyoto City has a living culture that has been handed down for over a thousand years. You can feel it in how the streets, kimono, shrines, and temples make you aware of the changing of the seasons.\n\n...\n\nKyoto was designed to be a capital city. Emperor Kanmu transferred the imperial court here in 794, and it remained until 1869. Being the capital also made Kyoto a cultural center. You can feel the length of Kyoto’s enduring influence in everything from the continually refined cultural practices to the buildings and gardens that have stood the test of time.\n\n...\n\n### Accommodations\n\n...\n\n### History & Religion\n\n...\n\n### Nature & Outdoors\n\n...\n\nSome of the art forms developed in Kyoto are things you can hold in your hand, like lavish kimono or refined tea bowls, while others come alive through being practiced and performed, like maiko dances, Noh theater, or flower arrangement. These are only a few examples of the many traditions, crafts, and performances that have shaped both Kyoto and Japan’s identity.\n\n...\n\n### It is a city of gastronomy, filled with edible works of art\n\n...\n\n### Food & Drink\n\n...\n\n### It is the birthplace of “Choju Jinbutsu Giga,” Japan’s first manga",
+            "index": 4,
+            "title": "Discover Kyoto | Kyoto Travel",
+            "url": "https://kyoto.travel/en/discover/"
+          },
+          {
+            "cited_text": "Kyoto Online Tourist Information Center is a website that provides access to frequently asked questions about sightseeing in Kyoto and a number of other documents.\n...\n(Kyo-Navi).Find the information that you need with the help of the chatbot or the FAQ",
+            "index": 5,
+            "title": "Kyoto Online Tourist Information Center",
+            "url": "https://kyonavi.kyoto.travel/en/"
           }
         ]
       }
-    },
-    {
-      "type": "usage",
-      "promptTokens": 0,
-      "completionTokens": 12,
-      "cachedTokens": 0,
-      "totalTokens": 12
     }
   ],
   "finishCount": 0,
   "completed": true,
   "usage": {
-    "promptTokens": 0,
-    "completionTokens": 12,
+    "promptTokens": 1038,
+    "completionTokens": 250,
     "cachedTokens": 0,
-    "totalTokens": 12
+    "totalTokens": 1288
   }
 }

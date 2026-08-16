@@ -2,7 +2,7 @@
   "contents": [
     {
       "role": "user",
-      "parts": [{ "text": "Think briefly, then generate a tiny red square PNG." }]
+      "parts": [{ "text": "Think in one short sentence, then generate a 16x16 solid red PNG square. No scene, no text, no extra objects." }]
     }
   ],
   "generationConfig": {

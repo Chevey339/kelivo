@@ -29,12 +29,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
   final Set<String> _serverToolStarted = <String>{};
+  final Set<String> _serverToolEnded = <String>{};
   final Map<int, int> _thinkingBlockIndex = <int, int>{};
   final Map<int, StringBuffer> _thinkingText = <int, StringBuffer>{};
   final Map<int, StringBuffer> _thinkingSig = <int, StringBuffer>{};
   final Map<int, int> _redactedBlockIndex = <int, int>{};
   final Map<int, StringBuffer> _redactedData = <int, StringBuffer>{};
   final StringBuffer _textBuf = StringBuffer();
+  final List<Map<String, dynamic>> _citationItems = <Map<String, dynamic>>[];
   bool _closed = false;
 
   Map<String, dynamic> get _anthropicMetadata => <String, dynamic>{
@@ -82,6 +84,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         chunks.addAll(_onMessageDelta(obj));
       case 'message_stop':
         _flushTextBlock();
+        chunks.addAll(_flushCitations());
         messageStopped = true;
         return DecodeResult(chunks: chunks, completed: true);
     }
@@ -94,7 +97,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (_closed) return const <StreamChunk>[];
     _closed = true;
     _flushTextBlock();
-    return const <StreamChunk>[];
+    return _flushCitations();
   }
 
   List<StreamChunk> _onBlockStart(Map<String, dynamic> obj) {
@@ -207,6 +210,20 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     } else if (kind == 'redacted_thinking_delta') {
       final data = (d['data'] ?? '').toString();
       if (data.isNotEmpty && idx != null) _redactedData[idx]?.write(data);
+    } else if (kind == 'citations_delta') {
+      final citation = d['citation'];
+      if (citation is Map) {
+        final url = (citation['url'] ?? '').toString();
+        if (url.isNotEmpty) {
+          _citationItems.add(<String, dynamic>{
+            'index': _citationItems.length + 1,
+            'title': (citation['title'] ?? '').toString(),
+            'url': url,
+            if ((citation['cited_text'] ?? '').toString().isNotEmpty)
+              'cited_text': citation['cited_text'].toString(),
+          });
+        }
+      }
     } else if (kind == 'tool_use_delta' || kind == 'input_json_delta') {
       final part = (d['partial_json'] ?? d['input'] ?? d['text'] ?? '')
           .toString();
@@ -325,6 +342,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       } catch (_) {}
     }
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
+    _serverToolEnded.add(id);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: 'search_web', input: args),
@@ -335,6 +353,42 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           'items': items,
           if ((errorCode ?? '').isNotEmpty) 'error': errorCode,
         },
+        metadata: _anthropicMetadata,
+      ),
+    ];
+  }
+
+  List<StreamChunk> _flushCitations() {
+    if (_citationItems.isEmpty) return const <StreamChunk>[];
+    final items = List<Map<String, dynamic>>.from(_citationItems);
+    _citationItems.clear();
+    String? id;
+    for (final sid in _serverIndexToId.values) {
+      if (!_serverToolEnded.contains(sid)) id = sid;
+    }
+    if (id == null) {
+      if (_serverIndexToId.isNotEmpty || _serverToolEnded.isNotEmpty) {
+        return const <StreamChunk>[];
+      }
+      id = _ids.search();
+    }
+    if (!_serverToolEnded.add(id)) {
+      return const <StreamChunk>[];
+    }
+    Map<String, dynamic> args = const <String, dynamic>{};
+    final raw = _serverArgs[id]?.toString();
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      } catch (_) {}
+    }
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: 'search_web', input: args),
+      ServerToolEnd(
+        id: id,
+        input: args,
+        output: <String, dynamic>{'items': items},
         metadata: _anthropicMetadata,
       ),
     ];

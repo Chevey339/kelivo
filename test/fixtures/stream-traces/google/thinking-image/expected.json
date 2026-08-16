@@ -1,43 +1,70 @@
 {
   "text": "",
-  "reasoning": "Sketching a square.",
+  "reasoning": "**Crafting the Scene**\n\nI'm now zeroing in on the environment. I'm focusing on creating a luxurious space-themed restaurant, envisioning dark blues, gold accents, and celestial patterns. The goal is to convey sophistication, and so far I'm making progress, though refinement is key. The banana dish needs to be the focal point within this imagined scene.\n\n\n**Constructing the Vision**\n\nI am now focusing on refining the specifics of the composition. I'm visualizing the \"Gemini Nano Banana\" dish: the caramelized banana and chocolate ganache, and the tiny edible flowers. I'm prioritizing the plate, runner, and table setting, making the image high-end. I am aiming for low light and an intimate feel, with a candid focus on the dessert plate.\n\n\n",
   "toolCalls": [],
   "serverTools": [],
   "images": [],
   "chunks": [
     {
+      "type": "usage",
+      "promptTokens": 17,
+      "completionTokens": 0,
+      "cachedTokens": 0,
+      "totalTokens": 17
+    },
+    {
       "type": "reasoning_delta",
       "id": "stream:reasoning-1",
-      "text": "Sketching a square.",
+      "text": "**Crafting the Scene**\n\nI'm now zeroing in on the environment. I'm focusing on creating a luxurious space-themed restaurant, envisioning dark blues, gold accents, and celestial patterns. The goal is to convey sophistication, and so far I'm making progress, though refinement is key. The banana dish needs to be the focal point within this imagined scene.\n\n\n",
       "reasoningType": "reasoningText"
     },
     {
       "type": "usage",
-      "promptTokens": 8,
-      "completionTokens": 4,
+      "promptTokens": 17,
+      "completionTokens": 0,
       "cachedTokens": 0,
-      "totalTokens": 12
+      "totalTokens": 17
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "**Constructing the Vision**\n\nI am now focusing on refining the specifics of the composition. I'm visualizing the \"Gemini Nano Banana\" dish: the caramelized banana and chocolate ganache, and the tiny edible flowers. I'm prioritizing the plate, runner, and table setting, making the image high-end. I am aiming for low light and an intimate feel, with a candid focus on the dessert plate.\n\n\n",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "usage",
+      "promptTokens": 17,
+      "completionTokens": 481,
+      "cachedTokens": 0,
+      "totalTokens": 498
+    },
+    {
+      "type": "usage",
+      "promptTokens": 17,
+      "completionTokens": 481,
+      "cachedTokens": 0,
+      "totalTokens": 498
     }
   ],
   "finishCount": 0,
   "completed": true,
   "usage": {
-    "promptTokens": 8,
-    "completionTokens": 4,
+    "promptTokens": 17,
+    "completionTokens": 481,
     "cachedTokens": 0,
-    "totalTokens": 12
+    "totalTokens": 498
   },
   "extras": {
     "bufferedImage": {
       "mimeType": "image/png",
-      "byteCount": 16,
-      "sha256": "02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8"
+      "byteCount": 79,
+      "sha256": "204f864f62153665a75f20ece9f0fd4ece67de16f87a63690a96898ebb1eef9c"
     },
     "receivedImage": true,
     "imageThoughtSigs": [
       {
         "k": "thoughtSignature",
-        "v": "c2lnbmF0dXJl"
+        "sha256": "76bfec054bf80107b0ea4b452ab18e3704f1942dd8fe3151d35addf40b1ee570"
       }
     ]
   }

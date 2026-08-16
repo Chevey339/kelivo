@@ -1,8 +1,11 @@
 {
+  "reasoning": { "effort": "low" },
+  "parallel_tool_calls": true,
+  "tool_choice": "auto",
   "messages": [
     {
       "role": "user",
-      "content": "Search Kotlin and Ktor independently, then compare them."
+      "content": "In this same assistant turn, call search_web twice: once with query Kotlin, once with query Ktor. Do not ask questions. Do not compare yet. Emit both tool calls together before any other work."
     }
   ],
   "tools": [
@@ -10,14 +13,12 @@
       "type": "function",
       "function": {
         "name": "search_web",
-        "description": "Search the web.",
+        "description": "Search the web. Call once per topic already named in the user message.",
         "parameters": {
           "type": "object",
-          "properties": { "query": { "type": "string" } },
-          "required": ["query"]
+          "properties": { "query": { "type": "string" } }
         }
       }
     }
-  ],
-  "tool_choice": "auto"
+  ]
 }

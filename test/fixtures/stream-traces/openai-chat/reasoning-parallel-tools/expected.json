@@ -1,6 +1,6 @@
 {
   "text": "",
-  "reasoning": "Plan two searches.",
+  "reasoning": "The user is asking me to call search_web twice in the same turn - once with \"Kotlin\" and once with \"Ktor\". They specifically said:\n1. Do not ask questions\n2. Do not compare yet \n3. Emit both tool calls together before any other work\n\nSo I need to make both function calls at the start of my response, then I can provide any additional context or information afterward.",
   "toolCalls": [],
   "serverTools": [],
   "images": [],
@@ -8,7 +8,169 @@
     {
       "type": "reasoning_delta",
       "id": "stream:reasoning-1",
-      "text": "Plan two searches.",
+      "text": "The user is",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " asking",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " me to call",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " search",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "_web twice in",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " the same turn -",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " once with \"",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "Kotlin\" and once with \"",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "Ktor\". They specifically",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " said:",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "\n1. Do",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " not ask questions\n2. Do not",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " compare yet ",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "\n3. Emit both tool calls",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " together before any other work\n\nSo",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " I need to make",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " both",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " function",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " calls at the start",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " of my",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " response",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": ", then",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " I",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " can provide",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " any",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " additional context",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": " or information afterwar",
+      "reasoningType": "reasoningText"
+    },
+    {
+      "type": "reasoning_delta",
+      "id": "stream:reasoning-1",
+      "text": "d.",
       "reasoningType": "reasoningText"
     }
   ],
@@ -19,23 +181,191 @@
     "toolCalls": [
       {
         "index": 0,
-        "id": "call_kotlin",
+        "id": "toolu_bdrk_01Bt2TjJUBsnQnTf6WPdLRKb",
         "name": "search_web",
-        "args": "{\"query\":\"Kotlin\"}"
+        "args": "{\"query\": \"Kotlin\"}"
       },
       {
         "index": 1,
-        "id": "call_ktor",
+        "id": "toolu_bdrk_01F4794GFiFTV3TBCLndpqSN",
         "name": "search_web",
-        "args": "{\"query\":\"Ktor\"}"
+        "args": "{\"query\": \"Ktor\"}"
       }
     ],
     "reasoningDetails": [
       {
-        "type": "reasoning.summary",
-        "text": "Plan two searches.",
-        "format": "openai-v1",
-        "id": "rd_1"
+        "type": "reasoning.text",
+        "text": "The user is",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " asking",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " me to call",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " search",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "_web twice in",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " the same turn -",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " once with \"",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "Kotlin\" and once with \"",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "Ktor\". They specifically",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " said:",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "\n1. Do",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " not ask questions\n2. Do not",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " compare yet ",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "\n3. Emit both tool calls",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " together before any other work\n\nSo",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " I need to make",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " both",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " function",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " calls at the start",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " of my",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " response",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": ", then",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " I",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " can provide",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " any",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " additional context",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": " or information afterwar",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "text": "d.",
+        "format": "anthropic-claude-v1",
+        "index": 0
+      },
+      {
+        "type": "reasoning.text",
+        "signature": "44b97b1fdb00fef5a39ce13677de06b14b0808f1e7e6200801f0385ef3dbbdef",
+        "format": "anthropic-claude-v1",
+        "index": 0
       }
     ]
   }

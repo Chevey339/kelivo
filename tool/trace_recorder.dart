@@ -38,7 +38,15 @@ Future<void> main(List<String> args) async {
               (throw StateError('Unknown case: ${options.caseName}')),
         ];
 
-  for (final trace in selected) {
+  for (final raw in selected) {
+    final trace = raw.copyWith(
+      baseUrl: options.baseUrl,
+      endpoint: options.endpoint,
+      apiKeyEnv: options.apiKeyEnv,
+      model: options.model,
+      authHeader: options.authHeader,
+      authScheme: options.authScheme,
+    );
     await _record(root, trace, dryRun: options.dryRun, force: options.force);
   }
 }
@@ -49,12 +57,24 @@ class _Options {
     this.list = false,
     this.dryRun = false,
     this.force = false,
+    this.baseUrl,
+    this.endpoint,
+    this.apiKeyEnv,
+    this.model,
+    this.authHeader,
+    this.authScheme,
   });
 
   final String? caseName;
   final bool list;
   final bool dryRun;
   final bool force;
+  final String? baseUrl;
+  final String? endpoint;
+  final String? apiKeyEnv;
+  final String? model;
+  final String? authHeader;
+  final String? authScheme;
 }
 
 _Options _parseArgs(List<String> args) {
@@ -62,7 +82,20 @@ _Options _parseArgs(List<String> args) {
   var list = false;
   var dryRun = false;
   var force = false;
+  String? baseUrl;
+  String? endpoint;
+  String? apiKeyEnv;
+  String? model;
+  String? authHeader;
+  String? authScheme;
   for (var i = 0; i < args.length; i++) {
+    String takeValue(String flag) {
+      if (i + 1 >= args.length) {
+        throw StateError('$flag requires a value');
+      }
+      return args[++i];
+    }
+
     switch (args[i]) {
       case '--list':
         list = true;
@@ -71,15 +104,35 @@ _Options _parseArgs(List<String> args) {
       case '--force':
         force = true;
       case '--case':
-        if (i + 1 >= args.length) {
-          throw StateError('--case requires a name');
-        }
-        caseName = args[++i];
+        caseName = takeValue('--case');
+      case '--base-url':
+        baseUrl = takeValue('--base-url');
+      case '--endpoint':
+        endpoint = takeValue('--endpoint');
+      case '--api-key-env':
+        apiKeyEnv = takeValue('--api-key-env');
+      case '--model':
+        model = takeValue('--model');
+      case '--auth-header':
+        authHeader = takeValue('--auth-header');
+      case '--auth-scheme':
+        authScheme = takeValue('--auth-scheme');
       default:
         throw StateError('Unknown argument: ${args[i]}');
     }
   }
-  return _Options(caseName: caseName, list: list, dryRun: dryRun, force: force);
+  return _Options(
+    caseName: caseName,
+    list: list,
+    dryRun: dryRun,
+    force: force,
+    baseUrl: baseUrl,
+    endpoint: endpoint,
+    apiKeyEnv: apiKeyEnv,
+    model: model,
+    authHeader: authHeader,
+    authScheme: authScheme,
+  );
 }
 
 Directory _repoRoot() {
@@ -190,6 +243,13 @@ void _forceStream(
 
 Map<String, String> _authHeaders(TraceCase trace) {
   final key = Platform.environment[trace.apiKeyEnv] ?? '';
+  if (trace.authHeader.isNotEmpty) {
+    final value = trace.authScheme.isEmpty ? key : '${trace.authScheme} $key';
+    return <String, String>{
+      trace.authHeader: value,
+      if (trace.provider == 'claude') 'anthropic-version': '2023-06-01',
+    };
+  }
   switch (trace.provider) {
     case 'claude':
       return <String, String>{

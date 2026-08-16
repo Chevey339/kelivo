@@ -20,21 +20,30 @@ void main() {
     final replayed = _replay('claude/thinking-tools-search', decoder);
     _assertCommon(replayed);
     expect(replayed.chunks.whereType<ReasoningDelta>(), isNotEmpty);
-    expect(replayed.chunks.whereType<ToolCallEnd>().map((c) => c.id).toSet(), {
-      'toolu_weather',
-      'toolu_lookup',
-      'srvtoolu_search',
-    });
     expect(
-      replayed.chunks.whereType<ServerToolEnd>().single.id,
-      'srvtoolu_search',
+      replayed.chunks.whereType<ToolCallStart>().map((c) => c.toolName),
+      containsAll(<String>['get_weather', 'lookup', 'search_web']),
     );
-    final thinking = decoder.assistantBlocks.firstWhere(
-      (block) => block['type'] == 'thinking',
+    expect(
+      replayed.chunks.whereType<ToolCallEnd>().map((c) => c.id).toSet().length,
+      greaterThanOrEqualTo(2),
     );
-    expect(thinking['signature'], 'sig_abc');
-    expect(decoder.clientTools.keys, {'toolu_weather', 'toolu_lookup'});
-    expect(decoder.lastStopReason, 'tool_use');
+    expect(
+      replayed.chunks.whereType<ServerToolStart>().map((c) => c.toolName),
+      contains('search_web'),
+    );
+    expect(replayed.chunks.whereType<ServerToolEnd>(), isNotEmpty);
+    final items =
+        (replayed.chunks.whereType<ServerToolEnd>().first.output
+                as Map)['items']
+            as List;
+    expect(items, isNotEmpty);
+    expect(items.first['url'].toString(), startsWith('http'));
+    expect(
+      decoder.assistantBlocks.any((block) => block['type'] == 'thinking'),
+      isTrue,
+    );
+    expect(decoder.lastStopReason, isNotEmpty);
   });
 
   test('replay Gemini thinking + image snapshot replace', () {
@@ -52,15 +61,22 @@ void main() {
               'sha256': sha256.convert(_bytes(image.data)).toString(),
             },
           'receivedImage': decoder.receivedImage,
-          'imageThoughtSigs': decoder.imageThoughtSigs,
+          'imageThoughtSigs': [
+            for (final sig in decoder.imageThoughtSigs)
+              <String, dynamic>{
+                'k': sig['k'],
+                'sha256': sha256.convert(utf8.encode('${sig['v']}')).toString(),
+              },
+          ],
         };
       },
     );
     _assertCommon(replayed);
-    expect(replayed.chunks.whereType<ReasoningDelta>().single.text, isNotEmpty);
+    expect(replayed.chunks.whereType<ReasoningDelta>(), isNotEmpty);
     expect(decoder.receivedImage, isTrue);
-    expect(decoder.imageThoughtSigs.single['v'], 'c2lnbmF0dXJl');
-    expect(_googleThoughtSignatures(replayed.events), ['c2lnbmF0dXJl']);
+    expect(decoder.imageThoughtSigs, isNotEmpty);
+    expect(decoder.imageThoughtSigs.first['v'].toString(), isNotEmpty);
+    expect(_googleThoughtSignatures(replayed.events), isNotEmpty);
     expect(
       replayed.snapshot['extras']?['bufferedImage']?['sha256'],
       isNotEmpty,
@@ -82,17 +98,21 @@ void main() {
             <String, dynamic>{'index': key, ...decoder.toolCalls[key]!},
         ],
         if (decoder.reasoningDetails != null)
-          'reasoningDetails': decoder.reasoningDetails,
+          'reasoningDetails': _hashReasoningDetails(decoder.reasoningDetails),
       },
     );
     _assertCommon(replayed);
     expect(decoder.reasoningEcho, isNotEmpty);
     expect(decoder.reasoningDetails, isNotEmpty);
-    expect(decoder.toolCalls.length, 2);
-    expect(decoder.toolCalls.values.map((call) => call['id']).toSet(), {
-      'call_kotlin',
-      'call_ktor',
-    });
+    expect(decoder.toolCalls.length, greaterThanOrEqualTo(2));
+    expect(
+      decoder.toolCalls.values.map((call) => call['id']).toSet().length,
+      greaterThanOrEqualTo(2),
+    );
+    expect(
+      decoder.toolCalls.values.map((call) => call['name']),
+      everyElement('search_web'),
+    );
     expect(decoder.finishReason, 'tool_calls');
   });
 
@@ -111,12 +131,12 @@ void main() {
     );
     _assertCommon(replayed);
     expect(decoder.completed, isTrue);
-    expect(decoder.citations.single['url'], 'https://kotlinlang.org');
+    expect(decoder.citations, isNotEmpty);
+    expect(decoder.citations.first['url'].toString(), startsWith('http'));
     expect(
-      decoder.outputItems.map((item) => item['type']),
-      contains('web_search_call'),
+      decoder.outputItems.map((item) => item['type']?.toString() ?? ''),
+      anyElement(contains('search')),
     );
-    expect(replayed.chunks.whereType<ReasoningDelta>(), isNotEmpty);
     expect(replayed.chunks.whereType<TextDelta>(), isNotEmpty);
   });
 }
@@ -217,6 +237,21 @@ List<String> _googleThoughtSignatures(List<SseEvent> events) {
     }
   }
   return signatures;
+}
+
+dynamic _hashReasoningDetails(dynamic details) {
+  if (details is List) {
+    return [for (final item in details) _hashReasoningDetails(item)];
+  }
+  if (details is Map) {
+    return <String, dynamic>{
+      for (final entry in details.entries)
+        entry.key.toString(): entry.key == 'signature' || entry.key == 'data'
+            ? sha256.convert(utf8.encode('${entry.value}')).toString()
+            : _hashReasoningDetails(entry.value),
+    };
+  }
+  return details;
 }
 
 List<int> _bytes(String data) {

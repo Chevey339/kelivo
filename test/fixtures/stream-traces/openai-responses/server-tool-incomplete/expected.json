@@ -1,48 +1,817 @@
 {
-  "text": "Kotlin ",
-  "reasoning": "Checking sources.",
+  "text": "The latest stable release of Kotlin is **Kotlin 1.9.22**, which was published on **December 21, 2023**. You can find more details about this release on the official GitHub page [here](https://github.com/JetBrains/kotlin/releases/tag/v1.9.22). \n\nAdditionally, prior to this, Kotlin 1.9.20 was released on **November 1, 2023**, marking an important milestone with the K2 compiler for all targets now in Beta and Kotlin Multiplatform becoming stable. More information can be found on the JetBrains blog [here](https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/).",
+  "reasoning": "",
   "toolCalls": [],
   "serverTools": [],
   "images": [],
   "chunks": [
     {
-      "type": "reasoning_delta",
-      "id": "stream:reasoning-1",
-      "text": "Checking sources.",
-      "reasoningType": "reasoningText"
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "The"
     },
     {
       "type": "text_delta",
-      "id": "stream:text-2",
-      "text": "Kotlin "
+      "id": "stream:text-1",
+      "text": " latest"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " stable"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " release"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " of"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Kotlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " is"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " **"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "K"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "otlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "1"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "9"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "22"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "**,"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " which"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " was"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " published"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " on"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " **"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "December"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "21"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ","
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "202"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "3"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "**"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " You"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " can"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " find"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " more"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " details"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " about"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " this"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " release"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " on"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " the"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " official"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Git"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "Hub"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " page"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " ["
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "here"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "]("
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "https"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "://"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "github"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ".com"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "Jet"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "Brains"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/k"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "otlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/releases"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/tag"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/v"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "1"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "9"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "22"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ")."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " \n\n"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "Additionally"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ","
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " prior"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " to"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " this"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ","
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Kotlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "1"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "9"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "20"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " was"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " released"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " on"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " **"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "November"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "1"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ","
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " "
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "202"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "3"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "**,"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " marking"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " an"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " important"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " milestone"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " with"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " the"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " K"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "2"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " compiler"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " for"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " all"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " targets"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " now"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " in"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Beta"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " and"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Kotlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Mult"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "ipl"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "atform"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " becoming"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " stable"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "."
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " More"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " information"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " can"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " be"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " found"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " on"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " the"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " Jet"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "Brains"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " blog"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": " ["
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "here"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "]("
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "https"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "://"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "blog"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ".jetbrains"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ".com"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/k"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "otlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "202"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "3"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "11"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/k"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "otlin"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "-"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "1"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "-"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "9"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "-"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "20"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "-re"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "leased"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": "/"
+    },
+    {
+      "type": "text_delta",
+      "id": "stream:text-1",
+      "text": ")."
     },
     {
       "type": "usage",
-      "promptTokens": 15,
-      "completionTokens": 6,
-      "cachedTokens": 2,
-      "totalTokens": 21
+      "promptTokens": 1751,
+      "completionTokens": 175,
+      "cachedTokens": 0,
+      "totalTokens": 1926
     }
   ],
   "finishCount": 0,
   "completed": true,
   "usage": {
-    "promptTokens": 15,
-    "completionTokens": 6,
-    "cachedTokens": 2,
-    "totalTokens": 21
+    "promptTokens": 1751,
+    "completionTokens": 175,
+    "cachedTokens": 0,
+    "totalTokens": 1926
   },
   "extras": {
     "citations": [
       {
         "index": 1,
-        "url": "https://kotlinlang.org",
-        "title": "Kotlin"
+        "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-1-9-20-released/",
+        "title": "Kotlin 1.9.20 Released - The JetBrains Blog"
+      },
+      {
+        "index": 2,
+        "url": "https://kotlinlang.org/docs/whatsnew1920.html",
+        "title": "What's new in Kotlin 1.9.20 | Kotlin Documentation"
+      },
+      {
+        "index": 3,
+        "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.22",
+        "title": "Kotlin 1.9.22"
+      },
+      {
+        "index": 4,
+        "url": "https://blog.jetbrains.com/kotlin/2023/11/kotlin-multiplatform-stable/",
+        "title": "Kotlin Multiplatform Is Stable and Production-Ready - The JetBrains Blog"
+      },
+      {
+        "index": 5,
+        "url": "https://github.com/JetBrains/kotlin/releases/tag/v1.9.21",
+        "title": "Kotlin 1.9.21"
       }
     ],
     "functionCallCount": 0,
     "outputItemTypes": [
-      "web_search_call",
+      "openrouter:web_search",
       "message"
     ]
   }

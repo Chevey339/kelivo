@@ -12,6 +12,8 @@ class TraceCase {
     this.endpoint = '',
     this.timeoutMs = 120000,
     this.outputRoot = 'test/fixtures/stream-traces',
+    this.authHeader = '',
+    this.authScheme = '',
   });
 
   final String name;
@@ -23,6 +25,31 @@ class TraceCase {
   final String bodyFile;
   final int timeoutMs;
   final String outputRoot;
+  final String authHeader;
+  final String authScheme;
+
+  TraceCase copyWith({
+    String? baseUrl,
+    String? endpoint,
+    String? apiKeyEnv,
+    String? model,
+    String? authHeader,
+    String? authScheme,
+  }) {
+    return TraceCase(
+      name: name,
+      provider: provider,
+      baseUrl: baseUrl ?? this.baseUrl,
+      endpoint: endpoint ?? this.endpoint,
+      apiKeyEnv: apiKeyEnv ?? this.apiKeyEnv,
+      model: model ?? this.model,
+      bodyFile: bodyFile,
+      timeoutMs: timeoutMs,
+      outputRoot: outputRoot,
+      authHeader: authHeader ?? this.authHeader,
+      authScheme: authScheme ?? this.authScheme,
+    );
+  }
 
   String get relativeOutput => '$outputRoot/$provider/$name/events.jsonl';
 }
@@ -89,6 +116,8 @@ TracesConfig parseTracesYaml(String source, {String outputRootFallback = ''}) {
             current['outputRoot'] ??
             defaults['outputRoot'] ??
             outputRootFallback,
+        authHeader: current['authHeader'] ?? '',
+        authScheme: current['authScheme'] ?? '',
       ),
     );
     current.clear();

@@ -1,29 +1,28 @@
 {
   "max_tokens": 4096,
   "thinking": { "type": "enabled", "budget_tokens": 1024 },
+  "tool_choice": { "type": "auto", "disable_parallel_tool_use": false },
   "messages": [
     {
       "role": "user",
-      "content": "Think, then call get_weather and lookup in parallel, and use web_search for Kyoto."
+      "content": "Think in one short sentence about the plan. Then, in this same assistant turn, call get_weather for Kyoto and lookup for kelivo in parallel, and also use web_search for Kyoto. Do not ask questions. Do not wait for results. Emit both client tool calls together."
     }
   ],
   "tools": [
     {
       "name": "get_weather",
-      "description": "Get weather for a city.",
+      "description": "Return weather. Always call immediately with the city already given in the user message.",
       "input_schema": {
         "type": "object",
-        "properties": { "city": { "type": "string" } },
-        "required": ["city"]
+        "properties": { "city": { "type": "string" } }
       }
     },
     {
       "name": "lookup",
-      "description": "Look up a topic.",
+      "description": "Look up a topic. Always call immediately with the topic already given in the user message.",
       "input_schema": {
         "type": "object",
-        "properties": { "q": { "type": "string" } },
-        "required": ["q"]
+        "properties": { "q": { "type": "string" } }
       }
     },
     {

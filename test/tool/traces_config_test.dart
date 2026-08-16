@@ -24,6 +24,28 @@ void main() {
     expect(yaml, isNot(contains('AIza')));
   });
 
+  test('parses optional auth header overrides for OpenRouter-style Claude', () {
+    final config = parseTracesYaml('''
+traces:
+  - name: thinking-tools-search
+    provider: claude
+    baseUrl: https://openrouter.ai/api/v1
+    endpoint: /messages
+    apiKeyEnv: OPENROUTER_API_KEY
+    authHeader: Authorization
+    authScheme: Bearer
+    model: anthropic/claude-sonnet-4
+    bodyFile: tool/trace-bodies/claude-thinking-tools-search.json
+''');
+    final trace = config.traces.single;
+    expect(trace.authHeader, 'Authorization');
+    expect(trace.authScheme, 'Bearer');
+    expect(
+      traceRequestUri(trace).toString(),
+      'https://openrouter.ai/api/v1/messages',
+    );
+  });
+
   test('joins OpenAI-style /v1 bases without dropping the version segment', () {
     expect(
       traceRequestUri(
