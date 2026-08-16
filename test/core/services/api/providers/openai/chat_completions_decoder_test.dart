@@ -1,9 +1,7 @@
 import 'dart:convert';
 
 import 'package:Kelivo/core/models/message_part.dart';
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
-import 'package:Kelivo/core/services/api/stream/legacy_chunk_adapter.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
@@ -204,7 +202,7 @@ void main() {
   });
 
   test(
-    'emits grok citations as search_web and maps them through the adapter',
+    'emits grok citations as search_web ServerTool events',
     () {
       final decoder = ChatCompletionsStreamDecoder();
       final result = decoder.accept(
@@ -226,20 +224,6 @@ void main() {
         'url': 'https://example.com',
         'title': 'https://example.com',
       });
-
-      final adapter = LegacyChunkAdapter();
-      final mapped = <ChatStreamChunk>[
-        for (final chunk in result.chunks) ...adapter.handle(chunk),
-      ];
-      expect(
-        mapped
-            .where((c) => c.toolResults != null)
-            .single
-            .toolResults!
-            .single
-            .name,
-        'search_web',
-      );
     },
   );
 

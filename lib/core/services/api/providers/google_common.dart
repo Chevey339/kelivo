@@ -741,7 +741,7 @@ Stream<StreamChunk> _sendGoogleStream(
           };
           yield* emitToolCalls(
             [
-              ToolCallInfo(
+              emitToolCall(
                 id: partId,
                 name: name,
                 arguments: args,
@@ -754,7 +754,7 @@ Stream<StreamChunk> _sendGoogleStream(
           final res = await onToolCall(name, args, toolCallId: partId);
           yield* emitToolResults(
             [
-              ToolResultInfo(
+              emitToolResult(
                 id: partId,
                 name: name,
                 arguments: args,
@@ -798,7 +798,7 @@ Stream<StreamChunk> _sendGoogleStream(
             codeExecIdx++;
             yield* emitToolCalls(
               [
-                ToolCallInfo(
+                emitToolCall(
                   id: ceId,
                   name: 'code_execution',
                   arguments: {'language': lang, 'code': code},
@@ -818,7 +818,7 @@ Stream<StreamChunk> _sendGoogleStream(
               : 'code_exec_0';
           yield* emitToolResults(
             [
-              ToolResultInfo(
+              emitToolResult(
                 id: resultId,
                 name: 'code_execution',
                 arguments: const <String, dynamic>{},
@@ -1263,7 +1263,7 @@ Stream<StreamChunk> _sendGoogleStream(
             call.result = resText;
             yield* emitToolResults(
               [
-                ToolResultInfo(
+                emitToolResult(
                   id: call.id,
                   name: call.name,
                   arguments: call.args,

@@ -88,8 +88,44 @@ Stream<StreamChunk> emitImages(
   }
 }
 
+typedef EmitToolCall = ({
+  String id,
+  String name,
+  Map<String, dynamic> arguments,
+  Map<String, dynamic>? metadata,
+});
+
+typedef EmitToolResult = ({
+  String id,
+  String name,
+  Map<String, dynamic> arguments,
+  String content,
+  Map<String, dynamic>? metadata,
+});
+
+EmitToolCall emitToolCall({
+  required String id,
+  required String name,
+  required Map<String, dynamic> arguments,
+  Map<String, dynamic>? metadata,
+}) => (id: id, name: name, arguments: arguments, metadata: metadata);
+
+EmitToolResult emitToolResult({
+  required String id,
+  required String name,
+  required Map<String, dynamic> arguments,
+  required String content,
+  Map<String, dynamic>? metadata,
+}) => (
+  id: id,
+  name: name,
+  arguments: arguments,
+  content: content,
+  metadata: metadata,
+);
+
 Stream<StreamChunk> emitToolCalls(
-  List<ToolCallInfo> calls, {
+  List<EmitToolCall> calls, {
   TokenUsage? usage,
   int totalTokens = 0,
 }) async* {
@@ -110,7 +146,7 @@ Stream<StreamChunk> emitToolCalls(
 // Local Kelivo-executed results reuse ServerTool until P5 lifts the tool
 // loop. Handler payload `server` is therefore true for these too.
 Stream<StreamChunk> emitToolResults(
-  List<ToolResultInfo> results, {
+  List<EmitToolResult> results, {
   TokenUsage? usage,
   int totalTokens = 0,
 }) async* {

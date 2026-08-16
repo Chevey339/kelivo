@@ -282,38 +282,28 @@ void main() {
         }) async {}
 
         await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
-              ),
-            ],
-          ),
+          [
+            emitToolResult(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content:
+                  '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"}]}',
+            ),
+          ],
           state,
           upsertToolEventInDb: upsertToolEventInDb,
         );
         await controller.handleToolResultsChunk(
-          ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: 0,
-            toolResults: [
-              ToolResultInfo(
-                id: 'builtin_search',
-                name: 'builtin_search',
-                arguments: const <String, dynamic>{},
-                content:
-                    '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
-              ),
-            ],
-          ),
+          [
+            emitToolResult(
+              id: 'builtin_search',
+              name: 'builtin_search',
+              arguments: const <String, dynamic>{},
+              content:
+                  '{"items":[{"title":"First source","url":"https://one.example.com/a","text":"A"},{"title":"Second source","url":"https://two.example.com/b","text":"B"}]}',
+            ),
+          ],
           state,
           upsertToolEventInDb: upsertToolEventInDb,
         );

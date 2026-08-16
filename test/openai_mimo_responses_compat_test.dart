@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _mimoConfig(String baseUrl) {
   return ProviderConfig(
@@ -74,7 +75,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _mimoConfig(baseUrl),
         modelId: 'mimo-v2.5-pro',
         messages: const [
@@ -84,11 +85,11 @@ void main() {
       ).toList();
 
       expect(requestBody['reasoning'], {'effort': 'low'});
-      expect(chunks.map((chunk) => chunk.reasoning ?? '').join(), '先比较两个小数。');
-      expect(chunks.map((chunk) => chunk.content).join(), contains('9.8 更大。'));
-      expect(chunks.last.isDone, isTrue);
-      expect(chunks.last.usage?.cachedTokens, 64);
-      expect(chunks.last.usage?.totalTokens, 130);
+      expect(chunks.joinedReasoning, '先比较两个小数。');
+      expect(chunks.joinedContent, contains('9.8 更大。'));
+      expect(chunks.isGenerationDone, isTrue);
+      expect(chunks.lastUsage?.cachedTokens, 64);
+      expect(chunks.lastUsage?.totalTokens, 130);
     });
 
     test(
@@ -142,7 +143,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _mimoConfig(baseUrl),
           modelId: 'mimo-v2.5-pro',
           messages: const [
@@ -152,11 +153,10 @@ void main() {
         ).toList();
 
         expect(requestBody.containsKey('reasoning'), isFalse);
-        expect(chunks, hasLength(1));
-        expect(chunks.single.content, '这是答案。');
-        expect(chunks.single.reasoning, '先分析问题。');
-        expect(chunks.single.usage?.cachedTokens, 32);
-        expect(chunks.single.usage?.totalTokens, 60);
+        expect(chunks.joinedContent, '这是答案。');
+        expect(chunks.joinedReasoning, '先分析问题。');
+        expect(chunks.lastUsage?.cachedTokens, 32);
+        expect(chunks.lastUsage?.totalTokens, 60);
       },
     );
 
@@ -191,7 +191,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _mimoConfig(baseUrl),
         modelId: 'mimo-v2.5-pro',
         messages: const [
@@ -201,7 +201,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requestBody['reasoning'], {'effort': 'none'});
     });
   });

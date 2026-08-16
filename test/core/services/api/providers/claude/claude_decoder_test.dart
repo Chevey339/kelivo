@@ -1,8 +1,6 @@
 import 'dart:convert';
 
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_decoder.dart';
-import 'package:Kelivo/core/services/api/stream/legacy_chunk_adapter.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -172,51 +170,19 @@ void main() {
     expect(end.output, isA<Map>());
     expect((end.output as Map)['items'], isNotEmpty);
 
-    final adapter = LegacyChunkAdapter();
-    final mapped = <ChatStreamChunk>[
-      for (final chunk in [
-        ...decoder
-            .accept(
-              _event('content_block_start', {
-                'type': 'content_block_start',
-                'index': 0,
-                'content_block': {
-                  'type': 'server_tool_use',
-                  'id': 'srv_2',
-                  'name': 'web_search',
-                },
-              }),
-            )
-            .chunks,
-        ...decoder
-            .accept(
-              _event('content_block_start', {
-                'type': 'content_block_start',
-                'index': 1,
-                'content_block': {
-                  'type': 'web_search_tool_result',
-                  'tool_use_id': 'srv_2',
-                  'content': [
-                    {
-                      'type': 'web_search_result',
-                      'title': 'Example',
-                      'url': 'https://example.com',
-                    },
-                  ],
-                },
-              }),
-            )
-            .chunks,
-      ])
-        ...adapter.handle(chunk),
-    ];
+    final second = decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 2,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srv_2',
+          'name': 'web_search',
+        },
+      }),
+    );
     expect(
-      mapped
-          .where((c) => (c.toolResults ?? const <ToolResultInfo>[]).isNotEmpty)
-          .single
-          .toolResults!
-          .single
-          .name,
+      second.chunks.whereType<ServerToolStart>().single.toolName,
       'search_web',
     );
   });

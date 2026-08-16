@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 const _conversationHeaderName = 'X-Conversation-Id';
 const _conversationId = 'conversation-123';
@@ -77,7 +78,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(
           'http://${server.address.address}:${server.port}/v1',
         ),
@@ -90,7 +91,7 @@ void main() {
       ).toList();
 
       expect(receivedConversationId, _conversationId);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('Claude requests forward conversation id header', () async {
@@ -117,7 +118,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _claudeConfig(
           'http://${server.address.address}:${server.port}',
         ),
@@ -130,7 +131,7 @@ void main() {
       ).toList();
 
       expect(receivedConversationId, _conversationId);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('Gemini requests forward conversation id header', () async {
@@ -166,7 +167,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -179,7 +180,7 @@ void main() {
       ).toList();
 
       expect(receivedConversationId, _conversationId);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
   });
 }

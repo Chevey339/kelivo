@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _geminiConfig(String baseUrl) {
   return ProviderConfig(
@@ -157,7 +158,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -179,10 +180,10 @@ void main() {
       expect(requestCount, 4);
       expect(toolCalls, ['search_first', 'search_second', 'search_follow_up']);
       expect(
-        chunks.map((chunk) => chunk.content).join(),
+        chunks.joinedContent,
         contains('Finished after the follow-up search.'),
       );
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     },
   );
 
@@ -205,7 +206,7 @@ void main() {
     });
 
     await expectLater(
-      ChatApiService.sendLegacyMessageStream(
+      ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),

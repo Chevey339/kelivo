@@ -27,12 +27,9 @@ import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
-import 'stream/legacy_chunk_adapter.dart';
 import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
 import 'stream/stream_chunk_ids.dart';
-import 'stream/stream_chunk_handler.dart';
-import 'stream/stream_chunk_shadow.dart';
 import 'providers/claude/claude_decoder.dart';
 import 'providers/google/google_decoder.dart';
 import 'providers/openai/chat_completions_decoder.dart';
@@ -563,98 +560,6 @@ class ChatApiService {
     bool allowMalformed = false,
   }) {
     return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
-  }
-
-  static Stream<ChatStreamChunk> sendLegacyMessageStream({
-    required ProviderConfig config,
-    required String modelId,
-    required List<Map<String, dynamic>> messages,
-    List<String>? userImagePaths,
-    int? thinkingBudget,
-    double? temperature,
-    double? topP,
-    int? maxTokens,
-    List<Map<String, dynamic>>? tools,
-    ToolCallHandler? onToolCall,
-    Map<String, String>? extraHeaders,
-    Map<String, dynamic>? extraBody,
-    bool stream = true,
-    String? requestId,
-    bool allowImagesApiRouting = true,
-    bool ocrActive = false,
-  }) {
-    return _adaptLegacyWithShadow(
-      sendMessageStream(
-        config: config,
-        modelId: modelId,
-        messages: messages,
-        userImagePaths: userImagePaths,
-        thinkingBudget: thinkingBudget,
-        temperature: temperature,
-        topP: topP,
-        maxTokens: maxTokens,
-        tools: tools,
-        onToolCall: onToolCall,
-        extraHeaders: extraHeaders,
-        extraBody: extraBody,
-        stream: stream,
-        requestId: requestId,
-        allowImagesApiRouting: allowImagesApiRouting,
-        ocrActive: ocrActive,
-      ),
-      source: 'legacy:${config.id}/$modelId',
-      stream: stream,
-      responsesImageDuplicates: config.useResponseApi == true,
-    );
-  }
-
-  static Stream<ChatStreamChunk> _adaptLegacyWithShadow(
-    Stream<StreamChunk> raw, {
-    required String source,
-    required bool stream,
-    bool responsesImageDuplicates = false,
-  }) async* {
-    final handler = StreamChunkHandler();
-    final adapter = LegacyChunkAdapter();
-    final bags = <ChatStreamChunk>[];
-    await for (final chunk in raw) {
-      handler.handle(chunk);
-      for (final bag in adapter.handle(chunk)) {
-        bags.add(bag);
-        if (stream) yield bag;
-      }
-    }
-    if (bags.isEmpty) return;
-    final coalesced = coalesceChatStreamChunks(bags);
-    if (!stream) yield coalesced;
-    StreamChunkShadow.reportLegacy(
-      source: source,
-      parts: handler.parts,
-      content: coalesced.content,
-      reasoning: coalesced.reasoning ?? '',
-      toolIds: {
-        for (final call in coalesced.toolCalls ?? const <ToolCallInfo>[])
-          call.id,
-        for (final result in coalesced.toolResults ?? const <ToolResultInfo>[])
-          result.id,
-      },
-      bags: [
-        for (final bag in bags)
-          ShadowBag(
-            content: bag.content,
-            reasoning: bag.reasoning ?? '',
-            toolCallIds: [
-              for (final call in bag.toolCalls ?? const <ToolCallInfo>[])
-                call.id,
-            ],
-            toolResultIds: [
-              for (final result in bag.toolResults ?? const <ToolResultInfo>[])
-                result.id,
-            ],
-          ),
-      ],
-      responsesImageDuplicates: responsesImageDuplicates,
-    );
   }
 
   static Stream<StreamChunk> sendMessageStream({
@@ -1587,58 +1492,4 @@ class _GeminiSignatureMeta {
   bool get hasText => (textKey ?? '').isNotEmpty && textValue != null;
   bool get hasImages => images.isNotEmpty;
   bool get hasAny => hasText || hasImages;
-}
-
-class ChatStreamChunk {
-  final String content;
-  // Optional reasoning delta (when model supports reasoning)
-  final String? reasoning;
-  // Optional vendor reasoning details (OpenRouter-style `reasoning_details`
-  // array, may carry thinking signatures). Emitted as a cumulative snapshot so
-  // it can be persisted and echoed back on later requests.
-  final dynamic reasoningDetails;
-  final bool isDone;
-  final int totalTokens;
-  final TokenUsage? usage;
-  final List<ToolCallInfo>? toolCalls;
-  final List<ToolResultInfo>? toolResults;
-
-  ChatStreamChunk({
-    required this.content,
-    this.reasoning,
-    this.reasoningDetails,
-    required this.isDone,
-    required this.totalTokens,
-    this.usage,
-    this.toolCalls,
-    this.toolResults,
-  });
-}
-
-class ToolCallInfo {
-  final String id;
-  final String name;
-  final Map<String, dynamic> arguments;
-  final Map<String, dynamic>? metadata;
-  ToolCallInfo({
-    required this.id,
-    required this.name,
-    required this.arguments,
-    this.metadata,
-  });
-}
-
-class ToolResultInfo {
-  final String id;
-  final String name;
-  final Map<String, dynamic> arguments;
-  final String content;
-  final Map<String, dynamic>? metadata;
-  ToolResultInfo({
-    required this.id,
-    required this.name,
-    required this.arguments,
-    required this.content,
-    this.metadata,
-  });
 }

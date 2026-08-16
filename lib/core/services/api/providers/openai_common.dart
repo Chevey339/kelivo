@@ -2028,7 +2028,7 @@ Stream<StreamChunk> _sendOpenAIStream(
         final tcs = (msg['tool_calls'] as List?) ?? const <dynamic>[];
         if (tcs.isNotEmpty && effectiveOnToolCall != null) {
           final calls = <Map<String, dynamic>>[];
-          final callInfos = <ToolCallInfo>[];
+          final callInfos = <EmitToolCall>[];
           for (int i = 0; i < tcs.length; i++) {
             final t = (tcs[i] as Map).cast<String, dynamic>();
             final id = _effectiveToolCallId(t['id'], 'call', i);
@@ -2043,7 +2043,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             } catch (_) {
               args = <String, dynamic>{};
             }
-            callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+            callInfos.add(emitToolCall(id: id, name: name, arguments: args));
             calls.add({
               'id': id,
               'type': 'function',
@@ -2058,7 +2058,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             );
           }
           final results = <Map<String, dynamic>>[];
-          final resultsInfo = <ToolResultInfo>[];
+          final resultsInfo = <EmitToolResult>[];
           for (final c in callInfos) {
             final res = await effectiveOnToolCall(
               c.name,
@@ -2067,7 +2067,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             );
             results.add({'tool_call_id': c.id, 'content': res});
             resultsInfo.add(
-              ToolResultInfo(
+              emitToolResult(
                 id: c.id,
                 name: c.name,
                 arguments: c.arguments,
@@ -2247,7 +2247,7 @@ Stream<StreamChunk> _sendOpenAIStream(
       // execute tool flow now and start follow-up request.
       if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
         final calls = <Map<String, dynamic>>[];
-        final callInfos = <ToolCallInfo>[];
+        final callInfos = <EmitToolCall>[];
         final toolMsgs = <Map<String, dynamic>>[];
         toolAcc.forEach((idx, m) {
           final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -2259,7 +2259,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           } catch (_) {
             args = <String, dynamic>{};
           }
-          callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+          callInfos.add(emitToolCall(id: id, name: name, arguments: args));
           calls.add({
             'id': id,
             'type': 'function',
@@ -2270,7 +2270,7 @@ Stream<StreamChunk> _sendOpenAIStream(
 
         // Execute tools and emit results. ToolCall* already left the decoder.
         final results = <Map<String, dynamic>>[];
-        final resultsInfo = <ToolResultInfo>[];
+        final resultsInfo = <EmitToolResult>[];
         for (final m in toolMsgs) {
           final name = m['__name'] as String;
           final id = m['__id'] as String;
@@ -2278,7 +2278,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           final res = await effectiveOnToolCall(name, args, toolCallId: id);
           results.add({'tool_call_id': id, 'content': res});
           resultsInfo.add(
-            ToolResultInfo(id: id, name: name, arguments: args, content: res),
+            emitToolResult(id: id, name: name, arguments: args, content: res),
           );
         }
         if (resultsInfo.isNotEmpty) {
@@ -2432,7 +2432,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           // After this follow-up round finishes: if tool calls again, execute and loop
           if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
             final calls2 = <Map<String, dynamic>>[];
-            final callInfos2 = <ToolCallInfo>[];
+            final callInfos2 = <EmitToolCall>[];
             final toolMsgs2 = <Map<String, dynamic>>[];
             toolAcc2.forEach((idx, m) {
               final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -2444,7 +2444,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               } catch (_) {
                 args = <String, dynamic>{};
               }
-              callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
+              callInfos2.add(emitToolCall(id: id, name: name, arguments: args));
               calls2.add({
                 'id': id,
                 'type': 'function',
@@ -2453,7 +2453,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
             final results2 = <Map<String, dynamic>>[];
-            final resultsInfo2 = <ToolResultInfo>[];
+            final resultsInfo2 = <EmitToolResult>[];
             for (final m in toolMsgs2) {
               final name = m['__name'] as String;
               final id = m['__id'] as String;
@@ -2461,7 +2461,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               final res = await effectiveOnToolCall(name, args, toolCallId: id);
               results2.add({'tool_call_id': id, 'content': res});
               resultsInfo2.add(
-                ToolResultInfo(
+                emitToolResult(
                   id: id,
                   name: name,
                   arguments: args,
@@ -2581,7 +2581,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           final payload = jsonEncode({'items': decoder.citations});
           yield* emitToolResults(
             [
-              ToolResultInfo(
+              emitToolResult(
                 id: 'builtin_search',
                 name: 'search_web',
                 arguments: const <String, dynamic>{},
@@ -2597,7 +2597,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             respToolCallsByIndex.isNotEmpty || toolAccResp.isNotEmpty;
         if (effectiveOnToolCall != null && hasRespCalls) {
           // Prefer the indexed calls (with call_id); fallback to toolAccResp
-          final callInfos = <ToolCallInfo>[];
+          final callInfos = <EmitToolCall>[];
           final msgs = <Map<String, dynamic>>[]; // for executing tools
           if (respToolCallsByIndex.isNotEmpty) {
             final sorted = respToolCallsByIndex.keys.toList()..sort();
@@ -2613,7 +2613,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                 args = <String, dynamic>{};
               }
               final id = _effectiveToolCallId(callId, 'call', idx);
-              callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+              callInfos.add(emitToolCall(id: id, name: name, arguments: args));
               msgs.add({'__id': id, '__name': name, '__args': args});
             }
           } else {
@@ -2628,7 +2628,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               }
               final id2 = _effectiveToolCallId(key, 'call', idx);
               callInfos.add(
-                ToolCallInfo(id: id2, name: (m['name'] ?? ''), arguments: args),
+                emitToolCall(id: id2, name: (m['name'] ?? ''), arguments: args),
               );
               msgs.add({
                 '__id': id2,
@@ -2642,7 +2642,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             lastResponseOutputItems,
             callInfos,
           );
-          final resultsInfo = <ToolResultInfo>[];
+          final resultsInfo = <EmitToolResult>[];
           final followUpOutputs = <Map<String, dynamic>>[];
           for (final m in msgs) {
             final nm = m['__name'] as String;
@@ -2650,7 +2650,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             final args = (m['__args'] as Map<String, dynamic>);
             final res = await effectiveOnToolCall(nm, args, toolCallId: id2);
             resultsInfo.add(
-              ToolResultInfo(id: id2, name: nm, arguments: args, content: res),
+              emitToolResult(id: id2, name: nm, arguments: args, content: res),
             );
             followUpOutputs.add({
               'type': 'function_call_output',
@@ -2828,7 +2828,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             }
 
             // Execute next round of tool calls
-            final callInfos2 = <ToolCallInfo>[];
+            final callInfos2 = <EmitToolCall>[];
             final msgs2 = <Map<String, dynamic>>[];
             for (final idx2 in sorted2) {
               final m2 = respCalls2[idx2]!;
@@ -2843,7 +2843,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               }
               final id2 = _effectiveToolCallId(callId2, 'call', idx2);
               callInfos2.add(
-                ToolCallInfo(id: id2, name: name2, arguments: args2),
+                emitToolCall(id: id2, name: name2, arguments: args2),
               );
               msgs2.add({'__id': id2, '__name': name2, '__args': args2});
             }
@@ -2851,7 +2851,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               outItems2,
               callInfos2,
             );
-            final resultsInfo2 = <ToolResultInfo>[];
+            final resultsInfo2 = <EmitToolResult>[];
             final followUpOutputs2 = <Map<String, dynamic>>[];
             for (final m in msgs2) {
               final nm = m['__name'] as String;
@@ -2863,7 +2863,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                 toolCallId: id2,
               );
               resultsInfo2.add(
-                ToolResultInfo(
+                emitToolResult(
                   id: id2,
                   name: nm,
                   arguments: args2,
@@ -2937,7 +2937,7 @@ Stream<StreamChunk> _sendOpenAIStream(
         // Some providers (like XinLiu) return tool_calls with finish_reason='tool_calls' but no [DONE]
         // Execute tools immediately in this case
         final calls = <Map<String, dynamic>>[];
-        final callInfos = <ToolCallInfo>[];
+        final callInfos = <EmitToolCall>[];
         final toolMsgs = <Map<String, dynamic>>[];
         toolAcc.forEach((idx, m) {
           final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -2949,7 +2949,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           } catch (_) {
             args = <String, dynamic>{};
           }
-          callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+          callInfos.add(emitToolCall(id: id, name: name, arguments: args));
           calls.add({
             'id': id,
             'type': 'function',
@@ -2959,7 +2959,7 @@ Stream<StreamChunk> _sendOpenAIStream(
         });
         // Execute tools and emit results. ToolCall* already left the decoder.
         final results = <Map<String, dynamic>>[];
-        final resultsInfo = <ToolResultInfo>[];
+        final resultsInfo = <EmitToolResult>[];
         for (final m in toolMsgs) {
           final name = m['__name'] as String;
           final id = m['__id'] as String;
@@ -2967,7 +2967,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           final res = await effectiveOnToolCall(name, args, toolCallId: id);
           results.add({'tool_call_id': id, 'content': res});
           resultsInfo.add(
-            ToolResultInfo(id: id, name: name, arguments: args, content: res),
+            emitToolResult(id: id, name: name, arguments: args, content: res),
           );
         }
         if (resultsInfo.isNotEmpty) {
@@ -3121,7 +3121,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           final reasoningDetailsAccum = roundDecoder.reasoningDetails;
           if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
             final calls2 = <Map<String, dynamic>>[];
-            final callInfos2 = <ToolCallInfo>[];
+            final callInfos2 = <EmitToolCall>[];
             final toolMsgs2 = <Map<String, dynamic>>[];
             toolAcc2.forEach((idx, m) {
               final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -3133,7 +3133,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               } catch (_) {
                 args = <String, dynamic>{};
               }
-              callInfos2.add(ToolCallInfo(id: id, name: name, arguments: args));
+              callInfos2.add(emitToolCall(id: id, name: name, arguments: args));
               calls2.add({
                 'id': id,
                 'type': 'function',
@@ -3142,7 +3142,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
             final results2 = <Map<String, dynamic>>[];
-            final resultsInfo2 = <ToolResultInfo>[];
+            final resultsInfo2 = <EmitToolResult>[];
             for (final m in toolMsgs2) {
               final name = m['__name'] as String;
               final id = m['__id'] as String;
@@ -3150,7 +3150,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               final res = await effectiveOnToolCall(name, args, toolCallId: id);
               results2.add({'tool_call_id': id, 'content': res});
               resultsInfo2.add(
-                ToolResultInfo(
+                emitToolResult(
                   id: id,
                   name: name,
                   arguments: args,
@@ -3213,7 +3213,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           // and may not send a [DONE] marker. Execute tools immediately in this case.
           if (effectiveOnToolCall != null && toolAcc.isNotEmpty) {
             final calls = <Map<String, dynamic>>[];
-            final callInfos = <ToolCallInfo>[];
+            final callInfos = <EmitToolCall>[];
             final toolMsgs = <Map<String, dynamic>>[];
             toolAcc.forEach((idx, m) {
               final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -3225,7 +3225,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               } catch (_) {
                 args = <String, dynamic>{};
               }
-              callInfos.add(ToolCallInfo(id: id, name: name, arguments: args));
+              callInfos.add(emitToolCall(id: id, name: name, arguments: args));
               calls.add({
                 'id': id,
                 'type': 'function',
@@ -3235,7 +3235,7 @@ Stream<StreamChunk> _sendOpenAIStream(
             });
             // Execute tools and emit results. ToolCall* already left the decoder.
             final results = <Map<String, dynamic>>[];
-            final resultsInfo = <ToolResultInfo>[];
+            final resultsInfo = <EmitToolResult>[];
             for (final m in toolMsgs) {
               final name = m['__name'] as String;
               final id = m['__id'] as String;
@@ -3243,7 +3243,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               final res = await effectiveOnToolCall(name, args, toolCallId: id);
               results.add({'tool_call_id': id, 'content': res});
               resultsInfo.add(
-                ToolResultInfo(
+                emitToolResult(
                   id: id,
                   name: name,
                   arguments: args,
@@ -3404,7 +3404,7 @@ Stream<StreamChunk> _sendOpenAIStream(
               final reasoningDetailsAccum = roundDecoder.reasoningDetails;
               if (finishReason2 == 'tool_calls' || toolAcc2.isNotEmpty) {
                 final calls2 = <Map<String, dynamic>>[];
-                final callInfos2 = <ToolCallInfo>[];
+                final callInfos2 = <EmitToolCall>[];
                 final toolMsgs2 = <Map<String, dynamic>>[];
                 toolAcc2.forEach((idx, m) {
                   final id = _effectiveToolCallId(m['id'], 'call', idx);
@@ -3417,7 +3417,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                     args = <String, dynamic>{};
                   }
                   callInfos2.add(
-                    ToolCallInfo(id: id, name: name, arguments: args),
+                    emitToolCall(id: id, name: name, arguments: args),
                   );
                   calls2.add({
                     'id': id,
@@ -3427,7 +3427,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 final results2 = <Map<String, dynamic>>[];
-                final resultsInfo2 = <ToolResultInfo>[];
+                final resultsInfo2 = <EmitToolResult>[];
                 for (final m in toolMsgs2) {
                   final name = m['__name'] as String;
                   final id = m['__id'] as String;
@@ -3439,7 +3439,7 @@ Stream<StreamChunk> _sendOpenAIStream(
                   );
                   results2.add({'tool_call_id': id, 'content': res});
                   resultsInfo2.add(
-                    ToolResultInfo(
+                    emitToolResult(
                       id: id,
                       name: name,
                       arguments: args,

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _config(ProviderKind kind, String baseUrl, String modelId) =>
     ProviderConfig(
@@ -107,7 +108,7 @@ void main() {
 
         final modelId = '${kind.name}-model';
         final baseUrl = 'http://${server.address.address}:${server.port}';
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _config(kind, baseUrl, modelId),
           modelId: modelId,
           messages: const [
@@ -126,7 +127,7 @@ void main() {
           stream: false,
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         expect(receivedHeaders.value('x-level'), 'model');
         expect(receivedHeaders.value('x-assistant'), 'assistant-only');
         expect(receivedHeaders.value('x-provider'), 'provider-only');

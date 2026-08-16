@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _geminiConfig(String baseUrl) {
   return ProviderConfig(
@@ -68,7 +70,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -79,11 +81,11 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.map((chunk) => chunk.reasoning).whereType<String>(), [
+      expect(chunks.whereType<ReasoningDelta>().map((chunk) => chunk.text), [
         'Check constraints.',
       ]);
-      expect(chunks.map((chunk) => chunk.content).join(), 'Final answer.');
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.joinedContent, 'Final answer.');
+      expect(chunks.isGenerationDone, isTrue);
       expect(
         capturedBody['generationConfig']['thinkingConfig'],
         containsPair('includeThoughts', true),
@@ -125,7 +127,7 @@ void main() {
           await server.close(force: true);
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
@@ -135,11 +137,11 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.map((chunk) => chunk.reasoning).whereType<String>(), [
+        expect(chunks.whereType<ReasoningDelta>().map((chunk) => chunk.text), [
           'Reasoning delta.',
         ]);
-        expect(chunks.map((chunk) => chunk.content).join(), 'Visible delta.');
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.joinedContent, 'Visible delta.');
+        expect(chunks.isGenerationDone, isTrue);
         expect(
           capturedBody['generationConfig']['thinkingConfig'],
           containsPair('includeThoughts', true),

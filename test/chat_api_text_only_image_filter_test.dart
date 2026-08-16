@@ -91,7 +91,7 @@ void main() {
       final file = await _tempPng('kelivo_openai_text_only_filter_');
       final body = await _captureJsonRequest(
         (baseUrl) {
-          return ChatApiService.sendLegacyMessageStream(
+          return ChatApiService.sendMessageStream(
             config: _openAiConfig(baseUrl),
             modelId: 'mimo-v2.5-pro',
             messages: [
@@ -136,7 +136,7 @@ void main() {
       final file = await _tempPng('kelivo_claude_text_only_filter_');
       final body = await _captureJsonRequest(
         (baseUrl) {
-          return ChatApiService.sendLegacyMessageStream(
+          return ChatApiService.sendMessageStream(
             config: _claudeConfig(baseUrl),
             modelId: 'claude-sonnet-4-6',
             messages: [
@@ -169,7 +169,7 @@ void main() {
       final file = await _tempPng('kelivo_gemini_text_only_filter_');
       final body = await _captureJsonRequest(
         (baseUrl) {
-          return ChatApiService.sendLegacyMessageStream(
+          return ChatApiService.sendMessageStream(
             config: _geminiConfig('$baseUrl/v1beta'),
             modelId: 'gemini-2.5-pro',
             messages: [

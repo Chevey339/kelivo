@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _zhipuConfig(String baseUrl) {
   return ProviderConfig(
@@ -68,7 +69,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
@@ -77,7 +78,7 @@ void main() {
         thinkingBudget: 1024,
       ).toList();
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
@@ -169,7 +170,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
@@ -203,7 +204,7 @@ void main() {
         (m) => m['role'] == 'assistant' && m['tool_calls'] is List,
       );
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(secondBody['thinking'], {'type': 'enabled'});
       expect(secondBody.containsKey('reasoning_effort'), isFalse);
       expect(assistantToolMessage['content'], '我先查一下日期。');

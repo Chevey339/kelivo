@@ -1,8 +1,6 @@
 import 'dart:convert';
 
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/google/google_decoder.dart';
-import 'package:Kelivo/core/services/api/stream/legacy_chunk_adapter.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,24 +96,20 @@ void main() {
     expect(call.thoughtSigKey, 'thoughtSignature');
     expect(call.thoughtSigVal, 'sig-1');
     expect(decoder.isClientFunctionCall('call_1'), isTrue);
-
-    final adapter = LegacyChunkAdapter();
-    final mapped = <ChatStreamChunk>[
-      for (final chunk in result.chunks) ...adapter.handle(chunk),
-    ];
-    final toolChunks = mapped
-        .where((c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty)
-        .toList();
-    expect(toolChunks, hasLength(2));
-    expect(toolChunks.last.toolCalls!.single.name, 'lookup');
-    expect(toolChunks.last.toolCalls!.single.arguments['q'], 'kelivo');
     expect(
-      toolChunks.last.toolCalls!.single.metadata!['google']['thoughtSigVal'],
+      result.chunks
+          .whereType<ToolCallStart>()
+          .single
+          .metadata!['google']['thoughtSigVal'],
       'sig-1',
+    );
+    expect(
+      result.chunks.whereType<ToolCallDelta>().single.inputDelta,
+      '{"q":"kelivo"}',
     );
   });
 
-  test('maps code execution and citations through the adapter', () {
+  test('maps code execution and citations to StreamChunks', () {
     final decoder = GoogleStreamDecoder();
     final result = decoder.accept(
       _event(
@@ -148,44 +142,17 @@ void main() {
       ),
     );
 
-    final adapter = LegacyChunkAdapter();
-    final mapped = <ChatStreamChunk>[
-      for (final chunk in result.chunks) ...adapter.handle(chunk),
-    ];
     expect(
-      mapped
-          .where((c) => (c.toolCalls ?? const <ToolCallInfo>[]).isNotEmpty)
-          .last
-          .toolCalls!
-          .single
-          .name,
+      result.chunks.whereType<ToolCallStart>().single.toolName,
       'code_execution',
     );
     expect(
-      mapped
-          .where(
-            (c) => (c.toolResults ?? const <ToolResultInfo>[]).any(
-              (r) => r.name == 'code_execution',
-            ),
-          )
-          .single
-          .toolResults!
-          .single
-          .content,
-      '1',
+      result.chunks.whereType<ServerToolEnd>().map((chunk) => chunk.output),
+      contains('1'),
     );
     expect(
-      mapped
-          .where(
-            (c) => (c.toolResults ?? const <ToolResultInfo>[]).any(
-              (r) => r.name == 'builtin_search',
-            ),
-          )
-          .single
-          .toolResults!
-          .single
-          .name,
-      'builtin_search',
+      result.chunks.whereType<ServerToolStart>().map((chunk) => chunk.toolName),
+      containsAll(<String>['code_execution', 'builtin_search']),
     );
   });
 

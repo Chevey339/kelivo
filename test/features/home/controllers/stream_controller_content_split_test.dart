@@ -183,15 +183,7 @@ void main() {
     final state = buildStreamingState(settings);
     addTearDown(() => controller.cleanupTimers(state.messageId));
 
-    await controller.handleReasoningChunk(
-      ChatStreamChunk(
-        content: '',
-        reasoning: 'thinking',
-        isDone: false,
-        totalTokens: 0,
-      ),
-      state,
-    );
+    await controller.handleReasoningChunk('thinking', state);
 
     expect(
       controller.reasoningSegments[state.messageId]!.single.expanded,
@@ -384,37 +376,27 @@ void main() {
       }) async {}
 
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content: '{"items":[{"title":"First"}]}',
-            ),
-          ],
-        ),
+        [
+          emitToolResult(
+            id: 'builtin_search',
+            name: 'builtin_search',
+            arguments: const <String, dynamic>{},
+            content: '{"items":[{"title":"First"}]}',
+          ),
+        ],
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
 
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'builtin_search',
-              arguments: const <String, dynamic>{},
-              content: '{"items":[{"title":"First"},{"title":"Second"}]}',
-            ),
-          ],
-        ),
+        [
+          emitToolResult(
+            id: 'builtin_search',
+            name: 'builtin_search',
+            arguments: const <String, dynamic>{},
+            content: '{"items":[{"title":"First"},{"title":"Second"}]}',
+          ),
+        ],
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
@@ -448,36 +430,26 @@ void main() {
       }) async {}
 
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'st_1',
-              name: 'search_web',
-              arguments: const <String, dynamic>{},
-              content: '{"query":"kotlin"}',
-            ),
-          ],
-        ),
+        [
+          emitToolResult(
+            id: 'st_1',
+            name: 'search_web',
+            arguments: const <String, dynamic>{},
+            content: '{"query":"kotlin"}',
+          ),
+        ],
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );
       await controller.handleToolResultsChunk(
-        ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: 0,
-          toolResults: [
-            ToolResultInfo(
-              id: 'builtin_search',
-              name: 'search_web',
-              arguments: const <String, dynamic>{},
-              content: '{"items":[{"url":"https://example.com"}]}',
-            ),
-          ],
-        ),
+        [
+          emitToolResult(
+            id: 'builtin_search',
+            name: 'search_web',
+            arguments: const <String, dynamic>{},
+            content: '{"items":[{"url":"https://example.com"}]}',
+          ),
+        ],
         state,
         upsertToolEventInDb: upsertToolEventInDb,
       );

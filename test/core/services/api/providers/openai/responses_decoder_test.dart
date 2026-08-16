@@ -1,8 +1,6 @@
 import 'dart:convert';
 
-import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_decoder.dart';
-import 'package:Kelivo/core/services/api/stream/legacy_chunk_adapter.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -338,10 +336,10 @@ void main() {
     expect(decoder.outputItems, hasLength(2));
   });
 
-  test('skips malformed JSON and maps citations through the adapter', () {
+  test('skips malformed JSON and emits citations as Annotations', () {
     final decoder = ResponsesStreamDecoder();
     decoder.accept(const SseEvent(data: 'not-json'));
-    decoder.accept(
+    final done = decoder.accept(
       _event({
         'type': 'response.completed',
         'response': {
@@ -365,17 +363,11 @@ void main() {
       }),
     );
 
-    final adapter = LegacyChunkAdapter();
-    final mapped = <ChatStreamChunk>[
-      for (final chunk in [
-        const ServerToolStart(id: 'builtin_search', toolName: 'search_web'),
-        ServerToolEnd(
-          id: 'builtin_search',
-          output: <String, dynamic>{'items': decoder.citations},
-        ),
-      ])
-        ...adapter.handle(chunk),
-    ];
-    expect(mapped.single.toolResults!.single.name, 'search_web');
+    expect(decoder.citations, isNotEmpty);
+    final annotation =
+        done.chunks.whereType<Annotations>().single.annotations.single
+            as UrlCitationAnnotation;
+    expect(annotation.url, 'https://a.example');
+    expect(annotation.title, 'A');
   });
 }

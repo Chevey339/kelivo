@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/utils/openai_model_compat.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _openAIConfig(
   String baseUrl, {
@@ -61,7 +62,7 @@ Future<Map<String, dynamic>> _captureChatBody({
     await request.response.close();
   });
 
-  final chunks = await ChatApiService.sendLegacyMessageStream(
+  final chunks = await ChatApiService.sendMessageStream(
     config: _openAIConfig(
       'http://${server.address.address}:${server.port}/v1',
       providerId: providerId,
@@ -76,7 +77,7 @@ Future<Map<String, dynamic>> _captureChatBody({
     tools: tools,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue);
+  expect(chunks.isGenerationDone, isTrue);
   return requestBody;
 }
 
@@ -234,7 +235,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
           useResponseApi: true,
@@ -247,11 +248,8 @@ void main() {
       ).toList();
 
       expect((requestBody['reasoning'] as Map)['effort'], 'low');
-      expect(
-        chunks.map((chunk) => chunk.reasoning ?? '').join(),
-        contains('reasoning summary'),
-      );
-      expect(chunks.map((chunk) => chunk.content).join(), contains('answer'));
+      expect(chunks.joinedReasoning, contains('reasoning summary'));
+      expect(chunks.joinedContent, contains('answer'));
     });
   });
 }

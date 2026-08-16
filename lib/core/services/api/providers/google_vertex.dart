@@ -526,10 +526,10 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
         }
       }
       if (toolUses.isNotEmpty && onToolCall != null) {
-        final callInfos = <ToolCallInfo>[];
+        final callInfos = <EmitToolCall>[];
         for (final e in toolUses.entries) {
           callInfos.add(
-            ToolCallInfo(
+            emitToolCall(
               id: e.key,
               name: (e.value['name'] ?? '').toString(),
               arguments: (e.value['args'] as Map<String, dynamic>),
@@ -542,7 +542,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
           totalTokens: (totalUsage?.totalTokens ?? 0),
         );
         final results = <Map<String, dynamic>>[];
-        final resultsInfo = <ToolResultInfo>[];
+        final resultsInfo = <EmitToolResult>[];
         for (final e in toolUses.entries) {
           final name = (e.value['name'] ?? '').toString();
           final args = (e.value['args'] as Map<String, dynamic>);
@@ -553,7 +553,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
             'content': res,
           });
           resultsInfo.add(
-            ToolResultInfo(
+            emitToolResult(
               id: e.key,
               name: name,
               arguments: args,
@@ -605,7 +605,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
           decoder.recordToolResult(tool.id, res);
           yield* emitToolResults(
             [
-              ToolResultInfo(
+              emitToolResult(
                 id: tool.id,
                 name: tool.name,
                 arguments: args,

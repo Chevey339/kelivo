@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _claudeConfig(
   String baseUrl, {
@@ -105,7 +107,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     await request.response.close();
   });
 
-  final chunks = await ChatApiService.sendLegacyMessageStream(
+  final chunks = await ChatApiService.sendMessageStream(
     config: _claudeConfig(
       'http://${server.address.address}:${server.port}',
       claudePromptCachingEnabled: claudePromptCachingEnabled,
@@ -119,7 +121,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     stream: false,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue);
+  expect(chunks.isGenerationDone, isTrue);
   return requestBody;
 }
 
@@ -192,7 +194,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   if (config.vertexAI == true) {
     await HttpOverrides.runZoned(
       () async {
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: config,
           modelId: modelId,
           messages: const [
@@ -200,7 +202,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
           ],
           stream: false,
         ).toList();
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
       },
       createHttpClient: (context) {
         return _ProxyHttpOverrides(server.port).createHttpClient(context);
@@ -210,7 +212,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
     final effectiveConfig = config.copyWith(
       baseUrl: 'http://${server.address.address}:${server.port}',
     );
-    final chunks = await ChatApiService.sendLegacyMessageStream(
+    final chunks = await ChatApiService.sendMessageStream(
       config: effectiveConfig,
       modelId: modelId,
       messages: const [
@@ -218,7 +220,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
       ],
       stream: false,
     ).toList();
-    expect(chunks.last.isDone, isTrue);
+    expect(chunks.isGenerationDone, isTrue);
   }
 
   return requestBody;
@@ -257,7 +259,7 @@ Future<Map<String, dynamic>> _captureClaudeProviderBody({
   final effectiveConfig = config.copyWith(
     baseUrl: 'http://${server.address.address}:${server.port}',
   );
-  final chunks = await ChatApiService.sendLegacyMessageStream(
+  final chunks = await ChatApiService.sendMessageStream(
     config: effectiveConfig,
     modelId: modelId,
     messages: const [
@@ -269,7 +271,7 @@ Future<Map<String, dynamic>> _captureClaudeProviderBody({
     stream: false,
   ).toList();
 
-  expect(chunks.last.isDone, isTrue);
+  expect(chunks.isGenerationDone, isTrue);
   return requestBody;
 }
 
@@ -507,7 +509,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: ProviderConfig(
           id: 'OpenRouterAnthropic',
           enabled: true,
@@ -524,7 +526,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requestUri.path, '/messages');
       expect(requestBody['thinking'], {
         'type': 'adaptive',
@@ -851,7 +853,7 @@ data: {"type":"message_stop"}
           },
         ).copyWith(baseUrl: 'http://${server.address.address}:${server.port}');
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: cfg,
           modelId: 'deepseek-v4-flash',
           messages: const [
@@ -860,8 +862,11 @@ data: {"type":"message_stop"}
           stream: true,
         ).toList();
 
-        expect(chunks.where((chunk) => chunk.content == 'done'), hasLength(1));
-        expect(chunks.last.isDone, isTrue);
+        expect(
+          chunks.whereType<TextDelta>().where((chunk) => chunk.text == 'done'),
+          hasLength(1),
+        );
+        expect(chunks.isGenerationDone, isTrue);
         expect(requestBodies, hasLength(1));
       },
     );
@@ -959,7 +964,7 @@ data: {"type":"message_stop"}
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _claudeConfig(
           'http://${server.address.address}:${server.port}',
         ),
@@ -1008,7 +1013,7 @@ data: {"type":"message_stop"}
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       final messages = (requestBody['messages'] as List).cast<Map>();
       final assistantContent = (messages[1]['content'] as List).cast<Map>();
       final toolResultContent = (messages[2]['content'] as List).cast<Map>();
@@ -1100,7 +1105,7 @@ data: {"type":"message_stop"}
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config:
               _claudeConfig(
                 'http://${server.address.address}:${server.port}',
@@ -1130,7 +1135,7 @@ data: {"type":"message_stop"}
           onToolCall: (name, args, {toolCallId}) async => '{"result":"ok"}',
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         expect(requestBodies, hasLength(2));
         final secondMessages = (requestBodies[1]['messages'] as List)
             .cast<Map>();
@@ -1374,7 +1379,7 @@ data: {"type":"message_stop"}
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _claudeConfig(
           'http://${server.address.address}:${server.port}',
         ),
@@ -1390,7 +1395,7 @@ data: {"type":"message_stop"}
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requestBodies, hasLength(2));
       final messages = (requestBodies[1]['messages'] as List).cast<Map>();
       final firstUserContent = (messages.first['content'] as List).cast<Map>();
