@@ -1543,7 +1543,9 @@ class _HomePageState extends State<HomePage>
         _controller.cancelFindJump();
         _controller.scrollCtrl.handleUserScrollIntent();
       },
-      chatFontScale: settings.chatFontScale,
+      // main.dart already bakes chatFontScale into the app-wide
+      // TextScaler; passing it again would double-scale messages.
+      chatFontScale: 1.0,
       collapseThinking: settings.autoCollapseThinking,
       collapseThinkingSteps: settings.collapseThinkingSteps,
       showThinkingCards: settings.showThinkingCards,
