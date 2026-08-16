@@ -2722,10 +2722,20 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         //   );
                                         // }
 
-                                        final enterToSend = context
-                                            .watch<SettingsProvider>()
-                                            .enterToSendOnMobile;
-                                        return GestureDetector(
+                                        final settings = context
+                                            .watch<SettingsProvider>();
+                                        final enterToSend =
+                                            settings.enterToSendOnMobile;
+                                        // Composer font scaling: the input
+                                        // font scale stacks on the app-wide UI
+                                        // scale from main.dart.
+                                        final mqData = MediaQuery.of(context);
+                                        final effectiveScale =
+                                            MediaQuery.textScalerOf(
+                                              context,
+                                            ).scale(1) *
+                                            settings.inputFontScale;
+                                        final inputField = GestureDetector(
                                           behavior:
                                               HitTestBehavior.deferToChild,
                                           // onSecondaryTapDown: (details) {
@@ -2796,6 +2806,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                                             cursorColor:
                                                 theme.colorScheme.primary,
                                           ),
+                                        );
+                                        return MediaQuery(
+                                          data: mqData.copyWith(
+                                            textScaler: TextScaler.linear(
+                                              effectiveScale,
+                                            ),
+                                          ),
+                                          child: inputField,
                                         );
                                       },
                                     ),

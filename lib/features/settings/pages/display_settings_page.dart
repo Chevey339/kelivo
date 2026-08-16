@@ -316,6 +316,27 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
               _iosDivider(context),
               _iosNavRow(
                 context,
+                icon: Lucide.Monitor,
+                label: l10n.displaySettingsPageUiFontSizeTitle,
+                detailBuilder: (ctx) {
+                  final scale = ctx.watch<SettingsProvider>().uiFontScale;
+                  return Text(
+                    '${(scale * 100).round()}%',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  );
+                },
+                onTap: () => _showFontScaleSheet(
+                  context,
+                  getter: (s) => s.uiFontScale,
+                  setter: (s, v) => s.setUiFontScale(v),
+                ),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
                 icon: Lucide.CaseSensitive,
                 label: l10n.displaySettingsPageChatFontSizeTitle,
                 detailBuilder: (ctx) {
@@ -328,7 +349,32 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                     ),
                   );
                 },
-                onTap: () => _showChatFontSizeSheet(context),
+                onTap: () => _showFontScaleSheet(
+                  context,
+                  getter: (s) => s.chatFontScale,
+                  setter: (s, v) => s.setChatFontScale(v),
+                ),
+              ),
+              _iosDivider(context),
+              _iosNavRow(
+                context,
+                icon: Lucide.TextInitial,
+                label: l10n.displaySettingsPageInputFontSizeTitle,
+                detailBuilder: (ctx) {
+                  final scale = ctx.watch<SettingsProvider>().inputFontScale;
+                  return Text(
+                    '${(scale * 100).round()}%',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.6),
+                      fontSize: 13,
+                    ),
+                  );
+                },
+                onTap: () => _showFontScaleSheet(
+                  context,
+                  getter: (s) => s.inputFontScale,
+                  setter: (s, v) => s.setInputFontScale(v),
+                ),
               ),
               _iosDivider(context),
               _iosNavRow(
@@ -609,8 +655,11 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
     }
   }
 
-  Future<void> _showChatFontSizeSheet(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
+  Future<void> _showFontScaleSheet(
+    BuildContext context, {
+    required double Function(SettingsProvider) getter,
+    required Future<void> Function(SettingsProvider, double) setter,
+  }) async {
     await showModalBottomSheet(
       context: context,
       backgroundColor: context.overlaySurface,
@@ -627,7 +676,7 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                 final theme = Theme.of(context);
                 final cs = theme.colorScheme;
                 final isDark = theme.brightness == Brightness.dark;
-                final scale = context.watch<SettingsProvider>().chatFontScale;
+                final scale = getter(context.watch<SettingsProvider>());
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -703,11 +752,10 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                                         ],
                                 ),
                               ),
-                              onChanged: (v) => context
-                                  .read<SettingsProvider>()
-                                  .setChatFontScale(
-                                    (v as double).clamp(0.5, 1.5),
-                                  ),
+                              onChanged: (v) => setter(
+                                context.read<SettingsProvider>(),
+                                (v as double).clamp(0.5, 1.5),
+                              ),
                             ),
                           ),
                         ),
@@ -727,11 +775,12 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        l10n.displaySettingsPageChatFontSampleText,
+                        AppLocalizations.of(
+                          context,
+                        )!.displaySettingsPageChatFontSampleText,
                         style: TextStyle(
                           fontSize:
-                              16 *
-                              context.watch<SettingsProvider>().chatFontScale,
+                              16 * getter(context.watch<SettingsProvider>()),
                         ),
                       ),
                     ),
