@@ -1331,6 +1331,11 @@ Stream<StreamChunk> _sendGoogleStream(
     if (!decoder.emittedImageEvents) {
       final pendingImage = await takeBufferedImageMarkdown();
       if (pendingImage.isNotEmpty) {
+        _logImageFallback(
+          provider: config.id,
+          model: modelId,
+          reason: 'google_decoder_missed_image',
+        );
         final sanitized = await sanitizeTextIfNeeded(pendingImage);
         yield* emitDelta(
           content: sanitized,

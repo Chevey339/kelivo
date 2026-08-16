@@ -7,6 +7,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
@@ -1025,6 +1026,71 @@ void main() {
         const [1, 2, 3, 4],
       );
       expect(chunks.last.isDone, isTrue);
+    });
+
+    test('emits Image events from non-stream output array', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_openrouter_responses_image_events_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      SandboxPathResolver.debugSetDirs(docsDir: tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        SandboxPathResolver.debugSetDirs(docsDir: null, supportDir: null);
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'output_text': 'Done',
+            'output': [
+              {
+                'type': 'openrouter:image_generation',
+                'result':
+                    'data:image/png;base64,${base64Encode(const [1, 2, 3, 4])}',
+              },
+            ],
+            'usage': {'input_tokens': 1, 'output_tokens': 1},
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _openAiConfig(_baseUrl(server), useResponseApi: true),
+        modelId: 'gpt-5.6-luna',
+        messages: const [
+          {'role': 'user', 'content': 'draw a cat'},
+        ],
+        stream: false,
+      ).toList();
+
+      expect(chunks.whereType<ImageStart>(), hasLength(1));
+      expect(chunks.whereType<ImageStart>().single.mimeType, 'image/png');
+      final uri = chunks.whereType<ImageSnapshot>().single.data;
+      expect(uri, startsWith('kelivo-file:///'));
+      expect(uri.endsWith('.png'), isTrue);
+      expect(chunks.whereType<ImageEnd>(), hasLength(1));
+      expect(chunks.whereType<TextDelta>().single.text, 'Done');
+      expect(chunks.whereType<Finish>(), hasLength(1));
+      expect(await File(SandboxPathResolver.fix(uri)).readAsBytes(), const [
+        1,
+        2,
+        3,
+        4,
+      ]);
     });
 
     test('renders partial image when completed output is empty', () async {

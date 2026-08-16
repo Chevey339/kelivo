@@ -20,7 +20,7 @@ Uri _openAICompatibleUrl(ProviderConfig config) {
   return Uri.parse('$rawBase$path');
 }
 
-Future<String> _saveResponsesImageGenerationMarkdown(
+Future<({String uri, String mimeType})?> _saveResponsesImageGeneration(
   String imageData, {
   String? outputFormat,
 }) async {
@@ -33,14 +33,35 @@ Future<String> _saveResponsesImageGenerationMarkdown(
   var imageBase64 = imageData.trim();
   if (imageBase64.startsWith('data:')) {
     final commaIndex = imageBase64.indexOf(',');
-    if (commaIndex < 0) return '';
+    if (commaIndex < 0) return null;
     mime = _mimeFromDataUrl(imageBase64);
     imageBase64 = imageBase64.substring(commaIndex + 1);
   }
   final savedPath = await AppDirectories.saveBase64Image(mime, imageBase64);
-  if (savedPath == null || savedPath.isEmpty) return '';
-  final uri = SandboxPathResolver.canonicalize(savedPath);
-  return '\n![image]($uri)\n';
+  if (savedPath == null || savedPath.isEmpty) return null;
+  return (uri: SandboxPathResolver.canonicalize(savedPath), mimeType: mime);
+}
+
+Future<String> _saveResponsesImageGenerationMarkdown(
+  String imageData, {
+  String? outputFormat,
+}) async {
+  final saved = await _saveResponsesImageGeneration(
+    imageData,
+    outputFormat: outputFormat,
+  );
+  if (saved == null) return '';
+  return '\n![image](${saved.uri})\n';
+}
+
+void _logImageFallback({
+  required String provider,
+  required String model,
+  required String reason,
+}) {
+  final message = 'provider=$provider model=$model reason=$reason';
+  debugPrint('[ImageFallback] $message');
+  FlutterLogger.log(message, tag: 'ImageFallback');
 }
 
 bool _isResponsesImageGenerationType(dynamic type) {
@@ -1903,6 +1924,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           } catch (_) {}
         }
         final shouldReadOutputText = outText.isEmpty;
+        final images = <({String uri, String mimeType})>[];
         try {
           final out = rawOutput as List?;
           if (out != null) {
@@ -1912,11 +1934,11 @@ Stream<StreamChunk> _sendOpenAIStream(
               if (_isResponsesImageGenerationType(it['type'])) {
                 final b64 = (it['result'] ?? '').toString();
                 if (b64.isNotEmpty) {
-                  final mdImg = await _saveResponsesImageGenerationMarkdown(
+                  final saved = await _saveResponsesImageGeneration(
                     b64,
                     outputFormat: (it['output_format'] ?? '').toString(),
                   );
-                  if (mdImg.isNotEmpty) buf.write(mdImg);
+                  if (saved != null) images.add(saved);
                 }
                 continue;
               }
@@ -1946,6 +1968,7 @@ Stream<StreamChunk> _sendOpenAIStream(
           null,
           obj['usage'] ?? obj['response']?['usage'],
         );
+        yield* emitImages(images);
         yield* emitDone(
           content: outText,
           reasoning: reasoningText.isEmpty ? null : reasoningText,
@@ -2531,19 +2554,27 @@ Stream<StreamChunk> _sendOpenAIStream(
               },
           });
         if (!decoder.emittedImageEvents) {
+          var fallbackCount = 0;
           for (final image in decoder.takeImages()) {
             if (image.base64.isEmpty) continue;
             final mdImg = await _saveResponsesImageGenerationMarkdown(
               image.base64,
               outputFormat: image.outputFormat,
             );
-            if (mdImg.isNotEmpty) {
-              yield* emitDelta(
-                content: mdImg,
-                usage: usage,
-                totalTokens: totalTokens,
-              );
-            }
+            if (mdImg.isEmpty) continue;
+            fallbackCount++;
+            yield* emitDelta(
+              content: mdImg,
+              usage: usage,
+              totalTokens: totalTokens,
+            );
+          }
+          if (fallbackCount > 0) {
+            _logImageFallback(
+              provider: config.id,
+              model: modelId,
+              reason: 'responses_decoder_missed_image count=$fallbackCount',
+            );
           }
         }
         if (!decoder.emittedCitationEvents && decoder.citations.isNotEmpty) {
