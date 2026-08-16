@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _siliconFlowConfig(String baseUrl, {String apiKey = ''}) {
   return ProviderConfig(
@@ -71,7 +72,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -80,7 +81,7 @@ void main() {
           thinkingBudget: 1024,
         ).toList();
 
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -198,7 +199,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -251,14 +252,11 @@ void main() {
         expect(toolMessage['tool_call_id'], 'call_1');
         expect(toolMessage['name'], 'date');
         expect(toolMessage['content'], '2026-03-27');
-        expect(
-          chunks.map((chunk) => chunk.content).join(),
-          contains('今天是 2026-03-27'),
-        );
-        expect(chunks.last.totalTokens, 895);
-        expect(chunks.last.usage?.promptTokens, 842);
-        expect(chunks.last.usage?.completionTokens, 53);
-        expect(chunks.last.usage?.cachedTokens, 384);
+        expect(chunks.joinedContent, contains('今天是 2026-03-27'));
+        expect(chunks.lastTotalTokens, 895);
+        expect(chunks.lastUsage?.promptTokens, 842);
+        expect(chunks.lastUsage?.completionTokens, 53);
+        expect(chunks.lastUsage?.cachedTokens, 384);
       },
     );
 
@@ -337,7 +335,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -383,14 +381,8 @@ void main() {
         expect(assistantToolMessage['content'], '我去调用工具');
         expect(toolMessage['tool_call_id'], 'call_1');
         expect(toolMessage['content'], '2026-03-27');
-        expect(
-          chunks.lastWhere((chunk) => chunk.isDone).totalTokens,
-          greaterThanOrEqualTo(0),
-        );
-        expect(
-          chunks.map((chunk) => chunk.content).join(),
-          contains('今天是 2026-03-27'),
-        );
+        expect(chunks.lastTotalTokens, greaterThanOrEqualTo(0));
+        expect(chunks.joinedContent, contains('今天是 2026-03-27'));
       },
     );
   });

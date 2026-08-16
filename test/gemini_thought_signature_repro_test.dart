@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _geminiConfig(String baseUrl) {
   return ProviderConfig(
@@ -147,7 +148,7 @@ void main() {
       });
 
       await expectLater(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
@@ -232,7 +233,7 @@ void main() {
           fail('Unexpected request count: $requestCount');
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
@@ -264,7 +265,7 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
       },
     );
 
@@ -326,7 +327,7 @@ void main() {
         fail('Unexpected request count: $requestCount');
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -368,7 +369,7 @@ void main() {
       ).toList();
 
       expect(requestCount, 2);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('keeps a detached signature part instead of moving it', () async {
@@ -433,7 +434,7 @@ void main() {
         fail('Unexpected request count: $requestCount');
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -461,7 +462,7 @@ void main() {
       ).toList();
 
       expect(requestCount, 2);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('preserves unknown non-thought model parts in replay', () async {
@@ -527,7 +528,7 @@ void main() {
         fail('Unexpected request count: $requestCount');
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -558,7 +559,7 @@ void main() {
       ).toList();
 
       expect(requestCount, 2);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('preserves signed toolCall and functionCall parts in order', () async {
@@ -626,7 +627,7 @@ void main() {
         fail('Unexpected request count: $requestCount');
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -659,7 +660,7 @@ void main() {
       ).toList();
 
       expect(requestCount, 2);
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test(
@@ -688,7 +689,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
@@ -758,7 +759,7 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         final contents = (requestBody['contents'] as List).cast<Map>();
         final modelParts = (contents[1]['parts'] as List).cast<Map>();
         final responseParts = (contents[2]['parts'] as List).cast<Map>();
@@ -801,7 +802,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _geminiConfig(
             'http://${server.address.address}:${server.port}/v1beta',
           ),
@@ -862,7 +863,7 @@ void main() {
           ],
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         final contents = (requestBody['contents'] as List).cast<Map>();
         final modelParts = (contents[1]['parts'] as List).cast<Map>();
         final replayedCall = modelParts.singleWhere(

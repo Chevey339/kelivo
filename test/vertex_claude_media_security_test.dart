@@ -82,7 +82,7 @@ Future<HttpHeaders?> _captureVertexClaudeMediaDownloadHeaders({
   try {
     await HttpOverrides.runZoned(
       () async {
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: _vertexClaudeConfig(),
           modelId: 'claude-sonnet-4@20250514',
           messages: [
@@ -327,7 +327,7 @@ void main() {
           await request.response.close();
         });
 
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: ProviderConfig(
             id: 'ClaudeJpgAliasTest',
             enabled: true,

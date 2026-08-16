@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import '../../../core/database/generation_run.dart';
@@ -14,9 +15,7 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
-import '../../../core/services/api/stream/legacy_chunk_adapter.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
-import '../../../core/services/api/stream/stream_chunk_shadow.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
@@ -30,7 +29,6 @@ import 'chat_controller.dart';
 import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
-import 'legacy_content_bookkeeping.dart';
 import 'stream_controller.dart' as stream_ctrl;
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
@@ -1839,8 +1837,8 @@ class ChatActions {
         ChatApiService.cancelRequest(conversationId);
         await _cancelSubscriptionWithTimeout(previousSub);
       }
-      final sub = listenSequentiallyToStream<ChatStreamChunk>(
-        stream: _adaptWithShadow(stream, state),
+      final sub = listenSequentiallyToStream<StreamChunk>(
+        stream: stream,
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),
@@ -1851,92 +1849,151 @@ class ChatActions {
     }
   }
 
-  Stream<ChatStreamChunk> _adaptWithShadow(
-    Stream<StreamChunk> raw,
-    stream_ctrl.StreamingState state,
-  ) {
-    final adapter = LegacyChunkAdapter();
-    return raw.asyncExpand((chunk) {
-      state.shadowHandler.handle(chunk);
-      return Stream.fromIterable(adapter.handle(chunk));
-    });
-  }
-
-  void _reportStreamChunkShadow(stream_ctrl.StreamingState state) {
-    final messageId = state.messageId;
-    final tools = streamController.getToolParts(messageId) ?? const [];
-    final segments = streamController.reasoningSegments[messageId] ?? const [];
-    StreamChunkShadow.reportChat(
-      conversationId: state.conversationId,
-      messageId: messageId,
-      parts: state.shadowHandler.parts,
-      fullContentRaw: state.fullContentRaw,
-      offsets: state.contentSplitOffsets,
-      reasoningCounts: state.reasoningCountAtSplit,
-      toolCounts: state.toolCountAtSplit,
-      toolIds: [for (final tool in tools) tool.id],
-      reasoningSegments: [
-        for (final segment in segments)
-          (
-            hasText: segment.text.isNotEmpty,
-            toolStartIndex: segment.toolStartIndex,
-          ),
-      ],
-      reasoningFallbackText:
-          streamController.reasoning[messageId]?.text ??
-          state.bufferedReasoning,
-      responsesImageDuplicates: state.ctx.config.useResponseApi == true,
-    );
-  }
-
   // ============================================================================
   // Stream Chunk Handlers
   // ============================================================================
 
   /// Dispatch stream chunk to appropriate handler.
   Future<void> _handleStreamChunk(
-    ChatStreamChunk chunk,
+    StreamChunk chunk,
     stream_ctrl.StreamingState state,
   ) async {
     await _markGenerationStreaming(state);
-    final chunkContent = chunk.content.isNotEmpty
-        ? streamController.captureGeminiThoughtSignature(
-            chunk.content,
-            state.messageId,
-          )
-        : '';
-
-    // Persist vendor reasoning details (may carry thinking signatures) so
-    // they can be echoed back on subsequent turns.
-    if (chunk.reasoningDetails != null) {
-      streamController.setReasoningDetails(
-        state.messageId,
-        chunk.reasoningDetails,
-      );
+    state.shadowHandler.handle(chunk);
+    switch (chunk) {
+      case TextDelta(:final text):
+        final cleaned = text.isNotEmpty
+            ? streamController.captureGeminiThoughtSignature(
+                text,
+                state.messageId,
+              )
+            : '';
+        await _handleContentChunk(state, cleaned);
+        _scheduleStreamingCheckpoint(state);
+      case ReasoningDelta(:final text, :final details):
+        if (details != null) {
+          streamController.setReasoningDetails(state.messageId, details);
+        }
+        if (text.isNotEmpty && state.ctx.supportsReasoning) {
+          await _handleReasoningChunk(text, state);
+        }
+        _scheduleStreamingCheckpoint(state);
+      case ToolCallStart(:final id, :final toolName, :final metadata):
+        if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+        await _handleToolCallsChunk([
+          emitToolCall(
+            id: id,
+            name: state.pendingToolNames[id] ?? toolName,
+            arguments: const <String, dynamic>{},
+            metadata: metadata,
+          ),
+        ], state);
+        _scheduleStreamingCheckpoint(state);
+      case ToolCallDelta(:final id, :final toolNameDelta):
+        if (toolNameDelta.isNotEmpty) {
+          state.pendingToolNames[id] =
+              '${state.pendingToolNames[id] ?? ''}$toolNameDelta';
+        }
+      case ToolCallEnd(:final id):
+        await _handleToolCallsChunk([
+          _emitToolCallFromHandler(state, id),
+        ], state);
+        _scheduleStreamingCheckpoint(state);
+      case ServerToolStart(:final id, :final toolName):
+        if (toolName.isNotEmpty) state.pendingToolNames[id] = toolName;
+      case ServerToolEnd(
+        :final id,
+        :final input,
+        :final output,
+        :final metadata,
+      ):
+        await _handleToolResultsChunk([
+          emitToolResult(
+            id: id,
+            name: state.pendingToolNames.remove(id) ?? '',
+            arguments: input is Map
+                ? input.cast<String, dynamic>()
+                : const <String, dynamic>{},
+            content: output == null
+                ? ''
+                : output is String
+                ? output
+                : jsonEncode(output),
+            metadata: metadata,
+          ),
+        ], state);
+        _scheduleStreamingCheckpoint(state);
+      case Annotations(:final annotations):
+        if (annotations.isEmpty) return;
+        await _handleToolResultsChunk([
+          emitToolResult(
+            id: 'builtin_search',
+            name: 'search_web',
+            arguments: const <String, dynamic>{},
+            content: jsonEncode(<String, dynamic>{
+              'items': [
+                for (final citation
+                    in annotations.whereType<UrlCitationAnnotation>())
+                  <String, dynamic>{
+                    'url': citation.url,
+                    if (citation.title.isNotEmpty) 'title': citation.title,
+                  },
+              ],
+            }),
+          ),
+        ], state);
+        _scheduleStreamingCheckpoint(state);
+      case Usage(:final usage):
+        _applyUsage(state, usage);
+      case Finish():
+        await _handleStreamFinish(state);
+      case ImageStart() || ImageDelta() || ImageSnapshot() || ImageEnd():
+        _publishAssistantParts(state);
+        _scheduleStreamingCheckpoint(state);
+      case TextStart() ||
+          TextEnd() ||
+          ReasoningStart() ||
+          ReasoningEnd() ||
+          ServerToolInputDelta() ||
+          ServerToolInputEnd():
+        break;
     }
+  }
 
-    // Handle reasoning
-    if ((chunk.reasoning ?? '').isNotEmpty && state.ctx.supportsReasoning) {
-      await _handleReasoningChunk(chunk, state);
-    }
+  void _applyUsage(stream_ctrl.StreamingState state, TokenUsage usage) {
+    state.usage = (state.usage ?? const TokenUsage()).merge(usage);
+    state.totalTokens = state.usage!.totalTokens;
+  }
 
-    // Handle tool calls
-    if ((chunk.toolCalls ?? const []).isNotEmpty) {
-      await _handleToolCallsChunk(chunk, state);
+  EmitToolCall _emitToolCallFromHandler(
+    stream_ctrl.StreamingState state,
+    String id,
+  ) {
+    for (final part in state.shadowHandler.parts.reversed) {
+      if (part is! ToolCallPart) continue;
+      try {
+        final decoded = jsonDecode(part.payloadJson);
+        if (decoded is! Map) continue;
+        if ((decoded['id'] ?? '').toString() != id) continue;
+        final args = decoded['arguments'];
+        return emitToolCall(
+          id: id,
+          name: (decoded['name'] ?? state.pendingToolNames[id] ?? '')
+              .toString(),
+          arguments: args is Map
+              ? args.cast<String, dynamic>()
+              : const <String, dynamic>{},
+          metadata: decoded['metadata'] is Map
+              ? (decoded['metadata'] as Map).cast<String, dynamic>()
+              : null,
+        );
+      } catch (_) {}
     }
-
-    // Handle tool results
-    if ((chunk.toolResults ?? const []).isNotEmpty) {
-      await _handleToolResultsChunk(chunk, state);
-    }
-
-    // Handle finish or content
-    if (chunk.isDone) {
-      await _handleStreamFinish(chunk, state, chunkContent);
-    } else {
-      await _handleContentChunk(chunk, state, chunkContent);
-      _scheduleStreamingCheckpoint(state);
-    }
+    return emitToolCall(
+      id: id,
+      name: state.pendingToolNames[id] ?? '',
+      arguments: const <String, dynamic>{},
+    );
   }
 
   Future<void> _markGenerationStreaming(
@@ -1968,20 +2025,20 @@ class ChatActions {
 
   /// Handle reasoning chunk from stream.
   Future<void> _handleReasoningChunk(
-    ChatStreamChunk chunk,
+    String reasoning,
     stream_ctrl.StreamingState state,
   ) async {
-    await streamController.handleReasoningChunk(chunk, state);
+    await streamController.handleReasoningChunk(reasoning, state);
     _publishAssistantParts(state);
   }
 
   /// Handle tool calls chunk from stream.
   Future<void> _handleToolCallsChunk(
-    ChatStreamChunk chunk,
+    List<EmitToolCall> toolCalls,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolCallsChunk(
-      chunk,
+      toolCalls,
       state,
       updateReasoningSegmentsInDb: (String messageId, String json) async {
         // The complete reasoning snapshot is coalesced after this chunk.
@@ -1999,11 +2056,11 @@ class ChatActions {
 
   /// Handle tool results chunk from stream.
   Future<void> _handleToolResultsChunk(
-    ChatStreamChunk chunk,
+    List<EmitToolResult> toolResults,
     stream_ctrl.StreamingState state,
   ) async {
     await streamController.handleToolResultsChunk(
-      chunk,
+      toolResults,
       state,
       upsertToolEventInDb:
           (
@@ -2040,7 +2097,6 @@ class ChatActions {
 
   /// Handle content chunk from stream (non-done).
   Future<void> _handleContentChunk(
-    ChatStreamChunk chunk,
     stream_ctrl.StreamingState state,
     String chunkContent,
   ) async {
@@ -2050,15 +2106,8 @@ class ChatActions {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
 
-    _recordContentSplit(state, chunkContent);
+    _recordContent(state, chunkContent);
     state.streamStartedAt ??= DateTime.now();
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
-      state.totalTokens = state.usage!.totalTokens;
-    }
 
     // End reasoning when content starts
     if (state.ctx.streamOutput && chunkContent.isNotEmpty) {
@@ -2110,11 +2159,7 @@ class ChatActions {
   }
 
   /// Handle stream finish (isDone == true).
-  Future<void> _handleStreamFinish(
-    ChatStreamChunk chunk,
-    stream_ctrl.StreamingState state,
-    String chunkContent,
-  ) async {
+  Future<void> _handleStreamFinish(stream_ctrl.StreamingState state) async {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     final autoCollapseThinking =
@@ -2122,21 +2167,11 @@ class ChatActions {
         ? contextProvider.read<SettingsProvider>().autoCollapseThinking
         : null;
 
-    _recordContentSplit(state, chunkContent);
-
     // Don't finish if tools are still loading
     final hasLoadingTool =
         (streamController.toolParts[messageId]?.any((p) => p.loading) ?? false);
     if (hasLoadingTool) {
       return;
-    }
-
-    if (chunk.totalTokens > 0) {
-      state.totalTokens = chunk.totalTokens;
-    }
-    if (chunk.usage != null) {
-      state.usage = (state.usage ?? const TokenUsage()).merge(chunk.usage!);
-      state.totalTokens = state.usage!.totalTokens;
     }
 
     // Materialize buffered reasoning before the final checkpoint.
@@ -2357,8 +2392,6 @@ class ChatActions {
         generateTitle: state.ctx.generateTitleOnFinish,
       );
     }
-    _reportStreamChunkShadow(state);
-
     // Idempotent: ensure notifier is removed even if _finishStreaming was skipped
     streamController.removeStreamingNotifier(messageId);
     onStreamFinished?.call(conversationId);
@@ -2425,29 +2458,9 @@ class ChatActions {
     onScheduleImageSanitize?.call(streaming.id, latestContent, immediate: true);
   }
 
-  void _recordContentSplit(
-    stream_ctrl.StreamingState state,
-    String chunkContent,
-  ) {
-    final bookkeeping = LegacyContentBookkeeping(
-      hadThinkingBlock: state.hadThinkingBlock,
-      fullContentRaw: state.fullContentRaw,
-      offsets: state.contentSplitOffsets,
-      reasoningCounts: state.reasoningCountAtSplit,
-      toolCounts: state.toolCountAtSplit,
-    );
-    bookkeeping.addContent(
-      chunkContent,
-      reasoningCount: streamController.getReasoningSegmentCount(
-        state.messageId,
-      ),
-      toolCount: streamController.getToolPartsCount(state.messageId),
-    );
-    state
-      ..hadThinkingBlock = bookkeeping.hadThinkingBlock
-      ..fullContentRaw = bookkeeping.fullContentRaw
-      ..contentSplitOffsets = bookkeeping.offsets
-      ..reasoningCountAtSplit = bookkeeping.reasoningCounts
-      ..toolCountAtSplit = bookkeeping.toolCounts;
+  void _recordContent(stream_ctrl.StreamingState state, String chunkContent) {
+    if (chunkContent.isNotEmpty) {
+      state.fullContentRaw += chunkContent;
+    }
   }
 }

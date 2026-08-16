@@ -5,6 +5,7 @@ import '../../../core/models/chat_message.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../settings/widgets/language_select_sheet.dart';
 
@@ -112,7 +113,7 @@ class TranslationService {
       // 创建翻译请求
       final provider = settings.getProviderConfig(translateProvider);
 
-      final translationStream = ChatApiService.sendLegacyMessageStream(
+      final translationStream = ChatApiService.sendMessageStream(
         config: provider,
         modelId: translateModelId,
         messages: [
@@ -126,10 +127,8 @@ class TranslationService {
       final buffer = StringBuffer();
 
       await for (final chunk in translationStream) {
-        // Reasoning/usage chunks carry no visible text. Keep the loading card
-        // until translated text arrives instead of replacing it with empty.
-        if (chunk.content.isEmpty && !chunk.isDone) continue;
-        buffer.write(chunk.content);
+        if (chunk is! TextDelta || chunk.text.isEmpty) continue;
+        buffer.write(chunk.text);
         // 实时更新翻译
         onTranslationUpdate(buffer.toString());
       }

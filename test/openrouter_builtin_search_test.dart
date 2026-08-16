@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _openRouterConfig({
   required String modelId,
@@ -108,7 +109,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendLegacyMessageStream(
+          final chunks = await ChatApiService.sendMessageStream(
             config: _openRouterConfig(modelId: 'deepseek/deepseek-chat'),
             modelId: 'deepseek/deepseek-chat',
             messages: const <Map<String, dynamic>>[
@@ -117,7 +118,7 @@ void main() {
             stream: false,
           ).toList();
 
-          expect(chunks.last.isDone, isTrue);
+          expect(chunks.isGenerationDone, isTrue);
         },
         createHttpClient: (context) {
           return _ProxyHttpOverrides(server.port).createHttpClient(context);
@@ -169,7 +170,7 @@ void main() {
 
         await HttpOverrides.runZoned(
           () async {
-            final chunks = await ChatApiService.sendLegacyMessageStream(
+            final chunks = await ChatApiService.sendMessageStream(
               config: _openRouterConfig(
                 modelId: 'deepseek/deepseek-chat',
                 searchEnabled: false,
@@ -181,7 +182,7 @@ void main() {
               stream: false,
             ).toList();
 
-            expect(chunks.last.isDone, isTrue);
+            expect(chunks.isGenerationDone, isTrue);
           },
           createHttpClient: (context) {
             return _ProxyHttpOverrides(server.port).createHttpClient(context);
@@ -228,7 +229,7 @@ void main() {
 
         await HttpOverrides.runZoned(
           () async {
-            final chunks = await ChatApiService.sendLegacyMessageStream(
+            final chunks = await ChatApiService.sendMessageStream(
               config: _openRouterConfig(
                 modelId: 'anthropic/claude-sonnet-4.5',
                 searchEnabled: false,
@@ -245,7 +246,7 @@ void main() {
               stream: false,
             ).toList();
 
-            expect(chunks.last.isDone, isTrue);
+            expect(chunks.isGenerationDone, isTrue);
           },
           createHttpClient: (context) {
             return _ProxyHttpOverrides(server.port).createHttpClient(context);
@@ -288,7 +289,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          await ChatApiService.sendLegacyMessageStream(
+          await ChatApiService.sendMessageStream(
             config: _openRouterConfig(
               modelId: 'anthropic/claude-sonnet-4.5',
               searchEnabled: false,
@@ -348,7 +349,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendLegacyMessageStream(
+          final chunks = await ChatApiService.sendMessageStream(
             config: _openRouterConfig(
               modelId: 'deepseek/deepseek-chat',
               searchEnabled: false,
@@ -362,7 +363,7 @@ void main() {
             stream: false,
           ).toList();
 
-          expect(chunks.last.isDone, isTrue);
+          expect(chunks.isGenerationDone, isTrue);
         },
         createHttpClient: (context) {
           return _ProxyHttpOverrides(server.port).createHttpClient(context);

@@ -36,7 +36,7 @@ List<Map<String, dynamic>> _toResponsesToolsFormat(
 
 List<Map<String, dynamic>> _withResponsesFunctionCallItems(
   List<Map<String, dynamic>> outputItems,
-  Iterable<ToolCallInfo> calls,
+  Iterable<EmitToolCall> calls,
 ) {
   final replayItems = <Map<String, dynamic>>[
     for (final item in outputItems) Map<String, dynamic>.from(item),

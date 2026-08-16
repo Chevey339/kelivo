@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _deepSeekConfig(String baseUrl, {bool useResponseApi = false}) {
   return ProviderConfig(
@@ -76,7 +77,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -87,13 +88,12 @@ void main() {
       ).toList();
 
       expect(requestBody['stream'], isFalse);
-      expect(chunks, hasLength(1));
-      expect(chunks.single.content, '9.8 is greater.');
-      expect(chunks.single.reasoning, 'Compare the decimal values.');
-      expect(chunks.single.usage?.promptTokens, 100);
-      expect(chunks.single.usage?.completionTokens, 30);
-      expect(chunks.single.usage?.cachedTokens, 64);
-      expect(chunks.single.usage?.totalTokens, 130);
+      expect(chunks.joinedContent, '9.8 is greater.');
+      expect(chunks.joinedReasoning, 'Compare the decimal values.');
+      expect(chunks.lastUsage?.promptTokens, 100);
+      expect(chunks.lastUsage?.completionTokens, 30);
+      expect(chunks.lastUsage?.cachedTokens, 64);
+      expect(chunks.lastUsage?.totalTokens, 130);
     });
 
     test('Responses stream reports cached tokens without DONE event', () async {
@@ -129,7 +129,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -137,11 +137,11 @@ void main() {
         ],
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
-      expect(chunks.last.usage?.promptTokens, 80);
-      expect(chunks.last.usage?.completionTokens, 12);
-      expect(chunks.last.usage?.cachedTokens, 48);
-      expect(chunks.last.usage?.totalTokens, 92);
+      expect(chunks.isGenerationDone, isTrue);
+      expect(chunks.lastUsage?.promptTokens, 80);
+      expect(chunks.lastUsage?.completionTokens, 12);
+      expect(chunks.lastUsage?.cachedTokens, 48);
+      expect(chunks.lastUsage?.totalTokens, 92);
     });
 
     test('Responses off reasoning sends effort none', () async {
@@ -175,7 +175,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -185,7 +185,7 @@ void main() {
         stream: false,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requestBody['reasoning'], {'effort': 'none'});
     });
 
@@ -227,7 +227,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _deepSeekConfig(baseUrl),
           modelId: 'deepseek-v4-pro',
           messages: const [
@@ -236,7 +236,7 @@ void main() {
           thinkingBudget: 64000,
         ).toList();
 
-        expect(chunks.last.isDone, isTrue);
+        expect(chunks.isGenerationDone, isTrue);
         expect(requests, hasLength(1));
         expect(requests.single['thinking'], {'type': 'enabled'});
         expect(requests.single['reasoning_effort'], 'xhigh');
@@ -279,7 +279,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl),
         modelId: 'deepseek-v4-pro',
         messages: const [
@@ -288,7 +288,7 @@ void main() {
         thinkingBudget: 0,
       ).toList();
 
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
       expect(requests, hasLength(1));
       expect(requests.single['thinking'], {'type': 'disabled'});
       expect(requests.single.containsKey('reasoning_effort'), isFalse);
@@ -324,7 +324,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _deepSeekConfig(baseUrl),
         modelId: 'deepseek-reasoner',
         messages: const [
@@ -374,7 +374,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: _deepSeekConfig(baseUrl),
           modelId: 'deepseek-reasoner',
           messages: const [

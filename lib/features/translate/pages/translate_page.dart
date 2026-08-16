@@ -10,6 +10,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../settings/widgets/language_select_sheet.dart'
@@ -131,7 +132,7 @@ class _TranslatePageState extends State<TranslatePage> {
     });
 
     try {
-      final stream = ChatApiService.sendLegacyMessageStream(
+      final stream = ChatApiService.sendMessageStream(
         config: cfg,
         modelId: mid,
         messages: [
@@ -143,7 +144,8 @@ class _TranslatePageState extends State<TranslatePage> {
       );
       _sub = stream.listen(
         (chunk) {
-          final s = chunk.content;
+          if (chunk is! TextDelta) return;
+          final s = chunk.text;
           if (_dst.text.isEmpty) {
             // Remove any leading whitespace/newlines from the first chunk to avoid top gap
             final cleaned = s.replaceFirst(RegExp(r'^\s+'), '');

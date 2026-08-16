@@ -5,6 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _testConfig(
   String baseUrl,
@@ -37,10 +39,10 @@ Future<HttpServer> _sseServer(List<String> frames) async {
   return server;
 }
 
-Future<({List<ChatStreamChunk> chunks, Object? error})> _drain(
-  Stream<ChatStreamChunk> stream,
+Future<({List<StreamChunk> chunks, Object? error})> _drain(
+  Stream<StreamChunk> stream,
 ) async {
-  final chunks = <ChatStreamChunk>[];
+  final chunks = <StreamChunk>[];
   Object? error;
   try {
     await for (final c in stream) {
@@ -75,7 +77,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -89,8 +91,8 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('Rate limit exceeded'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.joinedContent, contains('Partial'));
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test(
@@ -124,7 +126,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendLegacyMessageStream(
+          ChatApiService.sendMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}/v1',
               ProviderKind.openai,
@@ -137,8 +139,8 @@ void main() {
         );
 
         expect(result.error, isNull);
-        expect(result.chunks.map((c) => c.content).join(), 'Hello World');
-        expect(result.chunks.last.isDone, isTrue);
+        expect(result.chunks.joinedContent, 'Hello World');
+        expect(result.chunks.isGenerationDone, isTrue);
       },
     );
 
@@ -174,7 +176,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -188,8 +190,8 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('Provider ran out of capacity'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.joinedContent, contains('Partial'));
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
   });
 
@@ -248,11 +250,11 @@ void main() {
       return server;
     }
 
-    Future<({List<ChatStreamChunk> chunks, Object? error})> runTwoRounds(
+    Future<({List<StreamChunk> chunks, Object? error})> runTwoRounds(
       HttpServer server,
     ) {
       return _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -281,8 +283,8 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('HTTP 500'));
-      expect(result.chunks.any((c) => c.toolCalls != null), isTrue);
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.any((c) => c is ToolCallStart), isTrue);
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test(
@@ -310,7 +312,7 @@ void main() {
         expect(requestCount, 1);
         expect(result.error, isA<HttpException>());
         expect(result.error.toString(), contains('Follow-up request failed'));
-        expect(result.chunks.any((c) => c.isDone), isFalse);
+        expect(result.chunks.any((c) => c is Finish), isFalse);
       },
     );
 
@@ -334,7 +336,7 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('Follow-up rate limited'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test('malformed JSON line is still skipped', () async {
@@ -365,7 +367,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -378,8 +380,8 @@ void main() {
       );
 
       expect(result.error, isNull);
-      expect(result.chunks.map((c) => c.content).join(), 'Hello');
-      expect(result.chunks.last.isDone, isTrue);
+      expect(result.chunks.joinedContent, 'Hello');
+      expect(result.chunks.isGenerationDone, isTrue);
     });
   });
 
@@ -407,7 +409,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendLegacyMessageStream(
+          ChatApiService.sendMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}/v1',
               ProviderKind.openai,
@@ -422,8 +424,8 @@ void main() {
 
         expect(result.error, isA<HttpException>());
         expect(result.error.toString(), contains('The model crashed'));
-        expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-        expect(result.chunks.any((c) => c.isDone), isFalse);
+        expect(result.chunks.joinedContent, contains('Partial'));
+        expect(result.chunks.any((c) => c is Finish), isFalse);
       },
     );
 
@@ -442,7 +444,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -457,7 +459,7 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('content_filter'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test('event: error frame without top-level error key ends stream '
@@ -475,7 +477,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -490,7 +492,7 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('Stream exploded'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
   });
 
@@ -520,7 +522,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.claude,
@@ -534,8 +536,8 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('Overloaded'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.joinedContent, contains('Partial'));
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
   });
 
@@ -570,7 +572,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendLegacyMessageStream(
+          ChatApiService.sendMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}',
               ProviderKind.google,
@@ -587,8 +589,8 @@ void main() {
           result.error.toString(),
           contains('Resource has been exhausted'),
         );
-        expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-        expect(result.chunks.any((c) => c.isDone), isFalse);
+        expect(result.chunks.joinedContent, contains('Partial'));
+        expect(result.chunks.any((c) => c is Finish), isFalse);
       },
     );
 
@@ -602,7 +604,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,
@@ -616,7 +618,7 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('SAFETY'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test('candidate finishReason SAFETY mid-generation ends stream with '
@@ -649,7 +651,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,
@@ -663,8 +665,8 @@ void main() {
 
       expect(result.error, isA<HttpException>());
       expect(result.error.toString(), contains('SAFETY'));
-      expect(result.chunks.map((c) => c.content).join(), contains('Partial'));
-      expect(result.chunks.any((c) => c.isDone), isFalse);
+      expect(result.chunks.joinedContent, contains('Partial'));
+      expect(result.chunks.any((c) => c is Finish), isFalse);
     });
 
     test('finishReason STOP still completes normally', () async {
@@ -686,7 +688,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,
@@ -699,8 +701,8 @@ void main() {
       );
 
       expect(result.error, isNull);
-      expect(result.chunks.map((c) => c.content).join(), contains('Done'));
-      expect(result.chunks.any((c) => c.isDone), isTrue);
+      expect(result.chunks.joinedContent, contains('Done'));
+      expect(result.chunks.any((c) => c is Finish), isTrue);
     });
   });
 }

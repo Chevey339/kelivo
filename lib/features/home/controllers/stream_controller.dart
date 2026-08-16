@@ -826,10 +826,10 @@ class StreamController {
 
   /// Process a reasoning chunk from stream.
   Future<void> handleReasoningChunk(
-    ChatStreamChunk chunk,
+    String reasoning,
     StreamingState state,
   ) async {
-    if ((chunk.reasoning ?? '').isEmpty || !state.ctx.supportsReasoning) return;
+    if (reasoning.isEmpty || !state.ctx.supportsReasoning) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
@@ -839,7 +839,7 @@ class StreamController {
       final initialExpanded = !getSettingsProvider().autoCollapseThinking;
       final isNewReasoning = !_reasoning.containsKey(messageId);
       final r = _reasoning[messageId] ?? ReasoningData();
-      r.text += chunk.reasoning!;
+      r.text += reasoning;
       r.startAt ??= DateTime.now();
       // NOTE: Do not reset r.expanded here - preserve user's toggle state during streaming
       if (isNewReasoning) {
@@ -852,7 +852,7 @@ class StreamController {
           _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
       if (segments.isEmpty) {
         final newSegment = ReasoningSegmentData();
-        newSegment.text = chunk.reasoning!;
+        newSegment.text = reasoning;
         newSegment.startAt = DateTime.now();
         newSegment.expanded = initialExpanded;
         newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
@@ -863,13 +863,13 @@ class StreamController {
         final lastSegment = segments.last;
         if (hasToolsAfterLastSegment && lastSegment.finishedAt != null) {
           final newSegment = ReasoningSegmentData();
-          newSegment.text = chunk.reasoning!;
+          newSegment.text = reasoning;
           newSegment.startAt = DateTime.now();
           newSegment.expanded = initialExpanded;
           newSegment.toolStartIndex = (_toolParts[messageId]?.length ?? 0);
           segments.add(newSegment);
         } else {
-          lastSegment.text += chunk.reasoning!;
+          lastSegment.text += reasoning;
           lastSegment.startAt ??= DateTime.now();
         }
       }
@@ -891,13 +891,13 @@ class StreamController {
       _ensureStreamTimer(messageId);
     } else {
       state.reasoningStartAt ??= DateTime.now();
-      state.bufferedReasoning += chunk.reasoning!;
+      state.bufferedReasoning += reasoning;
     }
   }
 
   /// Process tool calls chunk from stream.
   Future<void> handleToolCallsChunk(
-    ChatStreamChunk chunk,
+    List<EmitToolCall> toolCalls,
     StreamingState state, {
     required Future<void> Function(String messageId, String json)
     updateReasoningSegmentsInDb,
@@ -909,7 +909,7 @@ class StreamController {
     required List<Map<String, dynamic>> Function(String messageId)
     getToolEventsFromDb,
   }) async {
-    if ((chunk.toolCalls ?? const []).isEmpty) return;
+    if (toolCalls.isEmpty) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
@@ -934,7 +934,7 @@ class StreamController {
 
     // Add tool call placeholders
     final existing = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final c in chunk.toolCalls!) {
+    for (final c in toolCalls) {
       existing.add(
         ToolUIPart(
           id: c.id,
@@ -960,7 +960,7 @@ class StreamController {
       final prev = getToolEventsFromDb(messageId);
       final newEvents = <Map<String, dynamic>>[
         ...prev,
-        for (final c in chunk.toolCalls!)
+        for (final c in toolCalls)
           {
             'id': c.id,
             'name': c.name,
@@ -976,7 +976,7 @@ class StreamController {
 
   /// Process tool results chunk from stream.
   Future<void> handleToolResultsChunk(
-    ChatStreamChunk chunk,
+    List<EmitToolResult> toolResults,
     StreamingState state, {
     required Future<void> Function(
       String messageId, {
@@ -988,14 +988,14 @@ class StreamController {
     })
     upsertToolEventInDb,
   }) async {
-    if ((chunk.toolResults ?? const []).isEmpty) return;
+    if (toolResults.isEmpty) return;
 
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     state.hadThinkingBlock = true;
 
     final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
-    for (final r in chunk.toolResults!) {
+    for (final r in toolResults) {
       int idx = -1;
       for (int i = 0; i < parts.length; i++) {
         if (parts[i].loading &&
@@ -1017,7 +1017,7 @@ class StreamController {
         );
       } else if (r.id == 'builtin_search' &&
           parts.any((part) => part.id != r.id && part.toolName == r.name)) {
-        // Adapter maps Annotations to a synthetic search result. The
+        // Annotations map to a synthetic search result. The
         // server tool already carries those citations.
         continue;
       } else {
@@ -1429,6 +1429,7 @@ class StreamingState {
   int? generationStateRevision;
   bool generationStreamingStarted = false;
   bool hadThinkingBlock = false;
+  final Map<String, String> pendingToolNames = <String, String>{};
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];

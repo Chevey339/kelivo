@@ -10,6 +10,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
+import 'support/collect_generation.dart';
 
 ProviderConfig _openAiConfig(String baseUrl, {bool useResponseApi = false}) {
   return ProviderConfig(
@@ -83,7 +84,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -96,12 +97,8 @@ void main() {
       expect(authorization, 'Bearer test-key');
       expect(requestBody['model'], 'gpt-image-2');
       expect(requestBody['prompt'], 'draw a tabby cat');
-      expect(chunks, hasLength(1));
-      expect(
-        chunks.single.content,
-        '\n\n![image](https://example.com/generated.png)',
-      );
-      expect(chunks.single.usage?.totalTokens, 8);
+      expect(chunks.firstImageUri, 'https://example.com/generated.png');
+      expect(chunks.lastUsage?.totalTokens, 8);
     });
 
     test(
@@ -131,7 +128,7 @@ void main() {
           await request.response.close();
         });
 
-        await ChatApiService.sendLegacyMessageStream(
+        await ChatApiService.sendMessageStream(
           config: _openAiConfig(_baseUrl(server), useResponseApi: true),
           modelId: 'gpt-image-2',
           messages: const [
@@ -172,7 +169,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server), useResponseApi: true),
         modelId: 'agnes-image-2.1-flash',
         messages: const [
@@ -184,7 +181,7 @@ void main() {
       expect(requestUri.path, '/v1/images/generations');
       expect(requestBody['model'], 'agnes-image-2.1-flash');
       expect(requestBody['prompt'], 'draw a clean app icon');
-      expect(chunks.single.content, contains('agnes-generated.png'));
+      expect(chunks.firstImageUri, contains('agnes-generated.png'));
     });
 
     test('can disable Images API routing for image models', () async {
@@ -214,7 +211,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -226,7 +223,7 @@ void main() {
 
       expect(requestUri.path, '/v1/chat/completions');
       expect(requestBody['model'], 'gpt-image-2');
-      expect(chunks.single.content, 'chat route');
+      expect(chunks.joinedContent, 'chat route');
     });
 
     test(
@@ -271,7 +268,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _openAiConfig(_baseUrl(server)),
           modelId: 'gpt-image-2',
           messages: const [
@@ -285,7 +282,7 @@ void main() {
         expect(requestUri.path, '/v1/chat/completions');
         expect(contentType, ContentType.json.mimeType);
         expect(requestBody['model'], 'gpt-image-2');
-        expect(chunks.single.content, 'chat route with image');
+        expect(chunks.joinedContent, 'chat route with image');
       },
     );
 
@@ -325,7 +322,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -344,10 +341,7 @@ void main() {
       expect(requestBody, contains('name="image[]"'));
       expect(requestBody, contains('content-type: image/png'));
       expect(requestBody, contains('filename="source.png"'));
-      expect(
-        chunks.single.content,
-        '\n\n![image](https://example.com/edited.png)',
-      );
+      expect(chunks.firstImageUri, 'https://example.com/edited.png');
     });
 
     test('sets jpeg content type for jpg image edit uploads', () async {
@@ -382,7 +376,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -421,7 +415,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -484,7 +478,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: [
@@ -541,7 +535,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: [
@@ -605,7 +599,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: [
@@ -672,7 +666,7 @@ void main() {
         await request.response.close();
       });
 
-      await ChatApiService.sendLegacyMessageStream(
+      await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: [
@@ -716,7 +710,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -730,15 +724,12 @@ void main() {
 
       // Marker text must not force edits; generations path is used instead.
       expect(requestUri.path, '/v1/images/generations');
-      expect(
-        chunks.single.content,
-        '\n\n![image](https://example.com/generated.png)',
-      );
+      expect(chunks.firstImageUri, 'https://example.com/generated.png');
     });
 
     test('rejects dall-e-3 edits before sending a request', () async {
       await expectLater(
-        ChatApiService.sendLegacyMessageStream(
+        ChatApiService.sendMessageStream(
           config: _openAiConfig('http://127.0.0.1:9/v1'),
           modelId: 'dall-e-3',
           messages: const [
@@ -796,7 +787,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server)),
         modelId: 'gpt-image-2',
         messages: const [
@@ -806,9 +797,7 @@ void main() {
         stream: false,
       ).toList();
 
-      final imageUri = RegExp(
-        r'!\[image\]\(([^)]+)\)',
-      ).firstMatch(chunks.single.content)!.group(1)!;
+      final imageUri = chunks.firstImageUri!;
       expect(requestBody['output_format'], 'webp');
       expect(imageUri, startsWith('kelivo-file:///'));
       expect(imageUri.endsWith('.webp'), isTrue);
@@ -853,7 +842,7 @@ void main() {
         });
 
         await expectLater(
-          ChatApiService.sendLegacyMessageStream(
+          ChatApiService.sendMessageStream(
             config: _openAiConfig(_baseUrl(server)),
             modelId: 'gpt-image-2',
             messages: const [
@@ -899,7 +888,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendLegacyMessageStream(
+        final chunks = await ChatApiService.sendMessageStream(
           config: _openAiConfig(_baseUrl(server)),
           modelId: 'gpt-image-2',
           messages: const [
@@ -920,10 +909,7 @@ void main() {
         expect(requestBody, isNot(contains('draw a tabby cat')));
         expect(requestBody, isNot(contains('Original image request:')));
         expect(requestBody, isNot(contains('Edit request:')));
-        expect(
-          chunks.single.content,
-          '\n\n![image](https://example.com/follow-up-edit.png)',
-        );
+        expect(chunks.firstImageUri, 'https://example.com/follow-up-edit.png');
       },
     );
 
@@ -944,7 +930,7 @@ void main() {
         });
 
         expect(
-          ChatApiService.sendLegacyMessageStream(
+          ChatApiService.sendMessageStream(
             config: _openAiConfig(_baseUrl(server)),
             modelId: 'gpt-image-2',
             messages: const [
@@ -1005,7 +991,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server), useResponseApi: true),
         modelId: 'gpt-5.6-luna',
         messages: const [
@@ -1014,18 +1000,15 @@ void main() {
         stream: false,
       ).toList();
 
-      final content = chunks.map((chunk) => chunk.content).join();
-      expect(content, contains('Done'));
-      final imageUri = RegExp(
-        r'!\[image\]\(([^)]+)\)',
-      ).firstMatch(content)!.group(1)!;
+      expect(chunks.joinedContent, contains('Done'));
+      final imageUri = chunks.firstImageUri!;
       expect(imageUri, startsWith('kelivo-file:///'));
       expect(imageUri.endsWith('.png'), isTrue);
       expect(
         await File(SandboxPathResolver.fix(imageUri)).readAsBytes(),
         const [1, 2, 3, 4],
       );
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.isGenerationDone, isTrue);
     });
 
     test('emits Image events from non-stream output array', () async {
@@ -1166,7 +1149,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendLegacyMessageStream(
+      final chunks = await ChatApiService.sendMessageStream(
         config: _openAiConfig(_baseUrl(server), useResponseApi: true),
         modelId: 'gpt-5.5',
         messages: const [
@@ -1174,17 +1157,10 @@ void main() {
         ],
       ).toList();
 
-      final content = chunks.map((chunk) => chunk.content).join();
-      final imageUri = RegExp(
-        r'!\[image\]\(([^)]+)\)',
-      ).firstMatch(content)!.group(1)!;
-      expect(content, contains('![image]('));
-      expect(imageUri, startsWith('data:image/png;base64,'));
-      expect(
-        base64Decode(imageUri.substring(imageUri.indexOf(',') + 1)),
-        const [1, 2, 3, 4],
-      );
-      expect(chunks.last.isDone, isTrue);
+      expect(chunks.whereType<ImageStart>(), hasLength(1));
+      expect(chunks.firstImageUri, base64Encode(const [1, 2, 3, 4]));
+      expect(chunks.whereType<ImageEnd>(), hasLength(1));
+      expect(chunks.isGenerationDone, isTrue);
     });
   });
 }
