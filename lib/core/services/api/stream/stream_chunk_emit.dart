@@ -4,9 +4,6 @@ import '../../../models/token_usage.dart';
 import 'stream_chunk.dart';
 import 'stream_chunk_ids.dart';
 
-const _emitTextId = 'legacy:text';
-const _emitReasoningId = 'legacy:reasoning';
-
 TokenUsage? _usageOrApprox(TokenUsage? usage, int totalTokens) {
   if (usage != null) return usage;
   if (totalTokens > 0) return TokenUsage(totalTokens: totalTokens);
@@ -26,16 +23,23 @@ Future<StreamChunk> sanitizeStreamChunk(
   return chunk;
 }
 
-Stream<StreamChunk> emitText(String content) async* {
+Stream<StreamChunk> emitText(
+  String content, {
+  required StreamChunkIds ids,
+}) async* {
   if (content.isNotEmpty) {
-    yield TextDelta(id: _emitTextId, text: content);
+    yield TextDelta(id: ids.text(), text: content);
   }
 }
 
-Stream<StreamChunk> emitReasoning(String? reasoning, {dynamic details}) async* {
+Stream<StreamChunk> emitReasoning(
+  String? reasoning, {
+  required StreamChunkIds ids,
+  dynamic details,
+}) async* {
   if ((reasoning == null || reasoning.isEmpty) && details == null) return;
   yield ReasoningDelta(
-    id: _emitReasoningId,
+    id: ids.reasoning(),
     text: reasoning ?? '',
     details: details,
   );
@@ -46,17 +50,19 @@ Stream<StreamChunk> emitUsage(TokenUsage? usage) async* {
 }
 
 Stream<StreamChunk> emitFinish({
+  required StreamChunkIds ids,
   TokenUsage? usage,
   int totalTokens = 0,
   dynamic reasoningDetails,
   String? finishReason,
 }) async* {
-  yield* emitReasoning(null, details: reasoningDetails);
+  yield* emitReasoning(null, ids: ids, details: reasoningDetails);
   yield* emitUsage(_usageOrApprox(usage, totalTokens));
   yield Finish(finishReason: finishReason);
 }
 
 Stream<StreamChunk> emitDelta({
+  required StreamChunkIds ids,
   String content = '',
   String? reasoning,
   dynamic reasoningDetails,
@@ -64,11 +70,12 @@ Stream<StreamChunk> emitDelta({
   int totalTokens = 0,
 }) async* {
   yield* emitUsage(_usageOrApprox(usage, totalTokens));
-  yield* emitReasoning(reasoning, details: reasoningDetails);
-  yield* emitText(content);
+  yield* emitReasoning(reasoning, ids: ids, details: reasoningDetails);
+  yield* emitText(content, ids: ids);
 }
 
 Stream<StreamChunk> emitDone({
+  required StreamChunkIds ids,
   String content = '',
   String? reasoning,
   dynamic reasoningDetails,
@@ -76,9 +83,10 @@ Stream<StreamChunk> emitDone({
   int totalTokens = 0,
   String? finishReason,
 }) async* {
-  yield* emitReasoning(reasoning, details: reasoningDetails);
-  yield* emitText(content);
+  yield* emitReasoning(reasoning, ids: ids, details: reasoningDetails);
+  yield* emitText(content, ids: ids);
   yield* emitFinish(
+    ids: ids,
     usage: usage,
     totalTokens: totalTokens,
     finishReason: finishReason,

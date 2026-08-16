@@ -469,4 +469,19 @@ void main() {
     expect(decoder.onClosed(), isEmpty);
     expect(decoder.onClosed(), isEmpty);
   });
+
+  test('follow-up approx chars from separate decoders must be added', () {
+    final first = ChatCompletionsStreamDecoder();
+    first.accept(_event(_choice(delta: <String, dynamic>{'content': 'abcd'})));
+    final second = ChatCompletionsStreamDecoder();
+    second.accept(
+      _event(_choice(delta: <String, dynamic>{'content': 'efghijkl'})),
+    );
+
+    // Chat Completions follow-ups used to assign `chars =` the last decoder
+    // only. Provider-omitted usage then estimated tokens from the last round.
+    expect(first.approxCompletionChars, 4);
+    expect(second.approxCompletionChars, 8);
+    expect(first.approxCompletionChars + second.approxCompletionChars, 12);
+  });
 }

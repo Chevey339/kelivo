@@ -1,5 +1,6 @@
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk_ids.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -44,7 +45,7 @@ void main() {
           yield const TextDelta(id: 't', text: 'done');
         },
         takeCallsAfterRound: () => const <EmitToolCall>[],
-        finish: () => emitFinish(),
+        finish: () => emitFinish(ids: StreamChunkIds('finish')),
       ).toList();
 
       expect(appended, ['res-call_1']);
@@ -79,7 +80,7 @@ void main() {
         emitCalls: true,
         onToolCall: (name, args, {toolCallId}) async => 'res-$toolCallId',
         append: (executed) => appended.add(executed.length),
-        finish: () => emitFinish(),
+        finish: () => emitFinish(ids: StreamChunkIds('finish')),
       ).toList();
 
       expect(sends, 2);
@@ -117,7 +118,7 @@ void main() {
                 ),
               ]
             : const <EmitToolCall>[],
-        finish: () => emitFinish(),
+        finish: () => emitFinish(ids: StreamChunkIds('finish')),
         emitCalls: true,
       ).toList();
 
@@ -147,7 +148,7 @@ void main() {
       continueWithoutCalls: () => sends < 2,
       executeAfterRound: false,
       append: (_) {},
-      finish: () => emitFinish(),
+      finish: () => emitFinish(ids: StreamChunkIds('finish')),
     ).toList();
 
     expect(sends, 2);

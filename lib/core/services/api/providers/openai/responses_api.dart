@@ -14,6 +14,7 @@ import '../../stream/sse_decode_loop.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
+import '../../stream/stream_chunk_ids.dart';
 import 'openai_vendor_compat.dart';
 import 'responses_decoder.dart';
 
@@ -332,6 +333,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
     finish: () {
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
+        ids: StreamChunkIds('finish'),
         usage: usage,
         totalTokens: usage?.totalTokens ?? approxTotal,
       );

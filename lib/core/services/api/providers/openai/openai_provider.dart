@@ -15,6 +15,7 @@ import '../../kimi_formula_search.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
+import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_api.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_vendor_compat.dart';
@@ -775,6 +776,7 @@ Stream<StreamChunk> sendOpenAIStream(
         );
         yield* emitImages(images);
         yield* emitDone(
+          ids: StreamChunkIds('finish'),
           content: outText,
           reasoning: reasoningText.isEmpty ? null : reasoningText,
           usage: usage,
@@ -791,6 +793,7 @@ Stream<StreamChunk> sendOpenAIStream(
       final firstChoice = openaiFirstChoice(lastObj);
       if (firstChoice == null) {
         yield* emitDone(
+          ids: StreamChunkIds('finish'),
           content: (lastObj['output_text'] ?? '').toString(),
           usage: firstUsage,
           totalTokens: firstUsage?.totalTokens ?? 0,
@@ -832,6 +835,7 @@ Stream<StreamChunk> sendOpenAIStream(
       final firstMessage = openaiFirstChoiceMessage(lastObj);
       yield* emitImages(visible.images);
       yield* emitDone(
+        ids: StreamChunkIds('finish'),
         content: visible.content,
         reasoning: openaiReasoningText(firstMessage),
         reasoningDetails: firstMessage?['reasoning_details'],
@@ -936,6 +940,7 @@ Stream<StreamChunk> sendOpenAIStream(
             if (mdImg.isEmpty) continue;
             fallbackCount++;
             yield* emitDelta(
+              ids: StreamChunkIds('round-0'),
               content: mdImg,
               usage: usage,
               totalTokens: totalTokens,
@@ -1016,6 +1021,7 @@ Stream<StreamChunk> sendOpenAIStream(
         final approxTotal =
             approxPromptTokens + approxTokensFromChars(approxCompletionChars);
         yield* emitDone(
+          ids: StreamChunkIds('finish'),
           usage: usage,
           totalTokens: usage?.totalTokens ?? approxTotal,
         );
@@ -1082,6 +1088,7 @@ Stream<StreamChunk> sendOpenAIStream(
           final approxTotal =
               approxPromptTokens + approxTokensFromChars(approxCompletionChars);
           yield* emitDone(
+            ids: StreamChunkIds('finish'),
             reasoningDetails:
                 decoder.reasoningDetails ??
                 reasoningDetailsBuffer.detailsOrNull,
@@ -1219,6 +1226,7 @@ Stream<StreamChunk> sendOpenAIStream(
       usage?.totalTokens ??
       (approxPromptTokens + approxTokensFromChars(approxCompletionChars));
   yield* emitDone(
+    ids: StreamChunkIds('finish'),
     reasoningDetails:
         chatDecoder?.reasoningDetails ?? reasoningDetailsBuffer.detailsOrNull,
     usage: usage,

@@ -13,6 +13,7 @@ import '../../../../utils/sandbox_path_resolver.dart';
 import '../chat_api_helpers.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
+import '../stream/stream_chunk_ids.dart';
 
 bool shouldUseOpenAIImagesApi(ProviderConfig config, String modelId) {
   final upstreamModelId = apiModelId(config, modelId).toLowerCase();
@@ -85,7 +86,11 @@ Stream<StreamChunk> sendOpenAIImagesStream(
   );
   final usage = _openAIImagesUsage(response);
   yield* emitImages(images);
-  yield* emitFinish(usage: usage, totalTokens: usage?.totalTokens ?? 0);
+  yield* emitFinish(
+    ids: StreamChunkIds('finish'),
+    usage: usage,
+    totalTokens: usage?.totalTokens ?? 0,
+  );
 }
 
 Future<Map<String, dynamic>> _sendOpenAIImageGeneration(

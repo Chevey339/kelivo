@@ -14,6 +14,7 @@ import '../../stream/sse_decode_loop.dart';
 import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
+import '../../stream/stream_chunk_ids.dart';
 import 'chat_completions_decoder.dart';
 import 'openai_tool_transcript.dart';
 import 'openai_vendor_compat.dart';
@@ -834,7 +835,8 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
       );
       yield* decodeSseEvents(parseSseEventStrings(s2), roundDecoder);
       usage = roundDecoder.usage ?? usage;
-      chars = roundDecoder.approxCompletionChars;
+      // Add this round. `=` would drop earlier rounds when usage is absent.
+      chars += roundDecoder.approxCompletionChars;
       lastRound = roundDecoder;
     },
     takeCallsAfterRound: () {
@@ -849,6 +851,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
     finish: () {
       final approxTotal = approxPromptTokens + (chars / 4).round();
       return emitDone(
+        ids: StreamChunkIds('finish'),
         reasoningDetails: includeReasoningDetailsOnDone
             ? lastRound?.reasoningDetails ?? firstReasoningDetails
             : null,
@@ -951,6 +954,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       final choice = openaiFirstChoice(lastObj);
       if (choice == null) {
         yield* emitDone(
+          ids: StreamChunkIds('finish'),
           content: (lastObj['output_text'] ?? '').toString(),
           usage: usage,
           totalTokens: usage?.totalTokens ?? 0,
@@ -963,6 +967,7 @@ Stream<StreamChunk> runOpenAIChatCompletionsNonStreamToolFollowUps({
       final lastMessage = openaiFirstChoiceMessage(lastObj);
       yield* emitImages(visible.images);
       yield* emitDone(
+        ids: StreamChunkIds('finish'),
         content: visible.content,
         reasoning: openaiReasoningText(lastMessage),
         reasoningDetails: lastMessage?['reasoning_details'],

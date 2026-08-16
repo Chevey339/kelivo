@@ -19,6 +19,7 @@ import '../google_service_account_auth.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
+import '../stream/stream_chunk_ids.dart';
 import 'google/google_decoder.dart';
 
 import 'google_gemini.dart';
@@ -822,6 +823,7 @@ Stream<StreamChunk> sendGoogleStream(
         final reasoningStr = reasoningBuf.toString();
         if (reasoningStr.isNotEmpty) {
           yield* emitDelta(
+            ids: StreamChunkIds('round-${currentContents.length}'),
             reasoning: reasoningStr,
             usage: totalUsage,
             totalTokens: totalUsage?.totalTokens ?? 0,
@@ -867,6 +869,7 @@ Stream<StreamChunk> sendGoogleStream(
         ];
       },
       finish: () => emitDone(
+        ids: StreamChunkIds('finish'),
         content: lastText,
         usage: totalUsage,
         totalTokens: totalUsage?.totalTokens ?? 0,
@@ -1204,6 +1207,7 @@ Stream<StreamChunk> sendGoogleStream(
       }
 
       final sse = resp.stream.transform(utf8.decoder);
+      final sourceId = 'round-${streamRound++}';
       final decoder = GoogleStreamDecoder(
         isGemini3: isGemini3,
         persistThoughtSigs: persistGeminiThoughtSigs,
@@ -1211,7 +1215,7 @@ Stream<StreamChunk> sendGoogleStream(
         receivedImage: receivedImage,
         initialUsage: usage,
         citations: builtinCitations,
-        sourceId: 'round-${streamRound++}',
+        sourceId: sourceId,
       );
       Future<String> sanitizeTextIfNeeded(String input) async {
         if (input.isEmpty) return input;
@@ -1365,6 +1369,7 @@ Stream<StreamChunk> sendGoogleStream(
           );
           final sanitized = await sanitizeTextIfNeeded(pendingImage);
           yield* emitDelta(
+            ids: StreamChunkIds(sourceId),
             content: sanitized,
             usage: usage,
             totalTokens: totalTokens,
@@ -1382,6 +1387,7 @@ Stream<StreamChunk> sendGoogleStream(
           );
           if (metaComment.isNotEmpty) {
             yield* emitDelta(
+              ids: StreamChunkIds(sourceId),
               content: metaComment,
               usage: usage,
               totalTokens: totalTokens,
@@ -1470,7 +1476,11 @@ Stream<StreamChunk> sendGoogleStream(
         });
       }
     },
-    finish: () => emitDone(usage: usage, totalTokens: totalTokens),
+    finish: () => emitDone(
+      ids: StreamChunkIds('finish'),
+      usage: usage,
+      totalTokens: totalTokens,
+    ),
     usageOf: () => usage,
   );
 }

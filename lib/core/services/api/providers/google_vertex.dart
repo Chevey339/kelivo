@@ -16,6 +16,7 @@ import '../google_service_account_auth.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
+import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
 
 import 'claude_official.dart';
@@ -686,6 +687,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
       ];
     },
     finish: () => emitDone(
+      ids: StreamChunkIds('finish'),
       content: lastText,
       usage: totalUsage,
       totalTokens: totalUsage?.totalTokens ?? 0,

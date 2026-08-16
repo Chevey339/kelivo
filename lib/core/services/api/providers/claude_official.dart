@@ -15,6 +15,7 @@ import '../generation/tool_loop_runner.dart';
 import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
+import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
@@ -718,6 +719,7 @@ Stream<StreamChunk> sendClaudeStream(
       ];
     },
     finish: () => emitDone(
+      ids: StreamChunkIds('finish'),
       content: lastText,
       usage: totalUsage,
       totalTokens: totalUsage?.totalTokens ?? 0,
