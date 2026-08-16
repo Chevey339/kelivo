@@ -131,6 +131,9 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
               ]);
             }
           }
+          if (delta is! Map || delta['tool_calls'] == null) {
+            _ingestCompleteToolCalls(message['tool_calls'], chunks);
+          }
         }
       }
     }
@@ -239,6 +242,32 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     }
   }
 
+  void _ingestCompleteToolCalls(dynamic raw, List<StreamChunk> chunks) {
+    if (raw is! List) return;
+    for (final t in raw) {
+      if (t is! Map) continue;
+      final idx = (t['index'] as int?) ?? toolCalls.length;
+      final id = (t['id'] ?? '').toString();
+      final func = t['function'];
+      if (func is! Map) continue;
+      final name = (func['name'] ?? '').toString();
+      final argsStr = (func['arguments'] ?? '').toString();
+      if (name.isEmpty) continue;
+      final eventId = _toolSeriesId(idx, vendorId: id);
+      final entry = toolCalls.putIfAbsent(
+        idx,
+        () => <String, String>{'id': '', 'name': '', 'args': ''},
+      );
+      entry['id'] = id.isNotEmpty ? id : eventId;
+      entry['name'] = name;
+      entry['args'] = argsStr;
+      chunks.addAll(_emitCompleteToolCall(eventId, name: name, args: argsStr));
+    }
+    if (raw.isNotEmpty) {
+      finishReason ??= 'tool_calls';
+    }
+  }
+
   String _toolSeriesId(int index, {String vendorId = ''}) {
     final existing = _toolIdsByIndex[index];
     if (existing != null) return existing;
@@ -283,11 +312,11 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         if (u2 is String) url = u2;
       }
       if (url == null || url.isEmpty) continue;
+      final mime = mimeTypeFromImageUri(url) ?? 'image/png';
+      final uri = completeRenderableImageUri(url, mimeType: mime);
       final id = _ids.next('image');
-      chunks.add(
-        ImageStart(id: id, mimeType: mimeTypeFromImageUri(url) ?? 'image/png'),
-      );
-      chunks.add(ImageSnapshot(id: id, data: url));
+      chunks.add(ImageStart(id: id, mimeType: mime));
+      chunks.add(ImageSnapshot(id: id, data: uri));
       chunks.add(ImageEnd(id));
     }
     return chunks;

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
-import '../../../core/services/api/stream/stream_chunk.dart';
 
 /// OCR 缓存条目
 class OcrCacheEntry {
@@ -119,29 +118,17 @@ class OcrService {
       },
     ];
 
-    final stream = ChatApiService.sendMessageStream(
-      config: cfg,
-      modelId: model,
-      messages: messages,
-      userImagePaths: imagePaths,
-      thinkingBudget: settings.ocrGenerationThinkingBudgetFor(null),
-      topP: null,
-      maxTokens: null,
-      tools: null,
-      onToolCall: null,
-      extraHeaders: null,
-      extraBody: null,
-      stream: false,
-      ocrActive: true,
-    );
-
     String out = '';
     try {
-      await for (final chunk in stream) {
-        if (chunk is TextDelta && chunk.text.isNotEmpty) {
-          out += chunk.text;
-        }
-      }
+      final result = await ChatApiService.generateMessage(
+        config: cfg,
+        modelId: model,
+        messages: messages,
+        userImagePaths: imagePaths,
+        thinkingBudget: settings.ocrGenerationThinkingBudgetFor(null),
+        ocrActive: true,
+      );
+      out = result.text;
     } catch (e) {
       onError?.call(e);
       return null;

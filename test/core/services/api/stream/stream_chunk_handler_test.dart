@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/models/token_usage.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
+import 'package:Kelivo/core/services/api/generation/text_generation_result.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -339,5 +340,42 @@ void main() {
 
     expect(handler.parts.map((p) => p.kind).toList(), ['text', 'tool_call']);
     expect((handler.parts[0] as TextPart).text, 'beforeafter');
+  });
+
+  test('collect folds chunks into a TextGenerationResult', () {
+    final result = StreamChunkHandler.collect([
+      const TextDelta(id: 't', text: 'Hello'),
+      const Usage(TokenUsage(totalTokens: 4)),
+      const Finish(finishReason: 'stop'),
+    ]);
+
+    expect(result.text, 'Hello');
+    expect(result.finishReason, 'stop');
+    expect(result.usage?.totalTokens, 4);
+    expect(result.parts, hasLength(1));
+  });
+
+  test('handleResult keeps image URIs as-is and does not add data:', () {
+    final handler = StreamChunkHandler();
+    handler.handleResult(
+      const TextGenerationResult(
+        parts: [
+          TextPart('done'),
+          ImagePart(uri: 'https://img.example/a.png', mime: 'image/png'),
+          ImagePart(uri: 'data:image/png;base64,AQID', mime: 'image/png'),
+          ImagePart(uri: 'kelivo-file:///images/a.png', mime: 'image/png'),
+        ],
+        finishReason: 'stop',
+      ),
+    );
+
+    expect(handler.finished, isTrue);
+    expect(handler.finishReason, 'stop');
+    expect(handler.parts.whereType<ImagePart>().map((part) => part.uri), [
+      'https://img.example/a.png',
+      'data:image/png;base64,AQID',
+      'kelivo-file:///images/a.png',
+    ]);
+    expect(handler.parts.whereType<TextPart>().single.text, 'done');
   });
 }

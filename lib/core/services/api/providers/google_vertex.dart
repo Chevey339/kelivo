@@ -487,7 +487,7 @@ Stream<StreamChunk> _sendGoogleVertexClaudeStream({
 
       if (!stream) {
         // Vertex rawPredict response is same as Anthropic non-stream response
-        final txt = await response.stream.bytesToString();
+        final txt = await _decodeUtf8Stream(response.stream);
         final obj = jsonDecode(txt) as Map;
         // Usage
         try {

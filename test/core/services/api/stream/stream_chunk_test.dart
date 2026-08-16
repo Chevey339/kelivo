@@ -20,6 +20,25 @@ void main() {
     expect(chunk.reasoningType, ReasoningType.summaryText);
   });
 
+  test('completeRenderableImageUri wraps raw base64 only', () {
+    expect(
+      completeRenderableImageUri('iVBORw0K', mimeType: 'image/png'),
+      'data:image/png;base64,iVBORw0K',
+    );
+    expect(
+      completeRenderableImageUri('data:image/png;base64,AAA'),
+      'data:image/png;base64,AAA',
+    );
+    expect(
+      completeRenderableImageUri('https://img.example/a.png'),
+      'https://img.example/a.png',
+    );
+    expect(
+      completeRenderableImageUri('kelivo-file:///images/a.png'),
+      'kelivo-file:///images/a.png',
+    );
+  });
+
   test('isCompleteImageUri distinguishes URLs from raw base64', () {
     expect(isCompleteImageUri('data:image/png;base64,AAA'), isTrue);
     expect(isCompleteImageUri('https://img.example/a.png'), isTrue);

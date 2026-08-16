@@ -473,6 +473,13 @@ TokenUsage? _openaiUsageFromObj(Map<String, dynamic> obj) {
   }
 }
 
+String? _openaiReasoningText(Map<String, dynamic>? message) {
+  final raw = (message?['reasoning_content'] ?? message?['reasoning'])
+      ?.toString();
+  if (raw == null || raw.isEmpty) return null;
+  return raw;
+}
+
 ({String content, List<({String uri, String mimeType})> images})
 _openaiVisibleOutputFromMessage(Map<String, dynamic>? cmsg) {
   var content = '';
@@ -498,9 +505,10 @@ _openaiVisibleOutputFromMessage(Map<String, dynamic>? cmsg) {
           if (u2 is String) url = u2;
         }
         if (url != null && url.isNotEmpty) {
+          final mime = mimeTypeFromImageUri(url) ?? 'image/png';
           images.add((
-            uri: url,
-            mimeType: mimeTypeFromImageUri(url) ?? 'image/png',
+            uri: completeRenderableImageUri(url, mimeType: mime),
+            mimeType: mime,
           ));
         }
       }
@@ -1443,7 +1451,7 @@ Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
         throw HttpException('HTTP ${resp2.statusCode}: $errorBody');
       }
       lastObj =
-          jsonDecode(await resp2.stream.bytesToString())
+          jsonDecode(await _decodeUtf8Stream(resp2.stream))
               as Map<String, dynamic>;
       final roundUsage = _openaiUsageFromObj(lastObj);
       if (roundUsage != null) {
@@ -1465,14 +1473,17 @@ Stream<StreamChunk> _runOpenAIChatCompletionsNonStreamToolFollowUps({
       final visible = _openaiVisibleOutputFromMessage(
         (choice['message'] as Map?)?.cast<String, dynamic>(),
       );
+      final lastMessage = _openaiFirstChoiceMessage(lastObj);
       yield* emitImages(visible.images);
       yield* emitDone(
         content: visible.content,
-        reasoningDetails: _openaiFirstChoiceMessage(
-          lastObj,
-        )?['reasoning_details'],
+        reasoning: _openaiReasoningText(lastMessage),
+        reasoningDetails: lastMessage?['reasoning_details'],
         usage: usage,
         totalTokens: usage?.totalTokens ?? 0,
+        finishReason: (choice['finish_reason'] ?? '').toString().isEmpty
+            ? null
+            : choice['finish_reason'].toString(),
       );
     },
     usageOf: () => usage,
@@ -2516,7 +2527,7 @@ Stream<StreamChunk> _sendOpenAIStream(
 
   // Non-streaming path: parse one-shot JSON and optionally follow tool calls.
   if (!stream) {
-    final txt = await response.stream.bytesToString();
+    final txt = await _decodeUtf8Stream(response.stream);
     try {
       final obj = jsonDecode(txt);
       // Responses API non-stream
@@ -2598,6 +2609,9 @@ Stream<StreamChunk> _sendOpenAIStream(
           content: (lastObj['output_text'] ?? '').toString(),
           usage: firstUsage,
           totalTokens: firstUsage?.totalTokens ?? 0,
+          finishReason: (lastObj['finish_reason'] ?? '').toString().isEmpty
+              ? null
+              : lastObj['finish_reason'].toString(),
         );
         return;
       }
@@ -2630,14 +2644,17 @@ Stream<StreamChunk> _sendOpenAIStream(
       final visible = _openaiVisibleOutputFromMessage(
         (firstChoice['message'] as Map?)?.cast<String, dynamic>(),
       );
+      final firstMessage = _openaiFirstChoiceMessage(lastObj);
       yield* emitImages(visible.images);
       yield* emitDone(
         content: visible.content,
-        reasoningDetails: _openaiFirstChoiceMessage(
-          lastObj,
-        )?['reasoning_details'],
+        reasoning: _openaiReasoningText(firstMessage),
+        reasoningDetails: firstMessage?['reasoning_details'],
         usage: firstUsage,
         totalTokens: firstUsage?.totalTokens ?? 0,
+        finishReason: (firstChoice['finish_reason'] ?? '').toString().isEmpty
+            ? null
+            : firstChoice['finish_reason'].toString(),
       );
       return;
     } catch (e) {

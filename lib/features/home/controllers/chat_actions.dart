@@ -1807,6 +1807,54 @@ class ChatActions {
           ..stateRevision = run.stateRevision
           ..nextSeq = run.checkpointSeq + 1;
       }
+      final previousSub = _conversationStreams.remove(conversationId);
+      if (previousSub != null) {
+        ChatApiService.cancelRequest(conversationId);
+        await _cancelSubscriptionWithTimeout(previousSub);
+      }
+
+      if (!ctx.streamOutput) {
+        try {
+          final result = await ChatApiService.generateMessage(
+            config: ctx.config,
+            modelId: ctx.modelId,
+            messages: ctx.apiMessages,
+            userImagePaths: ctx.userImagePaths,
+            thinkingBudget:
+                assistant?.thinkingBudget ?? ctx.settings.thinkingBudget,
+            temperature: assistant?.temperature,
+            topP: assistant?.topP,
+            maxTokens: assistant?.maxTokens,
+            tools: ctx.toolDefs.isEmpty ? null : ctx.toolDefs,
+            onToolCall: ctx.onToolCall,
+            extraHeaders: ctx.extraHeaders,
+            extraBody: ctx.extraBody,
+            requestId: conversationId,
+            allowImagesApiRouting: ctx.allowImagesApiRouting,
+            ocrActive: ctx.ocrActive,
+          );
+          state.streamStartedAt ??= DateTime.now();
+          await _markGenerationStreaming(state);
+          state.shadowHandler.handleResult(result);
+          state.fullContentRaw = result.text;
+          state.bufferedReasoning = [
+            for (final part in result.parts)
+              if (part is ReasoningPart && part.text.isNotEmpty) part.text,
+          ].join();
+          if (result.usage != null) _applyUsage(state, result.usage!);
+          if (result.reasoningDetails != null) {
+            streamController.setReasoningDetails(
+              state.messageId,
+              result.reasoningDetails,
+            );
+          }
+          await _handleStreamFinish(state);
+        } catch (e) {
+          await _handleStreamError(e, state);
+        }
+        return;
+      }
+
       final stream = ChatApiService.sendMessageStream(
         config: ctx.config,
         modelId: ctx.modelId,
@@ -1821,21 +1869,11 @@ class ChatActions {
         onToolCall: ctx.onToolCall,
         extraHeaders: ctx.extraHeaders,
         extraBody: ctx.extraBody,
-        stream: ctx.streamOutput,
         requestId: conversationId,
         allowImagesApiRouting: ctx.allowImagesApiRouting,
         ocrActive: ctx.ocrActive,
       );
 
-      // Replacing a previous stream: the new request has not registered its
-      // cancel token yet (that happens on listen), so cancelRequest still
-      // targets the old one. Break its network wait first so the barrier
-      // cancel below cannot stall on a dead connection.
-      final previousSub = _conversationStreams.remove(conversationId);
-      if (previousSub != null) {
-        ChatApiService.cancelRequest(conversationId);
-        await _cancelSubscriptionWithTimeout(previousSub);
-      }
       final sub = listenSequentiallyToStream<StreamChunk>(
         stream: stream,
         onData: (chunk) => _handleStreamChunk(chunk, state),

@@ -287,6 +287,60 @@ void main() {
     );
   });
 
+  test('ingests complete message.tool_calls from one-shot JSON', () {
+    final decoder = ChatCompletionsStreamDecoder();
+    final result = decoder.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': '',
+            'tool_calls': [
+              <String, dynamic>{
+                'id': 'call_ns',
+                'type': 'function',
+                'function': <String, dynamic>{
+                  'name': 'lookup',
+                  'arguments': '{"q":"kelivo"}',
+                },
+              },
+            ],
+          },
+          finishReason: 'tool_calls',
+        ),
+      ),
+    );
+
+    expect(decoder.finishReason, 'tool_calls');
+    expect(decoder.toolCalls[0]!['id'], 'call_ns');
+    expect(decoder.toolCalls[0]!['name'], 'lookup');
+    expect(decoder.toolCalls[0]!['args'], '{"q":"kelivo"}');
+    expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_ns');
+    expect(result.chunks.whereType<ToolCallEnd>().single.id, 'call_ns');
+  });
+
+  test('completes raw base64 Chat Completions images at the parse source', () {
+    final decoder = ChatCompletionsStreamDecoder(wantsImageOutput: true);
+    final result = decoder.accept(
+      _event(
+        _choice(
+          message: <String, dynamic>{
+            'content': [
+              <String, dynamic>{
+                'type': 'image_url',
+                'image_url': <String, dynamic>{'url': 'AQIDBA=='},
+              },
+            ],
+          },
+        ),
+      ),
+    );
+
+    expect(
+      result.chunks.whereType<ImageSnapshot>().single.data,
+      'data:image/png;base64,AQIDBA==',
+    );
+  });
+
   test('keeps the data: prefix on Chat Completions image URLs', () {
     const dataUri = 'data:image/png;base64,AQIDBA==';
     final decoder = ChatCompletionsStreamDecoder(wantsImageOutput: true);

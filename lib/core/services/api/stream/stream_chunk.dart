@@ -243,6 +243,19 @@ bool isCompleteImageUri(String data) {
       trimmed.contains('://');
 }
 
+/// Make [data] a renderable URI at the parse source.
+///
+/// Do not call this from [StreamChunkHandler] merge — rikkahub `806f7dd6`
+/// dropped a `data:` prefix by rewriting images during fold.
+String completeRenderableImageUri(
+  String data, {
+  String mimeType = 'image/png',
+}) {
+  final trimmed = data.trim();
+  if (trimmed.isEmpty || isCompleteImageUri(trimmed)) return trimmed;
+  return 'data:$mimeType;base64,$trimmed';
+}
+
 String? mimeTypeFromImageUri(String uri) {
   final trimmed = uri.trim();
   if (trimmed.startsWith('data:')) {

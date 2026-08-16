@@ -27,17 +27,22 @@ import '../model_override_payload_parser.dart';
 import '../custom_request_merger.dart';
 import 'provider_request_headers.dart';
 import '../../utils/multimodal_input_utils.dart';
+import 'generation/text_generation_result.dart';
 import 'stream/sse_framing.dart';
 import 'stream/stream_chunk.dart';
+import 'stream/stream_chunk_handler.dart';
 import 'stream/stream_chunk_ids.dart';
 import 'providers/claude/claude_decoder.dart';
 import 'providers/google/google_decoder.dart';
 import 'providers/openai/chat_completions_decoder.dart';
 import 'providers/openai/responses_decoder.dart';
 
+export 'generation/text_generation_result.dart';
+
 part 'chat_api_service_shims.dart';
 part 'stream/stream_chunk_emit.dart';
 part 'generation/tool_loop_runner.dart';
+part 'providers/openai/openai_tool_transcript.dart';
 part 'providers/openai_common.dart';
 part 'providers/openai_chat_completions.dart';
 part 'providers/openai_images.dart';
@@ -62,6 +67,13 @@ String _effectiveToolCallId(
   final id = rawId?.toString().trim() ?? '';
   if (id.isNotEmpty) return id;
   return '${fallbackPrefix}_${DateTime.now().microsecondsSinceEpoch}_$index';
+}
+
+Future<String> _decodeUtf8Stream(
+  http.ByteStream stream, {
+  bool allowMalformed = true,
+}) async {
+  return utf8.decode(await stream.toBytes(), allowMalformed: allowMalformed);
 }
 
 class ChatApiService {
@@ -556,13 +568,6 @@ class ChatApiService {
     return DioHttpClient(cancelToken: cancelToken);
   }
 
-  static String _decodeUtf8Body(
-    http.Response response, {
-    bool allowMalformed = false,
-  }) {
-    return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
-  }
-
   static Stream<StreamChunk> sendMessageStream({
     required ProviderConfig config,
     required String modelId,
@@ -743,6 +748,48 @@ class ChatApiService {
     }
   }
 
+  /// Non-stream generation folded through [StreamChunkHandler].
+  static Future<TextGenerationResult> generateMessage({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    String? requestId,
+    bool allowImagesApiRouting = true,
+    bool ocrActive = false,
+  }) async {
+    final handler = StreamChunkHandler();
+    await for (final chunk in sendMessageStream(
+      config: config,
+      modelId: modelId,
+      messages: messages,
+      userImagePaths: userImagePaths,
+      thinkingBudget: thinkingBudget,
+      temperature: temperature,
+      topP: topP,
+      maxTokens: maxTokens,
+      tools: tools,
+      onToolCall: onToolCall,
+      extraHeaders: extraHeaders,
+      extraBody: extraBody,
+      stream: false,
+      requestId: requestId,
+      allowImagesApiRouting: allowImagesApiRouting,
+      ocrActive: ocrActive,
+    )) {
+      handler.handle(chunk);
+    }
+    return handler.toResult();
+  }
+
   // Non-streaming text generation for utilities like title summarization
   static Future<String> generateText({
     required ProviderConfig config,
@@ -752,406 +799,17 @@ class ChatApiService {
     Map<String, dynamic>? extraBody,
     int? thinkingBudget,
   }) async {
-    final kind = ProviderConfig.classify(
-      config.id,
-      explicitType: config.providerType,
+    final result = await generateMessage(
+      config: config,
+      modelId: modelId,
+      messages: [
+        {'role': 'user', 'content': prompt},
+      ],
+      extraHeaders: extraHeaders,
+      extraBody: extraBody,
+      thinkingBudget: thinkingBudget,
     );
-    final client = _clientFor(config, CancelToken());
-    final upstreamModelId = _apiModelId(config, modelId);
-    final safePrompt = UnicodeSanitizer.sanitize(prompt);
-    try {
-      if (kind == ProviderKind.openai) {
-        final url = _openAICompatibleUrl(config);
-        Map<String, dynamic> body;
-        final effectiveInfo = _effectiveModelInfo(config, modelId);
-        final isReasoning = effectiveInfo.abilities.contains(
-          ModelAbility.reasoning,
-        );
-        final effort = _openAIEffortForBudget(thinkingBudget, upstreamModelId);
-        final info = _OpenAIProviderInfo(
-          host: Uri.tryParse(config.baseUrl)?.host.toLowerCase() ?? '',
-          providerId: config.id.toLowerCase(),
-          upstreamModelId: upstreamModelId,
-        );
-        if (config.useResponseApi == true) {
-          // Inject built-in web_search tool when enabled and supported
-          final toolsList = <Map<String, dynamic>>[];
-          bool isResponsesWebSearchSupported(String id) {
-            if (BuiltInToolsHelper.isOpenAIResponsesBuiltInSearchSupportedModel(
-              id,
-            )) {
-              return true;
-            }
-            if (BuiltInToolsHelper.isDashScopeProvider(config)) {
-              return BuiltInToolsHelper.isDashScopeResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            if (BuiltInToolsHelper.isArkProvider(config)) {
-              return BuiltInToolsHelper.isDoubaoResponsesBuiltInSearchSupportedModel(
-                id,
-              );
-            }
-            return false;
-          }
-
-          if (isResponsesWebSearchSupported(upstreamModelId)) {
-            final builtIns = _builtInTools(config, modelId);
-            if (builtIns.contains(BuiltInToolNames.search)) {
-              if (BuiltInToolsHelper.isDashScopeProvider(config) ||
-                  BuiltInToolsHelper.isArkProvider(config)) {
-                toolsList.add({'type': 'web_search'});
-              } else {
-                Map<String, dynamic> ws = const <String, dynamic>{};
-                try {
-                  final ov = config.modelOverrides[modelId];
-                  if (ov is Map && ov['webSearch'] is Map) {
-                    ws = (ov['webSearch'] as Map).cast<String, dynamic>();
-                  }
-                } catch (_) {}
-                final usePreview =
-                    (ws['preview'] == true) ||
-                    ((ws['tool'] ?? '').toString() == 'preview');
-                final entry = <String, dynamic>{
-                  'type': usePreview ? 'web_search_preview' : 'web_search',
-                };
-                if (ws['allowed_domains'] is List &&
-                    (ws['allowed_domains'] as List).isNotEmpty) {
-                  entry['filters'] = {
-                    'allowed_domains': List<String>.from(
-                      (ws['allowed_domains'] as List).map((e) => e.toString()),
-                    ),
-                  };
-                }
-                if (ws['user_location'] is Map) {
-                  entry['user_location'] = (ws['user_location'] as Map)
-                      .cast<String, dynamic>();
-                }
-                if (usePreview && ws['search_context_size'] is String) {
-                  entry['search_context_size'] = ws['search_context_size'];
-                }
-                toolsList.add(entry);
-              }
-            }
-          }
-          body = {
-            'model': upstreamModelId,
-            'stream': false,
-            'input': [
-              {'role': 'user', 'content': safePrompt},
-            ],
-            if (toolsList.isNotEmpty)
-              'tools': _toResponsesToolsFormat(toolsList),
-            if (toolsList.isNotEmpty) 'tool_choice': 'auto',
-            if (isReasoning && effort != 'off')
-              'reasoning': {
-                'summary': 'auto',
-                if (effort != 'auto') 'effort': effort,
-              },
-          };
-        } else {
-          body = {
-            'model': upstreamModelId,
-            'stream': false,
-            'messages': [
-              {'role': 'user', 'content': safePrompt},
-            ],
-            if (isReasoning && effort != 'off' && effort != 'auto')
-              'reasoning_effort': effort,
-          };
-        }
-        _applyCompatibleBuiltInSearch(
-          body,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-        );
-        _applyOpenRouterClaudePromptCaching(
-          body,
-          config: config,
-          upstreamModelId: upstreamModelId,
-        );
-        _applyCompatibleResponsesReasoning(
-          body,
-          config: config,
-          modelId: modelId,
-          upstreamModelId: upstreamModelId,
-          isReasoning: isReasoning,
-          thinkingBudget: thinkingBudget,
-        );
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: <String, String>{
-            'Authorization': 'Bearer ${_apiKeyForRequest(config, modelId)}',
-            'Content-Type': 'application/json',
-          },
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        // Vendor-specific reasoning knobs for chat-completions compatible hosts (non-streaming)
-        if (config.useResponseApi != true) {
-          _applyVendorReasoningKnobs(
-            body,
-            info: info,
-            isReasoning: isReasoning,
-            thinkingBudget: thinkingBudget,
-          );
-          if (info.isKimiThinkingModel) {
-            _normalizeMoonshotKimiChatBody(
-              body,
-              upstreamModelId: upstreamModelId,
-              isReasoning: isReasoning,
-              thinkingBudget: thinkingBudget,
-            );
-          }
-        }
-        // Ensure Responses tools use the flattened schema even if supplied via overrides
-        try {
-          if (config.useResponseApi == true && body['tools'] is List) {
-            final raw = (body['tools'] as List).cast<dynamic>();
-            body['tools'] = _toResponsesToolsFormat(
-              raw.map((e) => (e as Map).cast<String, dynamic>()).toList(),
-            );
-          }
-        } catch (_) {}
-        _sanitizeOpenAIGpt5SamplingParams(
-          body,
-          upstreamModelId,
-          fallbackEffort: effort,
-          isOpenRouter: info.isOpenRouter,
-        );
-        final resp = await client.post(
-          url,
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        if (config.useResponseApi == true) {
-          // Prefer SDK-style convenience when present
-          final ot = data['output_text'];
-          if (ot is String && ot.isNotEmpty) return ot;
-          // Aggregate text from `output` list of message blocks
-          final out = data['output'];
-          if (out is List) {
-            final buf = StringBuffer();
-            for (final item in out) {
-              if (item is! Map) continue;
-              final content = item['content'];
-              if (content is List) {
-                for (final c in content) {
-                  if (c is Map &&
-                      (c['type'] == 'output_text') &&
-                      (c['text'] is String)) {
-                    buf.write(c['text']);
-                  }
-                }
-              }
-            }
-            final s = buf.toString();
-            if (s.isNotEmpty) return s;
-          }
-          return '';
-        } else {
-          final choices = data['choices'] as List?;
-          if (choices != null && choices.isNotEmpty) {
-            final msg = choices.first['message'];
-            return (msg?['content'] ?? '').toString();
-          }
-          return '';
-        }
-      } else if (kind == ProviderKind.claude) {
-        final base = config.baseUrl.endsWith('/')
-            ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-            : config.baseUrl;
-        final url = Uri.parse('$base/messages');
-        final effectiveInfo = _effectiveModelInfo(config, modelId);
-        final isReasoning = effectiveInfo.abilities.contains(
-          ModelAbility.reasoning,
-        );
-        final thinking = isReasoning
-            ? _claudeThinkingConfig(
-                upstreamModelId,
-                thinkingBudget,
-                config: config,
-              )
-            : null;
-        final outputConfig = isReasoning
-            ? _claudeOutputConfig(
-                upstreamModelId,
-                thinkingBudget,
-                config: config,
-              )
-            : null;
-        final body = <String, dynamic>{
-          'model': upstreamModelId,
-          'stream': false,
-          'max_tokens': 512,
-          'messages': [
-            {'role': 'user', 'content': safePrompt},
-          ],
-          if (thinking != null) 'thinking': thinking,
-          if (outputConfig != null) 'output_config': outputConfig,
-        };
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: <String, String>{
-            'x-api-key': _apiKeyForRequest(config, modelId),
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json',
-          },
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        final resp = await client.post(
-          url,
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        final content = data['content'] as List?;
-        if (content != null && content.isNotEmpty) {
-          final buf = StringBuffer();
-          for (final item in content) {
-            if (item is! Map) continue;
-            if ((item['type'] ?? '').toString() != 'text') continue;
-            final text = item['text'];
-            if (text is String && text.isNotEmpty) {
-              buf.write(text);
-            }
-          }
-          return buf.toString();
-        }
-        return '';
-      } else {
-        // Google
-        // Check for Vertex AI Claude models (prefix "claude-")
-        if ((config.vertexAI == true) &&
-            modelId.toLowerCase().startsWith('claude-')) {
-          // Reuse existing streaming method but buffer the output for non-streaming
-          final stream = _sendGoogleVertexClaudeStream(
-            client: client,
-            config: config,
-            modelId: modelId,
-            messages: [
-              {'role': 'user', 'content': prompt},
-            ],
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-            thinkingBudget: thinkingBudget,
-            stream: false,
-          );
-          final text = StringBuffer();
-          await for (final chunk in stream) {
-            if (chunk is TextDelta) text.write(chunk.text);
-          }
-          return text.toString();
-        }
-
-        String url;
-        if (config.vertexAI == true &&
-            (config.location?.isNotEmpty == true) &&
-            (config.projectId?.isNotEmpty == true)) {
-          final loc = config.location!;
-          final proj = config.projectId!;
-          url =
-              'https://aiplatform.googleapis.com/v1/projects/$proj/locations/$loc/publishers/google/models/$upstreamModelId:generateContent';
-        } else {
-          final base = config.baseUrl.endsWith('/')
-              ? config.baseUrl.substring(0, config.baseUrl.length - 1)
-              : config.baseUrl;
-          url = '$base/models/$upstreamModelId:generateContent';
-        }
-        final body = <String, dynamic>{
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [
-                {'text': safePrompt},
-              ],
-            },
-          ],
-        };
-
-        // Inject Gemini built-in tools with version-aware mutual exclusion.
-        // Gemini 2.x: code_execution is exclusive (cannot coexist with others).
-        // Gemini 3: all built-in tools can coexist.
-        final builtIns = _builtInTools(config, modelId);
-        if (builtIns.isNotEmpty) {
-          final bool isGemini3 = upstreamModelId.toLowerCase().contains(
-            'gemini-3',
-          );
-          final toolsArr = _buildGeminiToolsArray(
-            builtIns: builtIns,
-            allowCoexistence: isGemini3,
-          );
-          if (toolsArr.isNotEmpty) {
-            body['tools'] = toolsArr;
-          }
-        }
-        final baseHeaders = <String, String>{
-          'Content-Type': 'application/json',
-        };
-        // Add API Key header for non-Vertex
-        if (!(config.vertexAI == true)) {
-          final apiKey = _apiKeyForRequest(config, modelId);
-          if (apiKey.isNotEmpty) {
-            baseHeaders['x-goog-api-key'] = apiKey;
-          }
-        }
-        // Add Bearer for Vertex via service account JSON
-        if (config.vertexAI == true) {
-          final token = await _maybeVertexAccessToken(config);
-          if (token != null && token.isNotEmpty) {
-            baseHeaders['Authorization'] = 'Bearer $token';
-          }
-          final proj = (config.projectId ?? '').trim();
-          if (proj.isNotEmpty) baseHeaders['X-Goog-User-Project'] = proj;
-        }
-        final headers = _customHeaders(
-          config,
-          modelId,
-          baseHeaders: baseHeaders,
-          assistantHeaders: extraHeaders,
-        );
-        final extra = _customBody(config, modelId, assistantBody: extraBody);
-        if (extra.isNotEmpty) body.addAll(extra);
-        final resp = await client.post(
-          Uri.parse(url),
-          headers: headers,
-          body: jsonEncode(body),
-        );
-        if (resp.statusCode < 200 || resp.statusCode >= 300) {
-          final responseText = _decodeUtf8Body(resp, allowMalformed: true);
-          throw HttpException('HTTP ${resp.statusCode}: $responseText');
-        }
-        final responseText = _decodeUtf8Body(resp);
-        final data = jsonDecode(responseText);
-        final candidates = data['candidates'] as List?;
-        if (candidates != null && candidates.isNotEmpty) {
-          final parts = candidates.first['content']?['parts'] as List?;
-          if (parts != null && parts.isNotEmpty) {
-            return (parts.first['text'] ?? '').toString();
-          }
-        }
-        return '';
-      }
-    } finally {
-      client.close();
-    }
+    return result.text;
   }
 
   static List<Map<String, dynamic>> _sanitizeMessages(

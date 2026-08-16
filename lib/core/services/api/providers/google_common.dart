@@ -688,7 +688,7 @@ Stream<StreamChunk> _sendGoogleStream(
           final errorBody = await resp.stream.bytesToString();
           throw HttpException('HTTP ${resp.statusCode}: $errorBody');
         }
-        final txt = await resp.stream.bytesToString();
+        final txt = await _decodeUtf8Stream(resp.stream);
         final obj = jsonDecode(txt) as Map<String, dynamic>;
         try {
           final u = (obj['usageMetadata'] as Map?)?.cast<String, dynamic>();

@@ -248,7 +248,8 @@ void main() {
       );
 
       expect(title, '标题');
-      expect(requestBody.containsKey('generationConfig'), isFalse);
+      expect(requestBody.containsKey('temperature'), isFalse);
+      expect(requestBody['generationConfig'], isA<Map>());
     });
 
     test(

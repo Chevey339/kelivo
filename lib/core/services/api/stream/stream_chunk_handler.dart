@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../../models/message_part.dart';
 import '../../../models/token_usage.dart';
+import '../generation/text_generation_result.dart';
 import 'stream_chunk.dart';
 
 /// Folds [StreamChunk] events into an ordered [MessagePart] list.
@@ -24,6 +25,51 @@ class StreamChunkHandler {
   String? finishReason;
 
   List<MessagePart> get parts => List<MessagePart>.unmodifiable(_parts);
+
+  TextGenerationResult toResult() {
+    return TextGenerationResult(
+      parts: [
+        for (final part in _parts)
+          if (!_isBlankPart(part)) part,
+      ],
+      usage: usage,
+      finishReason: finishReason,
+      reasoningDetails: reasoningDetails,
+    );
+  }
+
+  static TextGenerationResult collect(Iterable<StreamChunk> chunks) {
+    final handler = StreamChunkHandler();
+    for (final chunk in chunks) {
+      handler.handle(chunk);
+    }
+    return handler.toResult();
+  }
+
+  /// Merge a complete non-stream result. Image URIs are kept as-is.
+  void handleResult(TextGenerationResult result) {
+    if (finished) return;
+    for (final part in result.parts) {
+      switch (part) {
+        case TextPart(:final text) when text.isEmpty:
+          continue;
+        case ReasoningPart(:final text) when text.isEmpty:
+          continue;
+        case ImagePart(:final uri) when uri.isEmpty:
+          continue;
+        default:
+          _parts.add(part);
+      }
+    }
+    if (result.usage != null) {
+      usage = (usage ?? const TokenUsage()).merge(result.usage!);
+    }
+    if (result.reasoningDetails != null) {
+      reasoningDetails = result.reasoningDetails;
+    }
+    finishReason = result.finishReason ?? finishReason;
+    finished = true;
+  }
 
   void handle(StreamChunk chunk) {
     if (finished) return;
@@ -227,6 +273,15 @@ class StreamChunkHandler {
     } else {
       _parts[index] = part;
     }
+  }
+
+  static bool _isBlankPart(MessagePart part) {
+    return switch (part) {
+      TextPart(:final text) => text.isEmpty,
+      ReasoningPart(:final text) => text.isEmpty,
+      ImagePart(:final uri) => uri.isEmpty,
+      _ => false,
+    };
   }
 
   String? _toolId(ToolCallPart part) {

@@ -45,10 +45,11 @@ Stream<StreamChunk> emitFinish({
   TokenUsage? usage,
   int totalTokens = 0,
   dynamic reasoningDetails,
+  String? finishReason,
 }) async* {
   yield* emitReasoning(null, details: reasoningDetails);
   yield* emitUsage(_usageOrApprox(usage, totalTokens));
-  yield const Finish();
+  yield Finish(finishReason: finishReason);
 }
 
 Stream<StreamChunk> emitDelta({
@@ -69,10 +70,15 @@ Stream<StreamChunk> emitDone({
   dynamic reasoningDetails,
   TokenUsage? usage,
   int totalTokens = 0,
+  String? finishReason,
 }) async* {
   yield* emitReasoning(reasoning, details: reasoningDetails);
   yield* emitText(content);
-  yield* emitFinish(usage: usage, totalTokens: totalTokens);
+  yield* emitFinish(
+    usage: usage,
+    totalTokens: totalTokens,
+    finishReason: finishReason,
+  );
 }
 
 Stream<StreamChunk> emitImages(
@@ -83,7 +89,10 @@ Stream<StreamChunk> emitImages(
     if (image.uri.isEmpty) continue;
     final id = ids.next('image');
     yield ImageStart(id: id, mimeType: image.mimeType);
-    yield ImageSnapshot(id: id, data: image.uri);
+    yield ImageSnapshot(
+      id: id,
+      data: completeRenderableImageUri(image.uri, mimeType: image.mimeType),
+    );
     yield ImageEnd(id);
   }
 }
