@@ -51,12 +51,14 @@ class _MessageEditSheetState extends State<_MessageEditSheet> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    // Edit field font scaling: the input font scale stacks on the app-wide
-    // UI scale from main.dart.
+    // Edit field font scaling: divide the app-wide UI scale out so the
+    // input font scale stays absolute.
+    final settings = context.watch<SettingsProvider>();
     final mqData = MediaQuery.of(context);
     final effectiveScale =
-        MediaQuery.textScalerOf(context).scale(1) *
-        context.watch<SettingsProvider>().inputFontScale;
+        MediaQuery.textScalerOf(context).scale(1) /
+        settings.uiFontScale *
+        settings.inputFontScale;
     return Padding(
       // Ensure keyboard-safe bottom inset for the sheet
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
