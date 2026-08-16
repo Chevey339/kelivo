@@ -184,4 +184,52 @@ void main() {
       expect((video as FilePart).mime, 'video/mp4');
     });
   });
+
+  group('renderAssistantFromParts', () {
+    test('uses parts when reasoning or tool_call is present', () {
+      expect(
+        renderAssistantFromParts(
+          parts: const [ReasoningPart('plan'), TextPart('hi')],
+          hasContentSplits: true,
+        ),
+        isTrue,
+      );
+      expect(
+        renderAssistantFromParts(
+          parts: const [
+            ToolCallPart('{"id":"c1","name":"lookup"}'),
+            TextPart('done'),
+          ],
+          hasContentSplits: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('keeps split renderer for historical text plus extracted images', () {
+      expect(
+        renderAssistantFromParts(
+          parts: const [
+            TextPart('caption'),
+            ImagePart(uri: 'kelivo-file:///images/a.png', mime: 'image/png'),
+          ],
+          hasContentSplits: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('uses parts for new image-only rows without splits', () {
+      expect(
+        renderAssistantFromParts(
+          parts: const [
+            ImagePart(uri: 'https://example.com/a.png', mime: 'image/png'),
+            TextPart('Done'),
+          ],
+          hasContentSplits: false,
+        ),
+        isTrue,
+      );
+    });
+  });
 }

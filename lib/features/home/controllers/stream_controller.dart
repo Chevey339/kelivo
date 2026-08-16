@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
@@ -534,6 +535,7 @@ class StreamController {
     String messageId,
     String conversationId,
     String Function() contentBuilder, {
+    List<MessagePart> Function()? partsBuilder,
     required void Function(String messageId, String content, int totalTokens)
     updateMessageInList,
     required int totalTokens,
@@ -552,6 +554,7 @@ class StreamController {
     state
       ..conversationId = conversationId
       ..contentBuilder = contentBuilder
+      ..partsBuilder = partsBuilder
       ..totalTokens = totalTokens
       ..contentSplitOffsets = contentSplitOffsets
       ..reasoningCountAtSplit = reasoningCountAtSplit
@@ -631,6 +634,7 @@ class StreamController {
       messageId,
       content,
       state.totalTokens,
+      parts: state.partsBuilder?.call(),
       contentSplitOffsets: state.contentSplitOffsets,
       reasoningCountAtSplit: state.reasoningCountAtSplit,
       toolCountAtSplit: state.toolCountAtSplit,
@@ -830,13 +834,6 @@ class StreamController {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     state.hadThinkingBlock = true;
-    _contentSplits[messageId] = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(state.contentSplitOffsets),
-        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-        toolCounts: List<int>.of(state.toolCountAtSplit),
-      ),
-    );
 
     if (state.ctx.streamOutput) {
       final initialExpanded = !getSettingsProvider().autoCollapseThinking;
@@ -917,13 +914,6 @@ class StreamController {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     state.hadThinkingBlock = true;
-    _contentSplits[messageId] = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(state.contentSplitOffsets),
-        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-        toolCounts: List<int>.of(state.toolCountAtSplit),
-      ),
-    );
 
     // Finish any unfinished reasoning segment when tools start
     final segments = _reasoningSegments[messageId] ?? <ReasoningSegmentData>[];
@@ -938,12 +928,7 @@ class StreamController {
       _reasoningSegments[messageId] = segments;
       await updateReasoningSegmentsInDb(
         messageId,
-        serializeReasoningSegmentsWithSplits(
-          segments,
-          contentSplitOffsets: state.contentSplitOffsets,
-          reasoningCountAtSplit: state.reasoningCountAtSplit,
-          toolCountAtSplit: state.toolCountAtSplit,
-        ),
+        serializeReasoningSegmentsWithSplits(segments),
       );
     }
 
@@ -1008,13 +993,6 @@ class StreamController {
     final messageId = state.messageId;
     final conversationId = state.conversationId;
     state.hadThinkingBlock = true;
-    _contentSplits[messageId] = _normalizeContentSplitData(
-      ContentSplitData(
-        offsets: List<int>.of(state.contentSplitOffsets),
-        reasoningCounts: List<int>.of(state.reasoningCountAtSplit),
-        toolCounts: List<int>.of(state.toolCountAtSplit),
-      ),
-    );
 
     final parts = List<ToolUIPart>.of(_toolParts[messageId] ?? const []);
     for (final r in chunk.toolResults!) {
@@ -1120,12 +1098,7 @@ class StreamController {
       _safeNotifyStateChanged();
       await updateReasoningInDb(
         messageId,
-        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(
-          segments,
-          contentSplitOffsets: _contentSplits[messageId]?.offsets,
-          reasoningCountAtSplit: _contentSplits[messageId]?.reasoningCounts,
-          toolCountAtSplit: _contentSplits[messageId]?.toolCounts,
-        ),
+        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(segments),
       );
     }
   }
@@ -1173,12 +1146,7 @@ class StreamController {
     if (segments != null && segments.isNotEmpty) {
       await updateReasoningInDb(
         messageId,
-        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(
-          segments,
-          contentSplitOffsets: _contentSplits[messageId]?.offsets,
-          reasoningCountAtSplit: _contentSplits[messageId]?.reasoningCounts,
-          toolCountAtSplit: _contentSplits[messageId]?.toolCounts,
-        ),
+        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(segments),
       );
     }
   }
@@ -1280,12 +1248,7 @@ class StreamController {
     if (segments.isNotEmpty || splits != null) {
       await updateReasoningInDb(
         messageId,
-        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(
-          segments,
-          contentSplitOffsets: splits?.offsets,
-          reasoningCountAtSplit: splits?.reasoningCounts,
-          toolCountAtSplit: splits?.toolCounts,
-        ),
+        reasoningSegmentsJson: serializeReasoningSegmentsWithSplits(segments),
       );
     }
   }
@@ -1466,8 +1429,6 @@ class StreamingState {
   int? generationStateRevision;
   bool generationStreamingStarted = false;
   bool hadThinkingBlock = false;
-  bool hasInlineBase64 = false;
-  String inlineBase64TailProbe = '';
   List<int> contentSplitOffsets = <int>[];
   List<int> reasoningCountAtSplit = <int>[];
   List<int> toolCountAtSplit = <int>[];
@@ -1597,6 +1558,7 @@ class _StreamSmoothState {
   String targetContent = '';
   String visibleContent = '';
   String Function()? contentBuilder;
+  List<MessagePart> Function()? partsBuilder;
   int totalTokens = 0;
   List<int>? contentSplitOffsets;
   List<int>? reasoningCountAtSplit;

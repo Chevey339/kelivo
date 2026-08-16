@@ -243,3 +243,21 @@ bool _optionalBool(Map<String, dynamic> map, String key) {
   }
   return value;
 }
+
+/// Whether the assistant bubble should walk [parts] instead of contentSplits.
+///
+/// Historical rows keep a single [TextPart] plus persisted split triples.
+/// New streams persist [ReasoningPart] / [ToolCallPart] (and generated
+/// [ImagePart]s). Image-only new rows have no splits, so they also take
+/// this path; old extracted images that still have splits stay on the
+/// read-compat renderer.
+bool renderAssistantFromParts({
+  required List<MessagePart> parts,
+  required bool hasContentSplits,
+}) {
+  for (final part in parts) {
+    if (part is ReasoningPart || part is ToolCallPart) return true;
+  }
+  if (hasContentSplits) return false;
+  return parts.any((part) => part is ImagePart);
+}

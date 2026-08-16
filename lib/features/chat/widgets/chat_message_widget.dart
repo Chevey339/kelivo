@@ -2304,10 +2304,128 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     return steps;
   }
 
+  bool get _hasContentSplits =>
+      widget.contentSplitOffsets != null &&
+      widget.reasoningCountAtSplit != null &&
+      widget.toolCountAtSplit != null;
+
+  bool get _renderFromParts => renderAssistantFromParts(
+    parts: widget.message.parts,
+    hasContentSplits: _hasContentSplits,
+  );
+
+  ToolUIPart? _toolUiFromPayload(String payloadJson) {
+    try {
+      final decoded = jsonDecode(payloadJson);
+      if (decoded is! Map) return null;
+      final id = (decoded['id'] ?? '').toString();
+      if (id.isEmpty) return null;
+      final args = decoded['arguments'];
+      final content = decoded['content']?.toString();
+      return ToolUIPart(
+        id: id,
+        toolName: (decoded['name'] ?? '').toString(),
+        arguments: args is Map
+            ? args.cast<String, dynamic>()
+            : const <String, dynamic>{},
+        content: content,
+        loading: content == null || content.isEmpty,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  List<_RenderBlock> _buildRenderBlocksFromParts(
+    List<MessagePart> parts, {
+    List<ReasoningSegment>? reasoningSegments,
+  }) {
+    final liveTools = <String, ToolUIPart>{
+      for (final tool in widget.toolParts ?? const <ToolUIPart>[])
+        if (tool.toolName != 'builtin_search' && tool.id.isNotEmpty)
+          tool.id: tool,
+    };
+    final blocks = <_RenderBlock>[];
+    var pendingSteps = <_TimelineStepData>[];
+    var reasoningCount = 0;
+    var toolCount = 0;
+    var reasoningIndex = 0;
+    final assistant = _assistantForMessage();
+
+    void flushSteps() {
+      if (pendingSteps.isEmpty) return;
+      blocks.add(
+        _RenderBlock.thinking(List<_TimelineStepData>.of(pendingSteps)),
+      );
+      pendingSteps = <_TimelineStepData>[];
+    }
+
+    for (final part in parts) {
+      switch (part) {
+        case TextPart(:final text):
+          final visual = _applyVisualAssistantRegexes(
+            text,
+            assistant: assistant,
+            scope: AssistantRegexScope.assistant,
+          );
+          if (visual.trim().isEmpty) continue;
+          flushSteps();
+          blocks.add(_RenderBlock.text(visual));
+        case ImagePart(:final uri):
+          if (uri.trim().isEmpty) continue;
+          flushSteps();
+          blocks.add(_RenderBlock.text('\n\n![image]($uri)'));
+        case ReasoningPart(:final text):
+          if (text.isEmpty) continue;
+          final provided =
+              reasoningSegments != null &&
+                  reasoningIndex < reasoningSegments.length
+              ? reasoningSegments[reasoningIndex]
+              : null;
+          reasoningIndex++;
+          pendingSteps.add(
+            _TimelineStepData.reasoning(
+              reasoning: ReasoningSegment(
+                text: text,
+                expanded: provided?.expanded ?? true,
+                loading: provided?.loading ?? false,
+                startAt: provided?.startAt,
+                finishedAt: provided?.finishedAt,
+                onToggle: provided?.onToggle,
+                toolStartIndex: provided?.toolStartIndex ?? toolCount,
+              ),
+              reasoningCountAfter: ++reasoningCount,
+              toolCountAfter: toolCount,
+            ),
+          );
+        case ToolCallPart(:final payloadJson):
+          final parsed = _toolUiFromPayload(payloadJson);
+          if (parsed == null || parsed.toolName == 'builtin_search') continue;
+          pendingSteps.add(
+            _TimelineStepData.tool(
+              tool: liveTools[parsed.id] ?? parsed,
+              reasoningCountAfter: reasoningCount,
+              toolCountAfter: ++toolCount,
+            ),
+          );
+        default:
+          break;
+      }
+    }
+    flushSteps();
+    return blocks;
+  }
+
   List<_RenderBlock> _buildRenderBlocks(
     String visualContent, {
     List<ReasoningSegment>? reasoningSegments,
   }) {
+    if (_renderFromParts) {
+      return _buildRenderBlocksFromParts(
+        widget.message.parts,
+        reasoningSegments: reasoningSegments,
+      );
+    }
     final visibleTools = (widget.toolParts ?? const <ToolUIPart>[])
         .where((p) => p.toolName != 'builtin_search')
         .toList();
@@ -2405,7 +2523,12 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final mediaPreview = _buildAttachmentPreview(
       context,
-      parts: widget.message.parts,
+      parts: _renderFromParts
+          ? [
+              for (final part in widget.message.parts)
+                if (part is FilePart) part,
+            ]
+          : widget.message.parts,
       isDark: isDark,
       alignEnd: false,
     );

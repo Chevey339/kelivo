@@ -207,68 +207,73 @@ more text
     );
   });
 
-  testWidgets('assistant ImagePart/FilePart previews render in parts order', (
-    tester,
-  ) async {
-    const messageId = 'assistant-with-attachments';
+  testWidgets(
+    'assistant FilePart stays in the strip; ImagePart renders in the timeline',
+    (tester) async {
+      const messageId = 'assistant-with-attachments';
 
-    await tester.pumpWidget(
-      _harness(
-        ChatMessageWidget(
-          showModelIcon: false,
-          message: ChatMessage(
-            id: messageId,
-            role: 'assistant',
-            conversationId: 'conversation-assistant-attachments',
-            parts: const [
-              TextPart('这是助手附图'),
-              FilePart(
-                uri: '/tmp/report.pdf',
-                name: 'report.pdf',
-                mime: 'application/pdf',
-              ),
-              ImagePart(uri: 'https://example.com/assistant.png'),
-            ],
+      await tester.pumpWidget(
+        _harness(
+          ChatMessageWidget(
+            showModelIcon: false,
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: 'conversation-assistant-attachments',
+              parts: const [
+                TextPart('这是助手附图'),
+                FilePart(
+                  uri: '/tmp/report.pdf',
+                  name: 'report.pdf',
+                  mime: 'application/pdf',
+                ),
+                ImagePart(uri: 'https://example.com/assistant.png'),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    final attachmentsFinder = find.byKey(
-      const ValueKey('assistant-message-attachments:$messageId'),
-    );
-    expect(attachmentsFinder, findsOneWidget);
-    expect(
-      find.descendant(of: attachmentsFinder, matching: find.text('report.pdf')),
-      findsOneWidget,
-    );
+      final attachmentsFinder = find.byKey(
+        const ValueKey('assistant-message-attachments:$messageId'),
+      );
+      expect(attachmentsFinder, findsOneWidget);
+      expect(
+        find.descendant(
+          of: attachmentsFinder,
+          matching: find.text('report.pdf'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('assistant-message-attachment:$messageId:0')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('assistant-message-attachment:$messageId:1')),
+        findsNothing,
+      );
 
-    final fileFinder = find.byKey(
-      const ValueKey('assistant-message-attachment:$messageId:1'),
-    );
-    final imageFinder = find.byKey(
-      const ValueKey('assistant-message-attachment:$messageId:2'),
-    );
-    expect(fileFinder, findsOneWidget);
-    expect(imageFinder, findsOneWidget);
-    expect(
-      tester.getRect(fileFinder).left,
-      lessThan(tester.getRect(imageFinder).left),
-    );
+      final images = tester.widgetList<Image>(find.byType(Image)).toList();
+      expect(
+        images.any((image) {
+          final provider = image.image;
+          final network = provider is NetworkImage
+              ? provider
+              : provider is ResizeImage &&
+                    provider.imageProvider is NetworkImage
+              ? provider.imageProvider as NetworkImage
+              : null;
+          return network?.url == 'https://example.com/assistant.png';
+        }),
+        isTrue,
+      );
 
-    final image = tester.widget<Image>(
-      find.descendant(of: imageFinder, matching: find.byType(Image)),
-    );
-    expect(image.image, isA<NetworkImage>());
-    expect(
-      (image.image as NetworkImage).url,
-      'https://example.com/assistant.png',
-    );
-
-    final align = tester.widget<Align>(attachmentsFinder);
-    expect(align.alignment, Alignment.centerLeft);
-  });
+      final align = tester.widget<Align>(attachmentsFinder);
+      expect(align.alignment, Alignment.centerLeft);
+    },
+  );
 
   testWidgets('assistant data URI ImagePart uses MemoryImage', (tester) async {
     const messageId = 'assistant-data-image';
@@ -293,7 +298,17 @@ more text
     );
     await tester.pump();
 
+    expect(
+      find.byKey(const ValueKey('assistant-message-attachments:$messageId')),
+      findsNothing,
+    );
     final image = tester.widget<Image>(find.byType(Image));
-    expect(image.image, isA<MemoryImage>());
+    final provider = image.image;
+    final memory = provider is MemoryImage
+        ? provider
+        : provider is ResizeImage && provider.imageProvider is MemoryImage
+        ? provider.imageProvider as MemoryImage
+        : null;
+    expect(memory, isA<MemoryImage>());
   });
 }

@@ -423,6 +423,17 @@ void main() {
         assistant.parts.whereType<ReasoningPart>().single.text,
         'first thought\nsecond thought',
       );
+      expect(
+        renderAssistantFromParts(
+          parts: assistant.parts,
+          hasContentSplits: false,
+        ),
+        isTrue,
+      );
+      expect(assistant.parts.map((part) => part.kind).toList(), [
+        'reasoning',
+        'text',
+      ]);
     });
 
     test('preserves newline across attachment boundary', () async {
@@ -600,6 +611,14 @@ void main() {
         'before\nafter',
       );
       expect(assistant.content, 'before\nafter');
+      expect(
+        renderAssistantFromParts(
+          parts: assistant.parts,
+          hasContentSplits: false,
+        ),
+        isTrue,
+      );
+      expect(assistant.parts.first, isA<ReasoningPart>());
     });
   });
 }

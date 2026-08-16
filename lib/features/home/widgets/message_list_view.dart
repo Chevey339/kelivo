@@ -1556,7 +1556,8 @@ class _MessageListViewState extends State<MessageListView> {
 
         // Create a modified message with streaming content
         final streamingMessage = message.copyWith(
-          content: displayContent,
+          parts: data.parts,
+          content: data.parts == null ? displayContent : null,
           totalTokens: displayTokens,
           promptTokens: data.promptTokens,
           completionTokens: data.completionTokens,
