@@ -256,6 +256,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get storageSpaceClearLegacyChatDataButton => 'Clear Old Chat Records';
 
   @override
+  String get storageSpaceExportLegacyChatFileButton => 'Export';
+
+  @override
+  String storageSpaceExportDone(Object fileName) {
+    return '$fileName exported';
+  }
+
+  @override
+  String storageSpaceExportFailed(Object error) {
+    return 'Export failed: $error';
+  }
+
+  @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
       'Clear the retained old chat files? Your current SQLite chat records will remain available.';
 

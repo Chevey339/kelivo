@@ -120,4 +120,33 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     }
   });
+
+  testWidgets('legacy hive files expose a per-file export action', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => SettingsProvider(createBusinessTestPreferences()),
+          child: const MaterialApp(
+            locale: Locale('en'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            home: StorageSpacePage(),
+          ),
+        ),
+      );
+      await _pumpUntilFound(tester, find.text('Chat Records (Old)'));
+
+      await tester.tap(find.text('Chat Records (Old)').last);
+      await _pumpUntilFound(tester, find.text('Clear Old Chat Records'));
+      await _pumpUntilFound(tester, find.text('Export'));
+
+      expect(find.text('messages.hive'), findsOneWidget);
+      expect(find.text('Export'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

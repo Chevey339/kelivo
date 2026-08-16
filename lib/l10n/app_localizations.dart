@@ -550,6 +550,24 @@ abstract class AppLocalizations {
   /// **'Clear Old Chat Records'**
   String get storageSpaceClearLegacyChatDataButton;
 
+  /// No description provided for @storageSpaceExportLegacyChatFileButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get storageSpaceExportLegacyChatFileButton;
+
+  /// No description provided for @storageSpaceExportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'{fileName} exported'**
+  String storageSpaceExportDone(Object fileName);
+
+  /// No description provided for @storageSpaceExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Export failed: {error}'**
+  String storageSpaceExportFailed(Object error);
+
   /// No description provided for @storageSpaceClearLegacyChatDataConfirmMessage.
   ///
   /// In en, this message translates to:

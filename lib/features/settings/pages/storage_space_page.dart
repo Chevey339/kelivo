@@ -1,9 +1,11 @@
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 
 import '../../../core/services/haptics.dart';
+import '../../../core/services/native_file_save.dart';
 import '../../../core/services/storage/storage_usage_service.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1502,6 +1504,20 @@ class _CategoryDetail extends StatelessWidget {
                               enabled: !clearing,
                               onTap: () => onClearSystemCache?.call(),
                             ),
+                          if (category.key ==
+                                  StorageUsageCategoryKey.legacyChatData &&
+                              s.path != null &&
+                              s.path!.isNotEmpty)
+                            _MiniActionButton(
+                              label:
+                                  l10n.storageSpaceExportLegacyChatFileButton,
+                              enabled: true,
+                              onTap: () => _exportLegacyHiveFile(
+                                context,
+                                sourcePath: s.path!,
+                                fileName: s.id,
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -1512,6 +1528,53 @@ class _CategoryDetail extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _exportLegacyHiveFile(
+    BuildContext context, {
+    required String sourcePath,
+    required String fileName,
+  }) async {
+    final l10n = AppLocalizations.of(context)!;
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final saved = await NativeFileSave.saveFileFromPath(
+          sourcePath: sourcePath,
+          fileName: fileName,
+        );
+        if (saved && context.mounted) {
+          showAppSnackBar(
+            context,
+            message: l10n.storageSpaceExportDone(fileName),
+            type: NotificationType.success,
+          );
+        }
+        return;
+      }
+      final savePath = await FilePicker.platform.saveFile(
+        dialogTitle: l10n.backupPageExportToFile,
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['hive'],
+      );
+      if (savePath == null) return;
+      await File(savePath).parent.create(recursive: true);
+      await File(sourcePath).copy(savePath);
+      if (context.mounted) {
+        showAppSnackBar(
+          context,
+          message: l10n.storageSpaceExportDone(fileName),
+          type: NotificationType.success,
+        );
+      }
+    } catch (e) {
+      if (!context.mounted) return;
+      showAppSnackBar(
+        context,
+        message: l10n.storageSpaceExportFailed(e.toString()),
+        type: NotificationType.error,
+      );
+    }
   }
 }
 

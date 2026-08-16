@@ -250,6 +250,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
 
   @override
+  String get storageSpaceExportLegacyChatFileButton => '导出';
+
+  @override
+  String storageSpaceExportDone(Object fileName) {
+    return '已导出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
       '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
@@ -7458,6 +7471,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get storageSpaceClearLegacyChatDataButton => '清理旧聊天记录';
 
   @override
+  String get storageSpaceExportLegacyChatFileButton => '导出';
+
+  @override
+  String storageSpaceExportDone(Object fileName) {
+    return '已导出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(Object error) {
+    return '导出失败：$error';
+  }
+
+  @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
       '确定清理保留的旧聊天文件吗？当前 SQLite 聊天记录不会受到影响。';
 
@@ -14590,6 +14616,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get storageSpaceClearLegacyChatDataButton => '清理舊聊天記錄';
+
+  @override
+  String get storageSpaceExportLegacyChatFileButton => '匯出';
+
+  @override
+  String storageSpaceExportDone(Object fileName) {
+    return '已匯出 $fileName';
+  }
+
+  @override
+  String storageSpaceExportFailed(Object error) {
+    return '匯出失敗：$error';
+  }
 
   @override
   String get storageSpaceClearLegacyChatDataConfirmMessage =>
