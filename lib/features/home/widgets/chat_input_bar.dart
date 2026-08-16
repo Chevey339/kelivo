@@ -9,37 +9,26 @@ import 'package:Kelivo/shared/text_input/message_editing_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, listEquals;
 import 'package:flutter/rendering.dart';
-
 import '../../../core/services/incoming_share_service.dart';
 import 'composer_attachment_card.dart';
-
 import 'dart:collection';
 import 'dart:ui' as ui;
 import 'dart:math' as math;
-
 import '../../../theme/design_tokens.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
-
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-
 import '../../../l10n/app_localizations.dart';
-
 import 'package:image_picker/image_picker.dart';
-
 import '../../../utils/file_import_helper.dart';
 import '../../../utils/image_compressor.dart';
 import '../../../utils/upload_dedupe.dart';
-
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
-
 import '../../../shared/responsive/breakpoints.dart';
-
 import 'dart:async';
 import 'dart:io';
-
 import '../../../core/models/chat_input_data.dart';
 import '../../../core/models/quote_ref.dart';
 import '../../../core/models/model_spec.dart';
@@ -62,18 +51,14 @@ import '../../../shared/widgets/interactive_drawer.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
-
 import 'package:super_clipboard/super_clipboard.dart';
 import 'package:re_editor/re_editor.dart' show CodeEditorTapRegion;
-
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../shared/widgets/context_usage_ring.dart';
 import '../../../shared/widgets/long_message_editor.dart';
 import '../../../shared/widgets/app_text_selection_toolbar.dart';
 import '../services/context_usage_service.dart';
-
 import 'package:Kelivo/theme/app_font_weights.dart';
-
 import '../../../core/models/composer_draft.dart';
 import '../../../core/database/composer_draft_store.dart';
 
@@ -3817,7 +3802,8 @@ class _ChatInputBarState extends State<ChatInputBar>
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.white, // color-gate: ignore (on scrim over photo)
+                              Colors
+                                  .white, // color-gate: ignore (on scrim over photo)
                             ),
                           ),
                         ),
@@ -3997,17 +3983,20 @@ class _ChatInputBarState extends State<ChatInputBar>
                   children: [
                     Expanded(
                       child: _QueuedInputBanner(
-                        label: AppLocalizations.of(context)!
-                            .composerDraftRecovered,
-                        cancelLabel: AppLocalizations.of(context)!
-                            .composerDraftRestore,
+                        label: AppLocalizations.of(
+                          context,
+                        )!.composerDraftRecovered,
+                        cancelLabel: AppLocalizations.of(
+                          context,
+                        )!.composerDraftRestore,
                         onCancel: widget.mediaController?.onRecoverDraft,
                       ),
                     ),
                     IosIconButton(
                       icon: Lucide.Trash2,
-                      tooltip: AppLocalizations.of(context)!
-                          .composerDraftDiscard,
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.composerDraftDiscard,
                       onTap: widget.mediaController?.onDiscardRecoveredDraft,
                     ),
                   ],
@@ -4279,16 +4268,17 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                   .watch<SettingsProvider>();
                                               final enterToSend =
                                                   settings.enterToSendOnMobile;
-                                              // Composer font scaling: the input
-                                              // font scale stacks on the app-wide UI
-                                              // scale from main.dart.
+                                              // Composer font scaling: divide the
+                                              // app-wide UI scale out so the input
+                                              // font scale stays absolute.
                                               final mqData = MediaQuery.of(
                                                 context,
                                               );
                                               final effectiveScale =
                                                   MediaQuery.textScalerOf(
                                                     context,
-                                                  ).scale(1) *
+                                                  ).scale(1) /
+                                                  settings.uiFontScale *
                                                   settings.inputFontScale;
                                               final inputField = GestureDetector(
                                                 behavior: HitTestBehavior
@@ -4581,10 +4571,12 @@ class _ChatInputBarState extends State<ChatInputBar>
                         top: -12,
                         start: AppSpacing.sm,
                         child: _ImageModePill(
-                          label: AppLocalizations.of(context)!
-                              .chatInputBarImageMode,
-                          closeTooltip: AppLocalizations.of(context)!
-                              .chatInputBarDisableImageModeTooltip,
+                          label: AppLocalizations.of(
+                            context,
+                          )!.chatInputBarImageMode,
+                          closeTooltip: AppLocalizations.of(
+                            context,
+                          )!.chatInputBarDisableImageModeTooltip,
                           onClose: _composerLocked
                               ? null
                               : () {
