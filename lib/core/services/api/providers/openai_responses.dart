@@ -65,7 +65,7 @@ List<Map<String, dynamic>> _withResponsesFunctionCallItems(
   return replayItems;
 }
 
-Stream<ChatStreamChunk> _sendOpenAIResponsesStream(
+Stream<StreamChunk> _sendOpenAIResponsesStream(
   http.Client client,
   ProviderConfig config,
   String modelId,

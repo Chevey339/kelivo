@@ -105,7 +105,7 @@ Future<Map<String, dynamic>> _captureClaudeRequestBody({
     await request.response.close();
   });
 
-  final chunks = await ChatApiService.sendMessageStream(
+  final chunks = await ChatApiService.sendLegacyMessageStream(
     config: _claudeConfig(
       'http://${server.address.address}:${server.port}',
       claudePromptCachingEnabled: claudePromptCachingEnabled,
@@ -192,7 +192,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   if (config.vertexAI == true) {
     await HttpOverrides.runZoned(
       () async {
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: config,
           modelId: modelId,
           messages: const [
@@ -210,7 +210,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
     final effectiveConfig = config.copyWith(
       baseUrl: 'http://${server.address.address}:${server.port}',
     );
-    final chunks = await ChatApiService.sendMessageStream(
+    final chunks = await ChatApiService.sendLegacyMessageStream(
       config: effectiveConfig,
       modelId: modelId,
       messages: const [
@@ -257,7 +257,7 @@ Future<Map<String, dynamic>> _captureClaudeProviderBody({
   final effectiveConfig = config.copyWith(
     baseUrl: 'http://${server.address.address}:${server.port}',
   );
-  final chunks = await ChatApiService.sendMessageStream(
+  final chunks = await ChatApiService.sendLegacyMessageStream(
     config: effectiveConfig,
     modelId: modelId,
     messages: const [
@@ -507,7 +507,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: ProviderConfig(
           id: 'OpenRouterAnthropic',
           enabled: true,
@@ -851,7 +851,7 @@ data: {"type":"message_stop"}
           },
         ).copyWith(baseUrl: 'http://${server.address.address}:${server.port}');
 
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: cfg,
           modelId: 'deepseek-v4-flash',
           messages: const [
@@ -959,7 +959,7 @@ data: {"type":"message_stop"}
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _claudeConfig(
           'http://${server.address.address}:${server.port}',
         ),
@@ -1100,7 +1100,7 @@ data: {"type":"message_stop"}
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config:
               _claudeConfig(
                 'http://${server.address.address}:${server.port}',
@@ -1374,7 +1374,7 @@ data: {"type":"message_stop"}
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _claudeConfig(
           'http://${server.address.address}:${server.port}',
         ),

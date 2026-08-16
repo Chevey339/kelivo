@@ -187,7 +187,7 @@ String _collectThoughtSigCommentFromParts(List<dynamic> parts) {
 
 // Simple container for parsed text + image refs
 
-Stream<ChatStreamChunk> _sendGoogleGeminiStream(
+Stream<StreamChunk> _sendGoogleGeminiStream(
   http.Client client,
   ProviderConfig config,
   String modelId,

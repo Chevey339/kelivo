@@ -92,7 +92,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -124,7 +124,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -155,7 +155,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -181,7 +181,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),
@@ -212,7 +212,7 @@ void main() {
         await server.close(force: true);
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _geminiConfig(
           'http://${server.address.address}:${server.port}/v1beta',
         ),

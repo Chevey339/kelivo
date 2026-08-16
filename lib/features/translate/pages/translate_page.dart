@@ -131,7 +131,7 @@ class _TranslatePageState extends State<TranslatePage> {
     });
 
     try {
-      final stream = ChatApiService.sendMessageStream(
+      final stream = ChatApiService.sendLegacyMessageStream(
         config: cfg,
         modelId: mid,
         messages: [

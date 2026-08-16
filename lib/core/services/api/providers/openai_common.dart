@@ -1268,7 +1268,7 @@ void _applyVendorReasoningKnobs(
   }
 }
 
-Stream<ChatStreamChunk> _sendOpenAIStream(
+Stream<StreamChunk> _sendOpenAIStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -1946,12 +1946,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           null,
           obj['usage'] ?? obj['response']?['usage'],
         );
-        yield ChatStreamChunk(
+        yield* emitDone(
           content: outText,
           reasoning: reasoningText.isEmpty ? null : reasoningText,
-          isDone: true,
-          totalTokens: usage?.totalTokens ?? 0,
           usage: usage,
+          totalTokens: usage?.totalTokens ?? 0,
         );
         return;
       }
@@ -1971,11 +1970,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         } catch (_) {}
         if (c0 == null) {
           final s = (lastObj['output_text'] ?? '').toString();
-          yield ChatStreamChunk(
+          yield* emitDone(
             content: s,
-            isDone: true,
-            totalTokens: aggUsage?.totalTokens ?? 0,
             usage: aggUsage,
+            totalTokens: aggUsage?.totalTokens ?? 0,
           );
           return;
         }
@@ -2030,12 +2028,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             });
           }
           if (callInfos.isNotEmpty) {
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: aggUsage?.totalTokens ?? 0,
+            yield* emitToolCalls(
+              callInfos,
               usage: aggUsage,
-              toolCalls: callInfos,
+              totalTokens: aggUsage?.totalTokens ?? 0,
             );
           }
           final results = <Map<String, dynamic>>[];
@@ -2057,12 +2053,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             );
           }
           if (resultsInfo.isNotEmpty) {
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: aggUsage?.totalTokens ?? 0,
+            yield* emitToolResults(
+              resultsInfo,
               usage: aggUsage,
-              toolResults: resultsInfo,
+              totalTokens: aggUsage?.totalTokens ?? 0,
             );
           }
           // Follow-up request
@@ -2158,12 +2152,11 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             content = buf.toString();
           }
         }
-        yield ChatStreamChunk(
+        yield* emitDone(
           content: content,
           reasoningDetails: cmsg?['reasoning_details'],
-          isDone: true,
-          totalTokens: aggUsage?.totalTokens ?? 0,
           usage: aggUsage,
+          totalTokens: aggUsage?.totalTokens ?? 0,
         );
         return;
       }
@@ -2209,7 +2202,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           sourceId: 'round-${streamRound++}',
         )
       : null;
-  final responsesAdapter = LegacyChunkAdapter();
   final chatDecoder = config.useResponseApi == true
       ? null
       : ChatCompletionsStreamDecoder(
@@ -2219,7 +2211,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           initialUsage: usage,
           sourceId: 'round-${streamRound++}',
         );
-  final chatAdapter = LegacyChunkAdapter();
 
   await for (final event in parseSseEventStrings(sse)) {
     final data = event.data;
@@ -2252,12 +2243,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         if (callInfos.isNotEmpty) {
           final approxTotal =
               approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: usage?.totalTokens ?? approxTotal,
+          yield* emitToolCalls(
+            callInfos,
             usage: usage,
-            toolCalls: callInfos,
+            totalTokens: usage?.totalTokens ?? approxTotal,
           );
         }
 
@@ -2275,12 +2264,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           );
         }
         if (resultsInfo.isNotEmpty) {
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: usage?.totalTokens ?? 0,
+          yield* emitToolResults(
+            resultsInfo,
             usage: usage,
-            toolResults: resultsInfo,
+            totalTokens: usage?.totalTokens ?? 0,
           );
         }
 
@@ -2404,7 +2391,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             initialUsage: usage,
             sourceId: 'round-${streamRound++}',
           );
-          final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
             final d = event.data;
             if (d == '[DONE]') {
@@ -2413,9 +2399,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             _throwIfInBandStreamError(d);
             try {
               for (final chunk in roundDecoder.accept(event).chunks) {
-                for (final mapped in roundAdapter.handle(chunk)) {
-                  yield mapped;
-                }
+                yield chunk;
               }
             } catch (_) {}
           }
@@ -2451,12 +2435,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
             if (callInfos2.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolCalls(
+                callInfos2,
                 usage: usage,
-                toolCalls: callInfos2,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             final results2 = <Map<String, dynamic>>[];
@@ -2477,12 +2459,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               );
             }
             if (resultsInfo2.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolResults(
+                resultsInfo2,
                 usage: usage,
-                toolResults: resultsInfo2,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             // Append for next loop - including any content accumulated in this round
@@ -2516,12 +2496,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final approxTotal =
                 approxPromptTokens +
                 approxTokensFromChars(approxCompletionChars);
-            yield ChatStreamChunk(
-              content: '',
+            yield* emitDone(
               reasoningDetails: reasoningDetailsAccum,
-              isDone: true,
-              totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
+              totalTokens: usage?.totalTokens ?? approxTotal,
             );
             return;
           }
@@ -2530,14 +2508,12 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
 
       final approxTotal =
           approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-      yield ChatStreamChunk(
-        content: '',
+      yield* emitDone(
         reasoningDetails:
             chatDecoder?.reasoningDetails ??
             reasoningDetailsBuffer.detailsOrNull,
-        isDone: true,
-        totalTokens: usage?.totalTokens ?? approxTotal,
         usage: usage,
+        totalTokens: usage?.totalTokens ?? approxTotal,
       );
       return;
     }
@@ -2548,9 +2524,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         final decoder = responsesDecoder!;
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
-          for (final mapped in responsesAdapter.handle(chunk)) {
-            yield mapped;
-          }
+          yield chunk;
         }
         if (!decoded.completed) continue;
 
@@ -2575,22 +2549,17 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             outputFormat: image.outputFormat,
           );
           if (mdImg.isNotEmpty) {
-            yield ChatStreamChunk(
+            yield* emitDelta(
               content: mdImg,
-              isDone: false,
-              totalTokens: totalTokens,
               usage: usage,
+              totalTokens: totalTokens,
             );
           }
         }
         if (decoder.citations.isNotEmpty) {
           final payload = jsonEncode({'items': decoder.citations});
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: totalTokens,
-            usage: usage,
-            toolResults: [
+          yield* emitToolResults(
+            [
               ToolResultInfo(
                 id: 'builtin_search',
                 name: 'search_web',
@@ -2598,6 +2567,8 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 content: payload,
               ),
             ],
+            usage: usage,
+            totalTokens: totalTokens,
           );
         }
         // Responses tool calling follow-up handling
@@ -2650,12 +2621,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final approxTotal =
                 approxPromptTokens +
                 approxTokensFromChars(approxCompletionChars);
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: usage?.totalTokens ?? approxTotal,
+            yield* emitToolCalls(
+              callInfos,
               usage: usage,
-              toolCalls: callInfos,
+              totalTokens: usage?.totalTokens ?? approxTotal,
             );
           }
           final responseOutputItems = _withResponsesFunctionCallItems(
@@ -2679,12 +2648,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             });
           }
           if (resultsInfo.isNotEmpty) {
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: usage?.totalTokens ?? 0,
+            yield* emitToolResults(
+              resultsInfo,
               usage: usage,
-              toolResults: resultsInfo,
+              totalTokens: usage?.totalTokens ?? 0,
             );
           }
 
@@ -2792,7 +2759,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               initialUsage: usage,
               sourceId: 'round-${streamRound++}',
             );
-            final followUpAdapter = LegacyChunkAdapter();
             await for (final event in parseSseEventStrings(s2)) {
               final d = event.data;
               if (d == '[DONE]') {
@@ -2802,9 +2768,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               _throwIfInBandStreamError(d);
               final decoded = followUpDecoder.accept(event);
               for (final chunk in decoded.chunks) {
-                for (final mapped in followUpAdapter.handle(chunk)) {
-                  yield mapped;
-                }
+                yield chunk;
               }
               if (decoded.completed) break;
             }
@@ -2826,12 +2790,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final approxTotal2 =
                   approxPromptTokens +
                   approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(
-                content: '',
-                reasoning: null,
-                isDone: true,
-                totalTokens: usage?.totalTokens ?? approxTotal2,
+              yield* emitDone(
                 usage: usage,
+                totalTokens: usage?.totalTokens ?? approxTotal2,
               );
               return;
             }
@@ -2879,12 +2840,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final approxTotal =
                   approxPromptTokens +
                   approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? approxTotal,
+              yield* emitToolCalls(
+                callInfos2,
                 usage: usage,
-                toolCalls: callInfos2,
+                totalTokens: usage?.totalTokens ?? approxTotal,
               );
             }
             final responseOutputItems2 = _withResponsesFunctionCallItems(
@@ -2917,12 +2876,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               });
             }
             if (resultsInfo2.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolResults(
+                resultsInfo2,
                 usage: usage,
-                toolResults: resultsInfo2,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             // Extend current input with this round's model output and our outputs
@@ -2935,33 +2892,25 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           // Safety
           final approxTotal =
               approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield ChatStreamChunk(
-            content: '',
-            reasoning: null,
-            isDone: true,
-            totalTokens: usage?.totalTokens ?? approxTotal,
+          yield* emitDone(
             usage: usage,
+            totalTokens: usage?.totalTokens ?? approxTotal,
           );
           return;
         }
 
         final approxTotal =
             approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-        yield ChatStreamChunk(
-          content: '',
-          reasoning: null,
-          isDone: true,
-          totalTokens: usage?.totalTokens ?? approxTotal,
+        yield* emitDone(
           usage: usage,
+          totalTokens: usage?.totalTokens ?? approxTotal,
         );
         return;
       } else {
         final decoder = chatDecoder!;
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
-          for (final mapped in chatAdapter.handle(chunk)) {
-            yield mapped;
-          }
+          yield chunk;
         }
         toolAcc
           ..clear()
@@ -3010,12 +2959,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
         if (callInfos.isNotEmpty) {
           final approxTotal =
               approxPromptTokens + approxTokensFromChars(approxCompletionChars);
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: usage?.totalTokens ?? approxTotal,
+          yield* emitToolCalls(
+            callInfos,
             usage: usage,
-            toolCalls: callInfos,
+            totalTokens: usage?.totalTokens ?? approxTotal,
           );
         }
         // Execute tools and emit results
@@ -3032,12 +2979,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
           );
         }
         if (resultsInfo.isNotEmpty) {
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: usage?.totalTokens ?? 0,
+          yield* emitToolResults(
+            resultsInfo,
             usage: usage,
-            toolResults: resultsInfo,
+            totalTokens: usage?.totalTokens ?? 0,
           );
         }
         // Build follow-up messages
@@ -3163,7 +3108,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             initialUsage: usage,
             sourceId: 'round-${streamRound++}',
           );
-          final roundAdapter = LegacyChunkAdapter();
           await for (final event in parseSseEventStrings(s2)) {
             final d = event.data;
             if (d == '[DONE]') {
@@ -3172,9 +3116,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             _throwIfInBandStreamError(d);
             try {
               for (final chunk in roundDecoder.accept(event).chunks) {
-                for (final mapped in roundAdapter.handle(chunk)) {
-                  yield mapped;
-                }
+                yield chunk;
               }
             } catch (_) {}
           }
@@ -3208,12 +3150,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               toolMsgs2.add({'__name': name, '__id': id, '__args': args});
             });
             if (callInfos2.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolCalls(
+                callInfos2,
                 usage: usage,
-                toolCalls: callInfos2,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             final results2 = <Map<String, dynamic>>[];
@@ -3234,12 +3174,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               );
             }
             if (resultsInfo2.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolResults(
+                resultsInfo2,
                 usage: usage,
-                toolResults: resultsInfo2,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             final nextAssistantToolCall = _buildAssistantToolCallMessage(
@@ -3270,12 +3208,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
             final approxTotal =
                 approxPromptTokens +
                 approxTokensFromChars(approxCompletionChars);
-            yield ChatStreamChunk(
-              content: '',
+            yield* emitDone(
               reasoningDetails: reasoningDetailsAccum,
-              isDone: true,
-              totalTokens: usage?.totalTokens ?? approxTotal,
               usage: usage,
+              totalTokens: usage?.totalTokens ?? approxTotal,
             );
             return;
           }
@@ -3316,12 +3252,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               final approxTotal =
                   approxPromptTokens +
                   approxTokensFromChars(approxCompletionChars);
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? approxTotal,
+              yield* emitToolCalls(
+                callInfos,
                 usage: usage,
-                toolCalls: callInfos,
+                totalTokens: usage?.totalTokens ?? approxTotal,
               );
             }
             // Execute tools and emit results
@@ -3343,12 +3277,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
               );
             }
             if (resultsInfo.isNotEmpty) {
-              yield ChatStreamChunk(
-                content: '',
-                isDone: false,
-                totalTokens: usage?.totalTokens ?? 0,
+              yield* emitToolResults(
+                resultsInfo,
                 usage: usage,
-                toolResults: resultsInfo,
+                totalTokens: usage?.totalTokens ?? 0,
               );
             }
             // Build follow-up messages
@@ -3476,7 +3408,6 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 initialUsage: usage,
                 sourceId: 'round-${streamRound++}',
               );
-              final roundAdapter = LegacyChunkAdapter();
               await for (final event in parseSseEventStrings(s2)) {
                 final d = event.data;
                 if (d == '[DONE]') {
@@ -3485,9 +3416,7 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 _throwIfInBandStreamError(d);
                 try {
                   for (final chunk in roundDecoder.accept(event).chunks) {
-                    for (final mapped in roundAdapter.handle(chunk)) {
-                      yield mapped;
-                    }
+                    yield chunk;
                   }
                 } catch (_) {}
               }
@@ -3523,12 +3452,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   toolMsgs2.add({'__name': name, '__id': id, '__args': args});
                 });
                 if (callInfos2.isNotEmpty) {
-                  yield ChatStreamChunk(
-                    content: '',
-                    isDone: false,
-                    totalTokens: usage?.totalTokens ?? 0,
+                  yield* emitToolCalls(
+                    callInfos2,
                     usage: usage,
-                    toolCalls: callInfos2,
+                    totalTokens: usage?.totalTokens ?? 0,
                   );
                 }
                 final results2 = <Map<String, dynamic>>[];
@@ -3553,12 +3480,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                   );
                 }
                 if (resultsInfo2.isNotEmpty) {
-                  yield ChatStreamChunk(
-                    content: '',
-                    isDone: false,
-                    totalTokens: usage?.totalTokens ?? 0,
+                  yield* emitToolResults(
+                    resultsInfo2,
                     usage: usage,
-                    toolResults: resultsInfo2,
+                    totalTokens: usage?.totalTokens ?? 0,
                   );
                 }
                 final nextAssistantToolCall = _buildAssistantToolCallMessage(
@@ -3589,11 +3514,9 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
                 final approxTotal =
                     approxPromptTokens +
                     approxTokensFromChars(approxCompletionChars);
-                yield ChatStreamChunk(
-                  content: '',
-                  isDone: true,
-                  totalTokens: usage?.totalTokens ?? approxTotal,
+                yield* emitDone(
                   usage: usage,
+                  totalTokens: usage?.totalTokens ?? approxTotal,
                 );
                 return;
               }
@@ -3627,12 +3550,10 @@ Stream<ChatStreamChunk> _sendOpenAIStream(
   final approxTotal =
       usage?.totalTokens ??
       (approxPromptTokens + approxTokensFromChars(approxCompletionChars));
-  yield ChatStreamChunk(
-    content: '',
+  yield* emitDone(
     reasoningDetails:
         chatDecoder?.reasoningDetails ?? reasoningDetailsBuffer.detailsOrNull,
-    isDone: true,
-    totalTokens: approxTotal,
     usage: usage,
+    totalTokens: approxTotal,
   );
 }

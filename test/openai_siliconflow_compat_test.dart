@@ -71,7 +71,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -80,7 +80,7 @@ void main() {
           thinkingBudget: 1024,
         ).toList();
 
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -198,7 +198,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [
@@ -337,7 +337,7 @@ void main() {
         });
 
         final baseUrl = _siliconFlowBaseUrl(server);
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _siliconFlowConfig(baseUrl, apiKey: apiKey),
           modelId: 'Qwen/Qwen3-8B',
           messages: const [

@@ -47,7 +47,7 @@ Future<Map<String, dynamic>> _captureMoonshotBody({
     await request.response.close();
   });
 
-  await ChatApiService.sendMessageStream(
+  await ChatApiService.sendLegacyMessageStream(
     config: _moonshotConfig(
       'http://${server.address.address}:${server.port}/v1',
     ),
@@ -183,7 +183,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k2.5',
           messages: const [
@@ -246,7 +246,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k2.7-code',
           messages: const [
@@ -345,7 +345,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k3',
           messages: const [
@@ -469,7 +469,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _moonshotConfig(baseUrl),
         modelId: 'kimi-k2-thinking',
         messages: const [
@@ -575,7 +575,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _moonshotConfig(baseUrl),
           modelId: 'kimi-k2.6',
           messages: const [

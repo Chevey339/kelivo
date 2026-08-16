@@ -49,7 +49,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
         ),
@@ -90,7 +90,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _openAIConfig(
             'http://${server.address.address}:${server.port}/v1',
           ),
@@ -147,7 +147,7 @@ void main() {
             'signature': 'sig-proxy-1',
           },
         ];
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _openAIConfig(
             'http://${server.address.address}:${server.port}/v1',
           ),
@@ -199,7 +199,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
         ),
@@ -241,7 +241,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
         ),
@@ -285,7 +285,7 @@ void main() {
           await request.response.close();
         });
 
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: ProviderConfig(
             id: 'OpenRouter',
             enabled: true,
@@ -336,7 +336,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
         ),
@@ -382,7 +382,7 @@ void main() {
           'moonshotai/kimi-k3:nitro',
           'moonshotai/kimi-k2.7-code:floor',
         ]) {
-          final chunks = await ChatApiService.sendMessageStream(
+          final chunks = await ChatApiService.sendLegacyMessageStream(
             config: _openAIConfig(
               'http://${server.address.address}:${server.port}/v1',
             ),

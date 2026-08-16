@@ -32,7 +32,7 @@ bool _isClaudeSupportedImageMime(String mime) {
   }
 }
 
-Stream<ChatStreamChunk> _sendClaudeStream(
+Stream<StreamChunk> _sendClaudeStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -563,12 +563,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
             ),
           );
         }
-        yield ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: (totalUsage?.totalTokens ?? 0),
+        yield* emitToolCalls(
+          callInfos,
           usage: totalUsage,
-          toolCalls: callInfos,
+          totalTokens: (totalUsage?.totalTokens ?? 0),
         );
         final results = <Map<String, dynamic>>[];
         final resultsInfo = <ToolResultInfo>[];
@@ -594,12 +592,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
           );
         }
         if (resultsInfo.isNotEmpty) {
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: (totalUsage?.totalTokens ?? 0),
+          yield* emitToolResults(
+            resultsInfo,
             usage: totalUsage,
-            toolResults: resultsInfo,
+            totalTokens: (totalUsage?.totalTokens ?? 0),
           );
         }
         // Extend convo: assistant + user tool_result, loop
@@ -609,11 +605,10 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         continue; // next round
       }
       // No tool use -> return final text
-      yield ChatStreamChunk(
+      yield* emitDone(
         content: buf.toString(),
-        isDone: true,
-        totalTokens: (totalUsage?.totalTokens ?? 0),
         usage: totalUsage,
+        totalTokens: (totalUsage?.totalTokens ?? 0),
       );
       return;
     }
@@ -623,16 +618,13 @@ Stream<ChatStreamChunk> _sendClaudeStream(
       skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
       sourceId: 'round-${streamRound++}',
     );
-    final adapter = LegacyChunkAdapter();
     final executedToolIds = <String>{};
 
     await for (final event in parseSseEventStrings(sse)) {
       _throwIfInBandStreamError(event.data);
       final decoded = decoder.accept(event);
       for (final chunk in decoded.chunks) {
-        for (final mapped in adapter.handle(chunk)) {
-          yield mapped;
-        }
+        yield chunk;
         if (chunk is ToolCallEnd &&
             decoder.isClientTool(chunk.id) &&
             onToolCall != null &&
@@ -641,12 +633,8 @@ Stream<ChatStreamChunk> _sendClaudeStream(
           final args = tool.decodedArguments;
           final res = await onToolCall(tool.name, args, toolCallId: tool.id);
           decoder.recordToolResult(tool.id, res);
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: decoder.usage?.totalTokens ?? 0,
-            usage: decoder.usage,
-            toolResults: [
+          yield* emitToolResults(
+            [
               ToolResultInfo(
                 id: tool.id,
                 name: tool.name,
@@ -657,15 +645,15 @@ Stream<ChatStreamChunk> _sendClaudeStream(
                 },
               ),
             ],
+            usage: decoder.usage,
+            totalTokens: decoder.usage?.totalTokens ?? 0,
           );
         }
       }
       if (decoded.completed) break;
     }
     for (final chunk in decoder.onClosed()) {
-      for (final mapped in adapter.handle(chunk)) {
-        yield mapped;
-      }
+      yield chunk;
     }
 
     final usage = decoder.usage;
@@ -687,11 +675,9 @@ Stream<ChatStreamChunk> _sendClaudeStream(
         ];
         continue;
       }
-      yield ChatStreamChunk(
-        content: '',
-        isDone: true,
-        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
+      yield* emitDone(
         usage: totalUsage ?? usage,
+        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
       );
       return;
     }

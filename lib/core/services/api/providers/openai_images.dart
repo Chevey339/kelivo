@@ -29,7 +29,7 @@ Uri _openAIImagesUrl(ProviderConfig config, String path) {
   return Uri.parse('$rawBase$path');
 }
 
-Stream<ChatStreamChunk> _sendOpenAIImagesStream(
+Stream<StreamChunk> _sendOpenAIImagesStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -70,11 +70,10 @@ Stream<ChatStreamChunk> _sendOpenAIImagesStream(
     outputMime: outputMime,
   );
   final usage = _openAIImagesUsage(response);
-  yield ChatStreamChunk(
+  yield* emitDone(
     content: markdown,
-    isDone: true,
-    totalTokens: usage?.totalTokens ?? 0,
     usage: usage,
+    totalTokens: usage?.totalTokens ?? 0,
   );
 }
 

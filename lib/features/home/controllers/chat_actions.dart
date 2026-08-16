@@ -11,6 +11,7 @@ import '../../../core/models/token_usage.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/stream/legacy_chunk_adapter.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
 import '../../../l10n/app_localizations.dart';
@@ -1758,7 +1759,7 @@ class ChatActions {
         await _cancelSubscriptionWithTimeout(previousSub);
       }
       final sub = listenSequentiallyToStream<ChatStreamChunk>(
-        stream: stream,
+        stream: LegacyChunkAdapter().adapt(stream),
         onData: (chunk) => _handleStreamChunk(chunk, state),
         onError: (error, stackTrace) => _handleStreamError(error, state),
         onDone: () => _handleStreamDone(state),

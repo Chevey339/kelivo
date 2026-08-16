@@ -61,7 +61,7 @@ Future<Map<String, dynamic>> _captureChatBody({
     await request.response.close();
   });
 
-  final chunks = await ChatApiService.sendMessageStream(
+  final chunks = await ChatApiService.sendLegacyMessageStream(
     config: _openAIConfig(
       'http://${server.address.address}:${server.port}/v1',
       providerId: providerId,
@@ -234,7 +234,7 @@ void main() {
         await request.response.close();
       });
 
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _openAIConfig(
           'http://${server.address.address}:${server.port}/v1',
           useResponseApi: true,

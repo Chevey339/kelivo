@@ -55,7 +55,7 @@ void main() {
       },
     );
 
-    final chunks = await ChatApiService.sendMessageStream(
+    final chunks = await ChatApiService.sendLegacyMessageStream(
       config: config,
       modelId: 'gpt-image-2',
       messages: const [
@@ -63,6 +63,7 @@ void main() {
       ],
       extraHeaders: const {'X-Level': 'assistant'},
       extraBody: const {'quality': 'assistant'},
+      stream: false,
     ).toList();
 
     expect(chunks.single.isDone, isTrue);

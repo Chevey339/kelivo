@@ -168,7 +168,7 @@ class _DesktopTranslatePageState extends State<DesktopTranslatePage> {
     });
 
     try {
-      final stream = ChatApiService.sendMessageStream(
+      final stream = ChatApiService.sendLegacyMessageStream(
         config: cfg,
         modelId: modelId,
         messages: [

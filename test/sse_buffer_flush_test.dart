@@ -62,7 +62,7 @@ void main() {
         final config = _testConfig('http://localhost:${server.port}/v1');
         final chunks = <ChatStreamChunk>[];
 
-        await for (final c in ChatApiService.sendMessageStream(
+        await for (final c in ChatApiService.sendLegacyMessageStream(
           config: config,
           modelId: 'test-model',
           messages: [
@@ -117,7 +117,7 @@ void main() {
       final config = _testConfig('http://localhost:${server.port}/v1');
       final chunks = <ChatStreamChunk>[];
 
-      await for (final c in ChatApiService.sendMessageStream(
+      await for (final c in ChatApiService.sendLegacyMessageStream(
         config: config,
         modelId: 'test-model',
         messages: [
@@ -184,7 +184,7 @@ void main() {
       });
 
       final config = _testConfig('http://localhost:${server.port}/v1');
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: config,
         modelId: 'deepseek-v4-pro',
         messages: [

@@ -8,6 +8,47 @@ import 'stream_chunk.dart';
 ///
 /// Stateful: create one instance per response stream. After the first
 /// [Finish], further events are ignored so `isDone` is emitted exactly once.
+/// Fold adapter output back into one bag. Non-stream callers historically
+/// received content, reasoning, usage and `isDone` on a single chunk.
+ChatStreamChunk coalesceChatStreamChunks(List<ChatStreamChunk> chunks) {
+  final content = StringBuffer();
+  final reasoning = StringBuffer();
+  dynamic reasoningDetails;
+  TokenUsage? usage;
+  final toolCalls = <String, ToolCallInfo>{};
+  final toolResults = <String, ToolResultInfo>{};
+  var isDone = false;
+  for (final chunk in chunks) {
+    content.write(chunk.content);
+    if ((chunk.reasoning ?? '').isNotEmpty) {
+      reasoning.write(chunk.reasoning);
+    }
+    if (chunk.reasoningDetails != null) {
+      reasoningDetails = chunk.reasoningDetails;
+    }
+    if (chunk.usage != null) {
+      usage = (usage ?? const TokenUsage()).merge(chunk.usage!);
+    }
+    for (final call in chunk.toolCalls ?? const <ToolCallInfo>[]) {
+      toolCalls[call.id] = call;
+    }
+    for (final result in chunk.toolResults ?? const <ToolResultInfo>[]) {
+      toolResults[result.id] = result;
+    }
+    isDone = isDone || chunk.isDone;
+  }
+  return ChatStreamChunk(
+    content: content.toString(),
+    reasoning: reasoning.isEmpty ? null : reasoning.toString(),
+    reasoningDetails: reasoningDetails,
+    isDone: isDone,
+    totalTokens: usage?.totalTokens ?? 0,
+    usage: usage,
+    toolCalls: toolCalls.isEmpty ? null : toolCalls.values.toList(),
+    toolResults: toolResults.isEmpty ? null : toolResults.values.toList(),
+  );
+}
+
 class LegacyChunkAdapter {
   TokenUsage? _usage;
   dynamic _reasoningDetails;

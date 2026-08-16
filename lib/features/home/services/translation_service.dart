@@ -112,7 +112,7 @@ class TranslationService {
       // 创建翻译请求
       final provider = settings.getProviderConfig(translateProvider);
 
-      final translationStream = ChatApiService.sendMessageStream(
+      final translationStream = ChatApiService.sendLegacyMessageStream(
         config: provider,
         modelId: translateModelId,
         messages: [

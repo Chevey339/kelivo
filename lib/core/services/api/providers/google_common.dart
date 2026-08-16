@@ -352,7 +352,7 @@ void _throwIfGeminiCandidateBlocked(String data) {
   }
 }
 
-Stream<ChatStreamChunk> _sendGoogleStream(
+Stream<StreamChunk> _sendGoogleStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -696,11 +696,9 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       } catch (_) {}
       final candidates = (obj['candidates'] as List?) ?? const <dynamic>[];
       if (candidates.isEmpty) {
-        yield ChatStreamChunk(
-          content: '',
-          isDone: true,
-          totalTokens: totalUsage?.totalTokens ?? 0,
+        yield* emitDone(
           usage: totalUsage,
+          totalTokens: totalUsage?.totalTokens ?? 0,
         );
         return;
       }
@@ -741,12 +739,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 'thoughtSigVal': thoughtSigVal,
             },
           };
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: totalUsage?.totalTokens ?? 0,
-            usage: totalUsage,
-            toolCalls: [
+          yield* emitToolCalls(
+            [
               ToolCallInfo(
                 id: partId,
                 name: name,
@@ -754,14 +748,12 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 metadata: googleMetadata,
               ),
             ],
+            usage: totalUsage,
+            totalTokens: totalUsage?.totalTokens ?? 0,
           );
           final res = await onToolCall(name, args, toolCallId: partId);
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: totalUsage?.totalTokens ?? 0,
-            usage: totalUsage,
-            toolResults: [
+          yield* emitToolResults(
+            [
               ToolResultInfo(
                 id: partId,
                 name: name,
@@ -770,6 +762,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 metadata: googleMetadata,
               ),
             ],
+            usage: totalUsage,
+            totalTokens: totalUsage?.totalTokens ?? 0,
           );
           final frPart = <String, dynamic>{
             'functionResponse': {
@@ -802,18 +796,16 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           if (code.isNotEmpty) {
             final ceId = 'code_exec_$codeExecIdx';
             codeExecIdx++;
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: totalUsage?.totalTokens ?? 0,
-              usage: totalUsage,
-              toolCalls: [
+            yield* emitToolCalls(
+              [
                 ToolCallInfo(
                   id: ceId,
                   name: 'code_execution',
                   arguments: {'language': lang, 'code': code},
                 ),
               ],
+              usage: totalUsage,
+              totalTokens: totalUsage?.totalTokens ?? 0,
             );
           }
         }
@@ -824,12 +816,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           final resultId = codeExecIdx > 0
               ? 'code_exec_${codeExecIdx - 1}'
               : 'code_exec_0';
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: totalUsage?.totalTokens ?? 0,
-            usage: totalUsage,
-            toolResults: [
+          yield* emitToolResults(
+            [
               ToolResultInfo(
                 id: resultId,
                 name: 'code_execution',
@@ -837,6 +825,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                 content: output.isEmpty ? outcome : output,
               ),
             ],
+            usage: totalUsage,
+            totalTokens: totalUsage?.totalTokens ?? 0,
           );
         }
       }
@@ -855,12 +845,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       }
       final reasoningStr = reasoningBuf.toString();
       if (reasoningStr.isNotEmpty) {
-        yield ChatStreamChunk(
-          content: '',
+        yield* emitDelta(
           reasoning: reasoningStr,
-          isDone: false,
-          totalTokens: totalUsage?.totalTokens ?? 0,
           usage: totalUsage,
+          totalTokens: totalUsage?.totalTokens ?? 0,
         );
       }
       var contentStr = buf.toString();
@@ -868,11 +856,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         final metaComment = _collectThoughtSigCommentFromParts(parts);
         if (metaComment.isNotEmpty) contentStr += metaComment;
       }
-      yield ChatStreamChunk(
+      yield* emitDone(
         content: contentStr,
-        isDone: true,
-        totalTokens: totalUsage?.totalTokens ?? 0,
         usage: totalUsage,
+        totalTokens: totalUsage?.totalTokens ?? 0,
       );
       return;
     }
@@ -1204,8 +1191,6 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       citations: builtinCitations,
       sourceId: 'round-${streamRound++}',
     );
-    final adapter = LegacyChunkAdapter();
-
     Future<String> sanitizeTextIfNeeded(String input) async {
       if (input.isEmpty) return input;
       if (input.contains('data:image') && input.contains('base64,')) {
@@ -1259,30 +1244,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
         } catch (_) {}
       }
       for (final chunk in decoder.takeOrphanedTrailingText()) {
-        for (final mapped in adapter.handle(chunk)) {
-          yield mapped;
-        }
+        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
       }
       for (final chunk in decoded.chunks) {
-        for (final mapped in adapter.handle(chunk)) {
-          if (mapped.content.isNotEmpty) {
-            final sanitized = await sanitizeTextIfNeeded(mapped.content);
-            if (sanitized != mapped.content) {
-              yield ChatStreamChunk(
-                content: sanitized,
-                reasoning: mapped.reasoning,
-                reasoningDetails: mapped.reasoningDetails,
-                isDone: mapped.isDone,
-                totalTokens: mapped.totalTokens,
-                usage: mapped.usage,
-                toolCalls: mapped.toolCalls,
-                toolResults: mapped.toolResults,
-              );
-              continue;
-            }
-          }
-          yield mapped;
-        }
+        yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
         if (chunk is ToolCallEnd &&
             decoder.isClientFunctionCall(chunk.id) &&
             onToolCall != null) {
@@ -1294,12 +1259,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               toolCallId: call.id,
             );
             call.result = resText;
-            yield ChatStreamChunk(
-              content: '',
-              isDone: false,
-              totalTokens: decoder.usage?.totalTokens ?? 0,
-              usage: decoder.usage,
-              toolResults: [
+            yield* emitToolResults(
+              [
                 ToolResultInfo(
                   id: call.id,
                   name: call.name,
@@ -1318,6 +1279,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
                   },
                 ),
               ],
+              usage: decoder.usage,
+              totalTokens: decoder.usage?.totalTokens ?? 0,
             );
           }
         }
@@ -1325,9 +1288,7 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       if (decoded.completed || decoder.canFinishNow) break;
     }
     for (final chunk in decoder.onClosed()) {
-      for (final mapped in adapter.handle(chunk)) {
-        yield mapped;
-      }
+      yield await _sanitizeStreamChunk(chunk, sanitizeTextIfNeeded);
     }
 
     receivedImage = decoder.receivedImage;
@@ -1368,11 +1329,10 @@ Stream<ChatStreamChunk> _sendGoogleStream(
     final pendingImage = await takeBufferedImageMarkdown();
     if (pendingImage.isNotEmpty) {
       final sanitized = await sanitizeTextIfNeeded(pendingImage);
-      yield ChatStreamChunk(
+      yield* emitDelta(
         content: sanitized,
-        isDone: false,
-        totalTokens: totalTokens,
         usage: usage,
+        totalTokens: totalTokens,
       );
     }
 
@@ -1380,12 +1340,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
       // No tool calls; this round finished
       if (decoder.canFinishNow && builtinCitations.isNotEmpty) {
         final payload = jsonEncode({'items': builtinCitations});
-        yield ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: totalTokens,
-          usage: usage,
-          toolResults: [
+        yield* emitToolResults(
+          [
             ToolResultInfo(
               id: 'builtin_search',
               name: 'builtin_search',
@@ -1393,6 +1349,8 @@ Stream<ChatStreamChunk> _sendGoogleStream(
               content: payload,
             ),
           ],
+          usage: usage,
+          totalTokens: totalTokens,
         );
       }
       if (persistGeminiThoughtSigs) {
@@ -1402,20 +1360,14 @@ Stream<ChatStreamChunk> _sendGoogleStream(
           imageSigs: responseImageThoughtSigs,
         );
         if (metaComment.isNotEmpty) {
-          yield ChatStreamChunk(
+          yield* emitDelta(
             content: metaComment,
-            isDone: false,
-            totalTokens: totalTokens,
             usage: usage,
+            totalTokens: totalTokens,
           );
         }
       }
-      yield ChatStreamChunk(
-        content: '',
-        isDone: true,
-        totalTokens: totalTokens,
-        usage: usage,
-      );
+      yield* emitDone(usage: usage, totalTokens: totalTokens);
       return;
     }
 

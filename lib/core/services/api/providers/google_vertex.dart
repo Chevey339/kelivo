@@ -1,6 +1,6 @@
 part of '../chat_api_service.dart';
 
-Stream<ChatStreamChunk> _sendGoogleVertexStream(
+Stream<StreamChunk> _sendGoogleVertexStream(
   http.Client client,
   ProviderConfig config,
   String modelId,
@@ -136,7 +136,7 @@ int _getMaxOutputTokensForClaudeModel(String modelId) {
   }
 }
 
-Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
+Stream<StreamChunk> _sendGoogleVertexClaudeStream({
   required http.Client client,
   required ProviderConfig config,
   required String modelId,
@@ -536,12 +536,10 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
             ),
           );
         }
-        yield ChatStreamChunk(
-          content: '',
-          isDone: false,
-          totalTokens: (totalUsage?.totalTokens ?? 0),
+        yield* emitToolCalls(
+          callInfos,
           usage: totalUsage,
-          toolCalls: callInfos,
+          totalTokens: (totalUsage?.totalTokens ?? 0),
         );
         final results = <Map<String, dynamic>>[];
         final resultsInfo = <ToolResultInfo>[];
@@ -564,12 +562,10 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
           );
         }
         if (resultsInfo.isNotEmpty) {
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: (totalUsage?.totalTokens ?? 0),
+          yield* emitToolResults(
+            resultsInfo,
             usage: totalUsage,
-            toolResults: resultsInfo,
+            totalTokens: (totalUsage?.totalTokens ?? 0),
           );
         }
         // Extend convo: assistant + user tool_result, loop
@@ -579,18 +575,16 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         continue; // next round
       }
       // No tool use -> return final text
-      yield ChatStreamChunk(
+      yield* emitDone(
         content: buf.toString(),
-        isDone: true,
-        totalTokens: (totalUsage?.totalTokens ?? 0),
         usage: totalUsage,
+        totalTokens: (totalUsage?.totalTokens ?? 0),
       );
       return;
     }
 
     final sse = response.stream.transform(utf8.decoder);
     final decoder = ClaudeStreamDecoder(sourceId: 'round-${streamRound++}');
-    final adapter = LegacyChunkAdapter();
     final executedToolIds = <String>{};
 
     await for (final event in parseSseEventStrings(sse)) {
@@ -600,9 +594,7 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
       _throwIfInBandStreamError(event.data);
       final decoded = decoder.accept(event);
       for (final chunk in decoded.chunks) {
-        for (final mapped in adapter.handle(chunk)) {
-          yield mapped;
-        }
+        yield chunk;
         if (chunk is ToolCallEnd &&
             decoder.isClientTool(chunk.id) &&
             onToolCall != null &&
@@ -611,12 +603,8 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
           final args = tool.decodedArguments;
           final res = await onToolCall(tool.name, args, toolCallId: tool.id);
           decoder.recordToolResult(tool.id, res);
-          yield ChatStreamChunk(
-            content: '',
-            isDone: false,
-            totalTokens: decoder.usage?.totalTokens ?? 0,
-            usage: decoder.usage,
-            toolResults: [
+          yield* emitToolResults(
+            [
               ToolResultInfo(
                 id: tool.id,
                 name: tool.name,
@@ -624,15 +612,15 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
                 content: res,
               ),
             ],
+            usage: decoder.usage,
+            totalTokens: decoder.usage?.totalTokens ?? 0,
           );
         }
       }
       if (decoded.completed) break;
     }
     for (final chunk in decoder.onClosed()) {
-      for (final mapped in adapter.handle(chunk)) {
-        yield mapped;
-      }
+      yield chunk;
     }
 
     final usage = decoder.usage;
@@ -654,11 +642,9 @@ Stream<ChatStreamChunk> _sendGoogleVertexClaudeStream({
         ];
         continue;
       }
-      yield ChatStreamChunk(
-        content: '',
-        isDone: true,
-        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
+      yield* emitDone(
         usage: totalUsage ?? usage,
+        totalTokens: (totalUsage?.totalTokens ?? roundTokens),
       );
       return;
     }

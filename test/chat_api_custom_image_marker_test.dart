@@ -186,7 +186,7 @@ void main() {
         final file = File('${dir.path}/sample.png');
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -213,7 +213,7 @@ void main() {
 
     test('literal [image:...] text is not treated as an attachment', () async {
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: const [
@@ -240,7 +240,7 @@ void main() {
 
     test('markdown images are still parsed for image-capable models', () async {
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: const [
@@ -272,7 +272,7 @@ void main() {
           final file = File('${dir.path}/assistant.png');
           await file.writeAsBytes(const [1, 2, 3, 4]);
 
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _openAiConfig(baseUrl),
             modelId: 'gpt-4.1',
             messages: [
@@ -334,7 +334,7 @@ void main() {
         const dataUrl =
             'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
         final body = await _sendAndCaptureRequestBody((baseUrl) async {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _openAiConfig(baseUrl),
             modelId: 'gpt-4.1',
             messages: [
@@ -408,7 +408,7 @@ void main() {
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
         final body = await _sendAndCaptureRequestBody((baseUrl) async {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _openAiConfig(baseUrl),
             modelId: 'gpt-4.1',
             messages: [
@@ -500,7 +500,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -633,7 +633,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -752,7 +752,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      await ChatApiService.sendMessageStream(
+      await ChatApiService.sendLegacyMessageStream(
         config: _openAiConfig(baseUrl),
         modelId: 'gpt-4.1',
         messages: [
@@ -865,7 +865,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -938,7 +938,7 @@ void main() {
         final file = File('${dir.path}/clip.mp4');
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: [
@@ -981,7 +981,7 @@ void main() {
         await file.writeAsBytes(const [1, 2, 3, 4]);
         videoPath = file.path;
 
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: [
@@ -1015,7 +1015,7 @@ void main() {
 
     test('remote video URL stays as text, not input_image', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: [
@@ -1057,7 +1057,7 @@ void main() {
         final file = File('${dir.path}/sample.png');
         await file.writeAsBytes(const [1, 2, 3, 4]);
 
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: [
@@ -1081,7 +1081,7 @@ void main() {
 
     test('literal [image:...] text is not treated as an attachment', () async {
       final body = await _sendAndCaptureResponsesBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: const [
@@ -1122,7 +1122,7 @@ void main() {
           final file = File('${dir.path}/assistant.png');
           await file.writeAsBytes(const [1, 2, 3, 4]);
 
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _openAiConfig(baseUrl, useResponseApi: true),
             modelId: 'gpt-4.1',
             messages: [
@@ -1182,7 +1182,7 @@ void main() {
         await file1.writeAsBytes(const [1, 2, 3, 4]);
         await file2.writeAsBytes(const [5, 6, 7, 8]);
 
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl, useResponseApi: true),
           modelId: 'gpt-4.1',
           messages: [
@@ -1228,7 +1228,7 @@ void main() {
       'remote structured media stays as text when allowRemoteImages is false',
       () async {
         final body = await _sendAndCaptureRequestBody((baseUrl) async {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _openAiConfig(baseUrl),
             modelId: 'moonshotai/kimi-k3',
             messages: [
@@ -1277,7 +1277,7 @@ void main() {
 
         final body = await _captureProviderBody(
           (baseUrl) {
-            return ChatApiService.sendMessageStream(
+            return ChatApiService.sendLegacyMessageStream(
               config: _claudeConfig(baseUrl),
               modelId: 'claude-sonnet-4-6',
               messages: [
@@ -1318,7 +1318,7 @@ void main() {
     test('literal [image:...] text is not treated as an attachment', () async {
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _claudeConfig(baseUrl),
             modelId: 'claude-sonnet-4-6',
             messages: const [
@@ -1350,7 +1350,7 @@ void main() {
           '${Directory.systemTemp.path}/kelivo_missing_claude_${DateTime.now().microsecondsSinceEpoch}.png';
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _claudeConfig(baseUrl),
             modelId: 'claude-sonnet-4-6',
             messages: [
@@ -1395,7 +1395,7 @@ void main() {
 
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _claudeConfig(baseUrl),
             modelId: 'claude-sonnet-4-6',
             messages: [
@@ -1437,7 +1437,7 @@ void main() {
 
         final body = await _captureProviderBody(
           (baseUrl) {
-            return ChatApiService.sendMessageStream(
+            return ChatApiService.sendLegacyMessageStream(
               config: _claudeConfig(baseUrl),
               modelId: 'claude-sonnet-4-6',
               messages: [
@@ -1483,7 +1483,7 @@ void main() {
 
         final body = await _captureProviderBody(
           (baseUrl) {
-            return ChatApiService.sendMessageStream(
+            return ChatApiService.sendLegacyMessageStream(
               config: _claudeConfig(baseUrl),
               modelId: 'claude-sonnet-4-6',
               messages: [
@@ -1534,7 +1534,7 @@ void main() {
         const remote = 'https://cdn.example.com/clip.mp4';
         final body = await _captureProviderBody(
           (baseUrl) {
-            return ChatApiService.sendMessageStream(
+            return ChatApiService.sendLegacyMessageStream(
               config: _claudeConfig(baseUrl),
               modelId: 'claude-sonnet-4-6',
               messages: [
@@ -1580,7 +1580,7 @@ void main() {
 
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _geminiConfig('$baseUrl/v1beta'),
             modelId: 'gemini-2.5-pro',
             messages: [
@@ -1620,7 +1620,7 @@ void main() {
     test('literal [image:...] text is not treated as an attachment', () async {
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _geminiConfig('$baseUrl/v1beta'),
             modelId: 'gemini-2.5-pro',
             messages: const [
@@ -1656,7 +1656,7 @@ void main() {
           '${Directory.systemTemp.path}/kelivo_missing_gemini_${DateTime.now().microsecondsSinceEpoch}.png';
       final body = await _captureProviderBody(
         (baseUrl) {
-          return ChatApiService.sendMessageStream(
+          return ChatApiService.sendLegacyMessageStream(
             config: _geminiConfig('$baseUrl/v1beta'),
             modelId: 'gemini-2.5-pro',
             messages: [

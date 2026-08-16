@@ -107,7 +107,7 @@ void main() {
 
         final modelId = '${kind.name}-model';
         final baseUrl = 'http://${server.address.address}:${server.port}';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _config(kind, baseUrl, modelId),
           modelId: modelId,
           messages: const [

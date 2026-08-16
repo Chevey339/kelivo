@@ -108,7 +108,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendMessageStream(
+          final chunks = await ChatApiService.sendLegacyMessageStream(
             config: _openRouterConfig(modelId: 'deepseek/deepseek-chat'),
             modelId: 'deepseek/deepseek-chat',
             messages: const <Map<String, dynamic>>[
@@ -169,7 +169,7 @@ void main() {
 
         await HttpOverrides.runZoned(
           () async {
-            final chunks = await ChatApiService.sendMessageStream(
+            final chunks = await ChatApiService.sendLegacyMessageStream(
               config: _openRouterConfig(
                 modelId: 'deepseek/deepseek-chat',
                 searchEnabled: false,
@@ -228,7 +228,7 @@ void main() {
 
         await HttpOverrides.runZoned(
           () async {
-            final chunks = await ChatApiService.sendMessageStream(
+            final chunks = await ChatApiService.sendLegacyMessageStream(
               config: _openRouterConfig(
                 modelId: 'anthropic/claude-sonnet-4.5',
                 searchEnabled: false,
@@ -288,7 +288,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          await ChatApiService.sendMessageStream(
+          await ChatApiService.sendLegacyMessageStream(
             config: _openRouterConfig(
               modelId: 'anthropic/claude-sonnet-4.5',
               searchEnabled: false,
@@ -348,7 +348,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendMessageStream(
+          final chunks = await ChatApiService.sendLegacyMessageStream(
             config: _openRouterConfig(
               modelId: 'deepseek/deepseek-chat',
               searchEnabled: false,

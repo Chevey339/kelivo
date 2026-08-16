@@ -95,7 +95,7 @@ List<Map<String, dynamic>> _cleanToolsForCompatibility(
   return cleaned;
 }
 
-Stream<ChatStreamChunk> _sendOpenAIChatCompletionsStream(
+Stream<StreamChunk> _sendOpenAIChatCompletionsStream(
   http.Client client,
   ProviderConfig config,
   String modelId,

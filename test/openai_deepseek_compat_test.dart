@@ -76,7 +76,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -129,7 +129,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -175,7 +175,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _deepSeekConfig(baseUrl, useResponseApi: true),
         modelId: 'deepseek-v4-flash',
         messages: const [
@@ -227,7 +227,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _deepSeekConfig(baseUrl),
           modelId: 'deepseek-v4-pro',
           messages: const [
@@ -279,7 +279,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _deepSeekConfig(baseUrl),
         modelId: 'deepseek-v4-pro',
         messages: const [
@@ -324,7 +324,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      await ChatApiService.sendMessageStream(
+      await ChatApiService.sendLegacyMessageStream(
         config: _deepSeekConfig(baseUrl),
         modelId: 'deepseek-reasoner',
         messages: const [
@@ -374,7 +374,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        await ChatApiService.sendMessageStream(
+        await ChatApiService.sendLegacyMessageStream(
           config: _deepSeekConfig(baseUrl),
           modelId: 'deepseek-reasoner',
           messages: const [

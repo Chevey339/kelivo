@@ -102,7 +102,7 @@ void main() {
           'What does this mean?';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -125,7 +125,7 @@ void main() {
           '~~~';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -144,7 +144,7 @@ void main() {
       const input = 'Use `![alt](https://example.com/pic.png)` in markdown.';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -163,7 +163,7 @@ void main() {
       const input = 'Syntax: ``![img](https://x.com/a.png)`` here.';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -192,7 +192,7 @@ void main() {
       final input = '```\ncode\n```\n![](${file.path})';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -212,7 +212,7 @@ void main() {
       const input = '```\n![img](https://example.com/a.png)\nmore text';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [
@@ -231,7 +231,7 @@ void main() {
       const input = '```\n![img](data:image/png;base64,QUJD)\n```\nPlain text.';
 
       final body = await _sendAndCaptureRequestBody((baseUrl) async {
-        return ChatApiService.sendMessageStream(
+        return ChatApiService.sendLegacyMessageStream(
           config: _openAiConfig(baseUrl),
           modelId: 'gpt-4.1',
           messages: [

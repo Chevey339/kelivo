@@ -212,6 +212,28 @@ void main() {
       expect(chunks.single.content, isEmpty);
     });
 
+    test('coalesce folds split non-stream bags back together', () {
+      final folded = coalesceChatStreamChunks([
+        ChatStreamChunk(
+          content: '',
+          reasoning: 'think',
+          isDone: false,
+          totalTokens: 0,
+        ),
+        ChatStreamChunk(content: 'hello', isDone: false, totalTokens: 0),
+        ChatStreamChunk(
+          content: '',
+          isDone: true,
+          totalTokens: 4,
+          usage: const TokenUsage(totalTokens: 4),
+        ),
+      ]);
+      expect(folded.content, 'hello');
+      expect(folded.reasoning, 'think');
+      expect(folded.isDone, isTrue);
+      expect(folded.usage?.totalTokens, 4);
+    });
+
     test('adapt() also emits Finish only once', () async {
       final adapter = LegacyChunkAdapter();
       final chunks = await adapter

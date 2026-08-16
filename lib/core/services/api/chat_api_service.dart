@@ -36,6 +36,7 @@ import 'providers/openai/chat_completions_decoder.dart';
 import 'providers/openai/responses_decoder.dart';
 
 part 'chat_api_service_shims.dart';
+part 'stream/stream_chunk_emit.dart';
 part 'providers/openai_common.dart';
 part 'providers/openai_chat_completions.dart';
 part 'providers/openai_images.dart';
@@ -561,7 +562,57 @@ class ChatApiService {
     return utf8.decode(response.bodyBytes, allowMalformed: allowMalformed);
   }
 
-  static Stream<ChatStreamChunk> sendMessageStream({
+  static Stream<ChatStreamChunk> sendLegacyMessageStream({
+    required ProviderConfig config,
+    required String modelId,
+    required List<Map<String, dynamic>> messages,
+    List<String>? userImagePaths,
+    int? thinkingBudget,
+    double? temperature,
+    double? topP,
+    int? maxTokens,
+    List<Map<String, dynamic>>? tools,
+    ToolCallHandler? onToolCall,
+    Map<String, String>? extraHeaders,
+    Map<String, dynamic>? extraBody,
+    bool stream = true,
+    String? requestId,
+    bool allowImagesApiRouting = true,
+    bool ocrActive = false,
+  }) {
+    final adapted = LegacyChunkAdapter().adapt(
+      sendMessageStream(
+        config: config,
+        modelId: modelId,
+        messages: messages,
+        userImagePaths: userImagePaths,
+        thinkingBudget: thinkingBudget,
+        temperature: temperature,
+        topP: topP,
+        maxTokens: maxTokens,
+        tools: tools,
+        onToolCall: onToolCall,
+        extraHeaders: extraHeaders,
+        extraBody: extraBody,
+        stream: stream,
+        requestId: requestId,
+        allowImagesApiRouting: allowImagesApiRouting,
+        ocrActive: ocrActive,
+      ),
+    );
+    if (stream) return adapted;
+    return _coalesceLegacyChunks(adapted);
+  }
+
+  static Stream<ChatStreamChunk> _coalesceLegacyChunks(
+    Stream<ChatStreamChunk> input,
+  ) async* {
+    final chunks = await input.toList();
+    if (chunks.isEmpty) return;
+    yield coalesceChatStreamChunks(chunks);
+  }
+
+  static Stream<StreamChunk> sendMessageStream({
     required ProviderConfig config,
     required String modelId,
     required List<Map<String, dynamic>> messages,
@@ -1052,8 +1103,11 @@ class ChatApiService {
             thinkingBudget: thinkingBudget,
             stream: false,
           );
-          final chunk = await stream.last;
-          return chunk.content;
+          final text = StringBuffer();
+          await for (final chunk in stream) {
+            if (chunk is TextDelta) text.write(chunk.text);
+          }
+          return text.toString();
         }
 
         String url;

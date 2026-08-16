@@ -74,7 +74,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _mimoConfig(baseUrl),
         modelId: 'mimo-v2.5-pro',
         messages: const [
@@ -142,7 +142,7 @@ void main() {
         });
 
         final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-        final chunks = await ChatApiService.sendMessageStream(
+        final chunks = await ChatApiService.sendLegacyMessageStream(
           config: _mimoConfig(baseUrl),
           modelId: 'mimo-v2.5-pro',
           messages: const [
@@ -191,7 +191,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _mimoConfig(baseUrl),
         modelId: 'mimo-v2.5-pro',
         messages: const [

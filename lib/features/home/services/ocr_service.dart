@@ -118,7 +118,7 @@ class OcrService {
       },
     ];
 
-    final stream = ChatApiService.sendMessageStream(
+    final stream = ChatApiService.sendLegacyMessageStream(
       config: cfg,
       modelId: model,
       messages: messages,

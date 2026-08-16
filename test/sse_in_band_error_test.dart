@@ -75,7 +75,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -124,7 +124,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendMessageStream(
+          ChatApiService.sendLegacyMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}/v1',
               ProviderKind.openai,
@@ -174,7 +174,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -252,7 +252,7 @@ void main() {
       HttpServer server,
     ) {
       return _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -365,7 +365,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -407,7 +407,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendMessageStream(
+          ChatApiService.sendLegacyMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}/v1',
               ProviderKind.openai,
@@ -442,7 +442,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -475,7 +475,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}/v1',
             ProviderKind.openai,
@@ -520,7 +520,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.claude,
@@ -570,7 +570,7 @@ void main() {
         });
 
         final result = await _drain(
-          ChatApiService.sendMessageStream(
+          ChatApiService.sendLegacyMessageStream(
             config: _testConfig(
               'http://localhost:${server.port}',
               ProviderKind.google,
@@ -602,7 +602,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,
@@ -649,7 +649,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,
@@ -686,7 +686,7 @@ void main() {
       });
 
       final result = await _drain(
-        ChatApiService.sendMessageStream(
+        ChatApiService.sendLegacyMessageStream(
           config: _testConfig(
             'http://localhost:${server.port}',
             ProviderKind.google,

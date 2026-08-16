@@ -103,7 +103,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendMessageStream(
+          final chunks = await ChatApiService.sendLegacyMessageStream(
             config: _dashScopeConfig(
               useResponseApi: true,
               modelId: 'qwen3.6-plus',
@@ -158,7 +158,7 @@ void main() {
 
       await HttpOverrides.runZoned(
         () async {
-          final chunks = await ChatApiService.sendMessageStream(
+          final chunks = await ChatApiService.sendLegacyMessageStream(
             config: _dashScopeConfig(
               useResponseApi: true,
               modelId: 'qwen3.6-flash',

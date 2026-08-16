@@ -68,7 +68,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      await ChatApiService.sendMessageStream(
+      await ChatApiService.sendLegacyMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
@@ -77,7 +77,7 @@ void main() {
         thinkingBudget: 1024,
       ).toList();
 
-      await ChatApiService.sendMessageStream(
+      await ChatApiService.sendLegacyMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
@@ -169,7 +169,7 @@ void main() {
       });
 
       final baseUrl = 'http://${server.address.address}:${server.port}/v1';
-      final chunks = await ChatApiService.sendMessageStream(
+      final chunks = await ChatApiService.sendLegacyMessageStream(
         config: _zhipuConfig(baseUrl),
         modelId: 'glm-5.2',
         messages: const [
