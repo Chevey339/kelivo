@@ -85,7 +85,7 @@ Special thanks to the [RikkaHub](https://github.com/re-ovo/rikkahub) project for
 
 If you like this project, please give it a star ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.com/#Chevey339/kelivo&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.dera.page/#Chevey339/kelivo&Date)
 
 ## 📄 License
 

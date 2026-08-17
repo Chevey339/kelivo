@@ -85,7 +85,7 @@
 
 如果你喜欢这个项目，可以给个Star ⭐
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.com/#Chevey339/kelivo&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=Chevey339/kelivo&type=Date)](https://star-history.dera.page/#Chevey339/kelivo&Date)
 
 ## 📄 许可证
 
