@@ -25,6 +25,8 @@ final class BusinessKeyRegistry {
     'desktop_hotkeys_commands_v1',
     'desktop_hotkeys_enabled_v1',
     'display_chat_font_scale_v1',
+    'display_ui_font_scale_v1',
+    'display_input_font_scale_v1',
     'flutter_log_enabled_v1',
   };
 
