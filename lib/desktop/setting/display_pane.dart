@@ -1684,12 +1684,12 @@ class _FontScaleRowState extends State<_FontScaleRow> {
     super.dispose();
   }
 
-  void _commit(String text) {
+  Future<void> _commit(String text) async {
     final v = text.trim();
     final n = double.tryParse(v);
     if (n == null) return;
     final clamped = (n / 100.0).clamp(0.5, 1.5);
-    widget.setter(context.read<SettingsProvider>(), clamped);
+    await widget.setter(context.read<SettingsProvider>(), clamped);
     _controller.text = '${(clamped * 100).round()}';
   }
 

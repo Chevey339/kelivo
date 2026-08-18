@@ -5066,7 +5066,10 @@ Requirements:
     _uiFontScale = s;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_displayUiFontScaleKey, _uiFontScale);
+    final ok = await prefs.setDouble(_displayUiFontScaleKey, _uiFontScale);
+    if (!ok) {
+      debugPrint('setUiFontScale: failed to persist $_displayUiFontScaleKey');
+    }
   }
 
   // Display: composer/input font scale (0.5 - 1.5). Applied on top of the UI
@@ -5079,7 +5082,12 @@ Requirements:
     _inputFontScale = s;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_displayInputFontScaleKey, _inputFontScale);
+    final ok = await prefs.setDouble(_displayInputFontScaleKey, _inputFontScale);
+    if (!ok) {
+      debugPrint(
+        'setInputFontScale: failed to persist $_displayInputFontScaleKey',
+      );
+    }
   }
 
   // Display: auto-scroll back to bottom toggle
