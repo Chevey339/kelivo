@@ -5082,7 +5082,10 @@ Requirements:
     _inputFontScale = s;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
-    final ok = await prefs.setDouble(_displayInputFontScaleKey, _inputFontScale);
+    final ok = await prefs.setDouble(
+      _displayInputFontScaleKey,
+      _inputFontScale,
+    );
     if (!ok) {
       debugPrint(
         'setInputFontScale: failed to persist $_displayInputFontScaleKey',
