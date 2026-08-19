@@ -8,6 +8,7 @@ import '../database/business_repository.dart';
 import '../models/backup.dart';
 import '../services/chat/chat_service.dart';
 import '../services/backup/data_sync.dart';
+import '../services/backup/lan_sync_service.dart';
 
 class BackupProvider extends ChangeNotifier {
   final DataSync _dataSync;
@@ -103,4 +104,48 @@ class BackupProvider extends ChangeNotifier {
     File file, {
     RestoreMode mode = RestoreMode.overwrite,
   }) => _dataSync.restoreFromLocalFile(file, _cfg, mode: mode);
+
+  Future<LanSyncShareSession> startLanShare() async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? archive;
+    try {
+      archive = await _dataSync.prepareBackupFile(_cfg);
+      final session = await LanSyncShareSession.start(archive);
+      archive = null; // The session now owns and cleans up this file.
+      _message = 'LAN share ready';
+      return session;
+    } catch (error) {
+      _message = error.toString();
+      rethrow;
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(archive);
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> restoreFromLan(
+    String link, {
+    RestoreMode mode = RestoreMode.merge,
+    void Function(int received, int? total)? onProgress,
+  }) async {
+    _busy = true;
+    _message = null;
+    notifyListeners();
+    File? archive;
+    try {
+      archive = await LanSyncClient.download(link, onProgress: onProgress);
+      await _dataSync.restoreFromLocalFile(archive, _cfg, mode: mode);
+      _message = 'Restored';
+    } catch (error) {
+      _message = error.toString();
+      rethrow;
+    } finally {
+      await DataSync.cleanupTemporaryBackupFile(archive);
+      _busy = false;
+      notifyListeners();
+    }
+  }
 }

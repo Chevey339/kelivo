@@ -14,6 +14,7 @@ import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/desktop/setting/backup_pane.dart';
 import 'package:Kelivo/features/backup/pages/backup_page.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
+import 'package:window_manager/window_manager.dart';
 
 Future<BackupReminderProvider> _createReminderProvider(
   BusinessPreferences preferences,
@@ -248,6 +249,31 @@ void main() {
       _expectAbove(tester, 'Backup Reminder', 'Local Backup');
       _expectAbove(tester, 'Local Backup', 'WebDAV Server Settings');
       _expectAbove(tester, 'WebDAV Server Settings', 'S3 Settings');
+    });
+
+    testWidgets('desktop LAN sync route keeps a draggable title bar', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(1100, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final business = await createBusinessTestHarness();
+      final settings = SettingsProvider(business.preferences);
+      await settings.loaded;
+
+      await _pumpDesktopBackupPane(
+        tester,
+        settings: settings,
+        business: business,
+      );
+      await tester.tap(find.text('LAN Sync'));
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(AppBar, 'LAN Sync'), findsOneWidget);
+      expect(find.byType(DragToMoveArea), findsOneWidget);
+      expect(find.byType(WindowCaptionButton), findsWidgets);
+      expect(find.text('6-digit code'), findsOneWidget);
+      expect(find.text('Find device'), findsOneWidget);
     });
   });
 }

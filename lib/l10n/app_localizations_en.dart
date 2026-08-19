@@ -1883,6 +1883,170 @@ class AppLocalizationsEn extends AppLocalizations {
   String get backupPageLocalBackup => 'Local Backup';
 
   @override
+  String get lanSyncTitle => 'LAN Sync';
+
+  @override
+  String get lanSyncSecurityNotice =>
+      'Transfer directly between devices on the same local network. The share uses a temporary private link and stops when you leave this page. Only share it with devices you trust.';
+
+  @override
+  String get lanSyncPairingCodeLabel => 'Pairing code';
+
+  @override
+  String get lanSyncPairingCodeSendHint =>
+      'Enter this code on the other device to find this share.';
+
+  @override
+  String get lanSyncBroadcastUnavailable =>
+      'Network broadcast is unavailable on this device. You can still scan the QR code or use the link.';
+
+  @override
+  String get lanSyncPairingCodeInputLabel => '6-digit code';
+
+  @override
+  String get lanSyncPairingCodeInputHint =>
+      'Enter the code shown on the sending device. Kelivo will find it on your local network.';
+
+  @override
+  String get lanSyncFindDevice => 'Find device';
+
+  @override
+  String get lanSyncSearchingDevice => 'Searching…';
+
+  @override
+  String get lanSyncDeviceMatched =>
+      'Device matched. You can now receive and import its data.';
+
+  @override
+  String get lanSyncOrUseLink => 'or scan/paste a link';
+
+  @override
+  String get lanSyncSendTitle => 'Send this device\'s data';
+
+  @override
+  String get lanSyncSendDescription =>
+      'Create a verified backup and make it temporarily available on your local network.';
+
+  @override
+  String get lanSyncStartShare => 'Start sharing';
+
+  @override
+  String get lanSyncPreparing => 'Preparing data…';
+
+  @override
+  String get lanSyncScanOnOtherDevice =>
+      'On the other device, open LAN Sync and scan this QR code.';
+
+  @override
+  String get lanSyncCopyLink => 'Copy link';
+
+  @override
+  String get lanSyncLinkCopied => 'Sync link copied';
+
+  @override
+  String lanSyncAlternateAddresses(String addresses) {
+    return 'Other local addresses: $addresses';
+  }
+
+  @override
+  String get lanSyncLocalAddressLabel => 'Local address';
+
+  @override
+  String get lanSyncLocalAddressHint =>
+      'Choose an address to refresh the QR code and link above.';
+
+  @override
+  String get lanSyncWaiting => 'Waiting for another device…';
+
+  @override
+  String lanSyncTransfersCompleted(int count) {
+    return 'Transfers completed: $count';
+  }
+
+  @override
+  String get lanSyncStopShare => 'Stop sharing';
+
+  @override
+  String get lanSyncReceiveTitle => 'Receive data';
+
+  @override
+  String get lanSyncReceiveDescription =>
+      'Scan or paste a link from another Kelivo device, then validate and import its data.';
+
+  @override
+  String get lanSyncLinkLabel => 'Sync link';
+
+  @override
+  String get lanSyncPasteLink => 'Paste link';
+
+  @override
+  String get lanSyncScanQr => 'Scan QR code';
+
+  @override
+  String get lanSyncImportMode => 'Import mode';
+
+  @override
+  String get lanSyncReceiving => 'Receiving and validating…';
+
+  @override
+  String get lanSyncReceiveAction => 'Receive and import';
+
+  @override
+  String lanSyncReceivingProgress(String received, String total) {
+    return 'Received $received / $total';
+  }
+
+  @override
+  String get lanSyncOverwriteConfirmTitle => 'Replace local data?';
+
+  @override
+  String get lanSyncOverwriteConfirmMessage =>
+      'Overwrite mode replaces this device\'s current data with the received data. This cannot be undone unless you have another backup.';
+
+  @override
+  String get lanSyncContinue => 'Continue';
+
+  @override
+  String get lanSyncErrorNoLocalAddress =>
+      'No private local network address was found. Connect both devices to the same Wi-Fi or LAN and try again.';
+
+  @override
+  String get lanSyncErrorInvalidLink =>
+      'This is not a valid Kelivo LAN Sync link.';
+
+  @override
+  String get lanSyncErrorNonLocalAddress =>
+      'For safety, LAN Sync only accepts private local network addresses.';
+
+  @override
+  String get lanSyncErrorTimeout =>
+      'The connection timed out. Keep the sharing page open and check that both devices are on the same network.';
+
+  @override
+  String get lanSyncErrorConnectionFailed =>
+      'Could not connect to the other device. Keep its sharing page open and check the local network or firewall.';
+
+  @override
+  String get lanSyncErrorInvalidArchive =>
+      'The transferred backup is incomplete or invalid.';
+
+  @override
+  String get lanSyncErrorInvalidPairingCode =>
+      'Enter the complete 6-digit pairing code.';
+
+  @override
+  String get lanSyncErrorPairingNotFound =>
+      'No device with that pairing code was found. Keep the sending page open and check that both devices are on the same local network.';
+
+  @override
+  String get lanSyncErrorPairingRateLimited =>
+      'Too many incorrect pairing attempts. Wait one minute and try again.';
+
+  @override
+  String get lanSyncErrorDiscoveryUnavailable =>
+      'Local network discovery is unavailable. Check the firewall or local-network permission, or use the QR code or link instead.';
+
+  @override
   String get backupPageImportFromCherryStudio => 'Import from Cherry Studio';
 
   @override

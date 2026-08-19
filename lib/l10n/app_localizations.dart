@@ -3580,6 +3580,282 @@ abstract class AppLocalizations {
   /// **'Local Backup'**
   String get backupPageLocalBackup;
 
+  /// No description provided for @lanSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN Sync'**
+  String get lanSyncTitle;
+
+  /// No description provided for @lanSyncSecurityNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer directly between devices on the same local network. The share uses a temporary private link and stops when you leave this page. Only share it with devices you trust.'**
+  String get lanSyncSecurityNotice;
+
+  /// No description provided for @lanSyncPairingCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing code'**
+  String get lanSyncPairingCodeLabel;
+
+  /// No description provided for @lanSyncPairingCodeSendHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this code on the other device to find this share.'**
+  String get lanSyncPairingCodeSendHint;
+
+  /// No description provided for @lanSyncBroadcastUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Network broadcast is unavailable on this device. You can still scan the QR code or use the link.'**
+  String get lanSyncBroadcastUnavailable;
+
+  /// No description provided for @lanSyncPairingCodeInputLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'6-digit code'**
+  String get lanSyncPairingCodeInputLabel;
+
+  /// No description provided for @lanSyncPairingCodeInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code shown on the sending device. Kelivo will find it on your local network.'**
+  String get lanSyncPairingCodeInputHint;
+
+  /// No description provided for @lanSyncFindDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Find device'**
+  String get lanSyncFindDevice;
+
+  /// No description provided for @lanSyncSearchingDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching…'**
+  String get lanSyncSearchingDevice;
+
+  /// No description provided for @lanSyncDeviceMatched.
+  ///
+  /// In en, this message translates to:
+  /// **'Device matched. You can now receive and import its data.'**
+  String get lanSyncDeviceMatched;
+
+  /// No description provided for @lanSyncOrUseLink.
+  ///
+  /// In en, this message translates to:
+  /// **'or scan/paste a link'**
+  String get lanSyncOrUseLink;
+
+  /// No description provided for @lanSyncSendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this device\'s data'**
+  String get lanSyncSendTitle;
+
+  /// No description provided for @lanSyncSendDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a verified backup and make it temporarily available on your local network.'**
+  String get lanSyncSendDescription;
+
+  /// No description provided for @lanSyncStartShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Start sharing'**
+  String get lanSyncStartShare;
+
+  /// No description provided for @lanSyncPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing data…'**
+  String get lanSyncPreparing;
+
+  /// No description provided for @lanSyncScanOnOtherDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'On the other device, open LAN Sync and scan this QR code.'**
+  String get lanSyncScanOnOtherDevice;
+
+  /// No description provided for @lanSyncCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get lanSyncCopyLink;
+
+  /// No description provided for @lanSyncLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync link copied'**
+  String get lanSyncLinkCopied;
+
+  /// No description provided for @lanSyncAlternateAddresses.
+  ///
+  /// In en, this message translates to:
+  /// **'Other local addresses: {addresses}'**
+  String lanSyncAlternateAddresses(String addresses);
+
+  /// No description provided for @lanSyncLocalAddressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Local address'**
+  String get lanSyncLocalAddressLabel;
+
+  /// No description provided for @lanSyncLocalAddressHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an address to refresh the QR code and link above.'**
+  String get lanSyncLocalAddressHint;
+
+  /// No description provided for @lanSyncWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for another device…'**
+  String get lanSyncWaiting;
+
+  /// No description provided for @lanSyncTransfersCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfers completed: {count}'**
+  String lanSyncTransfersCompleted(int count);
+
+  /// No description provided for @lanSyncStopShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop sharing'**
+  String get lanSyncStopShare;
+
+  /// No description provided for @lanSyncReceiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive data'**
+  String get lanSyncReceiveTitle;
+
+  /// No description provided for @lanSyncReceiveDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan or paste a link from another Kelivo device, then validate and import its data.'**
+  String get lanSyncReceiveDescription;
+
+  /// No description provided for @lanSyncLinkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync link'**
+  String get lanSyncLinkLabel;
+
+  /// No description provided for @lanSyncPasteLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste link'**
+  String get lanSyncPasteLink;
+
+  /// No description provided for @lanSyncScanQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR code'**
+  String get lanSyncScanQr;
+
+  /// No description provided for @lanSyncImportMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Import mode'**
+  String get lanSyncImportMode;
+
+  /// No description provided for @lanSyncReceiving.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiving and validating…'**
+  String get lanSyncReceiving;
+
+  /// No description provided for @lanSyncReceiveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Receive and import'**
+  String get lanSyncReceiveAction;
+
+  /// No description provided for @lanSyncReceivingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Received {received} / {total}'**
+  String lanSyncReceivingProgress(String received, String total);
+
+  /// No description provided for @lanSyncOverwriteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace local data?'**
+  String get lanSyncOverwriteConfirmTitle;
+
+  /// No description provided for @lanSyncOverwriteConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Overwrite mode replaces this device\'s current data with the received data. This cannot be undone unless you have another backup.'**
+  String get lanSyncOverwriteConfirmMessage;
+
+  /// No description provided for @lanSyncContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get lanSyncContinue;
+
+  /// No description provided for @lanSyncErrorNoLocalAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'No private local network address was found. Connect both devices to the same Wi-Fi or LAN and try again.'**
+  String get lanSyncErrorNoLocalAddress;
+
+  /// No description provided for @lanSyncErrorInvalidLink.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a valid Kelivo LAN Sync link.'**
+  String get lanSyncErrorInvalidLink;
+
+  /// No description provided for @lanSyncErrorNonLocalAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'For safety, LAN Sync only accepts private local network addresses.'**
+  String get lanSyncErrorNonLocalAddress;
+
+  /// No description provided for @lanSyncErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection timed out. Keep the sharing page open and check that both devices are on the same network.'**
+  String get lanSyncErrorTimeout;
+
+  /// No description provided for @lanSyncErrorConnectionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to the other device. Keep its sharing page open and check the local network or firewall.'**
+  String get lanSyncErrorConnectionFailed;
+
+  /// No description provided for @lanSyncErrorInvalidArchive.
+  ///
+  /// In en, this message translates to:
+  /// **'The transferred backup is incomplete or invalid.'**
+  String get lanSyncErrorInvalidArchive;
+
+  /// No description provided for @lanSyncErrorInvalidPairingCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the complete 6-digit pairing code.'**
+  String get lanSyncErrorInvalidPairingCode;
+
+  /// No description provided for @lanSyncErrorPairingNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No device with that pairing code was found. Keep the sending page open and check that both devices are on the same local network.'**
+  String get lanSyncErrorPairingNotFound;
+
+  /// No description provided for @lanSyncErrorPairingRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many incorrect pairing attempts. Wait one minute and try again.'**
+  String get lanSyncErrorPairingRateLimited;
+
+  /// No description provided for @lanSyncErrorDiscoveryUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Local network discovery is unavailable. Check the firewall or local-network permission, or use the QR code or link instead.'**
+  String get lanSyncErrorDiscoveryUnavailable;
+
   /// No description provided for @backupPageImportFromCherryStudio.
   ///
   /// In en, this message translates to:

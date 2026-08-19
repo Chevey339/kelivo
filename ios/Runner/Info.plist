@@ -63,6 +63,8 @@
 	<string>Kelivo 需要使用相机拍摄照片，以便您将图片发送给 AI 助手进行分析。您可以选择是否上传照片。 / Kelivo uses the camera to capture photos that you can share with AI assistants for analysis. Your photo may be uploaded by your choice.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Kelivo 使用麦克风录制您主动提交的语音并转换为文字；我们不会收集这些信息。 / Kelivo uses the microphone to record audio you choose to submit for transcription; Kelivo does not collect this information.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Kelivo 使用本地网络与您选择的同一局域网设备直接同步数据；数据不会经过云端。 / Kelivo uses the local network to sync data directly with a device you choose on the same network; data does not pass through the cloud.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Kelivo 使用系统语音识别将您主动录制的语音转换为文字。您的数据由系统处理；我们不会收集这些信息。 / Kelivo uses system speech recognition to turn audio you choose to record into text. Your data is processed by the system; Kelivo does not collect this information.</string>
         <key>NSPhotoLibraryAddUsageDescription</key>

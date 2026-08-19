@@ -29,6 +29,7 @@ import '../../../utils/platform_utils.dart';
 import '../backup_restore_error_message.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
+import 'lan_sync_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 // File size formatter (B, KB, MB, GB)
@@ -1173,6 +1174,15 @@ class _BackupPageState extends State<BackupPage> {
       header(l10n.backupPageLocalBackup),
       _iosSectionCard(
         children: [
+          _iosNavRow(
+            context,
+            icon: Lucide.Network,
+            label: l10n.lanSyncTitle,
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const LanSyncPage())),
+          ),
+          _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Export,
