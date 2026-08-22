@@ -918,15 +918,26 @@ class MyApp extends StatelessWidget {
                           mq.size.longestSide < displaySize.longestSide - 1);
                   final systemTop = mq.viewPadding.top;
                   final controlsTop = systemTop < 56 ? 56.0 : systemTop;
+                  // App-wide base font scaling from the UI font size setting.
+                  // The chat and input font scales stack on top of this for
+                  // messages and the composer respectively.
+                  final fontScale = settings.uiFontScale;
+                  final scaledMq = fontScale == 1.0
+                      ? mq
+                      : mq.copyWith(
+                          textScaler: TextScaler.linear(
+                            mq.textScaler.scale(1) * fontScale,
+                          ),
+                        );
                   final appWithOverlays = MediaQuery(
                     data: isFloatingIpad
-                        ? mq.copyWith(
+                        ? scaledMq.copyWith(
                             padding: mq.padding.copyWith(top: controlsTop),
                             viewPadding: mq.viewPadding.copyWith(
                               top: controlsTop,
                             ),
                           )
-                        : mq,
+                        : scaledMq,
                     child: AppOverlays(child: child ?? const SizedBox.shrink()),
                   );
                   // Enforce app font as a default across the tree for Texts without explicit family

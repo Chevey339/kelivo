@@ -2522,10 +2522,14 @@ class _ChatInputBarState extends State<ChatInputBar>
       } else {
         maxInputHeight = math.max(80.0, softCap);
       }
+    } else {
+      // Desktop: bound the expanded composer so it can never grow past the
+      // window and cover the chat header at large font scales.
+      maxInputHeight = math.max(120.0, visibleHeight * 0.7);
     }
-    // Cap text field height on mobile so expanded input stays above the keyboard.
+    // Cap text field height so the expanded input stays within the viewport.
     final BoxConstraints textFieldConstraints =
-        (isMobileLayout && maxInputHeight.isFinite && maxInputHeight > 0)
+        (maxInputHeight.isFinite && maxInputHeight > 0)
         ? BoxConstraints(maxHeight: maxInputHeight)
         : const BoxConstraints();
 
@@ -2666,10 +2670,21 @@ class _ChatInputBarState extends State<ChatInputBar>
                                         //   );
                                         // }
 
-                                        final enterToSend = context
-                                            .watch<SettingsProvider>()
-                                            .enterToSendOnMobile;
-                                        return GestureDetector(
+                                        final settings = context
+                                            .watch<SettingsProvider>();
+                                        final enterToSend =
+                                            settings.enterToSendOnMobile;
+                                        // Composer font scaling: divide the
+                                        // app-wide UI scale out so the input
+                                        // font scale stays absolute.
+                                        final mqData = MediaQuery.of(context);
+                                        final effectiveScale =
+                                            MediaQuery.textScalerOf(
+                                              context,
+                                            ).scale(1) /
+                                            settings.uiFontScale *
+                                            settings.inputFontScale;
+                                        final inputField = GestureDetector(
                                           behavior:
                                               HitTestBehavior.deferToChild,
                                           // onSecondaryTapDown: (details) {
@@ -2741,6 +2756,14 @@ class _ChatInputBarState extends State<ChatInputBar>
                                                 theme.colorScheme.primary,
                                           ),
                                         );
+                                        return MediaQuery(
+                                          data: mqData.copyWith(
+                                            textScaler: TextScaler.linear(
+                                              effectiveScale,
+                                            ),
+                                          ),
+                                          child: inputField,
+                                        );
                                       },
                                     ),
                                   ),
@@ -2749,22 +2772,26 @@ class _ChatInputBarState extends State<ChatInputBar>
                               // Expand/Collapse icon button (only shown when 3+ lines)
                               if (_showExpandButton)
                                 Positioned(
-                                  top: 10,
-                                  right: 12,
+                                  top: 4,
+                                  right: 4,
                                   child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
                                     onTap: () {
                                       setState(
                                         () => _isExpanded = !_isExpanded,
                                       );
                                       _ensureCaretVisible();
                                     },
-                                    child: Icon(
-                                      _isExpanded
-                                          ? Lucide.ChevronsDownUp
-                                          : Lucide.ChevronsUpDown,
-                                      size: 16,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.45),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(8),
+                                      child: Icon(
+                                        _isExpanded
+                                            ? Lucide.ChevronsDownUp
+                                            : Lucide.ChevronsUpDown,
+                                        size: 16,
+                                        color: theme.colorScheme.onSurface
+                                            .withValues(alpha: 0.45),
+                                      ),
                                     ),
                                   ),
                                 ),

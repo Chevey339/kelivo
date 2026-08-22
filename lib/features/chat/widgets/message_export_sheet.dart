@@ -1041,7 +1041,9 @@ Future<File?> _renderAndSaveMessageImage(
       message: message,
       title: title,
       cs: cs,
-      chatFontScale: settings.chatFontScale,
+      // Ambient textScaler already includes uiFontScale; divide it out so
+      // the chat font scale stays absolute in the export.
+      chatFontScale: settings.chatFontScale / settings.uiFontScale,
       showThinkingAndToolCards: showThinkingAndToolCards,
       expandThinkingContent: expandThinkingContent,
       isDesktop: isDesktop,
@@ -1088,7 +1090,9 @@ Future<File?> _renderAndSaveChatImage(
           ? conversation.title
           : l10n.messageExportSheetDefaultTitle,
       cs: cs,
-      chatFontScale: settings.chatFontScale,
+      // Ambient textScaler already includes uiFontScale; divide it out so
+      // the chat font scale stays absolute in the export.
+      chatFontScale: settings.chatFontScale / settings.uiFontScale,
       messages: messages,
       timestamp: conversation.updatedAt,
       showThinkingAndToolCards: showThinkingAndToolCards,
