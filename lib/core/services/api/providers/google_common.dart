@@ -73,23 +73,49 @@ bool _isGemma4Model(String modelId) {
   ).hasMatch(modelId);
 }
 
-bool _isGemini35FlashModel(String modelId) {
-  return modelId.contains(
-    RegExp(r'gemini-3\.5-flash([._:@/-]|$)', caseSensitive: false),
-  );
+// Non-text Gemini variants: they take a raw budget, not a thinking level, so
+// they fall through to the Gemini 2.x branch. Holding them out here also stops
+// the `-` terminator in the family patterns below from swallowing the suffix and
+// reading `gemini-3.1-flash-image` as plain `gemini-3.1-flash`.
+final _gemini3NonTextSuffix = RegExp(
+  r'(^|[-_/])(image|tts|live)([-._:@/]|$)',
+  caseSensitive: false,
+);
+
+// Thresholds where a Gemini 3 family changed its thinking contract. Naming them
+// keeps the next release a one-line edit instead of a hunt for bare numbers.
+const _gemini3ProMediumMinor = 1; // pro gained 'medium' in 3.1
+const _gemini3FlashModernMinor =
+    5; // flash defaults to 'medium' and 64K from 3.5
+const _gemini3FlashNoMinimalMinor = 7; // flash dropped 'minimal' in 3.7
+
+final _gemini3FlashId = RegExp(
+  r'gemini-3(?:\.(?<minor>\d+))?-flash([._:@/-]|$)',
+  caseSensitive: false,
+);
+final _gemini3ProId = RegExp(
+  r'gemini-3(?:\.(?<minor>\d+))?-pro(-preview)?([._:@/-]|$)',
+  caseSensitive: false,
+);
+final _gemini3FlashLiteId = RegExp(
+  r'gemini-3(?:\.\d+)?-flash-lite([._:@/-]|$)',
+  caseSensitive: false,
+);
+
+// Minor version behind a Gemini 3 id (0 for plain `gemini-3-`), or null when the
+// id is not that family. Matching by version keeps unreleased 3.x models on the
+// Gemini 3 branches instead of the Gemini 2.x fallback.
+int? _gemini3Minor(String modelId, RegExp family) {
+  if (_gemini3NonTextSuffix.hasMatch(modelId)) return null;
+  final match = family.firstMatch(modelId);
+  if (match == null) return null;
+  return int.tryParse(match.namedGroup('minor') ?? '0') ?? 0;
 }
 
-bool _isGemini35FlashLiteModel(String modelId) {
-  return modelId.contains(
-    RegExp(r'gemini-3\.5-flash-lite([._:@/-]|$)', caseSensitive: false),
-  );
-}
+int? _gemini3FlashMinor(String modelId) =>
+    _gemini3Minor(modelId, _gemini3FlashId);
 
-bool _isGemini36FlashModel(String modelId) {
-  return modelId.contains(
-    RegExp(r'gemini-3\.6-flash([._:@/-]|$)', caseSensitive: false),
-  );
-}
+int? _gemini3ProMinor(String modelId) => _gemini3Minor(modelId, _gemini3ProId);
 
 bool _isGemini3TextModel(String modelId) {
   return modelId.contains(
@@ -114,59 +140,35 @@ Map<String, dynamic> _googleThinkingConfig(
     };
   }
 
-  // Match gemini-3-pro or gemini-3-pro-preview (and similar variants)
-  final isGemini3ProImage = upstreamModelId.contains(
-    RegExp(r'gemini-3-pro-image(-preview)?', caseSensitive: false),
-  );
-  final isGemini31Pro = upstreamModelId.contains(
-    RegExp(r'gemini-3\.1-pro(-preview)?', caseSensitive: false),
-  );
-  final isGemini3Pro = upstreamModelId.contains(
-    RegExp(r'gemini-3-pro(-preview)?', caseSensitive: false),
-  );
-  final isGemini3Flash = upstreamModelId.contains(
-    RegExp(r'gemini-3-flash(-preview)?', caseSensitive: false),
-  );
-  final isGemini35Flash = _isGemini35FlashModel(upstreamModelId);
-  final isGemini35FlashLite = _isGemini35FlashLiteModel(upstreamModelId);
-  final isGemini36Flash = _isGemini36FlashModel(upstreamModelId);
-  if (isGemini3ProImage) {
-    return {
-      'includeThoughts': true,
-      if (budget != null && budget >= 0) 'thinkingBudget': budget,
-    };
-  }
-  // Gemini 3.1 Pro: supports 'low', 'medium', 'high' (no minimal)
-  if (isGemini31Pro) {
+  final proMinor = _gemini3ProMinor(upstreamModelId);
+  if (proMinor != null) {
+    // gemini-3-pro has only 'low' and 'high'; 3.1 added 'medium'.
+    final hasMedium = proMinor >= _gemini3ProMediumMinor;
     String level = 'high';
     if (off) {
       level = 'low';
     } else if (budget != null && budget > 0) {
       if (budget < 8000) {
         level = 'low';
-      } else if (budget < 24000) {
-        level = 'medium'; // gemini 3.1 pro support medium
+      } else if (budget < 24000 && hasMedium) {
+        level = 'medium';
       }
     }
-    return {'includeThoughts': true, 'thinkingLevel': level};
+    // Gemini 3 always thinks, so "off" means hiding thoughts at the lowest level.
+    return {'includeThoughts': !off, 'thinkingLevel': level};
   }
-  // Gemini 3 Pro: supports 'low' and 'high' only (no off)
-  if (isGemini3Pro) {
-    String level = 'high';
-    if (off || (budget != null && budget > 0 && budget < 8000)) {
-      // Off or Light (1024) -> low
-      level = 'low';
-    }
-    return {'includeThoughts': true, 'thinkingLevel': level};
-  }
-  // Gemini 3 Flash, 3.5 Flash/Lite, and 3.6 Flash support
-  // 'minimal', 'low', 'medium', and 'high'.
-  if (isGemini3Flash || isGemini35Flash || isGemini36Flash) {
-    String level = isGemini35FlashLite
-        ? 'minimal'
-        : (isGemini35Flash || isGemini36Flash ? 'medium' : 'high');
+
+  final flashMinor = _gemini3FlashMinor(upstreamModelId);
+  if (flashMinor != null) {
+    // Flash dropped 'minimal' in 3.7, so the floor there is 'low' instead.
+    final lowest = flashMinor >= _gemini3FlashNoMinimalMinor
+        ? 'low'
+        : 'minimal';
+    String level = _gemini3FlashLiteId.hasMatch(upstreamModelId)
+        ? lowest
+        : (flashMinor >= _gemini3FlashModernMinor ? 'medium' : 'high');
     if (off) {
-      level = 'minimal';
+      level = lowest;
     } else if (budget != null && budget > 0) {
       // Light (1024) -> low, Medium (16000) -> medium, Heavy (32000) -> high
       if (budget < 8000) {
@@ -177,7 +179,7 @@ Map<String, dynamic> _googleThinkingConfig(
         level = 'high';
       }
     }
-    return {'includeThoughts': true, 'thinkingLevel': level};
+    return {'includeThoughts': !off, 'thinkingLevel': level};
   }
   // Gemini 2.x and below: use thinkingBudget
   if (off) return {'includeThoughts': false};
@@ -291,8 +293,8 @@ Map<String, dynamic> _googleApiPart(Map part) {
 }
 
 int? _defaultGeminiMaxOutputTokens(String upstreamModelId) {
-  if (_isGemini35FlashModel(upstreamModelId) ||
-      _isGemini36FlashModel(upstreamModelId)) {
+  final flashMinor = _gemini3FlashMinor(upstreamModelId);
+  if (flashMinor != null && flashMinor >= _gemini3FlashModernMinor) {
     return 65536;
   }
   return null;
