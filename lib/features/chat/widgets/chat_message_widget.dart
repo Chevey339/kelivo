@@ -1802,7 +1802,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
         style: TextStyle(
           fontSize: baseUser,
           height: 1.4,
-          color: _chatSurfacePlainTextColor(context),
+          color: _chatSurfacePlainTextColor(context, isUser: true),
         ),
       );
     }
@@ -2139,6 +2139,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                 : cs.primary.withValues(alpha: 0.08))
           : null,
       bareOnDefault: !isUser,
+      isUser: isUser,
       child: child,
     );
   }
@@ -3450,22 +3451,22 @@ class _AnimatedPopupState extends State<_AnimatedPopup> {
 }
 
 ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
-_chatSurfaceStyleSelection(BuildContext context) {
+_chatSurfaceStyleSelection(BuildContext context, {bool isUser = false}) {
   return context.select<
     SettingsProvider,
     ({ChatMessageBackgroundStyle style, ChatBubbleStyleOverrides overrides})
   >(
     (s) => (
       style: s.chatMessageBackgroundStyle,
-      overrides: s.chatBubbleStyleOverrides,
+      overrides: s.chatBubbleStyleOverridesFor(isUser: isUser),
     ),
   );
 }
 
-Color _chatSurfacePlainTextColor(BuildContext context) {
+Color _chatSurfacePlainTextColor(BuildContext context, {bool isUser = false}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return cs.onSurface;
   }
@@ -3484,10 +3485,11 @@ Widget _buildSharedChatSurface(
   required EdgeInsetsGeometry padding,
   Color? defaultColor,
   bool bareOnDefault = false,
+  bool isUser = false,
 }) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   final style = selection.style;
   final overrides = selection.overrides;
   final resolved = resolveBubbleStyle(cs, theme.brightness, style, overrides);
@@ -3572,11 +3574,12 @@ class _ChatSurfaceForegroundPalette {
 }
 
 _ChatSurfaceForegroundPalette _chatSurfaceForegroundPalette(
-  BuildContext context,
-) {
+  BuildContext context, {
+  bool isUser = false,
+}) {
   final theme = Theme.of(context);
   final cs = theme.colorScheme;
-  final selection = _chatSurfaceStyleSelection(context);
+  final selection = _chatSurfaceStyleSelection(context, isUser: isUser);
   if (selection.style == ChatMessageBackgroundStyle.defaultStyle) {
     return _ChatSurfaceForegroundPalette(
       strong: cs.secondary,
