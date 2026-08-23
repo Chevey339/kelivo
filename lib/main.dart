@@ -84,6 +84,15 @@ Future<void> main() async {
   await runZoned(
     () async {
       WidgetsFlutterBinding.ensureInitialized();
+      // Register notification tap handling for every Android launch. This is
+      // independent of the current background-chat mode: an older completion
+      // notification can still launch the app after the mode has changed.
+      // Initialization does not request notification permission.
+      if (Platform.isAndroid) {
+        try {
+          await NotificationService.ensureInitialized();
+        } catch (_) {}
+      }
       FlutterLogger.installGlobalHandlers();
       final appDataDirectory = await AppDirectories.getAppDataDirectory();
       final RestoreReceipt? restoreOutcome;
@@ -748,7 +757,6 @@ class MyApp extends StatelessWidget {
                         }
                       } catch (_) {}
                       if (mode == AndroidBackgroundChatMode.onNotify) {
-                        await NotificationService.ensureInitialized();
                         await NotificationService.ensureAndroidNotificationsPermission();
                       }
                     }
