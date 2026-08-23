@@ -114,6 +114,16 @@ void main() {
           isTrue,
         );
         expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.5'), isFalse);
+        expect(settings.supportsXhighReasoning('OpenAI', 'grok-4.6'), isTrue);
+        expect(settings.supportsMaxReasoning('OpenAI', 'grok-4.6'), isFalse);
+        expect(
+          settings.supportsXhighReasoning('OpenAI', 'deepseek-v4-pro'),
+          isFalse,
+        );
+        expect(
+          settings.supportsMaxReasoning('OpenAI', 'deepseek-v4-pro'),
+          isTrue,
+        );
         expect(
           settings.supportsMaxReasoning('OpenAI', 'muse-spark-1.1'),
           isFalse,
@@ -139,7 +149,7 @@ void main() {
     });
 
     test(
-      'Claude provider resolves apiModelId before DeepSeek xhigh check',
+      'Claude provider resolves apiModelId before DeepSeek max check',
       () async {
         final harness = await createBusinessTestHarness(initial: {});
         final settings = SettingsProvider(harness.preferences);
@@ -169,6 +179,10 @@ void main() {
 
         expect(
           settings.supportsXhighReasoning('ClaudeProxy', 'pro-alias'),
+          isFalse,
+        );
+        expect(
+          settings.supportsMaxReasoning('ClaudeProxy', 'pro-alias'),
           isTrue,
         );
       },

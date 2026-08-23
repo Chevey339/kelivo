@@ -106,6 +106,22 @@ void main() {
       expect(openAINormalizeReasoningEffort('off', 'grok-4.5'), 'low');
       expect(openAINormalizeReasoningEffort('max', 'grok-4.5'), 'high');
       expect(openAINormalizeReasoningEffort('off', 'x-ai/grok-4.5'), 'low');
+      expect(openAINormalizeReasoningEffort('off', 'grok-4.6'), 'low');
+      expect(openAINormalizeReasoningEffort('xhigh', 'grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('max', 'x-ai/grok-4.6'), 'xhigh');
+      expect(openAINormalizeReasoningEffort('off', 'deepseek-v4-pro'), 'off');
+      expect(
+        openAINormalizeReasoningEffort('medium', 'deepseek-v4-flash'),
+        'high',
+      );
+      expect(
+        openAINormalizeReasoningEffort('xhigh', 'deepseek-v4-pro'),
+        'high',
+      );
+      expect(
+        openAINormalizeReasoningEffort('max', 'deepseek-v4-flash-vision-exp'),
+        'max',
+      );
       expect(
         openAINormalizeReasoningEffort('high', 'meta/muse-spark-1.1'),
         'auto',
@@ -197,6 +213,68 @@ void main() {
       );
 
       expect(body.containsKey('reasoning_effort'), isFalse);
+    });
+
+    test('Grok 4.6 Responses keeps xhigh and clamps off to low', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      server.listen((request) async {
+        requestBody =
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        request.response.write(
+          'data: ${jsonEncode({'type': 'response.output_text.delta', 'delta': 'answer'})}\n\n',
+        );
+        request.response.write(
+          'data: ${jsonEncode({
+            'type': 'response.completed',
+            'response': {
+              'output': const [],
+              'usage': {'input_tokens': 1, 'output_tokens': 2},
+            },
+          })}\n\n',
+        );
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final offChunks = await ChatApiService.sendMessageStream(
+        config: _openAIConfig(
+          'http://${server.address.address}:${server.port}/v1',
+          useResponseApi: true,
+        ),
+        modelId: 'grok-4.6',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 0,
+      ).toList();
+      expect(offChunks.isGenerationDone, isTrue);
+      expect((requestBody['reasoning'] as Map)['effort'], 'low');
+
+      final xhighChunks = await ChatApiService.sendMessageStream(
+        config: _openAIConfig(
+          'http://${server.address.address}:${server.port}/v1',
+          useResponseApi: true,
+        ),
+        modelId: 'grok-4.6',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 64000,
+      ).toList();
+      expect(xhighChunks.isGenerationDone, isTrue);
+      expect((requestBody['reasoning'] as Map)['effort'], 'xhigh');
     });
 
     test('Grok Responses streams reasoning text and clamps off to low', () async {

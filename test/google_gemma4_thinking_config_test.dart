@@ -204,6 +204,68 @@ void main() {
       );
     });
 
+    test(
+      'Gemini 3.7 Flash defaults to medium and rejects minimal off',
+      () async {
+        late Map<String, dynamic> capturedBody;
+        final server = await _startGeminiServer((body) {
+          capturedBody = body;
+        });
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: 'gemini-3.7-flash',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          stream: false,
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        expect(_thinkingConfig(capturedBody), {
+          'includeThoughts': true,
+          'thinkingLevel': 'medium',
+        });
+        expect(
+          (capturedBody['generationConfig'] as Map)['maxOutputTokens'],
+          65536,
+        );
+      },
+    );
+
+    test('Gemini 3.7 Flash maps off thinking to low', () async {
+      late Map<String, dynamic> capturedBody;
+      final server = await _startGeminiServer((body) {
+        capturedBody = body;
+      });
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _geminiConfig(
+          'http://${server.address.address}:${server.port}/v1beta',
+        ),
+        modelId: 'gemini-3.7-flash',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 0,
+        stream: false,
+      ).toList();
+
+      expect(chunks.isGenerationDone, isTrue);
+      expect(_thinkingConfig(capturedBody), {
+        'includeThoughts': true,
+        'thinkingLevel': 'low',
+      });
+    });
+
     test('Gemini 3.5 Flash-Lite defaults to minimal thinking', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {

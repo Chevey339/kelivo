@@ -76,12 +76,18 @@ const OpenAIReasoningSupport _grok45Support = OpenAIReasoningSupport(
   supportedEfforts: <String>['low', 'medium', 'high'],
   offFallback: 'low',
 );
+const OpenAIReasoningSupport _grok46Support = OpenAIReasoningSupport(
+  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
+  offFallback: 'low',
+);
 const OpenAIReasoningSupport _museSpark11Support = OpenAIReasoningSupport(
   supportedEfforts: <String>[],
   effortParameterSupported: false,
 );
+// Official V4 effort: low / high / max. medium and xhigh map to high.
+// https://api-docs.deepseek.com/guides/thinking_mode
 const OpenAIReasoningSupport _deepSeekSupport = OpenAIReasoningSupport(
-  supportedEfforts: <String>['low', 'medium', 'high', 'xhigh'],
+  supportedEfforts: <String>['low', 'high', 'max'],
 );
 const OpenAIReasoningSupport _mimoSupport = OpenAIReasoningSupport(
   supportedEfforts: <String>['none', 'low', 'medium', 'high'],
@@ -216,6 +222,9 @@ OpenAIReasoningSupport? openAIReasoningSupport(String modelId) {
   }
   if (_matchesModel(normalized, r'(^|[/_:@])kimi-k3(?:$|[-.])')) {
     return _kimiK3Support;
+  }
+  if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.6(?:$|[-.])')) {
+    return _grok46Support;
   }
   if (_matchesModel(normalized, r'(^|[/_:@])grok-4\.5(?:$|[-.])')) {
     return _grok45Support;

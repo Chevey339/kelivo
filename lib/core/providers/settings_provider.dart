@@ -543,7 +543,7 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+        return !_isDeepSeekClaudeCompatible(cfg, modelForCheck) &&
             _claudeSupportsXhighReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
