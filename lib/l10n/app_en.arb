@@ -3468,5 +3468,8 @@
   "messageStyleSettingsPageCornerRadius": "Corner Radius",
   "messageStyleSettingsPagePreviewUser": "This is a user message",
   "messageStyleSettingsPagePreviewAssistant": "This is an assistant reply.",
-  "messageStyleSettingsPagePreviewThinking": "Thinking"
+  "messageStyleSettingsPagePreviewThinking": "Thinking",
+  "messageStyleSettingsPageRoleUser": "User",
+  "messageStyleSettingsPageRoleAssistant": "Assistant",
+  "messageStyleSettingsPageRoleAssistantHint": "Assistant settings also apply to thinking, tool-call, and translation cards."
 }
