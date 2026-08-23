@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
@@ -15,6 +14,9 @@ import '../../models/message_part.dart';
 import '../chat/chat_service.dart';
 import '../../../utils/app_directories.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import 'backup_cancel_token.dart';
+import 'backup_isolate_runner.dart';
+import 'backup_task_progress.dart';
 import 'cherry_direct_backup_reader.dart';
 
 export 'cherry_direct_backup_reader.dart'
@@ -48,156 +50,53 @@ class CherryImporter {
     required RestoreMode mode,
     required BusinessRepository businessRepository,
     required ChatService chatService,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
-    // 1) Load JSON from ZIP/BAK (best-effort)
-    final Map<String, dynamic> root = await _readCherryBackupFile(file);
-
-    // 2) Basic validation
-    final version = (root['version'] as num?)?.toInt() ?? 0;
-    if (version < 2) {
-      throw Exception('Unsupported Cherry backup version: $version');
+    if (!chatService.initialized) {
+      await chatService.init();
     }
-
-    // 3) Parse localStorage persist:cherry-studio (Redux persist)
-    final localStorage =
-        (root['localStorage'] as Map?)?.map(
-          (k, v) => MapEntry(k.toString(), v),
-        ) ??
-        const <String, dynamic>{};
-    final persistStr = (localStorage['persist:cherry-studio'] ?? '') as String;
-    if (persistStr.isEmpty) {
-      throw Exception('Missing localStorage["persist:cherry-studio"]');
+    final existingConvs = chatService.getAllCompleteConversations();
+    final existingConvIds = existingConvs.map((c) => c.id).toList();
+    final existingMsgIds = <String>[];
+    if (mode == RestoreMode.merge) {
+      for (final c in existingConvs) {
+        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
+      }
     }
-    late Map<String, dynamic> persistObj;
+    late final _CherryParsedBackup parsed;
     try {
-      persistObj = jsonDecode(persistStr) as Map<String, dynamic>;
-    } catch (_) {
-      throw Exception('Invalid persist:cherry-studio JSON');
+      parsed = await runBackupIsolate<_CherryParsedBackup, _CherryParseIsolateArgs>(
+        body: _parseCherryBackupInIsolate,
+        payload: _CherryParseIsolateArgs(
+          path: file.path,
+          merge: mode == RestoreMode.merge,
+          existingConvIds: existingConvIds,
+          existingMsgIds: existingMsgIds,
+          debugSpeculativeJsonProbeBytes: debugSpeculativeJsonProbeBytes,
+          debugIdentifiedArchiveJsonBytes: debugIdentifiedArchiveJsonBytes,
+        ),
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      debugZipJsonProbeDecodeCount = parsed.debugZipJsonProbeDecodeCount;
+    } on CherryUnsupportedBackupVersionException catch (error) {
+      debugZipJsonProbeDecodeCount = error.debugZipJsonProbeDecodeCount;
+      rethrow;
     }
-
-    // slices in persist are also JSON-encoded strings
-    Map<String, dynamic> assistantsSlice = const {};
-    Map<String, dynamic> llmSlice = const {};
-    try {
-      final aStr = (persistObj['assistants'] ?? '') as String;
-      if (aStr.isNotEmpty) {
-        assistantsSlice = jsonDecode(aStr) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-    try {
-      final lStr = (persistObj['llm'] ?? '') as String;
-      if (lStr.isNotEmpty) {
-        llmSlice = jsonDecode(lStr) as Map<String, dynamic>;
-      }
-    } catch (_) {}
-
-    final List<dynamic> cherryProviders =
-        (llmSlice['providers'] as List?) ?? const <dynamic>[];
-    final Map<String, dynamic> assistantsRoot = assistantsSlice;
-    final List<dynamic> cherryAssistants =
-        (assistantsRoot['assistants'] as List?) ?? const <dynamic>[];
-
-    // 4) IndexedDB
-    final indexedDB =
-        (root['indexedDB'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
-        const <String, dynamic>{};
-    final List<dynamic> cherryFiles =
-        (indexedDB['files'] as List?) ?? const <dynamic>[];
-    final List<dynamic> cherryTopicsWithMessages =
-        (indexedDB['topics'] as List?) ?? const <dynamic>[];
-    final List<dynamic> cherryMessageBlocks =
-        (indexedDB['message_blocks'] as List?) ?? const <dynamic>[];
-
-    // Build a map of topic metadata from assistants[].topics[]
-    final Map<String, Map<String, dynamic>> topicMeta =
-        <String, Map<String, dynamic>>{};
-    for (final a in cherryAssistants) {
-      if (a is! Map) continue;
-      final topics = (a['topics'] as List?) ?? const <dynamic>[];
-      for (final t in topics) {
-        if (t is Map && t['id'] != null) {
-          final id = t['id'].toString();
-          topicMeta[id] = t.map((k, v) => MapEntry(k.toString(), v));
-          final tm = topicMeta[id]!;
-          final parentAssistantId = (a['id'] ?? '').toString();
-          final topicAssistantId = (t['assistantId'] ?? '').toString();
-          // Cherry may keep a stale topic.assistantId; the parent assistant's
-          // topic list is the reliable ownership source.
-          final ownerAssistantId = parentAssistantId.isNotEmpty
-              ? parentAssistantId
-              : topicAssistantId;
-          if (ownerAssistantId.isNotEmpty) {
-            tm['assistantId'] = ownerAssistantId;
-          }
-        }
-      }
+    final importedProviders = parsed.providers;
+    final importedAssistants = parsed.assistants;
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
     }
-
-    // Build a map of topicId -> messages
-    final Map<String, List<Map<String, dynamic>>> topicMessages =
-        <String, List<Map<String, dynamic>>>{};
-    for (final e in cherryTopicsWithMessages) {
-      if (e is! Map) continue;
-      final id = (e['id'] ?? '').toString();
-      if (id.isEmpty) continue;
-      final msgs = (e['messages'] as List?) ?? const <dynamic>[];
-      topicMessages[id] = [
-        for (final m in msgs)
-          if (m is Map) m.map((k, v) => MapEntry(k.toString(), v)),
-      ];
-    }
-
-    // Build a map of messageId -> reconstructed text from message_blocks (for cases where message.content is empty)
-    final Map<String, String> blockTextByMessageId = <String, String>{};
-    for (final b in cherryMessageBlocks) {
-      if (b is! Map) continue;
-      final type = (b['type'] ?? '').toString();
-      final messageId = (b['messageId'] ?? '').toString();
-      if (messageId.isEmpty) continue;
-      // Only include readable blocks
-      if (type == 'main_text') {
-        final content = (b['content'] ?? '').toString();
-        if (content.isNotEmpty) {
-          final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
-              ? content
-              : '$prev\n$content';
-        }
-      } else if (type == 'code') {
-        final code = (b['content'] ?? '').toString();
-        final lang = (b['language'] ?? '').toString();
-        if (code.isNotEmpty) {
-          final fenced = '```$lang\n$code\n```';
-          final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
-              ? fenced
-              : '$prev\n$fenced';
-        }
-      } else if (type == 'error') {
-        final err = (b['content'] ?? '').toString();
-        if (err.isNotEmpty) {
-          final tagged = '> Error\n> ${err.replaceAll('\n', '\n> ')}';
-          final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
-              ? tagged
-              : '$prev\n$tagged';
-        }
-      } else if (type == 'thinking') {
-        // Optional: include as a collapsible-like section in plain text
-        final think = (b['content'] ?? '').toString();
-        if (think.isNotEmpty) {
-          final wrapped = '<think>\n$think\n</think>';
-          final prev = blockTextByMessageId[messageId];
-          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
-              ? wrapped
-              : '$prev\n$wrapped';
-        }
-      }
-    }
-
-    // 5) Parse business data before opening the single write transaction.
-    final importedProviders = _parseProviders(cherryProviders);
-    final importedAssistants = _parseAssistants(cherryAssistants);
+    cancelToken?.setCancellable(false);
+    onProgress?.call(
+      const BackupProgress(
+        phase: BackupPhase.committing,
+        processed: 0,
+        cancellable: false,
+      ),
+    );
     await _importBusinessData(
       businessRepository: businessRepository,
       mode: mode,
@@ -206,99 +105,24 @@ class CherryImporter {
     );
 
     // If overwrite, clear chats/files BEFORE writing any uploads to avoid deletion later
-    if (!chatService.initialized) {
-      await chatService.init();
-    }
     if (mode == RestoreMode.overwrite) {
       await chatService.clearAllData();
     }
 
-    // 7) Prepare files (only if referenced by messages)
-    final filesById = <String, Map<String, dynamic>>{
-      for (final f in cherryFiles)
-        if (f is Map && f['id'] != null)
-          f['id'].toString(): f.map((k, v) => MapEntry(k.toString(), v)),
-    };
-
-    // Precompute used file ids
-    final usedFileIds = <String>{};
-    for (final entry in topicMessages.entries) {
-      for (final m in entry.value) {
-        final files = (m['files'] as List?) ?? const <dynamic>[];
-        for (final rf in files) {
-          if (rf is Map && rf['id'] != null) {
-            usedFileIds.add(rf['id'].toString());
-          }
-        }
-      }
-    }
-
-    // Also include files referenced by message_blocks when a 'file' object is present
-    for (final b in cherryMessageBlocks) {
-      if (b is! Map) continue;
-      final fileObj = (b['file'] as Map?)?.map(
-        (k, v) => MapEntry(k.toString(), v),
-      );
-      final fid = (fileObj?['id'] ?? '').toString();
-      if (fid.isNotEmpty) usedFileIds.add(fid);
-    }
-
-    // Write referenced files into Documents/upload and build path map
+    // Materialize stays after the first DB write so overwrite cannot delete
+    // the files we just unpacked. Cancel is already disabled at this point.
     final pathsByFileId = await _materializeFiles(
-      filesById,
-      usedFileIds,
+      parsed.filesById,
+      parsed.usedFileIds,
       backupArchive: file,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
     );
 
-    // Build mapping of extra attachments (images/files) in message_blocks (not represented in message.files)
-    final Map<String, List<_PendingAttachmentRef>> pendingAttachmentsByMessage =
-        <String, List<_PendingAttachmentRef>>{};
-    for (final b in cherryMessageBlocks) {
-      if (b is! Map) continue;
-      final type = (b['type'] ?? '').toString();
-      final messageId = (b['messageId'] ?? '').toString();
-      if (messageId.isEmpty) continue;
-      final fileObj = (b['file'] as Map?)?.map(
-        (k, v) => MapEntry(k.toString(), v),
-      );
-      final url = (b['url'] ?? '').toString();
-      final isImageType =
-          type.toLowerCase().contains('image') ||
-          (fileObj?['type']?.toString().toLowerCase().startsWith('image') ??
-              false);
-      if (fileObj != null && (fileObj['id'] ?? '').toString().isNotEmpty) {
-        final originPath = (fileObj['path'] ?? '').toString().trim();
-        (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
-            .add(
-              _PendingAttachmentRef(
-                fileId: (fileObj['id'] ?? '').toString(),
-                name: (fileObj['origin_name'] ?? fileObj['name'] ?? '')
-                    .toString(),
-                mime: (fileObj['type'] ?? '').toString(),
-                originPath: originPath.isNotEmpty ? originPath : null,
-                isImage: isImageType,
-              ),
-            );
-      } else if (url.isNotEmpty) {
-        if (url.startsWith('data:image')) {
-          (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
-              .add(_PendingAttachmentRef(dataUrl: url, isImage: true));
-        } else {
-          (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
-              .add(_PendingAttachmentRef(url: url, isImage: isImageType));
-        }
-      }
-    }
-
-    // 8) Import topics & messages into ChatService
-    final convCountAndMsgCount = await _importConversations(
-      topicMeta: topicMeta,
-      topicMessages: topicMessages,
+    final convCountAndMsgCount = await _commitTypedCherryTopics(
+      topics: parsed.topics,
       filePaths: pathsByFileId,
       chatService: chatService,
-      mode: mode,
-      blockTexts: blockTextByMessageId,
-      pendingAttachmentsByMessage: pendingAttachmentsByMessage,
     );
 
     return CherryImportResult(
@@ -344,7 +168,12 @@ class CherryImporter {
     debugSpeculativeJsonProbeBytes = null;
     debugIdentifiedArchiveJsonBytes = null;
     debugZipJsonProbeDecodeCount = 0;
+    debugPendingWriteAccessCount = 0;
   }
+
+  /// Counts each pending-write access during typed-plan commit.
+  @visibleForTesting
+  static int debugPendingWriteAccessCount = 0;
 
   static const Set<String> _blockedSpeculativeProbeExtensions = <String>{
     '.sqlite',
@@ -477,8 +306,256 @@ class CherryImporter {
     }
   }
 
-  static Future<Map<String, dynamic>> _readCherryBackupFile(File file) async {
-    final bytes = await file.readAsBytes();
+  static _CherryParsedBackup _parseCherryBackupInIsolate(
+    BackupIsolateContext ctx,
+    _CherryParseIsolateArgs args,
+  ) {
+    debugSpeculativeJsonProbeBytes = args.debugSpeculativeJsonProbeBytes;
+    debugIdentifiedArchiveJsonBytes = args.debugIdentifiedArchiveJsonBytes;
+    debugZipJsonProbeDecodeCount = 0;
+    ctx.throwIfCancelled();
+    ctx.reportProgress(
+      const BackupProgress(
+        phase: BackupPhase.preparing,
+        processed: 0,
+        cancellable: true,
+      ),
+    );
+    late final Map<String, dynamic> root;
+    try {
+      root = _readCherryBackupFileSync(File(args.path));
+    } on CherryUnsupportedBackupVersionException catch (error) {
+      throw CherryUnsupportedBackupVersionException(
+        error.version,
+        debugZipJsonProbeDecodeCount: debugZipJsonProbeDecodeCount,
+      );
+    }
+
+    final version = (root['version'] as num?)?.toInt() ?? 0;
+    if (version < 2) {
+      throw Exception('Unsupported Cherry backup version: $version');
+    }
+
+    final localStorage =
+        (root['localStorage'] as Map?)?.map(
+          (k, v) => MapEntry(k.toString(), v),
+        ) ??
+        const <String, dynamic>{};
+    final persistStr = (localStorage['persist:cherry-studio'] ?? '') as String;
+    if (persistStr.isEmpty) {
+      throw Exception('Missing localStorage["persist:cherry-studio"]');
+    }
+    late Map<String, dynamic> persistObj;
+    try {
+      persistObj = jsonDecode(persistStr) as Map<String, dynamic>;
+    } catch (_) {
+      throw Exception('Invalid persist:cherry-studio JSON');
+    }
+
+    Map<String, dynamic> assistantsSlice = const {};
+    Map<String, dynamic> llmSlice = const {};
+    try {
+      final aStr = (persistObj['assistants'] ?? '') as String;
+      if (aStr.isNotEmpty) {
+        assistantsSlice = jsonDecode(aStr) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    try {
+      final lStr = (persistObj['llm'] ?? '') as String;
+      if (lStr.isNotEmpty) {
+        llmSlice = jsonDecode(lStr) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+
+    final List<dynamic> cherryProviders =
+        (llmSlice['providers'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryAssistants =
+        (assistantsSlice['assistants'] as List?) ?? const <dynamic>[];
+
+    final indexedDB =
+        (root['indexedDB'] as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+        const <String, dynamic>{};
+    final List<dynamic> cherryFiles =
+        (indexedDB['files'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryTopicsWithMessages =
+        (indexedDB['topics'] as List?) ?? const <dynamic>[];
+    final List<dynamic> cherryMessageBlocks =
+        (indexedDB['message_blocks'] as List?) ?? const <dynamic>[];
+
+    final topicMeta = <String, Map<String, dynamic>>{};
+    var sessionIndex = 0;
+    for (final a in cherryAssistants) {
+      ctx.throwIfCancelled();
+      sessionIndex++;
+      ctx.reportProgress(
+        BackupProgress(
+          phase: BackupPhase.importingSessions,
+          processed: sessionIndex,
+          total: cherryAssistants.length,
+          unit: BackupProgressUnit.items,
+          cancellable: true,
+        ),
+      );
+      if (a is! Map) continue;
+      final topics = (a['topics'] as List?) ?? const <dynamic>[];
+      for (final t in topics) {
+        if (t is Map && t['id'] != null) {
+          final id = t['id'].toString();
+          topicMeta[id] = t.map((k, v) => MapEntry(k.toString(), v));
+          final tm = topicMeta[id]!;
+          final parentAssistantId = (a['id'] ?? '').toString();
+          final topicAssistantId = (t['assistantId'] ?? '').toString();
+          final ownerAssistantId = parentAssistantId.isNotEmpty
+              ? parentAssistantId
+              : topicAssistantId;
+          if (ownerAssistantId.isNotEmpty) {
+            tm['assistantId'] = ownerAssistantId;
+          }
+        }
+      }
+    }
+
+    final topicMessages = <String, List<Map<String, dynamic>>>{};
+    for (final e in cherryTopicsWithMessages) {
+      ctx.throwIfCancelled();
+      if (e is! Map) continue;
+      final id = (e['id'] ?? '').toString();
+      if (id.isEmpty) continue;
+      final msgs = (e['messages'] as List?) ?? const <dynamic>[];
+      topicMessages[id] = [
+        for (final m in msgs)
+          if (m is Map) m.map((k, v) => MapEntry(k.toString(), v)),
+      ];
+    }
+
+    final blockTextByMessageId = <String, String>{};
+    for (final b in cherryMessageBlocks) {
+      ctx.throwIfCancelled();
+      if (b is! Map) continue;
+      final type = (b['type'] ?? '').toString();
+      final messageId = (b['messageId'] ?? '').toString();
+      if (messageId.isEmpty) continue;
+      if (type == 'main_text') {
+        final content = (b['content'] ?? '').toString();
+        if (content.isNotEmpty) {
+          final prev = blockTextByMessageId[messageId];
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? content
+              : '$prev\n$content';
+        }
+      } else if (type == 'code') {
+        final code = (b['content'] ?? '').toString();
+        final lang = (b['language'] ?? '').toString();
+        if (code.isNotEmpty) {
+          final fenced = '```$lang\n$code\n```';
+          final prev = blockTextByMessageId[messageId];
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? fenced
+              : '$prev\n$fenced';
+        }
+      } else if (type == 'error') {
+        final err = (b['content'] ?? '').toString();
+        if (err.isNotEmpty) {
+          final tagged = '> Error\n> ${err.replaceAll('\n', '\n> ')}';
+          final prev = blockTextByMessageId[messageId];
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? tagged
+              : '$prev\n$tagged';
+        }
+      } else if (type == 'thinking') {
+        final think = (b['content'] ?? '').toString();
+        if (think.isNotEmpty) {
+          final wrapped = '<think>\n$think\n</think>';
+          final prev = blockTextByMessageId[messageId];
+          blockTextByMessageId[messageId] = prev == null || prev.isEmpty
+              ? wrapped
+              : '$prev\n$wrapped';
+        }
+      }
+    }
+
+    final filesById = <String, Map<String, dynamic>>{
+      for (final f in cherryFiles)
+        if (f is Map && f['id'] != null)
+          f['id'].toString(): f.map((k, v) => MapEntry(k.toString(), v)),
+    };
+
+    final usedFileIds = <String>{};
+    for (final entry in topicMessages.entries) {
+      ctx.throwIfCancelled();
+      for (final m in entry.value) {
+        final files = (m['files'] as List?) ?? const <dynamic>[];
+        for (final rf in files) {
+          if (rf is Map && rf['id'] != null) {
+            usedFileIds.add(rf['id'].toString());
+          }
+        }
+      }
+    }
+
+    final pendingAttachmentsByMessage =
+        <String, List<_PendingAttachmentRef>>{};
+    for (final b in cherryMessageBlocks) {
+      ctx.throwIfCancelled();
+      if (b is! Map) continue;
+      final type = (b['type'] ?? '').toString();
+      final messageId = (b['messageId'] ?? '').toString();
+      if (messageId.isEmpty) continue;
+      final fileObj = (b['file'] as Map?)?.map(
+        (k, v) => MapEntry(k.toString(), v),
+      );
+      final fid = (fileObj?['id'] ?? '').toString();
+      if (fid.isNotEmpty) usedFileIds.add(fid);
+      final url = (b['url'] ?? '').toString();
+      final isImageType =
+          type.toLowerCase().contains('image') ||
+          (fileObj?['type']?.toString().toLowerCase().startsWith('image') ??
+              false);
+      if (fileObj != null && fid.isNotEmpty) {
+        final originPath = (fileObj['path'] ?? '').toString().trim();
+        (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
+            .add(
+              _PendingAttachmentRef(
+                fileId: fid,
+                name: (fileObj['origin_name'] ?? fileObj['name'] ?? '')
+                    .toString(),
+                mime: (fileObj['type'] ?? '').toString(),
+                originPath: originPath.isNotEmpty ? originPath : null,
+                isImage: isImageType,
+              ),
+            );
+      } else if (url.isNotEmpty) {
+        if (url.startsWith('data:image')) {
+          (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
+              .add(_PendingAttachmentRef(dataUrl: url, isImage: true));
+        } else {
+          (pendingAttachmentsByMessage[messageId] ??= <_PendingAttachmentRef>[])
+              .add(_PendingAttachmentRef(url: url, isImage: isImageType));
+        }
+      }
+    }
+
+    return _CherryParsedBackup(
+      providers: _parseProviders(cherryProviders),
+      assistants: _parseAssistants(cherryAssistants),
+      topics: _buildTypedCherryTopics(
+        ctx: ctx,
+        topicMeta: topicMeta,
+        topicMessages: topicMessages,
+        blockTexts: blockTextByMessageId,
+        pendingAttachmentsByMessage: pendingAttachmentsByMessage,
+        merge: args.merge,
+        existingConvIds: args.existingConvIds.toSet(),
+        existingMsgIds: args.existingMsgIds.toSet(),
+      ),
+      filesById: filesById,
+      usedFileIds: usedFileIds,
+      debugZipJsonProbeDecodeCount: debugZipJsonProbeDecodeCount,
+    );
+  }
+
+  static Map<String, dynamic> _readCherryBackupFileSync(File file) {
+    final bytes = file.readAsBytesSync();
 
     // Whole-file JSON (not ZIP/GZIP): uncapped, allowMalformed.
     if (!_looksLikeZip(bytes) && !_looksLikeGzip(bytes)) {
@@ -790,10 +867,25 @@ class CherryImporter {
         .toList(growable: false);
   }
 
+  static Map<String, String> _materializeFilesInIsolate(
+    BackupIsolateContext ctx,
+    _CherryMaterializeArgs args,
+  ) {
+    return _materializeFilesSync(
+      backupPath: args.backupPath,
+      uploadDirPath: args.uploadDirPath,
+      filesById: args.filesById,
+      usedIds: args.usedIds,
+      ctx: ctx,
+    );
+  }
+
   static Future<Map<String, String>> _materializeFiles(
     Map<String, Map<String, dynamic>> filesById,
     Set<String> usedIds, {
     File? backupArchive,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     final uploadDir = await AppDirectories.getUploadDirectory();
     if (!await uploadDir.exists()) await uploadDir.create(recursive: true);
@@ -803,28 +895,27 @@ class CherryImporter {
         if (filesById[id] != null)
           id: Map<String, dynamic>.from(filesById[id]!),
     };
-    final backupPath = backupArchive?.path;
-    final uploadDirPath = uploadDir.path;
     final used = usedIds.toList(growable: false);
-
-    // ArchiveFile / InputFileStream are not sendable; keep the ZIP open only
-    // inside the isolate and exchange plain path maps across the boundary.
-    return Isolate.run(
-      () => _materializeFilesSync(
-        backupPath: backupPath,
-        uploadDirPath: uploadDirPath,
+    return runBackupIsolate<Map<String, String>, _CherryMaterializeArgs>(
+      body: _materializeFilesInIsolate,
+      payload: _CherryMaterializeArgs(
+        backupPath: backupArchive?.path,
+        uploadDirPath: uploadDir.path,
         filesById: filesPayload,
         usedIds: used,
       ),
+      onProgress: onProgress,
+      cancelToken: cancelToken,
     );
   }
 
-  /// Synchronous attachment materialization — runs inside an [Isolate].
+  /// Synchronous attachment materialization — runs inside an isolate.
   static Map<String, String> _materializeFilesSync({
     required String? backupPath,
     required String uploadDirPath,
     required Map<String, Map<String, dynamic>> filesById,
     required List<String> usedIds,
+    BackupIsolateContext? ctx,
   }) {
     Map<String, ArchiveFile>? filesIndexByBase;
     Map<String, ArchiveFile>? filesIndexByRel;
@@ -919,7 +1010,30 @@ class CherryImporter {
 
     try {
       final result = <String, String>{};
+      final total = usedIds.length;
+      ctx?.reportProgress(
+        BackupProgress(
+          phase: BackupPhase.materializingFiles,
+          processed: 0,
+          total: total,
+          unit: BackupProgressUnit.items,
+          cancellable: false,
+        ),
+      );
+      var processed = 0;
       for (final id in usedIds) {
+        ctx?.throwIfCancelled();
+        processed++;
+        ctx?.reportProgress(
+          BackupProgress(
+            phase: BackupPhase.materializingFiles,
+            processed: processed,
+            total: total,
+            unit: BackupProgressUnit.items,
+            detail: id,
+            cancellable: false,
+          ),
+        );
         final meta = filesById[id];
         if (meta == null) continue;
         final name = (meta['origin_name'] ?? meta['name'] ?? 'file').toString();
@@ -1161,36 +1275,43 @@ class CherryImporter {
     }
   }
 
-  // Returns (conversations, messages, extraFilesSaved)
-  static Future<(int, int, int)> _importConversations({
+  static String? _cherryModelId(Map<String, dynamic> message) {
+    final raw = message['modelId'];
+    if (raw != null) {
+      if (raw is String) return raw;
+      throw const FormatException('cherry_message_model_id');
+    }
+    final model = message['model'];
+    if (model is Map) {
+      final id = model['id'];
+      if (id == null) return '';
+      if (id is String) return id;
+      throw const FormatException('cherry_message_model_id');
+    }
+    return null;
+  }
+
+  static List<_CherryTypedTopic> _buildTypedCherryTopics({
+    required BackupIsolateContext ctx,
     required Map<String, Map<String, dynamic>> topicMeta,
     required Map<String, List<Map<String, dynamic>>> topicMessages,
-    required Map<String, String> filePaths,
-    required ChatService chatService,
-    required RestoreMode mode,
     required Map<String, String> blockTexts,
     required Map<String, List<_PendingAttachmentRef>>
     pendingAttachmentsByMessage,
-  }) async {
-    if (!chatService.initialized) await chatService.init();
-
-    // Build map of existing conv ids for merge
-    final existingConvs = chatService.getAllCompleteConversations();
-    final existingConvIds = existingConvs.map((c) => c.id).toSet();
-    final existingMsgIds = <String>{};
-    if (mode == RestoreMode.merge) {
-      // Ids only: full message loads would flush the LRU cache for no gain.
-      for (final c in existingConvs) {
-        existingMsgIds.addAll(await chatService.getMessageIds(c.id));
-      }
-    }
-
-    int convCount = 0;
-    int msgCount = 0;
-    int extraSaved = 0; // number of files saved from base64/data urls
-
+    required bool merge,
+    required Set<String> existingConvIds,
+    required Set<String> existingMsgIds,
+  }) {
     final topicIds = <String>{...topicMeta.keys, ...topicMessages.keys};
-    for (final topicId in topicIds) {
+    final topicList = topicIds.toList(growable: false);
+    final messageTotal = topicMessages.values.fold<int>(
+      0,
+      (sum, messages) => sum + messages.length,
+    );
+    var messageProcessed = 0;
+    final topics = <_CherryTypedTopic>[];
+    for (final topicId in topicList) {
+      ctx.throwIfCancelled();
       final msgsRaw = topicMessages[topicId] ?? const <Map<String, dynamic>>[];
       final meta = topicMeta[topicId] ?? const <String, dynamic>{};
       final title = (meta['name'] ?? 'Imported').toString();
@@ -1198,7 +1319,6 @@ class CherryImporter {
       final assistantId = (meta['assistantId'] ?? '').toString().trim().isEmpty
           ? null
           : meta['assistantId'].toString();
-      // created/updated fallback from messages
       DateTime createdAt;
       DateTime updatedAt;
       try {
@@ -1212,19 +1332,26 @@ class CherryImporter {
         updatedAt = createdAt;
       }
 
-      // Convert messages
-      final messages = <ChatMessage>[];
+      final messages = <_CherryTypedMessage>[];
       for (final m in msgsRaw) {
+        ctx.throwIfCancelled();
+        messageProcessed++;
+        ctx.reportProgress(
+          BackupProgress(
+            phase: BackupPhase.importingMessages,
+            processed: messageProcessed,
+            total: messageTotal,
+            unit: BackupProgressUnit.items,
+            cancellable: true,
+          ),
+        );
         final msgId = (m['id'] ?? '').toString();
         if (msgId.isEmpty) continue;
-        if (mode == RestoreMode.merge && existingMsgIds.contains(msgId)) {
+        if (merge && existingMsgIds.contains(msgId)) {
           continue;
         }
         final roleRaw = (m['role'] ?? 'user').toString();
-        final role = (roleRaw == 'system')
-            ? 'assistant'
-            : roleRaw; // our schema only supports 'user'|'assistant'
-        // Prefer message.content; if empty, fallback to reconstructed blocks
+        final role = (roleRaw == 'system') ? 'assistant' : roleRaw;
         String content = '';
         final rawContent = m['content'];
         if (rawContent is String) {
@@ -1242,12 +1369,7 @@ class CherryImporter {
           ts = DateTime.now();
         }
 
-        final modelId =
-            (m['modelId'] ??
-                    (m['model'] is Map
-                        ? (m['model']['id'] ?? '').toString()
-                        : null))
-                as String?;
+        final modelId = _cherryModelId(m);
         final providerId = (m['model'] is Map
             ? (m['model']['provider'] ?? '').toString()
             : null);
@@ -1256,151 +1378,45 @@ class CherryImporter {
         );
         final totalTokens = (usage?['total_tokens'] as num?)?.toInt();
 
-        // Attachments -> structured ImagePart/FilePart (no mid-pipeline markers)
         final files = (m['files'] as List?) ?? const <dynamic>[];
-        final attachmentParts = <MessagePart>[];
+        final pendingWrites = <_PendingAttachmentRef>[];
         for (final f in files) {
           if (f is! Map) continue;
           final fid = (f['id'] ?? '').toString();
           if (fid.isEmpty) continue;
           final name = (f['origin_name'] ?? f['name'] ?? 'file').toString();
           final mime = (f['type'] ?? '').toString();
-          final savedPath = filePaths[fid];
-          final isImageByMeta =
+          final url = (f['url'] ?? '').toString();
+          final originPath = (f['path'] ?? '').toString().trim();
+          final lowerUrl = url.toLowerCase();
+          final isImage =
               mime.toLowerCase().startsWith('image') ||
               (name.toLowerCase().contains('.') &&
                   RegExp(
-                    r"\.(png|jpg|jpeg|gif|webp)",
-                  ).hasMatch(name.toLowerCase()));
-          if (savedPath != null && savedPath.isNotEmpty) {
-            attachmentParts.add(
-              _attachmentPart(
-                isImage: isImageByMeta,
-                target: savedPath,
-                name: name,
-                mime: mime,
-              ),
-            );
-          } else {
-            // Fallback to URL if present (no download)
-            final url = (f['url'] ?? '').toString();
-            if (url.isNotEmpty) {
-              // Trust known image MIME even on extensionless / presigned URLs.
-              final lowerUrl = url.toLowerCase();
-              final isImage =
-                  mime.toLowerCase().startsWith('image/') ||
-                  RegExp(
-                    r'\.(png|jpg|jpeg|gif|webp)(?:$|[?#])',
-                  ).hasMatch(lowerUrl);
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: isImage,
-                  target: url,
-                  name: name,
-                  mime: mime,
-                ),
-              );
-            } else {
-              // Archive file missing and no URL — keep an unavailable part so
-              // the attachment is not silently dropped from history.
-              // Prefer an archive-relative origin path when present; otherwise a
-              // stable non-empty placeholder (uri must not be empty).
-              final originPath = (f['path'] ?? '').toString().trim();
-              final placeholder = originPath.isNotEmpty
-                  ? originPath
-                  : 'cherry-missing:$fid';
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: isImageByMeta,
-                  target: placeholder,
-                  name: name,
-                  mime: mime,
-                  unavailable: true,
-                ),
-              );
-            }
-          }
+                    r'\.(png|jpg|jpeg|gif|webp)',
+                  ).hasMatch(name.toLowerCase())) ||
+              (url.isNotEmpty &&
+                  (mime.toLowerCase().startsWith('image/') ||
+                      RegExp(
+                        r'\.(png|jpg|jpeg|gif|webp)(?:$|[?#])',
+                      ).hasMatch(lowerUrl)));
+          pendingWrites.add(
+            _PendingAttachmentRef(
+              fileId: fid,
+              url: url.isNotEmpty ? url : null,
+              originPath: originPath.isNotEmpty ? originPath : null,
+              name: name,
+              mime: mime,
+              isImage: isImage,
+            ),
+          );
         }
 
-        // Add images referenced by message blocks (image) and message.metadata.generateImageResponse
         final extraAtt =
             pendingAttachmentsByMessage[msgId] ??
             const <_PendingAttachmentRef>[];
-        for (final ref in extraAtt) {
-          if (ref.fileId != null) {
-            final savedPath = filePaths[ref.fileId!];
-            final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
-            final fileMime =
-                ref.mime ??
-                (ref.isImage ? 'image/png' : 'application/octet-stream');
-            if (savedPath != null && savedPath.isNotEmpty) {
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: ref.isImage,
-                  target: savedPath,
-                  name: fileName,
-                  mime: fileMime,
-                ),
-              );
-            } else {
-              // Same contract as m['files']: keep an unavailable placeholder
-              // when the archive file is missing.
-              final originPath = (ref.originPath ?? '').trim();
-              final placeholder = originPath.isNotEmpty
-                  ? originPath
-                  : 'cherry-missing:${ref.fileId}';
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: ref.isImage,
-                  target: placeholder,
-                  name: fileName,
-                  mime: fileMime,
-                  unavailable: true,
-                ),
-              );
-            }
-          } else if (ref.dataUrl != null) {
-            final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
-            final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
-            final fileMime =
-                ref.mime ??
-                (ref.isImage ? 'image/png' : 'application/octet-stream');
-            if (savedPath != null) {
-              extraSaved += 1;
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: ref.isImage,
-                  target: savedPath,
-                  name: fileName,
-                  mime: fileMime,
-                ),
-              );
-            } else {
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: ref.isImage,
-                  target: 'cherry-missing:data-url',
-                  name: fileName,
-                  mime: fileMime,
-                  unavailable: true,
-                ),
-              );
-            }
-          } else if (ref.url != null && ref.url!.isNotEmpty) {
-            attachmentParts.add(
-              _attachmentPart(
-                isImage: ref.isImage,
-                target: ref.url!,
-                name: ref.name ?? (ref.isImage ? 'image' : 'file'),
-                mime:
-                    ref.mime ??
-                    (ref.isImage ? 'image/png' : 'application/octet-stream'),
-              ),
-            );
-          }
-        }
+        pendingWrites.addAll(extraAtt);
 
-        // generateImageResponse in metadata
         final metadata = (m['metadata'] as Map?)?.map(
           (k, v) => MapEntry(k.toString(), v),
         );
@@ -1413,115 +1429,204 @@ class CherryImporter {
             final s = (item ?? '').toString();
             if (s.isEmpty) continue;
             if (s.startsWith('data:image')) {
-              final saved = await _saveDataUrlToUpload(s);
-              if (saved != null) {
-                extraSaved += 1;
-                attachmentParts.add(
-                  _attachmentPart(
-                    isImage: true,
-                    target: saved,
-                    name: 'image',
-                    mime: 'image/png',
-                  ),
-                );
-              }
+              pendingWrites.add(_PendingAttachmentRef(dataUrl: s, isImage: true));
             } else if (s.startsWith('http://') || s.startsWith('https://')) {
-              attachmentParts.add(
-                _attachmentPart(
-                  isImage: true,
-                  target: s,
-                  name: 'image',
-                  mime: 'image/png',
-                ),
+              pendingWrites.add(
+                _PendingAttachmentRef(url: s, name: 'image', mime: 'image/png'),
               );
             } else {
-              // raw base64 without prefix
-              final saved = await _saveDataUrlToUpload(
-                'data:image/png;base64,$s',
+              pendingWrites.add(
+                _PendingAttachmentRef(
+                  dataUrl: 'data:image/png;base64,$s',
+                  isImage: true,
+                ),
               );
-              if (saved != null) {
-                extraSaved += 1;
-                attachmentParts.add(
-                  _attachmentPart(
-                    isImage: true,
-                    target: saved,
-                    name: 'image',
-                    mime: 'image/png',
-                  ),
-                );
-              }
             }
           }
         }
 
-        // Extract any inline data:image base64 URLs inside assistant content and convert to files
         if (role == 'assistant' && content.contains('data:image')) {
           final dataUrls = _extractDataImageUrls(content);
           if (dataUrls.isNotEmpty) {
             for (final du in dataUrls) {
-              final saved = await _saveDataUrlToUpload(du);
-              if (saved != null) {
-                extraSaved += 1;
-                attachmentParts.add(
-                  _attachmentPart(
-                    isImage: true,
-                    target: saved,
-                    name: 'image',
-                    mime: 'image/png',
-                  ),
-                );
-              }
+              pendingWrites.add(
+                _PendingAttachmentRef(dataUrl: du, isImage: true),
+              );
             }
-            // Optionally strip the base64 blobs from content to avoid giant text blobs
             content = _stripDataImageUrls(content);
           }
         }
-        final parts = <MessagePart>[TextPart(content), ...attachmentParts];
 
         messages.add(
-          ChatMessage(
-            id: msgId,
-            role: role,
-            parts: parts,
-            timestamp: ts,
-            modelId: modelId,
-            providerId: providerId,
-            totalTokens: totalTokens,
-            conversationId: topicId,
+          _CherryTypedMessage(
+            message: ChatMessage(
+              id: msgId,
+              role: role,
+              parts: <MessagePart>[TextPart(content)],
+              timestamp: ts,
+              modelId: modelId,
+              providerId: providerId,
+              totalTokens: totalTokens,
+              conversationId: topicId,
+            ),
+            pendingWrites: pendingWrites,
           ),
         );
       }
 
-      // Derive timestamps if missing
       if (messages.isNotEmpty) {
-        final times = messages.map((m) => m.timestamp).toList()..sort();
+        final times = messages.map((m) => m.message.timestamp).toList()..sort();
         createdAt = times.first;
         updatedAt = times.last;
       }
 
-      // Persist
-      if (mode == RestoreMode.merge && existingConvIds.contains(topicId)) {
-        // Only add new messages
-        for (final m in messages) {
-          await chatService.addMessageDirectly(topicId, m);
+      topics.add(
+        _CherryTypedTopic(
+          mergeIntoExisting: merge && existingConvIds.contains(topicId),
+          conversation: Conversation(
+            id: topicId,
+            title: title,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            isPinned: pinned,
+            assistantId: assistantId,
+          ),
+          messages: messages,
+        ),
+      );
+    }
+    return topics;
+  }
+
+  static Future<(int, int, int)> _commitTypedCherryTopics({
+    required List<_CherryTypedTopic> topics,
+    required Map<String, String> filePaths,
+    required ChatService chatService,
+  }) async {
+    if (!chatService.initialized) await chatService.init();
+    var convCount = 0;
+    var msgCount = 0;
+    var extraSaved = 0;
+    for (final topic in topics) {
+      final resolved = <ChatMessage>[];
+      for (final typed in topic.messages) {
+        final parts = <MessagePart>[...typed.message.parts];
+        for (final ref in typed.pendingWrites) {
+          debugPendingWriteAccessCount++;
+          final part = await _resolveCherryAttachment(ref, filePaths);
+          if (ref.dataUrl != null) {
+            final unavailable = part is ImagePart
+                ? part.unavailable
+                : part is FilePart && part.unavailable;
+            if (!unavailable) extraSaved += 1;
+          }
+          parts.add(part);
+        }
+        resolved.add(typed.message.copyWith(parts: parts));
+      }
+
+      if (topic.mergeIntoExisting) {
+        for (final message in resolved) {
+          await chatService.addMessageDirectly(topic.conversation.id, message);
           msgCount += 1;
         }
       } else {
-        final conv = Conversation(
-          id: topicId,
-          title: title,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-          isPinned: pinned,
-          assistantId: assistantId,
-        );
-        await chatService.restoreConversation(conv, messages);
+        await chatService.restoreConversation(topic.conversation, resolved);
         convCount += 1;
-        msgCount += messages.length;
+        msgCount += resolved.length;
       }
     }
-
     return (convCount, msgCount, extraSaved);
+  }
+
+  static Future<MessagePart> _resolveCherryAttachment(
+    _PendingAttachmentRef ref,
+    Map<String, String> filePaths,
+  ) async {
+    final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
+    final fileMime =
+        ref.mime ??
+        (ref.isImage ? 'image/png' : 'application/octet-stream');
+
+    if (ref.dataUrl != null) {
+      final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);
+      if (savedPath != null) {
+        return _attachmentPart(
+          isImage: ref.isImage,
+          target: savedPath,
+          name: fileName,
+          mime: fileMime,
+        );
+      }
+      return _attachmentPart(
+        isImage: ref.isImage,
+        target: 'cherry-missing:data-url',
+        name: fileName,
+        mime: fileMime,
+        unavailable: true,
+      );
+    }
+
+    if (ref.fileId != null) {
+      final savedPath = filePaths[ref.fileId!];
+      if (savedPath != null && savedPath.isNotEmpty) {
+        return _attachmentPart(
+          isImage: ref.isImage,
+          target: savedPath,
+          name: fileName,
+          mime: fileMime,
+        );
+      }
+      if (ref.url != null && ref.url!.isNotEmpty) {
+        return _attachmentPart(
+          isImage: ref.isImage,
+          target: ref.url!,
+          name: fileName,
+          mime: fileMime,
+        );
+      }
+      if (ref.originPath != null && ref.originPath!.isNotEmpty) {
+        return _attachmentPart(
+          isImage: ref.isImage,
+          target: ref.originPath!,
+          name: fileName,
+          mime: fileMime,
+          unavailable: true,
+        );
+      }
+      return _attachmentPart(
+        isImage: ref.isImage,
+        target: 'cherry-missing:${ref.fileId}',
+        name: fileName,
+        mime: fileMime,
+        unavailable: true,
+      );
+    }
+
+    if (ref.url != null && ref.url!.isNotEmpty) {
+      return _attachmentPart(
+        isImage: ref.isImage,
+        target: ref.url!,
+        name: fileName,
+        mime: fileMime,
+      );
+    }
+    if (ref.originPath != null && ref.originPath!.isNotEmpty) {
+      return _attachmentPart(
+        isImage: ref.isImage,
+        target: ref.originPath!,
+        name: fileName,
+        mime: fileMime,
+        unavailable: true,
+      );
+    }
+    return _attachmentPart(
+      isImage: ref.isImage,
+      target: 'cherry-missing:unknown',
+      name: fileName,
+      mime: fileMime,
+      unavailable: true,
+    );
   }
 
   static MessagePart _attachmentPart({
@@ -1651,6 +1756,78 @@ class _ExactSizeOutputFileStream extends OutputFileStream {
       throw const FormatException('zip_entry_size');
     }
   }
+}
+
+class _CherryMaterializeArgs {
+  const _CherryMaterializeArgs({
+    required this.backupPath,
+    required this.uploadDirPath,
+    required this.filesById,
+    required this.usedIds,
+  });
+
+  final String? backupPath;
+  final String uploadDirPath;
+  final Map<String, Map<String, dynamic>> filesById;
+  final List<String> usedIds;
+}
+
+class _CherryParseIsolateArgs {
+  const _CherryParseIsolateArgs({
+    required this.path,
+    required this.merge,
+    required this.existingConvIds,
+    required this.existingMsgIds,
+    this.debugSpeculativeJsonProbeBytes,
+    this.debugIdentifiedArchiveJsonBytes,
+  });
+
+  final String path;
+  final bool merge;
+  final List<String> existingConvIds;
+  final List<String> existingMsgIds;
+  final int? debugSpeculativeJsonProbeBytes;
+  final int? debugIdentifiedArchiveJsonBytes;
+}
+
+class _CherryParsedBackup {
+  const _CherryParsedBackup({
+    required this.providers,
+    required this.assistants,
+    required this.topics,
+    required this.filesById,
+    required this.usedFileIds,
+    this.debugZipJsonProbeDecodeCount = 0,
+  });
+
+  final Map<String, Map<String, dynamic>> providers;
+  final List<Map<String, dynamic>> assistants;
+  final List<_CherryTypedTopic> topics;
+  final Map<String, Map<String, dynamic>> filesById;
+  final Set<String> usedFileIds;
+  final int debugZipJsonProbeDecodeCount;
+}
+
+class _CherryTypedTopic {
+  const _CherryTypedTopic({
+    required this.mergeIntoExisting,
+    required this.conversation,
+    required this.messages,
+  });
+
+  final bool mergeIntoExisting;
+  final Conversation conversation;
+  final List<_CherryTypedMessage> messages;
+}
+
+class _CherryTypedMessage {
+  const _CherryTypedMessage({
+    required this.message,
+    required this.pendingWrites,
+  });
+
+  final ChatMessage message;
+  final List<_PendingAttachmentRef> pendingWrites;
 }
 
 class _PendingAttachmentRef {

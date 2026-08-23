@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
-import '../../../shared/widgets/loading_dialog_card.dart';
 import 'package:provider/provider.dart';
 
 import '../../../icons/lucide_adapter.dart';
@@ -19,13 +18,15 @@ import '../../../core/providers/backup_reminder_provider.dart';
 import '../../../core/providers/s3_backup_provider.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/backup/backup_cancel_token.dart';
 import '../../../core/services/backup/data_sync.dart';
+import '../backup_task_runner.dart';
+import '../widgets/backup_progress_dialog.dart';
 import '../../../core/services/native_file_save.dart';
 import '../../../shared/widgets/ios_switch.dart';
-import '../../../shared/widgets/restart_app_action.dart';
+import '../../../shared/widgets/loading_dialog_card.dart';
 import '../../../core/services/backup/cherry_importer.dart';
 import '../../../core/services/backup/chatbox_importer.dart';
-import '../../../utils/platform_utils.dart';
 import '../backup_restore_error_message.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
@@ -43,7 +44,16 @@ String _fmtBytes(int bytes) {
 }
 
 class BackupPage extends StatefulWidget {
-  const BackupPage({super.key});
+  const BackupPage({
+    super.key,
+    this.debugBackupProvider,
+    this.debugS3BackupProvider,
+  });
+
+  @visibleForTesting
+  final BackupProvider? debugBackupProvider;
+  @visibleForTesting
+  final S3BackupProvider? debugS3BackupProvider;
 
   @override
   State<BackupPage> createState() => _BackupPageState();
@@ -185,42 +195,33 @@ class _BackupPageState extends State<BackupPage> {
     );
   }
 
-  Future<T> _runWithExportingOverlay<T>(
-    BuildContext context,
-    Future<T> Function() task,
-  ) async {
-    final l10n = AppLocalizations.of(context)!;
-    return _runWithLoadingOverlay(
-      context,
-      task,
-      label: l10n.backupPageExporting,
-    );
-  }
-
   Future<T> _runWithLoadingOverlay<T>(
     BuildContext context,
-    Future<T> Function() task, {
+    Future<T> Function(BackupTaskHandle handle) task, {
     String? label,
   }) async {
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => LoadingDialogCard(label: label),
+    late T value;
+    final result = await showBackupProgressDialog<T>(
+      context,
+      title: label ?? AppLocalizations.of(context)!.backupProgressPreparing,
+      task: (handle) async {
+        value = await task(handle);
+        return value;
+      },
     );
-    try {
-      final res = await task();
-      return res;
-    } finally {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-    }
+    if (result.cancelled) throw const BackupCancelledException();
+    if (result.error != null) throw result.error!;
+    return result.value as T;
   }
 
   Future<T> _runWithImportingOverlay<T>(
     BuildContext context,
-    Future<T> Function() task,
-  ) => _runWithLoadingOverlay(context, task);
+    Future<T> Function(BackupTaskHandle handle) task,
+  ) => _runWithLoadingOverlay(
+    context,
+    task,
+    label: AppLocalizations.of(context)!.backupPageImportBackupFile,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -230,22 +231,32 @@ class _BackupPageState extends State<BackupPage> {
 
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => BackupProvider(
-            chatService: context.read<ChatService>(),
-            businessRepository: context.read<BusinessRepository>(),
-            businessPreferences: context.read<BusinessPreferences>(),
-            initialConfig: settings.webDavConfig,
+        if (widget.debugBackupProvider != null)
+          ChangeNotifierProvider<BackupProvider>.value(
+            value: widget.debugBackupProvider!,
+          )
+        else
+          ChangeNotifierProvider(
+            create: (_) => BackupProvider(
+              chatService: context.read<ChatService>(),
+              businessRepository: context.read<BusinessRepository>(),
+              businessPreferences: context.read<BusinessPreferences>(),
+              initialConfig: settings.webDavConfig,
+            ),
           ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => S3BackupProvider(
-            chatService: context.read<ChatService>(),
-            businessRepository: context.read<BusinessRepository>(),
-            businessPreferences: context.read<BusinessPreferences>(),
-            initialConfig: settings.s3Config,
+        if (widget.debugS3BackupProvider != null)
+          ChangeNotifierProvider<S3BackupProvider>.value(
+            value: widget.debugS3BackupProvider!,
+          )
+        else
+          ChangeNotifierProvider(
+            create: (_) => S3BackupProvider(
+              chatService: context.read<ChatService>(),
+              businessRepository: context.read<BusinessRepository>(),
+              businessPreferences: context.read<BusinessPreferences>(),
+              initialConfig: settings.s3Config,
+            ),
           ),
-        ),
       ],
       child: Builder(
         builder: (context) {
@@ -369,10 +380,21 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: vm.busy
                           ? null
                           : () async {
-                              final list = await _runWithImportingOverlay(
-                                context,
-                                () => vm.listRemote(),
-                              );
+                              final List<BackupFileItem> list;
+                              try {
+                                list = await _runWithImportingOverlay(
+                                  context,
+                                  (handle) => vm.listRemote(
+                                    onProgress: handle.report,
+                                    cancelToken: handle.cancelToken,
+                                  ),
+                                );
+                              } on BackupCancelledException {
+                                return;
+                              } catch (_) {
+                                return;
+                              }
+                              if (!mounted) return;
                               // 按时间倒序排列（最新的在前）
                               list.sort((a, b) {
                                 // 优先使用 lastModified
@@ -611,12 +633,17 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                () => vm.restoreFromItem(
+                                                (handle) => vm.restoreFromItem(
                                                   item,
                                                   mode: mode,
+                                                  onProgress: handle.report,
+                                                  cancelToken: handle.cancelToken,
                                                 ),
                                               );
                                             } catch (e) {
+                                              if (e is BackupCancelledException) {
+                                                return;
+                                              }
                                               if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
@@ -651,14 +678,7 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
-                                      // If error, ensure loading dialog is closed
-                                      if (context.mounted &&
-                                          Navigator.canPop(context)) {
-                                        Navigator.of(
-                                          context,
-                                          rootNavigator: true,
-                                        ).pop();
-                                      }
+                                      if (e is BackupCancelledException) return;
                                       if (context.mounted) {
                                         showAppSnackBar(
                                           context,
@@ -682,12 +702,15 @@ class _BackupPageState extends State<BackupPage> {
                                     try {
                                       await _runWithImportingOverlay(
                                         context,
-                                        () => vm.restoreFromItem(
+                                        (handle) => vm.restoreFromItem(
                                           item,
                                           mode: mode,
+                                          onProgress: handle.report,
+                                          cancelToken: handle.cancelToken,
                                         ),
                                       );
                                     } catch (e) {
+                                      if (e is BackupCancelledException) return;
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -729,21 +752,28 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final reminderProvider = context
                                   .read<BackupReminderProvider>();
-                              final success = await _runWithExportingOverlay(
+                              final success = await runBackupTask(
                                 context,
-                                () => vm.backup(),
+                                title: l10n.backupPageBackupNow,
+                                task: (handle) async {
+                                  final ok = await vm.backup(
+                                    onProgress: handle.report,
+                                    cancelToken: handle.cancelToken,
+                                  );
+                                  if (!ok) {
+                                    throw Exception(
+                                      vm.message ?? 'Backup failed',
+                                    );
+                                  }
+                                },
                               );
+                              if (!success || !context.mounted) return;
+                              await reminderProvider.recordBackupCompleted();
                               if (!context.mounted) return;
-                              final rawMessage = vm.message;
-                              if (success) {
-                                await reminderProvider.recordBackupCompleted();
-                                if (!context.mounted) return;
-                              }
-                              final message =
-                                  rawMessage ?? l10n.backupPageBackupUploaded;
                               showAppSnackBar(
                                 context,
-                                message: message,
+                                message:
+                                    vm.message ?? l10n.backupPageBackupUploaded,
                                 type: NotificationType.info,
                               );
                             },
@@ -792,10 +822,21 @@ class _BackupPageState extends State<BackupPage> {
                       onTap: s3Vm.busy
                           ? null
                           : () async {
-                              final list = await _runWithImportingOverlay(
-                                context,
-                                () => s3Vm.listRemote(),
-                              );
+                              final List<BackupFileItem> list;
+                              try {
+                                list = await _runWithImportingOverlay(
+                                  context,
+                                  (handle) => s3Vm.listRemote(
+                                    onProgress: handle.report,
+                                    cancelToken: handle.cancelToken,
+                                  ),
+                                );
+                              } on BackupCancelledException {
+                                return;
+                              } catch (_) {
+                                return;
+                              }
+                              if (!mounted) return;
                               list.sort((a, b) {
                                 if (a.lastModified != null &&
                                     b.lastModified != null) {
@@ -1018,12 +1059,17 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                () => s3Vm.restoreFromItem(
+                                                (handle) => s3Vm.restoreFromItem(
                                                   item,
                                                   mode: mode,
+                                                  onProgress: handle.report,
+                                                  cancelToken: handle.cancelToken,
                                                 ),
                                               );
                                             } catch (e) {
+                                              if (e is BackupCancelledException) {
+                                                return;
+                                              }
                                               if (!context.mounted) return;
                                               showAppSnackBar(
                                                 context,
@@ -1058,13 +1104,7 @@ class _BackupPageState extends State<BackupPage> {
                                         ),
                                       );
                                     } catch (e) {
-                                      if (context.mounted &&
-                                          Navigator.canPop(context)) {
-                                        Navigator.of(
-                                          context,
-                                          rootNavigator: true,
-                                        ).pop();
-                                      }
+                                      if (e is BackupCancelledException) return;
                                       if (context.mounted) {
                                         showAppSnackBar(
                                           context,
@@ -1087,12 +1127,15 @@ class _BackupPageState extends State<BackupPage> {
                                     try {
                                       await _runWithImportingOverlay(
                                         context,
-                                        () => s3Vm.restoreFromItem(
+                                        (handle) => s3Vm.restoreFromItem(
                                           item,
                                           mode: mode,
+                                          onProgress: handle.report,
+                                          cancelToken: handle.cancelToken,
                                         ),
                                       );
                                     } catch (e) {
+                                      if (e is BackupCancelledException) return;
                                       if (!context.mounted) return;
                                       showAppSnackBar(
                                         context,
@@ -1134,21 +1177,29 @@ class _BackupPageState extends State<BackupPage> {
                           : () async {
                               final reminderProvider = context
                                   .read<BackupReminderProvider>();
-                              final success = await _runWithExportingOverlay(
+                              final success = await runBackupTask(
                                 context,
-                                () => s3Vm.backup(),
+                                title: l10n.backupPageBackupNow,
+                                task: (handle) async {
+                                  final ok = await s3Vm.backup(
+                                    onProgress: handle.report,
+                                    cancelToken: handle.cancelToken,
+                                  );
+                                  if (!ok) {
+                                    throw Exception(
+                                      s3Vm.message ?? 'Backup failed',
+                                    );
+                                  }
+                                },
                               );
+                              if (!success || !context.mounted) return;
+                              await reminderProvider.recordBackupCompleted();
                               if (!context.mounted) return;
-                              final rawMessage = s3Vm.message;
-                              if (success) {
-                                await reminderProvider.recordBackupCompleted();
-                                if (!context.mounted) return;
-                              }
-                              final message =
-                                  rawMessage ?? l10n.backupPageBackupUploaded;
                               showAppSnackBar(
                                 context,
-                                message: message,
+                                message:
+                                    s3Vm.message ??
+                                    l10n.backupPageBackupUploaded,
                                 type: NotificationType.info,
                               );
                             },
@@ -1191,185 +1242,139 @@ class _BackupPageState extends State<BackupPage> {
             context,
             icon: Lucide.Box,
             label: l10n.backupPageImportFromCherryStudio,
-            onTap: () async {
-              // 1) Warn user that Cherry import is experimental
-              final acknowledged = await _confirmCherryImport(context);
-              if (acknowledged != true) return;
-
-              if (!context.mounted) return;
-              // Pick Cherry Studio backup (.zip or .bak)
-              final result = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['zip', 'bak'],
-              );
-              final path = result?.files.single.path;
-              if (path == null) return;
-              if (!context.mounted) return;
-
-              final mode = await _chooseImportModeDialog(context);
-              if (mode == null) return;
-              if (!context.mounted) return;
-
-              await _runWithImportingOverlay(context, () async {
-                try {
-                  final cs = context.read<ChatService>();
-                  final file = File(path);
-                  // Defer import to service
-                  final res = await CherryImporter.importFromCherryStudio(
-                    file: file,
-                    mode: mode,
-                    businessRepository: context.read<BusinessRepository>(),
-                    chatService: cs,
-                  );
-                  if (!context.mounted) return;
-                  await showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (dctx) => PopScope(
-                      canPop: false,
-                      child: AlertDialog(
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(
-                          '${l10n.backupPageImportFromCherryStudio}:\n'
-                          ' • Providers: ${res.providers}\n'
-                          ' • Assistants: ${res.assistants}\n'
-                          ' • Conversations: ${res.conversations}\n'
-                          ' • Messages: ${res.messages}\n'
-                          ' • Files: ${res.files}\n\n'
-                          '${l10n.backupPageRestartContent}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              if (await requestAppRestart(
-                                    dctx,
-                                    PlatformUtils.restartApp,
-                                  ) &&
-                                  dctx.mounted) {
-                                Navigator.of(dctx).pop();
-                              }
-                            },
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                } on CherryUnsupportedBackupVersionException catch (e) {
-                  if (!context.mounted) return;
-                  showAppSnackBar(
-                    context,
-                    message: l10n
-                        .backupPageCherryStudioUnsupportedBackupVersion(
-                          '${e.version}',
-                        ),
-                    type: NotificationType.error,
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  showAppSnackBar(
-                    context,
-                    message: e.toString(),
-                    type: NotificationType.error,
-                  );
-                }
-              });
-            },
+            onTap: () => _doImportCherry(context),
           ),
           _iosDivider(context),
           _iosNavRow(
             context,
             icon: Lucide.Box,
             label: l10n.backupPageImportFromChatbox,
-            onTap: () async {
-              // Pick Chatbox exported json or zip
-              final result = await FilePicker.platform.pickFiles(
-                type: FileType.custom,
-                allowedExtensions: ['json', 'zip'],
-              );
-              final path = result?.files.single.path;
-              if (path == null) return;
-              if (!context.mounted) return;
-
-              final mode = await _chooseImportModeDialog(context);
-              if (mode == null) return;
-              if (!context.mounted) return;
-
-              await _runWithImportingOverlay(context, () async {
-                try {
-                  final cs = context.read<ChatService>();
-                  final file = File(path);
-                  final res = await ChatboxImporter.importFromChatbox(
-                    file: file,
-                    mode: mode,
-                    businessRepository: context.read<BusinessRepository>(),
-                    chatService: cs,
-                  );
-                  if (!context.mounted) return;
-                  await showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (dctx) => PopScope(
-                      canPop: false,
-                      child: AlertDialog(
-                        title: Text(l10n.backupPageRestartRequired),
-                        content: Text(
-                          '${l10n.backupPageImportFromChatbox}:\n'
-                          ' • Providers: ${res.providers}\n'
-                          ' • Assistants: ${res.assistants}\n'
-                          ' • Conversations: ${res.conversations}\n'
-                          ' • Messages: ${res.messages}\n\n'
-                          '${l10n.backupPageRestartContent}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () async {
-                              if (await requestAppRestart(
-                                    dctx,
-                                    PlatformUtils.restartApp,
-                                  ) &&
-                                  dctx.mounted) {
-                                Navigator.of(dctx).pop();
-                              }
-                            },
-                            child: Text(l10n.backupPageOK),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                } catch (e) {
-                  if (!context.mounted) return;
-                  showAppSnackBar(
-                    context,
-                    message: e.toString(),
-                    type: NotificationType.error,
-                  );
-                }
-              });
-            },
+            onTap: () => _doImportChatbox(context),
           ),
         ],
       ),
     ];
   }
 
+  Future<void> _doImportCherry(BuildContext context) async {
+    final acknowledged = await _confirmCherryImport(context);
+    if (acknowledged != true) return;
+
+    if (!context.mounted) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['zip', 'bak'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    if (!context.mounted) return;
+
+    final mode = await _chooseImportModeDialog(context);
+    if (mode == null) return;
+    if (!context.mounted) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final cs = context.read<ChatService>();
+    final businessRepository = context.read<BusinessRepository>();
+    CherryImportResult? imported;
+    final ok = await runBackupTask(
+      context,
+      title: l10n.backupPageImportFromCherryStudio,
+      errorMessage: (error) {
+        if (error is CherryUnsupportedBackupVersionException) {
+          return l10n.backupPageCherryStudioUnsupportedBackupVersion(
+            '${error.version}',
+          );
+        }
+        return error.toString();
+      },
+      task: (handle) async {
+        imported = await CherryImporter.importFromCherryStudio(
+          file: File(path),
+          mode: mode,
+          businessRepository: businessRepository,
+          chatService: cs,
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        );
+      },
+    );
+    if (!ok || imported == null || !context.mounted) return;
+    final res = imported!;
+    await showBackupRestartRequiredDialog(
+      context,
+      details:
+          '${l10n.backupPageImportFromCherryStudio}:\n'
+          ' • Providers: ${res.providers}\n'
+          ' • Assistants: ${res.assistants}\n'
+          ' • Conversations: ${res.conversations}\n'
+          ' • Messages: ${res.messages}\n'
+          ' • Files: ${res.files}',
+    );
+  }
+
+  Future<void> _doImportChatbox(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json', 'zip'],
+    );
+    final path = result?.files.single.path;
+    if (path == null) return;
+    if (!context.mounted) return;
+
+    final mode = await _chooseImportModeDialog(context);
+    if (mode == null) return;
+    if (!context.mounted) return;
+
+    final l10n = AppLocalizations.of(context)!;
+    final cs = context.read<ChatService>();
+    final businessRepository = context.read<BusinessRepository>();
+    ChatboxImportResult? imported;
+    final ok = await runBackupTask(
+      context,
+      title: l10n.backupPageImportFromChatbox,
+      task: (handle) async {
+        imported = await ChatboxImporter.importFromChatbox(
+          file: File(path),
+          mode: mode,
+          businessRepository: businessRepository,
+          chatService: cs,
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        );
+      },
+    );
+    if (!ok || imported == null || !context.mounted) return;
+    final res = imported!;
+    await showBackupRestartRequiredDialog(
+      context,
+      details:
+          '${l10n.backupPageImportFromChatbox}:\n'
+          ' • Providers: ${res.providers}\n'
+          ' • Assistants: ${res.assistants}\n'
+          ' • Conversations: ${res.conversations}\n'
+          ' • Messages: ${res.messages}',
+    );
+  }
+
   Future<void> _doExport(BuildContext context, BackupProvider vm) async {
     final l10n = AppLocalizations.of(context)!;
-    final File file;
-    try {
-      file = await _runWithExportingOverlay(context, () => vm.exportToFile());
-    } catch (error) {
-      if (!context.mounted) return;
-      showAppSnackBar(
-        context,
-        message: l10n.backupPageExportFailedMessage(
-          backupRestoreErrorMessage(l10n, error),
-        ),
-        type: NotificationType.error,
-      );
-      return;
-    }
+    File? file;
+    final ok = await runBackupTask(
+      context,
+      title: l10n.backupPageExportToFile,
+      errorMessage: (error) => l10n.backupPageExportFailedMessage(
+        backupRestoreErrorMessage(l10n, error),
+      ),
+      task: (handle) async {
+        file = await vm.exportToFile(
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        );
+      },
+    );
+    if (!ok || file == null) return;
+    final exported = file!;
 
     try {
       if (!context.mounted) return;
@@ -1377,8 +1382,8 @@ class _BackupPageState extends State<BackupPage> {
       if (isMobile) {
         try {
           final saved = await NativeFileSave.saveFileFromPath(
-            sourcePath: file.path,
-            fileName: file.uri.pathSegments.last,
+            sourcePath: exported.path,
+            fileName: exported.uri.pathSegments.last,
           );
           if (saved && context.mounted) {
             await context
@@ -1396,14 +1401,14 @@ class _BackupPageState extends State<BackupPage> {
       } else {
         final savePath = await FilePicker.platform.saveFile(
           dialogTitle: l10n.backupPageExportToFile,
-          fileName: file.uri.pathSegments.last,
+          fileName: exported.uri.pathSegments.last,
           type: FileType.custom,
           allowedExtensions: ['zip'],
         );
         if (savePath != null) {
           try {
             await File(savePath).parent.create(recursive: true);
-            await file.copy(savePath);
+            await exported.copy(savePath);
             if (context.mounted) {
               await context
                   .read<BackupReminderProvider>()
@@ -1443,9 +1448,15 @@ class _BackupPageState extends State<BackupPage> {
     try {
       await _runWithImportingOverlay(
         context,
-        () => vm.restoreFromLocalFile(File(path), mode: mode),
+        (handle) => vm.restoreFromLocalFile(
+          File(path),
+          mode: mode,
+          onProgress: handle.report,
+          cancelToken: handle.cancelToken,
+        ),
       );
     } catch (error) {
+      if (error is BackupCancelledException) return;
       if (!context.mounted) return;
       showAppSnackBar(
         context,

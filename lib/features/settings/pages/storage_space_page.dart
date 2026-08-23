@@ -156,6 +156,12 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
         return l10n.storageSpaceSubChatSharedMemory;
       case 'completed_restore_runs':
         return l10n.storageSpaceSubCompletedRestoreRuns;
+      case 'fonts':
+        return l10n.storageSpaceCategoryFonts;
+      case 'local_models':
+        return l10n.storageSpaceCategoryLocalModels;
+      case 'app':
+        return l10n.storageSpaceSubOtherApp;
       case 'avatars':
         return l10n.storageSpaceSubAssistantAvatars;
       case 'images':
@@ -1285,6 +1291,7 @@ class _CategoryDetail extends StatelessWidget {
         l10n.storageSpaceLegacyChatDataHint,
       StorageUsageCategoryKey.restoreTraces =>
         l10n.storageSpaceRestoreTracesHint,
+      StorageUsageCategoryKey.other => l10n.storageSpaceOtherHint,
       _ =>
         safeToClear
             ? l10n.storageSpaceSafeToClearHint

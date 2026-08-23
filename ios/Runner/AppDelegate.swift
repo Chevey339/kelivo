@@ -942,6 +942,13 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
        event.endDate = endDate
      }
  
+     // Reminders are minutes before the event start; EKAlarm takes a negative
+     // offset in seconds relative to the start date.
+     let reminderMinutes = Self.reminderMinutesArg(args["reminders"])
+     for minutes in reminderMinutes {
+       event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-minutes * 60)))
+     }
+ 
      do {
        try eventStore.save(event, span: .thisEvent, commit: true)
      } catch {
@@ -954,6 +961,7 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
        "title": title,
        "all_day": allDay,
        "location": event.location ?? "",
+       "reminders": reminderMinutes,
      ]
      if allDay {
        payload["start"] = Self.formatDateOnly(allDayStart, calendar: calendar)
@@ -983,6 +991,49 @@ private final class NativeFileSaveHandler: NSObject, UIDocumentPickerDelegate {
      if let number = value as? Double { return Int(number) }
      if let text = value as? String { return Int(text.trimmingCharacters(in: .whitespaces)) }
      return nil
+   }
+ 
+   /// Reminder offsets in minutes before the event start. Accepts a JSON array,
+   /// or a single number/string for convenience. Negative values (models
+   /// sometimes send "-10" for "10 minutes before") are folded to positive;
+   /// duplicates are dropped and at most 5 are kept, matching EventKit's
+   /// practical limit for well-behaved events.
+   private static func reminderMinutesArg(_ value: Any?) -> [Int] {
+     let raw: [Any]
+     if let list = value as? [Any] {
+       raw = list
+     } else if let value, !(value is NSNull) {
+       raw = [value]
+     } else {
+       return []
+     }
+     var seen = Set<Int>()
+     var minutes: [Int] = []
+     for item in raw {
+       guard let normalized = clampedMinutes(item) else { continue }
+       if seen.insert(normalized).inserted {
+         minutes.append(normalized)
+       }
+       if minutes.count == 5 { break }
+     }
+     return minutes
+   }
+ 
+   /// Clamps one reminder offset into 0...40320 minutes (4 weeks). Parsed as a
+   /// Double throughout: an out-of-range or Int.min value would trap on the
+   /// Int conversion, and these values come straight from model output.
+   private static func clampedMinutes(_ value: Any?) -> Int? {
+     let raw: Double
+     if let number = value as? NSNumber {
+       raw = number.doubleValue
+     } else if let text = (value as? String)?.trimmingCharacters(in: .whitespaces),
+               let parsed = Double(text) {
+       raw = parsed
+     } else {
+       return nil
+     }
+     guard raw.isFinite else { return nil }
+     return Int(min(abs(raw), 40320))
    }
  
    private static func boolArg(_ value: Any?) -> Bool? {

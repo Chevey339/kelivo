@@ -7,7 +7,11 @@ import 'package:archive/archive.dart';
 /// live data in SQLite (v7+) rather than Local Storage / IndexedDB.
 class CherryUnsupportedBackupVersionException implements Exception {
   final int version;
-  const CherryUnsupportedBackupVersionException(this.version);
+  final int debugZipJsonProbeDecodeCount;
+  const CherryUnsupportedBackupVersionException(
+    this.version, {
+    this.debugZipJsonProbeDecodeCount = 0,
+  });
 
   @override
   String toString() =>

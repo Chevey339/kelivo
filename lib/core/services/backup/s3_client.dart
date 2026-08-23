@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
 import '../../models/backup.dart';
+import 'backup_cancel_token.dart';
+import 'backup_task_progress.dart';
 
 class S3BackupClient {
   const S3BackupClient();
@@ -245,6 +247,7 @@ class S3BackupClient {
     required Uri uri,
     Map<String, String>? headers,
     List<int>? bodyBytes,
+    BackupCancelToken? cancelToken,
   }) async {
     final now = DateTime.now().toUtc();
     final amzDate = _amzDate(now);
@@ -302,14 +305,28 @@ class S3BackupClient {
     }
 
     final client = http.Client();
+    StreamSubscription<void>? cancelSub;
     try {
+      cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+        client.close();
+      });
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       final streamed = await client.send(req);
       // IMPORTANT: we must fully read the response stream before closing the
       // underlying client; otherwise the socket can be closed mid-body which
       // surfaces as `ClientException: Connection closed while receiving data`.
       final res = await http.Response.fromStream(streamed);
       return res;
+    } catch (error) {
+      if (error is BackupCancelledException ||
+          cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
+      rethrow;
     } finally {
+      await cancelSub?.cancel();
       client.close();
     }
   }
@@ -317,12 +334,14 @@ class S3BackupClient {
   /// Like [_sendSigned] but streams a [File] as the request body instead of
   /// buffering all bytes in memory.  Uses `UNSIGNED-PAYLOAD` so we don't need
   /// to hash the entire file content for the SigV4 signature.
-  static Future<http.StreamedResponse> _sendSignedStreamedFile(
+  static Future<http.Response> _sendSignedStreamedFile(
     S3Config cfg, {
     required String method,
     required Uri uri,
     required File bodyFile,
     Map<String, String>? headers,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     final now = DateTime.now().toUtc();
     final amzDate = _amzDate(now);
@@ -383,7 +402,15 @@ class S3BackupClient {
     // whole zip in RAM (which OOM-killed large mobile uploads).
     unawaited(
       req.sink
-          .addStream(bodyFile.openRead())
+          .addStream(
+            _watchedByteStream(
+              bodyFile.openRead(),
+              phase: BackupPhase.uploading,
+              total: fileLen,
+              onProgress: onProgress,
+              cancelToken: cancelToken,
+            ),
+          )
           .then(
             (_) => req.sink.close(),
             onError: (Object error) {
@@ -394,20 +421,35 @@ class S3BackupClient {
     );
 
     final client = http.Client();
+    StreamSubscription<void>? cancelSub;
     try {
-      return await client.send(req);
+      cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+        client.close();
+      });
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
+      final streamed = await client.send(req);
+      return await http.Response.fromStream(streamed);
     } catch (e) {
-      client.close();
+      if (e is BackupCancelledException ||
+          cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       rethrow;
+    } finally {
+      await cancelSub?.cancel();
+      client.close();
     }
-    // NOTE: caller is responsible for reading the response body and closing
-    // the client (by draining the stream).
   }
 
   static Future<void> _sendSignedDownloadToFile(
     S3Config cfg, {
     required Uri uri,
     required File destination,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+    int? expectedSize,
   }) async {
     final now = DateTime.now().toUtc();
     final amzDate = _amzDate(now);
@@ -460,16 +502,42 @@ class S3BackupClient {
     req.headers.addAll({...reqHeaders, 'Authorization': auth});
 
     final client = http.Client();
+    StreamSubscription<void>? cancelSub;
     try {
+      cancelSub = cancelToken?.whenCancelled.asStream().listen((_) {
+        client.close();
+      });
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       final streamed = await client.send(req);
       if (streamed.statusCode != 200) {
         final res = await http.Response.fromStream(streamed);
         throw Exception('S3 download failed: ${_extractErrorMessage(res)}');
       }
       await destination.parent.create(recursive: true);
+      final knownLength = (expectedSize != null && expectedSize > 0)
+          ? expectedSize
+          : streamed.contentLength;
       final sink = destination.openWrite();
-      await streamed.stream.pipe(sink);
+      await _watchedByteStream(
+        streamed.stream,
+        phase: BackupPhase.downloading,
+        total: (knownLength != null && knownLength > 0) ? knownLength : null,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      ).pipe(sink);
+    } catch (error) {
+      try {
+        if (await destination.exists()) await destination.delete();
+      } catch (_) {}
+      if (error is BackupCancelledException ||
+          cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
+      rethrow;
     } finally {
+      await cancelSub?.cancel();
       client.close();
     }
   }
@@ -519,6 +587,7 @@ class S3BackupClient {
   static Future<http.Response> _sendSignedBucketListRequest(
     S3Config cfg, {
     required Map<String, String> query,
+    BackupCancelToken? cancelToken,
   }) async {
     final primary = _buildBucketUri(cfg, query: query);
     final candidates = <Uri>[primary, _withTrailingSlash(primary)];
@@ -532,6 +601,7 @@ class S3BackupClient {
         method: 'GET',
         uri: uri,
         headers: {'accept': 'application/xml'},
+        cancelToken: cancelToken,
       );
       if (res.statusCode == 200) return res;
       firstFailure ??= res;
@@ -543,12 +613,16 @@ class S3BackupClient {
     return firstFailure!;
   }
 
-  Future<List<BackupFileItem>?> _readManifest(S3Config cfg) async {
+  Future<List<BackupFileItem>?> _readManifest(
+    S3Config cfg, {
+    BackupCancelToken? cancelToken,
+  }) async {
     final res = await _sendSigned(
       cfg,
       method: 'GET',
       uri: _buildObjectUri(cfg, _manifestKey(cfg)),
       headers: {'accept': 'application/json'},
+      cancelToken: cancelToken,
     );
     if (_isMissingObjectResponse(res)) return null;
     if (res.statusCode != 200) {
@@ -581,7 +655,11 @@ class S3BackupClient {
     return items;
   }
 
-  Future<void> _writeManifest(S3Config cfg, List<BackupFileItem> items) async {
+  Future<void> _writeManifest(
+    S3Config cfg,
+    List<BackupFileItem> items, {
+    BackupCancelToken? cancelToken,
+  }) async {
     final encoded = utf8.encode(
       jsonEncode({
         'version': 1,
@@ -603,7 +681,11 @@ class S3BackupClient {
       uri: _buildObjectUri(cfg, _manifestKey(cfg)),
       headers: {'content-type': 'application/json'},
       bodyBytes: encoded,
+      cancelToken: cancelToken,
     );
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw Exception('S3 manifest write failed: ${_extractErrorMessage(res)}');
     }
@@ -641,12 +723,18 @@ class S3BackupClient {
     await _writeManifest(cfg, next);
   }
 
-  Future<List<BackupFileItem>> _listBucketObjects(S3Config cfg) async {
+  Future<List<BackupFileItem>> _listBucketObjects(
+    S3Config cfg, {
+    BackupCancelToken? cancelToken,
+  }) async {
     final prefix = _normalizePrefix(cfg.prefix);
     final items = <BackupFileItem>[];
     String? continuationToken;
 
     do {
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       final res = await _sendSignedBucketListRequest(
         cfg,
         query: {
@@ -656,6 +744,7 @@ class S3BackupClient {
           if (continuationToken != null)
             'continuation-token': continuationToken,
         },
+        cancelToken: cancelToken,
       );
       if (res.statusCode != 200) {
         throw Exception('S3 list failed: ${_extractErrorMessage(res)}');
@@ -779,12 +868,19 @@ class S3BackupClient {
     required bool manifestExists,
     required List<BackupFileItem> currentManifestItems,
     required List<BackupFileItem> reconciledItems,
+    BackupCancelToken? cancelToken,
   }) async {
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
     if (!manifestExists ||
         _sameBackupItems(currentManifestItems, reconciledItems)) {
       return;
     }
-    await _writeManifest(cfg, reconciledItems);
+    await _writeManifest(cfg, reconciledItems, cancelToken: cancelToken);
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
   }
 
   static void _validateConfigBasics(S3Config cfg) {
@@ -857,25 +953,58 @@ class S3BackupClient {
     S3Config cfg, {
     required String key,
     required File file,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     _validateConfigBasics(cfg);
     final uri = _buildObjectUri(cfg, key);
-    final streamed = await _sendSignedStreamedFile(
-      cfg,
-      method: 'PUT',
-      uri: uri,
-      bodyFile: file,
-      headers: {'content-type': 'application/zip'},
-    );
-    // Fully consume the response so the underlying connection can be released.
-    final res = await http.Response.fromStream(streamed);
-    if (res.statusCode < 200 || res.statusCode >= 300) {
-      throw Exception('S3 upload failed: ${_extractErrorMessage(res)}');
+    final size = await file.length();
+    try {
+      final res = await _sendSignedStreamedFile(
+        cfg,
+        method: 'PUT',
+        uri: uri,
+        bodyFile: file,
+        headers: {'content-type': 'application/zip'},
+        onProgress: onProgress,
+        cancelToken: cancelToken,
+      );
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        throw Exception('S3 upload failed: ${_extractErrorMessage(res)}');
+      }
+    } catch (error) {
+      if (error is BackupCancelledException ||
+          cancelToken?.isCancelled == true) {
+        try {
+          await deleteObject(cfg, key: key);
+        } catch (_) {}
+        throw const BackupCancelledException();
+      }
+      rethrow;
     }
+    if (cancelToken?.isCancelled == true) {
+      try {
+        await deleteObject(cfg, key: key);
+      } catch (_) {}
+      throw const BackupCancelledException();
+    }
+    cancelToken?.setCancellable(false);
+    onProgress?.call(
+      BackupProgress(
+        phase: BackupPhase.uploading,
+        processed: size,
+        total: size,
+        unit: BackupProgressUnit.bytes,
+        cancellable: false,
+      ),
+    );
     await _upsertManifestItem(
       cfg,
       key: key,
-      size: await file.length(),
+      size: size,
       lastModified: DateTime.now().toUtc(),
     );
   }
@@ -886,10 +1015,20 @@ class S3BackupClient {
     S3Config cfg, {
     required String key,
     required File destination,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+    int? expectedSize,
   }) async {
     _validateConfigBasics(cfg);
     final uri = _buildObjectUri(cfg, key);
-    await _sendSignedDownloadToFile(cfg, uri: uri, destination: destination);
+    await _sendSignedDownloadToFile(
+      cfg,
+      uri: uri,
+      destination: destination,
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+      expectedSize: expectedSize,
+    );
   }
 
   Future<void> deleteObject(S3Config cfg, {required String key}) async {
@@ -902,18 +1041,32 @@ class S3BackupClient {
     await _removeManifestItem(cfg, key: key);
   }
 
-  Future<List<BackupFileItem>> listObjects(S3Config cfg) async {
+  Future<List<BackupFileItem>> listObjects(
+    S3Config cfg, {
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
+  }) async {
     _validateConfigBasics(cfg);
+    onProgress?.call(
+      const BackupProgress(
+        phase: BackupPhase.listingRemote,
+        processed: 0,
+        cancellable: true,
+      ),
+    );
     List<BackupFileItem> manifestItems = const [];
     var manifestExists = false;
     Object? manifestError;
     try {
-      final manifest = await _readManifest(cfg);
+      final manifest = await _readManifest(cfg, cancelToken: cancelToken);
       if (manifest != null) {
         manifestItems = manifest;
         manifestExists = true;
       }
     } catch (e) {
+      if (e is BackupCancelledException || cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       manifestError = e;
     }
 
@@ -921,9 +1074,12 @@ class S3BackupClient {
     Object? bucketError;
     var bucketListSucceeded = false;
     try {
-      bucketItems = await _listBucketObjects(cfg);
+      bucketItems = await _listBucketObjects(cfg, cancelToken: cancelToken);
       bucketListSucceeded = true;
     } catch (e) {
+      if (e is BackupCancelledException || cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       bucketError = e;
     }
 
@@ -932,12 +1088,16 @@ class S3BackupClient {
       bucketItems,
       bucketIsAuthoritative: bucketListSucceeded,
     );
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
     if (bucketListSucceeded) {
       await _writeManifestIfChanged(
         cfg,
         manifestExists: manifestExists,
         currentManifestItems: manifestItems,
         reconciledItems: merged,
+        cancelToken: cancelToken,
       );
       if (merged.isNotEmpty || manifestError == null) return merged;
       throw manifestError;
@@ -946,5 +1106,40 @@ class S3BackupClient {
     if (manifestError != null) throw manifestError;
     if (bucketError != null) throw bucketError;
     return const [];
+  }
+}
+
+Stream<List<int>> _watchedByteStream(
+  Stream<List<int>> source, {
+  required BackupPhase phase,
+  required int? total,
+  BackupProgressSink? onProgress,
+  BackupCancelToken? cancelToken,
+}) async* {
+  var processed = 0;
+  onProgress?.call(
+    BackupProgress(
+      phase: phase,
+      processed: 0,
+      total: total,
+      unit: total == null ? BackupProgressUnit.none : BackupProgressUnit.bytes,
+      cancellable: true,
+    ),
+  );
+  await for (final chunk in source) {
+    if (cancelToken?.isCancelled == true) {
+      throw const BackupCancelledException();
+    }
+    processed += chunk.length;
+    onProgress?.call(
+      BackupProgress(
+        phase: phase,
+        processed: processed,
+        total: total,
+        unit: BackupProgressUnit.bytes,
+        cancellable: true,
+      ),
+    );
+    yield chunk;
   }
 }

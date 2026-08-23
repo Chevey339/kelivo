@@ -195,18 +195,63 @@ void main() {
       expect(requestBody['reasoning'], {'effort': 'none'});
     });
 
-    test(
-      'xhigh reasoning keeps thinking enabled and passes xhigh effort',
-      () async {
-        final requests = <Map<String, dynamic>>[];
+    test('Responses max reasoning sends official max effort', () async {
+      late Map<String, dynamic> requestBody;
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
 
+      server.listen((request) async {
+        requestBody = await _readJsonBody(request);
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'id': 'resp-deepseek',
+            'object': 'response',
+            'status': 'completed',
+            'output_text': 'ok',
+            'output': const [],
+            'usage': {
+              'input_tokens': 1,
+              'input_tokens_details': {'cached_tokens': 0},
+              'output_tokens': 1,
+              'output_tokens_details': {'reasoning_tokens': 0},
+              'total_tokens': 2,
+            },
+          }),
+        );
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _deepSeekConfig(
+          'http://${server.address.address}:${server.port}/v1',
+          useResponseApi: true,
+        ),
+        modelId: 'deepseek-v4-flash-vision-exp',
+        messages: const [
+          {'role': 'user', 'content': 'hello'},
+        ],
+        thinkingBudget: 128000,
+        stream: false,
+      ).toList();
+
+      expect(chunks.isGenerationDone, isTrue);
+      expect((requestBody['reasoning'] as Map)['effort'], 'max');
+    });
+
+    test('maps official thinking efforts and keeps thinking enabled', () async {
+      Future<Map<String, dynamic>> capture(int budget) async {
+        late Map<String, dynamic> requestBody;
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() async {
           await server.close(force: true);
         });
 
         server.listen((request) async {
-          requests.add(await _readJsonBody(request));
+          requestBody = await _readJsonBody(request);
           request.response.statusCode = HttpStatus.ok;
           request.response.headers.contentType = ContentType(
             'text',
@@ -232,22 +277,34 @@ void main() {
           await request.response.close();
         });
 
-        final baseUrl = 'http://${server.address.address}:${server.port}/v1';
         final chunks = await ChatApiService.sendMessageStream(
-          config: _deepSeekConfig(baseUrl),
+          config: _deepSeekConfig(
+            'http://${server.address.address}:${server.port}/v1',
+          ),
           modelId: 'deepseek-v4-pro',
           messages: const [
             {'role': 'user', 'content': 'hello'},
           ],
-          thinkingBudget: 64000,
+          thinkingBudget: budget,
         ).toList();
-
         expect(chunks.isGenerationDone, isTrue);
-        expect(requests, hasLength(1));
-        expect(requests.single['thinking'], {'type': 'enabled'});
-        expect(requests.single['reasoning_effort'], 'xhigh');
-      },
-    );
+        return requestBody;
+      }
+
+      final low = await capture(2000);
+      final medium = await capture(16000);
+      final xhigh = await capture(64000);
+      final max = await capture(128000);
+
+      expect(low['thinking'], {'type': 'enabled'});
+      expect(low['reasoning_effort'], 'low');
+      expect(medium['thinking'], {'type': 'enabled'});
+      expect(medium['reasoning_effort'], 'high');
+      expect(xhigh['thinking'], {'type': 'enabled'});
+      expect(xhigh['reasoning_effort'], 'high');
+      expect(max['thinking'], {'type': 'enabled'});
+      expect(max['reasoning_effort'], 'max');
+    });
 
     test('off reasoning disables thinking and strips effort', () async {
       final requests = <Map<String, dynamic>>[];

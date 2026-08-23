@@ -358,6 +358,8 @@ class ChatDatabaseRepository {
   static Future<ChatDatabaseSnapshotInfo> createConsistentSnapshot({
     required File sourceFile,
     required File destinationFile,
+    void Function(int handleAddress)? registerSourceHandle,
+    Future<void> Function()? waitForSourceCloseAck,
   }) async {
     final sourcePath = sourceFile.absolute.path;
     final destinationPath = destinationFile.absolute.path;
@@ -376,38 +378,28 @@ class ChatDatabaseRepository {
     await _deleteDatabaseFamily(destinationFile);
 
     try {
-      late final ChatDatabaseSnapshotInfo initialInfo;
       final source = sqlite.sqlite3.open(sourcePath);
       try {
-        source.execute('PRAGMA query_only = ON;');
-        final destination = sqlite.sqlite3.open(destinationPath);
-        try {
-          final pageSizeRows = source.select('PRAGMA page_size;');
-          final pageSize = pageSizeRows.first.values.first as int;
-          final pagesPerStep = (8 * 1024 * 1024 ~/ pageSize).clamp(1, 1 << 20);
-          await source.backup(destination, nPage: pagesPerStep).drain<void>();
-          initialInfo = _validateRawSnapshot(destination);
-          destination.execute('PRAGMA wal_checkpoint(TRUNCATE);');
-          destination.select('PRAGMA journal_mode = DELETE;');
-        } finally {
-          destination.close();
-        }
+        source.execute('PRAGMA busy_timeout = 30000;');
+        registerSourceHandle?.call(source.handle.address);
+        // VACUUM INTO does not write the source. query_only is omitted because
+        // SQLite rejects VACUUM INTO while query_only is ON.
+        // Parent timeout/cancel calls sqlite3_interrupt on [source.handle]
+        // before isolate.kill so a stuck step can return and release WAL.
+        source.execute('VACUUM INTO ?', [destinationPath]);
       } finally {
+        if (waitForSourceCloseAck != null) {
+          await waitForSourceCloseAck();
+        }
         source.close();
       }
 
-      await _deleteDatabaseSidecars(destinationFile);
-      final reopened = sqlite.sqlite3.open(destinationPath);
+      final snapshot = sqlite.sqlite3.open(destinationPath);
       try {
-        final reopenedInfo = _validateRawSnapshot(reopened);
-        if (reopenedInfo != initialInfo) {
-          throw StateError('snapshot_reopen_mismatch');
-        }
+        return _validateRawSnapshot(snapshot);
       } finally {
-        reopened.close();
+        snapshot.close();
       }
-      await _deleteDatabaseSidecars(destinationFile);
-      return initialInfo;
     } catch (_) {
       await _deleteDatabaseFamily(destinationFile);
       rethrow;
@@ -2115,9 +2107,9 @@ class ChatDatabaseRepository {
               SELECT CASE
                 WHEN ? AND target.role = 'user' THEN COALESCE(
                   (
-                    SELECT MIN(candidate.logical_index)
+                    SELECT candidate.logical_index
                     FROM ordered candidate
-                    WHERE candidate.logical_index > selected.logical_index
+                    WHERE candidate.logical_index = selected.logical_index + 1
                       AND candidate.role = 'assistant'
                   ),
                   selected.logical_index
@@ -4197,6 +4189,7 @@ class ChatDatabaseRepository {
           message: assistantMessage,
           selectVersion: false,
           touchUpdatedAt: true,
+          afterGroupId: anchorGroupId,
         );
         final run = await GenerationRunCommands(_db).create(
           id: runId,
@@ -4277,6 +4270,7 @@ class ChatDatabaseRepository {
     required ChatMessage message,
     required bool selectVersion,
     required bool touchUpdatedAt,
+    String? afterGroupId,
   }) {
     if (message.conversationId != conversation.id) {
       throw ArgumentError.value(
@@ -4307,7 +4301,9 @@ class ChatDatabaseRepository {
         await _replaceMcpServers(persisted.id, persisted.mcpServerIds);
       }
 
-      final order = await _nextMessageOrder(persisted.id);
+      final order = afterGroupId == null
+          ? await _nextMessageOrder(persisted.id)
+          : await _makeMessageOrderAfterGroup(persisted.id, afterGroupId);
       await _db
           .into(_db.messageRows)
           .insert(_messageCompanion(message, order), mode: InsertMode.insert);
@@ -4418,24 +4414,29 @@ class ChatDatabaseRepository {
       // Content-only append must load original parts first and keep non-text
       // attachments (ImagePart/FilePart/etc.) on the new revision, preserving
       // ordinal ([Image, Text] stays [Image, Text(new)], not [Text(new), Image]).
-      final List<MessagePart> resolvedParts;
-      if (parts != null) {
-        resolvedParts = parts;
-      } else {
-        final original = await _messageFromRowWithParts(originalRow);
-        resolvedParts = ChatMessage.partsWithRedistributedText(
-          original.parts,
-          content,
-        );
-      }
+      // Assistant body-only edits also inherit reasoning metadata so the
+      // collapsed card stays toggleable on the new version.
+      final original = await _messageFromRowWithParts(originalRow);
+      final preserveReasoning =
+          parts == null && original.role == 'assistant';
+      final resolvedParts = parts ??
+          ChatMessage.partsWithRedistributedText(original.parts, content);
       final message = ChatMessage(
-        role: originalRow.role,
+        role: original.role,
         parts: resolvedParts,
-        conversationId: originalRow.conversationId,
-        modelId: originalRow.modelId,
-        providerId: originalRow.providerId,
+        conversationId: original.conversationId,
+        modelId: original.modelId,
+        providerId: original.providerId,
         totalTokens: null,
         isStreaming: false,
+        reasoningText: preserveReasoning ? original.reasoningText : null,
+        reasoningStartAt: preserveReasoning ? original.reasoningStartAt : null,
+        reasoningFinishedAt: preserveReasoning
+            ? original.reasoningFinishedAt
+            : null,
+        reasoningSegmentsJson: preserveReasoning
+            ? original.reasoningSegmentsJson
+            : null,
         groupId: groupId,
         version: nextVersion,
       );
@@ -6079,6 +6080,73 @@ class ChatDatabaseRepository {
               ..where(_db.messageRows.conversationId.equals(conversationId)))
             .getSingle();
     return (row.read(maxOrder) ?? -1) + 1;
+  }
+
+  Future<int> _makeMessageOrderAfterGroup(
+    String conversationId,
+    String groupId,
+  ) async {
+    final minOrder = _db.messageRows.messageOrder.min();
+    final anchorRow =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([minOrder])
+              ..where(
+                _db.messageRows.conversationId.equals(conversationId) &
+                    (_db.messageRows.id.equals(groupId) |
+                        _db.messageRows.groupId.equals(groupId)),
+              ))
+            .getSingle();
+    final anchorOrder = anchorRow.read(minOrder);
+    if (anchorOrder == null) {
+      throw StateError('linear_message_group_missing');
+    }
+
+    final insertionOrder = anchorOrder + 1;
+    final occupied =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([_db.messageRows.id])
+              ..where(
+                _db.messageRows.conversationId.equals(conversationId) &
+                    _db.messageRows.messageOrder.equals(insertionOrder),
+              ))
+            .getSingleOrNull();
+    if (occupied == null) {
+      return insertionOrder;
+    }
+
+    final maxOrder = _db.messageRows.messageOrder.max();
+    final maxRow =
+        await (_db.selectOnly(_db.messageRows)
+              ..addColumns([maxOrder])
+              ..where(_db.messageRows.conversationId.equals(conversationId)))
+            .getSingle();
+    final currentMaxOrder = maxRow.read(maxOrder)!;
+    final temporaryOffset = currentMaxOrder + 1;
+
+    // A direct +1 update can violate the immediate unique constraint depending
+    // on row update order. Move the suffix above the current range first, then
+    // place it at its final orders with two set-based updates.
+    await _db.customUpdate(
+      'UPDATE message_rows SET message_order = message_order + ? '
+      'WHERE conversation_id = ? AND message_order > ?;',
+      variables: [
+        Variable.withInt(temporaryOffset),
+        Variable.withString(conversationId),
+        Variable.withInt(anchorOrder),
+      ],
+      updates: {_db.messageRows},
+    );
+    await _db.customUpdate(
+      'UPDATE message_rows SET message_order = message_order - ? + 1 '
+      'WHERE conversation_id = ? AND message_order > ?;',
+      variables: [
+        Variable.withInt(temporaryOffset),
+        Variable.withString(conversationId),
+        Variable.withInt(currentMaxOrder),
+      ],
+      updates: {_db.messageRows},
+    );
+    return insertionOrder;
   }
 
   Future<void> _replaceMcpServers(

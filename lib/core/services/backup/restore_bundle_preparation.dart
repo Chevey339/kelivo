@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'backup_cancel_token.dart';
+import 'backup_task_progress.dart';
 import 'restore_bundle_staging.dart';
 import 'restore_receipt.dart';
 
@@ -44,6 +46,9 @@ final class RestoreBundlePreparation {
     required bool restoreChats,
     required bool restoreFiles,
     DateTime? createdAtUtc,
+    Map<String, dynamic>? validatedSettings,
+    BackupProgressSink? onProgress,
+    BackupCancelToken? cancelToken,
   }) async {
     StagedRestoreBundle? staged;
     var publicationStarted = false;
@@ -53,6 +58,16 @@ final class RestoreBundlePreparation {
         throw const FormatException('restore_preparation_database_required');
       }
       final selectedFiles = restoreFiles && bundleIncludesFiles;
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.stagingCandidate,
+          processed: 0,
+          cancellable: true,
+        ),
+      );
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
       staged = await RestoreBundleStaging.create(
         appDataDirectory: appDataDirectory,
         extractedDirectory: extractedDirectory,
@@ -61,6 +76,9 @@ final class RestoreBundlePreparation {
         sourceIncludesChats: bundleIncludesChats,
         sourceIncludesFiles: bundleIncludesFiles,
         sourceManifestSha256: sourceManifestSha256,
+        validatedSettings: validatedSettings,
+        onProgress: onProgress,
+        cancelToken: cancelToken,
       );
       final receipt = RestoreReceipt.prepared(
         runId: staged.runId,
@@ -71,6 +89,17 @@ final class RestoreBundlePreparation {
       final store = RestoreReceiptStore(
         appDataDirectory: appDataDirectory,
         runId: staged.runId,
+      );
+      if (cancelToken?.isCancelled == true) {
+        throw const BackupCancelledException();
+      }
+      cancelToken?.setCancellable(false);
+      onProgress?.call(
+        const BackupProgress(
+          phase: BackupPhase.committing,
+          processed: 0,
+          cancellable: false,
+        ),
       );
       publicationStarted = true;
       await store.publish(receipt);

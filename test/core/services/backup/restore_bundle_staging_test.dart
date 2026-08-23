@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
@@ -9,6 +10,9 @@ import 'package:sqlite3/sqlite3.dart' show SqliteException;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
+import 'package:Kelivo/core/services/backup/backup_isolate_runner.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_staging.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
@@ -570,5 +574,393 @@ void main() {
         );
       },
     );
+
+    test('reuses validated settings without parsing settings.json', () async {
+      final extracted = await _createExtractedBundle(root);
+      final settingsFile = File(p.join(extracted.path, 'settings.json'));
+      await settingsFile.writeAsString('not-json', flush: true);
+      await _rewriteSettingsDescriptor(extracted, settingsFile);
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+        ),
+        throwsA(isA<FormatException>()),
+      );
+
+      final staged = await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+        validatedSettings: const {'theme': 'dark'},
+      );
+      expect(staged.runId, isNotEmpty);
+      expect(
+        await Directory(
+          p.join(root.path, RestoreBundleStaging.workspaceRootName),
+        ).exists(),
+        isTrue,
+      );
+    });
+
+    test(
+      'cancel during staging of a large file does not publish a candidate',
+      () async {
+        final extracted = await _createExtractedBundle(root, includeFiles: true);
+        final blob = File(p.join(extracted.path, 'upload', 'large.bin'));
+        await blob.parent.create(recursive: true);
+        await blob.writeAsBytes(List<int>.filled(4 * 1024 * 1024, 7), flush: true);
+        await _addDeclaredEntry(
+          extracted,
+          name: 'upload/large.bin',
+          file: blob,
+        );
+
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        await expectLater(
+          RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: true,
+            includeFiles: true,
+            sourceManifestSha256: await _manifestSha256(extracted),
+            cancelToken: token,
+            onProgress: (progress) {
+              if (progress.phase == BackupPhase.stagingCandidate &&
+                  progress.processed >= 1) {
+                token.cancel();
+              }
+            },
+          ),
+          throwsA(isA<BackupCancelledException>()),
+        );
+
+        final workspaceRoot = Directory(
+          p.join(root.path, RestoreBundleStaging.workspaceRootName),
+        );
+        expect(
+          await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList(),
+          isEmpty,
+        );
+      },
+    );
+
+    test('UI heartbeat continues during candidate DB validation', () async {
+      final extracted = await _createExtractedBundle(root);
+      RestoreBundleStaging.debugCandidateDbStallMs = 120;
+      addTearDown(() => RestoreBundleStaging.debugCandidateDbStallMs = 0);
+
+      var inDb = false;
+      var beats = 0;
+      final heartbeat = Timer.periodic(const Duration(milliseconds: 5), (_) {
+        if (inDb) beats++;
+      });
+      addTearDown(heartbeat.cancel);
+
+      await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+        onProgress: (progress) {
+          if (progress.detail == 'candidate-db') inDb = true;
+        },
+      );
+
+      heartbeat.cancel();
+      expect(inDb, isTrue);
+      expect(beats, greaterThan(0));
+    });
+
+    test('cancel during candidate DB validation can return', () async {
+      final extracted = await _createExtractedBundle(root);
+      RestoreBundleStaging.debugCandidateDbStallMs = 800;
+      addTearDown(() => RestoreBundleStaging.debugCandidateDbStallMs = 0);
+
+      final token = BackupCancelToken();
+      addTearDown(token.dispose);
+      final started = DateTime.now();
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+          cancelToken: token,
+          onProgress: (progress) {
+            if (progress.detail == 'candidate-db') {
+              token.cancel();
+            }
+          },
+        ),
+        throwsA(isA<BackupCancelledException>()),
+      );
+      expect(
+        DateTime.now().difference(started) < const Duration(seconds: 2),
+        isTrue,
+      );
+    });
+
+    test(
+      'does not delete candidate while the db isolate has not exited',
+      () async {
+        final extracted = await _createExtractedBundle(root);
+        RestoreBundleStaging.debugCandidateDbHangSeconds = 2;
+        RestoreBundleStaging.debugIsolateKillGrace = const Duration(
+          milliseconds: 40,
+        );
+        RestoreBundleStaging.debugIsolateExitDeadline = const Duration(
+          milliseconds: 80,
+        );
+        RestoreBundleStaging.debugIsolateTimeout = const Duration(
+          milliseconds: 150,
+        );
+        addTearDown(() {
+          RestoreBundleStaging.debugCandidateDbHangSeconds = 0;
+          RestoreBundleStaging.debugIsolateKillGrace = null;
+          RestoreBundleStaging.debugIsolateExitDeadline = null;
+          RestoreBundleStaging.debugIsolateTimeout = null;
+        });
+
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        Directory? workspaceRoot;
+        Object? error;
+        try {
+          await RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: true,
+            includeFiles: false,
+            sourceManifestSha256: await _manifestSha256(extracted),
+            cancelToken: token,
+            onProgress: (progress) {
+              if (progress.detail == 'candidate-db') {
+                token.cancel();
+              }
+            },
+          );
+        } catch (e) {
+          error = e;
+        }
+
+        expect(error, isNotNull);
+        expect(backupIsolateStillAlive(error!), isTrue);
+        workspaceRoot = Directory(
+          p.join(root.path, RestoreBundleStaging.workspaceRootName),
+        );
+        final runs = await workspaceRoot
+            .list(followLinks: false)
+            .where((entry) => p.basename(entry.path).startsWith('run_'))
+            .toList();
+        expect(runs, isNotEmpty);
+
+        final isolateExit = backupIsolateExitFuture(error);
+        expect(isolateExit, isNotNull);
+        await isolateExit!.timeout(const Duration(seconds: 5));
+        final deadline = DateTime.now().add(const Duration(seconds: 2));
+        while (DateTime.now().isBefore(deadline)) {
+          final remaining = await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList();
+          if (remaining.isEmpty) break;
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        expect(
+          await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList(),
+          isEmpty,
+        );
+      },
+    );
+
+    test('UI heartbeat continues during final DB/hash revalidation', () async {
+      final extracted = await _createExtractedBundle(root);
+      RestoreBundleStaging.debugCandidateValidateStallMs = 120;
+      addTearDown(() => RestoreBundleStaging.debugCandidateValidateStallMs = 0);
+
+      var inRevalidate = false;
+      var beats = 0;
+      final heartbeat = Timer.periodic(const Duration(milliseconds: 5), (_) {
+        if (inRevalidate) beats++;
+      });
+      addTearDown(heartbeat.cancel);
+
+      await RestoreBundleStaging.create(
+        appDataDirectory: root,
+        extractedDirectory: extracted,
+        includeChats: true,
+        includeFiles: false,
+        sourceManifestSha256: await _manifestSha256(extracted),
+        onProgress: (progress) {
+          if (progress.detail == 'candidate-revalidate') inRevalidate = true;
+        },
+      );
+
+      heartbeat.cancel();
+      expect(inRevalidate, isTrue);
+      expect(beats, greaterThan(0));
+    });
+
+    test('cancel during final DB/hash revalidation can return', () async {
+      final extracted = await _createExtractedBundle(root);
+      RestoreBundleStaging.debugCandidateValidateStallMs = 800;
+      addTearDown(() => RestoreBundleStaging.debugCandidateValidateStallMs = 0);
+
+      final token = BackupCancelToken();
+      addTearDown(token.dispose);
+      final started = DateTime.now();
+
+      await expectLater(
+        RestoreBundleStaging.create(
+          appDataDirectory: root,
+          extractedDirectory: extracted,
+          includeChats: true,
+          includeFiles: false,
+          sourceManifestSha256: await _manifestSha256(extracted),
+          cancelToken: token,
+          onProgress: (progress) {
+            if (progress.detail == 'candidate-revalidate') {
+              token.cancel();
+            }
+          },
+        ),
+        throwsA(isA<BackupCancelledException>()),
+      );
+      expect(
+        DateTime.now().difference(started) < const Duration(seconds: 2),
+        isTrue,
+      );
+    });
+
+    test(
+      'does not delete candidate while the revalidation isolate has not exited',
+      () async {
+        final extracted = await _createExtractedBundle(root);
+        RestoreBundleStaging.debugCandidateValidateHangSeconds = 2;
+        RestoreBundleStaging.debugIsolateKillGrace = const Duration(
+          milliseconds: 40,
+        );
+        RestoreBundleStaging.debugIsolateExitDeadline = const Duration(
+          milliseconds: 80,
+        );
+        RestoreBundleStaging.debugIsolateTimeout = const Duration(
+          milliseconds: 150,
+        );
+        addTearDown(() {
+          RestoreBundleStaging.debugCandidateValidateHangSeconds = 0;
+          RestoreBundleStaging.debugIsolateKillGrace = null;
+          RestoreBundleStaging.debugIsolateExitDeadline = null;
+          RestoreBundleStaging.debugIsolateTimeout = null;
+        });
+
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        Directory? workspaceRoot;
+        Object? error;
+        try {
+          await RestoreBundleStaging.create(
+            appDataDirectory: root,
+            extractedDirectory: extracted,
+            includeChats: true,
+            includeFiles: false,
+            sourceManifestSha256: await _manifestSha256(extracted),
+            cancelToken: token,
+            onProgress: (progress) {
+              if (progress.detail == 'candidate-revalidate') {
+                token.cancel();
+              }
+            },
+          );
+        } catch (e) {
+          error = e;
+        }
+
+        expect(error, isNotNull);
+        expect(backupIsolateStillAlive(error!), isTrue);
+        workspaceRoot = Directory(
+          p.join(root.path, RestoreBundleStaging.workspaceRootName),
+        );
+        final runs = await workspaceRoot
+            .list(followLinks: false)
+            .where((entry) => p.basename(entry.path).startsWith('run_'))
+            .toList();
+        expect(runs, isNotEmpty);
+
+        final isolateExit = backupIsolateExitFuture(error);
+        expect(isolateExit, isNotNull);
+        await isolateExit!.timeout(const Duration(seconds: 5));
+        final deadline = DateTime.now().add(const Duration(seconds: 2));
+        while (DateTime.now().isBefore(deadline)) {
+          final remaining = await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList();
+          if (remaining.isEmpty) break;
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        expect(
+          await workspaceRoot
+              .list(followLinks: false)
+              .where((entry) => p.basename(entry.path).startsWith('run_'))
+              .toList(),
+          isEmpty,
+        );
+      },
+    );
+
+    test('chunked hash observes cancel between chunks', () async {
+      final file = File(p.join(root.path, 'large.bin'));
+      await file.writeAsBytes(List<int>.filled(2 * 1024 * 1024, 3), flush: true);
+      final token = BackupCancelToken()..cancel();
+      addTearDown(token.dispose);
+
+      await expectLater(
+        RestoreBundleStaging.debugSha256(file, cancelToken: token),
+        throwsA(isA<BackupCancelledException>()),
+      );
+    });
   });
+}
+
+Future<void> _rewriteSettingsDescriptor(
+  Directory extracted,
+  File settingsFile,
+) async {
+  await _addDeclaredEntry(
+    extracted,
+    name: 'settings.json',
+    file: settingsFile,
+  );
+}
+
+Future<void> _addDeclaredEntry(
+  Directory extracted, {
+  required String name,
+  required File file,
+}) async {
+  final manifestFile = File(p.join(extracted.path, 'manifest.json'));
+  final manifest = jsonDecode(await manifestFile.readAsString()) as Map;
+  final entries = (manifest['entries'] as Map).cast<String, dynamic>();
+  entries[name] = {
+    'bytes': await file.length(),
+    'sha256': (await sha256.bind(file.openRead()).first).toString(),
+  };
+  await manifestFile.writeAsString(jsonEncode(manifest), flush: true);
 }

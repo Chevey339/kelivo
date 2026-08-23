@@ -46,6 +46,7 @@ void main() {
     final service = _ThrowingFinalizeChatService();
     final settings = SettingsProvider(createBusinessTestPreferences());
     final streamErrors = <String>[];
+    var assistantFinishedCount = 0;
     late HomeViewModel viewModel;
 
     await tester.pumpWidget(
@@ -97,6 +98,9 @@ void main() {
                 getTitleForLocale: (_) => 'title',
               );
               viewModel.debugChatActions.onStreamError = streamErrors.add;
+              viewModel.onAssistantMessageFinished = (_) {
+                assistantFinishedCount++;
+              };
               return const SizedBox.shrink();
             },
           ),
@@ -154,5 +158,6 @@ void main() {
       GenerationRunState.failed,
     ]);
     expect(streamErrors, ['Bad state: persist failed']);
+    expect(assistantFinishedCount, 0);
   });
 }

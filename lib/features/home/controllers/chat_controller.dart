@@ -6,6 +6,7 @@ import '../../../core/database/chat_database_repository.dart';
 import '../../../core/models/chat_message.dart';
 import '../../../core/models/conversation.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../core/services/screen_wakelock.dart';
 import 'message_render_model.dart';
 
 /// Initial window for a conversation switch, loaded by
@@ -1127,6 +1128,11 @@ class ChatController extends ChangeNotifier {
     }
     if (prev != loading) {
       notifyListeners();
+      if (loading && _loadingConversationIds.length == 1) {
+        ScreenWakelock.acquire();
+      } else if (!loading && _loadingConversationIds.isEmpty) {
+        ScreenWakelock.release();
+      }
       if (!loading &&
           _currentConversation?.id == conversationId &&
           !_chatService.isConversationFullyCached(conversationId)) {
@@ -1420,6 +1426,7 @@ class ChatController extends ChangeNotifier {
   void dispose() {
     _chatService.removeListener(_syncCurrentConversationWithService);
     cancelAllStreams();
+    ScreenWakelock.releaseNow();
     super.dispose();
   }
 }

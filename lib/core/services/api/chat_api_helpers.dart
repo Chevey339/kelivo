@@ -603,9 +603,15 @@ Map<String, dynamic>? claudeOutputConfig(
     if (!isClaudeReasoningEnabled(budget)) return null;
     final effort = _claudeEffortForBudget(budget);
     if (effort == 'auto' || effort == 'off') return null;
-    return <String, dynamic>{
-      'effort': (effort == 'xhigh' || effort == 'max') ? 'max' : 'high',
+    // Official Anthropic-format effort is low / high / max.
+    // medium and xhigh map to high.
+    // https://api-docs.deepseek.com/guides/thinking_mode
+    final mapped = switch (effort) {
+      'low' => 'low',
+      'max' => 'max',
+      _ => 'high',
     };
+    return <String, dynamic>{'effort': mapped};
   }
   if (!_supportsClaudeAdaptiveThinking(modelId) ||
       !isClaudeReasoningEnabled(budget)) {

@@ -39,6 +39,37 @@ void main() {
       expect(plus.abilities, contains(ModelAbility.reasoning));
     });
 
+    test('DeepSeek vision SKU is multimodal; text V4 stays text-only', () {
+      final vision = ModelRegistry.infer(
+        ModelInfo(
+          id: 'deepseek-v4-flash-vision-exp',
+          displayName: 'deepseek-v4-flash-vision-exp',
+        ),
+      );
+      final namespaced = ModelRegistry.infer(
+        ModelInfo(
+          id: 'deepseek/deepseek-v4-flash-vision-exp',
+          displayName: 'deepseek/deepseek-v4-flash-vision-exp',
+        ),
+      );
+      final flash = ModelRegistry.infer(
+        ModelInfo(id: 'deepseek-v4-flash', displayName: 'deepseek-v4-flash'),
+      );
+      final pro = ModelRegistry.infer(
+        ModelInfo(id: 'deepseek-v4-pro', displayName: 'deepseek-v4-pro'),
+      );
+
+      expect(vision.input, contains(Modality.image));
+      expect(namespaced.input, contains(Modality.image));
+      expect(flash.input, isNot(contains(Modality.image)));
+      expect(pro.input, isNot(contains(Modality.image)));
+      expect(vision.output, isNot(contains(Modality.image)));
+      expect(
+        vision.abilities,
+        containsAll([ModelAbility.tool, ModelAbility.reasoning]),
+      );
+    });
+
     test('Doubao seed 2.x / evolving get vision tool reasoning', () {
       for (final id in const [
         'doubao-seed-2.0-pro',

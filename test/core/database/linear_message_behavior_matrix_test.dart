@@ -2,6 +2,7 @@ import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -70,6 +71,20 @@ void main() {
         conversationId: conversation.id,
         fromStart: true,
       )).slots.map((slot) => slot.revisionId).toList(growable: false);
+
+  Future<Map<String, int>> messageOrders() async {
+    final rows = await database
+        .customSelect(
+          'SELECT id, message_order FROM message_rows '
+          'WHERE conversation_id = ?;',
+          variables: [Variable.withString(conversation.id)],
+        )
+        .get();
+    return {
+      for (final row in rows)
+        row.read<String>('id'): row.read<int>('message_order'),
+    };
+  }
 
   setUp(() async {
     database = AppDatabase(NativeDatabase.memory());
@@ -278,4 +293,64 @@ void main() {
       ]);
     },
   );
+
+  test('recreating a deleted middle reply keeps it after its user', () async {
+    await seed();
+    final deleted = await repository.deleteMessages(
+      conversationId: conversation.id,
+      messageIds: const {'assistant-v0'},
+      versionSelectionChanges: const {},
+    );
+
+    await repository.beginAssistantGeneration(
+      conversation: deleted!.conversation,
+      assistantMessage: message(
+        id: 'assistant-recreated',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      ),
+      anchorGroupId: 'user-0',
+      runId: 'run-recreated',
+      truncateFuture: false,
+    );
+
+    expect(await visibleIds(), [
+      'user-0',
+      'assistant-recreated',
+      'user-1',
+      'assistant-1',
+    ]);
+    expect(await messageOrders(), {
+      'user-0': 0,
+      'assistant-recreated': 1,
+      'user-1': 2,
+      'assistant-1': 3,
+    });
+  });
+
+  test('anchored insertion shifts an occupied suffix in order', () async {
+    await seed();
+
+    await repository.beginAssistantGeneration(
+      conversation: conversation,
+      assistantMessage: message(
+        id: 'assistant-inserted',
+        role: 'assistant',
+        content: '',
+        isStreaming: true,
+      ),
+      anchorGroupId: 'user-0',
+      runId: 'run-inserted',
+      truncateFuture: false,
+    );
+
+    expect(await messageOrders(), {
+      'user-0': 0,
+      'assistant-inserted': 1,
+      'assistant-v0': 2,
+      'user-1': 3,
+      'assistant-1': 4,
+    });
+  });
 }

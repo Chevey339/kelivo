@@ -345,6 +345,7 @@ class LocalToolsService {
           'description':
               "Create a new calendar event on the user's device. "
               'Requires title and start time at minimum. End time defaults to 1 hour after start. '
+              "Use 'reminders' to attach notification alerts ahead of the event. "
               'The user will be asked to confirm before the event is created. '
               '${_deviceTimezoneHint()} '
               "Requires the 'Calendar' permission; if it is not granted, an error is returned.",
@@ -372,6 +373,19 @@ class LocalToolsService {
                 'type': 'boolean',
                 'description':
                     'Whether this is an all-day event. Default false.',
+              },
+              'reminders': {
+                'type': 'array',
+                'items': {'type': 'integer'},
+                'description':
+                    'Optional notification reminders, as minutes before the event start '
+                    '(e.g. [10] for 10 minutes before, [0] for exactly at the start time, '
+                    '[30, 1440] for 30 minutes and 1 day before). For all-day events the '
+                    'offset counts back from the start of the day. No reminder is attached '
+                    'unless you pass this, so include one whenever the user expects to be '
+                    'notified. At most 5 reminders; values are clamped to 0-40320 minutes '
+                    '(4 weeks) and de-duplicated, and the result reports what was actually '
+                    'saved.',
               },
             },
             'required': ['title', 'start'],

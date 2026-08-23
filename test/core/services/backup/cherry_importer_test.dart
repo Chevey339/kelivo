@@ -14,10 +14,12 @@ import 'package:Kelivo/core/database/business_restore_service.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
 import 'package:Kelivo/core/models/backup.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/cherry_direct_backup_reader.dart';
 import 'package:Kelivo/core/services/backup/cherry_importer.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/utils/app_directories.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
 class _FakePathProviderPlatform extends PathProviderPlatform {
   _FakePathProviderPlatform(this.path);
@@ -220,6 +222,64 @@ void main() {
         'hello from legacy',
       );
     });
+
+    test(
+      'overwrite with a type-invalid message does not clear live chats',
+      () async {
+        await chatService.init();
+        final existing = await chatService.createConversation(title: 'Keep me');
+        final backup = await _createZip(tempDir, <String, List<int>>{
+          'data.json': utf8.encode(
+            jsonEncode(<String, dynamic>{
+              'version': 5,
+              'localStorage': <String, dynamic>{
+                'persist:cherry-studio': _persistStateJson(),
+              },
+              'indexedDB': <String, dynamic>{
+                'topics': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 'topic-invalid',
+                    'messages': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'id': 'msg-invalid',
+                        'role': 'user',
+                        'topicId': 'topic-invalid',
+                        'assistantId': 'assistant-1',
+                        'createdAt': '2026-01-01T00:00:00.000Z',
+                        'status': 'success',
+                        'modelId': 123,
+                        'content': 'should never land',
+                      },
+                    ],
+                  },
+                ],
+                'message_blocks': <Map<String, dynamic>>[],
+                'files': <Map<String, dynamic>>[],
+              },
+            }),
+          ),
+        });
+
+        await expectLater(
+          CherryImporter.importFromCherryStudio(
+            file: backup,
+            mode: RestoreMode.overwrite,
+            businessRepository: businessRepository,
+            chatService: chatService,
+          ),
+          throwsA(anything),
+        );
+
+        expect(
+          chatService.getAllConversations().any((c) => c.id == existing.id),
+          isTrue,
+        );
+        expect(
+          chatService.getAllConversations().any((c) => c.title == 'Keep me'),
+          isTrue,
+        );
+      },
+    );
 
     test('merge re-import of the same backup adds nothing twice', () async {
       Map<String, List<int>> entries() => <String, List<int>>{
@@ -646,6 +706,10 @@ void main() {
         throwsA(isA<CherryUnsupportedBackupVersionException>()),
       );
       expect(CherryImporter.debugZipJsonProbeDecodeCount, 0);
+      expect(
+        CherryImporter.debugIdentifiedArchiveJsonBytes,
+        tinyIdentifiedCap,
+      );
     });
 
     test(
@@ -891,6 +955,7 @@ void main() {
           chatService.getAllConversations().map((c) => c.id),
           isNot(contains('nested-poison')),
         );
+        expect(CherryImporter.debugZipJsonProbeDecodeCount, 1);
       },
     );
 
@@ -952,6 +1017,7 @@ void main() {
           chatService.getAllConversations().map((c) => c.id),
           isNot(contains('huge-poison')),
         );
+        expect(CherryImporter.debugZipJsonProbeDecodeCount, 1);
       },
     );
 
@@ -1038,13 +1104,25 @@ void main() {
           'Data/Files/large.bin': largeBytes,
         });
 
+        final events = <BackupProgress>[];
         final result = await CherryImporter.importFromCherryStudio(
           file: backup,
           mode: RestoreMode.overwrite,
           businessRepository: businessRepository,
           chatService: chatService,
+          onProgress: events.add,
         );
         expect(result.files, greaterThanOrEqualTo(4));
+        final materializing = events.where(
+          (event) => event.phase == BackupPhase.materializingFiles,
+        );
+        expect(materializing, isNotEmpty);
+        expect(
+          materializing,
+          everyElement(
+            predicate<BackupProgress>((event) => event.cancellable == false),
+          ),
+        );
 
         final upload = await AppDirectories.getUploadDirectory();
         Future<List<int>> readUpload(String id, String name) {
@@ -1216,6 +1294,174 @@ void main() {
       expect(file.unavailable, isTrue);
       expect(file.uri, 'Data/Files/notes.bin');
       expect(file.name, 'notes.bin');
+    });
+
+    test(
+      'path attachment uses materialized URI when materialize succeeds',
+      () async {
+        final bytes = utf8.encode('local-disk-bytes');
+        final backup = await _createZip(tempDir, <String, List<int>>{
+          'data.json': utf8.encode(
+            jsonEncode(
+              _legacyBackupWithAttachments(
+                files: <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 'file-path',
+                    'name': 'local.bin',
+                    'origin_name': 'local.bin',
+                    'path': 'Data/Files/local.bin',
+                    'type': 'application/octet-stream',
+                  },
+                ],
+              ),
+            ),
+          ),
+          'Data/Files/local.bin': bytes,
+        });
+
+        await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final upload = await AppDirectories.getUploadDirectory();
+        final saved = File('${upload.path}/cherry_file-path_local.bin');
+        expect(await saved.exists(), isTrue);
+        final file = (await chatService.loadMessages(
+          'topic-files',
+        )).single.parts.whereType<FilePart>().single;
+        expect(file.unavailable, isFalse);
+        expect(file.uri, SandboxPathResolver.canonicalize(saved.path));
+      },
+    );
+
+    test(
+      'url attachment uses materialized URI when materialize succeeds',
+      () async {
+        final bytes = utf8.encode('cdn-photo-bytes');
+        final backup = await _createZip(tempDir, <String, List<int>>{
+          'data.json': utf8.encode(
+            jsonEncode(
+              _legacyBackupWithAttachments(
+                files: <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 'file-url',
+                    'name': 'photo.png',
+                    'origin_name': 'photo.png',
+                    'type': 'image/png',
+                    'url': 'https://cdn.example.com/photo.png',
+                  },
+                ],
+              ),
+            ),
+          ),
+          'Data/Files/photo.png': bytes,
+        });
+
+        await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final upload = await AppDirectories.getUploadDirectory();
+        final saved = File('${upload.path}/cherry_file-url_photo.png');
+        expect(await saved.exists(), isTrue);
+        final image = (await chatService.loadMessages(
+          'topic-files',
+        )).single.parts.whereType<ImagePart>().single;
+        expect(image.unavailable, isFalse);
+        expect(image.uri, SandboxPathResolver.canonicalize(saved.path));
+      },
+    );
+
+    test(
+      'failed materialize keeps fallback URI and marks unavailable',
+      () async {
+        final backup = await _createZip(tempDir, <String, List<int>>{
+          'data.json': utf8.encode(
+            jsonEncode(
+              _legacyBackupWithAttachments(
+                files: <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'id': 'file-missing-path',
+                    'name': 'gone.bin',
+                    'origin_name': 'gone.bin',
+                    'path': 'Data/Files/gone.bin',
+                    'type': 'application/octet-stream',
+                  },
+                ],
+              ),
+            ),
+          ),
+        });
+
+        await CherryImporter.importFromCherryStudio(
+          file: backup,
+          mode: RestoreMode.overwrite,
+          businessRepository: businessRepository,
+          chatService: chatService,
+        );
+
+        final file = (await chatService.loadMessages(
+          'topic-files',
+        )).single.parts.whereType<FilePart>().single;
+        expect(file.unavailable, isTrue);
+        expect(file.uri, 'Data/Files/gone.bin');
+      },
+    );
+
+    test('each pending write is accessed exactly once at commit', () async {
+      const messageCount = 24;
+      const tinyPng =
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      final backup = await _createZip(tempDir, <String, List<int>>{
+        'data.json': utf8.encode(
+          jsonEncode(<String, dynamic>{
+            'version': 5,
+            'localStorage': <String, dynamic>{
+              'persist:cherry-studio': _persistStateJson(),
+            },
+            'indexedDB': <String, dynamic>{
+              'topics': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'id': 'topic-many',
+                  'messages': <Map<String, dynamic>>[
+                    for (var i = 0; i < messageCount; i++)
+                      <String, dynamic>{
+                        'id': 'msg-many-$i',
+                        'role': 'assistant',
+                        'topicId': 'topic-many',
+                        'assistantId': 'assistant-1',
+                        'createdAt': '2026-01-01T00:00:00.000Z',
+                        'status': 'success',
+                        'content': tinyPng,
+                        'blocks': <String>[],
+                        'files': <dynamic>[],
+                      },
+                  ],
+                },
+              ],
+              'message_blocks': <Map<String, dynamic>>[],
+              'files': <Map<String, dynamic>>[],
+            },
+          }),
+        ),
+      });
+
+      CherryImporter.debugPendingWriteAccessCount = 0;
+      await CherryImporter.importFromCherryStudio(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+      );
+
+      expect(CherryImporter.debugPendingWriteAccessCount, messageCount);
+      expect(await chatService.loadMessages('topic-many'), hasLength(messageCount));
     });
 
     test('extensionless image URL with image MIME becomes ImagePart', () async {

@@ -867,7 +867,10 @@ Stream<StreamChunk> sendOpenAIStream(
           sourceId: 'round-${streamRound++}',
         );
 
-  await for (final event in parseSseEventStrings(sse)) {
+  await for (final event in parseSseEventStrings(
+    sse,
+    recoverAdjacentJsonDataRecords: config.useResponseApi != true,
+  )) {
     final data = event.data;
     if (data.isNotEmpty && data != '[DONE]') {
       throwIfInBandStreamError(data);

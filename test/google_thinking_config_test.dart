@@ -231,6 +231,40 @@ void main() {
       );
     });
 
+    test(
+      'Gemini 3.7 Flash defaults to medium and rejects minimal off',
+      () async {
+        late Map<String, dynamic> capturedBody;
+        final server = await _startGeminiServer((body) {
+          capturedBody = body;
+        });
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _geminiConfig(
+            'http://${server.address.address}:${server.port}/v1beta',
+          ),
+          modelId: 'gemini-3.7-flash',
+          messages: const [
+            {'role': 'user', 'content': 'hello'},
+          ],
+          stream: false,
+        ).toList();
+
+        expect(chunks.isGenerationDone, isTrue);
+        expect(_thinkingConfig(capturedBody), {
+          'includeThoughts': true,
+          'thinkingLevel': 'medium',
+        });
+        expect(
+          (capturedBody['generationConfig'] as Map)['maxOutputTokens'],
+          65536,
+        );
+      },
+    );
+
     test('Gemini 3.5 Flash-Lite defaults to minimal thinking', () async {
       late Map<String, dynamic> capturedBody;
       final server = await _startGeminiServer((body) {
@@ -261,19 +295,6 @@ void main() {
         65536,
       );
     });
-    test('Gemini 3.7 Flash uses thinkingLevel, never thinkingBudget', () async {
-      final body = await _capture(
-        modelId: 'gemini-3.7-flash',
-        thinkingBudget: 16000,
-      );
-
-      expect(_thinkingConfig(body), {
-        'includeThoughts': true,
-        'thinkingLevel': 'medium',
-      });
-      expect((body['generationConfig'] as Map)['maxOutputTokens'], 65536);
-    });
-
     test('Gemini 3.1 Pro maps budget to medium thinkingLevel', () async {
       final body = await _capture(
         modelId: 'gemini-3.1-pro-preview',

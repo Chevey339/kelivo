@@ -21,6 +21,8 @@ import '../../../core/providers/memory_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/tts/tts_text_selection.dart';
 import '../../../core/services/haptics.dart';
+import '../../../core/services/notification_service.dart';
+import '../../../core/services/screen_wakelock.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/markdown_media_sanitizer.dart';
@@ -87,6 +89,8 @@ class HomePageController extends ChangeNotifier {
     required TextEditingController inputController,
     required ChatInputBarController mediaController,
     required ScrollController scrollController,
+    bool? isAndroidOverride,
+    ChatCompletionNotificationSender? chatCompletionNotificationSender,
   }) : this._(
          context,
          vsync,
@@ -96,6 +100,10 @@ class HomePageController extends ChangeNotifier {
          inputController,
          mediaController,
          scrollController,
+         isAndroid: isAndroidOverride ?? PlatformUtils.isAndroid,
+         chatCompletionNotificationSender:
+             chatCompletionNotificationSender ??
+             NotificationService.showChatCompleted,
        );
 
   HomePageController._(
@@ -106,8 +114,10 @@ class HomePageController extends ChangeNotifier {
     this._inputFocus,
     this._inputController,
     this._mediaController,
-    this._scrollController,
-  ) {
+    this._scrollController, {
+    required this._isAndroid,
+    required this._chatCompletionNotificationSender,
+  }) {
     _initialize();
   }
 
@@ -122,6 +132,8 @@ class HomePageController extends ChangeNotifier {
   final FocusNode _inputFocus;
   final TextEditingController _inputController;
   final ChatInputBarController _mediaController;
+  final bool _isAndroid;
+  final ChatCompletionNotificationSender _chatCompletionNotificationSender;
   ScrollController _scrollController;
 
   // ============================================================================
@@ -142,6 +154,7 @@ class HomePageController extends ChangeNotifier {
 
   McpProvider? _mcpProvider;
   StreamSubscription<ChatAction>? _chatActionSub;
+  StreamSubscription<String>? _notificationTapSub;
 
   // ============================================================================
   // Animation Controllers
@@ -208,9 +221,13 @@ class HomePageController extends ChangeNotifier {
   // Desktop drag-and-drop
   bool _isDragHovering = false;
 
-  // App lifecycle (currently unused but kept for future notification logic)
-  // ignore: unused_field
+  // App and route visibility determine whether a completion notification
+  // would add value or merely duplicate content already on screen.
   bool _appInForeground = true;
+  bool _homeRouteVisible = true;
+  bool _chatInitialized = false;
+  bool _openingNotificationConversation = false;
+  String? _pendingNotificationConversationId;
 
   // Sidebar state (tablet/desktop)
   bool _tabletSidebarOpen = true;
@@ -352,6 +369,7 @@ class HomePageController extends ChangeNotifier {
     _initializeProviders();
     _setupKeyboardListeners();
     _setupDesktopFeatures();
+    _setupNotificationActions();
   }
 
   void _initializeAnimations() {
@@ -656,6 +674,63 @@ class HomePageController extends ChangeNotifier {
     });
   }
 
+  void _setupNotificationActions() {
+    if (!_isAndroid) return;
+    _notificationTapSub = NotificationService.conversationTaps.listen(
+      _handleNotificationConversationTap,
+    );
+    final pendingConversationId =
+        NotificationService.takePendingConversationId();
+    if (pendingConversationId != null) {
+      _handleNotificationConversationTap(pendingConversationId);
+    }
+  }
+
+  void _handleNotificationConversationTap(String conversationId) {
+    _pendingNotificationConversationId = conversationId;
+    unawaited(_openPendingNotificationConversation());
+  }
+
+  Future<void> _openPendingNotificationConversation() async {
+    if (!_chatInitialized ||
+        !_homeRouteVisible ||
+        _openingNotificationConversation) {
+      return;
+    }
+    _openingNotificationConversation = true;
+    try {
+      while (_pendingNotificationConversationId != null &&
+          _homeRouteVisible &&
+          _context.mounted) {
+        final conversationId = _pendingNotificationConversationId!;
+        _pendingNotificationConversationId = null;
+        if (_chatService.getConversation(conversationId) == null) continue;
+        if (!_context.mounted || !_homeRouteVisible) {
+          _pendingNotificationConversationId = conversationId;
+          break;
+        }
+        await switchConversationAnimated(conversationId);
+      }
+    } catch (error) {
+      debugPrint('Failed to open chat completion notification: $error');
+    } finally {
+      _openingNotificationConversation = false;
+      if (_pendingNotificationConversationId != null && _context.mounted) {
+        unawaited(_openPendingNotificationConversation());
+      }
+    }
+  }
+
+  @visibleForTesting
+  void debugSetChatInitialized() {
+    _chatInitialized = true;
+  }
+
+  @visibleForTesting
+  void debugHandleNotificationConversationTap(String conversationId) {
+    _handleNotificationConversationTap(conversationId);
+  }
+
   void enterGlobalSearchMode({bool preserveQuery = true}) {
     _isGlobalSearchMode = true;
     if (!preserveQuery) _globalSearchQuery = '';
@@ -735,9 +810,13 @@ class HomePageController extends ChangeNotifier {
           await _createNewConversation();
         }
       }
+      _chatInitialized = true;
     } finally {
       _startupConversationPending = false;
       notifyListeners();
+      if (_chatInitialized) {
+        unawaited(_openPendingNotificationConversation());
+      }
     }
   }
 
@@ -1632,8 +1711,50 @@ class HomePageController extends ChangeNotifier {
   void _handleAssistantMessageFinished(ChatMessage message) {
     if (!_context.mounted || message.role != 'assistant') return;
     final settings = _context.read<SettingsProvider>();
-    if (!settings.ttsAutoPlayAssistantReplies) return;
-    unawaited(_speakAssistantMessage(message, autoPlay: true));
+    final shouldNotify = NotificationService.shouldShowChatCompleted(
+      isAndroid: _isAndroid,
+      notifyModeEnabled:
+          settings.androidBackgroundChatMode ==
+          AndroidBackgroundChatMode.onNotify,
+      appInForeground: _appInForeground,
+      homeRouteVisible: _homeRouteVisible,
+      isCurrentConversation: currentConversation?.id == message.conversationId,
+    );
+    if (shouldNotify) {
+      final l10n = AppLocalizations.of(_context)!;
+      unawaited(
+        _showChatCompletedNotification(
+          conversationId: message.conversationId,
+          title: l10n.notificationChatCompletedTitle,
+          body: l10n.notificationChatCompletedBody,
+        ),
+      );
+    }
+
+    if (settings.ttsAutoPlayAssistantReplies) {
+      unawaited(_speakAssistantMessage(message, autoPlay: true));
+    }
+  }
+
+  Future<void> _showChatCompletedNotification({
+    required String conversationId,
+    required String title,
+    required String body,
+  }) async {
+    try {
+      await _chatCompletionNotificationSender(
+        conversationId: conversationId,
+        title: title,
+        body: body,
+      );
+    } catch (error) {
+      debugPrint('Failed to show chat completion notification: $error');
+    }
+  }
+
+  @visibleForTesting
+  void debugHandleAssistantMessageFinished(ChatMessage message) {
+    _handleAssistantMessageFinished(message);
   }
 
   Future<void> speakMessage(ChatMessage message) async {
@@ -2537,9 +2658,14 @@ class HomePageController extends ChangeNotifier {
 
   void onAppLifecycleStateChanged(AppLifecycleState state) {
     _appInForeground = (state == AppLifecycleState.resumed);
+    if (state == AppLifecycleState.resumed) {
+      ScreenWakelock.reassert();
+    }
   }
 
   void onDidPopNext() {
+    _homeRouteVisible = true;
+    unawaited(_openPendingNotificationConversation());
     if (isDesktopPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _inputFocus.requestFocus();
@@ -2550,6 +2676,7 @@ class HomePageController extends ChangeNotifier {
   }
 
   void onDidPushNext() {
+    _homeRouteVisible = false;
     dismissKeyboard();
   }
 
@@ -2682,6 +2809,9 @@ class HomePageController extends ChangeNotifier {
     _scrollCtrl.dispose();
     try {
       _chatActionSub?.cancel();
+    } catch (_) {}
+    try {
+      _notificationTapSub?.cancel();
     } catch (_) {}
     _chatController.dispose();
     _streamController.dispose();

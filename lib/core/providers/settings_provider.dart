@@ -22,6 +22,7 @@ import '../models/backup.dart';
 import '../models/compress_context_options.dart';
 import '../models/provider_group.dart';
 import '../services/haptics.dart';
+import '../services/screen_wakelock.dart';
 import '../../utils/app_directories.dart';
 import '../../utils/sandbox_path_resolver.dart';
 import '../../utils/avatar_cache.dart';
@@ -186,6 +187,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_collapse_thinking_steps_v1';
   static const String _displayShowToolResultSummaryKey =
       'display_show_tool_result_summary_v1';
+  static const String _displayHideToolResultImagesKey =
+      'display_hide_tool_result_images_v1';
   static const String _displayRegenerateDeleteTrailingMessagesKey =
       'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
@@ -215,6 +218,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_haptics_on_list_item_tap_v1';
   static const String _displayHapticsOnCardTapKey =
       'display_haptics_on_card_tap_v1';
+  static const String _displayKeepScreenOnDuringGenerationKey =
+      'display_keep_screen_on_during_generation_v1';
   static const String _displayShowAppUpdatesKey = 'display_show_app_updates_v1';
   static const String _displayKeepSidebarOpenOnAssistantTapKey =
       'display_keep_sidebar_open_on_assistant_tap_v1';
@@ -282,6 +287,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
       'chat_bubble_style_overrides_v1';
+  static const String _userChatBubbleStyleOverridesKey =
+      'chat_bubble_style_overrides_user_v1';
   static const String _mobileAssistantEditTabOrderKey =
       'mobile_assistant_edit_tab_order_v1';
   static const String _mobileAssistantEditTabHiddenKey =
@@ -540,7 +547,7 @@ class SettingsProvider extends ChangeNotifier {
         final rawOv = cfg.modelOverrides[modelId];
         final ov = rawOv is Map ? rawOv.cast<String, dynamic>() : null;
         final modelForCheck = resolveApiModelIdOverride(ov, modelId);
-        return _isDeepSeekClaudeCompatible(cfg, modelForCheck) ||
+        return !_isDeepSeekClaudeCompatible(cfg, modelForCheck) &&
             _claudeSupportsXhighReasoning(modelForCheck);
       case ProviderKind.google:
         return false;
@@ -1040,6 +1047,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayCollapseThinkingStepsKey) ?? false;
     _showToolResultSummary =
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
+    _hideToolResultImages =
+        prefs.getBool(_displayHideToolResultImagesKey) ?? false;
     _regenerateDeleteTrailingMessages =
         prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
@@ -1071,6 +1080,9 @@ class SettingsProvider extends ChangeNotifier {
     _hapticsOnCardTap = prefs.getBool(_displayHapticsOnCardTapKey) ?? true;
     // Apply global haptics to service layer
     Haptics.setEnabled(_hapticsGlobalEnabled);
+    _keepScreenOnDuringGeneration =
+        prefs.getBool(_displayKeepScreenOnDuringGenerationKey) ?? false;
+    ScreenWakelock.setEnabled(_keepScreenOnDuringGeneration);
     _showAppUpdates = prefs.getBool(_displayShowAppUpdatesKey) ?? true;
     _keepSidebarOpenOnAssistantTap =
         prefs.getBool(_displayKeepSidebarOpenOnAssistantTapKey) ?? false;
@@ -1251,6 +1263,25 @@ class SettingsProvider extends ChangeNotifier {
         }
       } catch (_) {
         _chatBubbleStyleOverrides = const ChatBubbleStyleOverrides();
+      }
+    }
+    final userBubbleOverridesRaw = prefs.getString(
+      _userChatBubbleStyleOverridesKey,
+    );
+    if (userBubbleOverridesRaw != null && userBubbleOverridesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(userBubbleOverridesRaw);
+        if (decoded is Map<String, dynamic>) {
+          _userChatBubbleStyleOverrides = ChatBubbleStyleOverrides.fromJson(
+            decoded,
+          );
+        } else if (decoded is Map) {
+          _userChatBubbleStyleOverrides = ChatBubbleStyleOverrides.fromJson(
+            Map<String, dynamic>.from(decoded),
+          );
+        }
+      } catch (_) {
+        // Keep null so a corrupt user key still follows assistant.
       }
     }
     _mobileAssistantEditTabOrder = List.unmodifiable(
@@ -2692,15 +2723,73 @@ class SettingsProvider extends ChangeNotifier {
 
   ChatBubbleStyleOverrides _chatBubbleStyleOverrides =
       const ChatBubbleStyleOverrides();
+  ChatBubbleStyleOverrides? _userChatBubbleStyleOverrides;
   ChatBubbleStyleOverrides get chatBubbleStyleOverrides =>
       _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides get assistantChatBubbleStyleOverrides =>
+      _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides get userChatBubbleStyleOverrides =>
+      _userChatBubbleStyleOverrides ?? _chatBubbleStyleOverrides;
+  ChatBubbleStyleOverrides chatBubbleStyleOverridesFor({
+    required bool isUser,
+  }) =>
+      isUser ? userChatBubbleStyleOverrides : assistantChatBubbleStyleOverrides;
   Future<void> setChatBubbleStyleOverrides(ChatBubbleStyleOverrides v) async {
-    if (_chatBubbleStyleOverrides == v) return;
+    final assistantChanged = _chatBubbleStyleOverrides != v;
+    final hadUserSplit = _userChatBubbleStyleOverrides != null;
+    if (!assistantChanged && !hadUserSplit) return;
     _chatBubbleStyleOverrides = v;
+    _userChatBubbleStyleOverrides = null;
+    notifyListeners();
+    if (assistantChanged) {
+      await _preferences.setString(
+        _chatBubbleStyleOverridesKey,
+        jsonEncode(v.toJson()),
+      );
+    }
+    if (hadUserSplit) {
+      await _preferences.remove(_userChatBubbleStyleOverridesKey);
+    }
+  }
+
+  Future<void> setChatBubbleStyleOverridesForRole({
+    required bool isUser,
+    required ChatBubbleStyleOverrides value,
+  }) async {
+    if (isUser) {
+      if (_userChatBubbleStyleOverrides == value) return;
+      _userChatBubbleStyleOverrides = value;
+      notifyListeners();
+      await _preferences.setString(
+        _userChatBubbleStyleOverridesKey,
+        jsonEncode(value.toJson()),
+      );
+      return;
+    }
+    if (_chatBubbleStyleOverrides == value) return;
+    if (_userChatBubbleStyleOverrides == null) {
+      final previous = _chatBubbleStyleOverrides;
+      _userChatBubbleStyleOverrides = previous;
+      _chatBubbleStyleOverrides = value;
+      notifyListeners();
+      // Submit both writes before awaiting so they cannot interleave.
+      final userWrite = _preferences.setString(
+        _userChatBubbleStyleOverridesKey,
+        jsonEncode(previous.toJson()),
+      );
+      final assistantWrite = _preferences.setString(
+        _chatBubbleStyleOverridesKey,
+        jsonEncode(value.toJson()),
+      );
+      await userWrite;
+      await assistantWrite;
+      return;
+    }
+    _chatBubbleStyleOverrides = value;
     notifyListeners();
     await _preferences.setString(
       _chatBubbleStyleOverridesKey,
-      jsonEncode(v.toJson()),
+      jsonEncode(value.toJson()),
     );
   }
 
@@ -4326,6 +4415,16 @@ Requirements:
     await prefs.setBool(_displayShowToolResultSummaryKey, v);
   }
 
+  bool _hideToolResultImages = false;
+  bool get hideToolResultImages => _hideToolResultImages;
+  Future<void> setHideToolResultImages(bool v) async {
+    if (_hideToolResultImages == v) return;
+    _hideToolResultImages = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayHideToolResultImagesKey, v);
+  }
+
   bool _regenerateDeleteTrailingMessages = false;
   bool get regenerateDeleteTrailingMessages =>
       _regenerateDeleteTrailingMessages;
@@ -4926,6 +5025,18 @@ Requirements:
     await prefs.setBool(_displayHapticsOnGenerateKey, v);
   }
 
+  // Display: keep screen on while a conversation is generating
+  bool _keepScreenOnDuringGeneration = false;
+  bool get keepScreenOnDuringGeneration => _keepScreenOnDuringGeneration;
+  Future<void> setKeepScreenOnDuringGeneration(bool v) async {
+    if (_keepScreenOnDuringGeneration == v) return;
+    _keepScreenOnDuringGeneration = v;
+    ScreenWakelock.setEnabled(v);
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayKeepScreenOnDuringGenerationKey, v);
+  }
+
   // Display: haptics on drawer open/close
   bool _hapticsOnDrawer = true;
   bool get hapticsOnDrawer => _hapticsOnDrawer;
@@ -5298,6 +5409,7 @@ Requirements:
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
+    copy._hideToolResultImages = _hideToolResultImages;
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._forkKeepMessageVersions = _forkKeepMessageVersions;
@@ -5307,6 +5419,7 @@ Requirements:
     copy._showProviderInModelCapsule = _showProviderInModelCapsule;
     copy._showProviderInChatMessage = _showProviderInChatMessage;
     copy._hapticsOnGenerate = _hapticsOnGenerate;
+    copy._keepScreenOnDuringGeneration = _keepScreenOnDuringGeneration;
     copy._hapticsOnDrawer = _hapticsOnDrawer;
     copy._hapticsGlobalEnabled = _hapticsGlobalEnabled;
     copy._hapticsIosSwitch = _hapticsIosSwitch;
@@ -5354,6 +5467,7 @@ Requirements:
     copy._usePureBackground = _usePureBackground;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
+    copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
     copy._mobileAssistantEditTabOrder = _mobileAssistantEditTabOrder;
     copy._hiddenMobileAssistantEditTabs = _hiddenMobileAssistantEditTabs;
     copy._mobileAssistantDetailOutlineEnabled =

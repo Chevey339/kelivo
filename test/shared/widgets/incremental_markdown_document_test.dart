@@ -637,6 +637,28 @@ void main() {
     expect(document.blocks.first.stable, isTrue);
     expect(document.blocks.last.stable, isFalse);
   });
+
+  test('long italic paragraph prefixes preserve every source character', () {
+    final full = List<String>.generate(
+      120,
+      (index) =>
+          '*动作$index：懒懒地、黏糊糊地伸了个懒腰*\n\n'
+          '正文$index：反而笑得更甜，然后理直气壮地继续说话。',
+    ).join('\n\n');
+    expect(full.length, greaterThan(5000));
+
+    final document = IncrementalMarkdownDocument();
+    for (var end = 1; end <= full.length; end++) {
+      final prefix = full.substring(0, end);
+      final blocks = document.update(prefix);
+      final blockSource = blocks.map((block) => block.text).join();
+      expect(
+        blockSource.replaceAll('\n', ''),
+        prefix.replaceAll('\n', ''),
+        reason: 'prefix ending at UTF-16 code unit $end',
+      );
+    }
+  });
 }
 
 void _expectDocumentLinearScan(

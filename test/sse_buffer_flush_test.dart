@@ -22,6 +22,135 @@ ProviderConfig _testConfig(String baseUrl) {
 void main() {
   group('SSE buffer flush – last line without trailing newline', () {
     test(
+      'OpenAI-compatible adjacent data records keep every text delta',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        const fragments = <String>[
+          '*被窝裹住，她反而笑得更',
+          '甜*\n\n*懒懒地、',
+          '黏糊糊地*\n\n对',
+          '……后面的内容仍然保留。',
+        ];
+        server.listen((request) async {
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+            charset: 'utf-8',
+          );
+          for (var index = 0; index < fragments.length; index++) {
+            request.response.write(
+              'data: ${jsonEncode(<String, dynamic>{
+                'choices': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'delta': <String, dynamic>{'content': fragments[index]},
+                    'finish_reason': null,
+                  },
+                ],
+              })}${index == 1 ? '\n' : '\n\n'}',
+            );
+          }
+          request.response.write('data: [DONE]\n\n');
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _testConfig('http://localhost:${server.port}/v1'),
+          modelId: 'test-model',
+          messages: const [
+            {'role': 'user', 'content': 'hi'},
+          ],
+        ).toList();
+
+        expect(chunks.joinedContent, fragments.join());
+        expect(chunks.isGenerationDone, isTrue);
+      },
+    );
+
+    test('tool follow-up also recovers adjacent data records', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+
+      var requestCount = 0;
+      const fragments = <String>['*气音*', '\n\n……我要吃了。'];
+      server.listen((request) async {
+        requestCount += 1;
+        await request.drain<void>();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+          charset: 'utf-8',
+        );
+        if (requestCount == 1) {
+          request.response.write(
+            'data: ${jsonEncode(<String, dynamic>{
+              'choices': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'delta': <String, dynamic>{
+                    'tool_calls': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'index': 0,
+                        'id': 'call_1',
+                        'type': 'function',
+                        'function': <String, dynamic>{'name': 'noop', 'arguments': '{}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            })}\n\n',
+          );
+        } else {
+          for (final fragment in fragments) {
+            request.response.write(
+              'data: ${jsonEncode(<String, dynamic>{
+                'choices': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'delta': <String, dynamic>{'content': fragment},
+                    'finish_reason': null,
+                  },
+                ],
+              })}\n',
+            );
+          }
+        }
+        request.response.write('data: [DONE]\n\n');
+        await request.response.close();
+      });
+
+      final chunks = await ChatApiService.sendMessageStream(
+        config: _testConfig('http://localhost:${server.port}/v1'),
+        modelId: 'test-model',
+        messages: const [
+          {'role': 'user', 'content': 'hi'},
+        ],
+        tools: const [
+          {
+            'type': 'function',
+            'function': {
+              'name': 'noop',
+              'parameters': {'type': 'object'},
+            },
+          },
+        ],
+        onToolCall: (_, __, {toolCallId}) async => 'ok',
+      ).toList();
+
+      expect(requestCount, 2);
+      expect(chunks.joinedContent, fragments.join());
+      expect(chunks.isGenerationDone, isTrue);
+    });
+
+    test(
       'content is NOT truncated when final SSE chunk lacks trailing \\n',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

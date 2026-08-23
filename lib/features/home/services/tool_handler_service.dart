@@ -11,6 +11,7 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/tts_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/json_schema_utils.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/mcp/mcp_tool_service.dart';
 import '../../../core/services/memory/memory_pipeline.dart';
@@ -48,6 +49,13 @@ class ToolHandlerService {
     ProviderKind kind,
   ) {
     Map<String, dynamic> clone = _deepCloneMap(schema);
+    // Inline local $ref targets first: the allow-list below drops $ref/$defs,
+    // so an unresolved reference would reach the model as an empty schema and
+    // the whole nested object would silently vanish from the tool call.
+    clone = resolveJsonSchemaRefs(
+      clone,
+      expandAdditionalProperties: kind != ProviderKind.google,
+    );
     clone = _sanitizeNode(clone, kind) as Map<String, dynamic>;
     return clone;
   }

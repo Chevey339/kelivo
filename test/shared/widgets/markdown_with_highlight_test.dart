@@ -1,5 +1,6 @@
 import "../../support/business_test_harness.dart";
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:Kelivo/core/database/business_preferences.dart';
 import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
@@ -906,6 +907,61 @@ Inline ***strong emphasis*** text.
       expect(savedToGallery, isTrue);
     },
   );
+
+  testWidgets('MarkdownWithCodeHighlight saves an opaque table image', (
+    tester,
+  ) async {
+    _overrideMarkdownTablePlatform(TargetPlatform.android);
+    Uint8List? savedBytes;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('image_gallery_saver_plus'),
+          (call) async {
+            if (call.method == 'saveImageToGallery') {
+              final raw = call.arguments['imageBytes'];
+              if (raw is Uint8List) {
+                savedBytes = raw;
+              } else if (raw is List<int>) {
+                savedBytes = Uint8List.fromList(raw);
+              }
+              return <String, Object>{'isSuccess': true};
+            }
+            return null;
+          },
+        );
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(
+            const MethodChannel('image_gallery_saver_plus'),
+            null,
+          );
+    });
+
+    await tester.pumpWidget(
+      _markdownHarness('''
+| Name | Value |
+| - | - |
+| Alpha | 42 |
+''', width: 360),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Save to Gallery'));
+    await tester.pump();
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await tester.pump(const Duration(seconds: 4));
+
+    expect(savedBytes, isNotNull);
+    await tester.runAsync(() async {
+      final pixels = await _pngRgbaPixels(savedBytes!);
+      expect(pixels, isNotEmpty);
+      for (var i = 3; i < pixels.length; i += 4) {
+        expect(pixels[i], 255);
+      }
+    });
+  });
 
   testWidgets('MarkdownWithCodeHighlight scrolls only overflowing table', (
     tester,
@@ -4200,6 +4256,65 @@ void main() {
     },
   );
 
+  testWidgets(
+    '512+ streaming italic paragraphs keep every completed body visible',
+    (tester) async {
+      final padding = List<String>.generate(
+        12,
+        (index) => '前置段落$index：${'这是一段用于进入增量渲染路径的普通正文。' * 3}',
+      ).join('\n\n');
+      expect(padding.length, greaterThanOrEqualTo(512));
+      const paragraphs = <String>[
+        '*被窝裹住*',
+        '*反而笑得更甜*',
+        '*懒懒地、黏糊糊地*',
+        '对……',
+        '*摊平自己*',
+        '*眯着眼*',
+        '还要继续说。',
+        '*伸了个懒腰*',
+        '*然后理直气壮*',
+        '你养我。',
+        '*气音*',
+        '……我要吃了。',
+      ];
+      final text = ValueNotifier<String>(padding);
+
+      await tester.pumpWidget(_streamingMarkdownHarness(text, width: 360));
+      await tester.pump();
+
+      final tail = paragraphs.join('\n\n');
+      var source = padding;
+      for (var end = 1; end <= tail.length; end++) {
+        source = '$padding\n\n${tail.substring(0, end)}';
+        text.value = source;
+        await tester.pump();
+
+        final plainText = tester
+            .widgetList<RichText>(find.byType(RichText))
+            .map((widget) => widget.text.toPlainText())
+            .join('\n');
+        for (final completed in paragraphs.where(source.contains)) {
+          expect(
+            plainText,
+            contains(completed.replaceAll('*', '')),
+            reason: 'streaming prefix ending at tail code unit $end',
+          );
+        }
+      }
+
+      await tester.pumpWidget(_markdownHarness(source, width: 360));
+      await tester.pump();
+      final finishedPlainText = tester
+          .widgetList<RichText>(find.byType(RichText))
+          .map((widget) => widget.text.toPlainText())
+          .join('\n');
+      for (final paragraph in paragraphs) {
+        expect(finishedPlainText, contains(paragraph.replaceAll('*', '')));
+      }
+    },
+  );
+
   testWidgets('streaming markdown uses AtxHeadingMd and not the default HTag', (
     tester,
   ) async {
@@ -4535,4 +4650,16 @@ double? _spanFontSize(WidgetTester tester, String text) {
     if (span.text.contains(text)) return span.style.fontSize;
   }
   return null;
+}
+
+Future<Uint8List> _pngRgbaPixels(Uint8List pngBytes) async {
+  final codec = await ui.instantiateImageCodec(pngBytes);
+  final frame = await codec.getNextFrame();
+  final image = frame.image;
+  try {
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    return data!.buffer.asUint8List();
+  } finally {
+    image.dispose();
+  }
 }

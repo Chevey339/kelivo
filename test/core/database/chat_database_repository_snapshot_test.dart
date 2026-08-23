@@ -109,6 +109,101 @@ void main() {
       }
     });
 
+    test('registers the source handle before VACUUM INTO', () async {
+      int? handle;
+      final snapshotFile = File('${directory.path}/interrupt-snapshot.sqlite');
+      await ChatDatabaseRepository.createConsistentSnapshot(
+        sourceFile: sourceFile,
+        destinationFile: snapshotFile,
+        registerSourceHandle: (address) => handle = address,
+      );
+      expect(handle, isNotNull);
+      expect(handle, greaterThan(0));
+    });
+
+    test(
+      'finishes a consistent snapshot while the live database is being written',
+      () async {
+        await sourceRepository.putMigrationBatch(
+          conversations: [
+            Conversation(
+              id: 'conversation',
+              title: 'Snapshot',
+              messageIds: const ['message'],
+            ),
+          ],
+          messages: [
+            (
+              message: ChatMessage(
+                id: 'message',
+                role: 'assistant',
+                content: 'content from live wal',
+                conversationId: 'conversation',
+              ),
+              messageOrder: 0,
+            ),
+          ],
+          toolEventsByMessageId: const {},
+          geminiSignaturesByMessageId: const {},
+        );
+        await sourceRepository.markMigrationComplete();
+
+        final source = sqlite.sqlite3.open(sourceFile.path);
+        late final int userVersion;
+        try {
+          userVersion = source.userVersion;
+        } finally {
+          source.close();
+        }
+
+        var writing = true;
+        var writeCount = 0;
+        final writer = () async {
+          var i = 0;
+          while (writing) {
+            await sourceRepository.putConversation(
+              Conversation(
+                id: 'writer-$i',
+                title: 'Writer $i',
+                messageIds: const [],
+              ),
+            );
+            writeCount++;
+            i++;
+            await Future<void>.delayed(Duration.zero);
+          }
+        }();
+
+        final snapshotFile = File('${directory.path}/concurrent.sqlite');
+        try {
+          final info = await ChatDatabaseRepository.createConsistentSnapshot(
+            sourceFile: sourceFile,
+            destinationFile: snapshotFile,
+          );
+          expect(info.schemaVersion, userVersion);
+
+          final destination = sqlite.sqlite3.open(snapshotFile.path);
+          try {
+            expect(destination.userVersion, userVersion);
+          } finally {
+            destination.close();
+          }
+
+          final sourceAfter = sqlite.sqlite3.open(sourceFile.path);
+          try {
+            expect(sourceAfter.userVersion, userVersion);
+          } finally {
+            sourceAfter.close();
+          }
+        } finally {
+          writing = false;
+          await writer;
+        }
+        expect(writeCount, greaterThan(0));
+      },
+      timeout: const Timeout(Duration(seconds: 30)),
+    );
+
     test('rejects using the live database as its own destination', () async {
       await expectLater(
         ChatDatabaseRepository.createConsistentSnapshot(

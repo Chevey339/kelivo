@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
 import 'package:Kelivo/features/backup/backup_restore_error_message.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 
@@ -25,6 +26,13 @@ void main() {
         const FormatException('invalid backup'),
       ),
       'FormatException: invalid backup',
+    );
+    expect(
+      backupRestoreErrorMessage(
+        AppLocalizations.of(context)!,
+        const BackupCancelledException(),
+      ),
+      'Cancelled',
     );
   });
 }

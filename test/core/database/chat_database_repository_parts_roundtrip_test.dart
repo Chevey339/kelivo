@@ -371,6 +371,247 @@ void main() {
   );
 
   test(
+    'appendMessageVersion content-only keeps collapsed assistant reasoning',
+    () async {
+      final now = DateTime.utc(2026, 8, 22, 12);
+      const conversationId = 'conversation-append-reasoning';
+      const messageId = 'message-append-reasoning';
+      const reasoningJson =
+          '{"v":2,"segments":[{"text":"plan then check","expanded":false,'
+          '"toolStartIndex":0}],"contentSplits":{"offsets":[5],'
+          '"reasoningCounts":[1],"toolCounts":[1]},'
+          '"reasoningDetails":[{"id":"rd_1","type":"reasoning.encrypted",'
+          '"data":"sig","format":"anthropic-claude-v1"}]}';
+      final reasoningStart = DateTime.utc(2026, 8, 22, 11, 59);
+      final reasoningFinished = DateTime.utc(2026, 8, 22, 12);
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Append reasoning',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              groupId: messageId,
+              version: 0,
+              totalTokens: 42,
+              translation: 'old translation',
+              reasoningText: 'plan then check',
+              reasoningStartAt: reasoningStart,
+              reasoningFinishedAt: reasoningFinished,
+              reasoningSegmentsJson: reasoningJson,
+              parts: const [
+                ReasoningPart('plan then check'),
+                TextPart('original answer'),
+              ],
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        content: 'edited answer',
+      );
+      expect(result, isNotNull);
+      final created = result!.message;
+      expect(created.content, 'edited answer');
+      expect(created.parts.map((part) => part.kind), ['reasoning', 'text']);
+      expect((created.parts[0] as ReasoningPart).text, 'plan then check');
+      expect((created.parts[1] as TextPart).text, 'edited answer');
+      expect(created.reasoningText, 'plan then check');
+      expect(
+        created.reasoningStartAt?.millisecondsSinceEpoch,
+        reasoningStart.millisecondsSinceEpoch,
+      );
+      expect(
+        created.reasoningFinishedAt?.millisecondsSinceEpoch,
+        reasoningFinished.millisecondsSinceEpoch,
+      );
+      expect(created.reasoningSegmentsJson, reasoningJson);
+      expect(created.translation, isNull);
+      expect(created.totalTokens, isNull);
+
+      final persisted = await repository.getMessage(created.id);
+      expect(persisted, isNotNull);
+      expect(persisted!.content, 'edited answer');
+      expect(persisted.parts.map((part) => part.kind), ['reasoning', 'text']);
+      expect((persisted.parts[0] as ReasoningPart).text, 'plan then check');
+      expect(persisted.reasoningText, 'plan then check');
+      expect(
+        persisted.reasoningStartAt?.millisecondsSinceEpoch,
+        reasoningStart.millisecondsSinceEpoch,
+      );
+      expect(
+        persisted.reasoningFinishedAt?.millisecondsSinceEpoch,
+        reasoningFinished.millisecondsSinceEpoch,
+      );
+      expect(persisted.reasoningSegmentsJson, reasoningJson);
+      expect(persisted.translation, isNull);
+      expect(persisted.totalTokens, isNull);
+    },
+  );
+
+  test(
+    'appendMessageVersion content-only keeps interleaved reasoning tool text',
+    () async {
+      final now = DateTime.utc(2026, 8, 22, 13);
+      const conversationId = 'conversation-append-reasoning-interleave';
+      const messageId = 'message-append-reasoning-interleave';
+      const reasoningJson =
+          '{"v":2,"segments":['
+          '{"text":"plan","expanded":false,"toolStartIndex":0},'
+          '{"text":"check","expanded":false,"toolStartIndex":1}'
+          '],"contentSplits":{"offsets":[6,11],'
+          '"reasoningCounts":[1,2],"toolCounts":[1,1]},'
+          '"reasoningDetails":[{"id":"rd_2","type":"reasoning.encrypted",'
+          '"data":"sig2","format":"anthropic-claude-v1"}]}';
+      final reasoningStart = DateTime.utc(2026, 8, 22, 12, 50);
+      final reasoningFinished = DateTime.utc(2026, 8, 22, 13);
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Append reasoning interleave',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              groupId: messageId,
+              version: 0,
+              reasoningText: 'plan\ncheck',
+              reasoningStartAt: reasoningStart,
+              reasoningFinishedAt: reasoningFinished,
+              reasoningSegmentsJson: reasoningJson,
+              parts: const [
+                ReasoningPart('plan'),
+                TextPart('hello '),
+                ToolCallPart('{"id":"call_1","name":"lookup"}'),
+                TextPart('world'),
+                ReasoningPart('check'),
+              ],
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        content: 'hello world',
+      );
+      expect(result, isNotNull);
+      expect(result!.message.parts.map((part) => part.kind), [
+        'reasoning',
+        'text',
+        'tool_call',
+        'text',
+        'reasoning',
+      ]);
+      expect((result.message.parts[0] as ReasoningPart).text, 'plan');
+      expect((result.message.parts[4] as ReasoningPart).text, 'check');
+      expect(result.message.reasoningText, 'plan\ncheck');
+      expect(
+        result.message.reasoningStartAt?.millisecondsSinceEpoch,
+        reasoningStart.millisecondsSinceEpoch,
+      );
+      expect(
+        result.message.reasoningFinishedAt?.millisecondsSinceEpoch,
+        reasoningFinished.millisecondsSinceEpoch,
+      );
+      expect(result.message.reasoningSegmentsJson, reasoningJson);
+
+      final persisted = await repository.getMessage(result.message.id);
+      expect(persisted!.parts.map((part) => part.kind), [
+        'reasoning',
+        'text',
+        'tool_call',
+        'text',
+        'reasoning',
+      ]);
+      expect((persisted.parts[1] as TextPart).text, 'hello ');
+      expect((persisted.parts[3] as TextPart).text, 'world');
+      expect(persisted.reasoningSegmentsJson, reasoningJson);
+    },
+  );
+
+  test(
+    'appendMessageVersion explicit parts does not inherit reasoning metadata',
+    () async {
+      final now = DateTime.utc(2026, 8, 22, 14);
+      const conversationId = 'conversation-append-explicit-parts';
+      const messageId = 'message-append-explicit-parts';
+      await repository.putMigrationBatch(
+        conversations: [
+          Conversation(
+            id: conversationId,
+            title: 'Append explicit parts',
+            createdAt: now,
+            updatedAt: now,
+            messageIds: const [messageId],
+          ),
+        ],
+        messages: [
+          (
+            message: ChatMessage(
+              id: messageId,
+              role: 'assistant',
+              conversationId: conversationId,
+              timestamp: now,
+              groupId: messageId,
+              version: 0,
+              reasoningText: 'old plan',
+              reasoningStartAt: DateTime.utc(2026, 8, 22, 13, 50),
+              reasoningFinishedAt: now,
+              reasoningSegmentsJson:
+                  '{"segments":[{"text":"old plan","expanded":false}]}',
+              parts: const [ReasoningPart('old plan'), TextPart('old answer')],
+            ),
+            messageOrder: 0,
+          ),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final result = await repository.appendMessageVersion(
+        messageId: messageId,
+        content: 'replacement',
+        parts: const [TextPart('replacement')],
+      );
+      expect(result, isNotNull);
+      expect(result!.message.parts, hasLength(1));
+      expect(result.message.parts.single, isA<TextPart>());
+      expect(result.message.reasoningText, isNull);
+      expect(result.message.reasoningStartAt, isNull);
+      expect(result.message.reasoningFinishedAt, isNull);
+      expect(result.message.reasoningSegmentsJson, isNull);
+    },
+  );
+
+  test(
     'unknown future_widget part persists and writes back unchanged',
     () async {
       final now = DateTime.utc(2026, 8, 9, 14);

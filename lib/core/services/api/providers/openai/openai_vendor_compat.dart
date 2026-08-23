@@ -453,6 +453,10 @@ class OpenAIProviderInfo {
       host.contains('xiaomimimo') ||
       upstreamModelId.toLowerCase().startsWith('mimo-') ||
       upstreamModelId.toLowerCase().contains('/mimo-');
+  bool get isLaguna {
+    final id = upstreamModelId.toLowerCase();
+    return id.startsWith('laguna-') || id.contains('/laguna-');
+  }
   bool get isSiliconFlow =>
       providerId.contains('siliconflow') || host.contains('siliconflow');
   bool get isAzureOpenAI => host.contains('openai.azure.com');
@@ -480,9 +484,9 @@ class OpenAIProviderInfo {
   }
 
   bool get needsReasoningEcho =>
-      isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
+      isLaguna || isDeepSeek || isMimo || isZhipu || isKimiThinkingModel;
   ReasoningContentReplayPolicy get reasoningContentReplayPolicy {
-    if (_isKimiPreservedThinkingModel(upstreamModelId)) {
+    if (isLaguna || _isKimiPreservedThinkingModel(upstreamModelId)) {
       return ReasoningContentReplayPolicy.all;
     }
     if (needsReasoningEcho) {
@@ -522,6 +526,15 @@ void applyVendorReasoningKnobs(
       body.remove('reasoning');
       body.remove('reasoning_effort');
     }
+  } else if (info.isLaguna) {
+    if (isReasoning) {
+      body['chat_template_kwargs'] = {
+        'enable_thinking': !off,
+      };
+    } else {
+      body.remove('chat_template_kwargs');
+    }
+    body.remove('reasoning_effort');
   } else if (info.isDashScope) {
     if (isReasoning) {
       body['enable_thinking'] = !off;

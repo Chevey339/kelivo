@@ -6,10 +6,21 @@ import 'package:Kelivo/core/database/generation_run.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/conversation.dart';
 import 'package:Kelivo/core/models/message_part.dart';
+import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
+import 'package:Kelivo/core/services/api/stream/sse_decode_loop.dart';
+import 'package:Kelivo/core/services/api/stream/sse_framing.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
+import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/home/services/message_builder_service.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart' as sqlite;
+
+class _FakeBuildContext implements BuildContext {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   group('ChatDatabaseRepository streaming checkpoint', () {
@@ -163,6 +174,82 @@ void main() {
       ]);
       expect(persisted.content, 'before after');
       expect(await repository.getToolEvents('streaming'), toolEvents);
+    });
+
+    test('相邻 data 记录中的斜体段落逐字进入 checkpoint 和 API 历史', () async {
+      const fragments = <String>[
+        '*被窝裹住，她反而笑得更',
+        '甜*\n\n*懒懒地、',
+        '黏糊糊地*\n\n对',
+        '……后面的内容仍然保留。',
+      ];
+      String frame(String text) =>
+          'data: ${jsonEncode(<String, dynamic>{
+            'choices': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'delta': <String, dynamic>{'content': text},
+                'finish_reason': null,
+              },
+            ],
+          })}';
+      final wire =
+          '${frame(fragments[0])}\n\n'
+          '${frame(fragments[1])}\n'
+          '${frame(fragments[2])}\n\n'
+          '${frame(fragments[3])}\n\n'
+          'data: [DONE]\n\n';
+      final chunks = await decodeSseEvents(
+        parseSseEventStrings(
+          Stream<String>.value(wire),
+          recoverAdjacentJsonDataRecords: true,
+        ),
+        ChatCompletionsStreamDecoder(),
+      ).toList();
+      final result = StreamChunkHandler.collect(chunks);
+
+      final snapshot = ChatMessage(
+        id: 'streaming',
+        role: 'assistant',
+        conversationId: 'conversation',
+        isStreaming: true,
+        parts: result.parts,
+      );
+      await repository.updateStreamingCheckpoint(snapshot, const []);
+      await repository.updateStreamingCheckpoint(
+        snapshot.copyWith(isStreaming: false),
+        const [],
+      );
+
+      // Force a cold database read before rebuilding the next API request.
+      await repository.close();
+      repository = ChatDatabaseRepository.open(
+        file: File('${directory.path}/chat.sqlite'),
+      );
+      await repository.ensureReady();
+
+      final expected = fragments.join();
+      final persisted = await repository.getMessage('streaming');
+      expect(persisted!.content, expected);
+      expect(
+        persisted.parts.whereType<TextPart>().map((part) => part.text).join(),
+        expected,
+      );
+
+      final history = await repository.getMessagesByIds(const [
+        'first',
+        'streaming',
+      ]);
+      final apiMessages =
+          MessageBuilderService(
+            chatService: ChatService(),
+            contextProvider: _FakeBuildContext(),
+          ).buildApiMessages(
+            messages: history,
+            versionSelections: const {},
+            currentConversation: Conversation(title: 'Conversation'),
+          );
+      expect(apiMessages.last['role'], 'assistant');
+      expect(apiMessages.last['content'], expected);
     });
 
     test('已 finalize 的消息不会被迟到的流式 checkpoint 复活', () async {

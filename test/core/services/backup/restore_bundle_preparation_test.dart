@@ -7,8 +7,11 @@ import 'package:path/path.dart' as p;
 
 import 'package:Kelivo/core/database/app_database.dart';
 import 'package:Kelivo/core/database/chat_database_repository.dart';
+import 'package:Kelivo/core/services/backup/backup_cancel_token.dart';
+import 'package:Kelivo/core/services/backup/backup_task_progress.dart';
 import 'package:Kelivo/core/services/backup/restore_bundle_preparation.dart';
 import 'package:Kelivo/core/services/backup/restore_receipt.dart';
+import 'package:Kelivo/core/services/backup/restore_startup_gate.dart';
 import 'package:Kelivo/core/services/backup/restore_workspace_lock.dart';
 
 Future<({Directory directory, String manifestSha256})> _createBundle(
@@ -252,5 +255,89 @@ void main() {
       expect(results.whereType<PreparedRestoreBundle>(), hasLength(1));
       expect(results.whereType<StateError>(), hasLength(1));
     });
+
+    test(
+      'cancel mid-staging discards unpublished candidate and staging dirs',
+      () async {
+        final bundle = await _createBundle(root, includeFiles: true);
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+
+        await expectLater(
+          RestoreBundlePreparation.prepare(
+            appDataDirectory: root,
+            extractedDirectory: bundle.directory,
+            sourceManifestSha256: bundle.manifestSha256,
+            bundleIncludesChats: true,
+            bundleIncludesFiles: true,
+            restoreChats: true,
+            restoreFiles: true,
+            createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+            onProgress: (progress) {
+              if (progress.phase == BackupPhase.stagingCandidate &&
+                  progress.processed >= 1) {
+                token.cancel();
+              }
+            },
+            cancelToken: token,
+          ),
+          throwsA(isA<BackupCancelledException>()),
+        );
+
+        expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
+        final workspaceRoot = Directory(
+          p.join(root.path, RestoreWorkspaceLock.workspaceRootName),
+        );
+        if (await workspaceRoot.exists()) {
+          expect(
+            await workspaceRoot
+                .list(followLinks: false)
+                .where((entry) => p.basename(entry.path).startsWith('run_'))
+                .toList(),
+            isEmpty,
+          );
+        }
+      },
+    );
+
+    test(
+      'emits non-cancellable committing before publish and ignores later cancel',
+      () async {
+        final bundle = await _createBundle(root);
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        final events = <BackupProgress>[];
+
+        final prepared = await RestoreBundlePreparation.prepare(
+          appDataDirectory: root,
+          extractedDirectory: bundle.directory,
+          sourceManifestSha256: bundle.manifestSha256,
+          bundleIncludesChats: true,
+          bundleIncludesFiles: false,
+          restoreChats: true,
+          restoreFiles: false,
+          createdAtUtc: DateTime.utc(2026, 7, 9, 12),
+          onProgress: (progress) {
+            events.add(progress);
+            if (progress.phase == BackupPhase.committing) {
+              token.cancel();
+            }
+          },
+          cancelToken: token,
+        );
+
+        final committing = events.where(
+          (event) => event.phase == BackupPhase.committing,
+        );
+        expect(committing, isNotEmpty);
+        expect(committing.first.cancellable, isFalse);
+        expect(prepared.receipt.state, RestoreReceiptState.prepared);
+        final store = RestoreReceiptStore(
+          appDataDirectory: root,
+          runId: prepared.runId,
+        );
+        expect((await store.readLatest())?.checksum, prepared.receipt.checksum);
+      },
+    );
   });
 }

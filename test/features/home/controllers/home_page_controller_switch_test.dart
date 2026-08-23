@@ -277,6 +277,50 @@ void main() {
   }
 
   group('HomePageController conversation switch pipeline', () {
+    testWidgets(
+      'notification target waits until the Home route is visible again',
+      (tester) async {
+        await runAsMobile(() async {
+          final service = _ControlledChatService({
+            'conv-a': [_message('conv-a', 0)],
+            'conv-b': [_message('conv-b', 0)],
+          });
+          final controller = await pumpHarness(tester, service);
+          await switchAndSettle(tester, controller, service, 'conv-a');
+          controller.debugSetChatInitialized();
+
+          controller.onDidPushNext();
+          controller.debugHandleNotificationConversationTap('conv-b');
+          await tester.pump();
+
+          expect(controller.currentConversation?.id, 'conv-a');
+          expect(service.pageRequests, hasLength(1));
+
+          controller.onDidPopNext();
+          for (var i = 0; i < 40 && service.pageRequests.length < 2; i++) {
+            await tester.pump(const Duration(milliseconds: 10));
+          }
+          expect(service.pageRequests, hasLength(2));
+          service.completePage(
+            service.pageRequests.last,
+            service.messagesOf('conv-b'),
+            startIndex: 0,
+          );
+          for (
+            var i = 0;
+            i < 40 &&
+                (controller.currentConversation?.id != 'conv-b' ||
+                    controller.convoFadeController.value != 1.0);
+            i++
+          ) {
+            await tester.pump(const Duration(milliseconds: 100));
+          }
+
+          expect(controller.currentConversation?.id, 'conv-b');
+        });
+      },
+    );
+
     testWidgets('same-id tap short-circuits before flush and fetch', (
       tester,
     ) async {

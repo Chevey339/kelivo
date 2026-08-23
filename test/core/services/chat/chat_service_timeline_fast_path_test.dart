@@ -211,6 +211,104 @@ void main() {
     expect(page.totalSlotCount, ids.length);
   });
 
+  test(
+    'anchored assistant generation invalidates stale timeline order',
+    () async {
+      final service = createService();
+      await service.init();
+      final conversation = await service.createConversation(title: 'Chat');
+      final user1 = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'question 1',
+      );
+      final deletedReply = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'answer 1',
+      );
+      final user2 = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'user',
+        content: 'question 2',
+      );
+      final reply2 = await service.addMessage(
+        conversationId: conversation.id,
+        role: 'assistant',
+        content: 'answer 2',
+      );
+      await service.loadMessages(conversation.id);
+      await service.deleteMessages(
+        conversationId: conversation.id,
+        messageIds: {deletedReply.id},
+        versionSelectionChanges: const {},
+      );
+      await service.loadMessages(conversation.id);
+
+      final regenerated = await service.beginAssistantGeneration(
+        conversationId: conversation.id,
+        modelId: 'model',
+        providerId: 'provider',
+        anchorGroupId: user1.id,
+        truncateFuture: false,
+      );
+      final page = await service.loadTimelinePage(conversation.id);
+
+      expect(page, isNotNull);
+      expect(page!.slots.map((slot) => slot.message.id), [
+        user1.id,
+        regenerated.assistantMessage.id,
+        user2.id,
+        reply2.id,
+      ]);
+    },
+  );
+
+  test('temporary messages can be inserted after a middle group', () async {
+    final service = createService();
+    await service.init();
+    final conversation = await service.createDraftConversation(
+      title: 'Temporary',
+      temporary: true,
+    );
+    final user1 = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'user',
+      content: 'question 1',
+    );
+    final deletedReply = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: 'answer 1',
+    );
+    final user2 = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'user',
+      content: 'question 2',
+    );
+    final reply2 = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: 'answer 2',
+    );
+    await service.deleteMessage(deletedReply.id);
+
+    final recreated = await service.addMessage(
+      conversationId: conversation.id,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+      temporaryAfterGroupId: user1.id,
+    );
+
+    expect(await service.getMessageIds(conversation.id), [
+      user1.id,
+      recreated.id,
+      user2.id,
+      reply2.id,
+    ]);
+  });
+
   test('kill switch disables the fast path', () async {
     final (service, conversationId, ids) = await seedRestartedService();
 

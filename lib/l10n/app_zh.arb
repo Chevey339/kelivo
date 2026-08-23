@@ -34,6 +34,10 @@
   "storageSpaceClearableHint": "共发现可清理空间 {size}",
   "storageSpaceCategoryImages": "图片",
   "storageSpaceCategoryFiles": "文件",
+  "storageSpaceCategoryFonts": "字体",
+  "storageSpaceCategoryLocalModels": "本地模型",
+  "storageSpaceOtherHint": "包括导入字体、本地下载模型和其他应用文件。",
+  "storageSpaceSubOtherApp": "其他文件",
   "storageSpaceCategoryChatData": "聊天记录",
   "storageSpaceCategoryLegacyChatData": "聊天记录（旧）",
   "storageSpaceCategoryRestoreTraces": "恢复痕迹",
@@ -44,7 +48,7 @@
   "storageSpaceCategoryAssistantData": "助手",
   "storageSpaceCategoryCache": "缓存",
   "storageSpaceCategoryLogs": "日志",
-  "storageSpaceCategoryOther": "应用",
+  "storageSpaceCategoryOther": "其他",
   "storageSpaceFilesCount": "{count} 个文件",
   "storageSpaceSafeToClearHint": "可安全清理，不影响聊天记录。",
   "storageSpaceLegacyChatDataHint": "这是迁移到 SQLite 前保留的 Hive 旧文件。清理后不会删除当前聊天记录。",
@@ -580,6 +584,46 @@
   "backupPageBackupUploaded": "已上传备份",
   "backupPageBackup": "立即备份",
   "backupPageExporting": "正在导出...",
+  "backupProgressCancel": "取消",
+  "backupProgressCancelled": "已取消",
+  "backupProgressPreparing": "准备中",
+  "backupProgressSnapshotting": "正在创建数据库快照",
+  "backupProgressPacking": "正在打包",
+  "backupProgressVerifying": "正在校验",
+  "backupProgressUploading": "正在上传",
+  "backupProgressDownloading": "正在下载",
+  "backupProgressExtracting": "正在解压",
+  "backupProgressValidating": "正在验证",
+  "backupProgressReadingSettings": "正在读取设置",
+  "backupProgressStaging": "正在暂存",
+  "backupProgressCommitting": "正在提交",
+  "backupProgressImportingSessions": "正在导入会话",
+  "backupProgressImportingMessages": "正在导入消息",
+  "backupProgressMaterializingFiles": "正在写入文件",
+  "backupProgressListingRemote": "正在列出远端备份",
+  "backupProgressFinalizing": "正在完成",
+  "backupProgressBytes": "{done} / {total}",
+  "@backupProgressBytes": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
+  "backupProgressItems": "{done} / {total}",
+  "@backupProgressItems": {
+    "placeholders": {
+      "done": {
+        "type": "String"
+      },
+      "total": {
+        "type": "String"
+      }
+    }
+  },
   "backupPageExportToFile": "导出为文件",
   "backupPageExportToFileSubtitle": "导出APP数据为文件",
   "backupPageImportBackupFile": "备份文件导入",
@@ -1527,6 +1571,7 @@
   "displaySettingsPageShowToolResultSummaryTitle": "显示工具结果摘要",
   "displaySettingsPageInsertSuggestionOnlyTitle": "点击建议时仅填入输入框",
   "displaySettingsPageShowToolResultSummarySubtitle": "在工具步骤下方显示摘要文本",
+  "displaySettingsPageHideToolResultImagesTitle": "隐藏工具结果中的图片",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成时删除下面的消息",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "重新生成前弹出确认",
   "displaySettingsPageForkKeepMessageVersionsTitle": "创建分支时保留消息版本",
@@ -1544,6 +1589,8 @@
   "displaySettingsPageKeepAssistantListExpandedOnSidebarCloseTitle": "关闭侧边栏时不折叠助手列表",
   "displaySettingsPageShowUpdatesTitle": "显示更新",
   "displaySettingsPageShowUpdatesSubtitle": "显示应用更新通知",
+  "displaySettingsPageKeepScreenOnDuringGenerationTitle": "生成时保持屏幕常亮",
+  "displaySettingsPageKeepScreenOnDuringGenerationSubtitle": "防止生成中途锁屏导致中断，会增加耗电",
   "displaySettingsPageMessageNavButtonsTitle": "消息导航按钮",
   "displaySettingsPageMessageNavButtonsSubtitle": "选择快速跳转按钮的显示时机",
   "displaySettingsPageMessageNavButtonsModeAlways": "始终显示",
@@ -2894,5 +2941,8 @@
   "messageStyleSettingsPageCornerRadius": "圆角半径",
   "messageStyleSettingsPagePreviewUser": "这是一条用户消息",
   "messageStyleSettingsPagePreviewAssistant": "这是一条助手回复。",
-  "messageStyleSettingsPagePreviewThinking": "思考中"
+  "messageStyleSettingsPagePreviewThinking": "思考中",
+  "messageStyleSettingsPageRoleUser": "用户",
+  "messageStyleSettingsPageRoleAssistant": "助手",
+  "messageStyleSettingsPageRoleAssistantHint": "助手设定同时作用于思考、工具调用和翻译卡片。"
 }

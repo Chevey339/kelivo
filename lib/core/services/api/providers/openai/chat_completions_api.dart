@@ -875,7 +875,10 @@ Stream<StreamChunk> runOpenAIChatCompletionsToolFollowUps({
         initialUsage: usage,
         sourceId: 'round-${round++}',
       );
-      yield* decodeSseEvents(parseSseEventStrings(s2), roundDecoder);
+      yield* decodeSseEvents(
+        parseSseEventStrings(s2, recoverAdjacentJsonDataRecords: true),
+        roundDecoder,
+      );
       usage = roundDecoder.usage ?? usage;
       // Add this round. `=` would drop earlier rounds when usage is absent.
       chars += roundDecoder.approxCompletionChars;
