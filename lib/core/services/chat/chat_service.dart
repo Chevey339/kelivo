@@ -3573,6 +3573,10 @@ class ChatService extends ChangeNotifier {
           : versions.reduce((a, b) => a > b ? a : b) + 1;
       // Content-only append must keep prior attachments and TextPart slots
       // ([Text, Tool, Text] stays three parts, not a merged first TextPart).
+      // Assistant body-only edits also inherit reasoning metadata so the
+      // collapsed card stays toggleable on the new version.
+      final preserveReasoning =
+          parts == null && temporaryOriginal.role == 'assistant';
       final resolvedParts =
           parts ??
           ChatMessage.partsWithRedistributedText(
@@ -3585,6 +3589,17 @@ class ChatService extends ChangeNotifier {
         conversationId: conversationId,
         modelId: temporaryOriginal.modelId,
         providerId: temporaryOriginal.providerId,
+        totalTokens: null,
+        isStreaming: false,
+        reasoningText:
+            preserveReasoning ? temporaryOriginal.reasoningText : null,
+        reasoningStartAt:
+            preserveReasoning ? temporaryOriginal.reasoningStartAt : null,
+        reasoningFinishedAt:
+            preserveReasoning ? temporaryOriginal.reasoningFinishedAt : null,
+        reasoningSegmentsJson: preserveReasoning
+            ? temporaryOriginal.reasoningSegmentsJson
+            : null,
         groupId: groupId,
         version: nextVersion,
       );

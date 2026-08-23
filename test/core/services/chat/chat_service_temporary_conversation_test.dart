@@ -1018,6 +1018,157 @@ void main() {
         expect((persistedEdited.parts[2] as TextPart).text, '结果是 X');
       },
     );
+
+    test(
+      'temporary content-only append keeps collapsed assistant reasoning',
+      () async {
+        final service = createService();
+        await service.init();
+        const reasoningJson =
+            '{"v":2,"segments":[{"text":"plan then check","expanded":false,'
+            '"toolStartIndex":0}],"contentSplits":{"offsets":[5],'
+            '"reasoningCounts":[1],"toolCounts":[1]},'
+            '"reasoningDetails":[{"id":"rd_1","type":"reasoning.encrypted",'
+            '"data":"sig","format":"anthropic-claude-v1"}]}';
+        final reasoningStart = DateTime.utc(2026, 8, 22, 11, 59);
+        final reasoningFinished = DateTime.utc(2026, 8, 22, 12);
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: const [
+            ReasoningPart('plan then check'),
+            TextPart('original answer'),
+          ],
+          reasoningText: 'plan then check',
+          reasoningStartAt: reasoningStart,
+          reasoningFinishedAt: reasoningFinished,
+        );
+        await service.updateMessage(
+          original.id,
+          reasoningSegmentsJson: reasoningJson,
+        );
+
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'edited answer',
+        );
+
+        expect(edited, isNotNull);
+        expect(edited!.content, 'edited answer');
+        expect(edited.parts.map((part) => part.kind), ['reasoning', 'text']);
+        expect((edited.parts[0] as ReasoningPart).text, 'plan then check');
+        expect((edited.parts[1] as TextPart).text, 'edited answer');
+        expect(edited.reasoningText, 'plan then check');
+        expect(edited.reasoningStartAt, reasoningStart);
+        expect(edited.reasoningFinishedAt, reasoningFinished);
+        expect(edited.reasoningSegmentsJson, reasoningJson);
+        expect(edited.translation, isNull);
+        expect(edited.totalTokens, isNull);
+        expect(service.getMessages(conversation.id).last.id, edited.id);
+      },
+    );
+
+    test(
+      'temporary content-only append keeps interleaved reasoning tool text',
+      () async {
+        final service = createService();
+        await service.init();
+        const reasoningJson =
+            '{"v":2,"segments":['
+            '{"text":"plan","expanded":false,"toolStartIndex":0},'
+            '{"text":"check","expanded":false,"toolStartIndex":1}'
+            '],"contentSplits":{"offsets":[6,11],'
+            '"reasoningCounts":[1,2],"toolCounts":[1,1]}}';
+        final reasoningStart = DateTime.utc(2026, 8, 22, 12, 50);
+        final reasoningFinished = DateTime.utc(2026, 8, 22, 13);
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: const [
+            ReasoningPart('plan'),
+            TextPart('hello '),
+            ToolCallPart('{"id":"call_1","name":"lookup"}'),
+            TextPart('world'),
+            ReasoningPart('check'),
+          ],
+          reasoningText: 'plan\ncheck',
+          reasoningStartAt: reasoningStart,
+          reasoningFinishedAt: reasoningFinished,
+        );
+        await service.updateMessage(
+          original.id,
+          reasoningSegmentsJson: reasoningJson,
+        );
+
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'hello world',
+        );
+
+        expect(edited!.parts.map((part) => part.kind), [
+          'reasoning',
+          'text',
+          'tool_call',
+          'text',
+          'reasoning',
+        ]);
+        expect((edited.parts[0] as ReasoningPart).text, 'plan');
+        expect((edited.parts[4] as ReasoningPart).text, 'check');
+        expect(edited.reasoningText, 'plan\ncheck');
+        expect(edited.reasoningStartAt, reasoningStart);
+        expect(edited.reasoningFinishedAt, reasoningFinished);
+        expect(edited.reasoningSegmentsJson, reasoningJson);
+      },
+    );
+
+    test(
+      'temporary explicit parts does not inherit reasoning metadata',
+      () async {
+        final service = createService();
+        await service.init();
+
+        final conversation = await service.createDraftConversation(
+          title: 'Temporary Chat',
+          temporary: true,
+        );
+        final original = await service.addMessage(
+          conversationId: conversation.id,
+          role: 'assistant',
+          parts: const [ReasoningPart('old plan'), TextPart('old answer')],
+          reasoningText: 'old plan',
+          reasoningStartAt: DateTime.utc(2026, 8, 22, 13, 50),
+          reasoningFinishedAt: DateTime.utc(2026, 8, 22, 14),
+        );
+        await service.updateMessage(
+          original.id,
+          reasoningSegmentsJson:
+              '{"segments":[{"text":"old plan","expanded":false}]}',
+        );
+
+        final edited = await service.appendMessageVersion(
+          messageId: original.id,
+          content: 'replacement',
+          parts: const [TextPart('replacement')],
+        );
+
+        expect(edited!.parts, hasLength(1));
+        expect(edited.parts.single, isA<TextPart>());
+        expect(edited.reasoningText, isNull);
+        expect(edited.reasoningStartAt, isNull);
+        expect(edited.reasoningFinishedAt, isNull);
+        expect(edited.reasoningSegmentsJson, isNull);
+      },
+    );
   });
 
   group('ChatService fork conversations', () {

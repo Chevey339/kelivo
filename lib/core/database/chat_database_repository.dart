@@ -4414,24 +4414,29 @@ class ChatDatabaseRepository {
       // Content-only append must load original parts first and keep non-text
       // attachments (ImagePart/FilePart/etc.) on the new revision, preserving
       // ordinal ([Image, Text] stays [Image, Text(new)], not [Text(new), Image]).
-      final List<MessagePart> resolvedParts;
-      if (parts != null) {
-        resolvedParts = parts;
-      } else {
-        final original = await _messageFromRowWithParts(originalRow);
-        resolvedParts = ChatMessage.partsWithRedistributedText(
-          original.parts,
-          content,
-        );
-      }
+      // Assistant body-only edits also inherit reasoning metadata so the
+      // collapsed card stays toggleable on the new version.
+      final original = await _messageFromRowWithParts(originalRow);
+      final preserveReasoning =
+          parts == null && original.role == 'assistant';
+      final resolvedParts = parts ??
+          ChatMessage.partsWithRedistributedText(original.parts, content);
       final message = ChatMessage(
-        role: originalRow.role,
+        role: original.role,
         parts: resolvedParts,
-        conversationId: originalRow.conversationId,
-        modelId: originalRow.modelId,
-        providerId: originalRow.providerId,
+        conversationId: original.conversationId,
+        modelId: original.modelId,
+        providerId: original.providerId,
         totalTokens: null,
         isStreaming: false,
+        reasoningText: preserveReasoning ? original.reasoningText : null,
+        reasoningStartAt: preserveReasoning ? original.reasoningStartAt : null,
+        reasoningFinishedAt: preserveReasoning
+            ? original.reasoningFinishedAt
+            : null,
+        reasoningSegmentsJson: preserveReasoning
+            ? original.reasoningSegmentsJson
+            : null,
         groupId: groupId,
         version: nextVersion,
       );
