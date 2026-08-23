@@ -12,10 +12,7 @@ import '../../../shared/widgets/task_progress_dialog.dart';
 import '../../settings/widgets/custom_theme_widgets.dart';
 
 final class BackupTaskHandle {
-  BackupTaskHandle({
-    required this.cancelToken,
-    required ValueNotifier<BackupProgress> progress,
-  }) : _progress = progress;
+  BackupTaskHandle({required this.cancelToken, required this._progress});
 
   final BackupCancelToken cancelToken;
   final ValueNotifier<BackupProgress> _progress;
@@ -162,7 +159,9 @@ class _BackupProgressDialogHostState<T>
         return TaskProgressDialogCard(
           title: widget.title,
           phaseLabel: backupPhaseLabel(l10n, progress.phase),
-          fraction: _outcome == TaskProgressOutcome.success ? 1 : progress.fraction,
+          fraction: _outcome == TaskProgressOutcome.success
+              ? 1
+              : progress.fraction,
           subtitle: backupProgressSubtitle(l10n, progress),
           phaseIcon: backupPhaseIcon(progress.phase),
           cancellable: progress.cancellable && widget.initiallyCancellable,
