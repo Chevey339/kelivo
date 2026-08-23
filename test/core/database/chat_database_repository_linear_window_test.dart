@@ -327,4 +327,55 @@ void main() {
       expect(untruncated.single.content, partText);
     },
   );
+
+  test(
+    'following-assistant context does not cross the next user group',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'context_missing_reply_test_',
+      );
+      final repository = ChatDatabaseRepository.open(
+        file: File('${root.path}/chat.sqlite'),
+      );
+      addTearDown(() async {
+        await repository.close();
+        await root.delete(recursive: true);
+      });
+      const conversationId = 'conversation';
+      final conversation = Conversation(
+        id: conversationId,
+        title: 'Missing middle reply',
+      );
+      ChatMessage message(String id, String role) => ChatMessage(
+        id: id,
+        role: role,
+        content: id,
+        conversationId: conversationId,
+      );
+      final messages = [
+        message('user-1', 'user'),
+        message('user-2', 'user'),
+        message('assistant-2', 'assistant'),
+      ];
+      await repository.putMigrationBatch(
+        conversations: [conversation],
+        messages: [
+          for (final (index, item) in messages.indexed)
+            (message: item, messageOrder: index),
+        ],
+        toolEventsByMessageId: const {},
+        geminiSignaturesByMessageId: const {},
+      );
+
+      final context = await repository.getSelectedContextMessages(
+        conversationId,
+        truncateIndex: -1,
+        limit: 10,
+        throughRevisionId: 'user-1',
+        includeFollowingAssistant: true,
+      );
+
+      expect(context.map((message) => message.id), ['user-1']);
+    },
+  );
 }

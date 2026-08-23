@@ -2770,6 +2770,7 @@ class ChatService extends ChangeNotifier {
     String? groupId,
     int? version,
     bool selectVersion = false,
+    String? temporaryAfterGroupId,
   }) async {
     if (!_initialized) await init();
 
@@ -2813,8 +2814,22 @@ class ChatService extends ChangeNotifier {
       return message;
     }
 
+    int? temporaryInsertIndex;
     if (temporary) {
-      conversation.messageIds.add(message.id);
+      if (temporaryAfterGroupId != null) {
+        final messages = _messagesCache[conversationId]!;
+        final anchorIndex = messages.indexWhere(
+          (candidate) =>
+              (candidate.groupId ?? candidate.id) == temporaryAfterGroupId,
+        );
+        if (anchorIndex < 0) {
+          throw StateError('linear_message_group_missing');
+        }
+        temporaryInsertIndex = anchorIndex + 1;
+        conversation.messageIds.insert(temporaryInsertIndex, message.id);
+      } else {
+        conversation.messageIds.add(message.id);
+      }
       conversation.updatedAt = DateTime.now();
       if (selectVersion) {
         conversation.versionSelections[message.groupId ?? message.id] =
@@ -2822,6 +2837,9 @@ class ChatService extends ChangeNotifier {
       }
       _messagesCache.putIfAbsent(conversationId, () => <ChatMessage>[]);
     } else {
+      if (temporaryAfterGroupId != null) {
+        throw StateError('anchored_message_requires_temporary_conversation');
+      }
       if (_conversationsCache.containsKey(conversationId)) {
         await _loadMessageOrder(conversationId);
       }
@@ -2849,7 +2867,12 @@ class ChatService extends ChangeNotifier {
 
     // Update cache
     if (_messagesCache.containsKey(conversationId)) {
-      _messagesCache[conversationId]!.add(message);
+      final messages = _messagesCache[conversationId]!;
+      if (temporaryInsertIndex == null) {
+        messages.add(message);
+      } else {
+        messages.insert(temporaryInsertIndex, message);
+      }
     }
     _touchMessageCache(conversationId);
 
@@ -2967,12 +2990,10 @@ class ChatService extends ChangeNotifier {
       runId: const Uuid().v4(),
       truncateFuture: truncateFuture,
     );
-    if (truncateFuture) {
-      _messagesCache.remove(conversationId);
-      _messageOrderIds.remove(conversationId);
-      _firstGroupIndicesCache.remove(conversationId);
-      await _loadMessageOrder(conversationId);
-    }
+    _messagesCache.remove(conversationId);
+    _messageOrderIds.remove(conversationId);
+    _firstGroupIndicesCache.remove(conversationId);
+    await _loadMessageOrder(conversationId);
     await _publishGenerationBegin(result);
     return result;
   }
