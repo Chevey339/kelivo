@@ -108,6 +108,54 @@ void main() {
   );
 
   test(
+    'overlapping first assistant role writes persist the latest value',
+    () async {
+      final harness = await createBusinessTestHarness(initial: {});
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+
+      const shared = ChatBubbleStyleOverrides(
+        backgroundArgbLight: 0xFF112233,
+        cornerRadius: 8,
+      );
+      await settings.setChatBubbleStyleOverrides(shared);
+      expect(
+        harness.preferences.getString('chat_bubble_style_overrides_user_v1'),
+        isNull,
+      );
+
+      const assistantA = ChatBubbleStyleOverrides(cornerRadius: 2);
+      const assistantB = ChatBubbleStyleOverrides(cornerRadius: 4);
+      final first = settings.setChatBubbleStyleOverridesForRole(
+        isUser: false,
+        value: assistantA,
+      );
+      final second = settings.setChatBubbleStyleOverridesForRole(
+        isUser: false,
+        value: assistantB,
+      );
+      await first;
+      await second;
+
+      expect(settings.assistantChatBubbleStyleOverrides, assistantB);
+      expect(settings.userChatBubbleStyleOverrides, shared);
+      expect(
+        harness.preferences.getString('chat_bubble_style_overrides_v1'),
+        jsonEncode(assistantB.toJson()),
+      );
+      expect(
+        harness.preferences.getString('chat_bubble_style_overrides_user_v1'),
+        jsonEncode(shared.toJson()),
+      );
+
+      final reloaded = SettingsProvider(harness.preferences);
+      await reloaded.loaded;
+      expect(reloaded.assistantChatBubbleStyleOverrides, assistantB);
+      expect(reloaded.userChatBubbleStyleOverrides, shared);
+    },
+  );
+
+  test(
     'reset clears a user-only split even when assistant is already default',
     () async {
       final harness = await createBusinessTestHarness(initial: {});

@@ -2768,14 +2768,17 @@ class SettingsProvider extends ChangeNotifier {
       _userChatBubbleStyleOverrides = previous;
       _chatBubbleStyleOverrides = value;
       notifyListeners();
-      await _preferences.setString(
+      // Submit both writes before awaiting so they cannot interleave.
+      final userWrite = _preferences.setString(
         _userChatBubbleStyleOverridesKey,
         jsonEncode(previous.toJson()),
       );
-      await _preferences.setString(
+      final assistantWrite = _preferences.setString(
         _chatBubbleStyleOverridesKey,
         jsonEncode(value.toJson()),
       );
+      await userWrite;
+      await assistantWrite;
       return;
     }
     _chatBubbleStyleOverrides = value;
