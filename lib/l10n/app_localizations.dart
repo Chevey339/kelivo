@@ -14640,6 +14640,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Thinking'**
   String get messageStyleSettingsPagePreviewThinking;
+
+  /// No description provided for @messageStyleSettingsPageRoleUser.
+  ///
+  /// In en, this message translates to:
+  /// **'User'**
+  String get messageStyleSettingsPageRoleUser;
+
+  /// No description provided for @messageStyleSettingsPageRoleAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant'**
+  String get messageStyleSettingsPageRoleAssistant;
+
+  /// No description provided for @messageStyleSettingsPageRoleAssistantHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant settings also apply to thinking, tool-call, and translation cards.'**
+  String get messageStyleSettingsPageRoleAssistantHint;
 }
 
 class _AppLocalizationsDelegate

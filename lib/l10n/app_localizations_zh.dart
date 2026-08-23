@@ -7719,6 +7719,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '用户';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手设定同时作用于思考、工具调用和翻译卡片。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hans`).
@@ -15362,6 +15372,16 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '用户';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手设定同时作用于思考、工具调用和翻译卡片。';
 }
 
 /// The translations for Chinese, using the Han script (`zh_Hant`).
@@ -23079,4 +23099,14 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => '思考中';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => '使用者';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => '助手';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      '助手設定同時作用於思考、工具呼叫和翻譯卡片。';
 }

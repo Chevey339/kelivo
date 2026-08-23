@@ -165,6 +165,7 @@ final class BusinessKeyRegistry {
     'memory_migrate_prompt_en_v1',
     'memory_migration_batch_size_v1',
     'chat_bubble_style_overrides_v1',
+    'chat_bubble_style_overrides_user_v1',
   };
 
   static BusinessKeyDisposition classify(String key) {

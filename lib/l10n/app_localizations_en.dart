@@ -8049,4 +8049,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get messageStyleSettingsPagePreviewThinking => 'Thinking';
+
+  @override
+  String get messageStyleSettingsPageRoleUser => 'User';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistant => 'Assistant';
+
+  @override
+  String get messageStyleSettingsPageRoleAssistantHint =>
+      'Assistant settings also apply to thinking, tool-call, and translation cards.';
 }

@@ -2916,5 +2916,8 @@
   "messageStyleSettingsPageCornerRadius": "圆角半径",
   "messageStyleSettingsPagePreviewUser": "这是一条用户消息",
   "messageStyleSettingsPagePreviewAssistant": "这是一条助手回复。",
-  "messageStyleSettingsPagePreviewThinking": "思考中"
+  "messageStyleSettingsPagePreviewThinking": "思考中",
+  "messageStyleSettingsPageRoleUser": "用户",
+  "messageStyleSettingsPageRoleAssistant": "助手",
+  "messageStyleSettingsPageRoleAssistantHint": "助手设定同时作用于思考、工具调用和翻译卡片。"
 }
