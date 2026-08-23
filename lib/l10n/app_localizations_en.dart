@@ -4486,10 +4486,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Hide images in tool results';
 
   @override
-  String get displaySettingsPageHideToolResultImagesSubtitle =>
-      'Do not show Markdown images below tool or MCP result cards';
-
-  @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
       'Delete messages below when regenerating';
 

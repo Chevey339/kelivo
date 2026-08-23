@@ -1962,7 +1962,6 @@
   "displaySettingsPageInsertSuggestionOnlyTitle": "Insert suggestions without sending",
   "displaySettingsPageShowToolResultSummarySubtitle": "Display the summary text below tool steps",
   "displaySettingsPageHideToolResultImagesTitle": "Hide images in tool results",
-  "displaySettingsPageHideToolResultImagesSubtitle": "Do not show Markdown images below tool or MCP result cards",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "Delete messages below when regenerating",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "Confirm before regenerating",
   "displaySettingsPageForkKeepMessageVersionsTitle": "Keep Message Versions When Forking",

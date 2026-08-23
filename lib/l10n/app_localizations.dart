@@ -8275,12 +8275,6 @@ abstract class AppLocalizations {
   /// **'Hide images in tool results'**
   String get displaySettingsPageHideToolResultImagesTitle;
 
-  /// No description provided for @displaySettingsPageHideToolResultImagesSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Do not show Markdown images below tool or MCP result cards'**
-  String get displaySettingsPageHideToolResultImagesSubtitle;
-
   /// No description provided for @displaySettingsPageRegenerateDeleteTrailingMessagesTitle.
   ///
   /// In en, this message translates to:

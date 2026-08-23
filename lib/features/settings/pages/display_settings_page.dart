@@ -2056,7 +2056,6 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
                 context,
                 icon: Lucide.ImageOff,
                 label: l10n.displaySettingsPageHideToolResultImagesTitle,
-                subtitle: l10n.displaySettingsPageHideToolResultImagesSubtitle,
                 value: sp.hideToolResultImages,
                 onChanged: (v) =>
                     context.read<SettingsProvider>().setHideToolResultImages(v),
