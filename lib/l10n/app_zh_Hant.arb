@@ -1559,6 +1559,8 @@
   "displaySettingsPageShowToolResultSummaryTitle": "顯示工具結果摘要",
   "displaySettingsPageInsertSuggestionOnlyTitle": "點擊建議時僅填入輸入框",
   "displaySettingsPageShowToolResultSummarySubtitle": "在工具步驟下方顯示摘要文字",
+  "displaySettingsPageHideToolResultImagesTitle": "隱藏工具結果中的圖片",
+  "displaySettingsPageHideToolResultImagesSubtitle": "開啟後，工具或 MCP 結果裡的 Markdown 圖片不再顯示在卡片下方",
   "displaySettingsPageRegenerateDeleteTrailingMessagesTitle": "重新生成時刪除下面的訊息",
   "displaySettingsPageShowRegenerateConfirmDialogTitle": "重新生成前彈出確認",
   "displaySettingsPageForkKeepMessageVersionsTitle": "建立分支時保留訊息版本",

@@ -2054,6 +2054,16 @@ class BehaviorStartupSettingsPage extends StatelessWidget {
               _iosDivider(context),
               _iosSwitchRow(
                 context,
+                icon: Lucide.ImageOff,
+                label: l10n.displaySettingsPageHideToolResultImagesTitle,
+                subtitle: l10n.displaySettingsPageHideToolResultImagesSubtitle,
+                value: sp.hideToolResultImages,
+                onChanged: (v) =>
+                    context.read<SettingsProvider>().setHideToolResultImages(v),
+              ),
+              _iosDivider(context),
+              _iosSwitchRow(
+                context,
                 icon: Lucide.TextSelect,
                 label: l10n.displaySettingsPageInsertSuggestionOnlyTitle,
                 value: sp.insertSuggestionOnTapOnly,

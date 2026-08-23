@@ -4623,6 +4623,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     final showToolResultSummary = context.select<SettingsProvider, bool>(
       (s) => s.showToolResultSummary,
     );
+    final hideToolResultImages = context.select<SettingsProvider, bool>(
+      (s) => s.hideToolResultImages,
+    );
     final approvalService = context.watch<ToolApprovalService>();
     ToolApprovalRequest? pendingRequest;
     if (widget.part.id.isNotEmpty &&
@@ -4726,7 +4729,8 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               color: fg.body,
             ),
           );
-    final Widget? imageThumbnails = (!_isAskUser && imagePaths.isNotEmpty)
+    final Widget? imageThumbnails =
+        (!_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty)
         ? SizedBox(
             key: ValueKey('tool-image-thumbnails:${widget.part.id}'),
             height: 120,
@@ -4891,7 +4895,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg = _chatSurfaceForegroundPalette(context);
-    final hasImages = _imagePaths.isNotEmpty;
+    final hideToolResultImages = context.select<SettingsProvider, bool>(
+      (s) => s.hideToolResultImages,
+    );
+    final hasImages = !hideToolResultImages && _imagePaths.isNotEmpty;
     final l10n = AppLocalizations.of(context)!;
     final ttsText = widget.part.toolName == LocalToolNames.textToSpeech
         ? _textToSpeechToolText(widget.part.arguments)

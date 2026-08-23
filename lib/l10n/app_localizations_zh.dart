@@ -4318,6 +4318,13 @@ class AppLocalizationsZh extends AppLocalizations {
       '在工具步骤下方显示摘要文本';
 
   @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隐藏工具结果中的图片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '开启后，工具或 MCP 结果里的 Markdown 图片不再显示在卡片下方';
+
+  @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
       '重新生成时删除下面的消息';
 
@@ -12045,6 +12052,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '在工具步骤下方显示摘要文本';
 
   @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隐藏工具结果中的图片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '开启后，工具或 MCP 结果里的 Markdown 图片不再显示在卡片下方';
+
+  @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>
       '重新生成时删除下面的消息';
 
@@ -19694,6 +19708,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get displaySettingsPageShowToolResultSummarySubtitle =>
       '在工具步驟下方顯示摘要文字';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesTitle => '隱藏工具結果中的圖片';
+
+  @override
+  String get displaySettingsPageHideToolResultImagesSubtitle =>
+      '開啟後，工具或 MCP 結果裡的 Markdown 圖片不再顯示在卡片下方';
 
   @override
   String get displaySettingsPageRegenerateDeleteTrailingMessagesTitle =>

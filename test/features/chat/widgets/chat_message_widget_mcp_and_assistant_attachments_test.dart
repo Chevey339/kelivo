@@ -14,11 +14,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-Widget _harness(Widget child) {
+Widget _harness(Widget child, {SettingsProvider? settings}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(
-        create: (_) => SettingsProvider(createBusinessTestPreferences()),
+        create: (_) =>
+            settings ?? SettingsProvider(createBusinessTestPreferences()),
       ),
       ChangeNotifierProvider(
         create: (_) =>
@@ -133,6 +134,55 @@ more text
     );
   });
 
+  testWidgets('hideToolResultImages suppresses MCP thumbnails under the card', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setHideToolResultImages(true);
+
+    await tester.pumpWidget(
+      _harness(
+        settings: settings,
+        ChatMessageWidget(
+          showModelIcon: false,
+          message: ChatMessage(
+            id: 'assistant-mcp-thumbs-hidden',
+            role: 'assistant',
+            content: 'tool ran',
+            conversationId: 'conversation-mcp-thumbs-hidden',
+          ),
+          toolParts: const [
+            ToolUIPart(
+              id: 'tool-hidden',
+              toolName: 'screenshot',
+              arguments: {'target': 'desk'},
+              content:
+                  'captured\n![](https://example.com/mcp.png)\n![local](/tmp/mcp_local.png)',
+            ),
+          ],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('tool-image-thumbnails:tool-hidden')),
+      findsNothing,
+    );
+    expect(
+      tester
+          .widgetList<Image>(find.byType(Image))
+          .any(
+            (image) =>
+                image.image is NetworkImage &&
+                (image.image as NetworkImage).url ==
+                    'https://example.com/mcp.png',
+          ),
+      isFalse,
+    );
+  });
+
   testWidgets('MCP markdown images appear in tool detail sheet', (
     tester,
   ) async {
@@ -174,6 +224,42 @@ more text
                 'https://example.com/detail.png',
       ),
       isTrue,
+    );
+  });
+
+  testWidgets('hideToolResultImages also hides tool-role card thumbnails', (
+    tester,
+  ) async {
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+    await settings.setHideToolResultImages(true);
+
+    await tester.pumpWidget(
+      _harness(
+        settings: settings,
+        ChatMessageWidget(
+          message: ChatMessage(
+            id: 'tool-role-mcp-hidden',
+            role: 'tool',
+            conversationId: 'conversation-tool-role-mcp-hidden',
+            content:
+                '{"tool":"screenshot","arguments":{},"result":"ok\\n![](https://example.com/tool-role.png)"}',
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      tester
+          .widgetList<Image>(find.byType(Image))
+          .any(
+            (image) =>
+                image.image is NetworkImage &&
+                (image.image as NetworkImage).url ==
+                    'https://example.com/tool-role.png',
+          ),
+      isFalse,
     );
   });
 

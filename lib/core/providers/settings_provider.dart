@@ -187,6 +187,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_collapse_thinking_steps_v1';
   static const String _displayShowToolResultSummaryKey =
       'display_show_tool_result_summary_v1';
+  static const String _displayHideToolResultImagesKey =
+      'display_hide_tool_result_images_v1';
   static const String _displayRegenerateDeleteTrailingMessagesKey =
       'display_regenerate_delete_trailing_messages_v1';
   static const String _displayShowRegenerateConfirmDialogKey =
@@ -1045,6 +1047,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayCollapseThinkingStepsKey) ?? false;
     _showToolResultSummary =
         prefs.getBool(_displayShowToolResultSummaryKey) ?? false;
+    _hideToolResultImages =
+        prefs.getBool(_displayHideToolResultImagesKey) ?? false;
     _regenerateDeleteTrailingMessages =
         prefs.getBool(_displayRegenerateDeleteTrailingMessagesKey) ?? false;
     _showRegenerateConfirmDialog =
@@ -4411,6 +4415,16 @@ Requirements:
     await prefs.setBool(_displayShowToolResultSummaryKey, v);
   }
 
+  bool _hideToolResultImages = false;
+  bool get hideToolResultImages => _hideToolResultImages;
+  Future<void> setHideToolResultImages(bool v) async {
+    if (_hideToolResultImages == v) return;
+    _hideToolResultImages = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayHideToolResultImagesKey, v);
+  }
+
   bool _regenerateDeleteTrailingMessages = false;
   bool get regenerateDeleteTrailingMessages =>
       _regenerateDeleteTrailingMessages;
@@ -5395,6 +5409,7 @@ Requirements:
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;
+    copy._hideToolResultImages = _hideToolResultImages;
     copy._regenerateDeleteTrailingMessages = _regenerateDeleteTrailingMessages;
     copy._showRegenerateConfirmDialog = _showRegenerateConfirmDialog;
     copy._forkKeepMessageVersions = _forkKeepMessageVersions;
