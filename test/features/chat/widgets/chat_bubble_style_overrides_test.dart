@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -174,4 +175,105 @@ void main() {
         );
     expect(heading.text.style?.color, const Color(0xFF224466));
   });
+
+  testWidgets(
+    'user and assistant frosted overrides can differ in radius and text color',
+    (tester) async {
+      final harness = await createBusinessTestHarness(
+        initial: {'display_chat_message_background_style_v1': 'frosted'},
+      );
+      final settings = SettingsProvider(harness.preferences);
+      await settings.loaded;
+      await settings.setEnableAssistantMarkdown(false);
+      await settings.setEnableUserMarkdown(false);
+      await settings.setChatBubbleStyleOverridesForRole(
+        isUser: false,
+        value: const ChatBubbleStyleOverrides(
+          cornerRadius: 4,
+          textArgbLight: 0xFF224466,
+        ),
+      );
+      await settings.setChatBubbleStyleOverridesForRole(
+        isUser: true,
+        value: const ChatBubbleStyleOverrides(
+          cornerRadius: 20,
+          textArgbLight: 0xFFAA2200,
+        ),
+      );
+
+      const userId = 'user-role-overrides';
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  TtsProvider(preferences: createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  UserProvider(preferences: createBusinessTestPreferences()),
+            ),
+            ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+            ChangeNotifierProvider(create: (_) => AskUserInteractionService()),
+          ],
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Column(
+                children: [
+                  ChatMessageWidget(
+                    message: ChatMessage(
+                      id: userId,
+                      role: 'user',
+                      content: 'User override text',
+                      conversationId: 'conversation-role-overrides',
+                    ),
+                    showUserAvatar: false,
+                    showModelIcon: false,
+                  ),
+                  ChatMessageWidget(
+                    message: ChatMessage(
+                      role: 'assistant',
+                      content: 'Assistant override text',
+                      conversationId: 'conversation-role-overrides',
+                    ),
+                    showModelIcon: false,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final userClip = tester.widget<ClipRRect>(
+        find.descendant(
+          of: find.byKey(const ValueKey('user-message-text-bubble:$userId')),
+          matching: find.byType(ClipRRect),
+        ),
+      );
+      final assistantClip = tester.widget<ClipRRect>(
+        find
+            .ancestor(
+              of: find.text('Assistant override text'),
+              matching: find.byType(ClipRRect),
+            )
+            .first,
+      );
+
+      expect(userClip.borderRadius, BorderRadius.circular(20));
+      expect(assistantClip.borderRadius, BorderRadius.circular(4));
+      expect(
+        tester.widget<Text>(find.text('User override text')).style?.color,
+        const Color(0xFFAA2200),
+      );
+      expect(
+        tester.widget<Text>(find.text('Assistant override text')).style?.color,
+        const Color(0xFF224466),
+      );
+    },
+  );
 }
