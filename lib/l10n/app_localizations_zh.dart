@@ -4233,6 +4233,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutPageQQGroupTwo => 'Kelivo 二群';
 
   @override
+  String get aboutPageQQGroupThree => 'Kelivo 三群';
+
+  @override
   String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
@@ -11976,6 +11979,9 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get aboutPageQQGroupTwo => 'Kelivo 二群';
 
   @override
+  String get aboutPageQQGroupThree => 'Kelivo 三群';
+
+  @override
   String get aboutPageJoinDiscord => '在 Discord 中加入我们';
 
   @override
@@ -19641,6 +19647,9 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get aboutPageQQGroupTwo => 'Kelivo 二群';
+
+  @override
+  String get aboutPageQQGroupThree => 'Kelivo 三群';
 
   @override
   String get aboutPageJoinDiscord => '加入我們的 Discord';

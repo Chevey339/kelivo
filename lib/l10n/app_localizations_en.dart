@@ -4384,6 +4384,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutPageQQGroupTwo => 'Kelivo Group 2';
 
   @override
+  String get aboutPageQQGroupThree => 'Kelivo Group 3';
+
+  @override
   String get aboutPageJoinDiscord => 'Join us on Discord';
 
   @override

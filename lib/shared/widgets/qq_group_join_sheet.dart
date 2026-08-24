@@ -26,6 +26,10 @@ List<_QQGroupEntry> _groups(AppLocalizations l10n) => <_QQGroupEntry>[
     name: l10n.aboutPageQQGroupTwo,
     joinUrl: 'https://qm.qq.com/q/7t6VEqSXhm',
   ),
+  _QQGroupEntry(
+    name: l10n.aboutPageQQGroupThree,
+    joinUrl: 'https://qm.qq.com/q/ebEJBgvDMs',
+  ),
 ];
 
 Future<void> _openJoinUrl(String url) async {
@@ -78,8 +82,8 @@ Future<void> showQQGroupJoinSheet({required BuildContext context}) {
     context: context,
     title: l10n.aboutPageJoinQQGroup,
     closeSemanticLabel: l10n.mcpPageClose,
-    partialHeightFactor: 0.42,
-    expandedHeightFactor: 0.42,
+    partialHeightFactor: 0.50,
+    expandedHeightFactor: 0.50,
     builder: (sheetContext, controller) => ListView(
       controller: controller,
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

@@ -8113,6 +8113,12 @@ abstract class AppLocalizations {
   /// **'Kelivo Group 2'**
   String get aboutPageQQGroupTwo;
 
+  /// No description provided for @aboutPageQQGroupThree.
+  ///
+  /// In en, this message translates to:
+  /// **'Kelivo Group 3'**
+  String get aboutPageQQGroupThree;
+
   /// No description provided for @aboutPageJoinDiscord.
   ///
   /// In en, this message translates to:
