@@ -20,6 +20,7 @@ import '../../../utils/brand_assets.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../desktop/hotkeys/chat_action_bus.dart';
 import '../../../desktop/hotkeys/sidebar_tab_bus.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -118,53 +119,50 @@ class HomeDesktopScaffold extends StatelessWidget {
     final sp = context.watch<SettingsProvider>();
     final topicsOnRight = sp.desktopTopicPosition == DesktopTopicPosition.right;
 
-    return Stack(
-      children: [
-        Positioned.fill(child: buildAssistantBackground(context)),
-        SizedBox.expand(
-          child: Row(
-            children: [
-              // Left sidebar
-              _buildLeftSidebar(context, cs, topicsOnRight),
-              // Left sidebar resize handle / divider
-              if (_isDesktop)
-                SidebarResizeHandle(
-                  visible: tabletSidebarOpen,
-                  onDrag: onSidebarWidthChanged,
-                  onDragEnd: onSidebarWidthChangeEnd,
-                )
-              else
-                AnimatedContainer(
-                  duration: _sidebarAnimDuration,
-                  curve: _sidebarAnimCurve,
-                  width: tabletSidebarOpen ? 0.6 : 0,
-                  child: tabletSidebarOpen
-                      ? VerticalDivider(
-                          width: 0.6,
-                          thickness: 0.5,
-                          color: cs.outlineVariant.withValues(alpha: 0.20),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-              // Main content
-              Expanded(
-                child: Scaffold(
-                  key: scaffoldKey,
-                  resizeToAvoidBottomInset: true,
-                  extendBodyBehindAppBar: true,
-                  backgroundColor: Colors.transparent,
-                  appBar:
-                      appBarOverride ??
-                      _buildAppBar(context, cs, topicsOnRight),
-                  body: body,
-                ),
+    return ChatFrostedBackdrop(
+      backdrop: buildAssistantBackground(context),
+      child: SizedBox.expand(
+        child: Row(
+          children: [
+            // Left sidebar
+            _buildLeftSidebar(context, cs, topicsOnRight),
+            // Left sidebar resize handle / divider
+            if (_isDesktop)
+              SidebarResizeHandle(
+                visible: tabletSidebarOpen,
+                onDrag: onSidebarWidthChanged,
+                onDragEnd: onSidebarWidthChangeEnd,
+              )
+            else
+              AnimatedContainer(
+                duration: _sidebarAnimDuration,
+                curve: _sidebarAnimCurve,
+                width: tabletSidebarOpen ? 0.6 : 0,
+                child: tabletSidebarOpen
+                    ? VerticalDivider(
+                        width: 0.6,
+                        thickness: 0.5,
+                        color: cs.outlineVariant.withValues(alpha: 0.20),
+                      )
+                    : const SizedBox.shrink(),
               ),
-              // Right sidebar (desktop only with topics on right)
-              _buildRightSidebar(context, cs, topicsOnRight),
-            ],
-          ),
+            // Main content
+            Expanded(
+              child: Scaffold(
+                key: scaffoldKey,
+                resizeToAvoidBottomInset: true,
+                extendBodyBehindAppBar: true,
+                backgroundColor: Colors.transparent,
+                appBar:
+                    appBarOverride ?? _buildAppBar(context, cs, topicsOnRight),
+                body: body,
+              ),
+            ),
+            // Right sidebar (desktop only with topics on right)
+            _buildRightSidebar(context, cs, topicsOnRight),
+          ],
         ),
-      ],
+      ),
     );
   }
 

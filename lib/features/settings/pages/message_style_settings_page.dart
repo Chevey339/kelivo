@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_core/theme.dart';
@@ -18,6 +16,8 @@ import '../../../theme/chat_bubble_style.dart';
 import '../../../theme/custom_theme.dart';
 import '../../../theme/palettes.dart';
 import '../../../theme/theme_factory.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../chat/widgets/frosted/frosted_surface.dart';
 import '../../home/pages/home_mobile_layout.dart';
 import '../widgets/custom_theme_widgets.dart';
 
@@ -1057,110 +1057,117 @@ class _PreviewScene extends StatelessWidget {
       return Opacity(opacity: 0.45, child: child);
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Positioned.fill(child: ColoredBox(color: cs.surface)),
-        const MobileBackgroundLayer(),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 240),
-                  child: maybeDim(
-                    active: editingUser,
-                    child: _PreviewSurface(
-                      style: style,
-                      resolved: userResolved,
-                      defaultColor: brightness == Brightness.dark
-                          ? cs.primary.withValues(alpha: 0.15)
-                          : cs.primary.withValues(alpha: 0.08),
-                      padding: const EdgeInsets.all(11),
-                      child: Text(
-                        l10n.messageStyleSettingsPagePreviewUser,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.35,
-                          color:
-                              style == ChatMessageBackgroundStyle.defaultStyle
-                              ? cs.onSurface
-                              : userResolved.text,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              maybeDim(
-                active: !editingUser,
-                child: _PreviewSurface(
-                  style: style,
-                  resolved: assistantResolved,
-                  defaultColor: cs.primaryContainer.withValues(
-                    alpha: brightness == Brightness.dark ? 0.25 : 0.30,
-                  ),
-                  padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-                  child: Row(
-                    children: [
-                      ReasoningIcons.thinkingCardIcon(
-                        size: 16,
-                        color: _previewStrong(context, assistantResolved),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
+    return ChatFrostedBackdrop(
+      backdrop: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(color: cs.surface),
+          const MobileBackgroundLayer(),
+        ],
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 240),
+                    child: maybeDim(
+                      active: editingUser,
+                      child: _PreviewSurface(
+                        style: style,
+                        resolved: userResolved,
+                        defaultColor: brightness == Brightness.dark
+                            ? cs.primary.withValues(alpha: 0.15)
+                            : cs.primary.withValues(alpha: 0.08),
+                        padding: const EdgeInsets.all(11),
                         child: Text(
-                          l10n.messageStyleSettingsPagePreviewThinking,
+                          l10n.messageStyleSettingsPagePreviewUser,
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: AppFontWeights.emphasis,
-                            color: _previewStrong(context, assistantResolved),
+                            fontSize: 14,
+                            height: 1.35,
+                            color:
+                                style == ChatMessageBackgroundStyle.defaultStyle
+                                ? cs.onSurface
+                                : userResolved.text,
                           ),
                         ),
                       ),
-                      Icon(
-                        Lucide.ChevronRight,
-                        size: 16,
-                        color: _previewStrong(context, assistantResolved),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 260),
-                  child: maybeDim(
-                    active: !editingUser,
-                    child: _PreviewSurface(
-                      style: style,
-                      resolved: assistantResolved,
-                      bareOnDefault: true,
-                      padding: const EdgeInsets.all(11),
-                      child: Text(
-                        l10n.messageStyleSettingsPagePreviewAssistant,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.45,
-                          color:
-                              style == ChatMessageBackgroundStyle.defaultStyle
-                              ? cs.onSurface
-                              : assistantResolved.text,
+                maybeDim(
+                  active: !editingUser,
+                  child: _PreviewSurface(
+                    style: style,
+                    resolved: assistantResolved,
+                    defaultColor: cs.primaryContainer.withValues(
+                      alpha: brightness == Brightness.dark ? 0.25 : 0.30,
+                    ),
+                    padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+                    child: Row(
+                      children: [
+                        ReasoningIcons.thinkingCardIcon(
+                          size: 16,
+                          color: _previewStrong(context, assistantResolved),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.messageStyleSettingsPagePreviewThinking,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: AppFontWeights.emphasis,
+                              color: _previewStrong(context, assistantResolved),
+                            ),
+                          ),
+                        ),
+                        Icon(
+                          Lucide.ChevronRight,
+                          size: 16,
+                          color: _previewStrong(context, assistantResolved),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    child: maybeDim(
+                      active: !editingUser,
+                      child: _PreviewSurface(
+                        style: style,
+                        resolved: assistantResolved,
+                        bareOnDefault: true,
+                        padding: const EdgeInsets.all(11),
+                        child: Text(
+                          l10n.messageStyleSettingsPagePreviewAssistant,
+                          style: TextStyle(
+                            fontSize: 14,
+                            height: 1.45,
+                            color:
+                                style == ChatMessageBackgroundStyle.defaultStyle
+                                ? cs.onSurface
+                                : assistantResolved.text,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -1198,26 +1205,10 @@ class _PreviewSurface extends StatelessWidget {
     final padded = Padding(padding: padding, child: child);
     switch (style) {
       case ChatMessageBackgroundStyle.frosted:
-        final radius = BorderRadius.circular(resolved.radius);
-        return ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter.grouped(
-            filter: ui.ImageFilter.blur(
-              sigmaX: resolved.blurSigma,
-              sigmaY: resolved.blurSigma,
-            ),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: resolved.background,
-                borderRadius: radius,
-                border: Border.all(
-                  color: resolved.border,
-                  width: resolved.borderWidth,
-                ),
-              ),
-              child: padded,
-            ),
-          ),
+        return FrostedSurface(
+          style: resolved,
+          borderRadius: BorderRadius.circular(resolved.radius),
+          child: padded,
         );
       case ChatMessageBackgroundStyle.solid:
         final radius = BorderRadius.circular(resolved.radius);

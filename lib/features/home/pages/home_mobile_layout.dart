@@ -18,6 +18,7 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -116,22 +117,16 @@ class HomeMobileScaffold extends StatelessWidget {
           if (closeDrawer) drawerController.close();
         },
       ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Keep the chat artwork at the full window size while Scaffold
-          // resizes only its body around the keyboard. Transparent IMEs can
-          // then reveal the artwork instead of Scaffold's surface color.
-          const MobileBackgroundLayer(),
-          Scaffold(
-            key: scaffoldKey,
-            resizeToAvoidBottomInset: true,
-            extendBodyBehindAppBar: true,
-            backgroundColor: Colors.transparent,
-            appBar: appBarOverride ?? _buildAppBar(context, cs),
-            body: body,
-          ),
-        ],
+      child: ChatFrostedBackdrop(
+        backdrop: const MobileBackgroundLayer(),
+        child: Scaffold(
+          key: scaffoldKey,
+          resizeToAvoidBottomInset: true,
+          extendBodyBehindAppBar: true,
+          backgroundColor: Colors.transparent,
+          appBar: appBarOverride ?? _buildAppBar(context, cs),
+          body: body,
+        ),
       ),
     );
   }
@@ -348,7 +343,7 @@ class MobileBackgroundLayer extends StatelessWidget {
         .watch<SettingsProvider>()
         .chatBackgroundMaskStrength;
 
-    if (bg == null || bg.trim().isEmpty) return const SizedBox.shrink();
+    if (bg == null || bg.trim().isEmpty) return const SizedBox.expand();
 
     ImageProvider provider;
     if (bg.startsWith('http')) {
@@ -356,49 +351,44 @@ class MobileBackgroundLayer extends StatelessWidget {
     } else {
       final localPath = SandboxPathResolver.fix(bg);
       final file = File(localPath);
-      if (!file.existsSync()) return const SizedBox.shrink();
+      if (!file.existsSync()) return const SizedBox.expand();
       provider = FileImage(file);
     }
 
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: provider,
-                  fit: BoxFit.cover,
-                  colorFilter: ColorFilter.mode(
-                    cs.shadow.withValues(alpha: 0.04),
-                    BlendMode.srcATop,
-                  ),
-                ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            image: DecorationImage(
+              image: provider,
+              fit: BoxFit.cover,
+              colorFilter: ColorFilter.mode(
+                cs.shadow.withValues(alpha: 0.04),
+                BlendMode.srcATop,
               ),
             ),
           ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      cs.surface.withValues(
-                        alpha: (0.20 * maskStrength).clamp(0.0, 1.0),
-                      ),
-                      cs.surface.withValues(
-                        alpha: (0.50 * maskStrength).clamp(0.0, 1.0),
-                      ),
-                    ],
+        ),
+        IgnorePointer(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  cs.surface.withValues(
+                    alpha: (0.20 * maskStrength).clamp(0.0, 1.0),
                   ),
-                ),
+                  cs.surface.withValues(
+                    alpha: (0.50 * maskStrength).clamp(0.0, 1.0),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

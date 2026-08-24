@@ -38,6 +38,7 @@ import '../../chat/widgets/bottom_tools_sheet.dart';
 import '../../chat/widgets/context_management_sheet.dart';
 import '../../chat/widgets/reasoning_budget_sheet.dart';
 import '../../search/widgets/search_settings_sheet.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../model/widgets/model_select_sheet.dart';
 import '../../mcp/pages/mcp_page.dart';
 import '../../provider/pages/providers_page.dart';
@@ -694,7 +695,6 @@ class _HomePageState extends State<HomePage>
   scroll_ctrl.ChatAutoFollowScrollController _scrollController =
       scroll_ctrl.ChatAutoFollowScrollController();
   String? _scrollConversationId;
-  final BackdropKey _messageListBackdropKey = BackdropKey();
   final GlobalKey _inputBarKey = GlobalKey();
   final GlobalKey _selectionMiniMapKey = GlobalKey();
   final GlobalKey _selectionActionBarKey = GlobalKey();
@@ -1336,17 +1336,7 @@ class _HomePageState extends State<HomePage>
   }
 
   bool _assistantBackgroundActive(BuildContext context) {
-    final bgRaw =
-        (context.watch<AssistantProvider>().currentAssistant?.background ?? '')
-            .trim();
-    if (bgRaw.isEmpty) return false;
-    if (bgRaw.startsWith('http')) return true;
-    try {
-      final fixed = SandboxPathResolver.fix(bgRaw);
-      return File(fixed).existsSync();
-    } catch (_) {
-      return false;
-    }
+    return ChatBackdropSpec.resolve(context).active;
   }
 
   double _chatTopOverlayInset(BuildContext context) {
@@ -1372,101 +1362,100 @@ class _HomePageState extends State<HomePage>
         settings.suggestionModelProvider != null &&
         settings.suggestionModelId != null;
     final assistant = context.watch<AssistantProvider>().currentAssistant;
-    return BackdropGroup(
-      backdropKey: _messageListBackdropKey,
-      child: MessageListView(
-        isProcessingFiles: _controller.isProcessingFiles,
-        scrollController: _scrollController,
-        listController: _controller.scrollCtrl.messageListController,
-        messages: _controller.chatController.collapsedMessages,
-        renderModels: _controller.chatController.messageRenderModels,
-        byGroup: _controller.chatController.groupedMessages,
-        versionSelections: _controller.versionSelections,
-        reasoning: _controller.reasoning,
-        reasoningSegments: _controller.reasoningSegments,
-        contentSplits: _controller.contentSplits,
-        toolParts: _controller.toolParts,
-        translations: _buildTranslationUiStates(),
-        selecting: _controller.selecting,
-        selectedItems: _controller.selectedItems,
-        suggestions: suggestionsEnabled
-            ? (_controller.currentConversation?.chatSuggestions ??
-                  const <String>[])
-            : const <String>[],
-        topContentPadding: topContentPadding,
-        bottomContentPadding: bottomContentPadding,
-        dividerPadding: dividerPadding,
-        streamingContentNotifier: _controller.streamingContentNotifier,
-        spotlightMessageId: _controller.spotlightMessageId,
-        spotlightToken: _controller.spotlightToken,
-        removingSlotIds: _controller.removingSlotIds,
-        hasMoreBefore: _controller.chatController.hasMoreBefore,
-        isLoadingWindow: _controller.isLoadingWindow,
-        onLoadMoreBefore: _controller.loadMoreBefore,
-        hasMoreAfter: _controller.chatController.hasMoreAfter,
-        onLoadMoreAfter: _controller.loadMoreAfter,
-        onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
-        chatFontScale: settings.chatFontScale,
-        collapseThinking: settings.autoCollapseThinking,
-        showThinkingCards: settings.showThinkingCards,
-        showToolCards: settings.showToolCards,
-        collapsedCodeLines: settings.autoCollapseCodeBlock
-            ? settings.autoCollapseCodeBlockLines
-            : null,
-        // Mirrors the wrap decision in the code block renderer.
-        wrapCodeBlocks:
-            Platform.isMacOS ||
-            Platform.isWindows ||
-            Platform.isLinux ||
-            settings.mobileCodeBlockWrap,
-        showModelIcon: settings.showModelIcon,
-        showUserAvatar: settings.showUserAvatar,
-        showTokenStats: settings.showTokenStats,
-        assistant: assistant,
-        onVersionChange: (groupId, version) async {
-          await _controller.setSelectedVersion(groupId, version);
-        },
-        onRegenerateMessage: (message) =>
-            _controller.regenerateAtMessage(message),
-        onResendMessage: (message) => _controller.regenerateAtMessage(message),
-        onTranslateMessage: (message) => _controller.translateMessage(message),
-        onEditMessage: (message) => _controller.editMessage(message),
-        onDeleteMessage: (message, byGroup) =>
-            _handleDeleteMessage(context, message, byGroup),
-        onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
-          context,
-          message,
-          byGroup,
-          deleteAllVersions: true,
-        ),
-        onForkConversation: _controller.isTemporaryConversation
-            ? null
-            : (message) => _controller.forkConversation(message),
-        onShareMessage: (index, messages) =>
-            _controller.shareMessage(index, messages),
-        onSelectMessages: (index, messages) =>
-            _controller.startMessageSelection(
-              messageIndex: index,
-              messageList: messages,
-              mode: ChatSelectionMode.delete,
-            ),
-        onSpeakMessage: (message) => _controller.speakMessage(message),
-        onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
-        onRecoveredAskUserAnswer: (message, part, result) =>
-            _controller.submitRecoveredAskUserAnswer(message, part, result),
-        onToggleSelection: (messageId, selected) {
-          _controller.toggleSelection(messageId, selected);
-        },
-        onToggleReasoning: (messageId) {
-          _controller.toggleReasoning(messageId);
-        },
-        onToggleTranslation: (messageId) {
-          _controller.toggleTranslation(messageId);
-        },
-        onToggleReasoningSegment: (messageId, segmentIndex) {
-          _controller.toggleReasoningSegment(messageId, segmentIndex);
-        },
+    return MessageListView(
+      isProcessingFiles: _controller.isProcessingFiles,
+      scrollController: _scrollController,
+      listController: _controller.scrollCtrl.messageListController,
+      messages: _controller.chatController.collapsedMessages,
+      renderModels: _controller.chatController.messageRenderModels,
+      byGroup: _controller.chatController.groupedMessages,
+      versionSelections: _controller.versionSelections,
+      reasoning: _controller.reasoning,
+      reasoningSegments: _controller.reasoningSegments,
+      contentSplits: _controller.contentSplits,
+      toolParts: _controller.toolParts,
+      translations: _buildTranslationUiStates(),
+      selecting: _controller.selecting,
+      selectedItems: _controller.selectedItems,
+      suggestions: suggestionsEnabled
+          ? (_controller.currentConversation?.chatSuggestions ??
+                const <String>[])
+          : const <String>[],
+      topContentPadding: topContentPadding,
+      bottomContentPadding: bottomContentPadding,
+      dividerPadding: dividerPadding,
+      streamingContentNotifier: _controller.streamingContentNotifier,
+      spotlightMessageId: _controller.spotlightMessageId,
+      spotlightToken: _controller.spotlightToken,
+      removingSlotIds: _controller.removingSlotIds,
+      hasMoreBefore: _controller.chatController.hasMoreBefore,
+      isLoadingWindow: _controller.isLoadingWindow,
+      onLoadMoreBefore: _controller.loadMoreBefore,
+      hasMoreAfter: _controller.chatController.hasMoreAfter,
+      onLoadMoreAfter: _controller.loadMoreAfter,
+      onUserScrollIntent: _controller.scrollCtrl.handleUserScrollIntent,
+      chatFontScale: settings.chatFontScale,
+      collapseThinking: settings.autoCollapseThinking,
+      collapseThinkingSteps: settings.collapseThinkingSteps,
+      showThinkingCards: settings.showThinkingCards,
+      showToolCards: settings.showToolCards,
+      showToolResultSummary: settings.showToolResultSummary,
+      hideToolResultImages: settings.hideToolResultImages,
+      collapsedCodeLines: settings.autoCollapseCodeBlock
+          ? settings.autoCollapseCodeBlockLines
+          : null,
+      // Mirrors the wrap decision in the code block renderer.
+      wrapCodeBlocks:
+          Platform.isMacOS ||
+          Platform.isWindows ||
+          Platform.isLinux ||
+          settings.mobileCodeBlockWrap,
+      showModelIcon: settings.showModelIcon,
+      showUserAvatar: settings.showUserAvatar,
+      showTokenStats: settings.showTokenStats,
+      assistant: assistant,
+      onVersionChange: (groupId, version) async {
+        await _controller.setSelectedVersion(groupId, version);
+      },
+      onRegenerateMessage: (message) =>
+          _controller.regenerateAtMessage(message),
+      onResendMessage: (message) => _controller.regenerateAtMessage(message),
+      onTranslateMessage: (message) => _controller.translateMessage(message),
+      onEditMessage: (message) => _controller.editMessage(message),
+      onDeleteMessage: (message, byGroup) =>
+          _handleDeleteMessage(context, message, byGroup),
+      onDeleteAllVersions: (message, byGroup) => _handleDeleteMessage(
+        context,
+        message,
+        byGroup,
+        deleteAllVersions: true,
       ),
+      onForkConversation: _controller.isTemporaryConversation
+          ? null
+          : (message) => _controller.forkConversation(message),
+      onShareMessage: (index, messages) =>
+          _controller.shareMessage(index, messages),
+      onSelectMessages: (index, messages) => _controller.startMessageSelection(
+        messageIndex: index,
+        messageList: messages,
+        mode: ChatSelectionMode.delete,
+      ),
+      onSpeakMessage: (message) => _controller.speakMessage(message),
+      onSuggestionTap: (suggestion) => _controller.sendSuggestion(suggestion),
+      onRecoveredAskUserAnswer: (message, part, result) =>
+          _controller.submitRecoveredAskUserAnswer(message, part, result),
+      onToggleSelection: (messageId, selected) {
+        _controller.toggleSelection(messageId, selected);
+      },
+      onToggleReasoning: (messageId) {
+        _controller.toggleReasoning(messageId);
+      },
+      onToggleTranslation: (messageId) {
+        _controller.toggleTranslation(messageId);
+      },
+      onToggleReasoningSegment: (messageId, segmentIndex) {
+        _controller.toggleReasoningSegment(messageId, segmentIndex);
+      },
     );
   }
 
