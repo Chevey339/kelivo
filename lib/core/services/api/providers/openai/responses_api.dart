@@ -15,6 +15,7 @@ import '../../stream/sse_framing.dart';
 import '../../stream/stream_chunk.dart';
 import '../../stream/stream_chunk_emit.dart';
 import '../../stream/stream_chunk_ids.dart';
+import 'openai_tool_transcript.dart';
 import 'openai_vendor_compat.dart';
 import 'responses_decoder.dart';
 
@@ -66,18 +67,19 @@ List<Map<String, dynamic>> withResponsesFunctionCallItems(
       .toSet();
 
   for (final call in calls) {
-    if (call.id.isEmpty || presentCallIds.contains(call.id)) continue;
+    final transcriptId = openaiTranscriptCallId(call);
+    if (transcriptId.isEmpty || presentCallIds.contains(transcriptId)) continue;
     var argumentsJson = '{}';
     try {
       argumentsJson = jsonEncode(call.arguments);
     } catch (_) {}
     replayItems.add({
       'type': 'function_call',
-      'call_id': call.id,
+      'call_id': transcriptId,
       'name': call.name,
       'arguments': argumentsJson,
     });
-    presentCallIds.add(call.id);
+    presentCallIds.add(transcriptId);
   }
 
   return replayItems;
@@ -135,11 +137,17 @@ List<EmitToolCall> responsesCallsFromIndexMap(
     } catch (_) {
       args = <String, dynamic>{};
     }
+    final vendorId = (m['call_id'] ?? '').toString().trim();
+    final seriesId = (m['series_id'] ?? '').toString().trim();
+    final id = seriesId.isNotEmpty
+        ? seriesId
+        : effectiveToolCallId(m['call_id'], 'call', idx);
     calls.add(
       emitToolCall(
-        id: effectiveToolCallId(m['call_id'], 'call', idx),
+        id: id,
         name: (m['name'] ?? '').toString(),
         arguments: args,
+        providerCallId: vendorId.isNotEmpty ? vendorId : null,
       ),
     );
   }
@@ -218,7 +226,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
         for (final item in executed)
           <String, dynamic>{
             'type': 'function_call_output',
-            'call_id': item.call.id,
+            'call_id': openaiTranscriptCallId(item.call),
             'output': item.content,
           },
       ];
@@ -306,11 +314,7 @@ Stream<StreamChunk> runOpenAIResponsesToolFollowUps({
       outputItemsForAppend = followUpDecoder.outputItems;
       final respCalls2 = <int, Map<String, String>>{
         for (final call in followUpDecoder.takeFunctionCalls())
-          call.index: <String, String>{
-            'call_id': call.callId,
-            'name': call.name,
-            'args': call.args,
-          },
+          call.index: call.toIndexFields(),
       };
       lastCalls = responsesCallsFromIndexMap(respCalls2);
       if (lastCalls.isEmpty) return;

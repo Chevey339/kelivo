@@ -1,7 +1,16 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mcp_client/mcp_client.dart' as mcp;
+import 'package:provider/provider.dart';
 
+import 'package:Kelivo/core/providers/assistant_provider.dart';
+import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
+import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
+
+import '../../../support/business_test_harness.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -325,4 +334,106 @@ void main() {
       );
     });
   });
+
+  group('ToolHandlerService MCP approval identity', () {
+    testWidgets('requestApproval uses the provider toolCallId for MCP tools', (
+      tester,
+    ) async {
+      final mcpProvider = _RecordingMcpProvider([
+        McpServerConfig(
+          id: 'srv-id',
+          enabled: true,
+          name: 'Test MCP',
+          transport: McpTransportType.http,
+          tools: [
+            McpToolConfig(enabled: true, name: 'echo', needsApproval: true),
+          ],
+        ),
+      ]);
+      final assistants = AssistantProvider(
+        preferences: createBusinessTestPreferences(),
+      );
+      final toolSvc = McpToolService();
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      final approval = ToolApprovalService();
+      addTearDown(mcpProvider.dispose);
+      addTearDown(assistants.dispose);
+      addTearDown(toolSvc.dispose);
+      addTearDown(settings.dispose);
+      addTearDown(approval.dispose);
+
+      await assistants.loaded;
+      await settings.loaded;
+      final assistantId = await assistants.addAssistant(name: 'Test');
+      await assistants.updateAssistant(
+        assistants
+            .getById(assistantId)!
+            .copyWith(mcpServerIds: const ['srv-id']),
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AssistantProvider>.value(value: assistants),
+            ChangeNotifierProvider<McpProvider>.value(value: mcpProvider),
+            ChangeNotifierProvider<McpToolService>.value(value: toolSvc),
+          ],
+          child: const SizedBox.shrink(),
+        ),
+      );
+
+      final service = ToolHandlerService(
+        contextProvider: tester.element(find.byType(SizedBox)),
+      );
+      final handler = service.buildToolCallHandler(
+        settings,
+        assistants.getById(assistantId),
+        approvalService: approval,
+        conversationId: 'conv-1',
+      );
+      expect(handler, isNotNull);
+
+      final future = handler!('echo', <String, dynamic>{
+        'city': 'Seattle',
+      }, toolCallId: 'provider-call-99');
+      await tester.pump();
+
+      final pending = approval.pendingFor(
+        toolCallId: 'provider-call-99',
+        conversationId: 'conv-1',
+      );
+      expect(pending, isNotNull);
+      expect(pending!.toolName, 'echo');
+      expect(pending.conversationId, 'conv-1');
+      expect(mcpProvider.calls, isEmpty);
+
+      approval.approve('provider-call-99', conversationId: 'conv-1');
+      expect(await future, 'srv-id:echo');
+      expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
+    });
+  });
+}
+
+class _RecordingMcpProvider extends McpProvider {
+  _RecordingMcpProvider(this._servers)
+    : super(preferences: createBusinessTestPreferences());
+
+  final List<McpServerConfig> _servers;
+  final List<({String serverId, String toolName})> calls = [];
+
+  @override
+  List<McpServerConfig> get servers => List.unmodifiable(_servers);
+
+  @override
+  Future<void> connect(String id) async {}
+
+  @override
+  Future<mcp.CallToolResult?> callTool(
+    String serverId,
+    String toolName,
+    Map<String, dynamic> args,
+  ) async {
+    calls.add((serverId: serverId, toolName: toolName));
+    return mcp.CallToolResult([mcp.TextContent(text: '$serverId:$toolName')]);
+  }
 }

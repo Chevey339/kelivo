@@ -4,6 +4,12 @@ import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
 import '../../stream/stream_chunk_emit.dart';
 
+String openaiTranscriptCallId(EmitToolCall call) {
+  final providerId = call.providerCallId?.trim() ?? '';
+  if (providerId.isNotEmpty) return providerId;
+  return call.id;
+}
+
 List<EmitToolCall> clientToolCallsFromChatAcc(Map<dynamic, dynamic> toolAcc) {
   final calls = <EmitToolCall>[];
   final keys = toolAcc.keys.toList()
@@ -15,7 +21,11 @@ List<EmitToolCall> clientToolCallsFromChatAcc(Map<dynamic, dynamic> toolAcc) {
   for (final key in keys) {
     final raw = toolAcc[key];
     if (raw is! Map) continue;
-    final id = effectiveToolCallId(raw['id'], 'call', key);
+    final vendorId = (raw['id'] ?? '').toString().trim();
+    final seriesId = (raw['series_id'] ?? '').toString().trim();
+    final id = seriesId.isNotEmpty
+        ? seriesId
+        : effectiveToolCallId(raw['id'], 'call', key);
     final name = (raw['name'] ?? '').toString();
     Map<String, dynamic> arguments;
     try {
@@ -33,6 +43,7 @@ List<EmitToolCall> clientToolCallsFromChatAcc(Map<dynamic, dynamic> toolAcc) {
           raw['extra_content'] ??
               _openaiExtraContentFromMetadata(raw['metadata']),
         ),
+        providerCallId: vendorId.isNotEmpty ? vendorId : null,
       ),
     );
   }
@@ -44,7 +55,7 @@ List<Map<String, dynamic>> openaiToolCallMaps(List<EmitToolCall> calls) {
   for (final call in calls) {
     final extra = _openaiExtraContentFromMetadata(call.metadata);
     out.add(<String, dynamic>{
-      'id': call.id,
+      'id': openaiTranscriptCallId(call),
       'type': 'function',
       'function': <String, dynamic>{
         'name': call.name,
@@ -104,7 +115,7 @@ List<Map<String, dynamic>> openaiToolResultMessages(
     for (final item in executed)
       <String, dynamic>{
         'role': 'tool',
-        'tool_call_id': item.call.id,
+        'tool_call_id': openaiTranscriptCallId(item.call),
         'name': item.call.name,
         'content': item.content,
       },

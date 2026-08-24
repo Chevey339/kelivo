@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
+import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
@@ -184,6 +185,11 @@ void main() {
       ),
     );
     expect(decoder.toolCalls[0]!['id'], 'call_late');
+    expect(decoder.toolCalls[0]!['series_id'], 'round-0:tool-1');
+    final calls = clientToolCallsFromChatAcc(decoder.toolCalls);
+    expect(calls.single.id, 'round-0:tool-1');
+    expect(calls.single.providerCallId, 'call_late');
+    expect(openaiToolCallMaps(calls).single['id'], 'call_late');
     expect(
       decoder
           .accept(const SseEvent(data: '[DONE]'))
@@ -367,8 +373,18 @@ void main() {
 
     expect(result.chunks.whereType<TextDelta>().single.text, '正文仍然保留。');
     expect(decoder.toolCalls, <int, Map<String, dynamic>>{
-      0: <String, dynamic>{'id': 'call_lookup', 'name': 'lookup', 'args': '{}'},
-      1: <String, dynamic>{'id': 'call_notify', 'name': 'notify', 'args': '{}'},
+      0: <String, dynamic>{
+        'id': 'call_lookup',
+        'name': 'lookup',
+        'args': '{}',
+        'series_id': 'call_lookup',
+      },
+      1: <String, dynamic>{
+        'id': 'call_notify',
+        'name': 'notify',
+        'args': '{}',
+        'series_id': 'call_notify',
+      },
     });
     expect(
       result.chunks.whereType<ToolCallStart>().map((chunk) => chunk.toolName),
@@ -414,11 +430,13 @@ void main() {
           'id': 'call_explicit',
           'name': 'explicit',
           'args': '{"slot":1}',
+          'series_id': 'call_explicit',
         },
         2: <String, dynamic>{
           'id': 'call_fallback',
           'name': 'fallback',
           'args': '{}',
+          'series_id': 'call_fallback',
         },
       }, reason: reason);
       expect(
@@ -471,11 +489,13 @@ void main() {
           'id': 'call_explicit',
           'name': 'explicit',
           'args': '{"slot":0}',
+          'series_id': 'call_explicit',
         },
         1: <String, dynamic>{
           'id': 'call_fallback',
           'name': 'fallback',
           'args': '{}',
+          'series_id': 'call_fallback',
         },
       }, reason: reason);
       expect(
@@ -967,6 +987,7 @@ void main() {
       'id': 'call_null',
       'name': 'lookup',
       'args': '{}',
+      'series_id': 'call_null',
     });
     expect(result.chunks.whereType<ToolCallStart>().single.id, 'call_null');
     expect(result.chunks.whereType<ToolCallEnd>().single.id, 'call_null');
@@ -1021,6 +1042,7 @@ void main() {
       'id': 'call_1',
       'name': 'lookup',
       'args': '{"q":"kelivo"}',
+      'series_id': 'call_1',
     });
   });
 
@@ -1081,6 +1103,7 @@ void main() {
         'id': 'call_1',
         'name': 'lookup',
         'args': '{"q":"kelivo"}',
+        'series_id': 'call_1',
       },
     });
   });

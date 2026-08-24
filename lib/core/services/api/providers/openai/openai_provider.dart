@@ -846,7 +846,7 @@ Stream<StreamChunk> sendOpenAIStream(
       <String, Map<String, String>>{}; // id/name -> {name,args}
   // Responses API: track by output_index to capture call_id reliably
   final Map<int, Map<String, String>> respToolCallsByIndex =
-      <int, Map<String, String>>{}; // index -> {call_id,name,args}
+      <int, Map<String, String>>{}; // index -> {call_id,name,args,series_id}
   List<Map<String, dynamic>> lastResponseOutputItems =
       const <Map<String, dynamic>>[];
   String? finishReason;
@@ -895,11 +895,7 @@ Stream<StreamChunk> sendOpenAIStream(
           ..clear()
           ..addAll({
             for (final call in decoder.takeFunctionCalls())
-              call.index: <String, String>{
-                'call_id': call.callId,
-                'name': call.name,
-                'args': call.args,
-              },
+              call.index: call.toIndexFields(),
           });
         if (!decoder.emittedImageEvents) {
           var fallbackCount = 0;

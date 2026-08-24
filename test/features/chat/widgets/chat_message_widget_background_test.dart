@@ -9,6 +9,11 @@ import 'package:provider/provider.dart';
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
+import 'package:Kelivo/core/services/api/providers/openai/chat_completions_decoder.dart';
+import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_api.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_decoder.dart';
+import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
@@ -41,6 +46,7 @@ Widget _buildHarness({
   required SettingsProvider settings,
   required Widget child,
   AskUserInteractionService? askUserService,
+  ToolApprovalService? approvalService,
   TtsProvider? ttsProvider,
   Locale? locale,
 }) {
@@ -54,7 +60,9 @@ Widget _buildHarness({
           create: (_) =>
               TtsProvider(preferences: createBusinessTestPreferences()),
         ),
-      ChangeNotifierProvider(create: (_) => ToolApprovalService()),
+      ChangeNotifierProvider<ToolApprovalService>.value(
+        value: approvalService ?? ToolApprovalService(),
+      ),
       ChangeNotifierProvider<AskUserInteractionService>.value(
         value: askUserService ?? AskUserInteractionService(),
       ),
@@ -1057,6 +1065,681 @@ void main() {
           find.textContaining('正文 <think>literal</think> 继续显示'),
           findsOneWidget,
         );
+      },
+    );
+
+    testWidgets('hiding thinking cards removes the thinking card', (
+      tester,
+    ) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setShowThinkingCards(false);
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: '<think>legacy reasoning</think>Final answer',
+              conversationId: 'conversation-hide-thinking',
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Deep Thinking'), findsNothing);
+      expect(find.textContaining('legacy reasoning'), findsNothing);
+      expect(find.textContaining('Final answer'), findsOneWidget);
+    });
+
+    testWidgets('hiding tool cards keeps thinking and ask-user cards', (
+      tester,
+    ) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      await settings.setShowToolCards(false);
+      final askUserService = AskUserInteractionService();
+      askUserService.requestAnswer(
+        toolCallId: 'ask-hidden-tools',
+        arguments: const {
+          'questions': [
+            {
+              'id': 'scope',
+              'question': 'Choose scope?',
+              'type': 'single',
+              'options': ['Minimal', 'Complete'],
+            },
+          ],
+        },
+      );
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          askUserService: askUserService,
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Answer after tools',
+              conversationId: 'conversation-hide-tools',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            reasoningSegments: const [
+              ReasoningSegment(text: '需要本地信息', expanded: true, loading: false),
+            ],
+            toolParts: const [
+              ToolUIPart(
+                id: 'time-info',
+                toolName: 'get_time_info',
+                arguments: {},
+                content: '{"date":"2026-05-06"}',
+              ),
+              ToolUIPart(
+                id: 'ask-hidden-tools',
+                toolName: 'ask_user_input_v0',
+                arguments: {
+                  'questions': [
+                    {
+                      'id': 'scope',
+                      'question': 'Choose scope?',
+                      'type': 'single',
+                      'options': ['Minimal', 'Complete'],
+                    },
+                  ],
+                },
+                loading: true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Deep Thinking'), findsOneWidget);
+      expect(find.textContaining('需要本地信息'), findsOneWidget);
+      expect(find.text('Time Info'), findsNothing);
+      expect(find.text('Choose scope?'), findsOneWidget);
+      expect(find.textContaining('Answer after tools'), findsOneWidget);
+    });
+
+    testWidgets(
+      'hiding tool cards keeps pending approval only in that conversation',
+      (tester) async {
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolCards(false);
+        final approval = ToolApprovalService();
+        final approvalFuture = approval.requestApproval(
+          toolCallId: 'call-a',
+          toolName: 'get_time_info',
+          arguments: const {},
+          conversationId: 'conversation-a',
+        );
+
+        ChatMessageWidget toolMessage({
+          required String conversationId,
+          required String toolCallId,
+        }) {
+          return ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Working',
+              conversationId: conversationId,
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            showToolCards: false,
+            toolParts: [
+              ToolUIPart(
+                id: toolCallId,
+                toolName: 'get_time_info',
+                arguments: const {},
+                loading: true,
+              ),
+            ],
+          );
+        }
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: toolMessage(
+              conversationId: 'conversation-b',
+              toolCallId: 'call-b',
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.text('Time Info'), findsNothing);
+        expect(find.bySemanticsLabel('Approve'), findsNothing);
+        expect(approval.isPending('call-a'), isTrue);
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: toolMessage(
+              conversationId: 'conversation-a',
+              toolCallId: 'call-a',
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.text('Time Info'), findsOneWidget);
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        final result = await approvalFuture;
+        expect(result.approved, isTrue);
+      },
+    );
+
+    testWidgets(
+      'late provider id keeps UI card and approval on the first-seen id',
+      (tester) async {
+        final decoder = ChatCompletionsStreamDecoder(sourceId: 'round-0');
+        final first = decoder.accept(
+          SseEvent(
+            data: jsonEncode({
+              'choices': [
+                {
+                  'delta': {
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'function': {'name': 'lookup', 'arguments': '{'},
+                      },
+                    ],
+                  },
+                },
+              ],
+            }),
+          ),
+        );
+        decoder.accept(
+          SseEvent(
+            data: jsonEncode({
+              'choices': [
+                {
+                  'delta': {
+                    'tool_calls': [
+                      {
+                        'index': 0,
+                        'id': 'call_late',
+                        'function': {'arguments': '}'},
+                      },
+                    ],
+                  },
+                  'finish_reason': 'tool_calls',
+                },
+              ],
+            }),
+          ),
+        );
+        final uiId = first.chunks.whereType<ToolCallStart>().single.id;
+        final emitCall = clientToolCallsFromChatAcc(decoder.toolCalls).single;
+        expect(uiId, 'round-0:tool-1');
+        expect(emitCall.id, uiId);
+        expect(emitCall.providerCallId, 'call_late');
+
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolCards(false);
+        final approval = ToolApprovalService();
+        final approvalFuture = approval.requestApproval(
+          toolCallId: emitCall.id,
+          toolName: 'lookup',
+          arguments: emitCall.arguments,
+          conversationId: 'conversation-late-id',
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: 'Working',
+                conversationId: 'conversation-late-id',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              showToolCards: false,
+              toolParts: [
+                ToolUIPart(
+                  id: uiId,
+                  toolName: 'lookup',
+                  arguments: emitCall.arguments,
+                  loading: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.textContaining('lookup'), findsOneWidget);
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        final result = await approvalFuture;
+        expect(result.approved, isTrue);
+        expect(approval.isPending(uiId), isFalse);
+      },
+    );
+
+    testWidgets(
+      'Responses late call_id keeps UI card and approval on the first-seen id',
+      (tester) async {
+        final decoder = ResponsesStreamDecoder(sourceId: 'round-0');
+        final first = decoder.accept(
+          SseEvent(
+            data: jsonEncode({
+              'type': 'response.output_item.added',
+              'output_index': 0,
+              'item': {'type': 'function_call', 'id': 'fc_1', 'name': 'lookup'},
+            }),
+          ),
+        );
+        decoder.accept(
+          SseEvent(
+            data: jsonEncode({
+              'type': 'response.output_item.done',
+              'output_index': 0,
+              'item': {
+                'type': 'function_call',
+                'id': 'fc_1',
+                'call_id': 'call_late',
+                'name': 'lookup',
+                'arguments': '{"q":"kelivo"}',
+              },
+            }),
+          ),
+        );
+        final uiId = first.chunks.whereType<ToolCallStart>().single.id;
+        final decoded = decoder.takeFunctionCalls().single;
+        final emitCall = responsesCallsFromIndexMap({
+          decoded.index: decoded.toIndexFields(),
+        }).single;
+        expect(uiId, 'fc_1');
+        expect(emitCall.id, uiId);
+        expect(emitCall.providerCallId, 'call_late');
+
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolCards(false);
+        final approval = ToolApprovalService();
+        final approvalFuture = approval.requestApproval(
+          toolCallId: emitCall.id,
+          toolName: 'lookup',
+          arguments: emitCall.arguments,
+          conversationId: 'conversation-responses-late-id',
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: 'Working',
+                conversationId: 'conversation-responses-late-id',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              showToolCards: false,
+              toolParts: [
+                ToolUIPart(
+                  id: uiId,
+                  toolName: 'lookup',
+                  arguments: emitCall.arguments,
+                  loading: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.textContaining('lookup'), findsOneWidget);
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        final result = await approvalFuture;
+        expect(result.approved, isTrue);
+        expect(
+          approval.isPending(
+            uiId,
+            conversationId: 'conversation-responses-late-id',
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    testWidgets(
+      'approving one chat does not complete a sibling with the same placeholder id',
+      (tester) async {
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        final approval = ToolApprovalService();
+        final futureA = approval.requestApproval(
+          toolCallId: 'round-0:tool-1',
+          toolName: 'get_time_info',
+          arguments: const {},
+          conversationId: 'conversation-a',
+        );
+        final futureB = approval.requestApproval(
+          toolCallId: 'round-0:tool-1',
+          toolName: 'get_time_info',
+          arguments: const {},
+          conversationId: 'conversation-b',
+        );
+
+        ChatMessageWidget toolMessage(String conversationId) {
+          return ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Working',
+              conversationId: conversationId,
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'round-0:tool-1',
+                toolName: 'get_time_info',
+                arguments: {},
+                loading: true,
+              ),
+            ],
+          );
+        }
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: toolMessage('conversation-a'),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        expect((await futureA).approved, isTrue);
+        expect(
+          approval.isPending(
+            'round-0:tool-1',
+            conversationId: 'conversation-b',
+          ),
+          isTrue,
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: toolMessage('conversation-b'),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        expect((await futureB).approved, isTrue);
+      },
+    );
+
+    testWidgets('same-name approval actions stay scoped to the conversation', (
+      tester,
+    ) async {
+      final settings = await _createSettings(
+        ChatMessageBackgroundStyle.defaultStyle,
+      );
+      final approval = ToolApprovalService();
+      approval.requestApproval(
+        toolCallId: 'call-a',
+        toolName: 'get_time_info',
+        arguments: const {},
+        conversationId: 'conversation-a',
+      );
+
+      await tester.pumpWidget(
+        _buildHarness(
+          settings: settings,
+          approvalService: approval,
+          locale: const Locale('en'),
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              role: 'assistant',
+              content: 'Working',
+              conversationId: 'conversation-b',
+              isStreaming: true,
+            ),
+            showModelIcon: false,
+            toolParts: const [
+              ToolUIPart(
+                id: 'call-b',
+                toolName: 'get_time_info',
+                arguments: {},
+                loading: true,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Time Info'), findsOneWidget);
+      expect(find.bySemanticsLabel('Approve'), findsNothing);
+      expect(approval.isPending('call-a'), isTrue);
+    });
+
+    testWidgets(
+      'same-name sibling in one conversation does not share approval UI',
+      (tester) async {
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolResultSummary(true);
+        final approval = ToolApprovalService();
+        final approvalFuture = approval.requestApproval(
+          toolCallId: 'call-1',
+          toolName: 'get_time_info',
+          arguments: const {'query': 'seattle-pending'},
+          conversationId: 'conversation-same-name',
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: 'Working',
+                conversationId: 'conversation-same-name',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              toolParts: const [
+                ToolUIPart(
+                  id: 'call-1',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'seattle-pending'},
+                  loading: true,
+                ),
+                ToolUIPart(
+                  id: 'call-2',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'tokyo-sibling'},
+                  loading: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.text('Time Info'), findsNWidgets(2));
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.textContaining('seattle-pending'), findsOneWidget);
+        expect(find.textContaining('query: tokyo-sibling'), findsNothing);
+
+        await tester.tap(find.bySemanticsLabel('Approve'));
+        await tester.pump();
+        final result = await approvalFuture;
+        expect(result.approved, isTrue);
+        expect(approval.isPending('call-1'), isFalse);
+        expect(approval.isPending('call-2'), isFalse);
+      },
+    );
+
+    testWidgets(
+      'hiding tool cards keeps only the pending same-name approval card',
+      (tester) async {
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolCards(false);
+        await settings.setShowToolResultSummary(true);
+        final approval = ToolApprovalService();
+        approval.requestApproval(
+          toolCallId: 'call-1',
+          toolName: 'get_time_info',
+          arguments: const {'query': 'seattle-pending'},
+          conversationId: 'conversation-same-name-hidden',
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: 'Working',
+                conversationId: 'conversation-same-name-hidden',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              showToolCards: false,
+              toolParts: const [
+                ToolUIPart(
+                  id: 'call-1',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'seattle-pending'},
+                  loading: true,
+                ),
+                ToolUIPart(
+                  id: 'call-2',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'tokyo-sibling'},
+                  loading: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.text('Time Info'), findsOneWidget);
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.textContaining('seattle-pending'), findsOneWidget);
+        expect(find.textContaining('tokyo-sibling'), findsNothing);
+      },
+    );
+
+    testWidgets(
+      'unscoped approval matches any conversation by toolCallId only',
+      (tester) async {
+        final settings = await _createSettings(
+          ChatMessageBackgroundStyle.defaultStyle,
+        );
+        await settings.setShowToolResultSummary(true);
+        final approval = ToolApprovalService();
+        approval.requestApproval(
+          toolCallId: 'call-unscoped',
+          toolName: 'get_time_info',
+          arguments: const {'query': 'unscoped-args'},
+        );
+
+        await tester.pumpWidget(
+          _buildHarness(
+            settings: settings,
+            approvalService: approval,
+            locale: const Locale('en'),
+            child: ChatMessageWidget(
+              message: ChatMessage(
+                role: 'assistant',
+                content: 'Working',
+                conversationId: 'conversation-other',
+                isStreaming: true,
+              ),
+              showModelIcon: false,
+              toolParts: const [
+                ToolUIPart(
+                  id: 'call-other',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'other-args'},
+                  loading: true,
+                ),
+                ToolUIPart(
+                  id: 'call-unscoped',
+                  toolName: 'get_time_info',
+                  arguments: {'query': 'unscoped-args'},
+                  loading: true,
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+
+        expect(find.bySemanticsLabel('Approve'), findsOneWidget);
+        expect(find.textContaining('unscoped-args'), findsOneWidget);
+        expect(find.textContaining('query: other-args'), findsNothing);
       },
     );
 

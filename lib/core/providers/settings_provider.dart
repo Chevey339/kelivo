@@ -181,6 +181,9 @@ class SettingsProvider extends ChangeNotifier {
       'display_show_model_timestamp_v1';
   static const String _displayShowUserMessageActionsKey =
       'display_show_user_message_actions_v1';
+  static const String _displayShowThinkingCardsKey =
+      'display_show_thinking_cards_v1';
+  static const String _displayShowToolCardsKey = 'display_show_tool_cards_v1';
   static const String _displayAutoCollapseThinkingKey =
       'display_auto_collapse_thinking_v1';
   static const String _displayCollapseThinkingStepsKey =
@@ -1041,6 +1044,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayShowModelTimestampKey) ?? legacyModelNameTs;
     _showUserMessageActions =
         prefs.getBool(_displayShowUserMessageActionsKey) ?? true;
+    _showThinkingCards = prefs.getBool(_displayShowThinkingCardsKey) ?? true;
+    _showToolCards = prefs.getBool(_displayShowToolCardsKey) ?? true;
     _autoCollapseThinking =
         prefs.getBool(_displayAutoCollapseThinkingKey) ?? true;
     _collapseThinkingSteps =
@@ -4384,6 +4389,28 @@ Requirements:
     await prefs.setBool(_displayShowTokenStatsKey, v);
   }
 
+  // Display: show thinking-process cards in chat (default on)
+  bool _showThinkingCards = true;
+  bool get showThinkingCards => _showThinkingCards;
+  Future<void> setShowThinkingCards(bool v) async {
+    if (_showThinkingCards == v) return;
+    _showThinkingCards = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayShowThinkingCardsKey, v);
+  }
+
+  // Display: show tool-use cards in chat (default on)
+  bool _showToolCards = true;
+  bool get showToolCards => _showToolCards;
+  Future<void> setShowToolCards(bool v) async {
+    if (_showToolCards == v) return;
+    _showToolCards = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayShowToolCardsKey, v);
+  }
+
   // Display: auto-collapse reasoning/thinking section
   bool _autoCollapseThinking = true;
   bool get autoCollapseThinking => _autoCollapseThinking;
@@ -5406,6 +5433,8 @@ Requirements:
     copy._showUserTimestamp = _showUserTimestamp;
     copy._showModelName = _showModelName;
     copy._showModelTimestamp = _showModelTimestamp;
+    copy._showThinkingCards = _showThinkingCards;
+    copy._showToolCards = _showToolCards;
     copy._autoCollapseThinking = _autoCollapseThinking;
     copy._collapseThinkingSteps = _collapseThinkingSteps;
     copy._showToolResultSummary = _showToolResultSummary;

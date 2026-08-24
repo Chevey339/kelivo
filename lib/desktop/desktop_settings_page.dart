@@ -74,6 +74,7 @@ import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../theme/custom_theme.dart';
 import '../features/settings/widgets/custom_theme_widgets.dart';
 import '../features/settings/pages/message_style_settings_page.dart';
+import '../features/settings/widgets/memory_ui.dart';
 
 part 'setting/assistants_pane.dart';
 part 'setting/providers_pane.dart';

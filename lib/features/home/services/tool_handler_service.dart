@@ -454,10 +454,17 @@ class ToolHandlerService {
           reservedNames: BuiltInToolNames.all,
         );
 
+    String approvalIdFor(String name, String? toolCallId) {
+      final trimmed = toolCallId?.trim();
+      if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+      return '${name}_${DateTime.now().microsecondsSinceEpoch}';
+    }
+
     Future<String> approveAndExecuteMcp(
       String name,
-      Map<String, dynamic> args,
-    ) async {
+      Map<String, dynamic> args, {
+      String? toolCallId,
+    }) async {
       if (approvalService != null &&
           toolSvc.toolNeedsApprovalForAssistant(
             mcp,
@@ -467,10 +474,8 @@ class ToolHandlerService {
             routeSnapshot: routes,
             reservedNames: BuiltInToolNames.all,
           )) {
-        // Generate a unique id for this tool call approval request
-        final toolCallId = '${name}_${DateTime.now().microsecondsSinceEpoch}';
         final result = await approvalService.requestApproval(
-          toolCallId: toolCallId,
+          toolCallId: approvalIdFor(name, toolCallId),
           toolName: name,
           arguments: args,
           conversationId: conversationId,
@@ -499,7 +504,7 @@ class ToolHandlerService {
     return (name, args, {toolCallId}) async {
       try {
         if (routes.containsExposedName(name)) {
-          return await approveAndExecuteMcp(name, args);
+          return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
         }
 
         // Search tool
@@ -526,11 +531,8 @@ class ToolHandlerService {
             assistant != null &&
             assistant.localToolIds.contains(LocalToolNames.calendarCreate) &&
             approvalService != null) {
-          final approvalId = (toolCallId?.trim().isNotEmpty == true)
-              ? toolCallId!.trim()
-              : '${name}_${DateTime.now().microsecondsSinceEpoch}';
           final approval = await approvalService.requestApproval(
-            toolCallId: approvalId,
+            toolCallId: approvalIdFor(name, toolCallId),
             toolName: name,
             arguments: args,
             conversationId: conversationId,
@@ -600,7 +602,7 @@ class ToolHandlerService {
           }
         }
 
-        return await approveAndExecuteMcp(name, args);
+        return await approveAndExecuteMcp(name, args, toolCallId: toolCallId);
       } catch (e) {
         // Catch unexpected exceptions and return error JSON to LLM
         // This prevents tool failures from terminating the chat flow

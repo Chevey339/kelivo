@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -20,6 +21,7 @@ import '../controllers/streaming_content_notifier.dart';
 import '../controllers/message_render_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import '../services/ask_user_interaction_service.dart';
+import '../services/local_tools_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
@@ -140,6 +142,8 @@ class MessageListView extends StatefulWidget {
     this.onUserScrollIntent,
     this.chatFontScale = 1,
     this.collapseThinking = true,
+    this.showThinkingCards = true,
+    this.showToolCards = true,
     this.collapsedCodeLines,
     this.wrapCodeBlocks = false,
     this.showModelIcon = true,
@@ -230,6 +234,12 @@ class MessageListView extends StatefulWidget {
 
   /// Whether finished thinking blocks render collapsed (display setting).
   final bool collapseThinking;
+
+  /// Whether thinking-process cards render in chat.
+  final bool showThinkingCards;
+
+  /// Whether tool-use cards render in chat.
+  final bool showToolCards;
 
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
@@ -328,6 +338,8 @@ class _MessageListViewState extends State<MessageListView> {
   /// Display settings the estimate depends on, refreshed in [build].
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
+    showThinkingCards: true,
+    showToolCards: true,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
   );
@@ -405,19 +417,44 @@ class _MessageListViewState extends State<MessageListView> {
       return cached.extent;
     }
 
-    // Inline thinking renders as its own card. When it is collapsed only the
-    // visible remainder takes space, so parse it out with the same parser the
-    // renderer uses instead of guessing at the tag syntax.
+    // Standalone tool rows render as their own card — or as nothing when the
+    // user hid tool cards. Ask-user cards stay up so generation is not blocked.
+    // Pending-approval exceptions do not apply here: `_buildToolMessage`
+    // always builds these rows with `loading: false`.
+    if (message.role == 'tool' &&
+        !settings.showToolCards &&
+        !_hiddenStandaloneToolMessageRemainsVisible(text)) {
+      if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
+        _extentEstimateCache.clear();
+      }
+      _extentEstimateCache[message.id] = _ExtentEstimate(
+        content: text,
+        crossAxisExtent: crossAxisExtent,
+        fontScale: fontScale,
+        settings: settings,
+        reasoningSignature: reasoningSignature,
+        extent: 0,
+      );
+      return 0;
+    }
+
+    // Inline thinking renders as its own card. When it is collapsed — or when
+    // thinking cards are hidden entirely — only the visible remainder takes
+    // space, so parse it out with the same parser the renderer uses.
     var body = text;
     var collapsedCards = 0;
-    if (settings.collapseThinking &&
+    final shouldStripInlineThink =
         message.role != 'user' &&
         text.length <= _estimateParseLimit &&
-        text.contains('<')) {
+        text.contains('<') &&
+        (!settings.showThinkingCards || settings.collapseThinking);
+    if (shouldStripInlineThink) {
       final parsed = ThinkingTagParser.parseLegacyInlineBlocks(text);
       if (parsed.hasThinking) {
         body = parsed.visibleContent;
-        collapsedCards = parsed.thinkingTexts.length;
+        if (settings.showThinkingCards) {
+          collapsedCards = parsed.thinkingTexts.length;
+        }
       }
     }
 
@@ -447,12 +484,14 @@ class _MessageListViewState extends State<MessageListView> {
             lineHeight +
         _estimateChrome +
         collapsedCards * _estimateCollapsedCard +
-        _estimateReasoningExtent(
-          reasoning,
-          reasoningSegments,
-          textWidth: textWidth,
-          fontScale: fontScale,
-        );
+        (settings.showThinkingCards
+            ? _estimateReasoningExtent(
+                reasoning,
+                reasoningSegments,
+                textWidth: textWidth,
+                fontScale: fontScale,
+              )
+            : 0);
 
     if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
       _extentEstimateCache.clear();
@@ -676,6 +715,8 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.showUserAvatar != widget.showUserAvatar ||
         oldWidget.showTokenStats != widget.showTokenStats ||
         oldWidget.collapseThinking != widget.collapseThinking ||
+        oldWidget.showThinkingCards != widget.showThinkingCards ||
+        oldWidget.showToolCards != widget.showToolCards ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
         oldWidget.wrapCodeBlocks != widget.wrapCodeBlocks ||
         !identical(oldWidget.assistant, widget.assistant);
@@ -1076,6 +1117,8 @@ class _MessageListViewState extends State<MessageListView> {
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
+      showThinkingCards: widget.showThinkingCards,
+      showToolCards: widget.showToolCards,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
     );
@@ -1771,7 +1814,24 @@ class _MessageListViewState extends State<MessageListView> {
           ? null
           : (part, result) =>
                 widget.onRecoveredAskUserAnswer!(message, part, result),
+      showThinkingCards: widget.showThinkingCards,
+      showToolCards: widget.showToolCards,
     );
+  }
+
+  /// Whether a hidden standalone tool row still occupies height.
+  ///
+  /// Mirrors `_shouldShowToolCard` for `role == 'tool'` messages: ask-user
+  /// cards stay visible so generation is not blocked. Pending-approval cards
+  /// do not apply — those rows are never built as loading.
+  bool _hiddenStandaloneToolMessageRemainsVisible(String content) {
+    try {
+      final obj = jsonDecode(content);
+      if (obj is Map) {
+        return (obj['tool'] ?? '').toString() == LocalToolNames.askUser;
+      }
+    } catch (_) {}
+    return false;
   }
 }
 
@@ -1779,12 +1839,20 @@ class _MessageListViewState extends State<MessageListView> {
 final class _EstimateSettings {
   const _EstimateSettings({
     required this.collapseThinking,
+    required this.showThinkingCards,
+    required this.showToolCards,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
   });
 
   /// Whether finished thinking blocks render as a collapsed card.
   final bool collapseThinking;
+
+  /// Whether thinking-process cards contribute to estimated height.
+  final bool showThinkingCards;
+
+  /// Whether tool-use cards contribute to estimated height.
+  final bool showToolCards;
 
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
@@ -1796,12 +1864,19 @@ final class _EstimateSettings {
   bool operator ==(Object other) =>
       other is _EstimateSettings &&
       other.collapseThinking == collapseThinking &&
+      other.showThinkingCards == showThinkingCards &&
+      other.showToolCards == showToolCards &&
       other.collapsedCodeLines == collapsedCodeLines &&
       other.wrapCodeBlocks == wrapCodeBlocks;
 
   @override
-  int get hashCode =>
-      Object.hash(collapseThinking, collapsedCodeLines, wrapCodeBlocks);
+  int get hashCode => Object.hash(
+    collapseThinking,
+    showThinkingCards,
+    showToolCards,
+    collapsedCodeLines,
+    wrapCodeBlocks,
+  );
 }
 
 /// A memoized extent estimate together with everything it was derived from.

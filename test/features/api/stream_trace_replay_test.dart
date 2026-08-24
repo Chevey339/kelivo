@@ -101,7 +101,11 @@ void main() {
         'finishReason': decoder.finishReason,
         'toolCalls': [
           for (final key in (decoder.toolCalls.keys.toList()..sort()))
-            <String, dynamic>{'index': key, ...decoder.toolCalls[key]!},
+            <String, dynamic>{
+              'index': key,
+              ...Map<String, dynamic>.from(decoder.toolCalls[key]!)
+                ..remove('series_id'),
+            },
         ],
         if (decoder.reasoningDetails != null)
           'reasoningDetails': _hashReasoningDetails(decoder.reasoningDetails),

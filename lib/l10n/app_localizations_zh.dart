@@ -4294,6 +4294,19 @@ class AppLocalizationsZh extends AppLocalizations {
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => '显示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle =>
+      '关闭后，聊天中不再显示思考过程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '显示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -12024,6 +12037,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get displaySettingsPageShowTokenStatsSubtitle => '显示 token 用量与消息数量';
 
   @override
+  String get displaySettingsPageShowThinkingCardsTitle => '显示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle =>
+      '关闭后，聊天中不再显示思考过程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '显示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '关闭后，聊天中不再显示工具调用卡片';
+
+  @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自动折叠思考';
 
   @override
@@ -19676,6 +19702,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get displaySettingsPageShowTokenStatsSubtitle => '顯示 token 用量與訊息數量';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsTitle => '顯示思考卡片';
+
+  @override
+  String get displaySettingsPageShowThinkingCardsSubtitle =>
+      '關閉後，聊天中不再顯示思考過程卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsTitle => '顯示工具卡片';
+
+  @override
+  String get displaySettingsPageShowToolCardsSubtitle => '關閉後，聊天中不再顯示工具呼叫卡片';
 
   @override
   String get displaySettingsPageAutoCollapseThinkingTitle => '自動折疊思考';

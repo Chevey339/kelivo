@@ -176,7 +176,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
           idx,
           () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
         );
-        entry['id'] = id.isNotEmpty ? id : eventId;
+        _assignToolIds(entry, eventId: eventId, vendorId: id);
         entry['name'] = name;
         entry['args'] = argsStr;
         if (extraContent != null) {
@@ -258,11 +258,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
       );
       final eventId = _toolSeriesId(idx, vendorId: vendorId);
-      if (vendorId.isNotEmpty) {
-        entry['id'] = vendorId;
-      } else if ((entry['id'] ?? '').toString().isEmpty) {
-        entry['id'] = eventId;
-      }
+      _assignToolIds(entry, eventId: eventId, vendorId: vendorId);
       final hadName = (entry['name'] ?? '').toString().isNotEmpty;
       if (name != null && name.isNotEmpty) entry['name'] = name;
       if (argsDelta != null && argsDelta.isNotEmpty) {
@@ -327,7 +323,7 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
         idx,
         () => <String, dynamic>{'id': '', 'name': '', 'args': ''},
       );
-      entry['id'] = id.isNotEmpty ? id : eventId;
+      _assignToolIds(entry, eventId: eventId, vendorId: id);
       entry['name'] = name;
       entry['args'] = argsStr;
       if (extraContent != null) {
@@ -353,6 +349,27 @@ class ChatCompletionsStreamDecoder implements StreamChunkDecoder {
     final id = vendorId.isNotEmpty ? vendorId : _ids.next('tool');
     _toolIdsByIndex[index] = id;
     return id;
+  }
+
+  /// Persist the first-seen stream id as [series_id] and the vendor id as [id].
+  ///
+  /// OpenAI-compatible streams may emit a tool fragment before the vendor
+  /// `call_*` id arrives. UI chunks already use the first-seen series id; the
+  /// handler must use that same id so approval matching cannot desync. The
+  /// vendor id is still stored for the API transcript.
+  void _assignToolIds(
+    Map<String, dynamic> entry, {
+    required String eventId,
+    required String vendorId,
+  }) {
+    if ((entry['series_id'] ?? '').toString().isEmpty) {
+      entry['series_id'] = eventId;
+    }
+    if (vendorId.isNotEmpty) {
+      entry['id'] = vendorId;
+    } else if ((entry['id'] ?? '').toString().isEmpty) {
+      entry['id'] = eventId;
+    }
   }
 
   List<StreamChunk> _emitCompleteToolCall(

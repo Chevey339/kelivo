@@ -114,6 +114,7 @@ typedef EmitToolCall = ({
   String name,
   Map<String, dynamic> arguments,
   Map<String, dynamic>? metadata,
+  String? providerCallId,
 });
 
 typedef EmitToolResult = ({
@@ -129,7 +130,14 @@ EmitToolCall emitToolCall({
   required String name,
   required Map<String, dynamic> arguments,
   Map<String, dynamic>? metadata,
-}) => (id: id, name: name, arguments: arguments, metadata: metadata);
+  String? providerCallId,
+}) => (
+  id: id,
+  name: name,
+  arguments: arguments,
+  metadata: metadata,
+  providerCallId: providerCallId,
+);
 
 EmitToolResult emitToolResult({
   required String id,

@@ -819,6 +819,12 @@ class ChatMessageWidget extends StatefulWidget {
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAskUserAnswer;
 
+  /// When null, follows [SettingsProvider.showThinkingCards].
+  final bool? showThinkingCards;
+
+  /// When null, follows [SettingsProvider.showToolCards].
+  final bool? showToolCards;
+
   const ChatMessageWidget({
     super.key,
     required this.message,
@@ -861,6 +867,8 @@ class ChatMessageWidget extends StatefulWidget {
     this.suggestions = const <String>[],
     this.onSuggestionTap,
     this.onRecoveredAskUserAnswer,
+    this.showThinkingCards,
+    this.showToolCards,
   });
 
   @override
@@ -1438,10 +1446,19 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       content: result,
       loading: false,
     );
+    if (!_shouldShowToolCard(
+      context,
+      part,
+      showToolCards: widget.showToolCards,
+      conversationId: widget.message.conversationId,
+    )) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: _ToolCallItem(
         part: part,
+        conversationId: widget.message.conversationId,
         onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
       ),
     );
@@ -2712,10 +2729,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             }
 
             final widgets = <Widget>[];
-            for (int i = 0; i < renderBlocks.length; i++) {
-              final block = renderBlocks[i];
+            void addBlock(Widget child) {
+              if (widgets.isNotEmpty) {
+                widgets.add(const SizedBox(height: 8));
+              }
+              widgets.add(child);
+            }
+
+            for (final block in renderBlocks) {
               if (block.type == _RenderBlockType.text && block.text != null) {
-                widgets.add(
+                addBlock(
                   _buildAssistantTextBlock(
                     context,
                     block.text!,
@@ -2723,17 +2746,29 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                     citationIndexLookup,
                   ),
                 );
-              } else if (block.steps.isNotEmpty) {
-                widgets.add(
-                  _ChainOfThoughtCard(
-                    steps: block.steps,
-                    onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
-                  ),
-                );
+                continue;
               }
-              if (i != renderBlocks.length - 1) {
-                widgets.add(const SizedBox(height: 8));
+              if (block.steps.isEmpty) continue;
+              final showThinkingCards =
+                  widget.showThinkingCards ?? settings.showThinkingCards;
+              final showToolCards =
+                  widget.showToolCards ?? settings.showToolCards;
+              if (!_chatTimelineBlockCanShow(
+                block.steps,
+                showThinkingCards: showThinkingCards,
+                showToolCards: showToolCards,
+              )) {
+                continue;
               }
+              addBlock(
+                _ChainOfThoughtCard(
+                  steps: block.steps,
+                  conversationId: widget.message.conversationId,
+                  showThinkingCards: showThinkingCards,
+                  showToolCards: showToolCards,
+                  onRecoveredAnswer: widget.onRecoveredAskUserAnswer,
+                ),
+              );
             }
 
             if (widget.message.isStreaming && visualContent.isNotEmpty) {
@@ -3960,6 +3995,106 @@ class _TimelineStepData {
   bool get loading => reasoning?.loading ?? tool?.loading ?? false;
 }
 
+bool _approvalBelongsToConversation(
+  ToolApprovalRequest request,
+  String? conversationId,
+) {
+  final requestConversationId = request.conversationId;
+  if (requestConversationId == null || requestConversationId.isEmpty) {
+    return true;
+  }
+  if (conversationId == null || conversationId.isEmpty) {
+    return false;
+  }
+  return requestConversationId == conversationId;
+}
+
+ToolApprovalRequest? _matchingApprovalRequest({
+  required ToolApprovalService approval,
+  required String? conversationId,
+  String? toolCallId,
+}) {
+  if (toolCallId == null || toolCallId.isEmpty) {
+    return null;
+  }
+  return approval.pendingFor(
+    toolCallId: toolCallId,
+    conversationId: conversationId,
+  );
+}
+
+bool _shouldShowToolCard(
+  BuildContext context,
+  ToolUIPart part, {
+  bool? showToolCards,
+  String? conversationId,
+}) {
+  final visible =
+      showToolCards ??
+      context.select<SettingsProvider, bool>((s) => s.showToolCards);
+  if (visible) return true;
+  if (part.toolName == LocalToolNames.askUser) return true;
+  if (!part.loading) return false;
+  try {
+    final approval = context.watch<ToolApprovalService>();
+    return _matchingApprovalRequest(
+          approval: approval,
+          conversationId: conversationId,
+          toolCallId: part.id,
+        ) !=
+        null;
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _chatTimelineBlockCanShow(
+  List<_TimelineStepData> steps, {
+  required bool showThinkingCards,
+  required bool showToolCards,
+}) {
+  for (final step in steps) {
+    if (step.isReasoning && showThinkingCards) return true;
+    if (step.isTool) {
+      if (showToolCards) return true;
+      if (step.tool?.toolName == LocalToolNames.askUser) return true;
+      // Keep a slot for in-flight tools so a pending approval can appear.
+      if (step.tool?.loading == true) return true;
+    }
+  }
+  return false;
+}
+
+List<_TimelineStepData> _visibleChatTimelineSteps(
+  BuildContext context,
+  List<_TimelineStepData> steps, {
+  required bool showThinkingCards,
+  required bool showToolCards,
+  required String conversationId,
+}) {
+  if (showThinkingCards && showToolCards) return steps;
+  var pendingApprovalIds = const <String>{};
+  if (!showToolCards) {
+    try {
+      pendingApprovalIds = {
+        for (final req in context.watch<ToolApprovalService>().pendingRequests)
+          if (_approvalBelongsToConversation(req, conversationId))
+            req.toolCallId,
+      };
+    } catch (_) {}
+  }
+  return [
+    for (final step in steps)
+      if (step.isReasoning
+          ? showThinkingCards
+          : showToolCards ||
+                step.tool?.toolName == LocalToolNames.askUser ||
+                (step.tool?.loading == true &&
+                    pendingApprovalIds.contains(step.tool?.id)))
+        step,
+  ];
+}
+
 enum _ReasoningStepState { collapsed, preview, expanded }
 
 const double _timelineStepPaddingV = 8;
@@ -3970,9 +4105,18 @@ const double _timelineLineGap = 3;
 const double _timelineLineX = (_timelineIconColumnWidth - 1) / 2;
 
 class _ChainOfThoughtCard extends StatefulWidget {
-  const _ChainOfThoughtCard({required this.steps, this.onRecoveredAnswer});
+  const _ChainOfThoughtCard({
+    required this.steps,
+    required this.conversationId,
+    required this.showThinkingCards,
+    required this.showToolCards,
+    this.onRecoveredAnswer,
+  });
 
   final List<_TimelineStepData> steps;
+  final String conversationId;
+  final bool showThinkingCards;
+  final bool showToolCards;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -3991,15 +4135,25 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     final collapseThinkingSteps = context.select<SettingsProvider, bool>(
       (s) => s.collapseThinkingSteps,
     );
+    final filteredSteps = _visibleChatTimelineSteps(
+      context,
+      widget.steps,
+      showThinkingCards: widget.showThinkingCards,
+      showToolCards: widget.showToolCards,
+      conversationId: widget.conversationId,
+    );
+    if (filteredSteps.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final l10n = AppLocalizations.of(context)!;
     final enableAdaptiveWidth =
-        widget.steps.isNotEmpty &&
-        widget.steps.every((step) => step.isReasoning) &&
-        !widget.steps.any((step) => step.isReasoning && step.loading);
-    final canCollapse = collapseThinkingSteps && widget.steps.length > 2;
+        filteredSteps.isNotEmpty &&
+        filteredSteps.every((step) => step.isReasoning) &&
+        !filteredSteps.any((step) => step.isReasoning && step.loading);
+    final canCollapse = collapseThinkingSteps && filteredSteps.length > 2;
     final visibleSteps = canCollapse && !_showAllSteps
-        ? widget.steps.sublist(widget.steps.length - 2)
-        : widget.steps;
+        ? filteredSteps.sublist(filteredSteps.length - 2)
+        : filteredSteps;
     final fillWidth =
         !enableAdaptiveWidth ||
         visibleSteps.any(
@@ -4075,6 +4229,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
               }
               return _ChainOfThoughtToolStep(
                 part: step.tool!,
+                conversationId: widget.conversationId,
                 isFirst: index == 0,
                 isLast: index == visibleSteps.length - 1,
                 onRecoveredAnswer: widget.onRecoveredAnswer,
@@ -4494,12 +4649,14 @@ class _ChainOfThoughtReasoningStepState
 class _ChainOfThoughtToolStep extends StatefulWidget {
   const _ChainOfThoughtToolStep({
     required this.part,
+    required this.conversationId,
     required this.isFirst,
     required this.isLast,
     this.onRecoveredAnswer,
   });
 
   final ToolUIPart part;
+  final String conversationId;
   final bool isFirst;
   final bool isLast;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
@@ -4579,8 +4736,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   void _showDenyDialog(
     BuildContext context,
     ToolApprovalService approvalService,
-    String toolCallId,
-  ) {
+    String toolCallId, {
+    String? conversationId,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final reasonCtrl = TextEditingController();
     showDialog<void>(
@@ -4602,7 +4760,11 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
               final reason = reasonCtrl.text.trim().isEmpty
                   ? null
                   : reasonCtrl.text.trim();
-              approvalService.deny(toolCallId, reason);
+              approvalService.deny(
+                toolCallId,
+                reason: reason,
+                conversationId: conversationId,
+              );
               Navigator.of(ctx).pop();
             },
             child: Text(l10n.toolApprovalDeny),
@@ -4627,18 +4789,11 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       (s) => s.hideToolResultImages,
     );
     final approvalService = context.watch<ToolApprovalService>();
-    ToolApprovalRequest? pendingRequest;
-    if (widget.part.id.isNotEmpty &&
-        approvalService.isPending(widget.part.id)) {
-      pendingRequest = approvalService.pendingRequests[widget.part.id];
-    } else {
-      for (final request in approvalService.pendingRequests.values) {
-        if (request.toolName == widget.part.toolName) {
-          pendingRequest = request;
-          break;
-        }
-      }
-    }
+    final pendingRequest = _matchingApprovalRequest(
+      approval: approvalService,
+      conversationId: widget.conversationId,
+      toolCallId: widget.part.id,
+    );
     final isPendingApproval = pendingRequest != null;
     final approvalRequest = pendingRequest;
 
@@ -4777,6 +4932,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   context,
                   approvalService,
                   approvalRequest.toolCallId,
+                  conversationId: approvalRequest.conversationId,
                 ),
               ),
               const SizedBox(width: 6),
@@ -4788,8 +4944,10 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   context,
                 )!.toolApprovalApprove,
                 builder: (color) => Icon(Lucide.Check, size: 14, color: color),
-                onTap: () =>
-                    approvalService.approve(approvalRequest.toolCallId),
+                onTap: () => approvalService.approve(
+                  approvalRequest.toolCallId,
+                  conversationId: approvalRequest.conversationId,
+                ),
               ),
             ],
           )
@@ -4818,8 +4976,13 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
 }
 
 class _ToolCallItem extends StatefulWidget {
-  const _ToolCallItem({required this.part, this.onRecoveredAnswer});
+  const _ToolCallItem({
+    required this.part,
+    required this.conversationId,
+    this.onRecoveredAnswer,
+  });
   final ToolUIPart part;
+  final String conversationId;
   final Future<void> Function(ToolUIPart part, AskUserResult result)?
   onRecoveredAnswer;
 
@@ -4913,21 +5076,15 @@ class _ToolCallItemState extends State<_ToolCallItem> {
 
     // Check if this tool call is pending approval
     final approvalService = context.watch<ToolApprovalService>();
-    final isPendingApproval =
-        widget.part.loading &&
-        approvalService.pendingRequests.values.any(
-          (req) => req.toolName == widget.part.toolName,
-        );
-    // Find the matching approval request
-    String? pendingToolCallId;
-    if (isPendingApproval) {
-      try {
-        final req = approvalService.pendingRequests.values.firstWhere(
-          (req) => req.toolName == widget.part.toolName,
-        );
-        pendingToolCallId = req.toolCallId;
-      } catch (_) {}
-    }
+    final pendingRequest = widget.part.loading
+        ? _matchingApprovalRequest(
+            approval: approvalService,
+            conversationId: widget.conversationId,
+            toolCallId: widget.part.id,
+          )
+        : null;
+    final isPendingApproval = pendingRequest != null;
+    final pendingToolCallId = pendingRequest?.toolCallId;
 
     return IosCardPress(
       borderRadius: BorderRadius.circular(16),
@@ -5086,7 +5243,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       onTap: () => _showDenyDialog(
                         context,
                         approvalService,
-                        pendingToolCallId!,
+                        pendingToolCallId,
+                        conversationId: pendingRequest.conversationId,
                       ),
                     ),
                   ),
@@ -5096,7 +5254,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       label: l10n.toolApprovalApprove,
                       color: fg.accent,
                       filled: true,
-                      onTap: () => approvalService.approve(pendingToolCallId!),
+                      onTap: () => approvalService.approve(
+                        pendingToolCallId,
+                        conversationId: pendingRequest.conversationId,
+                      ),
                     ),
                   ),
                 ],
@@ -5133,8 +5294,9 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   void _showDenyDialog(
     BuildContext context,
     ToolApprovalService approvalService,
-    String toolCallId,
-  ) {
+    String toolCallId, {
+    String? conversationId,
+  }) {
     final l10n = AppLocalizations.of(context)!;
     final reasonCtrl = TextEditingController();
     showDialog<void>(
@@ -5156,7 +5318,11 @@ class _ToolCallItemState extends State<_ToolCallItem> {
               final reason = reasonCtrl.text.trim().isEmpty
                   ? null
                   : reasonCtrl.text.trim();
-              approvalService.deny(toolCallId, reason);
+              approvalService.deny(
+                toolCallId,
+                reason: reason,
+                conversationId: conversationId,
+              );
               Navigator.of(ctx).pop();
             },
             child: Text(l10n.toolApprovalDeny),

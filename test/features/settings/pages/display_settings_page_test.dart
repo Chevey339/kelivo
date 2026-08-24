@@ -1,6 +1,7 @@
 import "../../../support/business_test_harness.dart";
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/features/settings/pages/display_settings_page.dart';
+import 'package:Kelivo/features/settings/widgets/memory_ui.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +49,72 @@ void main() {
     expect(find.byType(SfSlider), findsNWidgets(2));
   });
 
+  testWidgets(
+    'chat item display page shows thinking and tool card switches with tips',
+    (tester) async {
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      addTearDown(settings.dispose);
+      await settings.loaded;
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<SettingsProvider>.value(
+          value: settings,
+          child: const MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: ChatItemDisplaySettingsPage(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final thinkingTitle = find.text('Show Thinking Cards');
+      await tester.scrollUntilVisible(
+        thinkingTitle,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(thinkingTitle, findsOneWidget);
+      expect(find.text('Show Tool Cards'), findsOneWidget);
+      expect(
+        find.text('When off, thinking-process cards are hidden in chat.'),
+        findsNothing,
+      );
+      expect(
+        find.text('When off, tool-use cards are hidden in chat.'),
+        findsNothing,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is MemoryTipIcon &&
+              widget.message ==
+                  'When off, thinking-process cards are hidden in chat.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is MemoryTipIcon &&
+              widget.message == 'When off, tool-use cards are hidden in chat.',
+        ),
+        findsOneWidget,
+      );
+      expect(settings.showThinkingCards, isTrue);
+      expect(settings.showToolCards, isTrue);
+
+      await tester.tap(thinkingTitle);
+      await tester.pumpAndSettle();
+      expect(settings.showThinkingCards, isFalse);
+
+      await tester.tap(find.text('Show Tool Cards'));
+      await tester.pumpAndSettle();
+      expect(settings.showToolCards, isFalse);
+    },
+  );
+
   testWidgets('behavior page shows long-paste threshold only when enabled', (
     tester,
   ) async {
@@ -66,6 +133,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    expect(find.text('Show Thinking Cards'), findsNothing);
+    expect(find.text('Show Tool Cards'), findsNothing);
 
     final toggle = find.text('Paste long text as file');
     await tester.scrollUntilVisible(

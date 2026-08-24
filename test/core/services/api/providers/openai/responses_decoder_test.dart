@@ -1,8 +1,11 @@
 import 'dart:convert';
 
+import 'package:Kelivo/core/services/api/providers/openai/openai_tool_transcript.dart';
+import 'package:Kelivo/core/services/api/providers/openai/responses_api.dart';
 import 'package:Kelivo/core/services/api/providers/openai/responses_decoder.dart';
 import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
+import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 SseEvent _event(Map<String, dynamic> data) => SseEvent(data: jsonEncode(data));
@@ -417,6 +420,78 @@ void main() {
     );
     expect(delta.chunks.whereType<ToolCallDelta>().single.id, 'call_1');
   });
+
+  test(
+    'late call_id keeps first-seen series id for emit, approval, and transcript',
+    () async {
+      final decoder = ResponsesStreamDecoder(sourceId: 'round-0');
+      final start = decoder.accept(
+        _event({
+          'type': 'response.output_item.added',
+          'output_index': 0,
+          'item': {'type': 'function_call', 'id': 'fc_1', 'name': 'lookup'},
+        }),
+      );
+      decoder.accept(
+        _event({
+          'type': 'response.function_call_arguments.delta',
+          'output_index': 0,
+          'delta': '{"q":"kelivo"}',
+        }),
+      );
+      decoder.accept(
+        _event({
+          'type': 'response.output_item.done',
+          'output_index': 0,
+          'item': {
+            'type': 'function_call',
+            'id': 'fc_1',
+            'call_id': 'call_late',
+            'name': 'lookup',
+            'arguments': '{"q":"kelivo"}',
+          },
+        }),
+      );
+
+      final uiId = start.chunks.whereType<ToolCallStart>().single.id;
+      expect(uiId, 'fc_1');
+      expect(decoder.toolCallsByIndex[0]!.seriesId, 'fc_1');
+      expect(decoder.toolCallsByIndex[0]!.callId, 'call_late');
+
+      final decoded = decoder.takeFunctionCalls().single;
+      expect(decoded.seriesId, 'fc_1');
+      expect(decoded.callId, 'call_late');
+
+      final emitCall = responsesCallsFromIndexMap({
+        decoded.index: decoded.toIndexFields(),
+      }).single;
+      expect(emitCall.id, uiId);
+      expect(emitCall.providerCallId, 'call_late');
+      expect(openaiTranscriptCallId(emitCall), 'call_late');
+      expect(
+        withResponsesFunctionCallItems(const [], [emitCall]).single['call_id'],
+        'call_late',
+      );
+
+      final approval = ToolApprovalService();
+      addTearDown(approval.dispose);
+      final approvalFuture = approval.requestApproval(
+        toolCallId: emitCall.id,
+        toolName: emitCall.name,
+        arguments: emitCall.arguments,
+        conversationId: 'conversation-responses-late-id',
+      );
+      expect(
+        approval.pendingFor(
+          toolCallId: uiId,
+          conversationId: 'conversation-responses-late-id',
+        ),
+        isNotNull,
+      );
+      approval.approve(uiId, conversationId: 'conversation-responses-late-id');
+      expect((await approvalFuture).approved, isTrue);
+    },
+  );
 
   test('follow-up decoder usage is the cumulative snapshot', () {
     final first = ResponsesStreamDecoder();

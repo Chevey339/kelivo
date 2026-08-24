@@ -12,12 +12,20 @@ class ResponsesFunctionCall {
     required this.callId,
     required this.name,
     this.args = '',
+    this.seriesId = '',
   });
 
   final int index;
   String callId;
   String name;
   String args;
+
+  /// First-seen stream id used by UI chunks, handler, and approval.
+  ///
+  /// OpenAI may emit an item id (for example `fc_1`) before `call_id`.
+  /// [seriesId] stays on that first-seen id; [callId] may later become the
+  /// vendor `call_id` for the API transcript.
+  String seriesId;
 
   Map<String, dynamic> get decodedArguments {
     try {
@@ -27,6 +35,13 @@ class ResponsesFunctionCall {
       return <String, dynamic>{};
     }
   }
+
+  Map<String, String> toIndexFields() => <String, String>{
+    'call_id': callId,
+    'name': name,
+    'args': args,
+    'series_id': seriesId,
+  };
 }
 
 class ResponsesPendingImage {
@@ -90,16 +105,23 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
   List<ResponsesFunctionCall> takeFunctionCalls() {
     if (toolCallsByIndex.isNotEmpty) {
       final sorted = toolCallsByIndex.keys.toList()..sort();
-      return [for (final index in sorted) toolCallsByIndex[index]!];
+      return [
+        for (final index in sorted)
+          _withSeriesId(toolCallsByIndex[index]!, _toolEventIdsByIndex[index]),
+      ];
     }
     var index = 0;
     return [
       for (final entry in toolCallsByKey.entries)
-        ResponsesFunctionCall(
-          index: index++,
-          callId: entry.key,
-          name: entry.value.name,
-          args: entry.value.args,
+        _withSeriesId(
+          ResponsesFunctionCall(
+            index: index++,
+            callId: entry.key,
+            name: entry.value.name,
+            args: entry.value.args,
+            seriesId: entry.value.seriesId,
+          ),
+          _toolEventIdsByKey[entry.key],
         ),
     ];
   }
@@ -191,6 +213,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
           idx,
           vendorId: callId.isNotEmpty ? callId : (item['id'] ?? '').toString(),
         );
+        _assignSeriesId(toolCallsByIndex[idx]!, eventId);
         chunks.addAll(_startTool(eventId, name: name, args: args));
       } else if (item is Map && _isImageGenerationType(item['type'])) {
         imagesByIndex.putIfAbsent(
@@ -230,6 +253,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
       );
       if (delta.isNotEmpty) entry.args += delta;
       final eventId = _toolSeriesId(idx, vendorId: entry.callId);
+      _assignSeriesId(entry, eventId);
       if (_openToolIds.add(eventId) && !_endedToolIds.contains(eventId)) {
         chunks.add(ToolCallStart(id: eventId, toolName: entry.name));
       }
@@ -264,6 +288,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
               ? entry.callId
               : (item['id'] ?? '').toString(),
         );
+        _assignSeriesId(entry, eventId);
         if (args.isNotEmpty && !_openToolIds.contains(eventId)) {
           chunks.addAll(_startTool(eventId, name: entry.name, args: args));
         }
@@ -326,6 +351,7 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
           key,
           () => id.isNotEmpty ? id : _ids.next('tool'),
         );
+        _assignSeriesId(entry, eventId);
         chunks.addAll(_startTool(eventId, name: entry.name, args: argsDelta));
       }
       return;
@@ -498,6 +524,24 @@ class ResponsesStreamDecoder implements StreamChunkDecoder {
     final id = vendorId.isNotEmpty ? vendorId : _ids.next('tool');
     _toolEventIdsByIndex[index] = id;
     return id;
+  }
+
+  /// Persist the first-seen stream id. Late vendor `call_id` stays on [callId].
+  void _assignSeriesId(ResponsesFunctionCall entry, String eventId) {
+    if (entry.seriesId.isEmpty) {
+      entry.seriesId = eventId;
+    }
+  }
+
+  ResponsesFunctionCall _withSeriesId(
+    ResponsesFunctionCall call,
+    String? eventId,
+  ) {
+    final fallback = eventId != null && eventId.isNotEmpty
+        ? eventId
+        : call.callId;
+    _assignSeriesId(call, fallback);
+    return call;
   }
 
   List<StreamChunk> _startTool(
