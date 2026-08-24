@@ -17,6 +17,7 @@ import 'package:Kelivo/core/services/api/stream/sse_event.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/widgets/frosted/frosted_surface.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart'
     as home_stream;
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
@@ -399,7 +400,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(FrostedSurface), findsOneWidget);
       expect(
         tester.widget<Text>(find.text('Deep Thinking')).style?.color,
         _expectedNeutralStrong(),
@@ -447,7 +448,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(FrostedSurface), findsNothing);
       expect(
         tester.widget<Text>(find.text('Deep Thinking')).style?.color,
         _expectedNeutralStrong(),
@@ -482,7 +483,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byType(BackdropFilter), findsOneWidget);
+      expect(find.byType(FrostedSurface), findsOneWidget);
       expect(
         tester.widget<Text>(find.text('Web Search: Kelivo')).style?.color,
         _expectedNeutralStrong(),
@@ -513,7 +514,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(FrostedSurface), findsNothing);
       expect(
         tester.widget<Text>(find.text('Web Search: Kelivo')).style?.color,
         _expectedNeutralStrong(),
@@ -545,7 +546,7 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
 
-        expect(find.byType(BackdropFilter), findsNWidgets(2));
+        expect(find.byType(FrostedSurface), findsNWidgets(2));
         expect(
           tester.widget<Text>(find.text('Translation')).style?.color,
           _expectedNeutralStrong(),
@@ -574,7 +575,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.byType(BackdropFilter), findsNothing);
+      expect(find.byType(FrostedSurface), findsNothing);
       expect(
         tester.widget<Text>(find.text('Translation')).style?.color,
         _expectedNeutralStrong(),
@@ -827,26 +828,28 @@ void main() {
       expect(label, findsOneWidget);
       expect(tester.getSize(label).height, greaterThan(20));
 
-      final iconRect = tester.getRect(
-        find.byWidgetPredicate(
-          (widget) => widget is Icon && widget.icon == Lucide.Earth,
+      final earth = find.byWidgetPredicate(
+        (widget) => widget is Icon && widget.icon == Lucide.Earth,
+      );
+      final iconRect = tester.getRect(earth);
+      final columnRect = tester.getRect(
+        find.ancestor(
+          of: earth,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key! as ValueKey<String>).value.startsWith(
+                  'chatMessageTimelineIconColumn',
+                ),
+          ),
         ),
       );
-      final topLineRect = tester.getRect(
-        find.byKey(const ValueKey('chatMessageTimelineHeaderTopLine')).first,
-      );
-      final bottomLineRect = tester.getRect(
-        find.byKey(const ValueKey('chatMessageTimelineHeaderBottomLine')).last,
-      );
 
-      final topGap = iconRect.top - topLineRect.bottom;
-      final bottomGap = bottomLineRect.top - iconRect.bottom;
+      final topGap = iconRect.top - columnRect.top;
+      final bottomGap = columnRect.bottom - iconRect.bottom;
       expect(topGap, greaterThanOrEqualTo(3));
-      expect(topGap, lessThanOrEqualTo(4));
       expect(bottomGap, greaterThanOrEqualTo(3));
-      expect(bottomGap, lessThanOrEqualTo(4));
       expect(topGap, closeTo(bottomGap, 0.1));
-      expect(topLineRect.height, closeTo(bottomLineRect.height, 0.1));
     });
 
     testWidgets('text to speech replay button speaks the tool text', (

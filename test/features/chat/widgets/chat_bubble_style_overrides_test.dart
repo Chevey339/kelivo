@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +12,7 @@ import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart'
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/theme/chat_bubble_style.dart';
+import 'package:Kelivo/features/chat/widgets/frosted/frosted_surface.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -66,12 +65,9 @@ void main() {
     );
     await tester.pump();
 
-    final clip = tester.widget<ClipRRect>(find.byType(ClipRRect).first);
-    expect(clip.borderRadius, BorderRadius.circular(4));
-
-    final filter = tester.widget<BackdropFilter>(find.byType(BackdropFilter));
-    final blur = filter.filter as ImageFilter;
-    expect(blur, ImageFilter.blur(sigmaX: 3, sigmaY: 3));
+    final surface = tester.widget<FrostedSurface>(find.byType(FrostedSurface));
+    expect(surface.style.radius, 4);
+    expect(surface.style.blurSigma, 3);
     expect(
       tester.widget<Text>(find.text('Plain override text')).style?.color,
       const Color(0xFF224466),
@@ -249,23 +245,25 @@ void main() {
       );
       await tester.pump();
 
-      final userClip = tester.widget<ClipRRect>(
+      final userSurface = tester.widget<FrostedSurface>(
         find.descendant(
           of: find.byKey(const ValueKey('user-message-text-bubble:$userId')),
-          matching: find.byType(ClipRRect),
+          matching: find.byType(FrostedSurface),
         ),
       );
-      final assistantClip = tester.widget<ClipRRect>(
+      final assistantSurface = tester.widget<FrostedSurface>(
         find
             .ancestor(
               of: find.text('Assistant override text'),
-              matching: find.byType(ClipRRect),
+              matching: find.byType(FrostedSurface),
             )
             .first,
       );
 
-      expect(userClip.borderRadius, BorderRadius.circular(20));
-      expect(assistantClip.borderRadius, BorderRadius.circular(4));
+      expect(userSurface.isUser, isTrue);
+      expect(assistantSurface.isUser, isFalse);
+      expect(userSurface.style.radius, 20);
+      expect(assistantSurface.style.radius, 4);
       expect(
         tester.widget<Text>(find.text('User override text')).style?.color,
         const Color(0xFFAA2200),
