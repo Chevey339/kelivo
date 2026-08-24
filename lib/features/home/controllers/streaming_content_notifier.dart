@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../core/models/message_part.dart';
@@ -13,11 +15,32 @@ import '../../../core/models/message_part.dart';
 /// 1. StreamController updates content via updateContent()
 /// 2. ChatMessageWidget uses ValueListenableBuilder to listen to contentNotifier
 /// 3. Only the streaming message widget rebuilds, not the entire page
+/// Lightweight tool-height signal for [MessageListView] extent invalidation.
+///
+/// The list must not compare [oldWidget.toolParts] — that map is mutated in
+/// place. This event is the streaming path; a stored signature snapshot covers
+/// non-streaming rebuilds.
+@immutable
+class ToolHeightEvent {
+  const ToolHeightEvent({required this.messageId, required this.version});
+
+  final String messageId;
+  final int version;
+}
+
 class StreamingContentNotifier {
   /// Map of message ID to its content notifier.
   /// Each streaming message has its own `ValueNotifier<String>`.
   final Map<String, ValueNotifier<StreamingContentData>> _notifiers =
       <String, ValueNotifier<StreamingContentData>>{};
+
+  /// Incremented tool-height events. Listeners must not rebuild the page.
+  final ValueNotifier<ToolHeightEvent?> toolHeightEvents =
+      ValueNotifier<ToolHeightEvent?>(null);
+
+  int _toolHeightVersion = 0;
+  final Set<String> _pendingHeightIds = <String>{};
+  var _heightFlushScheduled = false;
 
   /// Get or create a notifier for a message.
   ValueNotifier<StreamingContentData> getNotifier(String messageId) {
@@ -135,6 +158,28 @@ class StreamingContentNotifier {
         durationMs: current.durationMs,
       );
     }
+    notifyToolHeightChanged(messageId);
+  }
+
+  /// Emit a coalesced tool-height event. Safe to call without a content notifier.
+  void notifyToolHeightChanged(String messageId) {
+    if (!_pendingHeightIds.add(messageId)) return;
+    if (_heightFlushScheduled) return;
+    _heightFlushScheduled = true;
+    scheduleMicrotask(_flushToolHeightEvents);
+  }
+
+  void _flushToolHeightEvents() {
+    _heightFlushScheduled = false;
+    final ids = List<String>.of(_pendingHeightIds);
+    _pendingHeightIds.clear();
+    for (final id in ids) {
+      _toolHeightVersion += 1;
+      toolHeightEvents.value = ToolHeightEvent(
+        messageId: id,
+        version: _toolHeightVersion,
+      );
+    }
   }
 
   /// Force a rebuild of the streaming message widget.
@@ -177,6 +222,7 @@ class StreamingContentNotifier {
   /// Dispose all resources.
   void dispose() {
     clear();
+    toolHeightEvents.dispose();
   }
 }
 

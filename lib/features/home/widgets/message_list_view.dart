@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
@@ -14,6 +15,7 @@ import '../../../core/models/assistant.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
 import '../controllers/stream_controller.dart' as stream_ctrl;
@@ -22,6 +24,7 @@ import '../controllers/message_render_model.dart';
 import '../controllers/scroll_controller.dart' as scroll_ctrl;
 import '../services/ask_user_interaction_service.dart';
 import '../services/local_tools_service.dart';
+import '../services/tool_approval_service.dart';
 import '../utils/chat_layout_constants.dart';
 import 'model_icon.dart';
 
@@ -142,8 +145,11 @@ class MessageListView extends StatefulWidget {
     this.onUserScrollIntent,
     this.chatFontScale = 1,
     this.collapseThinking = true,
+    this.collapseThinkingSteps = false,
     this.showThinkingCards = true,
     this.showToolCards = true,
+    this.showToolResultSummary = false,
+    this.hideToolResultImages = false,
     this.collapsedCodeLines,
     this.wrapCodeBlocks = false,
     this.showModelIcon = true,
@@ -235,11 +241,22 @@ class MessageListView extends StatefulWidget {
   /// Whether finished thinking blocks render collapsed (display setting).
   final bool collapseThinking;
 
+  /// Whether each timeline block keeps only the last two steps plus an expand
+  /// row. Must match the renderer so estimates do not assume every tool header
+  /// is visible.
+  final bool collapseThinkingSteps;
+
   /// Whether thinking-process cards render in chat.
   final bool showThinkingCards;
 
   /// Whether tool-use cards render in chat.
   final bool showToolCards;
+
+  /// Whether collapsed tool cards also show a short result summary.
+  final bool showToolResultSummary;
+
+  /// Whether tool-result image thumbnails are hidden under the card.
+  final bool hideToolResultImages;
 
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
@@ -277,6 +294,10 @@ class _MessageListViewState extends State<MessageListView> {
   bool _pointerScrollActivityCheckScheduled = false;
   late List<MessageRenderModel> _effectiveRenderModels;
   late Map<String, int> _slotIndexById;
+  late Map<String, int> _messageIndexById;
+  final Map<String, int> _lastToolSignatures = <String, int>{};
+  final Set<String> _pendingToolExtentIds = <String>{};
+  var _toolExtentFlushScheduled = false;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -287,14 +308,27 @@ class _MessageListViewState extends State<MessageListView> {
   void initState() {
     super.initState();
     _refreshRenderModels();
+    _snapshotToolSignatures();
+    widget.streamingContentNotifier?.toolHeightEvents.addListener(
+      _handleToolHeightEvent,
+    );
   }
 
   @override
   void didUpdateWidget(covariant MessageListView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamingContentNotifier != widget.streamingContentNotifier) {
+      oldWidget.streamingContentNotifier?.toolHeightEvents.removeListener(
+        _handleToolHeightEvent,
+      );
+      widget.streamingContentNotifier?.toolHeightEvents.addListener(
+        _handleToolHeightEvent,
+      );
+    }
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
     _synchronizeExtentCache(oldWidget, oldRenderModels);
+    _snapshotToolSignatures();
   }
 
   void _refreshRenderModels() {
@@ -310,6 +344,70 @@ class _MessageListViewState extends State<MessageListView> {
       for (var index = 0; index < _effectiveRenderModels.length; index++)
         _effectiveRenderModels[index].slotId: index,
     };
+    _messageIndexById = <String, int>{
+      for (var index = 0; index < _effectiveRenderModels.length; index++)
+        _effectiveRenderModels[index].message.id: index,
+    };
+  }
+
+  void _snapshotToolSignatures() {
+    _lastToolSignatures
+      ..clear()
+      ..addAll({
+        for (final model in _effectiveRenderModels)
+          model.message.id: _toolEstimateSignature(
+            widget.toolParts[model.message.id],
+          ),
+      });
+  }
+
+  void _handleToolHeightEvent() {
+    final event = widget.streamingContentNotifier?.toolHeightEvents.value;
+    if (event == null) return;
+    _invalidateToolExtentForMessage(event.messageId);
+  }
+
+  void _invalidateToolExtentForMessage(String messageId) {
+    _extentEstimateCache.remove(messageId);
+    final controller = widget.listController;
+    if (!controller.isAttached) return;
+    if (controller.isLocked) {
+      _pendingToolExtentIds.add(messageId);
+      if (_toolExtentFlushScheduled) return;
+      _toolExtentFlushScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _toolExtentFlushScheduled = false;
+        if (!mounted) return;
+        final ids = List<String>.of(_pendingToolExtentIds);
+        _pendingToolExtentIds.clear();
+        for (final id in ids) {
+          _applyToolExtentInvalidation(id);
+        }
+      });
+      return;
+    }
+    _applyToolExtentInvalidation(messageId);
+  }
+
+  void _applyToolExtentInvalidation(String messageId) {
+    final controller = widget.listController;
+    if (!controller.isAttached || controller.isLocked) return;
+    final index = _messageIndexById[messageId];
+    if (index == null) return;
+    final visible = controller.visibleRange;
+    final scrollController = widget.scrollController;
+    if (visible != null &&
+        index < visible.$1 &&
+        scrollController is scroll_ctrl.ChatAutoFollowScrollController) {
+      final request = scrollController
+          .requestPreserveDistanceFromEndDuringLayout();
+      if (request != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          scrollController.finishPreserveDistanceFromEndDuringLayout(request);
+        });
+      }
+    }
+    controller.invalidateExtent(index);
   }
 
   /// Header row + action bar + vertical margins around a bubble.
@@ -317,6 +415,9 @@ class _MessageListViewState extends State<MessageListView> {
 
   /// Height of a collapsed inline thinking card.
   static const double _estimateCollapsedCard = 44.0;
+
+  /// Expand-steps row shown when a timeline block is collapsed.
+  static const double _estimateExpandRow = 36.0;
 
   /// Characters scanned before a message's line density is extrapolated.
   static const int _estimateScanLimit = 8000;
@@ -338,10 +439,14 @@ class _MessageListViewState extends State<MessageListView> {
   /// Display settings the estimate depends on, refreshed in [build].
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
+    collapseThinkingSteps: false,
     showThinkingCards: true,
     showToolCards: true,
+    showToolResultSummary: false,
+    hideToolResultImages: false,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
+    pendingApprovalIds: <String>{},
   );
 
   /// Font scale the currently stored extents were estimated at.
@@ -394,7 +499,11 @@ class _MessageListViewState extends State<MessageListView> {
     final hasReasoning =
         (reasoning?.text.isNotEmpty ?? false) ||
         (reasoningSegments?.isNotEmpty ?? false);
-    if (text.isEmpty && !hasReasoning) return _estimateChrome;
+    final toolParts = message.role == 'assistant'
+        ? widget.toolParts[message.id]
+        : null;
+    final hasTools = toolParts != null && toolParts.isNotEmpty;
+    if (text.isEmpty && !hasReasoning && !hasTools) return _estimateChrome;
 
     // Layout asks for the same item repeatedly (every resize, every window
     // change), and the scan below is linear in the message length, so a memo
@@ -407,13 +516,15 @@ class _MessageListViewState extends State<MessageListView> {
       reasoning,
       reasoningSegments,
     );
+    final toolSignature = _toolEstimateSignature(toolParts);
     final cached = _extentEstimateCache[message.id];
     if (cached != null &&
         identical(cached.content, text) &&
         cached.crossAxisExtent == crossAxisExtent &&
         cached.fontScale == fontScale &&
         cached.settings == settings &&
-        cached.reasoningSignature == reasoningSignature) {
+        cached.reasoningSignature == reasoningSignature &&
+        cached.toolSignature == toolSignature) {
       return cached.extent;
     }
 
@@ -433,6 +544,7 @@ class _MessageListViewState extends State<MessageListView> {
         fontScale: fontScale,
         settings: settings,
         reasoningSignature: reasoningSignature,
+        toolSignature: toolSignature,
         extent: 0,
       );
       return 0;
@@ -471,17 +583,19 @@ class _MessageListViewState extends State<MessageListView> {
     // column and stacks at a different row height than the body text.
     final codeFontSize = _estimateCodeFontSize * fontScale;
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    // An empty body still reports one wrapped line; skip it so a tools-only
+    // assistant turn is chrome + cards, not chrome + a phantom text row.
+    final bodyLines = body.isEmpty
+        ? 0.0
+        : _wrappedLineCount(
+            body,
+            charsPerLine: charsPerLine,
+            codeCharsPerLine: settings.wrapCodeBlocks ? codeCharsPerLine : null,
+            codeLineRatio: codeFontSize / fontSize,
+            collapsedCodeLines: settings.collapsedCodeLines,
+          );
     final extent =
-        _wrappedLineCount(
-              body,
-              charsPerLine: charsPerLine,
-              codeCharsPerLine: settings.wrapCodeBlocks
-                  ? codeCharsPerLine
-                  : null,
-              codeLineRatio: codeFontSize / fontSize,
-              collapsedCodeLines: settings.collapsedCodeLines,
-            ) *
-            lineHeight +
+        bodyLines * lineHeight +
         _estimateChrome +
         collapsedCards * _estimateCollapsedCard +
         (settings.showThinkingCards
@@ -491,7 +605,13 @@ class _MessageListViewState extends State<MessageListView> {
                 textWidth: textWidth,
                 fontScale: fontScale,
               )
-            : 0);
+            : 0) +
+        _estimateToolExtent(
+          toolParts,
+          messageId: message.id,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        );
 
     if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
       _extentEstimateCache.clear();
@@ -502,6 +622,7 @@ class _MessageListViewState extends State<MessageListView> {
       fontScale: fontScale,
       settings: settings,
       reasoningSignature: reasoningSignature,
+      toolSignature: toolSignature,
       extent: extent,
     );
     return extent;
@@ -548,6 +669,80 @@ class _MessageListViewState extends State<MessageListView> {
       addCard(reasoning.text, reasoning.expanded);
     }
     return extent;
+  }
+
+  /// Estimated height of the inline tool cards rendered in the timeline.
+  ///
+  /// Tool parts live outside [ChatMessage.content], so the content-only
+  /// estimate used to treat a tools-only assistant turn as [_estimateChrome]
+  /// (96px). Each collapsed card is a header row; when summaries are shown
+  /// the first four wrapped lines of the result are appended, matching the
+  /// renderer's `maxLines: 4` clamp.
+  double _estimateToolExtent(
+    List<ToolUIPart>? parts, {
+    required String messageId,
+    required double textWidth,
+    required double fontScale,
+  }) {
+    if (parts == null || parts.isEmpty) return 0;
+    final settings = _estimateSettings;
+    final cardTools = [
+      for (final part in parts)
+        if (toolCreatesTimelineCard(part.toolName)) part,
+    ];
+    if (cardTools.isEmpty) return 0;
+
+    final splits = widget.contentSplits[messageId];
+    final blocks = splitToolsIntoTimelineBlocks(
+      cardTools,
+      toolCounts: splits?.toolCounts,
+    );
+
+    var extent = 0.0;
+    for (final block in blocks) {
+      final visible = [
+        for (final part in block)
+          if (isTimelineToolVisible(
+            toolName: part.toolName,
+            loading: part.loading,
+            showToolCards: settings.showToolCards,
+            pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          ))
+            part,
+      ];
+      if (visible.isEmpty) continue;
+      final collapsed = collapseTimelineSteps(
+        visible,
+        collapseThinkingSteps: settings.collapseThinkingSteps,
+      );
+      if (collapsed.hasExpandRow) {
+        extent += _estimateExpandRow;
+      }
+      for (final part in collapsed.visibleSteps) {
+        extent += _estimateCollapsedCard;
+        extent += estimateToolExtraHeight(
+          toolName: part.toolName,
+          arguments: part.arguments,
+          content: part.content,
+          showToolResultSummary: settings.showToolResultSummary,
+          hideToolResultImages: settings.hideToolResultImages,
+          pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          textWidth: textWidth,
+          fontScale: fontScale,
+          wrappedLineCount: _wrappedLineCount,
+        );
+      }
+    }
+    return extent;
+  }
+
+  /// Identity of the tool-card inputs an estimate was computed from.
+  ///
+  /// Stream updates replace each [ToolUIPart] with a new instance, so object
+  /// identity is the change signal — the same rule as the live tool map.
+  int _toolEstimateSignature(List<ToolUIPart>? parts) {
+    if (parts == null || parts.isEmpty) return 0;
+    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
   }
 
   /// Identity of the reasoning inputs an estimate was computed from.
@@ -715,8 +910,11 @@ class _MessageListViewState extends State<MessageListView> {
         oldWidget.showUserAvatar != widget.showUserAvatar ||
         oldWidget.showTokenStats != widget.showTokenStats ||
         oldWidget.collapseThinking != widget.collapseThinking ||
+        oldWidget.collapseThinkingSteps != widget.collapseThinkingSteps ||
         oldWidget.showThinkingCards != widget.showThinkingCards ||
         oldWidget.showToolCards != widget.showToolCards ||
+        oldWidget.showToolResultSummary != widget.showToolResultSummary ||
+        oldWidget.hideToolResultImages != widget.hideToolResultImages ||
         oldWidget.collapsedCodeLines != widget.collapsedCodeLines ||
         oldWidget.wrapCodeBlocks != widget.wrapCodeBlocks ||
         !identical(oldWidget.assistant, widget.assistant);
@@ -806,6 +1004,12 @@ class _MessageListViewState extends State<MessageListView> {
           newModels[index].message,
         )) {
           changedIndices.add(index);
+        } else {
+          final messageId = newModels[index].message.id;
+          if (_lastToolSignatures[messageId] !=
+              _toolEstimateSignature(widget.toolParts[messageId])) {
+            changedIndices.add(index);
+          }
         }
       }
       if (slotsMatch) {
@@ -1069,6 +1273,9 @@ class _MessageListViewState extends State<MessageListView> {
 
   @override
   void dispose() {
+    widget.streamingContentNotifier?.toolHeightEvents.removeListener(
+      _handleToolHeightEvent,
+    );
     _scrollIdleTimer?.cancel();
     _deferStreamingMessageUpdates.dispose();
     _keyboardFocusNode.dispose();
@@ -1115,12 +1322,26 @@ class _MessageListViewState extends State<MessageListView> {
     // Items render at the system scale times the chat scale (see the MediaQuery
     // override in _buildMessageItem), so the estimate has to use both.
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
+    var pendingApprovalIds = const <String>{};
+    try {
+      pendingApprovalIds = context.select<ToolApprovalService, _EstimateIdSet>((
+        approval,
+      ) {
+        return _EstimateIdSet({
+          for (final req in approval.pendingRequests) req.toolCallId,
+        });
+      }).ids;
+    } catch (_) {}
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
+      collapseThinkingSteps: widget.collapseThinkingSteps,
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
+      showToolResultSummary: widget.showToolResultSummary,
+      hideToolResultImages: widget.hideToolResultImages,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
+      pendingApprovalIds: pendingApprovalIds,
     );
     _invalidateEstimatesIfScaleChanged();
     final presentation = _MessagePresentation(
@@ -1835,18 +2056,37 @@ class _MessageListViewState extends State<MessageListView> {
   }
 }
 
+final class _EstimateIdSet {
+  const _EstimateIdSet(this.ids);
+  final Set<String> ids;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _EstimateIdSet && setEquals(other.ids, ids);
+
+  @override
+  int get hashCode => Object.hashAllUnordered(ids);
+}
+
 /// Display settings that change how tall a message renders.
 final class _EstimateSettings {
   const _EstimateSettings({
     required this.collapseThinking,
+    required this.collapseThinkingSteps,
     required this.showThinkingCards,
     required this.showToolCards,
+    required this.showToolResultSummary,
+    required this.hideToolResultImages,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
+    required this.pendingApprovalIds,
   });
 
   /// Whether finished thinking blocks render as a collapsed card.
   final bool collapseThinking;
+
+  /// Whether each timeline block keeps only the last two steps plus expand.
+  final bool collapseThinkingSteps;
 
   /// Whether thinking-process cards contribute to estimated height.
   final bool showThinkingCards;
@@ -1854,28 +2094,45 @@ final class _EstimateSettings {
   /// Whether tool-use cards contribute to estimated height.
   final bool showToolCards;
 
+  /// Whether collapsed tool cards also show a short result summary.
+  final bool showToolResultSummary;
+
+  /// Whether tool-result image thumbnails are hidden under the card.
+  final bool hideToolResultImages;
+
   /// Lines a long code block collapses to, or null when it stays expanded.
   final int? collapsedCodeLines;
 
   /// Whether code blocks wrap instead of scrolling horizontally.
   final bool wrapCodeBlocks;
 
+  /// Tool-call ids with a pending approval, snapshotted during [build].
+  final Set<String> pendingApprovalIds;
+
   @override
   bool operator ==(Object other) =>
       other is _EstimateSettings &&
       other.collapseThinking == collapseThinking &&
+      other.collapseThinkingSteps == collapseThinkingSteps &&
       other.showThinkingCards == showThinkingCards &&
       other.showToolCards == showToolCards &&
+      other.showToolResultSummary == showToolResultSummary &&
+      other.hideToolResultImages == hideToolResultImages &&
       other.collapsedCodeLines == collapsedCodeLines &&
-      other.wrapCodeBlocks == wrapCodeBlocks;
+      other.wrapCodeBlocks == wrapCodeBlocks &&
+      setEquals(other.pendingApprovalIds, pendingApprovalIds);
 
   @override
   int get hashCode => Object.hash(
     collapseThinking,
+    collapseThinkingSteps,
     showThinkingCards,
     showToolCards,
+    showToolResultSummary,
+    hideToolResultImages,
     collapsedCodeLines,
     wrapCodeBlocks,
+    Object.hashAllUnordered(pendingApprovalIds),
   );
 }
 
@@ -1887,6 +2144,7 @@ final class _ExtentEstimate {
     required this.fontScale,
     required this.settings,
     required this.reasoningSignature,
+    required this.toolSignature,
     required this.extent,
   });
 
@@ -1895,6 +2153,7 @@ final class _ExtentEstimate {
   final double fontScale;
   final _EstimateSettings settings;
   final int reasoningSignature;
+  final int toolSignature;
   final double extent;
 }
 

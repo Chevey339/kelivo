@@ -1050,6 +1050,7 @@ class HomePageController extends ChangeNotifier {
       parts.add(answeredPart);
     }
     _streamController.setToolParts(message.id, parts);
+    streamingContentNotifier.notifyToolHeightChanged(message.id);
     notifyListeners();
 
     await _viewModel.continueAssistantMessageAfterToolAnswer(
