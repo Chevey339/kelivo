@@ -1488,7 +1488,7 @@
   "searchSettingsSheetBuiltinSearchTitle": "模型內建搜尋",
   "searchSettingsSheetBuiltinSearchDescription": "是否啟用模型內建的搜尋功能",
   "searchSettingsSheetClaudeDynamicSearchTitle": "模型內建搜尋(新)",
-  "searchSettingsSheetClaudeDynamicSearchDescription": "在支援的 Claude 官方模型上使用 `web_search_20260209`，支援動態過濾能力。",
+  "searchSettingsSheetClaudeDynamicSearchDescription": "在支援的 Claude 官方模型上使用 `web_search_20260318`，支援動態過濾能力。",
   "searchSettingsSheetWebSearchTitle": "網路搜尋",
   "searchSettingsSheetWebSearchDescription": "是否啟用網頁搜尋",
   "searchSettingsSheetOpenSearchServicesTooltip": "開啟搜尋服務設定",

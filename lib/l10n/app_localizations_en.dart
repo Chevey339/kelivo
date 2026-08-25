@@ -4291,7 +4291,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      'Use `web_search_20260209` with dynamic filtering on supported official Claude models.';
+      'Use `web_search_20260318` with dynamic filtering on supported official Claude models.';
 
   @override
   String get searchSettingsSheetWebSearchTitle => 'Web Search';

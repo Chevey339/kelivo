@@ -4148,7 +4148,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '在支持的 Claude 官方模型上使用 `web_search_20260318`，支持动态过滤能力。';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -11917,7 +11917,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支持的 Claude 官方模型上使用 `web_search_20260209`，支持动态过滤能力。';
+      '在支持的 Claude 官方模型上使用 `web_search_20260318`，支持动态过滤能力。';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -19610,7 +19610,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '在支援的 Claude 官方模型上使用 `web_search_20260209`，支援動態過濾能力。';
+      '在支援的 Claude 官方模型上使用 `web_search_20260318`，支援動態過濾能力。';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '網路搜尋';

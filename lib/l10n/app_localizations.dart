@@ -7948,7 +7948,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use `web_search_20260209` with dynamic filtering on supported official Claude models.'**
+  /// **'Use `web_search_20260318` with dynamic filtering on supported official Claude models.'**
   String get searchSettingsSheetClaudeDynamicSearchDescription;
 
   /// No description provided for @searchSettingsSheetWebSearchTitle.

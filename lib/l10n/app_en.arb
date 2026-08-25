@@ -1890,7 +1890,7 @@
   "searchSettingsSheetBuiltinSearchTitle": "Built-in Search",
   "searchSettingsSheetBuiltinSearchDescription": "Enable model's built-in search",
   "searchSettingsSheetClaudeDynamicSearchTitle": "Built-in Search (New)",
-  "searchSettingsSheetClaudeDynamicSearchDescription": "Use `web_search_20260209` with dynamic filtering on supported official Claude models.",
+  "searchSettingsSheetClaudeDynamicSearchDescription": "Use `web_search_20260318` with dynamic filtering on supported official Claude models.",
   "searchSettingsSheetWebSearchTitle": "Web Search",
   "searchSettingsSheetWebSearchDescription": "Enable web search in chat",
   "searchSettingsSheetOpenSearchServicesTooltip": "Open search services",
