@@ -415,6 +415,12 @@ Stream<StreamChunk> sendClaudeStream(
       'type': searchToolType,
       'name': 'web_search',
     };
+    if (BuiltInToolsHelper.claudeBuiltInSearchNeedsDirectCaller(
+      cfg: config,
+      modelId: modelId,
+    )) {
+      entry['allowed_callers'] = const <String>['direct'];
+    }
     if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) {
       entry['max_uses'] = ws['max_uses'];
     }

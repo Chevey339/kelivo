@@ -742,6 +742,41 @@ void main() {
           ),
           isFalse,
         );
+        // Leaving allowed_callers off keeps the code execution default.
+        expect(
+          tools.firstWhere(
+            (tool) => tool['name'] == 'web_search',
+          ).containsKey('allowed_callers'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'a dynamic-capable model without the opt-in calls web search directly',
+      () async {
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'claude-opus-4-7',
+          config: _claudeConfig(
+            'http://localhost',
+            modelOverrides: const <String, dynamic>{
+              'claude-opus-4-7': <String, dynamic>{
+                'builtInTools': <String>[BuiltInToolNames.search],
+              },
+            },
+          ),
+        );
+
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        final search = tools.firstWhere((tool) => tool['name'] == 'web_search');
+        expect(search['type'], 'web_search_20260318');
+        expect(search['allowed_callers'], <String>['direct']);
+        expect(
+          tools.any(
+            (tool) => (tool['type'] as String).startsWith('code_execution'),
+          ),
+          isFalse,
+        );
       },
     );
 
@@ -762,10 +797,10 @@ void main() {
       );
 
       final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
-      expect(
-        tools.firstWhere((tool) => tool['name'] == 'web_search')['type'],
-        'web_search_20250305',
-      );
+      final search = tools.firstWhere((tool) => tool['name'] == 'web_search');
+      expect(search['type'], 'web_search_20250305');
+      // The basic tool has no code execution default to opt out of.
+      expect(search.containsKey('allowed_callers'), isFalse);
     });
 
     test(

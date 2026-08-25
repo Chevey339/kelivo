@@ -742,13 +742,26 @@ abstract class BuiltInToolsHelper {
         _claudeDynamicSearchMarkers.contains(ws['tool_version']);
   }
 
+  /// The tool version follows what the model can do, not what the user turned
+  /// on: older models and Claude-compatible relays only know the basic type.
   static String claudeBuiltInSearchToolType({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
+    return supportsClaudeDynamicWebSearchForModel(cfg: cfg, modelId: modelId)
         ? claudeSearchToolTypeDynamic
         : claudeSearchToolTypeBasic;
+  }
+
+  /// `web_search_20260209` and later default to being called from code
+  /// execution, which is what performs the filtering. Opting out means saying
+  /// so explicitly; the basic type has no such default and takes no callers.
+  static bool claudeBuiltInSearchNeedsDirectCaller({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    return supportsClaudeDynamicWebSearchForModel(cfg: cfg, modelId: modelId) &&
+        !isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId);
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
