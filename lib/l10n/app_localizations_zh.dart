@@ -3296,9 +3296,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -3328,21 +3325,15 @@ class AppLocalizationsZh extends AppLocalizations {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
-  String get modelDetailSheetClaudeWebFetchTool => '网页抓取';
-
-  @override
   String get modelDetailSheetClaudeWebFetchToolDescription =>
       '允许 Claude 抓取对话中出现的网页与 PDF';
-
-  @override
-  String get modelDetailSheetClaudeCodeExecutionTool => '代码执行';
 
   @override
   String get modelDetailSheetClaudeCodeExecutionToolDescription =>
@@ -11074,9 +11065,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -11106,21 +11094,15 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
-  String get modelDetailSheetClaudeWebFetchTool => '网页抓取';
-
-  @override
   String get modelDetailSheetClaudeWebFetchToolDescription =>
       '允许 Claude 抓取对话中出现的网页与 PDF';
-
-  @override
-  String get modelDetailSheetClaudeCodeExecutionTool => '代码执行';
 
   @override
   String get modelDetailSheetClaudeCodeExecutionToolDescription =>
@@ -18777,9 +18759,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜尋';
 
   @override
@@ -18809,21 +18788,15 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '需要啟用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '網頁擷取';
+  String get modelDetailSheetWebFetchTool => '網頁擷取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
 
   @override
-  String get modelDetailSheetClaudeWebFetchTool => '網頁擷取';
-
-  @override
   String get modelDetailSheetClaudeWebFetchToolDescription =>
       '允許 Claude 擷取對話中出現的網頁與 PDF';
-
-  @override
-  String get modelDetailSheetClaudeCodeExecutionTool => '程式碼執行';
 
   @override
   String get modelDetailSheetClaudeCodeExecutionToolDescription =>

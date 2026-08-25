@@ -6325,12 +6325,6 @@ abstract class AppLocalizations {
   /// **'Built-in tools depend on the provider and API mode.'**
   String get modelDetailSheetBuiltinToolsDescription;
 
-  /// No description provided for @modelDetailSheetBuiltinToolsUnsupportedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Current provider does not support these built-in tools.'**
-  String get modelDetailSheetBuiltinToolsUnsupportedHint;
-
   /// No description provided for @modelDetailSheetSearchTool.
   ///
   /// In en, this message translates to:
@@ -6385,11 +6379,11 @@ abstract class AppLocalizations {
   /// **'Requires OpenAI Responses API.'**
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint;
 
-  /// No description provided for @modelDetailSheetOpenrouterWebFetchTool.
+  /// No description provided for @modelDetailSheetWebFetchTool.
   ///
   /// In en, this message translates to:
   /// **'Web Fetch'**
-  String get modelDetailSheetOpenrouterWebFetchTool;
+  String get modelDetailSheetWebFetchTool;
 
   /// No description provided for @modelDetailSheetOpenrouterWebFetchToolDescription.
   ///
@@ -6397,23 +6391,11 @@ abstract class AppLocalizations {
   /// **'Enable OpenRouter web fetch server tool'**
   String get modelDetailSheetOpenrouterWebFetchToolDescription;
 
-  /// No description provided for @modelDetailSheetClaudeWebFetchTool.
-  ///
-  /// In en, this message translates to:
-  /// **'Web Fetch'**
-  String get modelDetailSheetClaudeWebFetchTool;
-
   /// No description provided for @modelDetailSheetClaudeWebFetchToolDescription.
   ///
   /// In en, this message translates to:
   /// **'Let Claude fetch pages and PDFs from URLs in the conversation'**
   String get modelDetailSheetClaudeWebFetchToolDescription;
-
-  /// No description provided for @modelDetailSheetClaudeCodeExecutionTool.
-  ///
-  /// In en, this message translates to:
-  /// **'Code Execution'**
-  String get modelDetailSheetClaudeCodeExecutionTool;
 
   /// No description provided for @modelDetailSheetClaudeCodeExecutionToolDescription.
   ///

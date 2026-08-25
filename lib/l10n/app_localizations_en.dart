@@ -3414,10 +3414,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Built-in tools depend on the provider and API mode.';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint =>
-      'Current provider does not support these built-in tools.';
-
-  @override
   String get modelDetailSheetSearchTool => 'Search';
 
   @override
@@ -3450,21 +3446,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Requires OpenAI Responses API.';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => 'Web Fetch';
+  String get modelDetailSheetWebFetchTool => 'Web Fetch';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       'Enable OpenRouter web fetch server tool';
 
   @override
-  String get modelDetailSheetClaudeWebFetchTool => 'Web Fetch';
-
-  @override
   String get modelDetailSheetClaudeWebFetchToolDescription =>
       'Let Claude fetch pages and PDFs from URLs in the conversation';
-
-  @override
-  String get modelDetailSheetClaudeCodeExecutionTool => 'Code Execution';
 
   @override
   String get modelDetailSheetClaudeCodeExecutionToolDescription =>
