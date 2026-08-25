@@ -98,6 +98,7 @@ final class ImagePart extends MessagePart {
     required this.uri,
     this.mime,
     this.assetId,
+    this.id,
     this.unavailable = false,
   });
 
@@ -118,6 +119,9 @@ final class ImagePart extends MessagePart {
   final String uri;
   final String? mime;
   final String? assetId;
+
+  /// Stream image id. Runtime-only — not written to [encodePayload].
+  final String? id;
   final bool unavailable;
 
   @override
@@ -138,10 +142,11 @@ final class ImagePart extends MessagePart {
           uri == other.uri &&
           mime == other.mime &&
           assetId == other.assetId &&
+          id == other.id &&
           unavailable == other.unavailable;
 
   @override
-  int get hashCode => Object.hash(uri, mime, assetId, unavailable);
+  int get hashCode => Object.hash(uri, mime, assetId, id, unavailable);
 }
 
 final class FilePart extends MessagePart {

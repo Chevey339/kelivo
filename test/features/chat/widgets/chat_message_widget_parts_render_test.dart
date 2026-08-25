@@ -4,7 +4,9 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/tts_provider.dart';
 import 'package:Kelivo/core/services/chat/chat_service.dart';
+import 'package:Kelivo/features/chat/pages/image_viewer_page.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_projection.dart';
 import 'package:Kelivo/features/home/controllers/stream_controller.dart';
 import 'package:Kelivo/features/home/services/ask_user_interaction_service.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
@@ -685,4 +687,120 @@ void main() {
       expect(find.textContaining('after'), findsWidgets);
     },
   );
+
+  testWidgets(
+    'structured image restores viewer, aspect, bubble, and ResizeImage',
+    (tester) async {
+      const png =
+          'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD5N/qhAAAAEklEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+      await tester.pumpWidget(
+        _buildHarness(
+          child: ChatMessageWidget(
+            message: ChatMessage(
+              id: 'structured-image',
+              role: 'assistant',
+              conversationId: 'c1',
+              parts: const [
+                ReasoningPart('plan'),
+                ImagePart(uri: png),
+                TextPart('caption'),
+              ],
+            ),
+            showModelIcon: false,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(
+        find.byKey(
+          const ValueKey('assistant-message-attachments:structured-image'),
+        ),
+        findsNothing,
+      );
+      final image = tester.widget<Image>(find.byType(Image).first);
+      expect(image.height, isNot(kTimelineImageBlockHeight));
+      expect(image.image, isA<ResizeImage>());
+      expect(find.byType(ImageViewerPage), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey('assistant-inline-image:image-ordinal:0')),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(ImageViewerPage), findsOneWidget);
+    },
+  );
+
+  testWidgets('structured image plus valid splits keeps arrival order', (
+    tester,
+  ) async {
+    const imageUrl = 'https://example.com/inline.png';
+    await tester.pumpWidget(
+      _buildHarness(
+        child: ChatMessageWidget(
+          message: ChatMessage(
+            id: 'structured-image-splits',
+            role: 'assistant',
+            content: 'caption',
+            conversationId: 'c1',
+            parts: const [
+              ReasoningPart('plan'),
+              ImagePart(uri: imageUrl),
+              TextPart('caption'),
+            ],
+          ),
+          showModelIcon: false,
+          reasoningSegments: const [
+            ReasoningSegment(text: 'plan', expanded: true, loading: false),
+          ],
+          contentSplitOffsets: const [0],
+          reasoningCountAtSplit: const [1],
+          toolCountAtSplit: const [0],
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final attachmentsFinder = find.byKey(
+      const ValueKey('assistant-message-attachments:structured-image-splits'),
+    );
+    expect(attachmentsFinder, findsOneWidget);
+    expect(
+      find.descendant(of: attachmentsFinder, matching: find.byType(Image)),
+      findsOneWidget,
+    );
+    expectAbove(
+      tester,
+      find.textContaining('plan'),
+      find.textContaining('caption'),
+    );
+  });
+
+  testWidgets('standalone builtin_search historical message stays visible', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildHarness(
+        child: ChatMessageWidget(
+          message: ChatMessage(
+            id: 'chatbox-search',
+            role: 'tool',
+            conversationId: 'c1',
+            content: '{"tool":"builtin_search","arguments":{},"result":"hits"}',
+          ),
+          showToolCards: true,
+          showModelIcon: false,
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.textContaining('Built-in Search'), findsOneWidget);
+    expect(
+      tester.getSize(find.byType(ChatMessageWidget)).height,
+      greaterThan(20),
+    );
+  });
 }

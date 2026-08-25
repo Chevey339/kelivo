@@ -47,6 +47,7 @@ import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import '../../home/services/tool_approval_service.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'timeline_projection.dart';
 import 'timeline_visibility.dart';
 import 'citation_sources_sheet.dart';
 import 'chat_suggestion_bubbles.dart';
@@ -138,6 +139,10 @@ Uri? _tryNormalizeExternalUri(String raw) {
 @visibleForTesting
 (String, List<String>) parseMcpImagePathsForTesting(String? content) =>
     _parseMcpImagePaths(content);
+
+/// Incremented when a memoized tool-step builder actually runs.
+@visibleForTesting
+int debugTimelineToolStepBuilds = 0;
 
 String _resolveAttachmentImageUri(String uri) {
   final path = uri.trim();
@@ -250,6 +255,157 @@ Widget _buildResolvedImage(
     height: height,
     fit: fit,
     errorBuilder: (_, __, ___) => errorWidget(),
+  );
+}
+
+ImageProvider? _assistantInlineImageProvider(String src) {
+  if (src.startsWith('http://') || src.startsWith('https://')) {
+    return NetworkImage(src);
+  }
+  if (src.startsWith('data:')) {
+    final bytes = _decodeDataUriBytes(src);
+    if (bytes == null) return null;
+    return MemoryImage(bytes);
+  }
+  final fixed = SandboxPathResolver.fix(src);
+  if (File(fixed).existsSync()) return FileImage(File(fixed));
+  return null;
+}
+
+class _AssistantInlineImage extends StatefulWidget {
+  const _AssistantInlineImage({
+    required this.uri,
+    required this.imageKey,
+    required this.group,
+    required this.initialIndex,
+    this.onAspectResolved,
+  });
+
+  final String uri;
+  final String imageKey;
+  final List<String> group;
+  final int initialIndex;
+  final void Function(String imageKey, double aspectRatio)? onAspectResolved;
+
+  @override
+  State<_AssistantInlineImage> createState() => _AssistantInlineImageState();
+}
+
+class _AssistantInlineImageState extends State<_AssistantInlineImage> {
+  ImageStream? _stream;
+  ImageStreamListener? _listener;
+  String? _listenedIdentity;
+
+  @override
+  void dispose() {
+    _stopListening();
+    super.dispose();
+  }
+
+  void _stopListening() {
+    if (_stream != null && _listener != null) {
+      _stream!.removeListener(_listener!);
+    }
+    _stream = null;
+    _listener = null;
+    _listenedIdentity = null;
+  }
+
+  void _listenForAspect(ImageProvider provider) {
+    final identity = '${widget.imageKey}:${widget.uri.length}';
+    if (_listenedIdentity == identity) return;
+    _stopListening();
+    _listenedIdentity = identity;
+    final stream = provider.resolve(ImageConfiguration.empty);
+    late final ImageStreamListener listener;
+    listener = ImageStreamListener((info, _) {
+      final width = info.image.width;
+      final height = info.image.height;
+      if (width > 0 && height > 0) {
+        widget.onAspectResolved?.call(widget.imageKey, width / height);
+      }
+    });
+    _stream = stream;
+    _listener = listener;
+    stream.addListener(listener);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = _assistantInlineImageProvider(widget.uri);
+    return GestureDetector(
+      key: ValueKey('assistant-inline-image:${widget.imageKey}'),
+      onTap: widget.group.isEmpty
+          ? null
+          : () => _openAssistantImageViewer(
+              context,
+              images: widget.group,
+              initialIndex: widget.initialIndex.clamp(
+                0,
+                widget.group.length - 1,
+              ),
+            ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final displayWidth = constraints.maxWidth;
+          final dpr = MediaQuery.devicePixelRatioOf(context);
+          final cacheWidth = displayWidth.isFinite
+              ? math.max(1, (displayWidth * dpr).ceil())
+              : null;
+          final image = provider == null
+              ? const Icon(Icons.broken_image)
+              : Image(
+                  image: ResizeImage.resizeIfNeeded(cacheWidth, null, provider),
+                  width: displayWidth.isFinite ? displayWidth : null,
+                  fit: BoxFit.contain,
+                  frameBuilder: (context, child, frame, _) {
+                    if (frame != null) {
+                      _listenForAspect(provider);
+                    }
+                    return child;
+                  },
+                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+                );
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: image,
+          );
+        },
+      ),
+    );
+  }
+}
+
+void _openAssistantImageViewer(
+  BuildContext context, {
+  required List<String> images,
+  required int initialIndex,
+}) {
+  Navigator.of(context).push(
+    PageRouteBuilder<void>(
+      opaque: false,
+      pageBuilder: (_, __, ___) =>
+          ImageViewerPage(images: images, initialIndex: initialIndex),
+      transitionDuration: const Duration(milliseconds: 360),
+      reverseTransitionDuration: const Duration(milliseconds: 280),
+      transitionsBuilder: (context, anim, sec, child) {
+        final curved = CurvedAnimation(
+          parent: anim,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.02),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
+    ),
   );
 }
 
@@ -826,6 +982,7 @@ class ChatMessageWidget extends StatefulWidget {
 
   /// When null, follows [SettingsProvider.showToolCards].
   final bool? showToolCards;
+  final void Function(String imageKey, double aspectRatio)? onInlineImageAspect;
 
   const ChatMessageWidget({
     super.key,
@@ -871,6 +1028,7 @@ class ChatMessageWidget extends StatefulWidget {
     this.onRecoveredAskUserAnswer,
     this.showThinkingCards,
     this.showToolCards,
+    this.onInlineImageAspect,
   });
 
   @override
@@ -2254,296 +2412,124 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
-  List<_TimelineStepData> _buildTimelineSteps(
-    List<ToolUIPart> visibleTools, {
-    List<ReasoningSegment>? reasoningSegments,
+  Widget _buildAssistantImageBlock(
+    BuildContext context,
+    String uri, {
+    required String imageKey,
+    required List<String> group,
   }) {
-    final segments =
-        reasoningSegments ??
-        widget.reasoningSegments ??
-        const <ReasoningSegment>[];
-    if (segments.isEmpty) {
-      int toolCount = 0;
-      return visibleTools
-          .map(
-            (tool) => _TimelineStepData.tool(
-              tool: tool,
-              reasoningCountAfter: 0,
-              toolCountAfter: ++toolCount,
-            ),
-          )
-          .toList();
-    }
-
-    final steps = <_TimelineStepData>[];
-    int reasoningCount = 0;
-    int toolCount = 0;
-    int toolIndex = 0;
-
-    for (int i = 0; i < segments.length; i++) {
-      final segment = segments[i];
-      final int segmentToolStart = segment.toolStartIndex.clamp(
-        0,
-        visibleTools.length,
-      );
-      while (toolIndex < segmentToolStart && toolIndex < visibleTools.length) {
-        steps.add(
-          _TimelineStepData.tool(
-            tool: visibleTools[toolIndex],
-            reasoningCountAfter: reasoningCount,
-            toolCountAfter: ++toolCount,
-          ),
-        );
-        toolIndex++;
-      }
-
-      if (segment.text.isNotEmpty) {
-        steps.add(
-          _TimelineStepData.reasoning(
-            reasoning: segment,
-            reasoningCountAfter: ++reasoningCount,
-            toolCountAfter: toolCount,
-          ),
-        );
-      }
-
-      final int nextToolBoundary = i < segments.length - 1
-          ? segments[i + 1].toolStartIndex.clamp(0, visibleTools.length)
-          : visibleTools.length;
-      while (toolIndex < nextToolBoundary && toolIndex < visibleTools.length) {
-        steps.add(
-          _TimelineStepData.tool(
-            tool: visibleTools[toolIndex],
-            reasoningCountAfter: reasoningCount,
-            toolCountAfter: ++toolCount,
-          ),
-        );
-        toolIndex++;
-      }
-    }
-
-    while (toolIndex < visibleTools.length) {
-      steps.add(
-        _TimelineStepData.tool(
-          tool: visibleTools[toolIndex],
-          reasoningCountAfter: reasoningCount,
-          toolCountAfter: ++toolCount,
+    final resolved = _resolveAttachmentImageUri(uri);
+    final index = group.indexOf(resolved);
+    return SizedBox(
+      width: double.infinity,
+      child: _buildAssistantBubbleContainer(
+        context: context,
+        child: _AssistantInlineImage(
+          uri: resolved,
+          imageKey: imageKey,
+          group: group,
+          initialIndex: index >= 0 ? index : 0,
+          onAspectResolved: widget.onInlineImageAspect,
         ),
-      );
-      toolIndex++;
-    }
-
-    return steps;
-  }
-
-  bool get _hasUsableContentSplits => contentSplitsAreUsable(
-    widget.contentSplitOffsets,
-    widget.reasoningCountAtSplit,
-    widget.toolCountAtSplit,
-  );
-
-  bool get _hasStructuredAssistantParts => renderAssistantFromParts(
-    parts: widget.message.parts,
-    hasContentSplits: false,
-  );
-
-  bool _shouldRenderAssistantFromParts(
-    String visualContent, {
-    List<ReasoningSegment>? reasoningSegments,
-    List<_TimelineStepData>? steps,
-  }) {
-    if (renderAssistantFromParts(
-      parts: widget.message.parts,
-      hasContentSplits: _hasUsableContentSplits,
-    )) {
-      return true;
-    }
-    if (!_hasStructuredAssistantParts) return false;
-    final resolvedSteps =
-        steps ??
-        _buildTimelineSteps(
-          (widget.toolParts ?? const <ToolUIPart>[])
-              .where((p) => p.toolName != 'builtin_search')
-              .toList(),
-          reasoningSegments: reasoningSegments,
-        );
-    return !_contentSplitsMatchSteps(resolvedSteps, visualContent);
-  }
-
-  List<_RenderBlock> _buildRenderBlocksFromParts(
-    List<MessagePart> parts, {
-    List<ReasoningSegment>? reasoningSegments,
-  }) {
-    final liveTools = <String, ToolUIPart>{
-      for (final tool in widget.toolParts ?? const <ToolUIPart>[])
-        if (tool.toolName != 'builtin_search' && tool.id.isNotEmpty)
-          tool.id: tool,
-    };
-    final blocks = <_RenderBlock>[];
-    var pendingSteps = <_TimelineStepData>[];
-    var reasoningCount = 0;
-    var toolCount = 0;
-    var reasoningIndex = 0;
-    final assistant = _assistantForMessage();
-
-    void flushSteps() {
-      if (pendingSteps.isEmpty) return;
-      blocks.add(
-        _RenderBlock.thinking(List<_TimelineStepData>.of(pendingSteps)),
-      );
-      pendingSteps = <_TimelineStepData>[];
-    }
-
-    for (final part in parts) {
-      switch (part) {
-        case TextPart(:final text):
-          final visual = _applyVisualAssistantRegexes(
-            text,
-            assistant: assistant,
-            scope: AssistantRegexScope.assistant,
-          );
-          if (visual.trim().isEmpty) continue;
-          flushSteps();
-          blocks.add(_RenderBlock.text(visual));
-        case ImagePart(:final uri):
-          if (!shouldInlineImagePart(part)) continue;
-          flushSteps();
-          blocks.add(_RenderBlock.text('\n\n![image]($uri)'));
-        case ReasoningPart(:final text):
-          if (text.isEmpty) continue;
-          final provided =
-              reasoningSegments != null &&
-                  reasoningIndex < reasoningSegments.length
-              ? reasoningSegments[reasoningIndex]
-              : null;
-          reasoningIndex++;
-          pendingSteps.add(
-            _TimelineStepData.reasoning(
-              reasoning: ReasoningSegment(
-                text: text,
-                expanded: provided?.expanded ?? true,
-                loading: provided?.loading ?? false,
-                startAt: provided?.startAt,
-                finishedAt: provided?.finishedAt,
-                onToggle: provided?.onToggle,
-                toolStartIndex: provided?.toolStartIndex ?? toolCount,
-              ),
-              reasoningCountAfter: ++reasoningCount,
-              toolCountAfter: toolCount,
-            ),
-          );
-        case ToolCallPart(:final payloadJson):
-          final parsed = toolUiFromPayload(
-            payloadJson,
-            fallbackOrdinal: toolCount,
-          );
-          if (parsed == null || parsed.toolName == 'builtin_search') continue;
-          pendingSteps.add(
-            _TimelineStepData.tool(
-              tool: liveTools[parsed.id] ?? parsed,
-              reasoningCountAfter: reasoningCount,
-              toolCountAfter: ++toolCount,
-            ),
-          );
-        default:
-          break;
-      }
-    }
-    flushSteps();
-    return blocks;
-  }
-
-  List<_RenderBlock> _buildRenderBlocks(
-    String visualContent, {
-    List<ReasoningSegment>? reasoningSegments,
-    List<_TimelineStepData>? steps,
-    bool? renderFromParts,
-  }) {
-    if (renderFromParts ??
-        _shouldRenderAssistantFromParts(
-          visualContent,
-          reasoningSegments: reasoningSegments,
-          steps: steps,
-        )) {
-      return _buildRenderBlocksFromParts(
-        widget.message.parts,
-        reasoningSegments: reasoningSegments,
-      );
-    }
-    final resolvedSteps =
-        steps ??
-        _buildTimelineSteps(
-          (widget.toolParts ?? const <ToolUIPart>[])
-              .where((p) => p.toolName != 'builtin_search')
-              .toList(),
-          reasoningSegments: reasoningSegments,
-        );
-    if (resolvedSteps.isEmpty) {
-      return visualContent.trim().isEmpty
-          ? const <_RenderBlock>[]
-          : <_RenderBlock>[_RenderBlock.text(visualContent)];
-    }
-
-    if (!_contentSplitsMatchSteps(resolvedSteps, visualContent)) {
-      final blocks = <_RenderBlock>[_RenderBlock.thinking(resolvedSteps)];
-      if (visualContent.trim().isNotEmpty) {
-        blocks.add(_RenderBlock.text(visualContent));
-      }
-      return blocks;
-    }
-
-    final offsets = widget.contentSplitOffsets!;
-    final reasoningCounts = widget.reasoningCountAtSplit!;
-    final toolCounts = widget.toolCountAtSplit!;
-    final blocks = <_RenderBlock>[];
-    int stepIndex = 0;
-    int textStart = 0;
-
-    for (int i = 0; i < offsets.length; i++) {
-      final int safeOffset = offsets[i].clamp(0, visualContent.length);
-      final textSlice = visualContent.substring(textStart, safeOffset);
-      if (textSlice.trim().isNotEmpty) {
-        blocks.add(_RenderBlock.text(textSlice.trim()));
-      }
-
-      final targetReasoning = reasoningCounts[i];
-      final targetTool = toolCounts[i];
-      final blockSteps = <_TimelineStepData>[];
-      while (stepIndex < resolvedSteps.length) {
-        final step = resolvedSteps[stepIndex];
-        blockSteps.add(step);
-        stepIndex++;
-        if (step.reasoningCountAfter == targetReasoning &&
-            step.toolCountAfter == targetTool) {
-          break;
-        }
-      }
-      if (blockSteps.isNotEmpty) {
-        blocks.add(_RenderBlock.thinking(blockSteps));
-      }
-      textStart = safeOffset;
-    }
-
-    final trailingText = visualContent.substring(textStart);
-    if (trailingText.trim().isNotEmpty) {
-      blocks.add(_RenderBlock.text(trailingText.trim()));
-    }
-    return blocks;
-  }
-
-  bool _contentSplitsMatchSteps(
-    List<_TimelineStepData> steps,
-    String visualContent,
-  ) {
-    if (!_hasUsableContentSplits) return false;
-    return contentSplitsMatchTimeline(
-      offsets: widget.contentSplitOffsets!,
-      reasoningCounts: widget.reasoningCountAtSplit!,
-      toolCounts: widget.toolCountAtSplit!,
-      contentLength: visualContent.length,
-      stepReasoningCounts: [for (final step in steps) step.reasoningCountAfter],
-      stepToolCounts: [for (final step in steps) step.toolCountAfter],
+      ),
     );
+  }
+
+  TimelineProjection _projectAssistantTimeline(
+    String visualContent, {
+    List<ReasoningSegment>? reasoningSegments,
+  }) {
+    final assistant = _assistantForMessage();
+    return projectAssistantTimeline(
+      parts: widget.message.parts,
+      liveTools: [
+        for (var i = 0; i < (widget.toolParts?.length ?? 0); i++)
+          TimelineToolRef(
+            providerId: widget.toolParts![i].id,
+            fallbackOrdinal: i,
+            toolName: widget.toolParts![i].toolName,
+            arguments: widget.toolParts![i].arguments,
+            content: widget.toolParts![i].content,
+            loading: widget.toolParts![i].loading,
+            memoToken: identityHashCode(widget.toolParts![i]),
+          ),
+      ],
+      reasoningSegments: [
+        for (final segment in reasoningSegments ?? const <ReasoningSegment>[])
+          TimelineReasoningRef(
+            text: segment.text,
+            expanded: segment.expanded,
+            loading: segment.loading,
+            startAt: segment.startAt,
+            finishedAt: segment.finishedAt,
+            toolStartIndex: segment.toolStartIndex,
+          ),
+      ],
+      visualContent: visualContent,
+      contentSplitOffsets: widget.contentSplitOffsets,
+      reasoningCountAtSplit: widget.reasoningCountAtSplit,
+      toolCountAtSplit: widget.toolCountAtSplit,
+      transformText: (text) => _applyVisualAssistantRegexes(
+        text,
+        assistant: assistant,
+        scope: AssistantRegexScope.assistant,
+      ),
+      partsArrivalOrdered: widget.message.isStreaming,
+    );
+  }
+
+  VoidCallback? _projectedReasoningToggle(
+    int? overlayIndex,
+    List<ReasoningSegment>? reasoningSegments,
+  ) {
+    if (overlayIndex == null ||
+        reasoningSegments == null ||
+        overlayIndex < 0 ||
+        overlayIndex >= reasoningSegments.length) {
+      return null;
+    }
+    return reasoningSegments[overlayIndex].onToggle;
+  }
+
+  List<_TimelineStepData> _timelineStepsFromProjected(
+    List<TimelineProjectedStep> steps,
+    List<ReasoningSegment>? reasoningSegments,
+  ) {
+    return [
+      for (final step in steps)
+        if (step.isReasoning)
+          _TimelineStepData.reasoning(
+            reasoning: ReasoningSegment(
+              text: step.reasoning!.text,
+              expanded: step.reasoning!.expanded,
+              loading: step.reasoning!.loading,
+              startAt: step.reasoning!.startAt,
+              finishedAt: step.reasoning!.finishedAt,
+              onToggle: _projectedReasoningToggle(
+                step.reasoningOverlayIndex,
+                reasoningSegments,
+              ),
+              toolStartIndex: step.reasoning!.toolStartIndex,
+            ),
+            reasoningCountAfter: step.reasoningCountAfter,
+            toolCountAfter: step.toolCountAfter,
+            sourceOrdinal: step.sourceOrdinal,
+          )
+        else
+          _TimelineStepData.tool(
+            tool: ToolUIPart(
+              id: step.tool!.providerId,
+              toolName: step.tool!.toolName,
+              arguments: step.tool!.arguments,
+              content: step.tool!.content,
+              loading: step.tool!.loading,
+              memoToken: step.tool!.memoToken,
+            ),
+            reasoningCountAfter: step.reasoningCountAfter,
+            toolCountAfter: step.toolCountAfter,
+            sourceOrdinal: step.sourceOrdinal,
+          ),
+    ];
   }
 
   List<ReasoningSegment>? _effectiveReasoningSegments(
@@ -2562,9 +2548,11 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final effectiveExpanded = usingInlineThink
         ? (_inlineThinkExpanded ?? true)
         : widget.reasoningExpanded;
-    final effectiveLoading = usingInlineThink
-        ? false
-        : (widget.reasoningFinishedAt == null);
+    final effectiveLoading = timelineReasoningLoading(
+      finishedAt: widget.reasoningFinishedAt,
+      isStreaming: widget.message.isStreaming,
+      usingInlineThink: usingInlineThink,
+    );
 
     final provided = widget.reasoningSegments;
     if (provided != null && provided.isNotEmpty) return provided;
@@ -2638,21 +2626,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final effectiveReasoningSegments = _effectiveReasoningSegments(
       extractedThinking,
     );
-    final visibleTools = (widget.toolParts ?? const <ToolUIPart>[])
-        .where((p) => p.toolName != 'builtin_search')
-        .toList();
-    final timelineSteps = _buildTimelineSteps(
-      visibleTools,
-      reasoningSegments: effectiveReasoningSegments,
-    );
-    final renderFromParts = _shouldRenderAssistantFromParts(
+    final timelineProjection = _projectAssistantTimeline(
       visualContent,
       reasoningSegments: effectiveReasoningSegments,
-      steps: timelineSteps,
     );
     final mediaPreview = _buildAttachmentPreview(
       context,
-      parts: renderFromParts
+      parts: timelineProjection.fromParts
           ? [
               for (final part in widget.message.parts)
                 if (part is FilePart) part,
@@ -2744,13 +2724,33 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               const SizedBox(height: 8),
             ],
             ...() {
-              final renderBlocks = _buildRenderBlocks(
-                visualContent,
-                reasoningSegments: effectiveReasoningSegments,
-                steps: timelineSteps,
-                renderFromParts: renderFromParts,
+              final showThinkingCards =
+                  widget.showThinkingCards ?? showThinkingCardsSetting;
+              final showToolCards =
+                  widget.showToolCards ?? showToolCardsSetting;
+              ToolApprovalService? approval;
+              try {
+                approval = context.read<ToolApprovalService>();
+                context.select<ToolApprovalService, int>(
+                  (service) => Object.hashAll([
+                    for (final req in service.pendingRequests)
+                      Object.hash(req.toolCallId, req.conversationId),
+                  ]),
+                );
+              } catch (_) {}
+              bool isPending(TimelineToolRef tool) =>
+                  approval?.pendingFor(
+                    toolCallId: tool.providerId,
+                    conversationId: widget.message.conversationId,
+                  ) !=
+                  null;
+              final visibleBlocks = visibleAssistantTimeline(
+                timelineProjection,
+                showThinkingCards: showThinkingCards,
+                showToolCards: showToolCards,
+                isPendingApproval: isPending,
               );
-              if (renderBlocks.isEmpty &&
+              if (visibleBlocks.isEmpty &&
                   widget.message.isStreaming &&
                   visualContent.isEmpty) {
                 return <Widget>[
@@ -2771,18 +2771,57 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   ),
                 ];
               }
+              // Projector omits trim-empty visualContent. Newline-only history
+              // still has to occupy body height so a short scroll from the
+              // bottom does not evict the last streaming bubble.
+              if (visibleBlocks.isEmpty && visualContent.isNotEmpty) {
+                return <Widget>[
+                  _buildAssistantTextBlock(
+                    context,
+                    visualContent,
+                    enableAssistantMarkdown,
+                    citationIndexLookup,
+                  ),
+                  if (widget.message.isStreaming && visualContent.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, top: 4),
+                      child: widget.hideStreamingIndicator
+                          ? const SizedBox(height: 16)
+                          : const LoadingIndicator(),
+                    ),
+                ];
+              }
 
               final widgets = <Widget>[];
-              void addBlock(Widget child) {
+              void addVisible(Widget child) {
                 if (widgets.isNotEmpty) {
                   widgets.add(const SizedBox(height: 8));
                 }
                 widgets.add(child);
               }
 
-              for (final block in renderBlocks) {
-                if (block.type == _RenderBlockType.text && block.text != null) {
-                  addBlock(
+              final imageGroup = <String>[
+                for (final block in visibleBlocks)
+                  if (block.isImage)
+                    _resolveAttachmentImageUri(block.imageUri!),
+              ];
+
+              for (final block in visibleBlocks) {
+                if (block.isImage) {
+                  addVisible(
+                    _buildAssistantImageBlock(
+                      context,
+                      block.imageUri!,
+                      imageKey:
+                          block.imageKey ??
+                          timelineImageBlockKey(sourceOrdinal: 0),
+                      group: imageGroup,
+                    ),
+                  );
+                  continue;
+                }
+                if (block.isText) {
+                  addVisible(
                     _buildAssistantTextBlock(
                       context,
                       block.text!,
@@ -2792,21 +2831,13 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   );
                   continue;
                 }
-                if (block.steps.isEmpty) continue;
-                final showThinkingCards =
-                    widget.showThinkingCards ?? showThinkingCardsSetting;
-                final showToolCards =
-                    widget.showToolCards ?? showToolCardsSetting;
-                if (!_chatTimelineBlockCanShow(
-                  block.steps,
-                  showThinkingCards: showThinkingCards,
-                  showToolCards: showToolCards,
-                )) {
-                  continue;
-                }
-                addBlock(
+                if (!block.isThinking) continue;
+                addVisible(
                   _ChainOfThoughtCard(
-                    steps: block.steps,
+                    steps: _timelineStepsFromProjected(
+                      block.thinkingSteps,
+                      effectiveReasoningSegments,
+                    ),
                     conversationId: widget.message.conversationId,
                     showThinkingCards: showThinkingCards,
                     showToolCards: showToolCards,
@@ -4019,13 +4050,20 @@ class ToolUIPart {
   final Map<String, dynamic> arguments;
   final String? content; // null means still loading/result not yet available
   final bool loading;
+
+  /// Stable memo identity from the original live tool, if any.
+  final int? memoToken;
+
   const ToolUIPart({
     required this.id,
     required this.toolName,
     required this.arguments,
     this.content,
     this.loading = false,
+    this.memoToken,
   });
+
+  int get cacheToken => memoToken ?? identityHashCode(this);
 }
 
 // Data for a reasoning segment (for mixed display)
@@ -4066,39 +4104,26 @@ class ReasoningSegment {
       Object.hash(text, expanded, loading, startAt, finishedAt, toolStartIndex);
 }
 
-enum _RenderBlockType { text, thinking }
-
-class _RenderBlock {
-  const _RenderBlock.text(this.text)
-    : type = _RenderBlockType.text,
-      steps = const <_TimelineStepData>[];
-
-  const _RenderBlock.thinking(this.steps)
-    : type = _RenderBlockType.thinking,
-      text = null;
-
-  final _RenderBlockType type;
-  final String? text;
-  final List<_TimelineStepData> steps;
-}
-
 class _TimelineStepData {
   const _TimelineStepData.reasoning({
     required this.reasoning,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
+    this.sourceOrdinal = 0,
   }) : tool = null;
 
   const _TimelineStepData.tool({
     required this.tool,
     required this.reasoningCountAfter,
     required this.toolCountAfter,
+    this.sourceOrdinal = 0,
   }) : reasoning = null;
 
   final ReasoningSegment? reasoning;
   final ToolUIPart? tool;
   final int reasoningCountAfter;
   final int toolCountAfter;
+  final int sourceOrdinal;
 
   bool get isReasoning => reasoning != null;
   bool get isTool => tool != null;
@@ -4120,20 +4145,6 @@ class _IdSet {
 
   @override
   int get hashCode => Object.hashAllUnordered(ids);
-}
-
-bool _approvalBelongsToConversation(
-  ToolApprovalRequest request,
-  String? conversationId,
-) {
-  final requestConversationId = request.conversationId;
-  if (requestConversationId == null || requestConversationId.isEmpty) {
-    return true;
-  }
-  if (conversationId == null || conversationId.isEmpty) {
-    return false;
-  }
-  return requestConversationId == conversationId;
 }
 
 ToolApprovalRequest? _matchingApprovalRequest({
@@ -4178,28 +4189,8 @@ bool _shouldShowToolCard(
     loading: part.loading,
     showToolCards: visible,
     pendingApproval: pendingApproval,
+    filterBuiltinSearch: false,
   );
-}
-
-bool _chatTimelineBlockCanShow(
-  List<_TimelineStepData> steps, {
-  required bool showThinkingCards,
-  required bool showToolCards,
-}) {
-  for (final step in steps) {
-    if (step.isReasoning && showThinkingCards) return true;
-    if (step.isTool &&
-        isTimelineToolVisible(
-          toolName: step.tool!.toolName,
-          loading: step.tool!.loading,
-          showToolCards: showToolCards,
-          // Keep a slot for in-flight tools so a pending approval can appear.
-          pendingApproval: step.tool!.loading,
-        )) {
-      return true;
-    }
-  }
-  return false;
 }
 
 List<_TimelineStepData> _visibleChatTimelineSteps(
@@ -4210,18 +4201,16 @@ List<_TimelineStepData> _visibleChatTimelineSteps(
   required String conversationId,
 }) {
   if (showThinkingCards && showToolCards) return steps;
-  var pendingApprovalIds = const _IdSet(<String>{});
+  ToolApprovalService? approval;
   if (!showToolCards) {
     try {
-      pendingApprovalIds = context.select<ToolApprovalService, _IdSet>((
-        approval,
-      ) {
-        return _IdSet({
-          for (final req in approval.pendingRequests)
-            if (_approvalBelongsToConversation(req, conversationId))
-              req.toolCallId,
-        });
-      });
+      approval = context.read<ToolApprovalService>();
+      context.select<ToolApprovalService, int>(
+        (service) => Object.hashAll([
+          for (final req in service.pendingRequests)
+            Object.hash(req.toolCallId, req.conversationId),
+        ]),
+      );
     } catch (_) {}
   }
   return [
@@ -4232,7 +4221,12 @@ List<_TimelineStepData> _visibleChatTimelineSteps(
               toolName: step.tool!.toolName,
               loading: step.tool!.loading,
               showToolCards: showToolCards,
-              pendingApproval: pendingApprovalIds.contains(step.tool?.id),
+              pendingApproval:
+                  approval?.pendingFor(
+                    toolCallId: step.tool?.id ?? '',
+                    conversationId: conversationId,
+                  ) !=
+                  null,
             ))
         step,
   ];
@@ -4349,6 +4343,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     required Brightness brightness,
     required bool enableReasoningMarkdown,
     required double textScale,
+    required bool hasToggle,
   }) {
     return Object.hash(
       'reasoning',
@@ -4364,6 +4359,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
       brightness,
       enableReasoningMarkdown,
       textScale,
+      hasToggle,
     );
   }
 
@@ -4381,7 +4377,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
     return Object.hash(
       'tool',
       widget.conversationId,
-      identityHashCode(part),
+      part.cacheToken,
       isFirst,
       isLast,
       fg,
@@ -4529,6 +4525,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                     final isLast = i == visibleSteps.length - 1;
                     if (step.isReasoning) {
                       final reasoning = step.reasoning!;
+                      final hasToggle = reasoning.onToggle != null;
                       return _CachedTimelineStep(
                         key: ValueKey<String>('reasoning-$sourceIndex'),
                         signature: _reasoningStepSignature(
@@ -4539,6 +4536,7 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                           brightness: theme.brightness,
                           enableReasoningMarkdown: enableReasoningMarkdown,
                           textScale: textScale,
+                          hasToggle: hasToggle,
                         ),
                         builder: () => _ChainOfThoughtReasoningStep(
                           step: reasoning,
@@ -4550,7 +4548,13 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                     }
                     final part = step.tool!;
                     return _CachedTimelineStep(
-                      key: ValueKey<String>('tool-${part.id}'),
+                      key: ValueKey<String>(
+                        timelineToolStepKey(
+                          id: part.id,
+                          sourceOrdinal: step.sourceOrdinal,
+                          toolName: part.toolName,
+                        ),
+                      ),
                       signature: _toolStepSignature(
                         part: part,
                         isFirst: isFirst,
@@ -4562,12 +4566,15 @@ class _ChainOfThoughtCardState extends State<_ChainOfThoughtCard> {
                         pendingApproval: pendingApprovalIds.contains(part.id),
                         textScale: textScale,
                       ),
-                      builder: () => _ChainOfThoughtToolStep(
-                        part: part,
-                        conversationId: widget.conversationId,
-                        isFirst: isFirst,
-                        isLast: isLast,
-                      ),
+                      builder: () {
+                        debugTimelineToolStepBuilds++;
+                        return _ChainOfThoughtToolStep(
+                          part: part,
+                          conversationId: widget.conversationId,
+                          isFirst: isFirst,
+                          isLast: isLast,
+                        );
+                      },
                     );
                   }(),
               ],
@@ -4997,23 +5004,28 @@ class _ChainOfThoughtReasoningStepState
       content = SelectionArea(child: reasoningContent(display));
     }
 
+    final hasToggle =
+        _ChainOfThoughtActions.toggleOf(context, widget.sourceIndex) != null;
     return _TimelineStepShell(
       icon: icon,
       label: label,
       isFirst: widget.isFirst,
       isLast: widget.isLast,
-      onTap: () =>
-          _ChainOfThoughtActions.toggleOf(context, widget.sourceIndex)?.call(),
-      indicator:
-          _ChainOfThoughtActions.toggleOf(context, widget.sourceIndex) == null
-          ? null
-          : Icon(
+      onTap: hasToggle
+          ? () => _ChainOfThoughtActions.toggleOf(
+              context,
+              widget.sourceIndex,
+            )?.call()
+          : null,
+      indicator: hasToggle
+          ? Icon(
               state == _ReasoningStepState.expanded
                   ? Lucide.ChevronUp
                   : Lucide.ChevronDown,
               size: 16,
               color: fg.muted,
-            ),
+            )
+          : null,
       content: content,
       contentVisible: state != _ReasoningStepState.collapsed,
       expectContent: true,

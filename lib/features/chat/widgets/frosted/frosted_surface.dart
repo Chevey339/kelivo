@@ -31,37 +31,50 @@ class FrostedSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = ChatFrostedBackdropScope.maybeOf(context);
     final sigma = style.blurSigma;
+    final Widget painted;
     if (debugFrostedForceLiveBackdropFilter && sigma > 0) {
-      return _liveBackdrop(child);
-    }
-    if (scope == null || sigma <= 0) {
-      return _tint(child);
-    }
-    return ListenableBuilder(
-      listenable: scope.controller,
-      builder: (context, _) {
-        final mode = scope.controller.mode;
-        if (mode == FrostedRenderMode.uniform) {
-          return _tint(child);
-        }
-        if (mode == FrostedRenderMode.liveBackdropFilter) {
-          return _liveBackdrop(child);
-        }
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                child: _FrostedBackdropCrop(
+      painted = _liveBackdrop(child);
+    } else if (scope == null || sigma <= 0) {
+      painted = _tint(child);
+    } else {
+      painted = ListenableBuilder(
+        listenable: scope.controller,
+        builder: (context, _) {
+          final mode = scope.controller.mode;
+          if (mode == FrostedRenderMode.uniform) {
+            return _tint(child);
+          }
+          if (mode == FrostedRenderMode.liveBackdropFilter) {
+            return Stack(
+              children: [
+                _FrostedSnapshotLease(
                   controller: scope.controller,
                   sigma: sigma,
-                  borderRadius: borderRadius,
+                ),
+                _liveBackdrop(child),
+              ],
+            );
+          }
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _FrostedBackdropCrop(
+                    controller: scope.controller,
+                    sigma: sigma,
+                  ),
                 ),
               ),
-            ),
-            _tint(child),
-          ],
-        );
-      },
+              _tint(child),
+            ],
+          );
+        },
+      );
+    }
+    return ClipRRect(
+      borderRadius: borderRadius,
+      clipBehavior: Clip.antiAlias,
+      child: painted,
     );
   }
 
@@ -77,36 +90,67 @@ class FrostedSurface extends StatelessWidget {
   }
 
   Widget _liveBackdrop(Widget child) {
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: BackdropFilter.grouped(
-        filter: ui.ImageFilter.blur(
-          sigmaX: style.blurSigma,
-          sigmaY: style.blurSigma,
+    return BackdropFilter.grouped(
+      filter: ui.ImageFilter.blur(
+        sigmaX: style.blurSigma,
+        sigmaY: style.blurSigma,
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: style.background,
+          borderRadius: borderRadius,
+          border: Border.all(color: style.border, width: style.borderWidth),
         ),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: style.background,
-            borderRadius: borderRadius,
-            border: Border.all(color: style.border, width: style.borderWidth),
-          ),
-          child: child,
-        ),
+        child: child,
       ),
     );
   }
 }
 
-class _FrostedBackdropCrop extends StatefulWidget {
-  const _FrostedBackdropCrop({
-    required this.controller,
-    required this.sigma,
-    required this.borderRadius,
-  });
+/// Holds a snapshot bucket so capture can resume after live glass stops.
+/// Does not paint [RawImage].
+class _FrostedSnapshotLease extends StatefulWidget {
+  const _FrostedSnapshotLease({required this.controller, required this.sigma});
 
   final ChatFrostedBackdropController controller;
   final double sigma;
-  final BorderRadius borderRadius;
+
+  @override
+  State<_FrostedSnapshotLease> createState() => _FrostedSnapshotLeaseState();
+}
+
+class _FrostedSnapshotLeaseState extends State<_FrostedSnapshotLease> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.acquireSnapshot(widget.sigma);
+  }
+
+  @override
+  void didUpdateWidget(covariant _FrostedSnapshotLease oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller ||
+        oldWidget.sigma != widget.sigma) {
+      oldWidget.controller.releaseSnapshot(oldWidget.sigma);
+      widget.controller.acquireSnapshot(widget.sigma);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.releaseSnapshot(widget.sigma);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
+}
+
+class _FrostedBackdropCrop extends StatefulWidget {
+  const _FrostedBackdropCrop({required this.controller, required this.sigma});
+
+  final ChatFrostedBackdropController controller;
+  final double sigma;
 
   @override
   State<_FrostedBackdropCrop> createState() => _FrostedBackdropCropState();
@@ -152,28 +196,24 @@ class _FrostedBackdropCropState extends State<_FrostedBackdropCrop> {
           // and screenshots must go through the no-scope Tier 0 path.
           return true;
         }());
-        return ClipRRect(
-          borderRadius: widget.borderRadius,
-          clipBehavior: Clip.antiAlias,
-          child: OverflowBox(
-            alignment: Alignment.topLeft,
-            minWidth: 0,
-            minHeight: 0,
-            maxWidth: double.infinity,
-            maxHeight: double.infinity,
-            child: CompositedTransformFollower(
-              link: widget.controller.link,
-              showWhenUnlinked: false,
-              targetAnchor: Alignment.topLeft,
-              followerAnchor: Alignment.topLeft,
-              child: SizedBox(
-                width: snapshot.logicalSize.width,
-                height: snapshot.logicalSize.height,
-                child: RawImage(
-                  image: snapshot.image,
-                  fit: BoxFit.fill,
-                  filterQuality: FilterQuality.low,
-                ),
+        return OverflowBox(
+          alignment: Alignment.topLeft,
+          minWidth: 0,
+          minHeight: 0,
+          maxWidth: double.infinity,
+          maxHeight: double.infinity,
+          child: CompositedTransformFollower(
+            link: widget.controller.link,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.topLeft,
+            followerAnchor: Alignment.topLeft,
+            child: SizedBox(
+              width: snapshot.logicalSize.width,
+              height: snapshot.logicalSize.height,
+              child: RawImage(
+                image: snapshot.image,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.low,
               ),
             ),
           ),

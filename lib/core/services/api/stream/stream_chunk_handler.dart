@@ -25,6 +25,7 @@ class StreamChunkHandler {
   final Map<String, _ToolBuffer> _tools = <String, _ToolBuffer>{};
   final Map<String, StringBuffer> _serverInput = <String, StringBuffer>{};
   final Map<String, String> _imageMime = <String, String>{};
+  final Map<String, StringBuffer> _imageBuffers = <String, StringBuffer>{};
 
   TokenUsage? usage;
   dynamic reasoningDetails;
@@ -183,39 +184,29 @@ class StreamChunkHandler {
       case ImageDelta(:final id, :final data):
         if (data.isEmpty) return;
         final mime = _imageMime[id] ?? 'image/png';
-        final index = _imageIndex[id];
-        if (isCompleteImageUri(data) ||
-            index == null ||
-            _parts[index] is! ImagePart) {
+        if (isCompleteImageUri(data)) {
           _ensureImage(id, mimeType: mime, data: data);
-        } else {
-          final current = _parts[index] as ImagePart;
-          _parts[index] = ImagePart(
-            uri: '${current.uri}$data',
-            mime: current.mime ?? mime,
-          );
+          return;
         }
+        _imageBuffers.putIfAbsent(id, StringBuffer.new).write(data);
       case ImageSnapshot(:final id, :final data):
         if (data.isEmpty) return;
         final mime = _imageMime[id] ?? 'image/png';
+        _ensureImage(id, mimeType: mime, data: data);
+        if (!isCompleteImageUri(data)) {
+          _imageBuffers[id] = StringBuffer(data);
+        }
+      case ImageEnd(:final id):
+        final mime = _imageMime[id] ?? 'image/png';
+        final buffered = _imageBuffers.remove(id)?.toString() ?? '';
         final index = _imageIndex[id];
         final current = index != null && _parts[index] is ImagePart
             ? _parts[index] as ImagePart
             : null;
-        if (isCompleteImageUri(data) ||
-            current == null ||
-            !current.uri.startsWith('data:')) {
-          _ensureImage(id, mimeType: mime, data: data);
-        } else {
-          final prefix = current.uri.contains(',')
-              ? current.uri.substring(0, current.uri.indexOf(',') + 1)
-              : 'data:$mime;base64,';
-          _parts[index!] = ImagePart(
-            uri: '$prefix$data',
-            mime: current.mime ?? mime,
-          );
+        if (buffered.isNotEmpty &&
+            (current == null || current.uri.startsWith('data:'))) {
+          _ensureImage(id, mimeType: mime, data: buffered);
         }
-      case ImageEnd(:final id):
         _imageIndex.remove(id);
         _imageMime.remove(id);
       case Annotations(:final id, :final annotations):
@@ -250,6 +241,7 @@ class StreamChunkHandler {
         _tools.clear();
         _serverInput.clear();
         _imageMime.clear();
+        _imageBuffers.clear();
     }
   }
 
@@ -277,7 +269,7 @@ class StreamChunkHandler {
     _imageMime[id] = mimeType;
     final uri = isCompleteImageUri(data) ? data : 'data:$mimeType;base64,$data';
     final index = _imageIndex[id];
-    final part = ImagePart(uri: uri, mime: mimeType);
+    final part = ImagePart(uri: uri, mime: mimeType, id: id);
     if (index != null && _parts[index] is ImagePart) {
       _parts[index] = part;
       return index;

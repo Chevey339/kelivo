@@ -1,9 +1,41 @@
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/painting.dart';
+
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import 'screen_time_tool_ui.dart';
 
 /// Built-in search is cited elsewhere and must not create a timeline card.
 const String kBuiltinSearchToolName = 'builtin_search';
+
+/// Scoped pending-approval identity. An empty [conversationId] is unscoped
+/// and matches any conversation (same fail-safe as [ToolApprovalService]).
+class PendingApprovalKey {
+  const PendingApprovalKey({
+    required this.conversationId,
+    required this.toolCallId,
+  });
+
+  final String conversationId;
+  final String toolCallId;
+
+  bool matches({required String conversationId, required String toolCallId}) {
+    if (this.toolCallId != toolCallId) return false;
+    if (this.conversationId.isEmpty) return true;
+    return this.conversationId == conversationId;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is PendingApprovalKey &&
+      other.conversationId == conversationId &&
+      other.toolCallId == toolCallId;
+
+  @override
+  int get hashCode => Object.hash(conversationId, toolCallId);
+}
 
 /// Extract markdown images from a tool result. Matches `![alt](url)` only.
 (String, List<String>) parseToolResultImages(String? content) {
@@ -59,8 +91,9 @@ bool isTimelineToolVisible({
   required bool loading,
   required bool showToolCards,
   required bool pendingApproval,
+  bool filterBuiltinSearch = true,
 }) {
-  if (!toolCreatesTimelineCard(toolName)) return false;
+  if (filterBuiltinSearch && !toolCreatesTimelineCard(toolName)) return false;
   if (showToolCards) return true;
   if (toolName == LocalToolNames.askUser) return true;
   return loading && pendingApproval;
@@ -146,9 +179,10 @@ double estimateToolExtraHeight({
   if (toolName == LocalToolNames.askUser) {
     return _estimateAskUserExtra(
       arguments,
-      textWidth,
-      fontScale,
-      wrappedLineCount,
+      content: content,
+      textWidth: textWidth,
+      fontScale: fontScale,
+      wrappedLineCount: wrappedLineCount,
     );
   }
 
@@ -176,11 +210,12 @@ double estimateToolExtraHeight({
   if (pendingApproval) {
     extra += _estimatePendingApprovalExtra(
       arguments,
+      showToolResultSummary: showToolResultSummary,
       textWidth: textWidth,
       fontScale: fontScale,
       wrappedLineCount: wrappedLineCount,
     );
-    hasSummary = true;
+    hasSummary = showToolResultSummary;
   } else if (showToolResultSummary) {
     final summary = cleanText.trim();
     if (summary.isNotEmpty) {
@@ -209,56 +244,67 @@ double estimateToolExtraHeight({
 const double _estimateTtsReplayRowHeight = 36;
 const double _estimateToolImageHeight = 120;
 const double _estimateToolImageSummaryGap = 8;
-const double _estimateApprovalButtonsHeight = 36;
-const double _estimateAskUserOptionHeight = 36;
-const double _estimateAskUserSubmitHeight = 40;
+const double _estimateAskUserOptionHeight = 40;
+const double _estimateAskUserOptionGap = 7;
+const double _estimateAskUserOtherHeight = 40;
+const double _estimateAskUserSubmitHeight = 38;
+const double _estimateAskUserAnsweredGap = 3;
+const double _estimateAskUserAnsweredPad = 4;
+
+/// Matches [_AskUserOptionRow]: 13px / 1.25, max 3 lines, minHeight 40.
+double _estimateAskUserOptionRowHeight(
+  String label, {
+  required double textWidth,
+  required double fontScale,
+}) {
+  final fontSize = 13.0 * fontScale;
+  final optionTextWidth = math.max(40.0, textWidth - 28 - 44);
+  final textHeight = _askUserLayoutHeight(
+    label,
+    fontSize: fontSize,
+    height: 1.25,
+    maxWidth: optionTextWidth,
+    maxLines: 3,
+    fontWeight: FontWeight.w500,
+  );
+  return math.max(
+    _estimateAskUserOptionHeight * fontScale,
+    textHeight + 16 * fontScale,
+  );
+}
+
+double _askUserLayoutHeight(
+  String text, {
+  required double fontSize,
+  required double height,
+  required double maxWidth,
+  int? maxLines,
+  FontWeight? fontWeight,
+}) {
+  if (text.trim().isEmpty) return fontSize * height;
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: TextStyle(
+        fontSize: fontSize,
+        height: height,
+        fontWeight: fontWeight,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+    maxLines: maxLines,
+    ellipsis: maxLines == null ? null : '…',
+  )..layout(maxWidth: math.max(1.0, maxWidth));
+  try {
+    return math.max(fontSize * height, painter.height);
+  } finally {
+    painter.dispose();
+  }
+}
 
 double _estimateAskUserExtra(
-  Map<String, dynamic> arguments,
-  double textWidth,
-  double fontScale,
-  double Function(
-    String text, {
-    required double charsPerLine,
-    required double? codeCharsPerLine,
-    required double codeLineRatio,
-    required int? collapsedCodeLines,
-  })
-  wrappedLineCount,
-) {
-  final questions = AskUserInteractionService.normalizeQuestions(arguments);
-  if (questions.isEmpty) return 20 * fontScale;
-  final fontSize = 13.0 * fontScale;
-  final lineHeight = fontSize * 1.35;
-  final charWidth = fontSize * 0.55;
-  final charsPerLine = (textWidth / charWidth).clamp(8.0, 80.0);
-  var extra = 8.0;
-  for (final question in questions) {
-    extra +=
-        wrappedLineCount(
-          question.question,
-          charsPerLine: charsPerLine,
-          codeCharsPerLine: null,
-          codeLineRatio: 1.0,
-          collapsedCodeLines: null,
-        ).clamp(1.0, 3.0) *
-        lineHeight;
-    extra += question.options.length * _estimateAskUserOptionHeight * fontScale;
-    extra += 12;
-  }
-  extra += _estimateAskUserSubmitHeight * fontScale;
-  return extra;
-}
-
-double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
-  final line = 16.0 * fontScale;
-  if (result.isNoPermission) return line;
-  final apps = result.apps.length.clamp(0, 3);
-  return line + apps * (line + 2);
-}
-
-double _estimatePendingApprovalExtra(
   Map<String, dynamic> arguments, {
+  required String? content,
   required double textWidth,
   required double fontScale,
   required double Function(
@@ -270,14 +316,133 @@ double _estimatePendingApprovalExtra(
   })
   wrappedLineCount,
 }) {
+  final questions = AskUserInteractionService.normalizeQuestions(arguments);
+  if (questions.isEmpty) return 20 * fontScale;
+  final answeredContent = content;
+  if (answeredContent != null && answeredContent.trim().isNotEmpty) {
+    return _estimateAskUserAnsweredExtra(
+      questions,
+      answeredContent,
+      textWidth: textWidth,
+      fontScale: fontScale,
+    );
+  }
+  final fontSize = 13.0 * fontScale;
+  // Card padding (16+12) plus the Skip pill on the question row.
+  final questionWidth = math.max(80.0, textWidth - 40 - 28 - 56);
+  var extra = 0.0;
+  for (final question in questions) {
+    extra += _askUserLayoutHeight(
+      question.question,
+      fontSize: fontSize,
+      height: 1.35,
+      maxWidth: questionWidth,
+    );
+    extra += 8;
+    for (final option in question.options) {
+      extra += _estimateAskUserOptionRowHeight(
+        option,
+        textWidth: textWidth,
+        fontScale: fontScale,
+      );
+      extra += _estimateAskUserOptionGap * fontScale;
+    }
+    extra += _estimateAskUserOtherHeight * fontScale;
+    extra += 12;
+  }
+  extra += _estimateAskUserSubmitHeight * fontScale;
+  return extra;
+}
+
+double _estimateAskUserAnsweredExtra(
+  List<AskUserQuestion> questions,
+  String content, {
+  required double textWidth,
+  required double fontScale,
+}) {
+  final questionFontSize = 12.5 * fontScale;
+  final answerFontSize = 13.0 * fontScale;
+  // Card padding (16+12) plus leftover message inset not in [textWidth].
+  final innerWidth = math.max(80.0, textWidth - 40);
+  final answers = _askUserAnsweredValues(content);
+  var extra = 8.0;
+  for (var i = 0; i < questions.length; i++) {
+    final question = questions[i];
+    extra += _askUserLayoutHeight(
+      question.question,
+      fontSize: questionFontSize,
+      height: 1.35,
+      maxWidth: innerWidth,
+      fontWeight: FontWeight.w600,
+    );
+    extra += _estimateAskUserAnsweredGap;
+    extra += _askUserLayoutHeight(
+      _askUserAnswerSummary(question.id, answers),
+      fontSize: answerFontSize,
+      height: 1.35,
+      maxWidth: innerWidth,
+      fontWeight: FontWeight.w600,
+    );
+    extra += _estimateAskUserAnsweredPad;
+    if (i != questions.length - 1) extra += 10;
+  }
+  return extra;
+}
+
+Map<dynamic, dynamic> _askUserAnsweredValues(String content) {
+  try {
+    final payload = jsonDecode(content);
+    if (payload is Map) {
+      final answers = payload['answers'];
+      if (answers is Map) return answers;
+    }
+  } catch (_) {}
+  return const <dynamic, dynamic>{};
+}
+
+String _askUserAnswerSummary(String questionId, Map<dynamic, dynamic> answers) {
+  final raw = answers[questionId];
+  if (raw is! Map) return ' ';
+  if (raw['skipped'] == true) return 'Skipped';
+  final value = raw['value'];
+  if (value is List) {
+    final joined = value.map((item) => item.toString()).join(', ');
+    return joined.isEmpty ? ' ' : joined;
+  }
+  final text = value?.toString() ?? '';
+  return text.isEmpty ? ' ' : text;
+}
+
+double _estimateScreenTimeExtra(ScreenTimeResult result, double fontScale) {
+  final line = 16.0 * fontScale;
+  if (result.isNoPermission) return line;
+  final apps = result.apps.length.clamp(0, 3);
+  return line + apps * (line + 2);
+}
+
+double _estimatePendingApprovalExtra(
+  Map<String, dynamic> arguments, {
+  required bool showToolResultSummary,
+  required double textWidth,
+  required double fontScale,
+  required double Function(
+    String text, {
+    required double charsPerLine,
+    required double? codeCharsPerLine,
+    required double codeLineRatio,
+    required int? collapsedCodeLines,
+  })
+  wrappedLineCount,
+}) {
+  // Approve/deny sit in the header row — they add no extra vertical height.
+  if (!showToolResultSummary) return 0;
   final entries = arguments.entries.take(2).map((e) {
     final v = e.value?.toString() ?? '';
     final truncated = v.length > 40 ? '${v.substring(0, 40)}...' : v;
     return '${e.key}: $truncated';
   });
   final summary = entries.join(', ');
-  var extra = _estimateApprovalButtonsHeight * fontScale;
-  if (summary.isEmpty) return extra;
+  if (summary.isEmpty) return 0;
   final fontSize = 12.0 * fontScale;
   final charWidth = fontSize * 0.55;
   final charsPerLine = (textWidth / charWidth).clamp(8.0, 80.0);
@@ -288,5 +453,5 @@ double _estimatePendingApprovalExtra(
     codeLineRatio: 1.0,
     collapsedCodeLines: null,
   ).clamp(0.0, 2.0);
-  return extra + lines * (fontSize * 1.4);
+  return lines * (fontSize * 1.4);
 }

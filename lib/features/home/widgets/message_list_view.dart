@@ -11,10 +11,14 @@ import 'package:provider/provider.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import '../../../core/models/chat_message.dart';
+import '../../../core/models/message_part.dart';
 import '../../../core/models/assistant.dart';
+import '../../../core/models/assistant_regex.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../utils/assistant_regex.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../chat/widgets/chat_message_widget.dart';
+import '../../chat/widgets/timeline_projection.dart';
 import '../../chat/widgets/timeline_visibility.dart';
 import '../../chat/utils/thinking_tag_parser.dart';
 import '../../chat/widgets/message_more_sheet.dart';
@@ -284,11 +288,18 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _historyLoadScheduled = false;
   bool _pointerDragInProgress = false;
-  bool _userScrollActive = false;
   ScrollMetrics? _latestPointerDragMetrics;
+  bool _userScrollActive = false;
   final ValueNotifier<bool> _deferStreamingMessageUpdates = ValueNotifier<bool>(
     false,
   );
+
+  /// Frozen streaming payloads keyed by message id, captured when defer
+  /// starts. SuperSliverList must not AutomaticKeepAlive the row — that
+  /// parks it off-stage, so [find.text] and the on-screen bubble lose the
+  /// initial text. The visible item builder paints this snapshot instead.
+  final Map<String, StreamingContentData> _deferredStreamingHolds =
+      <String, StreamingContentData>{};
   DateTime? _lastHistoryLoadAt;
   Timer? _scrollIdleTimer;
   bool _pointerScrollActivityCheckScheduled = false;
@@ -296,8 +307,10 @@ class _MessageListViewState extends State<MessageListView> {
   late Map<String, int> _slotIndexById;
   late Map<String, int> _messageIndexById;
   final Map<String, int> _lastToolSignatures = <String, int>{};
-  final Set<String> _pendingToolExtentIds = <String>{};
-  var _toolExtentFlushScheduled = false;
+  final ToolExtentInvalidationQueue _toolExtentQueue =
+      ToolExtentInvalidationQueue();
+  var _awaitingAttachFlush = false;
+  var _attachFlushScheduled = false;
   final FocusNode _keyboardFocusNode = FocusNode(
     debugLabel: 'timeline-keyboard-scroll-region',
   );
@@ -324,6 +337,10 @@ class _MessageListViewState extends State<MessageListView> {
       widget.streamingContentNotifier?.toolHeightEvents.addListener(
         _handleToolHeightEvent,
       );
+    }
+    if (!identical(oldWidget.listController, widget.listController)) {
+      _awaitingAttachFlush = _toolExtentQueue.pendingIds.isNotEmpty;
+      _scheduleAttachAwareFlush();
     }
     final oldRenderModels = _effectiveRenderModels;
     _refreshRenderModels();
@@ -367,26 +384,106 @@ class _MessageListViewState extends State<MessageListView> {
     _invalidateToolExtentForMessage(event.messageId);
   }
 
+  void _onInlineImageAspect(
+    String messageId,
+    String imageKey,
+    double aspectRatio,
+  ) {
+    if (aspectRatio <= 0 || !aspectRatio.isFinite) return;
+    final previous = timelineImageAspects[imageKey];
+    if (previous != null && (previous - aspectRatio).abs() < 0.001) return;
+    timelineImageAspects[imageKey] = aspectRatio;
+    _invalidateToolExtentForMessage(messageId);
+  }
+
   void _invalidateToolExtentForMessage(String messageId) {
     _extentEstimateCache.remove(messageId);
     final controller = widget.listController;
-    if (!controller.isAttached) return;
-    if (controller.isLocked) {
-      _pendingToolExtentIds.add(messageId);
-      if (_toolExtentFlushScheduled) return;
-      _toolExtentFlushScheduled = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _toolExtentFlushScheduled = false;
-        if (!mounted) return;
-        final ids = List<String>.of(_pendingToolExtentIds);
-        _pendingToolExtentIds.clear();
-        for (final id in ids) {
-          _applyToolExtentInvalidation(id);
-        }
-      });
+    if (!controller.isAttached) {
+      _toolExtentQueue.retain(messageId);
+      _awaitingAttachFlush = true;
+      _scheduleAttachAwareFlush();
       return;
     }
-    _applyToolExtentInvalidation(messageId);
+    if (!controller.isLocked) {
+      _applyToolExtentInvalidation(messageId);
+      return;
+    }
+    if (_toolExtentQueue.enqueue(messageId)) {
+      _scheduleToolExtentFlush();
+    }
+  }
+
+  void _scheduleAttachAwareFlush() {
+    if (_attachFlushScheduled) return;
+    if (!_awaitingAttachFlush && _toolExtentQueue.pendingIds.isEmpty) {
+      return;
+    }
+    _attachFlushScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _attachFlushScheduled = false;
+      if (!mounted) return;
+      if (!widget.listController.isAttached) return;
+      _awaitingAttachFlush = false;
+      if (_toolExtentQueue.pendingIds.isEmpty) return;
+      _scheduleToolExtentFlush();
+    });
+  }
+
+  void _scheduleToolExtentFlush() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final controller = widget.listController;
+      final result = _toolExtentQueue.takeForFlush(
+        mounted: mounted,
+        isAttached: controller.isAttached,
+        isLocked: controller.isLocked,
+      );
+      for (final id in result.ids) {
+        _applyToolExtentInvalidation(id);
+      }
+      if (result.reschedule) {
+        _scheduleToolExtentFlush();
+      } else if (_toolExtentQueue.pendingIds.isNotEmpty) {
+        _awaitingAttachFlush = true;
+        _scheduleAttachAwareFlush();
+      }
+    });
+  }
+
+  void _invalidateExtentsForApprovalChange(
+    List<PendingApprovalKey> previous,
+    List<PendingApprovalKey> next,
+  ) {
+    final previousSet = previous.toSet();
+    final nextSet = next.toSet();
+    final changed = <PendingApprovalKey>{
+      ...previousSet.difference(nextSet),
+      ...nextSet.difference(previousSet),
+    };
+    if (changed.isEmpty && previous.length != next.length) {
+      changed.addAll(nextSet);
+    }
+    if (changed.isEmpty) return;
+    for (final model in _effectiveRenderModels) {
+      final parts = widget.toolParts[model.message.id];
+      if (parts == null || parts.isEmpty) continue;
+      final conversationId = model.message.conversationId;
+      final affected = parts.any((part) {
+        for (final key in changed) {
+          if (key.matches(
+            conversationId: conversationId,
+            toolCallId: part.id,
+          )) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (affected) {
+        _invalidateToolExtentForMessage(model.message.id);
+      }
+    }
   }
 
   void _applyToolExtentInvalidation(String messageId) {
@@ -437,6 +534,7 @@ class _MessageListViewState extends State<MessageListView> {
   double _systemTextScale = 1.0;
 
   /// Display settings the estimate depends on, refreshed in [build].
+  ToolApprovalService? _approvalForEstimate;
   _EstimateSettings _estimateSettings = const _EstimateSettings(
     collapseThinking: true,
     collapseThinkingSteps: false,
@@ -446,7 +544,8 @@ class _MessageListViewState extends State<MessageListView> {
     hideToolResultImages: false,
     collapsedCodeLines: null,
     wrapCodeBlocks: false,
-    pendingApprovalIds: <String>{},
+    visualRegexSignature: 0,
+    pendingApprovals: <PendingApprovalKey>[],
   );
 
   /// Font scale the currently stored extents were estimated at.
@@ -489,7 +588,11 @@ class _MessageListViewState extends State<MessageListView> {
     if (index < 0 || index >= models.length) return _estimateChrome;
 
     final message = models[index].message;
-    final text = message.content;
+    final snapshot = _streamingSnapshot(message);
+    final estimateParts = snapshot?.parts ?? message.parts;
+    final text = snapshot != null && snapshot.content.isNotEmpty
+        ? snapshot.content
+        : message.content;
     final reasoning = message.role == 'assistant'
         ? widget.reasoning[message.id]
         : null;
@@ -503,7 +606,17 @@ class _MessageListViewState extends State<MessageListView> {
         ? widget.toolParts[message.id]
         : null;
     final hasTools = toolParts != null && toolParts.isNotEmpty;
-    if (text.isEmpty && !hasReasoning && !hasTools) return _estimateChrome;
+    final hasStructuredTimeline =
+        message.role == 'assistant' &&
+        estimateParts.any(
+          (part) =>
+              part is ReasoningPart ||
+              part is ToolCallPart ||
+              part is ImagePart,
+        );
+    if (text.isEmpty && !hasReasoning && !hasTools && !hasStructuredTimeline) {
+      return _estimateChrome;
+    }
 
     // Layout asks for the same item repeatedly (every resize, every window
     // change), and the scan below is linear in the message length, so a memo
@@ -515,16 +628,26 @@ class _MessageListViewState extends State<MessageListView> {
     final reasoningSignature = _reasoningEstimateSignature(
       reasoning,
       reasoningSegments,
+      isStreaming: message.isStreaming,
     );
     final toolSignature = _toolEstimateSignature(toolParts);
+    final partsSignature = _partsEstimateSignature(estimateParts);
+    final streamingSignature = Object.hash(
+      snapshot?.timelineStructureSignature ?? 0,
+      snapshot?.reasoningFinishedAt,
+      message.isStreaming,
+    );
+    final estimateContent = text;
     final cached = _extentEstimateCache[message.id];
     if (cached != null &&
-        identical(cached.content, text) &&
+        identical(cached.content, estimateContent) &&
         cached.crossAxisExtent == crossAxisExtent &&
         cached.fontScale == fontScale &&
         cached.settings == settings &&
         cached.reasoningSignature == reasoningSignature &&
-        cached.toolSignature == toolSignature) {
+        cached.toolSignature == toolSignature &&
+        cached.partsSignature == partsSignature &&
+        cached.streamingSignature == streamingSignature) {
       return cached.extent;
     }
 
@@ -539,12 +662,14 @@ class _MessageListViewState extends State<MessageListView> {
         _extentEstimateCache.clear();
       }
       _extentEstimateCache[message.id] = _ExtentEstimate(
-        content: text,
+        content: estimateContent,
         crossAxisExtent: crossAxisExtent,
         fontScale: fontScale,
         settings: settings,
         reasoningSignature: reasoningSignature,
         toolSignature: toolSignature,
+        partsSignature: partsSignature,
+        streamingSignature: streamingSignature,
         extent: 0,
       );
       return 0;
@@ -585,10 +710,38 @@ class _MessageListViewState extends State<MessageListView> {
     final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
     // An empty body still reports one wrapped line; skip it so a tools-only
     // assistant turn is chrome + cards, not chrome + a phantom text row.
-    final bodyLines = body.isEmpty
+    final visualBody = _estimateVisualTransform(
+      body,
+      scope: message.role == 'user'
+          ? AssistantRegexScope.user
+          : AssistantRegexScope.assistant,
+    );
+    final timeline = _estimateTimelineExtent(
+      message: message,
+      parts: estimateParts,
+      toolParts: toolParts,
+      reasoning: reasoning,
+      reasoningSegments: reasoningSegments,
+      visualContent: visualBody,
+      contentSplitOffsets:
+          snapshot?.contentSplitOffsets ??
+          widget.contentSplits[message.id]?.offsets,
+      reasoningCountAtSplit:
+          snapshot?.reasoningCountAtSplit ??
+          widget.contentSplits[message.id]?.reasoningCounts,
+      toolCountAtSplit:
+          snapshot?.toolCountAtSplit ??
+          widget.contentSplits[message.id]?.toolCounts,
+      textWidth: textWidth,
+      fontScale: fontScale,
+    );
+    final bodyForLines = message.role == 'assistant'
+        ? (timeline.extent > 0 ? '' : visualBody)
+        : visualBody;
+    final bodyLines = bodyForLines.isEmpty
         ? 0.0
         : _wrappedLineCount(
-            body,
+            bodyForLines,
             charsPerLine: charsPerLine,
             codeCharsPerLine: settings.wrapCodeBlocks ? codeCharsPerLine : null,
             codeLineRatio: codeFontSize / fontSize,
@@ -598,135 +751,201 @@ class _MessageListViewState extends State<MessageListView> {
         bodyLines * lineHeight +
         _estimateChrome +
         collapsedCards * _estimateCollapsedCard +
-        (settings.showThinkingCards
-            ? _estimateReasoningExtent(
-                reasoning,
-                reasoningSegments,
-                textWidth: textWidth,
-                fontScale: fontScale,
-              )
-            : 0) +
-        _estimateToolExtent(
-          toolParts,
-          messageId: message.id,
-          textWidth: textWidth,
-          fontScale: fontScale,
-        );
+        timeline.extent;
 
     if (_extentEstimateCache.length > _extentEstimateCacheLimit) {
       _extentEstimateCache.clear();
     }
     _extentEstimateCache[message.id] = _ExtentEstimate(
-      content: text,
+      content: estimateContent,
       crossAxisExtent: crossAxisExtent,
       fontScale: fontScale,
       settings: settings,
       reasoningSignature: reasoningSignature,
       toolSignature: toolSignature,
+      partsSignature: partsSignature,
+      streamingSignature: streamingSignature,
       extent: extent,
     );
     return extent;
   }
 
-  /// Estimated height of the reasoning card(s) rendered above the answer.
-  ///
-  /// Reasoning lives outside [ChatMessage.content], so the content-only
-  /// estimate misses it entirely: a reasoning-heavy message gets estimated an
-  /// order of magnitude too short, and every scroll or anchor computation
-  /// across the unmeasured region is off by the same amount. Mirrors the
-  /// renderer's choice of showing the segments when present and otherwise the
-  /// single reasoning block.
-  double _estimateReasoningExtent(
-    stream_ctrl.ReasoningData? reasoning,
-    List<stream_ctrl.ReasoningSegmentData>? segments, {
-    required double textWidth,
-    required double fontScale,
-  }) {
-    var extent = 0.0;
-    void addCard(String reasoningText, bool expanded) {
-      if (reasoningText.isEmpty) return;
-      extent += _estimateCollapsedCard;
-      if (!expanded) return;
-      final fontSize = 13.0 * fontScale;
-      final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoningText));
-      final charsPerLine = math.max(1.0, textWidth / charWidth);
-      extent +=
-          _wrappedLineCount(
-            reasoningText,
-            charsPerLine: charsPerLine,
-            codeCharsPerLine: null,
-            codeLineRatio: 1.0,
-            collapsedCodeLines: null,
-          ) *
-          (fontSize * 1.5);
+  /// Timeline height from the same projector the renderer uses.
+  StreamingContentData? _streamingSnapshot(ChatMessage message) {
+    if (!message.isStreaming) return null;
+    if (_deferStreamingMessageUpdates.value) {
+      final hold = _deferredStreamingHolds[message.id];
+      if (hold != null) return hold;
     }
-
-    if (segments != null && segments.isNotEmpty) {
-      for (final segment in segments) {
-        addCard(segment.text, segment.expanded);
-      }
-    } else if (reasoning != null) {
-      addCard(reasoning.text, reasoning.expanded);
-    }
-    return extent;
+    final notifier = widget.streamingContentNotifier;
+    if (notifier == null || !notifier.hasNotifier(message.id)) return null;
+    return notifier.getNotifier(message.id).value;
   }
 
-  /// Estimated height of the inline tool cards rendered in the timeline.
-  ///
-  /// Tool parts live outside [ChatMessage.content], so the content-only
-  /// estimate used to treat a tools-only assistant turn as [_estimateChrome]
-  /// (96px). Each collapsed card is a header row; when summaries are shown
-  /// the first four wrapped lines of the result are appended, matching the
-  /// renderer's `maxLines: 4` clamp.
-  double _estimateToolExtent(
-    List<ToolUIPart>? parts, {
-    required String messageId,
+  ({double extent, bool fromParts}) _estimateTimelineExtent({
+    required ChatMessage message,
+    required List<MessagePart> parts,
+    required List<ToolUIPart>? toolParts,
+    required stream_ctrl.ReasoningData? reasoning,
+    required List<stream_ctrl.ReasoningSegmentData>? reasoningSegments,
+    required String visualContent,
+    required List<int>? contentSplitOffsets,
+    required List<int>? reasoningCountAtSplit,
+    required List<int>? toolCountAtSplit,
     required double textWidth,
     required double fontScale,
   }) {
-    if (parts == null || parts.isEmpty) return 0;
+    if (message.role != 'assistant') {
+      return (extent: 0, fromParts: false);
+    }
     final settings = _estimateSettings;
-    final cardTools = [
-      for (final part in parts)
-        if (toolCreatesTimelineCard(part.toolName)) part,
+    final liveTools = <TimelineToolRef>[
+      for (var i = 0; i < (toolParts?.length ?? 0); i++)
+        TimelineToolRef(
+          providerId: toolParts![i].id,
+          fallbackOrdinal: i,
+          toolName: toolParts[i].toolName,
+          arguments: toolParts[i].arguments,
+          content: toolParts[i].content,
+          loading: toolParts[i].loading,
+          memoToken: identityHashCode(toolParts[i]),
+        ),
     ];
-    if (cardTools.isEmpty) return 0;
-
-    final splits = widget.contentSplits[messageId];
-    final blocks = splitToolsIntoTimelineBlocks(
-      cardTools,
-      toolCounts: splits?.toolCounts,
+    final reasoningRefs = <TimelineReasoningRef>[
+      if (reasoningSegments != null && reasoningSegments.isNotEmpty)
+        for (final segment in reasoningSegments)
+          TimelineReasoningRef(
+            text: segment.text,
+            expanded: segment.expanded,
+            loading: timelineReasoningLoading(
+              finishedAt: segment.finishedAt,
+              isStreaming: message.isStreaming,
+            ),
+            startAt: segment.startAt,
+            finishedAt: segment.finishedAt,
+            toolStartIndex: segment.toolStartIndex,
+          )
+      else if (reasoning != null && reasoning.text.isNotEmpty)
+        TimelineReasoningRef(
+          text: reasoning.text,
+          expanded: reasoning.expanded,
+          loading: timelineReasoningLoading(
+            finishedAt: reasoning.finishedAt,
+            isStreaming: message.isStreaming,
+          ),
+          startAt: reasoning.startAt,
+          finishedAt: reasoning.finishedAt,
+        ),
+    ];
+    final projected = projectAssistantTimeline(
+      parts: parts,
+      liveTools: liveTools,
+      reasoningSegments: reasoningRefs,
+      visualContent: visualContent,
+      contentSplitOffsets: contentSplitOffsets,
+      reasoningCountAtSplit: reasoningCountAtSplit,
+      toolCountAtSplit: toolCountAtSplit,
+      transformText: _estimateVisualTransform,
+      partsArrivalOrdered: message.isStreaming,
     );
-
+    bool isPending(TimelineToolRef tool) => _isPendingApproval(
+      conversationId: message.conversationId,
+      toolCallId: tool.providerId,
+    );
     var extent = 0.0;
-    for (final block in blocks) {
-      final visible = [
-        for (final part in block)
-          if (isTimelineToolVisible(
-            toolName: part.toolName,
-            loading: part.loading,
-            showToolCards: settings.showToolCards,
-            pendingApproval: settings.pendingApprovalIds.contains(part.id),
-          ))
-            part,
-      ];
-      if (visible.isEmpty) continue;
+    var visibleBlockCount = 0;
+    void addVisible(double height) {
+      if (visibleBlockCount > 0) extent += 8.0;
+      extent += height;
+      visibleBlockCount++;
+    }
+
+    final fontSize = 15.6 * fontScale;
+    final lineHeight = fontSize * 1.5;
+    final codeFontSize = _estimateCodeFontSize * fontScale;
+    final codeCharsPerLine = math.max(1.0, textWidth / (codeFontSize * 0.6));
+    for (final block in visibleAssistantTimeline(
+      projected,
+      showThinkingCards: settings.showThinkingCards,
+      showToolCards: settings.showToolCards,
+      isPendingApproval: isPending,
+    )) {
+      if (block.isImage) {
+        addVisible(
+          estimateTimelineImageHeight(
+            maxWidth: textWidth,
+            aspectRatio:
+                block.aspectRatio ?? timelineImageAspects[block.imageKey],
+          ),
+        );
+        continue;
+      }
+      if (block.isText && block.text != null) {
+        final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(block.text!));
+        final charsPerLine = math.max(1.0, textWidth / charWidth);
+        addVisible(
+          _wrappedLineCount(
+                block.text!,
+                charsPerLine: charsPerLine,
+                codeCharsPerLine: settings.wrapCodeBlocks
+                    ? codeCharsPerLine
+                    : null,
+                codeLineRatio: codeFontSize / fontSize,
+                collapsedCodeLines: settings.collapsedCodeLines,
+              ) *
+              lineHeight,
+        );
+        continue;
+      }
+      if (!block.isThinking) continue;
       final collapsed = collapseTimelineSteps(
-        visible,
+        block.thinkingSteps,
         collapseThinkingSteps: settings.collapseThinkingSteps,
       );
-      if (collapsed.hasExpandRow) {
-        extent += _estimateExpandRow;
-      }
-      for (final part in collapsed.visibleSteps) {
+      addVisible(
+        _estimateVisibleThinkingHeight(
+          VisibleTimelineBlock(
+            visibleSteps: collapsed.visibleSteps,
+            hiddenCount: collapsed.hiddenCount,
+          ),
+          conversationId: message.conversationId,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        ),
+      );
+    }
+    return (extent: extent, fromParts: projected.fromParts);
+  }
+
+  double _estimateVisibleThinkingHeight(
+    VisibleTimelineBlock visible, {
+    required String conversationId,
+    required double textWidth,
+    required double fontScale,
+  }) {
+    final settings = _estimateSettings;
+    var extent = 0.0;
+    if (visible.hasExpandRow) extent += _estimateExpandRow;
+    for (final step in visible.visibleSteps) {
+      if (step.isReasoning) {
+        extent += _estimateReasoningStepHeight(
+          step.reasoning!,
+          textWidth: textWidth,
+          fontScale: fontScale,
+        );
+      } else {
+        final tool = step.tool!;
         extent += _estimateCollapsedCard;
         extent += estimateToolExtraHeight(
-          toolName: part.toolName,
-          arguments: part.arguments,
-          content: part.content,
+          toolName: tool.toolName,
+          arguments: tool.arguments,
+          content: tool.content,
           showToolResultSummary: settings.showToolResultSummary,
           hideToolResultImages: settings.hideToolResultImages,
-          pendingApproval: settings.pendingApprovalIds.contains(part.id),
+          pendingApproval: _isPendingApproval(
+            conversationId: conversationId,
+            toolCallId: tool.providerId,
+          ),
           textWidth: textWidth,
           fontScale: fontScale,
           wrappedLineCount: _wrappedLineCount,
@@ -736,10 +955,63 @@ class _MessageListViewState extends State<MessageListView> {
     return extent;
   }
 
+  String _estimateVisualTransform(
+    String text, {
+    AssistantRegexScope scope = AssistantRegexScope.assistant,
+  }) {
+    return applyAssistantRegexes(
+      text,
+      assistant: widget.assistant,
+      scope: scope,
+      target: AssistantRegexTransformTarget.visual,
+    );
+  }
+
+  bool _isPendingApproval({
+    required String conversationId,
+    required String toolCallId,
+  }) {
+    return _approvalForEstimate?.pendingFor(
+          toolCallId: toolCallId,
+          conversationId: conversationId,
+        ) !=
+        null;
+  }
+
+  double _estimateReasoningStepHeight(
+    TimelineReasoningRef reasoning, {
+    required double textWidth,
+    required double fontScale,
+  }) {
+    if (reasoning.text.isEmpty) return 0;
+    var extent = _estimateCollapsedCard;
+    if (!reasoning.expanded) {
+      if (reasoning.loading) return extent + 100;
+      return extent;
+    }
+    final fontSize = 13.0 * fontScale;
+    final charWidth = fontSize * (0.5 + 0.55 * _wideCharRatio(reasoning.text));
+    final charsPerLine = math.max(1.0, textWidth / charWidth);
+    return extent +
+        _wrappedLineCount(
+              reasoning.text,
+              charsPerLine: charsPerLine,
+              codeCharsPerLine: null,
+              codeLineRatio: 1.0,
+              collapsedCodeLines: null,
+            ) *
+            (fontSize * 1.5);
+  }
+
   /// Identity of the tool-card inputs an estimate was computed from.
   ///
   /// Stream updates replace each [ToolUIPart] with a new instance, so object
   /// identity is the change signal — the same rule as the live tool map.
+  int _partsEstimateSignature(List<MessagePart> parts) {
+    if (parts.isEmpty) return 0;
+    return Object.hashAll([for (final part in parts) identityHashCode(part)]);
+  }
+
   int _toolEstimateSignature(List<ToolUIPart>? parts) {
     if (parts == null || parts.isEmpty) return 0;
     return Object.hashAll([for (final part in parts) identityHashCode(part)]);
@@ -752,18 +1024,30 @@ class _MessageListViewState extends State<MessageListView> {
   /// distinguishes every state the estimate depends on.
   int _reasoningEstimateSignature(
     stream_ctrl.ReasoningData? reasoning,
-    List<stream_ctrl.ReasoningSegmentData>? segments,
-  ) {
+    List<stream_ctrl.ReasoningSegmentData>? segments, {
+    required bool isStreaming,
+  }) {
     if (reasoning == null && (segments == null || segments.isEmpty)) return 0;
     return Object.hashAll([
+      isStreaming,
       if (reasoning != null) ...[
         identityHashCode(reasoning.text),
         reasoning.expanded,
+        reasoning.finishedAt,
+        timelineReasoningLoading(
+          finishedAt: reasoning.finishedAt,
+          isStreaming: isStreaming,
+        ),
       ],
       if (segments != null)
         for (final segment in segments) ...[
           identityHashCode(segment.text),
           segment.expanded,
+          segment.finishedAt,
+          timelineReasoningLoading(
+            finishedAt: segment.finishedAt,
+            isStreaming: isStreaming,
+          ),
         ],
     ]);
   }
@@ -1216,7 +1500,17 @@ class _MessageListViewState extends State<MessageListView> {
         old.promptTokens != current.promptTokens ||
         old.completionTokens != current.completionTokens ||
         old.cachedTokens != current.cachedTokens ||
-        old.durationMs != current.durationMs;
+        old.durationMs != current.durationMs ||
+        _partsIdentityChanged(old.parts, current.parts);
+  }
+
+  bool _partsIdentityChanged(List<MessagePart> old, List<MessagePart> current) {
+    if (identical(old, current)) return false;
+    if (old.length != current.length) return true;
+    for (var i = 0; i < old.length; i++) {
+      if (!identical(old[i], current[i])) return true;
+    }
+    return false;
   }
 
   bool _isPrefix(
@@ -1322,16 +1616,24 @@ class _MessageListViewState extends State<MessageListView> {
     // Items render at the system scale times the chat scale (see the MediaQuery
     // override in _buildMessageItem), so the estimate has to use both.
     _systemTextScale = MediaQuery.textScalerOf(context).scale(1);
-    var pendingApprovalIds = const <String>{};
+    var pendingApprovals = const <PendingApprovalKey>[];
     try {
-      pendingApprovalIds = context.select<ToolApprovalService, _EstimateIdSet>((
+      _approvalForEstimate = context.read<ToolApprovalService>();
+      pendingApprovals = context.select<ToolApprovalService, _EstimateIdSet>((
         approval,
       ) {
-        return _EstimateIdSet({
-          for (final req in approval.pendingRequests) req.toolCallId,
-        });
+        return _EstimateIdSet([
+          for (final req in approval.pendingRequests)
+            PendingApprovalKey(
+              conversationId: req.conversationId ?? '',
+              toolCallId: req.toolCallId,
+            ),
+        ]);
       }).ids;
-    } catch (_) {}
+    } catch (_) {
+      _approvalForEstimate = null;
+    }
+    final previousApprovals = _estimateSettings.pendingApprovals;
     _estimateSettings = _EstimateSettings(
       collapseThinking: widget.collapseThinking,
       collapseThinkingSteps: widget.collapseThinkingSteps,
@@ -1341,9 +1643,16 @@ class _MessageListViewState extends State<MessageListView> {
       hideToolResultImages: widget.hideToolResultImages,
       collapsedCodeLines: widget.collapsedCodeLines,
       wrapCodeBlocks: widget.wrapCodeBlocks,
-      pendingApprovalIds: pendingApprovalIds,
+      visualRegexSignature: _visualRegexEstimateSignature(widget.assistant),
+      pendingApprovals: pendingApprovals,
     );
+    if (!listEquals(previousApprovals, pendingApprovals)) {
+      _invalidateExtentsForApprovalChange(previousApprovals, pendingApprovals);
+    }
     _invalidateEstimatesIfScaleChanged();
+    if (_awaitingAttachFlush && widget.listController.isAttached) {
+      _scheduleAttachAwareFlush();
+    }
     final presentation = _MessagePresentation(
       chatFontScale: widget.chatFontScale,
       showModelIcon: widget.showModelIcon,
@@ -1402,12 +1711,14 @@ class _MessageListViewState extends State<MessageListView> {
                     event.buttons != kSecondaryMouseButton) {
                   _pointerDragInProgress = true;
                   _latestPointerDragMetrics = null;
+                  _setDeferStreamingMessageUpdates(true);
                 }
               },
               onPointerUp: (_) => _settlePointerDrag(),
               onPointerCancel: (_) => _settlePointerDrag(),
               onPointerSignal: (event) {
                 if (event is PointerScrollEvent) {
+                  _setDeferStreamingMessageUpdates(true);
                   _schedulePointerScrollActivityCheck();
                 }
               },
@@ -1548,22 +1859,55 @@ class _MessageListViewState extends State<MessageListView> {
 
   bool _isWithinStreamingAutoFollowBand([ScrollMetrics? metrics]) {
     if (metrics != null) {
-      final gap = _contentMaxScrollExtent(metrics) - metrics.pixels;
+      final gap = metrics.maxScrollExtent - metrics.pixels;
       return gap <= _streamingUpdateDeferBottomTolerance;
     }
     if (!widget.scrollController.hasClients) return true;
     final position = widget.scrollController.position;
-    final gap = _contentMaxScrollExtent(position) - position.pixels;
+    final gap = position.maxScrollExtent - position.pixels;
     return gap <= _streamingUpdateDeferBottomTolerance;
-  }
-
-  double _contentMaxScrollExtent(ScrollMetrics metrics) {
-    return metrics.maxScrollExtent;
   }
 
   void _setDeferStreamingMessageUpdates(bool value) {
     if (_deferStreamingMessageUpdates.value == value) return;
+    if (value) {
+      _captureDeferredStreamingHolds();
+    } else {
+      _deferredStreamingHolds.clear();
+    }
     _deferStreamingMessageUpdates.value = value;
+  }
+
+  void _captureDeferredStreamingHolds() {
+    _deferredStreamingHolds.clear();
+    final notifier = widget.streamingContentNotifier;
+    if (notifier == null) return;
+    for (final message in widget.messages) {
+      if (!message.isStreaming || !notifier.hasNotifier(message.id)) {
+        continue;
+      }
+      final data = notifier.getNotifier(message.id).value;
+      _deferredStreamingHolds[message.id] =
+          data.content.isEmpty && message.content.isNotEmpty
+          ? StreamingContentData(
+              content: message.content,
+              totalTokens: data.totalTokens,
+              parts: data.parts,
+              reasoningText: data.reasoningText,
+              reasoningStartAt: data.reasoningStartAt,
+              reasoningFinishedAt: data.reasoningFinishedAt,
+              contentSplitOffsets: data.contentSplitOffsets,
+              reasoningCountAtSplit: data.reasoningCountAtSplit,
+              toolCountAtSplit: data.toolCountAtSplit,
+              toolPartsVersion: data.toolPartsVersion,
+              uiVersion: data.uiVersion,
+              promptTokens: data.promptTokens,
+              completionTokens: data.completionTokens,
+              cachedTokens: data.cachedTokens,
+              durationMs: data.durationMs,
+            )
+          : data;
+    }
   }
 
   void _scheduleStreamingUpdateResume() {
@@ -1579,7 +1923,7 @@ class _MessageListViewState extends State<MessageListView> {
     _scrollIdleTimer?.cancel();
     _scrollIdleTimer = null;
     if (!mounted || !_deferStreamingMessageUpdates.value) return;
-    _deferStreamingMessageUpdates.value = false;
+    _setDeferStreamingMessageUpdates(false);
   }
 
   void _scheduleHistoryLoad({required Future<bool> Function() load}) {
@@ -1809,34 +2153,39 @@ class _MessageListViewState extends State<MessageListView> {
     return _StreamingMessageDataGate(
       notifier: widget.streamingContentNotifier!.getNotifier(message.id),
       deferUpdates: _deferStreamingMessageUpdates,
+      deferredHold: _deferredStreamingHolds[message.id],
       builder: (context, data, deferUpdates) {
+        final painted = deferUpdates
+            ? (_deferredStreamingHolds[message.id] ?? data)
+            : data;
         // Use streaming content if available, otherwise fall back to message content
-        final displayContent = data.content.isNotEmpty
-            ? data.content
+        final displayContent = painted.content.isNotEmpty
+            ? painted.content
             : message.content;
-        final displayTokens = data.totalTokens > 0
-            ? data.totalTokens
+        final displayTokens = painted.totalTokens > 0
+            ? painted.totalTokens
             : message.totalTokens;
 
         // Create a modified message with streaming content
         final streamingMessage = message.copyWith(
-          parts: data.parts,
-          content: data.parts == null ? displayContent : null,
+          parts: painted.parts,
+          content: painted.parts == null ? displayContent : null,
           totalTokens: displayTokens,
-          promptTokens: data.promptTokens,
-          completionTokens: data.completionTokens,
-          cachedTokens: data.cachedTokens,
-          durationMs: data.durationMs,
+          promptTokens: painted.promptTokens,
+          completionTokens: painted.completionTokens,
+          cachedTokens: painted.cachedTokens,
+          durationMs: painted.durationMs,
         );
 
         // Update reasoning text from streaming data while preserving expanded state from r
         // This allows user to toggle expanded state during streaming without it being reset
         stream_ctrl.ReasoningData? streamingReasoning = r;
-        if (data.reasoningText != null && data.reasoningText!.isNotEmpty) {
+        if (painted.reasoningText != null &&
+            painted.reasoningText!.isNotEmpty) {
           streamingReasoning = stream_ctrl.ReasoningData()
-            ..text = data.reasoningText!
-            ..startAt = data.reasoningStartAt ?? r?.startAt
-            ..finishedAt = data.reasoningFinishedAt ?? r?.finishedAt
+            ..text = painted.reasoningText!
+            ..startAt = painted.reasoningStartAt ?? r?.startAt
+            ..finishedAt = painted.reasoningFinishedAt ?? r?.finishedAt
             ..expanded = r?.expanded ?? false;
         }
 
@@ -1860,6 +2209,9 @@ class _MessageListViewState extends State<MessageListView> {
             suggestions: suggestions,
             presentation: presentation,
             enableStreamingTextMotion: !deferUpdates,
+            contentSplitOffsets: painted.contentSplitOffsets,
+            reasoningCountAtSplit: painted.reasoningCountAtSplit,
+            toolCountAtSplit: painted.toolCountAtSplit,
           ),
         );
       },
@@ -1885,6 +2237,9 @@ class _MessageListViewState extends State<MessageListView> {
     required List<String> suggestions,
     required _MessagePresentation presentation,
     bool enableStreamingTextMotion = true,
+    List<int>? contentSplitOffsets,
+    List<int>? reasoningCountAtSplit,
+    List<int>? toolCountAtSplit,
   }) {
     final currentIdx = availableVersions.indexOf(selectedVersion);
     return ChatMessageWidget(
@@ -1993,13 +2348,14 @@ class _MessageListViewState extends State<MessageListView> {
           ? widget.toolParts[message.id]
           : null,
       contentSplitOffsets: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.offsets
+          ? (contentSplitOffsets ?? widget.contentSplits[message.id]?.offsets)
           : null,
       reasoningCountAtSplit: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.reasoningCounts
+          ? (reasoningCountAtSplit ??
+                widget.contentSplits[message.id]?.reasoningCounts)
           : null,
       toolCountAtSplit: message.role == 'assistant'
-          ? widget.contentSplits[message.id]?.toolCounts
+          ? (toolCountAtSplit ?? widget.contentSplits[message.id]?.toolCounts)
           : null,
       reasoningSegments: message.role == 'assistant'
           ? (() {
@@ -2012,10 +2368,10 @@ class _MessageListViewState extends State<MessageListView> {
                     (entry) => ReasoningSegment(
                       text: entry.value.text,
                       expanded: entry.value.expanded,
-                      loading:
-                          message.isStreaming &&
-                          entry.value.finishedAt == null &&
-                          entry.value.text.isNotEmpty,
+                      loading: timelineReasoningLoading(
+                        finishedAt: entry.value.finishedAt,
+                        isStreaming: message.isStreaming,
+                      ),
                       startAt: entry.value.startAt,
                       finishedAt: entry.value.finishedAt,
                       onToggle: () => widget.onToggleReasoningSegment?.call(
@@ -2037,6 +2393,9 @@ class _MessageListViewState extends State<MessageListView> {
                 widget.onRecoveredAskUserAnswer!(message, part, result),
       showThinkingCards: widget.showThinkingCards,
       showToolCards: widget.showToolCards,
+      onInlineImageAspect: (imageKey, aspectRatio) {
+        _onInlineImageAspect(message.id, imageKey, aspectRatio);
+      },
     );
   }
 
@@ -2054,18 +2413,33 @@ class _MessageListViewState extends State<MessageListView> {
     } catch (_) {}
     return false;
   }
+
+  int _visualRegexEstimateSignature(Assistant? assistant) {
+    if (assistant == null || assistant.regexRules.isEmpty) return 0;
+    return Object.hashAll([
+      for (final rule in assistant.regexRules)
+        Object.hash(
+          rule.enabled,
+          rule.pattern,
+          rule.replacement,
+          rule.visualOnly,
+          rule.replaceOnly,
+          Object.hashAll(rule.scopes.map((scope) => scope.index)),
+        ),
+    ]);
+  }
 }
 
 final class _EstimateIdSet {
   const _EstimateIdSet(this.ids);
-  final Set<String> ids;
+  final List<PendingApprovalKey> ids;
 
   @override
   bool operator ==(Object other) =>
-      other is _EstimateIdSet && setEquals(other.ids, ids);
+      other is _EstimateIdSet && listEquals(other.ids, ids);
 
   @override
-  int get hashCode => Object.hashAllUnordered(ids);
+  int get hashCode => Object.hashAll(ids);
 }
 
 /// Display settings that change how tall a message renders.
@@ -2079,7 +2453,8 @@ final class _EstimateSettings {
     required this.hideToolResultImages,
     required this.collapsedCodeLines,
     required this.wrapCodeBlocks,
-    required this.pendingApprovalIds,
+    required this.visualRegexSignature,
+    required this.pendingApprovals,
   });
 
   /// Whether finished thinking blocks render as a collapsed card.
@@ -2106,8 +2481,14 @@ final class _EstimateSettings {
   /// Whether code blocks wrap instead of scrolling horizontally.
   final bool wrapCodeBlocks;
 
-  /// Tool-call ids with a pending approval, snapshotted during [build].
-  final Set<String> pendingApprovalIds;
+  /// Identity of assistant visual-regex rules used by the estimate transform.
+  final int visualRegexSignature;
+
+  /// Pending approvals snapshotted during [build], scoped by conversation.
+  ///
+  /// A list so two unscoped same-id requests stay distinct. [Set] would merge
+  /// them and make the estimate say pending while the renderer says not.
+  final List<PendingApprovalKey> pendingApprovals;
 
   @override
   bool operator ==(Object other) =>
@@ -2120,7 +2501,8 @@ final class _EstimateSettings {
       other.hideToolResultImages == hideToolResultImages &&
       other.collapsedCodeLines == collapsedCodeLines &&
       other.wrapCodeBlocks == wrapCodeBlocks &&
-      setEquals(other.pendingApprovalIds, pendingApprovalIds);
+      other.visualRegexSignature == visualRegexSignature &&
+      listEquals(other.pendingApprovals, pendingApprovals);
 
   @override
   int get hashCode => Object.hash(
@@ -2132,7 +2514,8 @@ final class _EstimateSettings {
     hideToolResultImages,
     collapsedCodeLines,
     wrapCodeBlocks,
-    Object.hashAllUnordered(pendingApprovalIds),
+    visualRegexSignature,
+    Object.hashAll(pendingApprovals),
   );
 }
 
@@ -2145,6 +2528,8 @@ final class _ExtentEstimate {
     required this.settings,
     required this.reasoningSignature,
     required this.toolSignature,
+    required this.partsSignature,
+    required this.streamingSignature,
     required this.extent,
   });
 
@@ -2154,6 +2539,8 @@ final class _ExtentEstimate {
   final _EstimateSettings settings;
   final int reasoningSignature;
   final int toolSignature;
+  final int partsSignature;
+  final int streamingSignature;
   final double extent;
 }
 
@@ -2269,11 +2656,13 @@ class _StreamingMessageDataGate extends StatefulWidget {
   const _StreamingMessageDataGate({
     required this.notifier,
     required this.deferUpdates,
+    this.deferredHold,
     required this.builder,
   });
 
   final ValueNotifier<StreamingContentData> notifier;
   final ValueListenable<bool> deferUpdates;
+  final StreamingContentData? deferredHold;
   final Widget Function(
     BuildContext context,
     StreamingContentData data,
@@ -2293,9 +2682,10 @@ class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
 
   @override
   void initState() {
-    super.initState();
-    _visibleData = widget.notifier.value;
     _deferUpdates = widget.deferUpdates.value;
+    final hold = widget.deferredHold;
+    _visibleData = _deferUpdates && hold != null ? hold : widget.notifier.value;
+    super.initState();
     widget.notifier.addListener(_handleNotifierChanged);
     widget.deferUpdates.addListener(_handleDeferUpdatesChanged);
   }
@@ -2365,8 +2755,9 @@ class _StreamingMessageDataGateState extends State<_StreamingMessageDataGate> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      widget.builder(context, _visibleData, _deferUpdates);
+  Widget build(BuildContext context) {
+    return widget.builder(context, _visibleData, _deferUpdates);
+  }
 }
 
 /// Bubble-shaped shimmer skeleton shown only while a cold initial window
@@ -2442,5 +2833,58 @@ class _WindowLoadingSkeletonState extends State<_WindowLoadingSkeleton>
         ),
       ),
     );
+  }
+}
+
+/// Coalesces SuperList extent invalidations that cannot run while locked.
+///
+/// IDs stay queued until a flush observes an unlocked, attached controller.
+/// At most one next-frame callback is scheduled at a time.
+@visibleForTesting
+class ToolExtentInvalidationQueue {
+  final Set<String> _pending = <String>{};
+  var _scheduled = false;
+
+  @visibleForTesting
+  Set<String> get pendingIds => Set<String>.unmodifiable(_pending);
+
+  @visibleForTesting
+  bool get isScheduled => _scheduled;
+
+  /// Returns true when the caller should schedule a next-frame flush.
+  bool enqueue(String id) {
+    _pending.add(id);
+    if (_scheduled) return false;
+    _scheduled = true;
+    return true;
+  }
+
+  /// Keep [id] queued without treating a flush as scheduled.
+  ///
+  /// Used when the list controller is detached so a later attach can drain
+  /// the queue without spinning every frame.
+  void retain(String id) {
+    _pending.add(id);
+  }
+
+  ({List<String> ids, bool reschedule}) takeForFlush({
+    required bool mounted,
+    required bool isAttached,
+    required bool isLocked,
+  }) {
+    _scheduled = false;
+    if (!mounted || !isAttached) {
+      return (ids: const <String>[], reschedule: false);
+    }
+    if (isLocked) {
+      if (_pending.isEmpty) {
+        return (ids: const <String>[], reschedule: false);
+      }
+      _scheduled = true;
+      return (ids: const <String>[], reschedule: true);
+    }
+    final ids = List<String>.of(_pending);
+    _pending.clear();
+    return (ids: ids, reschedule: false);
   }
 }

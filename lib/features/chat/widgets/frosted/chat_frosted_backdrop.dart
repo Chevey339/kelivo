@@ -44,6 +44,7 @@ class ChatBackdropSpec {
     required this.brightness,
     required this.logicalSize,
     required this.dpr,
+    this.revision = 0,
   });
 
   final String backgroundRaw;
@@ -54,6 +55,25 @@ class ChatBackdropSpec {
   final Brightness brightness;
   final Size logicalSize;
   final double dpr;
+
+  /// Bumped by [ChatFrostedBackdrop] when identity fields change.
+  ///
+  /// Theme interpolation keeps this moving. Wallpaper paint does not.
+  final int revision;
+
+  ChatBackdropSpec withRevision(int revision) {
+    return ChatBackdropSpec(
+      backgroundRaw: backgroundRaw,
+      active: active,
+      maskStrength: maskStrength,
+      surface: surface,
+      shadow: shadow,
+      brightness: brightness,
+      logicalSize: logicalSize,
+      dpr: dpr,
+      revision: revision,
+    );
+  }
 
   /// Whether a wallpaper (local file or network) is actually shown.
   ///
@@ -102,7 +122,8 @@ class ChatBackdropSpec {
       other.shadow == shadow &&
       other.brightness == brightness &&
       other.logicalSize == logicalSize &&
-      other.dpr == dpr;
+      other.dpr == dpr &&
+      other.revision == revision;
 
   @override
   int get hashCode => Object.hash(
@@ -114,6 +135,7 @@ class ChatBackdropSpec {
     brightness,
     logicalSize,
     dpr,
+    revision,
   );
 }
 
@@ -155,9 +177,18 @@ class ChatFrostedBackdropController extends ChangeNotifier {
   /// still returns to [FrostedRenderMode.uniform].
   bool snapshotUnsupported = false;
 
+  /// Temporary grouped live glass while the backdrop is changing.
+  ///
+  /// Theme interpolation, wallpaper switches, and animated wallpapers use
+  /// this. Generation and scroll never set it.
+  bool liveTransition = false;
+
+  bool _wallpaperActive = false;
+
   final Map<double, _SnapshotBucket> _buckets = <double, _SnapshotBucket>{};
   final List<ui.Image> _pendingDispose = <ui.Image>[];
   int _generation = 0;
+  int _pixelVersion = 0;
   bool _disposed = false;
   var _retireScheduled = false;
   VoidCallback? onSnapshotRequested;
@@ -212,10 +243,12 @@ class ChatFrostedBackdropController extends ChangeNotifier {
   }
 
   bool get hasAllCurrentSnapshots {
+    var any = false;
     for (final sigma in acquiredSigmas) {
+      any = true;
       if (!hasCurrentSnapshot(sigma)) return false;
     }
-    return true;
+    return any;
   }
 
   @visibleForTesting
@@ -224,33 +257,78 @@ class ChatFrostedBackdropController extends ChangeNotifier {
   @visibleForTesting
   int get debugAcquiredSigmaCount => acquiredSigmas.length;
 
-  void applyBackdropState({required bool wallpaperActive}) {
-    final FrostedRenderMode next;
-    if (debugFrostedForceLiveBackdropFilter) {
-      next = FrostedRenderMode.liveBackdropFilter;
-    } else if (!wallpaperActive) {
-      next = FrostedRenderMode.uniform;
-    } else if (snapshotUnsupported) {
-      next = FrostedRenderMode.liveBackdropFilter;
-    } else {
-      next = FrostedRenderMode.cached;
-    }
-    if (mode == next) return;
+  /// Successful [toImageSync] calls for tests (one per sigma per capture).
+  @visibleForTesting
+  int debugCaptureCount = 0;
+
+  void applyBackdropState({
+    required bool wallpaperActive,
+    bool enterLive = false,
+  }) {
+    final nextLive = _nextLiveTransition(
+      wallpaperActive: wallpaperActive,
+      enterLive: enterLive,
+    );
+    final next = _nextRenderMode(
+      wallpaperActive: wallpaperActive,
+      liveTransition: nextLive,
+    );
+    final changed =
+        _wallpaperActive != wallpaperActive ||
+        liveTransition != nextLive ||
+        mode != next;
+    _wallpaperActive = wallpaperActive;
+    liveTransition = nextLive;
     mode = next;
-    notifyListeners();
+    if (changed) notifyListeners();
+  }
+
+  bool _nextLiveTransition({
+    required bool wallpaperActive,
+    required bool enterLive,
+  }) {
+    if (debugFrostedForceLiveBackdropFilter) return liveTransition;
+    if (!wallpaperActive || snapshotUnsupported) return false;
+    if (enterLive) return true;
+    return liveTransition;
+  }
+
+  FrostedRenderMode _nextRenderMode({
+    required bool wallpaperActive,
+    required bool liveTransition,
+  }) {
+    if (debugFrostedForceLiveBackdropFilter) {
+      return FrostedRenderMode.liveBackdropFilter;
+    }
+    if (!wallpaperActive) return FrostedRenderMode.uniform;
+    if (snapshotUnsupported || liveTransition) {
+      return FrostedRenderMode.liveBackdropFilter;
+    }
+    return FrostedRenderMode.cached;
+  }
+
+  void beginLiveTransition() {
+    applyBackdropState(wallpaperActive: _wallpaperActive, enterLive: true);
+  }
+
+  void endLiveTransition() {
+    if (!liveTransition) return;
+    liveTransition = false;
+    applyBackdropState(wallpaperActive: _wallpaperActive);
   }
 
   void markSnapshotUnsupported() {
-    if (snapshotUnsupported && mode == FrostedRenderMode.liveBackdropFilter) {
-      return;
-    }
     snapshotUnsupported = true;
-    if (mode == FrostedRenderMode.uniform &&
-        !debugFrostedForceLiveBackdropFilter) {
+    liveTransition = false;
+    final next = _nextRenderMode(
+      wallpaperActive: _wallpaperActive,
+      liveTransition: false,
+    );
+    if (mode == next) {
+      notifyListeners();
       return;
     }
-    if (mode == FrostedRenderMode.liveBackdropFilter) return;
-    mode = FrostedRenderMode.liveBackdropFilter;
+    mode = next;
     notifyListeners();
   }
 
@@ -304,6 +382,15 @@ class ChatFrostedBackdropController extends ChangeNotifier {
   }
 
   int get generation => _generation;
+
+  /// Incremented when the captured backdrop pixels actually change.
+  int get pixelVersion => _pixelVersion;
+
+  /// A real backdrop paint (decode / theme / first frame), not a capture paint.
+  int noteBackdropPixelsChanged() {
+    _pixelVersion += 1;
+    return invalidateSnapshots();
+  }
 
   @override
   void dispose() {
@@ -365,7 +452,17 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
   final GlobalKey _boundaryKey = GlobalKey();
   final BackdropKey _backdropKey = BackdropKey();
   ChatBackdropSpec? _lastSpec;
+  var _revision = 0;
   var _capturePending = false;
+  var _pendingPixelInvalidate = false;
+  var _awaitingStableSpec = false;
+  var _deferEndLive = false;
+  var _specChangedThisBuild = false;
+  var _frame = 0;
+  final List<int> _dirtyFrames = <int>[];
+  var _paintBurstScheduled = false;
+  var _paintsSinceSettle = 0;
+  var _paintSettleScheduled = false;
   VoidCallback? _onDirty;
 
   @override
@@ -374,16 +471,38 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
     super.dispose();
   }
 
-  void _scheduleCapture() {
-    if (_capturePending || !mounted || _controller.isDisposed) return;
-    if (_controller.mode != FrostedRenderMode.cached) return;
-    if (_controller.hasAllCurrentSnapshots) return;
+  bool get _canCapture =>
+      _controller.mode == FrostedRenderMode.cached ||
+      _controller.liveTransition;
+
+  void _requestCapture({bool pixelsChanged = false}) {
+    if (!mounted || _controller.isDisposed) return;
+    if (!_canCapture) return;
+    // First paint / first build has no snapshot yet — capture only.
+    // A later real paint (decode, theme) invalidates then recaptures.
+    if (pixelsChanged && _controller.hasAllCurrentSnapshots) {
+      _pendingPixelInvalidate = true;
+    }
+    if (_capturePending) return;
+    if (!pixelsChanged &&
+        !_pendingPixelInvalidate &&
+        _controller.hasAllCurrentSnapshots) {
+      return;
+    }
     _capturePending = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _capturePending = false;
       if (!mounted || _controller.isDisposed) return;
+      if (!_canCapture) return;
+      if (_pendingPixelInvalidate) {
+        _pendingPixelInvalidate = false;
+        _controller.noteBackdropPixelsChanged();
+      }
       _capture();
       _controller._scheduleDisposeRetired();
+      if (_deferEndLive) {
+        _scheduleSettleFrameCheck();
+      }
     });
   }
 
@@ -398,8 +517,10 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
       _controller.markSnapshotUnsupported();
       return;
     }
-    if (_controller.mode != FrostedRenderMode.cached) return;
-    if (_controller.hasAllCurrentSnapshots) return;
+    if (!_canCapture) return;
+    if (_controller.hasAllCurrentSnapshots) {
+      return;
+    }
     final boundary =
         _boundaryKey.currentContext?.findRenderObject()
             as _RenderBackdropCaptureBoundary?;
@@ -421,6 +542,7 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
           ui.Image? raw;
           try {
             raw = boundary.toImageSync(pixelRatio: sample);
+            _controller.debugCaptureCount += 1;
             final blurred = _blurImage(raw, sigma * sample);
             final published = _controller.publish(
               sigma,
@@ -439,11 +561,85 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
           }
         }
       } finally {
+        // Capture-induced paints during toImageSync stay suppressed.
+        // The next independent paint (decode / theme) must recapture.
         boundary.suppressPaintNotify = false;
       }
     } catch (_) {
       _controller.markSnapshotUnsupported();
+      return;
     }
+    if (!_controller.hasAllCurrentSnapshots) {
+      return;
+    }
+    if (!_deferEndLive) {
+      _controller.endLiveTransition();
+      return;
+    }
+    // Spec-change captures stay live until a later settle frame. A later
+    // acquire/recapture on the same revision can return to cached now.
+    if (!_specChangedThisBuild) {
+      _deferEndLive = false;
+      _controller.endLiveTransition();
+    }
+  }
+
+  void _scheduleSettleFrameCheck() {
+    final revision = _revision;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeEndLiveAfterSettle(revision);
+    });
+  }
+
+  void _maybeEndLiveAfterSettle(int revision) {
+    if (!mounted || _controller.isDisposed) return;
+    if (_revision != revision) return;
+    if (!_controller.hasAllCurrentSnapshots) {
+      if (_canCapture && _controller.debugAcquiredSigmaCount > 0) {
+        _requestCapture();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _maybeEndLiveAfterSettle(revision);
+        });
+      }
+      return;
+    }
+    _deferEndLive = false;
+    _controller.endLiveTransition();
+  }
+
+  void _schedulePaintSettleCapture() {
+    if (_paintSettleScheduled) return;
+    _paintSettleScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _paintSettleScheduled = false;
+      if (!mounted || _controller.isDisposed) return;
+      if (_paintsSinceSettle > 0) {
+        _paintsSinceSettle = 0;
+        _schedulePaintSettleCapture();
+        return;
+      }
+      _requestCapture(pixelsChanged: true);
+    });
+  }
+
+  void _schedulePaintBurstCheck() {
+    if (_paintBurstScheduled) return;
+    _paintBurstScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _paintBurstScheduled = false;
+      if (!mounted || _controller.isDisposed) return;
+      _dirtyFrames.removeWhere((frame) => _frame - frame > 3);
+      if (_dirtyFrames.length >= 3) {
+        _controller.beginLiveTransition();
+        _paintsSinceSettle++;
+        _schedulePaintSettleCapture();
+        return;
+      }
+      if (_controller.liveTransition) return;
+      if (_dirtyFrames.isNotEmpty) {
+        _requestCapture(pixelsChanged: true);
+      }
+    });
   }
 
   ui.Image _blurImage(ui.Image src, double sigmaPx) {
@@ -472,24 +668,66 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
 
   @override
   Widget build(BuildContext context) {
-    final spec = ChatBackdropSpec.resolve(context);
-    final specChanged = _lastSpec != spec;
+    _frame++;
+    final incoming = ChatBackdropSpec.resolve(context).withRevision(_revision);
+    final specChanged = _lastSpec != incoming;
+    if (specChanged) {
+      _revision += 1;
+    }
+    final spec = incoming.withRevision(_revision);
     _lastSpec = spec;
+    _specChangedThisBuild = specChanged;
 
     if (specChanged) {
       _controller.invalidateSnapshots();
+      if (spec.active && !_controller.snapshotUnsupported) {
+        _controller.applyBackdropState(wallpaperActive: true, enterLive: true);
+        _awaitingStableSpec = true;
+        _deferEndLive = true;
+      } else {
+        _controller.applyBackdropState(wallpaperActive: spec.active);
+        _awaitingStableSpec = false;
+        _deferEndLive = false;
+      }
+    } else {
+      _controller.applyBackdropState(wallpaperActive: spec.active);
+      if (_deferEndLive && spec.active) {
+        _scheduleSettleFrameCheck();
+      }
     }
-    _controller.applyBackdropState(wallpaperActive: spec.active);
 
-    if (specChanged && _controller.mode == FrostedRenderMode.cached) {
-      _scheduleCapture();
+    if (_awaitingStableSpec && spec.active) {
+      _awaitingStableSpec = false;
+      _requestCapture();
+    } else if (!specChanged &&
+        spec.active &&
+        _controller.mode == FrostedRenderMode.cached &&
+        !_controller.hasAllCurrentSnapshots) {
+      _requestCapture();
     }
 
-    _controller.onSnapshotRequested ??= _scheduleCapture;
+    _controller.onSnapshotRequested ??= () {
+      _requestCapture();
+    };
     _onDirty ??= () {
+      if (_controller.snapshotUnsupported) return;
+      if (_controller.mode == FrostedRenderMode.uniform) return;
+      // Spec-driven live (theme / wallpaper identity) is settled by
+      // revision checks, not by backdrop paints.
+      if (_deferEndLive) return;
+      if (_controller.liveTransition) {
+        _paintsSinceSettle++;
+        _schedulePaintSettleCapture();
+        return;
+      }
       if (_controller.mode != FrostedRenderMode.cached) return;
-      if (_controller.hasAllCurrentSnapshots) return;
-      _scheduleCapture();
+      _dirtyFrames.add(_frame);
+      _dirtyFrames.removeWhere((frame) => _frame - frame > 3);
+      if (_dirtyFrames.length >= 3) {
+        _schedulePaintBurstCheck();
+        return;
+      }
+      _requestCapture(pixelsChanged: true);
     };
 
     return Stack(
@@ -501,7 +739,7 @@ class _ChatFrostedBackdropState extends State<ChatFrostedBackdrop> {
             onPainted: _onDirty!,
             child: CompositedTransformTarget(
               link: _controller.link,
-              child: widget.backdrop,
+              child: ColoredBox(color: spec.surface, child: widget.backdrop),
             ),
           ),
         ),
@@ -549,6 +787,7 @@ class _RenderBackdropCaptureBoundary extends RenderRepaintBoundary {
   @override
   void paint(PaintingContext context, Offset offset) {
     super.paint(context, offset);
-    if (!suppressPaintNotify) onPainted();
+    if (suppressPaintNotify) return;
+    onPainted();
   }
 }

@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:ui' as ui;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -147,11 +151,16 @@ void main() {
 
     expect(controller.generation, greaterThan(generationA));
     expect(find.byType(RawImage), findsNothing);
-    expect(find.byType(BackdropFilter), findsNothing);
-    expect(_countLayers<BackdropFilterLayer>(tester), 0);
+    expect(controller.liveTransition, isTrue);
+    expect(find.byType(BackdropFilter), findsWidgets);
 
     await tester.pump();
-    expect(find.byType(BackdropFilter), findsNothing);
+    await tester.pump();
+    if (controller.liveTransition) {
+      expect(find.byType(RawImage), findsNothing);
+    } else {
+      expect(controller.mode, FrostedRenderMode.cached);
+    }
   });
 
   testWidgets(
@@ -245,12 +254,357 @@ void main() {
       expect(_countLayers<BackdropFilterLayer>(tester), 0);
     },
   );
+
+  testWidgets('backdrop pixel change recaptures without flipping to live', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final id = await assistants.addAssistant(name: 'Frosted');
+    await assistants.setCurrentAssistant(id);
+    await assistants.updateAssistant(
+      assistants.currentAssistant!.copyWith(
+        background: 'https://example.com/wallpaper-a.png',
+      ),
+    );
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    final backdropKey = GlobalKey<_TwoToneBackdropState>();
+    await tester.pumpWidget(
+      _app(
+        assistants: assistants,
+        settings: settings,
+        backdrop: _TwoToneBackdrop(key: backdropKey),
+        child: FrostedSurface(
+          style: _style(14),
+          borderRadius: BorderRadius.circular(16),
+          child: const SizedBox(height: 40, child: Text('card')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final controller = tester
+        .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
+        .controller;
+    final generationAfterFirst = controller.generation;
+    final pixelsAfterFirst = controller.pixelVersion;
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(find.byType(RawImage), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    backdropKey.currentState!.paintSecondTone();
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.generation, greaterThan(generationAfterFirst));
+    expect(controller.pixelVersion, greaterThan(pixelsAfterFirst));
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(find.byType(RawImage), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsNothing);
+    expect(_countLayers<BackdropFilterLayer>(tester), 0);
+    expect(controller.mode, FrostedRenderMode.cached);
+  });
+
+  testWidgets('first frame captures once per sigma; later paint adds one', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final id = await assistants.addAssistant(name: 'Frosted');
+    await assistants.setCurrentAssistant(id);
+    await assistants.updateAssistant(
+      assistants.currentAssistant!.copyWith(
+        background: 'https://example.com/wallpaper-a.png',
+      ),
+    );
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    final backdropKey = GlobalKey<_TwoToneBackdropState>();
+    await tester.pumpWidget(
+      _app(
+        assistants: assistants,
+        settings: settings,
+        backdrop: _TwoToneBackdrop(key: backdropKey),
+        child: FrostedSurface(
+          style: _style(14),
+          borderRadius: BorderRadius.circular(16),
+          child: const SizedBox(height: 40, child: Text('card')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final controller = tester
+        .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
+        .controller;
+    expect(controller.debugCaptureCount, 1);
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    backdropKey.currentState!.paintSecondTone();
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.debugCaptureCount, 2);
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(find.byType(BackdropFilter), findsNothing);
+  });
+
+  testWidgets('delayed wallpaper decode recaptures after first placeholder', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final id = await assistants.addAssistant(name: 'Frosted');
+    await assistants.setCurrentAssistant(id);
+    await assistants.updateAssistant(
+      assistants.currentAssistant!.copyWith(
+        background: 'https://example.com/wallpaper-a.png',
+      ),
+    );
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    final completer = Completer<ImageInfo>();
+    final provider = _DelayedImageProvider(completer);
+    await tester.pumpWidget(
+      _app(
+        assistants: assistants,
+        settings: settings,
+        backdrop: ColoredBox(
+          color: const Color(0xFF4D5C92),
+          child: Image(image: provider, fit: BoxFit.cover),
+        ),
+        child: FrostedSurface(
+          style: _style(14),
+          borderRadius: BorderRadius.circular(16),
+          child: const SizedBox(height: 40, child: Text('card')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final controller = tester
+        .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
+        .controller;
+    final generationAfterPlaceholder = controller.generation;
+    final pixelsAfterPlaceholder = controller.pixelVersion;
+    final capturesAfterPlaceholder = controller.debugCaptureCount;
+    expect(capturesAfterPlaceholder, greaterThanOrEqualTo(1));
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    completer.complete(ImageInfo(image: _solidImage(const Color(0xFF00C853))));
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.generation, greaterThan(generationAfterPlaceholder));
+    expect(controller.pixelVersion, greaterThan(pixelsAfterPlaceholder));
+    expect(controller.debugCaptureCount, greaterThan(capturesAfterPlaceholder));
+    expect(controller.hasCurrentSnapshot(14), isTrue);
+    expect(
+      find.descendant(
+        of: find.byType(FrostedSurface),
+        matching: find.byType(RawImage),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(BackdropFilter), findsNothing);
+    expect(controller.mode, FrostedRenderMode.cached);
+  });
+
+  testWidgets('AnimatedTheme intermediate frames keep live grouped glass', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final id = await assistants.addAssistant(name: 'Frosted');
+    await assistants.setCurrentAssistant(id);
+    await assistants.updateAssistant(
+      assistants.currentAssistant!.copyWith(
+        background: 'https://example.com/wallpaper-a.png',
+      ),
+    );
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    var dark = false;
+    late void Function(void Function()) rebuild;
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          rebuild = setState;
+          return MultiProvider(
+            providers: [
+              ChangeNotifierProvider<AssistantProvider>.value(
+                value: assistants,
+              ),
+              ChangeNotifierProvider<SettingsProvider>.value(value: settings),
+            ],
+            child: MaterialApp(
+              theme: dark ? ThemeData.dark() : ThemeData.light(),
+              themeAnimationDuration: const Duration(milliseconds: 200),
+              home: ChatFrostedBackdrop(
+                backdrop: const ColoredBox(color: Color(0xFF4D5C92)),
+                child: FrostedSurface(
+                  style: _style(14),
+                  borderRadius: BorderRadius.circular(16),
+                  child: const SizedBox(height: 40, child: Text('card')),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final controller = tester
+        .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
+        .controller;
+    expect(controller.mode, FrostedRenderMode.cached);
+    expect(find.byType(BackdropFilter), findsNothing);
+
+    dark = true;
+    rebuild(() {});
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(controller.liveTransition, isTrue);
+    expect(find.byType(BackdropFilter), findsWidgets);
+    expect(find.byType(RawImage), findsNothing);
+  });
+
+  testWidgets('dynamic backdrop capture count is bounded', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final id = await assistants.addAssistant(name: 'Frosted');
+    await assistants.setCurrentAssistant(id);
+    await assistants.updateAssistant(
+      assistants.currentAssistant!.copyWith(
+        background: 'https://example.com/wallpaper-a.png',
+      ),
+    );
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    final flicker = GlobalKey<_FlickerBackdropState>();
+    await tester.pumpWidget(
+      _app(
+        assistants: assistants,
+        settings: settings,
+        backdrop: _FlickerBackdrop(key: flicker),
+        child: FrostedSurface(
+          style: _style(14),
+          borderRadius: BorderRadius.circular(16),
+          child: const SizedBox(height: 40, child: Text('card')),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final controller = tester
+        .widget<ChatFrostedBackdropScope>(find.byType(ChatFrostedBackdropScope))
+        .controller;
+    final baseline = controller.debugCaptureCount;
+    expect(baseline, greaterThanOrEqualTo(1));
+
+    for (var i = 0; i < 12; i++) {
+      flicker.currentState!.tick();
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    expect(controller.debugCaptureCount, lessThanOrEqualTo(baseline + 2));
+    expect(controller.liveTransition, isTrue);
+    expect(find.byType(BackdropFilter), findsWidgets);
+  });
+}
+
+class _FlickerBackdrop extends StatefulWidget {
+  const _FlickerBackdrop({super.key});
+
+  @override
+  State<_FlickerBackdrop> createState() => _FlickerBackdropState();
+}
+
+class _FlickerBackdropState extends State<_FlickerBackdrop> {
+  var _frame = 0;
+
+  void tick() => setState(() => _frame++);
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _FlickerPainter(frame: _frame),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _FlickerPainter extends CustomPainter {
+  const _FlickerPainter({required this.frame});
+
+  final int frame;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = frame.isEven
+            ? const Color(0xFFB71C1C)
+            : const Color(0xFF1B5E20),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _FlickerPainter oldDelegate) =>
+      oldDelegate.frame != frame;
 }
 
 Widget _app({
   required AssistantProvider assistants,
   required SettingsProvider settings,
   required Widget child,
+  Widget backdrop = const ColoredBox(color: Color(0xFF4D5C92)),
 }) {
   return MultiProvider(
     providers: [
@@ -258,12 +612,80 @@ Widget _app({
       ChangeNotifierProvider<SettingsProvider>.value(value: settings),
     ],
     child: MaterialApp(
-      home: ChatFrostedBackdrop(
-        backdrop: const ColoredBox(color: Color(0xFF4D5C92)),
-        child: child,
-      ),
+      home: ChatFrostedBackdrop(backdrop: backdrop, child: child),
     ),
   );
+}
+
+class _TwoToneBackdrop extends StatefulWidget {
+  const _TwoToneBackdrop({super.key});
+
+  @override
+  State<_TwoToneBackdrop> createState() => _TwoToneBackdropState();
+}
+
+class _TwoToneBackdropState extends State<_TwoToneBackdrop> {
+  var _second = false;
+
+  void paintSecondTone() => setState(() => _second = true);
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _TwoTonePainter(second: _second),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _TwoTonePainter extends CustomPainter {
+  const _TwoTonePainter({required this.second});
+
+  final bool second;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..color = second ? const Color(0xFF1B5E20) : const Color(0xFFB71C1C),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TwoTonePainter oldDelegate) =>
+      oldDelegate.second != second;
+}
+
+ui.Image _solidImage(Color color) {
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  canvas.drawRect(const Rect.fromLTWH(0, 0, 8, 8), Paint()..color = color);
+  final picture = recorder.endRecording();
+  try {
+    return picture.toImageSync(8, 8);
+  } finally {
+    picture.dispose();
+  }
+}
+
+class _DelayedImageProvider extends ImageProvider<_DelayedImageProvider> {
+  _DelayedImageProvider(this.completer);
+
+  final Completer<ImageInfo> completer;
+
+  @override
+  Future<_DelayedImageProvider> obtainKey(ImageConfiguration configuration) {
+    return SynchronousFuture<_DelayedImageProvider>(this);
+  }
+
+  @override
+  ImageStreamCompleter loadImage(
+    _DelayedImageProvider key,
+    ImageDecoderCallback decode,
+  ) {
+    return OneFrameImageStreamCompleter(completer.future);
+  }
 }
 
 int _countLayers<T extends Layer>(WidgetTester tester) {

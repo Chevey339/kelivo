@@ -171,6 +171,41 @@ void main() {
 
     expect(find.byType(BackdropFilter), findsOneWidget);
   });
+
+  testWidgets('frosted whole-surface rounded clip', (tester) async {
+    tester.view.physicalSize = const Size(300, 200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    await assistants.loaded;
+    final settings = SettingsProvider(createBusinessTestPreferences());
+    await settings.loaded;
+
+    await tester.pumpWidget(
+      _frostedApp(
+        assistants: assistants,
+        settings: settings,
+        child: const FrostedSurface(
+          style: _style,
+          borderRadius: BorderRadius.all(Radius.circular(16)),
+          child: SizedBox(width: 160, height: 80, child: Text('clip')),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    final clips = find.descendant(
+      of: find.byType(FrostedSurface),
+      matching: find.byType(ClipRRect),
+    );
+    expect(clips, findsOneWidget);
+    final clip = tester.widget<ClipRRect>(clips);
+    expect(clip.borderRadius, const BorderRadius.all(Radius.circular(16)));
+    expect(tester.getSize(clips), tester.getSize(find.byType(FrostedSurface)));
+  });
 }
 
 Widget _frostedApp({

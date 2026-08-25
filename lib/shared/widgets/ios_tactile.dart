@@ -224,6 +224,12 @@ class _IosCardPressState extends State<IosCardPress> {
   @override
   void didUpdateWidget(covariant IosCardPress oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final wasInteractive =
+        oldWidget.onTap != null || oldWidget.onLongPress != null;
+    if (wasInteractive && !_interactive) {
+      _hovered = false;
+      _pressed = false;
+    }
     if (oldWidget.onTap != widget.onTap ||
         oldWidget.onLongPress != widget.onLongPress ||
         oldWidget.longPressTimeout != widget.longPressTimeout) {
@@ -345,8 +351,14 @@ class _IosCardPressState extends State<IosCardPress> {
 
     return MouseRegion(
       cursor: _interactive ? SystemMouseCursors.click : MouseCursor.defer,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      onEnter: (_) {
+        if (!_interactive) return;
+        setState(() => _hovered = true);
+      },
+      onExit: (_) {
+        if (!_hovered) return;
+        setState(() => _hovered = false);
+      },
       child: RawGestureDetector(
         behavior: HitTestBehavior.opaque,
         gestures: _gestures,

@@ -85,6 +85,20 @@ void main() {
     expect(payloads[1]['arguments']['query'], 'Ktor');
   });
 
+  test('ImageDelta does not publish an accumulating data URI', () {
+    final handler = StreamChunkHandler();
+    handler.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
+    handler.handle(const ImageDelta(id: 'img', data: 'aaa'));
+    handler.handle(const ImageDelta(id: 'img', data: 'bbb'));
+
+    expect(handler.parts.whereType<ImagePart>(), isEmpty);
+
+    handler.handle(const ImageEnd('img'));
+    final image = handler.parts.single as ImagePart;
+    expect(image.uri, 'data:image/png;base64,aaabbb');
+    expect(image.id, 'img');
+  });
+
   test('ImageSnapshot replaces previous data for the same id', () {
     final handler = StreamChunkHandler();
     handler.handle(const ImageStart(id: 'img', mimeType: 'image/png'));
