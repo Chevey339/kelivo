@@ -443,18 +443,6 @@ String effortForBudget(int? budget) {
 
 bool isClaudeReasoningEnabled(int? budget) => budget != 0;
 
-bool _isDeepSeekClaudeCompatible(String modelId, {ProviderConfig? config}) {
-  final lowerModelId = modelId.trim().toLowerCase();
-  if (lowerModelId.contains('deepseek')) return true;
-  if (config == null) return false;
-  final baseUrl = config.baseUrl.trim().toLowerCase();
-  final providerId = config.id.trim().toLowerCase();
-  final providerName = config.name.trim().toLowerCase();
-  return baseUrl.contains('api.deepseek.com') ||
-      providerId.contains('deepseek') ||
-      providerName.contains('deepseek');
-}
-
 bool _isClaude5AdaptiveThinkingModel(String modelId) {
   return RegExp(
     r'claude-(?:opus|sonnet)-5(?:$|[._:@/-])',
@@ -574,7 +562,7 @@ Map<String, dynamic>? claudeThinkingConfig(
   if (!isClaudeReasoningEnabled(budget)) {
     return <String, dynamic>{'type': 'disabled'};
   }
-  if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
     return <String, dynamic>{'type': 'enabled'};
   }
   if (_supportsClaudeAdaptiveThinking(modelId)) {
@@ -599,7 +587,7 @@ Map<String, dynamic>? claudeOutputConfig(
     if (effort == 'auto' || effort == 'off') return null;
     return <String, dynamic>{'effort': effort};
   }
-  if (_isDeepSeekClaudeCompatible(modelId, config: config)) {
+  if (ProviderConfig.isDeepSeekClaudeCompatible(modelId, config: config)) {
     if (!isClaudeReasoningEnabled(budget)) return null;
     final effort = _claudeEffortForBudget(budget);
     if (effort == 'auto' || effort == 'off') return null;
