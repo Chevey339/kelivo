@@ -182,10 +182,15 @@ abstract class BuiltInToolsHelper {
     return _normalizedModelId(modelId).contains('grok');
   }
 
-  static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
+  /// Claude model gating: internal builds always qualify, everything else has
+  /// to be listed explicitly because Anthropic ids carry no version ordering.
+  static bool _isClaudeModelIn(String? modelId, Set<String> supported) {
     final normalized = _normalizedModelId(modelId);
-    if (normalized.contains('mythos')) return true;
-    const supported = <String>{
+    return normalized.contains('mythos') || supported.contains(normalized);
+  }
+
+  static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
       'claude-fable-5',
       'claude-opus-5',
       'claude-opus-4-8',
@@ -200,20 +205,19 @@ abstract class BuiltInToolsHelper {
       'claude-sonnet-4-6',
       'claude-opus-4-1-20250805',
       'claude-opus-4-20250514',
-    };
-    return supported.contains(normalized);
+    });
   }
 
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
-    final normalized = _normalizedModelId(modelId);
-    return normalized.contains('mythos') ||
-        normalized == 'claude-fable-5' ||
-        normalized == 'claude-opus-5' ||
-        normalized == 'claude-opus-4-8' ||
-        normalized == 'claude-opus-4-7' ||
-        normalized == 'claude-opus-4-6' ||
-        normalized == 'claude-sonnet-5' ||
-        normalized == 'claude-sonnet-4-6';
+    return _isClaudeModelIn(modelId, const <String>{
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-sonnet-5',
+      'claude-sonnet-4-6',
+    });
   }
 
   static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
@@ -687,21 +691,28 @@ abstract class BuiltInToolsHelper {
     return supportsBuiltInSearchForModel(cfg: cfg, modelId: modelId);
   }
 
-  static bool supportsClaudeDynamicWebSearchForModel({
+  /// Upstream model id when [cfg] talks to the official Claude API, or null
+  /// for anything else — Vertex and Claude-compatible vendors reject the
+  /// Anthropic-hosted server tools.
+  static String? _claudeUpstreamModelId({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
-    if (cfg == null || (modelId ?? '').trim().isEmpty) return false;
+    if (cfg == null || (modelId ?? '').trim().isEmpty) return null;
     final kind = ProviderConfig.classify(
       cfg.id,
       explicitType: cfg.providerType,
     );
-    if (kind != ProviderKind.claude) return false;
-    final upstreamModelId = BuiltInToolNames.effectiveModelId(
-      cfg: cfg,
-      modelId: modelId,
-    );
-    return !isDeepSeekProvider(cfg) &&
+    if (kind != ProviderKind.claude || isDeepSeekProvider(cfg)) return null;
+    return BuiltInToolNames.effectiveModelId(cfg: cfg, modelId: modelId);
+  }
+
+  static bool supportsClaudeDynamicWebSearchForModel({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    return upstreamModelId != null &&
         isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
 

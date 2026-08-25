@@ -425,13 +425,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (contentBlock['type'] == 'web_search_tool_result_error')) {
       errorCode = (contentBlock['error_code'] ?? '').toString();
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[toolUseId]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(toolUseId);
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     _serverToolEnded.add(id);
     return <StreamChunk>[
