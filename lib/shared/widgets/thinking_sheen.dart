@@ -26,13 +26,11 @@ class ThinkingSheenPalette {
   final Color base;
   final Color highlight;
 
-  factory ThinkingSheenPalette.fromColor(
-    Color color, {
-    required bool isDark,
-  }) {
+  factory ThinkingSheenPalette.fromColor(Color color, {required bool isDark}) {
+    final opaque = _opaque(color);
     return ThinkingSheenPalette(
-      base: color,
-      highlight: Color.lerp(color, Colors.white, isDark ? 0.82 : 0.78)!,
+      base: opaque,
+      highlight: Color.lerp(opaque, Colors.white, isDark ? 0.82 : 0.78)!,
     );
   }
 
@@ -90,7 +88,8 @@ class _ThinkingSheenAnimation extends StatefulWidget {
   final Widget child;
 
   @override
-  State<_ThinkingSheenAnimation> createState() => _ThinkingSheenAnimationState();
+  State<_ThinkingSheenAnimation> createState() =>
+      _ThinkingSheenAnimationState();
 }
 
 class _ThinkingSheenAnimationState extends State<_ThinkingSheenAnimation>
@@ -140,12 +139,15 @@ class _ThinkingSheenAnimationState extends State<_ThinkingSheenAnimation>
 
   @override
   Widget build(BuildContext context) {
-    final peak = Color.lerp(
-      widget.palette.base,
-      widget.palette.highlight,
-      0.42 + widget.params.intensity * 0.58,
-    )!;
-    final mid = Color.lerp(widget.palette.base, peak, 0.5)!;
+    final base = _opaque(widget.palette.base);
+    final peak = _opaque(
+      Color.lerp(
+        base,
+        widget.palette.highlight,
+        0.42 + widget.params.intensity * 0.58,
+      )!,
+    );
+    final mid = _opaque(Color.lerp(base, peak, 0.5)!);
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: _controller,
@@ -156,15 +158,7 @@ class _ThinkingSheenAnimationState extends State<_ThinkingSheenAnimation>
               return LinearGradient(
                 begin: const Alignment(-1.0, -0.18),
                 end: const Alignment(1.0, 0.18),
-                colors: [
-                  widget.palette.base,
-                  widget.palette.base,
-                  mid,
-                  peak,
-                  mid,
-                  widget.palette.base,
-                  widget.palette.base,
-                ],
+                colors: [base, base, mid, peak, mid, base, base],
                 stops: _sheenStops(widget.params.spread),
                 transform: _SlideGradientTransform(_controller.value),
               ).createShader(bounds);
@@ -217,3 +211,5 @@ Duration _scaledDuration(Duration base, double speed) {
   final millis = (base.inMilliseconds / speed.clamp(0.35, 3)).round();
   return Duration(milliseconds: math.max(420, millis));
 }
+
+Color _opaque(Color color) => color.withValues(alpha: 1);
