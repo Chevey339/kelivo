@@ -4142,7 +4142,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '让 Claude 先用代码筛选搜索结果再放入上下文，减少 token 消耗';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -11888,7 +11888,7 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '让 Claude 先用代码筛选搜索结果再放入上下文，减少 token 消耗';
+      '筛选搜索结果，节省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '网络搜索';
@@ -19558,7 +19558,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      '讓 Claude 先用程式碼篩選搜尋結果再放入上下文，減少 token 消耗';
+      '篩選搜尋結果，節省 token';
 
   @override
   String get searchSettingsSheetWebSearchTitle => '網路搜尋';

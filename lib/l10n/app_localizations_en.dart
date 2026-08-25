@@ -4286,7 +4286,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get searchSettingsSheetClaudeDynamicSearchDescription =>
-      'Let Claude filter search results with code before they reach the context, cutting token use';
+      'Filter results to save tokens';
 
   @override
   String get searchSettingsSheetWebSearchTitle => 'Web Search';

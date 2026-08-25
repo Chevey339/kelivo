@@ -1525,7 +1525,7 @@
   "searchSettingsSheetBuiltinSearchTitle": "模型内置搜索",
   "searchSettingsSheetBuiltinSearchDescription": "是否启用模型内置的搜索功能",
   "searchSettingsSheetClaudeDynamicSearchTitle": "动态过滤",
-  "searchSettingsSheetClaudeDynamicSearchDescription": "让 Claude 先用代码筛选搜索结果再放入上下文，减少 token 消耗",
+  "searchSettingsSheetClaudeDynamicSearchDescription": "筛选搜索结果，节省 token",
   "searchSettingsSheetWebSearchTitle": "网络搜索",
   "searchSettingsSheetWebSearchDescription": "是否启用网页搜索",
   "searchSettingsSheetOpenSearchServicesTooltip": "打开搜索服务设置",

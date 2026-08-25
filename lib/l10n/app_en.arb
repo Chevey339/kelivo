@@ -1889,7 +1889,7 @@
   "searchSettingsSheetBuiltinSearchTitle": "Built-in Search",
   "searchSettingsSheetBuiltinSearchDescription": "Enable model's built-in search",
   "searchSettingsSheetClaudeDynamicSearchTitle": "Dynamic filtering",
-  "searchSettingsSheetClaudeDynamicSearchDescription": "Let Claude filter search results with code before they reach the context, cutting token use",
+  "searchSettingsSheetClaudeDynamicSearchDescription": "Filter results to save tokens",
   "searchSettingsSheetWebSearchTitle": "Web Search",
   "searchSettingsSheetWebSearchDescription": "Enable web search in chat",
   "searchSettingsSheetOpenSearchServicesTooltip": "Open search services",

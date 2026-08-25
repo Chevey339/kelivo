@@ -7942,7 +7942,7 @@ abstract class AppLocalizations {
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchDescription.
   ///
   /// In en, this message translates to:
-  /// **'Let Claude filter search results with code before they reach the context, cutting token use'**
+  /// **'Filter results to save tokens'**
   String get searchSettingsSheetClaudeDynamicSearchDescription;
 
   /// No description provided for @searchSettingsSheetWebSearchTitle.
