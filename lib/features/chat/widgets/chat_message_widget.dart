@@ -39,6 +39,7 @@ import '../../../core/models/assistant_regex.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/thinking_sheen.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import '../../../shared/widgets/emoji_text.dart';
@@ -4899,11 +4900,13 @@ class _ChainOfThoughtReasoningStepState
     );
     final state = _stepState;
     final display = _sanitize(widget.step.text);
-    final label = Row(
-      children: [
-        _Shimmer(
-          enabled: widget.step.loading,
-          child: Text(
+    final label = ThinkingSheen(
+      enabled: widget.step.loading,
+      color: fg.strong,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
             l10n.chatMessageWidgetDeepThinking,
             style: TextStyle(
               fontSize: 13,
@@ -4911,31 +4914,25 @@ class _ChainOfThoughtReasoningStepState
               color: fg.strong,
             ),
           ),
-        ),
-        if (widget.step.startAt != null) ...[
-          const SizedBox(width: 6),
-          ValueListenableBuilder<int>(
-            valueListenable: _elapsedTick,
-            builder: (context, _, __) => _Shimmer(
-              enabled: widget.step.loading,
-              child: Text(
+          if (widget.step.startAt != null) ...[
+            const SizedBox(width: 6),
+            ValueListenableBuilder<int>(
+              valueListenable: _elapsedTick,
+              builder: (context, _, __) => Text(
                 _elapsed(),
                 style: TextStyle(fontSize: 13, color: fg.medium),
               ),
             ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
 
     final icon = SizedBox(
       width: 18,
       height: 18,
       child: Center(
-        child: _Shimmer(
-          enabled: widget.step.loading,
-          child: ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
-        ),
+        child: ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
       ),
     );
 
@@ -5204,8 +5201,9 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
       widget.part.arguments,
       isResult: !widget.part.loading && !isPendingApproval,
     );
-    final label = _Shimmer(
+    final label = ThinkingSheen(
       enabled: widget.part.loading && !_isAskUser,
+      color: fg.strong,
       child: Text(
         title,
         maxLines: 2,
@@ -5521,17 +5519,21 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Title: always show tool name; add "waiting" badge when pending
-                      Text(
-                        _titleFor(
-                          context,
-                          widget.part.toolName,
-                          widget.part.arguments,
-                          isResult: !widget.part.loading && !isPendingApproval,
-                        ),
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: AppFontWeights.emphasis,
-                          color: isPendingApproval ? fg.accent : fg.strong,
+                      ThinkingSheen(
+                        enabled: widget.part.loading && !isPendingApproval,
+                        color: fg.strong,
+                        child: Text(
+                          _titleFor(
+                            context,
+                            widget.part.toolName,
+                            widget.part.arguments,
+                            isResult: !widget.part.loading && !isPendingApproval,
+                          ),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: AppFontWeights.emphasis,
+                            color: isPendingApproval ? fg.accent : fg.strong,
+                          ),
                         ),
                       ),
                       // "Waiting for approval" subtitle
@@ -6830,29 +6832,33 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
           children: [
             ReasoningIcons.thinkingCardIcon(size: 18, color: fg.strong),
             const SizedBox(width: 8),
-            _Shimmer(
+            ThinkingSheen(
               enabled: loading,
-              child: Text(
-                l10n.chatMessageWidgetDeepThinking,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: AppFontWeights.emphasis,
-                  color: fg.strong,
-                ),
+              color: fg.strong,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.chatMessageWidgetDeepThinking,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: AppFontWeights.emphasis,
+                      color: fg.strong,
+                    ),
+                  ),
+                  if (widget.startAt != null) ...[
+                    const SizedBox(width: 8),
+                    ValueListenableBuilder<int>(
+                      valueListenable: _elapsedTick,
+                      builder: (context, _, __) => Text(
+                        _elapsed(),
+                        style: TextStyle(fontSize: 13, color: fg.medium),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            if (widget.startAt != null)
-              ValueListenableBuilder<int>(
-                valueListenable: _elapsedTick,
-                builder: (context, _, __) => _Shimmer(
-                  enabled: loading,
-                  child: Text(
-                    _elapsed(),
-                    style: TextStyle(fontSize: 13, color: fg.medium),
-                  ),
-                ),
-              ),
             // No header marquee; content area handles scrolling when loading
             const Spacer(),
             AnimatedRotation(
@@ -6989,91 +6995,6 @@ class _ReasoningSectionState extends State<_ReasoningSection> {
             children: [header, if (widget.expanded || isLoading) body],
           ),
         ),
-      ),
-    );
-  }
-}
-
-// Lightweight shimmer effect without external dependency
-class _Shimmer extends StatelessWidget {
-  final Widget child;
-  final bool enabled;
-  const _Shimmer({required this.child, this.enabled = false});
-
-  @override
-  Widget build(BuildContext context) {
-    if (!enabled) return child;
-    return _ShimmerAnimation(child: child);
-  }
-}
-
-class _ShimmerAnimation extends StatefulWidget {
-  final Widget child;
-  const _ShimmerAnimation({required this.child});
-
-  @override
-  State<_ShimmerAnimation> createState() => _ShimmerAnimationState();
-}
-
-class _ShimmerAnimationState extends State<_ShimmerAnimation>
-    with TickerProviderStateMixin {
-  late AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (context, child) {
-          final t = _c.value; // 0..1
-          return ShaderMask(
-            shaderCallback: (rect) {
-              final width = rect.width;
-              final gradientWidth = width * 0.4;
-              final dx = (width + gradientWidth) * t - gradientWidth;
-              final shaderRect = Rect.fromLTWH(
-                -dx,
-                0,
-                width + gradientWidth * 2,
-                rect.height,
-              );
-              return LinearGradient(
-                colors: [
-                  Colors.white.withValues(
-                    alpha: 0.0,
-                  ), // color-gate: ignore (shimmer effect)
-                  Colors.white.withValues(
-                    alpha: 0.35,
-                  ), // color-gate: ignore (shimmer effect)
-                  Colors.white.withValues(
-                    alpha: 0.0,
-                  ), // color-gate: ignore (shimmer effect)
-                ],
-                stops: const [0.0, 0.5, 1.0],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ).createShader(shaderRect);
-            },
-            blendMode: BlendMode.srcATop,
-            child: child,
-          );
-        },
-        child: widget.child,
       ),
     );
   }
