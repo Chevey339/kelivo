@@ -7942,13 +7942,13 @@ abstract class AppLocalizations {
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchTitle.
   ///
   /// In en, this message translates to:
-  /// **'Built-in Search (New)'**
+  /// **'Dynamic filtering'**
   String get searchSettingsSheetClaudeDynamicSearchTitle;
 
   /// No description provided for @searchSettingsSheetClaudeDynamicSearchDescription.
   ///
   /// In en, this message translates to:
-  /// **'Use `web_search_20260318` with dynamic filtering on supported official Claude models.'**
+  /// **'Filter results to save tokens'**
   String get searchSettingsSheetClaudeDynamicSearchDescription;
 
   /// No description provided for @searchSettingsSheetWebSearchTitle.
