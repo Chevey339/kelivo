@@ -263,7 +263,9 @@ class _SearchSettingsSheet extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 14),
-                  if (supportsClaudeDynamicWebSearch)
+                  // Only meaningful under built-in search: the tool version is
+                  // picked when that tool is added, so on its own it is inert.
+                  if (supportsClaudeDynamicWebSearch && hasBuiltInSearch)
                     Builder(
                       builder: (context) {
                         final providerCfg = cfg;
