@@ -812,11 +812,6 @@ abstract class BuiltInToolsHelper {
     return out;
   }
 
-  /// Check if a provider supports built-in tools configuration.
-  static bool supportsBuiltInTools(ProviderKind kind) {
-    return kind == ProviderKind.google || kind == ProviderKind.openai;
-  }
-
   /// Tool names edited in a model's built-in tools tab. Search is excluded
   /// because it is controlled from the chat search switch.
   static Set<String> modelSettingsToolNames(ProviderConfig cfg) {

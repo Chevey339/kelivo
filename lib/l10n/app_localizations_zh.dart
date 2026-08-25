@@ -3295,9 +3295,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -11041,9 +11038,6 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get modelDetailSheetBuiltinToolsDescription => '内置工具取决于供应商和 API 模式。';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '当前供应商不支持这些内置工具。';
-
-  @override
   String get modelDetailSheetSearchTool => '搜索';
 
   @override
@@ -18710,9 +18704,6 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get modelDetailSheetBuiltinToolsDescription => '內建工具取決於供應商和 API 模式。';
-
-  @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint => '目前供應商不支援這些內建工具。';
 
   @override
   String get modelDetailSheetSearchTool => '搜尋';

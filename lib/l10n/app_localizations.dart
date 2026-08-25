@@ -6325,12 +6325,6 @@ abstract class AppLocalizations {
   /// **'Built-in tools depend on the provider and API mode.'**
   String get modelDetailSheetBuiltinToolsDescription;
 
-  /// No description provided for @modelDetailSheetBuiltinToolsUnsupportedHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Current provider does not support these built-in tools.'**
-  String get modelDetailSheetBuiltinToolsUnsupportedHint;
-
   /// No description provided for @modelDetailSheetSearchTool.
   ///
   /// In en, this message translates to:

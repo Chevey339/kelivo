@@ -3414,10 +3414,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Built-in tools depend on the provider and API mode.';
 
   @override
-  String get modelDetailSheetBuiltinToolsUnsupportedHint =>
-      'Current provider does not support these built-in tools.';
-
-  @override
   String get modelDetailSheetSearchTool => 'Search';
 
   @override
