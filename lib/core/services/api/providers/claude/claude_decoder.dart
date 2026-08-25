@@ -38,6 +38,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+
+  /// Position of each `server_tool_use` block inside [assistantBlocks], so its
+  /// streamed input can be filled in once the block closes.
+  final Map<String, int> _serverBlockIndex = <String, int>{};
   final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
@@ -173,11 +177,25 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         );
       }
     } else if (kind == 'server_tool_use') {
+      _flushTextBlock();
       final id = (block['id'] ?? '').toString();
       final name = (block['name'] ?? '').toString();
       if (id.isNotEmpty && idx != null) {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
+      }
+      if (id.isNotEmpty) {
+        // Server tools have to be replayed as the blocks the API sent, not as
+        // client tool calls: search results only decrypt when their original
+        // block comes back intact.
+        assistantBlocks.add(<String, dynamic>{
+          'type': 'server_tool_use',
+          'id': id,
+          'name': name,
+          'input': <String, dynamic>{},
+          if (block['caller'] != null) 'caller': block['caller'],
+        });
+        _serverBlockIndex[id] = assistantBlocks.length - 1;
       }
       final display = _serverToolDisplayName(name);
       if (id.isNotEmpty && display != null) {
@@ -192,10 +210,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           ),
         );
       }
-    } else if (kind == 'web_search_tool_result') {
-      chunks.addAll(_webSearchResult(block));
-    } else if (_serverResultBlockTypes.contains(kind)) {
-      chunks.addAll(_serverToolResult(block));
+    } else if (kind.endsWith('_tool_result')) {
+      _flushTextBlock();
+      assistantBlocks.add(Map<String, dynamic>.from(block));
+      if (kind == 'web_search_tool_result') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (_serverResultBlockTypes.contains(kind)) {
+        chunks.addAll(_serverToolResult(block));
+      }
     } else if (kind == 'text') {
       if (idx != null) {
         chunks.add(TextStart(_ids.indexed('text', idx)));
@@ -316,9 +338,19 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
+      _updateServerToolUseBlock(sid);
       chunks.add(ToolCallEnd(sid));
     }
     return chunks;
+  }
+
+  void _updateServerToolUseBlock(String id) {
+    final pos = _serverBlockIndex[id];
+    if (pos == null || pos >= assistantBlocks.length) return;
+    assistantBlocks[pos] = <String, dynamic>{
+      ...assistantBlocks[pos],
+      'input': _serverArgsFor(id),
+    };
   }
 
   List<StreamChunk> _onMessageDelta(Map<String, dynamic> obj) {
