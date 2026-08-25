@@ -3457,6 +3457,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enable OpenRouter web fetch server tool';
 
   @override
+  String get modelDetailSheetClaudeWebFetchTool => 'Web Fetch';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      'Let Claude fetch pages and PDFs from URLs in the conversation';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionTool => 'Code Execution';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      'Let Claude run Python and Bash in Anthropic\'s sandbox';
+
+  @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
 
   @override

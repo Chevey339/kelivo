@@ -118,6 +118,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
   bool _openaiImageGenerationTool = false;
   bool _openrouterWebFetchTool = false;
   bool _openrouterShellTool = false;
+  bool _claudeWebFetchTool = false;
+  bool _claudeCodeExecutionTool = false;
+  bool _showBuiltinToolsTab = false;
 
   @override
   void initState() {
@@ -129,11 +132,12 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       explicitType: cfg.providerType,
     );
 
-    // Determine tab count: 3 for Google/OpenAI (has tools tab), 2 for others
-    final hasToolsTab =
-        _providerKind == ProviderKind.google ||
-        _providerKind == ProviderKind.openai;
-    _tabCtrl = TabController(length: hasToolsTab ? 3 : 2, vsync: this);
+    // Determine tab count: 3 when the provider exposes editable built-in
+    // tools, 2 for others
+    _showBuiltinToolsTab = BuiltInToolsHelper.modelSettingsToolNames(
+      cfg,
+    ).isNotEmpty;
+    _tabCtrl = TabController(length: _showBuiltinToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
       if (!_tabCtrl.indexIsChanging) {
         setState(() {
@@ -236,6 +240,10 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
       _openrouterShellTool =
           cfg.useResponseApi == true &&
           builtInSet.contains(BuiltInToolNames.shell);
+      _claudeWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _claudeCodeExecutionTool = builtInSet.contains(
+        BuiltInToolNames.codeExecution,
+      );
     }
   }
 
@@ -403,8 +411,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                             tabs: [
                               l10n.modelDetailSheetBasicTab,
                               l10n.modelDetailSheetAdvancedTab,
-                              if (_providerKind == ProviderKind.google ||
-                                  _providerKind == ProviderKind.openai)
+                              if (_showBuiltinToolsTab)
                                 l10n.modelDetailSheetBuiltinToolsTab,
                             ],
                           ),
@@ -710,9 +717,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
     final cfg = settings.getProviderConfig(widget.providerKey);
     final bool disableTools = _type == ModelType.embedding;
     final bool isOpenRouter = BuiltInToolsHelper.isOpenRouterProvider(cfg);
-    final bool hasTiles =
-        _providerKind == ProviderKind.google ||
-        _providerKind == ProviderKind.openai;
+    final bool hasTiles = BuiltInToolsHelper.modelSettingsToolNames(
+      cfg,
+    ).isNotEmpty;
     return [
       _DeskCard(
         child: Column(
@@ -833,6 +840,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 : (v) => setState(() => _openaiImageGenerationTool = v),
           ),
         ],
+      ] else if (_providerKind == ProviderKind.claude) ...[
+        _ToolTile(
+          title: l10n.modelDetailSheetClaudeWebFetchTool,
+          desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+          value: _claudeWebFetchTool,
+          onChanged: disableTools
+              ? null
+              : (v) => setState(() => _claudeWebFetchTool = v),
+        ),
+        const SizedBox(height: 8),
+        _ToolTile(
+          title: l10n.modelDetailSheetClaudeCodeExecutionTool,
+          desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+          value: _claudeCodeExecutionTool,
+          onChanged: disableTools
+              ? null
+              : (v) => setState(() => _claudeCodeExecutionTool = v),
+        ),
       ],
     ];
   }
@@ -923,6 +948,13 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
         if (_openaiImageGenerationTool) {
           selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
         }
+      }
+    } else if (_providerKind == ProviderKind.claude) {
+      if (_claudeWebFetchTool) {
+        selectedBuiltIns.add(BuiltInToolNames.webFetch);
+      }
+      if (_claudeCodeExecutionTool) {
+        selectedBuiltIns.add(BuiltInToolNames.codeExecution);
       }
     }
     final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(

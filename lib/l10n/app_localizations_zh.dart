@@ -3335,6 +3335,20 @@ class AppLocalizationsZh extends AppLocalizations {
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
+  String get modelDetailSheetClaudeWebFetchTool => '网页抓取';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionTool => '代码执行';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
+
+  @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
 
   @override
@@ -11099,6 +11113,20 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '启用 OpenRouter 网页抓取服务端工具';
 
   @override
+  String get modelDetailSheetClaudeWebFetchTool => '网页抓取';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionTool => '代码执行';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
+
+  @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
 
   @override
@@ -18786,6 +18814,20 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchTool => '網頁擷取';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允許 Claude 擷取對話中出現的網頁與 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionTool => '程式碼執行';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允許 Claude 在 Anthropic 沙箱中執行 Python 與 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';

@@ -415,12 +415,6 @@ Stream<StreamChunk> sendClaudeStream(
       'type': searchToolType,
       'name': 'web_search',
     };
-    if (searchToolType == 'web_search_20260209') {
-      allTools.add(<String, dynamic>{
-        'type': 'code_execution_20250825',
-        'name': 'code_execution',
-      });
-    }
     if (ws['max_uses'] is int && (ws['max_uses'] as int) > 0) {
       entry['max_uses'] = ws['max_uses'];
     }
@@ -439,6 +433,31 @@ Stream<StreamChunk> sendClaudeStream(
           .cast<String, dynamic>();
     }
     allTools.add(entry);
+  }
+  if (builtIns.contains(BuiltInToolNames.webFetch) &&
+      BuiltInToolsHelper.supportsClaudeServerToolForModel(
+        cfg: config,
+        modelId: modelId,
+        toolName: BuiltInToolNames.webFetch,
+      )) {
+    allTools.add(<String, dynamic>{
+      'type': BuiltInToolsHelper.claudeWebFetchToolType(
+        cfg: config,
+        modelId: modelId,
+      ),
+      'name': 'web_fetch',
+    });
+  }
+  if (builtIns.contains(BuiltInToolNames.codeExecution) &&
+      BuiltInToolsHelper.supportsClaudeServerToolForModel(
+        cfg: config,
+        modelId: modelId,
+        toolName: BuiltInToolNames.codeExecution,
+      )) {
+    allTools.add(<String, dynamic>{
+      'type': BuiltInToolsHelper.claudeCodeExecutionToolType,
+      'name': 'code_execution',
+    });
   }
 
   // Headers (constant across rounds)

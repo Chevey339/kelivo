@@ -119,6 +119,8 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
   bool _openaiImageGenerationTool = false;
   bool _openrouterWebFetchTool = false;
   bool _openrouterShellTool = false;
+  bool _claudeWebFetchTool = false;
+  bool _claudeCodeExecutionTool = false;
 
   @override
   void initState() {
@@ -129,9 +131,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       cfg.id,
       explicitType: cfg.providerType,
     );
-    _showBuiltinToolsTab =
-        _providerKind == ProviderKind.google ||
-        _providerKind == ProviderKind.openai;
+    _showBuiltinToolsTab = BuiltInToolsHelper.modelSettingsToolNames(
+      cfg,
+    ).isNotEmpty;
     _tabCtrl = TabController(length: _showBuiltinToolsTab ? 3 : 2, vsync: this);
     _tabCtrl.addListener(() {
       if (_tabCtrl.indexIsChanging) return;
@@ -235,6 +237,10 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
       _openrouterShellTool =
           cfg.useResponseApi == true &&
           builtInSet.contains(BuiltInToolNames.shell);
+      _claudeWebFetchTool = builtInSet.contains(BuiltInToolNames.webFetch);
+      _claudeCodeExecutionTool = builtInSet.contains(
+        BuiltInToolNames.codeExecution,
+      );
 
       final rawTools = ov['tools'];
       final tools = rawTools is Map ? rawTools : const <dynamic, dynamic>{};
@@ -825,6 +831,29 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             ),
           ),
         ],
+      ] else if (_providerKind == ProviderKind.claude) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetClaudeWebFetchTool,
+            desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+            value: _claudeWebFetchTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _claudeWebFetchTool = v),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetClaudeCodeExecutionTool,
+            desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+            value: _claudeCodeExecutionTool,
+            onChanged: disableTools
+                ? null
+                : (v) => setState(() => _claudeCodeExecutionTool = v),
+          ),
+        ),
       ] else
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -947,6 +976,13 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         if (_openaiImageGenerationTool) {
           selectedBuiltIns.add(BuiltInToolNames.imageGeneration);
         }
+      }
+    } else if (_providerKind == ProviderKind.claude) {
+      if (_claudeWebFetchTool) {
+        selectedBuiltIns.add(BuiltInToolNames.webFetch);
+      }
+      if (_claudeCodeExecutionTool) {
+        selectedBuiltIns.add(BuiltInToolNames.codeExecution);
       }
     }
     final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(

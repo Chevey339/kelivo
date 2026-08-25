@@ -729,13 +729,90 @@ void main() {
 
       final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
       expect(
-        tools.any((tool) => tool['type'] == 'web_search_20260209'),
+        tools.any((tool) => tool['type'] == 'web_search_20260318'),
         isTrue,
       );
+      // The API provisions code execution for dynamic filtering itself;
+      // declaring it here collides with that auto-injected tool name.
+      expect(tools.any((tool) => tool['name'] == 'code_execution'), isFalse);
+    });
+
+    test(
+      'official Claude sends web fetch and code execution built-ins',
+      () async {
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'claude-opus-4-7',
+          config: _claudeConfig(
+            'http://localhost',
+            modelOverrides: const <String, dynamic>{
+              'claude-opus-4-7': <String, dynamic>{
+                'builtInTools': <String>[
+                  BuiltInToolNames.webFetch,
+                  BuiltInToolNames.codeExecution,
+                ],
+              },
+            },
+          ),
+        );
+
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        expect(
+          tools.firstWhere((tool) => tool['name'] == 'web_fetch')['type'],
+          'web_fetch_20250910',
+        );
+        expect(
+          tools.firstWhere((tool) => tool['name'] == 'code_execution')['type'],
+          'code_execution_20260521',
+        );
+      },
+    );
+
+    test('dynamic filtering upgrades the web fetch tool version', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'claude-opus-4-7',
+        config: _claudeConfig(
+          'http://localhost',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.search,
+                BuiltInToolNames.webFetch,
+              ],
+              'webSearch': <String, dynamic>{
+                'toolVersion': 'web_search_20260209',
+              },
+            },
+          },
+        ),
+      );
+
+      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
       expect(
-        tools.any((tool) => tool['type'] == 'code_execution_20250825'),
-        isTrue,
+        tools.firstWhere((tool) => tool['name'] == 'web_fetch')['type'],
+        'web_fetch_20260318',
       );
+    });
+
+    test('Claude-compatible vendors get no Anthropic server tools', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'deepseek-chat',
+        config: _deepSeekClaudeConfig(
+          modelOverrides: const <String, dynamic>{
+            'deepseek-chat': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.webFetch,
+                BuiltInToolNames.codeExecution,
+              ],
+            },
+          },
+        ),
+      );
+
+      final tools =
+          (body['tools'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      expect(tools.any((tool) => tool['name'] == 'web_fetch'), isFalse);
+      expect(tools.any((tool) => tool['name'] == 'code_execution'), isFalse);
     });
 
     test(
@@ -781,10 +858,7 @@ void main() {
           tools.any((tool) => tool['type'] == 'web_search_20260209'),
           isFalse,
         );
-        expect(
-          tools.any((tool) => tool['type'] == 'code_execution_20250825'),
-          isFalse,
-        );
+        expect(tools.any((tool) => tool['name'] == 'code_execution'), isFalse);
       },
     );
 

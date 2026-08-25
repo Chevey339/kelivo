@@ -36,6 +36,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+  final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
   final Set<String> _clientToolEnded = <String>{};
@@ -176,19 +177,23 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
       }
-      if (id.isNotEmpty && name == 'web_search') {
+      final display = _serverToolDisplayName(name);
+      if (id.isNotEmpty && display != null) {
+        _serverToolNames[id] = display;
         _serverToolStarted.add(id);
-        chunks.add(ServerToolStart(id: id, toolName: 'search_web'));
+        chunks.add(ServerToolStart(id: id, toolName: display));
         chunks.add(
           ToolCallStart(
             id: id,
-            toolName: 'search_web',
+            toolName: display,
             metadata: _anthropicMetadata,
           ),
         );
       }
     } else if (kind == 'web_search_tool_result') {
       chunks.addAll(_webSearchResult(block));
+    } else if (_serverResultBlockTypes.contains(kind)) {
+      chunks.addAll(_serverToolResult(block));
     } else if (kind == 'text') {
       if (idx != null) {
         chunks.add(TextStart(_ids.indexed('text', idx)));
@@ -334,6 +339,79 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       }
     } catch (_) {}
     return chunks;
+  }
+
+  /// Result block types of the Anthropic server tools handled by
+  /// [_serverToolResult]; web search keeps its own citation-aware mapping.
+  static const _serverResultBlockTypes = <String>{
+    'web_fetch_tool_result',
+    'code_execution_tool_result',
+    'bash_code_execution_tool_result',
+    'text_editor_code_execution_tool_result',
+  };
+
+  /// Tool name shown in the UI, or null for a server tool we don't surface.
+  static String? _serverToolDisplayName(String name) {
+    switch (name) {
+      case 'web_search':
+        return 'search_web';
+      case 'web_fetch':
+      case 'code_execution':
+      case 'bash_code_execution':
+      case 'text_editor_code_execution':
+        return name;
+      default:
+        return null;
+    }
+  }
+
+  /// Fetched pages and container output can be megabytes; the card and the
+  /// persisted message only need a readable excerpt.
+  static const _serverToolOutputLimit = 4000;
+
+  static Object? _clipServerToolValue(Object? value) {
+    if (value is String) {
+      return value.length <= _serverToolOutputLimit
+          ? value
+          : '${value.substring(0, _serverToolOutputLimit)}…';
+    }
+    if (value is List) {
+      return value.map(_clipServerToolValue).toList();
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _clipServerToolValue(entry.value),
+      };
+    }
+    return value;
+  }
+
+  List<StreamChunk> _serverToolResult(Map<String, dynamic> block) {
+    final toolUseId = (block['tool_use_id'] ?? '').toString();
+    final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
+    final toolName = _serverToolNames[id] ?? 'server_tool';
+    Map<String, dynamic> args = const <String, dynamic>{};
+    final raw = _serverArgs[id]?.toString();
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      } catch (_) {}
+    }
+    final clipped = _clipServerToolValue(block['content']);
+    _serverToolEnded.add(id);
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: toolName, input: args),
+      ServerToolEnd(
+        id: id,
+        input: args,
+        output: clipped is Map<String, dynamic>
+            ? clipped
+            : <String, dynamic>{'content': clipped},
+        metadata: _anthropicMetadata,
+      ),
+    ];
   }
 
   List<StreamChunk> _webSearchResult(Map<String, dynamic> block) {

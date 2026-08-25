@@ -216,6 +216,24 @@ abstract class BuiltInToolsHelper {
         normalized == 'claude-sonnet-4-6';
   }
 
+  static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
+    final normalized = _normalizedModelId(modelId);
+    if (normalized.contains('mythos')) return true;
+    const supported = <String>{
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-5',
+      'claude-sonnet-4-6',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    };
+    return supported.contains(normalized);
+  }
+
   static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return m.startsWith('gpt-4o') ||
@@ -705,6 +723,26 @@ abstract class BuiltInToolsHelper {
         isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
 
+  /// Persisted marker for the dynamic-filtering web search opt-in. Kept as a
+  /// tool type string for backward compatibility with settings written before
+  /// newer versions shipped; [claudeSearchToolTypeDynamic] is what gets sent.
+  static const claudeSearchToolVersionMarker = 'web_search_20260209';
+
+  static const claudeSearchToolTypeBasic = 'web_search_20250305';
+  static const claudeSearchToolTypeDynamic = 'web_search_20260318';
+  static const claudeFetchToolTypeBasic = 'web_fetch_20250910';
+  static const claudeFetchToolTypeDynamic = 'web_fetch_20260318';
+
+  /// Dynamic filtering runs inside code execution, which requires this version
+  /// or later; older types make the API inject a conflicting `code_execution`.
+  static const claudeCodeExecutionToolType = 'code_execution_20260521';
+
+  /// Every tool type that marks the dynamic-filtering opt-in as enabled.
+  static const _claudeDynamicSearchMarkers = <String>{
+    claudeSearchToolVersionMarker,
+    claudeSearchToolTypeDynamic,
+  };
+
   static bool isClaudeDynamicWebSearchEnabled({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -720,8 +758,8 @@ abstract class BuiltInToolsHelper {
     final rawWs = ov?['webSearch'];
     if (rawWs is! Map) return false;
     final ws = rawWs.cast<String, dynamic>();
-    return ws['toolVersion'] == 'web_search_20260209' ||
-        ws['tool_version'] == 'web_search_20260209';
+    return _claudeDynamicSearchMarkers.contains(ws['toolVersion']) ||
+        _claudeDynamicSearchMarkers.contains(ws['tool_version']);
   }
 
   static String claudeBuiltInSearchToolType({
@@ -729,8 +767,44 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
   }) {
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
-        ? 'web_search_20260209'
-        : 'web_search_20250305';
+        ? claudeSearchToolTypeDynamic
+        : claudeSearchToolTypeBasic;
+  }
+
+  static String claudeWebFetchToolType({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
+        ? claudeFetchToolTypeDynamic
+        : claudeFetchToolTypeBasic;
+  }
+
+  /// Anthropic-hosted server tools beyond search run on the official Claude API
+  /// only; Claude-compatible vendors and Vertex reject them.
+  static bool supportsClaudeServerToolForModel({
+    required ProviderConfig? cfg,
+    required String? modelId,
+    required String toolName,
+  }) {
+    if (cfg == null || (modelId ?? '').trim().isEmpty) return false;
+    final kind = ProviderConfig.classify(
+      cfg.id,
+      explicitType: cfg.providerType,
+    );
+    if (kind != ProviderKind.claude || isDeepSeekProvider(cfg)) return false;
+    final upstreamModelId = BuiltInToolNames.effectiveModelId(
+      cfg: cfg,
+      modelId: modelId,
+    );
+    switch (BuiltInToolNames.normalize(toolName)) {
+      case BuiltInToolNames.webFetch:
+        return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
+      case BuiltInToolNames.codeExecution:
+        return isClaudeCodeExecutionSupportedModel(upstreamModelId);
+      default:
+        return false;
+    }
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
@@ -783,7 +857,9 @@ abstract class BuiltInToolsHelper {
 
   /// Check if a provider supports built-in tools configuration.
   static bool supportsBuiltInTools(ProviderKind kind) {
-    return kind == ProviderKind.google || kind == ProviderKind.openai;
+    return kind == ProviderKind.google ||
+        kind == ProviderKind.openai ||
+        kind == ProviderKind.claude;
   }
 
   /// Tool names edited in a model's built-in tools tab. Search is excluded
@@ -798,6 +874,13 @@ abstract class BuiltInToolsHelper {
         BuiltInToolNames.urlContext,
         BuiltInToolNames.codeExecution,
         BuiltInToolNames.youtube,
+      };
+    }
+    if (kind == ProviderKind.claude) {
+      if (isDeepSeekProvider(cfg)) return const <String>{};
+      return const <String>{
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.codeExecution,
       };
     }
     if (kind != ProviderKind.openai) return const <String>{};
