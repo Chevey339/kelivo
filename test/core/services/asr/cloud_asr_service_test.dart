@@ -638,7 +638,7 @@ void main() {
             ].join('\n'),
           ),
           200,
-          headers: {'content-type': 'text/event-stream; charset=utf-8'},
+          headers: {'content-type': 'text/event-stream'},
         );
       });
       final session = await CloudAsrService(httpClient: client).startSession(

@@ -1138,7 +1138,7 @@ class _StepAsrSession implements CloudAsrSession {
         ),
       );
     }
-    return _parseStepSseTranscript(response.body);
+    return _parseStepSseTranscript(utf8.decode(response.bodyBytes));
   }
 
   @override
