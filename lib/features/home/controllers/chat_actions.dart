@@ -17,6 +17,7 @@ import '../../../core/services/api/chat_api_service.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/ios_background_generation.dart';
+import '../../../core/services/logging/flutter_logger.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -29,6 +30,15 @@ import 'generation_controller.dart';
 import 'home_view_model.dart';
 import 'latest_wins_checkpoint_writer.dart';
 import 'stream_controller.dart' as stream_ctrl;
+
+/// Raised when the generation context carries audio the target model cannot
+/// read. Its [toString] is the error code the UI localizes.
+final class UnsupportedAudioAttachmentException implements Exception {
+  const UnsupportedAudioAttachmentException();
+
+  @override
+  String toString() => 'audio_attachment_unsupported';
+}
 
 final class _BarrierStreamSubscription<T> implements StreamSubscription<T> {
   _BarrierStreamSubscription(this._delegate, this._cancelWithBarrier);
@@ -254,11 +264,12 @@ class ChatActions {
   /// Called when a successful assistant reply is finalized.
   void Function(ChatMessage message)? onAssistantMessageFinished;
 
-  /// Called when file processing starts.
-  VoidCallback? onFileProcessingStarted;
+  /// Called when file processing starts for the assistant message [messageId].
+  void Function(String messageId)? onFileProcessingStarted;
 
-  /// Called when file processing finishes.
-  VoidCallback? onFileProcessingFinished;
+  /// Called when file processing finishes. A null [messageId] clears whichever
+  /// message currently owns the indicator (error/cancel cleanup paths).
+  void Function(String? messageId)? onFileProcessingFinished;
 
   // ============================================================================
   // Private Helpers
@@ -1123,20 +1134,16 @@ class ChatActions {
       }
     }
 
-    final existingContextMessages = await chatController
-        .messagesForGenerationContext(
-          conversation,
-          maxMessages: await _contextReadLimit(assistant, conversation),
-        );
-    if (_hasUnsupportedAudioAttachments(
-      messages: existingContextMessages,
-      conversation: conversation,
-      settings: settings,
-      providerKey: providerKey,
-      modelId: modelId,
-      pendingInput: input,
-      maxRawTruncateIndex: null,
-    )) {
+    // Only the pending input is screened here: it needs no database read, so
+    // the send pair still reaches the screen without waiting on the context
+    // query. History is screened in [_runSendGeneration], where a failure
+    // lands on the assistant message instead of rejecting the input.
+    if (!_supportsAudioAttachmentsForProvider(
+          settings,
+          providerKey: providerKey,
+          modelId: modelId,
+        ) &&
+        messageGenerationService.inputContainsAudioAttachments(input)) {
       return ChatActionResult.error('audio_attachment_unsupported');
     }
 
@@ -1176,19 +1183,81 @@ class ChatActions {
     onMessagesChanged?.call();
     onSendPairAppended?.call();
 
-    // Reset tool parts and initialize reasoning
-    streamController.toolParts.remove(assistantMessage.id);
-    final supportsReasoning = _isReasoningModel(providerKey, modelId);
-    final enableReasoning =
-        supportsReasoning &&
-        _isReasoningEnabled(
-          assistant?.thinkingBudget ?? settings.thinkingBudget,
-        );
-    // Prepare API messages
-    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
-    messageGenerationService.onFileProcessingFinished =
-        onFileProcessingFinished;
+    // The send pair is visible and owned by the loading guard from here on, so
+    // the caller is released now: the composer must not keep its attachments
+    // (or the keyboard) around for the whole generation. Failures past this
+    // point surface through onStreamError and the message itself.
+    unawaited(
+      _runSendGeneration(
+        input: input,
+        conversation: conversation,
+        settings: settings,
+        assistant: assistant,
+        assistantId: assistantId,
+        providerKey: providerKey,
+        modelId: modelId,
+        userMessage: userMessage,
+        assistantMessage: assistantMessage,
+        generationRunId: generationRunId,
+        approvalService: approvalService,
+        askUserService: askUserService,
+      ),
+    );
+    return ChatActionResult.success(assistantMessage);
+  }
+
+  Future<void> _runSendGeneration({
+    required ChatInputData input,
+    required Conversation conversation,
+    required SettingsProvider settings,
+    required Assistant? assistant,
+    required String? assistantId,
+    required String providerKey,
+    required String modelId,
+    required ChatMessage userMessage,
+    required ChatMessage assistantMessage,
+    required String? generationRunId,
+    required ToolApprovalService? approvalService,
+    required AskUserInteractionService? askUserService,
+  }) async {
+    // Nothing awaits this future, so every failure has to be caught here.
     try {
+      // The context query is the slowest step of a send and nothing on screen
+      // depends on it, so it runs after the pair is already visible. The pair
+      // itself is persisted by now and comes back in this read — drop it here
+      // and let the caller re-append it in generation order.
+      final contextLimit = await _contextReadLimit(assistant, conversation);
+      final persistedContext = await chatController
+          .messagesForGenerationContext(
+            conversation,
+            maxMessages: contextLimit + 2,
+          );
+      final existingContextMessages = <ChatMessage>[
+        for (final message in persistedContext)
+          if (message.id != userMessage.id && message.id != assistantMessage.id)
+            message,
+      ];
+      if (_hasUnsupportedAudioAttachments(
+        messages: existingContextMessages,
+        conversation: conversation,
+        settings: settings,
+        providerKey: providerKey,
+        modelId: modelId,
+        maxRawTruncateIndex: null,
+      )) {
+        throw const UnsupportedAudioAttachmentException();
+      }
+
+      // Reset tool parts and initialize reasoning
+      streamController.toolParts.remove(assistantMessage.id);
+      final supportsReasoning = _isReasoningModel(providerKey, modelId);
+      final enableReasoning =
+          supportsReasoning &&
+          _isReasoningEnabled(
+            assistant?.thinkingBudget ?? settings.thinkingBudget,
+          );
+      // Prepare API messages
+      _bindFileProcessingCallbacks();
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
         enableReasoning: enableReasoning,
@@ -1210,6 +1279,7 @@ class ChatActions {
             modelId: modelId,
             approvalService: approvalService,
             askUserService: askUserService,
+            processingMessageId: assistantMessage.id,
           );
 
       // Build user image paths
@@ -1238,16 +1308,48 @@ class ChatActions {
       );
 
       if (!_activeAssistantMessages.isActive(assistantMessage)) {
-        return ChatActionResult.success(assistantMessage);
+        return;
       }
       await _executeGeneration(ctx);
-      return ChatActionResult.success(assistantMessage);
     } catch (e) {
-      // Ensure file processing indicator is cleared on error
-      onFileProcessingFinished?.call();
-      await _finishPreparingMessage(conversation.id, assistantMessage);
-      return ChatActionResult.error(e.toString());
+      await handleSendGenerationFailure(
+        error: e,
+        conversationId: conversation.id,
+        assistantMessage: assistantMessage,
+      );
     }
+  }
+
+  /// Terminal handling for a send whose generation future nobody awaits.
+  ///
+  /// The caller already has its success result, so this is the only place the
+  /// failure can reach the UI. The cleanup write is caught separately: if it
+  /// throws too, the original error must still surface instead of becoming an
+  /// unhandled async error behind a silent empty assistant message.
+  @visibleForTesting
+  Future<void> handleSendGenerationFailure({
+    required Object error,
+    required String conversationId,
+    required ChatMessage assistantMessage,
+  }) async {
+    // Ensure file processing indicator is cleared on error
+    onFileProcessingFinished?.call(assistantMessage.id);
+    try {
+      await _finishPreparingMessage(conversationId, assistantMessage);
+    } catch (cleanupError, stackTrace) {
+      FlutterLogger.log(
+        '[ChatActions] finishPreparingMessage failed after send error: '
+        '$cleanupError\n$stackTrace',
+        tag: 'ChatActions',
+      );
+    }
+    onStreamError?.call(error.toString());
+  }
+
+  void _bindFileProcessingCallbacks() {
+    messageGenerationService.onFileProcessingStarted = onFileProcessingStarted;
+    messageGenerationService.onFileProcessingFinished =
+        onFileProcessingFinished;
   }
 
   Future<int> _contextReadLimit(
@@ -1515,6 +1617,7 @@ class ChatActions {
         _isReasoningEnabled(
           assistant?.thinkingBudget ?? settings.thinkingBudget,
         );
+    _bindFileProcessingCallbacks();
     try {
       await messageGenerationService.initializeReasoningState(
         messageId: assistantMessage.id,
@@ -1540,6 +1643,7 @@ class ChatActions {
             modelId: modelId,
             approvalService: regenApprovalService,
             askUserService: regenAskUserService,
+            processingMessageId: assistantMessage.id,
           );
 
       // Build user image paths
@@ -1648,6 +1752,7 @@ class ChatActions {
           assistant?.thinkingBudget ?? settings.thinkingBudget,
         );
 
+    _bindFileProcessingCallbacks();
     try {
       final apiContextMessages = List<ChatMessage>.of(completeMessages);
       apiContextMessages[contextIndex] = streamingMessage.copyWith(content: '');
@@ -1663,6 +1768,7 @@ class ChatActions {
             modelId: modelId,
             approvalService: approvalService,
             askUserService: askUserService,
+            processingMessageId: streamingMessage.id,
           );
 
       final userImagePaths = messageGenerationService.buildUserImagePaths(
@@ -1745,8 +1851,15 @@ class ChatActions {
       // AskUserInteractionService may not be registered yet
     }
 
-    // Reset file processing state on cancel
-    onFileProcessingFinished?.call();
+    // Reset file processing state on cancel, for this conversation's message
+    // only: a global reset would hide a bar another conversation still owns.
+    final cancelIndicatorTarget = _activeAssistantMessages.cancellationTarget(
+      cid,
+      _messages,
+    );
+    if (cancelIndicatorTarget != null) {
+      onFileProcessingFinished?.call(cancelIndicatorTarget.id);
+    }
 
     // Abort the HTTP request before waiting on the subscription: the barrier
     // cancel only completes once the generator leaves its network await,
@@ -2372,8 +2485,9 @@ class ChatActions {
     final conversationId = state.conversationId;
     final errorText = e.toString();
 
-    // Reset file processing state on error
-    onFileProcessingFinished?.call();
+    // Reset file processing state on error, scoped to this message so a
+    // background conversation's indicator survives.
+    onFileProcessingFinished?.call(messageId);
 
     // Mark streaming as ended to allow UI rebuilds again
     streamController.markStreamingEnded(messageId);
@@ -2421,11 +2535,12 @@ class ChatActions {
 
   /// Handle stream done callback.
   Future<void> _handleStreamDone(stream_ctrl.StreamingState state) async {
-    // Reset file processing state on done (just in case)
-    onFileProcessingFinished?.call();
-
     final conversationId = state.conversationId;
     final messageId = state.messageId;
+
+    // Reset file processing state on done (just in case), scoped to this
+    // message so a background conversation's indicator survives.
+    onFileProcessingFinished?.call(messageId);
 
     // Ensure streaming is marked as ended
     streamController.markStreamingEnded(messageId);

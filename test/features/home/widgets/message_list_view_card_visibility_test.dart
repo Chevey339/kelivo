@@ -1363,7 +1363,7 @@ class _CardVisibilityHarness extends StatefulWidget {
 class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
   late final ScrollController scrollController;
   late final ListController listController;
-  late final ValueNotifier<bool> isProcessingFiles;
+  late final ValueNotifier<String?> processingFilesMessageId;
   late final ToolApprovalService _ownedApproval;
 
   @override
@@ -1371,7 +1371,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
     super.initState();
     scrollController = ScrollController();
     listController = ListController();
-    isProcessingFiles = ValueNotifier<bool>(false);
+    processingFilesMessageId = ValueNotifier<String?>(null);
     _ownedApproval = ToolApprovalService();
   }
 
@@ -1379,7 +1379,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
   void dispose() {
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     _ownedApproval.dispose();
     super.dispose();
   }
@@ -1426,7 +1426,7 @@ class _CardVisibilityHarnessState extends State<_CardVisibilityHarness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             showThinkingCards: widget.showThinkingCards,
             showToolCards: widget.showToolCards,
             showToolResultSummary: widget.showToolResultSummary,

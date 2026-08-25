@@ -339,7 +339,8 @@ class HomePageController extends ChangeNotifier {
 
   QueuedChatInput? get currentQueuedInput => _viewModel.currentQueuedInput;
 
-  ValueNotifier<bool> get isProcessingFiles => _viewModel.isProcessingFiles;
+  ValueNotifier<String?> get processingFilesMessageId =>
+      _viewModel.processingFilesMessageId;
 
   bool get isTemporaryConversation =>
       _chatService.isTemporaryConversation(currentConversation?.id);
@@ -2802,6 +2803,7 @@ class HomePageController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _viewModel.resetFileProcessingIndicator();
     _viewModel.onBackgroundTaskError = null;
     _ocrService.onError = null;
     _convoFadeController.dispose();

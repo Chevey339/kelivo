@@ -930,7 +930,16 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
     final submittedDraftRevision = _draftReplacementRevision;
     _isSubmitting = true;
-    setState(_controller.clear);
+    // Attachments leave the composer with the text, not when the send future
+    // completes: that future now resolves at send time, but the draft must not
+    // depend on it at all. A rejected send puts everything back below.
+    setState(() {
+      _controller.clear();
+      _images.removeWhere((image) => submittedImageIds.contains(image.id));
+      for (final document in submittedDocuments) {
+        _docs.remove(document);
+      }
+    });
     try {
       final result =
           await widget.onSend?.call(
@@ -947,10 +956,6 @@ class _ChatInputBarState extends State<ChatInputBar>
           result == ChatInputSubmissionResult.queued) {
         if (_draftReplacementRevision != submittedDraftRevision) return;
         _discardImageState(submittedImageIds);
-        _images.removeWhere((image) => submittedImageIds.contains(image.id));
-        for (final document in submittedDocuments) {
-          _docs.remove(document);
-        }
         setState(() {});
         // Keep focus on desktop so user can continue typing
         try {
@@ -959,16 +964,47 @@ class _ChatInputBarState extends State<ChatInputBar>
           }
         } catch (_) {}
       } else if (_draftReplacementRevision == submittedDraftRevision) {
-        setState(() => _restoreSubmittedText(submittedValue));
+        setState(
+          () => _restoreSubmittedDraft(
+            submittedValue,
+            submittedImages,
+            submittedDocuments,
+          ),
+        );
       }
     } catch (_) {
       if (mounted && _draftReplacementRevision == submittedDraftRevision) {
-        setState(() => _restoreSubmittedText(submittedValue));
+        setState(
+          () => _restoreSubmittedDraft(
+            submittedValue,
+            submittedImages,
+            submittedDocuments,
+          ),
+        );
       }
       rethrow;
     } finally {
       _isSubmitting = false;
     }
+  }
+
+  /// Puts a rejected submission back into the composer: text first, then the
+  /// attachments ahead of anything added while the send was in flight.
+  void _restoreSubmittedDraft(
+    TextEditingValue submittedValue,
+    List<_DraftImage> submittedImages,
+    List<DocumentAttachment> submittedDocuments,
+  ) {
+    _restoreSubmittedText(submittedValue);
+    final existingImageIds = _images.map((image) => image.id).toSet();
+    _images.insertAll(
+      0,
+      submittedImages.where((image) => !existingImageIds.contains(image.id)),
+    );
+    _docs.insertAll(
+      0,
+      submittedDocuments.where((document) => !_docs.contains(document)),
+    );
   }
 
   void _restoreSubmittedText(TextEditingValue submittedValue) {

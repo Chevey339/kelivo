@@ -92,21 +92,21 @@ class _MessageListHarness extends StatefulWidget {
 class _MessageListHarnessState extends State<_MessageListHarness> {
   late final ScrollController scrollController;
   late final ListController listController;
-  late final ValueNotifier<bool> isProcessingFiles;
+  late final ValueNotifier<String?> processingFilesMessageId;
 
   @override
   void initState() {
     super.initState();
     scrollController = ScrollController();
     listController = ListController();
-    isProcessingFiles = ValueNotifier<bool>(false);
+    processingFilesMessageId = ValueNotifier<String?>(null);
   }
 
   @override
   void dispose() {
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -151,7 +151,7 @@ class _MessageListHarnessState extends State<_MessageListHarness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             onEditMessage: widget.onEditMessage,
           ),
         ),

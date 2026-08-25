@@ -333,7 +333,7 @@ class _Harness extends StatefulWidget {
 class _HarnessState extends State<_Harness> {
   late final ScrollController scrollController;
   late ListController listController;
-  late final ValueNotifier<bool> isProcessingFiles;
+  late final ValueNotifier<String?> processingFilesMessageId;
   late Map<String, List<ToolUIPart>> toolParts;
   late List<ChatMessage> messages;
 
@@ -342,7 +342,7 @@ class _HarnessState extends State<_Harness> {
     super.initState();
     scrollController = ScrollController();
     listController = ListController();
-    isProcessingFiles = ValueNotifier<bool>(false);
+    processingFilesMessageId = ValueNotifier<String?>(null);
     // Share the same mutable map as production: stream updates replace the
     // list in place instead of rebuilding MessageListView.
     toolParts = widget.toolParts;
@@ -367,7 +367,7 @@ class _HarnessState extends State<_Harness> {
   void dispose() {
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -413,7 +413,7 @@ class _HarnessState extends State<_Harness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             streamingContentNotifier: widget.notifier,
           ),
         ),

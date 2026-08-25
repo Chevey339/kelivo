@@ -134,7 +134,7 @@ class _H extends StatefulWidget {
 class _HState extends State<_H> {
   final scrollController = scroll_ctrl.ChatAutoFollowScrollController();
   late final scroll_ctrl.ChatScrollController scrollCtrl;
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
   int tick = 0;
 
   late final List<ChatMessage> messages = <ChatMessage>[
@@ -170,7 +170,7 @@ class _HState extends State<_H> {
   void dispose() {
     scrollCtrl.dispose();
     scrollController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -215,7 +215,7 @@ class _HState extends State<_H> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
           ),
         ),
       ),

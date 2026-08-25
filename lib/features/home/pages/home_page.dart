@@ -1363,7 +1363,7 @@ class _HomePageState extends State<HomePage>
         settings.suggestionModelId != null;
     final assistant = context.watch<AssistantProvider>().currentAssistant;
     return MessageListView(
-      isProcessingFiles: _controller.isProcessingFiles,
+      processingFilesMessageId: _controller.processingFilesMessageId,
       scrollController: _scrollController,
       listController: _controller.scrollCtrl.messageListController,
       messages: _controller.chatController.collapsedMessages,

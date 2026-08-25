@@ -133,13 +133,14 @@ void main() {
       'lib/features/home/controllers/chat_actions.dart',
     ).readAsStringSync();
     expect(
-      'maxMessages: await _contextReadLimit(assistant, conversation),'
+      'await _contextReadLimit(assistant, conversation)'
           .allMatches(source)
           .length,
       3,
       reason: 'send, regenerate, and continue must each await resolved counts',
     );
     expect(source.contains('maxMessages: _contextReadLimit('), isFalse);
+    expect(source.contains('maxMessages: contextLimit + 2'), isTrue);
   });
 
   group('ChatActions.shouldBeginNewAssistantReply', () {

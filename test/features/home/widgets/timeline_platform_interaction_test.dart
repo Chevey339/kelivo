@@ -23,7 +23,7 @@ void main() {
       addTearDown(scrollController.dispose);
       final listController = ListController();
       addTearDown(listController.dispose);
-      final processing = ValueNotifier(false);
+      final processing = ValueNotifier<String?>(null);
       addTearDown(processing.dispose);
       var userScrollIntentCount = 0;
 
@@ -44,7 +44,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: processing,
+              processingFilesMessageId: processing,
               onUserScrollIntent: () => userScrollIntentCount++,
             ),
           ),

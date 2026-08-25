@@ -189,7 +189,7 @@ class _BenchHarnessState extends State<_BenchHarness> {
   final scrollController = scroll_ctrl.ChatAutoFollowScrollController();
   final streamingNotifier = StreamingContentNotifier();
   late final scroll_ctrl.ChatScrollController scrollCtrl;
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
   bool generating = true;
 
   late Map<String, List<ToolUIPart>> toolParts;
@@ -274,7 +274,7 @@ class _BenchHarnessState extends State<_BenchHarness> {
     scrollCtrl.dispose();
     scrollController.dispose();
     streamingNotifier.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -322,7 +322,7 @@ class _BenchHarnessState extends State<_BenchHarness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             streamingContentNotifier: streamingNotifier,
             onUserScrollIntent: scrollCtrl.handleUserScrollIntent,
           ),

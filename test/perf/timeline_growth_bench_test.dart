@@ -75,7 +75,7 @@ class _HState extends State<_H> {
   final scrollController = scroll_ctrl.ChatAutoFollowScrollController();
   final notifier = StreamingContentNotifier();
   late final scroll_ctrl.ChatScrollController scrollCtrl;
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
   final tools = <ToolUIPart>[];
 
   late final List<ChatMessage> messages = <ChatMessage>[
@@ -122,7 +122,7 @@ class _HState extends State<_H> {
     scrollCtrl.dispose();
     scrollController.dispose();
     notifier.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -166,7 +166,7 @@ class _HState extends State<_H> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             streamingContentNotifier: notifier,
             onUserScrollIntent: scrollCtrl.handleUserScrollIntent,
           ),

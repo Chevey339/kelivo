@@ -25,7 +25,7 @@ void main() {
   testWidgets('冷加载空窗口显示气泡骨架占位', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     try {
       await tester.pumpWidget(
@@ -47,7 +47,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               isLoadingWindow: true,
             ),
           ),
@@ -63,14 +63,14 @@ void main() {
     } finally {
       scrollController.dispose();
       listController.dispose();
-      isProcessingFiles.dispose();
+      processingFilesMessageId.dispose();
     }
   });
 
   testWidgets('空窗口非加载态保持空白（无占位）', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     try {
       await tester.pumpWidget(
@@ -92,7 +92,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
             ),
           ),
         ),
@@ -103,7 +103,7 @@ void main() {
     } finally {
       scrollController.dispose();
       listController.dispose();
-      isProcessingFiles.dispose();
+      processingFilesMessageId.dispose();
     }
   });
 
@@ -152,7 +152,7 @@ class _PlaceholderHarness extends StatefulWidget {
 class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
   final scrollController = scroll_ctrl.ChatAutoFollowScrollController();
   final listController = ListController();
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
 
   late bool isLoading = widget.initialLoading;
   late List<ChatMessage> messages = widget.withMessages
@@ -181,7 +181,7 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
   void dispose() {
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -225,7 +225,7 @@ class _PlaceholderHarnessState extends State<_PlaceholderHarness> {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             isLoadingWindow: isLoading,
           ),
         ),

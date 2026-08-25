@@ -97,11 +97,12 @@ class MessageGenerationService {
   OnShowWarning? onShowWarning;
   OnHapticFeedback? onHapticFeedback;
 
-  /// Called when file processing starts.
-  VoidCallback? onFileProcessingStarted;
+  /// Called when file processing starts for the assistant message [messageId].
+  void Function(String messageId)? onFileProcessingStarted;
 
-  /// Called when file processing finishes.
-  VoidCallback? onFileProcessingFinished;
+  /// Called when file processing finishes. A null [messageId] clears whichever
+  /// message currently owns the indicator (error/cancel cleanup paths).
+  void Function(String? messageId)? onFileProcessingFinished;
 
   /// Check if reasoning is enabled for given budget
   bool isReasoningEnabled(int? budget) {
@@ -122,6 +123,7 @@ class MessageGenerationService {
     required String modelId,
     ToolApprovalService? approvalService,
     AskUserInteractionService? askUserService,
+    String? processingMessageId,
   }) async {
     final cfg = settings.getProviderConfig(providerKey);
     final kind = ProviderConfig.classify(
@@ -131,8 +133,6 @@ class MessageGenerationService {
     final includeToolMessages = switch (kind) {
       ProviderKind.openai || ProviderKind.claude || ProviderKind.google => true,
     };
-
-    onFileProcessingStarted?.call();
 
     // Build API messages
     final apiMessages = messageBuilderService.buildApiMessages(
@@ -194,16 +194,39 @@ class MessageGenerationService {
     // not be sent are never processed (#769).
     messageBuilderService.applyContextLimit(apiMessages, assistant);
 
-    final lastUserImagePaths = await messageBuilderService
-        .processUserMessagesForApi(
-          apiMessages,
-          settings,
-          assistant,
-          conversation: currentConversation,
-          sourceMessages: messages,
-        );
-
-    onFileProcessingFinished?.call();
+    // Only this step does the actual attachment work (document extraction and
+    // OCR), so the indicator must not cover the injection/trim passes above —
+    // and it only claims to be parsing files when the retained messages really
+    // carry files to parse. A text-only send that is merely slow (frozen prompt
+    // reads, memory injection, templating) must never show the bar.
+    final indicatorMessageId =
+        processingMessageId != null &&
+            messageBuilderService.hasPendingAttachmentWork(
+              apiMessages,
+              settings,
+              conversation: currentConversation,
+              sourceMessages: messages,
+            )
+        ? processingMessageId
+        : null;
+    final List<String> lastUserImagePaths;
+    if (indicatorMessageId != null) {
+      onFileProcessingStarted?.call(indicatorMessageId);
+    }
+    try {
+      lastUserImagePaths = await messageBuilderService
+          .processUserMessagesForApi(
+            apiMessages,
+            settings,
+            assistant,
+            conversation: currentConversation,
+            sourceMessages: messages,
+          );
+    } finally {
+      if (indicatorMessageId != null) {
+        onFileProcessingFinished?.call(indicatorMessageId);
+      }
+    }
 
     await messageBuilderService.inlineLocalImages(apiMessages);
     if (ContextLogger.enabled) {

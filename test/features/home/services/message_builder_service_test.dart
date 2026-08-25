@@ -1292,6 +1292,164 @@ void main() {
     });
   });
 
+  group('MessageBuilderService.hasPendingAttachmentWork', () {
+    Future<SettingsProvider> newSettings() async {
+      SharedPreferences.setMockInitialValues({});
+      final settings = SettingsProvider(createBusinessTestPreferences());
+      await settings.loaded;
+      return settings;
+    }
+
+    Future<SettingsProvider> settingsWithOcr() async {
+      final settings = await newSettings();
+      await settings.setProviderConfig(
+        'ocr-provider',
+        ProviderConfig(
+          id: 'ocr-provider',
+          enabled: true,
+          name: 'OCR',
+          apiKey: 'key',
+          baseUrl: 'https://example.test',
+          models: const ['ocr-model'],
+          modelOverrides: const {
+            'ocr-model': {
+              'input': ['text', 'image'],
+            },
+          },
+        ),
+      );
+      await settings.setOcrModel('ocr-provider', 'ocr-model');
+      await settings.setOcrEnabled(true);
+      return settings;
+    }
+
+    MessageBuilderService serviceWithOcr() => MessageBuilderService(
+      chatService: _FakeChatService({}),
+      contextProvider: _FakeBuildContext(),
+      ocrHandler: (imagePaths, {revisionId, session}) async => 'ocr',
+    );
+
+    List<Map<String, dynamic>> apiMessagesFor(ChatMessage message) => [
+      {
+        'role': 'user',
+        'content': message.content,
+        MessageBuilderService.internalRevisionIdKey: message.id,
+      },
+    ];
+
+    test('纯文本消息没有待解析附件', () async {
+      final settings = await settingsWithOcr();
+      final user = ChatMessage(
+        id: 'u1',
+        role: 'user',
+        conversationId: 'c1',
+        parts: const [TextPart('just text')],
+      );
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(
+          apiMessagesFor(user),
+          settings,
+          sourceMessages: [user],
+        ),
+        isFalse,
+      );
+    });
+
+    test('关闭 OCR 时纯图片消息没有待解析附件', () async {
+      final settings = await newSettings();
+      final user = ChatMessage(
+        id: 'u1',
+        role: 'user',
+        conversationId: 'c1',
+        parts: const [
+          TextPart('look'),
+          ImagePart(uri: '/tmp/a.png', mime: 'image/png'),
+        ],
+      );
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(
+          apiMessagesFor(user),
+          settings,
+          sourceMessages: [user],
+        ),
+        isFalse,
+      );
+    });
+
+    test('开启 OCR 时图片消息需要解析', () async {
+      final settings = await settingsWithOcr();
+      final user = ChatMessage(
+        id: 'u1',
+        role: 'user',
+        conversationId: 'c1',
+        parts: const [
+          TextPart('look'),
+          ImagePart(uri: '/tmp/a.png', mime: 'image/png'),
+        ],
+      );
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(
+          apiMessagesFor(user),
+          settings,
+          sourceMessages: [user],
+        ),
+        isTrue,
+      );
+    });
+
+    test('文档附件无论 OCR 开关都需要解析', () async {
+      final settings = await newSettings();
+      final user = ChatMessage(
+        id: 'u1',
+        role: 'user',
+        conversationId: 'c1',
+        parts: const [
+          TextPart('read this'),
+          FilePart(uri: '/tmp/a.pdf', name: 'a.pdf', mime: 'application/pdf'),
+        ],
+      );
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(
+          apiMessagesFor(user),
+          settings,
+          sourceMessages: [user],
+        ),
+        isTrue,
+      );
+    });
+
+    test('音视频附件不算待解析文档', () async {
+      final settings = await newSettings();
+      final user = ChatMessage(
+        id: 'u1',
+        role: 'user',
+        conversationId: 'c1',
+        parts: const [
+          TextPart('listen'),
+          FilePart(uri: '/tmp/clip.mp3', name: 'clip.mp3', mime: 'audio/mpeg'),
+        ],
+      );
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(
+          apiMessagesFor(user),
+          settings,
+          sourceMessages: [user],
+        ),
+        isFalse,
+      );
+    });
+
+    test('缺少 revision id 的 WorldBook lore 不算待解析附件', () async {
+      final settings = await settingsWithOcr();
+      expect(
+        serviceWithOcr().hasPendingAttachmentWork(const [
+          {'role': 'user', 'content': 'lore [image:/tmp/lore.png]'},
+        ], settings),
+        isFalse,
+      );
+    });
+  });
+
   group('MessageBuilderService.processUserMessagesForApi', () {
     test('不处理缺少内部 revision ID 的 WorldBook lore user 消息', () async {
       SharedPreferences.setMockInitialValues({});

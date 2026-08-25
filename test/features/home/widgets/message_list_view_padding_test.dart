@@ -32,7 +32,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     try {
       await tester.pumpWidget(
@@ -52,7 +52,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
             ),
           ),
         ),
@@ -73,7 +73,7 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
       scrollController.dispose();
       listController.dispose();
-      isProcessingFiles.dispose();
+      processingFilesMessageId.dispose();
     }
   });
 
@@ -81,7 +81,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     try {
       await tester.pumpWidget(
@@ -101,7 +101,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
             ),
           ),
         ),
@@ -116,14 +116,14 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
       scrollController.dispose();
       listController.dispose();
-      isProcessingFiles.dispose();
+      processingFilesMessageId.dispose();
     }
   });
 
   testWidgets('消息列表底部留白使用传入的输入框覆盖高度', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -142,7 +142,7 @@ void main() {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             bottomContentPadding: 144,
           ),
         ),
@@ -154,13 +154,13 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
   });
 
   testWidgets('消息列表顶部留白使用传入的导航栏覆盖高度', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -179,7 +179,7 @@ void main() {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             topContentPadding: 88,
             bottomContentPadding: 144,
           ),
@@ -193,13 +193,13 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
   });
 
   testWidgets('置顶流式指示器激活时保留额外底部空间', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -218,7 +218,7 @@ void main() {
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             isPinnedIndicatorActive: true,
             bottomContentPadding: 144,
           ),
@@ -231,13 +231,13 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
   });
 
   testWidgets('流式思考更新缺少起始时间时保留已有计时起点', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final streamingNotifier = StreamingContentNotifier();
     const messageId = 'reasoning-streaming-message';
     final startAt = DateTime.now().subtract(const Duration(seconds: 7));
@@ -293,7 +293,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
             ),
@@ -312,14 +312,14 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     streamingNotifier.dispose();
   });
 
   testWidgets('思考卡内部滚动不暂停流式正文更新', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final streamingNotifier = StreamingContentNotifier();
     const messageId = 'nested-reasoning-scroll-message';
     final reasoningText = List.filled(40, 'reasoning line').join('\n');
@@ -375,7 +375,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
             ),
@@ -401,14 +401,14 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     streamingNotifier.dispose();
   });
 
   testWidgets('用户拖动离开底部时暂停应用流式内容更新', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
       for (var i = 0; i < 18; i++)
@@ -463,7 +463,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
             ),
@@ -502,7 +502,7 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     streamingNotifier.dispose();
   });
 
@@ -510,7 +510,7 @@ void main() {
     var userIntentCalls = 0;
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
       for (var i = 0; i < 18; i++)
@@ -565,7 +565,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
               onUserScrollIntent: () => userIntentCalls++,
@@ -608,14 +608,14 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     streamingNotifier.dispose();
   });
 
   testWidgets('滚轮滚动时暂停应用流式内容更新', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final streamingNotifier = StreamingContentNotifier();
     final messages = <ChatMessage>[
       for (var i = 0; i < 18; i++)
@@ -670,7 +670,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
               bottomContentPadding: 16,
               streamingContentNotifier: streamingNotifier,
             ),
@@ -705,14 +705,14 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     streamingNotifier.dispose();
   });
 
   testWidgets('未布局的长消息按内容长度估算高度而非默认 100px', (tester) async {
     final scrollController = ScrollController();
     final listController = ListController();
-    final isProcessingFiles = ValueNotifier<bool>(false);
+    final processingFilesMessageId = ValueNotifier<String?>(null);
     final longBody = List<String>.filled(
       120,
       '这是一段用于撑高消息气泡的长文本，重复出现以便估算高度。',
@@ -765,7 +765,7 @@ void main() {
               selecting: false,
               selectedItems: const {},
               dividerPadding: EdgeInsets.zero,
-              isProcessingFiles: isProcessingFiles,
+              processingFilesMessageId: processingFilesMessageId,
             ),
           ),
         ),
@@ -781,7 +781,7 @@ void main() {
 
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
   });
 
   testWidgets('估算高度跟随系统无障碍字体缩放', (tester) async {
@@ -1196,7 +1196,7 @@ class _PrependingMessageListHarnessState
     extends State<_PrependingMessageListHarness> {
   final scrollController = scroll_ctrl.ChatAutoFollowScrollController();
   final listController = ListController();
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
   final removingSlotIds = <String>{};
   late List<ChatMessage> messages = <ChatMessage>[
     for (var index = 0; index < 30; index++)
@@ -1283,7 +1283,7 @@ class _PrependingMessageListHarnessState
   void dispose() {
     scrollController.dispose();
     listController.dispose();
-    isProcessingFiles.dispose();
+    processingFilesMessageId.dispose();
     super.dispose();
   }
 
@@ -1328,7 +1328,7 @@ class _PrependingMessageListHarnessState
             selecting: false,
             selectedItems: const {},
             dividerPadding: EdgeInsets.zero,
-            isProcessingFiles: isProcessingFiles,
+            processingFilesMessageId: processingFilesMessageId,
             removingSlotIds: removingSlotIds,
           ),
         ),
@@ -1348,9 +1348,9 @@ Future<void> _pumpEstimatorHarness(
       const <String, stream_ctrl.ReasoningData>{},
 }) async {
   final scrollController = ScrollController();
-  final isProcessingFiles = ValueNotifier<bool>(false);
+  final processingFilesMessageId = ValueNotifier<String?>(null);
   addTearDown(scrollController.dispose);
-  addTearDown(isProcessingFiles.dispose);
+  addTearDown(processingFilesMessageId.dispose);
 
   await tester.pumpWidget(
     MultiProvider(
@@ -1395,7 +1395,7 @@ Future<void> _pumpEstimatorHarness(
                 selecting: false,
                 selectedItems: const {},
                 dividerPadding: EdgeInsets.zero,
-                isProcessingFiles: isProcessingFiles,
+                processingFilesMessageId: processingFilesMessageId,
                 collapseThinking: collapseThinking,
                 wrapCodeBlocks: wrapCodeBlocks,
               ),

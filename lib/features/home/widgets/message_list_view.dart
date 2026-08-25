@@ -117,7 +117,7 @@ class MessageListView extends StatefulWidget {
     this.bottomContentPadding = 16,
     this.pinnedStreamingMessageId,
     this.isPinnedIndicatorActive = false,
-    required this.isProcessingFiles,
+    required this.processingFilesMessageId,
     this.streamingContentNotifier,
     this.spotlightMessageId,
     this.spotlightToken = 0,
@@ -192,7 +192,10 @@ class MessageListView extends StatefulWidget {
   final double bottomContentPadding;
   final String? pinnedStreamingMessageId;
   final bool isPinnedIndicatorActive;
-  final ValueNotifier<bool> isProcessingFiles;
+
+  /// Assistant message currently parsing its attachments, or null. Scoped to a
+  /// single message so the indicator never renders on every assistant reply.
+  final ValueNotifier<String?> processingFilesMessageId;
 
   /// Lightweight notifier for streaming content updates.
   /// When provided, streaming messages will use ValueListenableBuilder
@@ -1666,9 +1669,8 @@ class _MessageListViewState extends State<MessageListView> {
             ((constraints.maxWidth - ChatLayoutConstants.maxContentWidth) / 2)
                 .clamp(0.0, double.infinity);
 
-        return ValueListenableBuilder<bool>(
-          valueListenable: widget.isProcessingFiles,
-          builder: (context, isProcessing, child) {
+        return Builder(
+          builder: (context) {
             final list = SuperListView.builder(
               controller: widget.scrollController,
               listController: widget.listController,
@@ -1693,7 +1695,6 @@ class _MessageListViewState extends State<MessageListView> {
                 return _buildMessageItem(
                   context,
                   index: index,
-                  isProcessingFiles: isProcessing,
                   presentation: presentation,
                 );
               },
@@ -1955,7 +1956,6 @@ class _MessageListViewState extends State<MessageListView> {
   Widget _buildMessageItem(
     BuildContext context, {
     required int index,
-    required bool isProcessingFiles,
     required _MessagePresentation presentation,
   }) {
     final model = _effectiveRenderModels[index];
@@ -2006,7 +2006,7 @@ class _MessageListViewState extends State<MessageListView> {
               ),
             Expanded(
               child: (() {
-                Widget content = Builder(
+                Widget buildContent(bool isProcessingFiles) => Builder(
                   builder: (context) {
                     final baseMediaQuery = context
                         .getInheritedWidgetOfExactType<MediaQuery>();
@@ -2060,6 +2060,16 @@ class _MessageListViewState extends State<MessageListView> {
                     );
                   },
                 );
+
+                // Only the assistant message that owns the indicator listens,
+                // so parsing never rebuilds the rest of the timeline.
+                Widget content = message.role == 'assistant'
+                    ? ValueListenableBuilder<String?>(
+                        valueListenable: widget.processingFilesMessageId,
+                        builder: (context, processingId, _) =>
+                            buildContent(processingId == message.id),
+                      )
+                    : buildContent(false);
 
                 final canSelect =
                     (message.role == 'user' || message.role == 'assistant');
