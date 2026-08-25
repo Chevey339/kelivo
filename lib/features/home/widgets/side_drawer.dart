@@ -259,6 +259,9 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     if (_selectionMode) return;
     final l10n = AppLocalizations.of(context)!;
     final chatService = context.read<ChatService>();
+    final titleGenerationEnabled = context
+        .read<SettingsProvider>()
+        .isTitleGenerationEnabled;
     final isPinned = chat.isPinned;
     final isDesktop =
         defaultTargetPlatform == TargetPlatform.macOS ||
@@ -293,13 +296,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
               await chatService.togglePinConversation(chat.id);
             },
           ),
-          DesktopContextMenuItem(
-            icon: Lucide.RefreshCw,
-            label: l10n.sideDrawerMenuRegenerateTitle,
-            onTap: () async {
-              await _regenerateTitle(context, chat.id);
-            },
-          ),
+          if (titleGenerationEnabled)
+            DesktopContextMenuItem(
+              icon: Lucide.RefreshCw,
+              label: l10n.sideDrawerMenuRegenerateTitle,
+              onTap: () async {
+                await _regenerateTitle(context, chat.id);
+              },
+            ),
           DesktopContextMenuItem(
             icon: Lucide.Copy,
             label: l10n.sideDrawerMenuCopy,
@@ -496,13 +500,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
                         await chatService.togglePinConversation(chat.id);
                       },
                     ),
-                    row(
-                      icon: Lucide.RefreshCw,
-                      label: l10n.sideDrawerMenuRegenerateTitle,
-                      action: () async {
-                        await _regenerateTitle(context, chat.id);
-                      },
-                    ),
+                    if (titleGenerationEnabled)
+                      row(
+                        icon: Lucide.RefreshCw,
+                        label: l10n.sideDrawerMenuRegenerateTitle,
+                        action: () async {
+                          await _regenerateTitle(context, chat.id);
+                        },
+                      ),
                     row(
                       icon: Lucide.Copy,
                       label: l10n.sideDrawerMenuCopy,
@@ -915,22 +920,14 @@ class _SideDrawerState extends State<SideDrawer> with TickerProviderStateMixin {
     final convo = chatService.getConversation(conversationId);
     if (convo == null) return;
 
+    final provKey = settings.titleModelProvider;
+    final mdlId = settings.titleModelId;
+    if (provKey == null || mdlId == null) return;
+
     // Get assistant for this conversation
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
-
-    // Decide model: prefer title model, else fall back to assistant's model, then to global default
-    final provKey =
-        settings.titleModelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final mdlId =
-        settings.titleModelId ??
-        assistant?.chatModelId ??
-        settings.currentModelId;
-
-    if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,

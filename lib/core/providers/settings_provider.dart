@@ -3360,6 +3360,10 @@ class SettingsProvider extends ChangeNotifier {
       ? '${_titleModelProvider!}::${_titleModelId!}'
       : null;
 
+  /// Title summarization is opt-in: unset model means the feature is off.
+  bool get isTitleGenerationEnabled =>
+      _titleModelProvider != null && _titleModelId != null;
+
   static const String defaultTitlePrompt =
       '''I will give you some dialogue content in the `<content>` block.
 You need to summarize the conversation between user and assistant into a short title.

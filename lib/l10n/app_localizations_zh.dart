@@ -3052,7 +3052,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -10815,7 +10816,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get defaultModelPageTitleModelTitle => '标题总结模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用于总结对话标题的模型，推荐使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用于总结对话标题的模型，推荐使用快速且便宜的模型。选择模型后才会启用。';
 
   @override
   String get titleModelThinkingTitle => '是否开启思考';
@@ -18503,7 +18505,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get defaultModelPageTitleModelTitle => '標題總結模型';
 
   @override
-  String get defaultModelPageTitleModelSubtitle => '用於總結對話標題的模型，推薦使用快速且便宜的模型';
+  String get defaultModelPageTitleModelSubtitle =>
+      '用於總結對話標題的模型，推薦使用快速且便宜的模型。選擇模型後才會啟用。';
 
   @override
   String get titleModelThinkingTitle => '是否開啟思考';

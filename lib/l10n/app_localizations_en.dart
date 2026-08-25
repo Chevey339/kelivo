@@ -3156,7 +3156,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultModelPageTitleModelSubtitle =>
-      'Used for summarizing conversation titles; prefer fast & cheap models';
+      'Used for summarizing conversation titles; prefer fast & cheap models. Disabled until a model is selected.';
 
   @override
   String get titleModelThinkingTitle => 'Enable Thinking';

@@ -77,8 +77,8 @@ class DefaultModelPage extends StatelessWidget {
             subtitle: l10n.defaultModelPageTitleModelSubtitle,
             modelProvider: settings.titleModelProvider,
             modelId: settings.titleModelId,
-            fallbackProvider: settings.currentModelProvider,
-            fallbackModelId: settings.currentModelId,
+            disabledWhenUnset: true,
+            resetIcon: Lucide.Ban,
             onReset: () async {
               await settings.resetTitleModel();
             },

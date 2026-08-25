@@ -1426,6 +1426,13 @@ class HomeViewModel extends ChangeNotifier {
   Future<void> debugMaybeGenerateSummaryFor(String conversationId) =>
       _maybeGenerateSummaryFor(conversationId);
 
+  /// Test entry for [_maybeGenerateTitleFor].
+  @visibleForTesting
+  Future<void> debugMaybeGenerateTitleFor(
+    String conversationId, {
+    bool force = false,
+  }) => _maybeGenerateTitleFor(conversationId, force: force);
+
   @visibleForTesting
   static int computeClearContextRemainingMessageCount({
     required int totalMessages,
@@ -1456,23 +1463,19 @@ class HomeViewModel extends ChangeNotifier {
     }
 
     final settings = _contextProvider.read<SettingsProvider>();
+    final provKey = settings.titleModelProvider;
+    final mdlId = settings.titleModelId;
+    // Opt-in: do not fall back to the chat model. Falling back made every
+    // reply try title summarization and toast failures for users who never
+    // configured it.
+    if (provKey == null || mdlId == null) return;
+
     final assistantProvider = _contextProvider.read<AssistantProvider>();
 
     // Get assistant for this conversation
     final assistant = convo.assistantId != null
         ? assistantProvider.getById(convo.assistantId!)
         : assistantProvider.currentAssistant;
-
-    // Decide model: prefer title model, else fall back to assistant's model, then to global default
-    final provKey =
-        settings.titleModelProvider ??
-        assistant?.chatModelProvider ??
-        settings.currentModelProvider;
-    final mdlId =
-        settings.titleModelId ??
-        assistant?.chatModelId ??
-        settings.currentModelId;
-    if (provKey == null || mdlId == null) return;
     final cfg = settings.getProviderConfig(provKey);
     final budget = settings.titleGenerationThinkingBudgetFor(
       assistant?.thinkingBudget,
