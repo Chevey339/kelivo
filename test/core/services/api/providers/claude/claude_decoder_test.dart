@@ -745,4 +745,52 @@ void main() {
             as Map)['data'];
     expect((raw as String).length, 9000);
   });
+
+  test('a server tool without a card emits no orphan tool chunks', () {
+    final decoder = ClaudeStreamDecoder();
+    final start = decoder
+        .accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': 0,
+            'content_block': {
+              'type': 'server_tool_use',
+              'id': 'srvtoolu_9',
+              'name': 'memory',
+            },
+          }),
+        )
+        .chunks;
+    expect(start.whereType<ServerToolStart>(), isEmpty);
+    expect(start.whereType<ToolCallStart>(), isEmpty);
+
+    final delta = decoder
+        .accept(
+          _event('content_block_delta', {
+            'type': 'content_block_delta',
+            'index': 0,
+            'delta': {
+              'type': 'input_json_delta',
+              'partial_json': '{"command":"view"}',
+            },
+          }),
+        )
+        .chunks;
+    expect(delta.whereType<ToolCallDelta>(), isEmpty);
+
+    final stop = decoder
+        .accept(
+          _event('content_block_stop', {
+            'type': 'content_block_stop',
+            'index': 0,
+          }),
+        )
+        .chunks;
+    expect(stop.whereType<ToolCallEnd>(), isEmpty);
+
+    // The block is still replayed with its input, card or no card.
+    final block = decoder.assistantBlocks.single;
+    expect(block['name'], 'memory');
+    expect(block['input'], {'command': 'view'});
+  });
 }

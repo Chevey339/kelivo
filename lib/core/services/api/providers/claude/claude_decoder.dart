@@ -290,8 +290,13 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       } else {
         final serverId = _serverIndexToId[idx];
         if (serverId != null) {
+          // The buffer feeds the replayed block, so it fills either way. The
+          // card chunks only go out for a tool that opened one: a nameless
+          // card is worse than none.
           _serverArgs.putIfAbsent(serverId, StringBuffer.new).write(part);
-          chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          if (_serverToolStarted.contains(serverId)) {
+            chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          }
         }
       }
     }
@@ -339,7 +344,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
       _updateServerToolUseBlock(sid);
-      chunks.add(ToolCallEnd(sid));
+      if (_serverToolStarted.contains(sid)) chunks.add(ToolCallEnd(sid));
     }
     return chunks;
   }
