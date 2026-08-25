@@ -741,6 +741,10 @@ abstract class BuiltInToolsHelper {
   static const claudeFetchToolTypeBasic = 'web_fetch_20250910';
   static const claudeFetchToolTypeDynamic = 'web_fetch_20260318';
 
+  /// Unbounded by default, and one PDF is worth ~125k tokens. Bound it low
+  /// enough that a couple of fetches in one turn still leave room to answer.
+  static const claudeFetchMaxContentTokens = 30000;
+
   /// Dynamic filtering runs inside code execution, which requires this version
   /// or later; older types make the API inject a conflicting `code_execution`.
   static const claudeCodeExecutionToolType = 'code_execution_20260521';

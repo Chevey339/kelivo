@@ -446,6 +446,7 @@ Stream<StreamChunk> sendClaudeStream(
         modelId: modelId,
       ),
       'name': 'web_fetch',
+      'max_content_tokens': BuiltInToolsHelper.claudeFetchMaxContentTokens,
     });
   }
   if (builtIns.contains(BuiltInToolNames.codeExecution) &&

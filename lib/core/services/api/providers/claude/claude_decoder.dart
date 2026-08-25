@@ -391,19 +391,35 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   List<StreamChunk> _serverToolResult(Map<String, dynamic> block) {
     final toolUseId = (block['tool_use_id'] ?? '').toString();
     final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
+    if (!_serverToolEnded.add(id)) return const <StreamChunk>[];
     final toolName = _serverToolNames[id] ?? 'server_tool';
     final args = _serverArgsFor(id);
-    final clipped = _clipServerToolValue(block['content']);
-    _serverToolEnded.add(id);
+    final content = block['content'];
+    // Anthropic reports a server tool failure as a `*_tool_result_error`
+    // content block. Without a failed card a throttled turn renders nothing at
+    // all, which reads like the tool had never been enabled.
+    final errorCode =
+        content is Map && (content['type'] ?? '').toString().endsWith('_error')
+        ? (content['error_code'] ?? '').toString()
+        : '';
+    final clipped = _clipServerToolValue(content);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: toolName, input: args),
       ServerToolEnd(
         id: id,
         input: args,
-        output: clipped is Map<String, dynamic>
-            ? clipped
-            : <String, dynamic>{'content': clipped},
+        output: errorCode.isNotEmpty
+            ? <String, dynamic>{
+                'items': const <Map<String, dynamic>>[],
+                'error': errorCode,
+              }
+            : (clipped is Map<String, dynamic>
+                  ? clipped
+                  : <String, dynamic>{'content': clipped}),
+        status: errorCode.isNotEmpty
+            ? ServerToolStatus.failed
+            : ServerToolStatus.completed,
         metadata: _anthropicMetadata,
       ),
     ];
