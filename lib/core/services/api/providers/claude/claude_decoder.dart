@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../../../../utils/utf16_safe_cut.dart';
+
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
@@ -371,9 +373,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
   static Object? _clipServerToolValue(Object? value) {
     if (value is String) {
-      return value.length <= _serverToolOutputLimit
-          ? value
-          : '${value.substring(0, _serverToolOutputLimit)}…';
+      if (value.length <= _serverToolOutputLimit) return value;
+      return '${truncateHeadUtf16Safe(value, _serverToolOutputLimit)}…';
     }
     if (value is List) {
       return value.map(_clipServerToolValue).toList();
@@ -391,13 +392,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     final toolUseId = (block['tool_use_id'] ?? '').toString();
     final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
     final toolName = _serverToolNames[id] ?? 'server_tool';
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[id]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(id);
     final clipped = _clipServerToolValue(block['content']);
     _serverToolEnded.add(id);
     return <StreamChunk>[
@@ -436,13 +431,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         (contentBlock['type'] == 'web_search_tool_result_error')) {
       errorCode = (contentBlock['error_code'] ?? '').toString();
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[toolUseId]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(toolUseId);
     final id = toolUseId.isEmpty ? _ids.search() : toolUseId;
     _serverToolEnded.add(id);
     return <StreamChunk>[
@@ -514,13 +503,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (!_serverToolEnded.add(id)) {
       return const <StreamChunk>[];
     }
-    Map<String, dynamic> args = const <String, dynamic>{};
-    final raw = _serverArgs[id]?.toString();
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        args = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {}
-    }
+    final args = _serverArgsFor(id);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
         ServerToolStart(id: id, toolName: 'search_web', input: args),
