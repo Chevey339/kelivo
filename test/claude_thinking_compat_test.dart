@@ -744,9 +744,9 @@ void main() {
         );
         // Leaving allowed_callers off keeps the code execution default.
         expect(
-          tools.firstWhere(
-            (tool) => tool['name'] == 'web_search',
-          ).containsKey('allowed_callers'),
+          tools
+              .firstWhere((tool) => tool['name'] == 'web_search')
+              .containsKey('allowed_callers'),
           isFalse,
         );
       },
@@ -779,6 +779,79 @@ void main() {
         );
       },
     );
+
+    test('web fetch and code execution are declared when enabled', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'claude-opus-4-7',
+        config: _claudeConfig(
+          'http://localhost',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.webFetch,
+                BuiltInToolNames.codeExecution,
+              ],
+            },
+          },
+        ),
+      );
+
+      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+      final fetch = tools.firstWhere((tool) => tool['name'] == 'web_fetch');
+      expect(fetch['type'], 'web_fetch_20260318');
+      expect(fetch['allowed_callers'], <String>['direct']);
+      // Unbounded by default, and one PDF is worth ~125k tokens.
+      expect(fetch['max_content_tokens'], isA<int>());
+      final code = tools.firstWhere((tool) => tool['name'] == 'code_execution');
+      expect(code['type'], 'code_execution_20260521');
+    });
+
+    test('web fetch falls back on a model without dynamic filtering', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'claude-3-7-sonnet-20250219',
+        config: _claudeConfig(
+          'http://localhost',
+          modelOverrides: const <String, dynamic>{
+            'claude-3-7-sonnet-20250219': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.webFetch],
+            },
+          },
+        ),
+      );
+
+      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+      final fetch = tools.firstWhere((tool) => tool['name'] == 'web_fetch');
+      expect(fetch['type'], 'web_fetch_20250910');
+      // The basic type has no code execution default to opt out of.
+      expect(fetch.containsKey('allowed_callers'), isFalse);
+    });
+
+    test('a Claude-compatible vendor gets no server tools', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'deepseek-chat',
+        config: _deepSeekClaudeConfig(
+          modelOverrides: const <String, dynamic>{
+            'deepseek-chat': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.webFetch,
+                BuiltInToolNames.codeExecution,
+              ],
+            },
+          },
+        ),
+      );
+
+      final tools =
+          (body['tools'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      expect(
+        tools.any(
+          (tool) =>
+              tool['name'] == 'web_fetch' || tool['name'] == 'code_execution',
+        ),
+        isFalse,
+      );
+    });
 
     test('a stale dynamic flag on an unsupported model falls back', () async {
       final body = await _captureClaudeBuiltInSearchBody(
@@ -1403,81 +1476,91 @@ data: {"type":"message_stop"}
       },
     );
 
-    test('replayed web search keeps its native blocks and encrypted content', () async {
-      const searchBlocks = [
-        {'type': 'text', 'text': '我先搜索一下。'},
-        {
-          'type': 'server_tool_use',
-          'id': 'srvtoolu_1',
-          'name': 'web_search',
-          'input': {'query': 'kyoto'},
-        },
-        {
-          'type': 'web_search_tool_result',
-          'tool_use_id': 'srvtoolu_1',
-          'content': [
-            {
-              'type': 'web_search_result',
-              'url': 'https://example.com',
-              'title': 'Example',
-              'encrypted_content': 'EqgfCioIARgBIiQ3',
-            },
-          ],
-        },
-      ];
-      final body = await _captureClaudeRequestBody(
-        modelId: 'claude-sonnet-4-6',
-        messages: const [
-          {'role': 'user', 'content': '京都有什么好玩的'},
+    test(
+      'replayed web search keeps its native blocks and encrypted content',
+      () async {
+        const searchBlocks = [
+          {'type': 'text', 'text': '我先搜索一下。'},
           {
-            'role': 'assistant',
-            'content': '\n\n',
-            'tool_calls': [
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_1',
+            'name': 'web_search',
+            'input': {'query': 'kyoto'},
+          },
+          {
+            'type': 'web_search_tool_result',
+            'tool_use_id': 'srvtoolu_1',
+            'content': [
               {
-                'id': 'srvtoolu_1',
-                'type': 'function',
-                'function': {'name': 'search_web', 'arguments': '{"query":"kyoto"}'},
-                'metadata': {
-                  'anthropic': {'assistant_blocks': searchBlocks},
-                },
+                'type': 'web_search_result',
+                'url': 'https://example.com',
+                'title': 'Example',
+                'encrypted_content': 'EqgfCioIARgBIiQ3',
               },
             ],
           },
-          {
-            'role': 'tool',
-            'tool_call_id': 'srvtoolu_1',
-            'name': 'search_web',
-            'content': '{"items":[{"title":"Example","url":"https://example.com"}]}',
-          },
-          {'role': 'user', 'content': '第一条具体怎么说的'},
-        ],
-      );
-
-      final messages = (body['messages'] as List).cast<Map>();
-      final assistantContent = (messages[1]['content'] as List).cast<Map>();
-      expect(
-        assistantContent.map((block) => block['type']).toList(),
-        ['text', 'server_tool_use', 'web_search_tool_result'],
-      );
-      final result = assistantContent.firstWhere(
-        (block) => block['type'] == 'web_search_tool_result',
-      );
-      expect(
-        ((result['content'] as List).first as Map)['encrypted_content'],
-        'EqgfCioIARgBIiQ3',
-      );
-      // The server tool carries its own result, so the synthesised tool
-      // message must not become a second, orphaned tool_result.
-      for (final message in messages) {
-        final content = message['content'];
-        if (content is! List) continue;
-        expect(
-          content.whereType<Map>().any((block) => block['type'] == 'tool_result'),
-          isFalse,
+        ];
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '京都有什么好玩的'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_1',
+                  'type': 'function',
+                  'function': {
+                    'name': 'search_web',
+                    'arguments': '{"query":"kyoto"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': searchBlocks},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'srvtoolu_1',
+              'name': 'search_web',
+              'content':
+                  '{"items":[{"title":"Example","url":"https://example.com"}]}',
+            },
+            {'role': 'user', 'content': '第一条具体怎么说的'},
+          ],
         );
-      }
-      expect(messages.last['content'], '第一条具体怎么说的');
-    });
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistantContent = (messages[1]['content'] as List).cast<Map>();
+        expect(assistantContent.map((block) => block['type']).toList(), [
+          'text',
+          'server_tool_use',
+          'web_search_tool_result',
+        ]);
+        final result = assistantContent.firstWhere(
+          (block) => block['type'] == 'web_search_tool_result',
+        );
+        expect(
+          ((result['content'] as List).first as Map)['encrypted_content'],
+          'EqgfCioIARgBIiQ3',
+        );
+        // The server tool carries its own result, so the synthesised tool
+        // message must not become a second, orphaned tool_result.
+        for (final message in messages) {
+          final content = message['content'];
+          if (content is! List) continue;
+          expect(
+            content.whereType<Map>().any(
+              (block) => block['type'] == 'tool_result',
+            ),
+            isFalse,
+          );
+        }
+        expect(messages.last['content'], '第一条具体怎么说的');
+      },
+    );
 
     test('live tool continuation keeps initial user image blocks', () async {
       final dir = await Directory.systemTemp.createTemp(

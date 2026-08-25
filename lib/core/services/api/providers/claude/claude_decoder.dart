@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../../../../utils/utf16_safe_cut.dart';
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
@@ -10,11 +11,16 @@ import '../../stream/stream_chunk_ids.dart';
 class ClaudeStreamDecoder implements StreamChunkDecoder {
   ClaudeStreamDecoder({
     this.skipRedactedThinkingBlocks = false,
+    this.codeExecutionDeclared = false,
     this.initialUsage,
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
+
+  /// Whether the request asked for the code execution tool. When it did not,
+  /// any container in the response belongs to dynamic web search filtering.
+  final bool codeExecutionDeclared;
   final TokenUsage? initialUsage;
   final StreamChunkIds _ids;
 
@@ -36,6 +42,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+
   /// Position of each `server_tool_use` block inside [assistantBlocks], so its
   /// streamed input can be filled in once the block closes.
   final Map<String, int> _serverBlockIndex = <String, int>{};
@@ -181,8 +188,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
       }
+      final cardName = _serverToolCardName(name);
       if (id.isNotEmpty) {
-        _serverToolNames[id] = name;
+        _serverToolNames[id] = cardName ?? name;
         // Server tools must be replayed as the blocks the API sent, not as
         // client tool calls: web search results only decrypt when their
         // original block comes back intact.
@@ -195,13 +203,13 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         });
         _serverBlockIndex[id] = assistantBlocks.length - 1;
       }
-      if (id.isNotEmpty && name == 'web_search') {
+      if (id.isNotEmpty && cardName != null) {
         _serverToolStarted.add(id);
-        chunks.add(ServerToolStart(id: id, toolName: 'search_web'));
+        chunks.add(ServerToolStart(id: id, toolName: cardName));
         chunks.add(
           ToolCallStart(
             id: id,
-            toolName: 'search_web',
+            toolName: cardName,
             metadata: _anthropicMetadata,
           ),
         );
@@ -211,8 +219,8 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       assistantBlocks.add(Map<String, dynamic>.from(block));
       if (kind == 'web_search_tool_result') {
         chunks.addAll(_webSearchResult(block));
-      } else if (kind.contains('code_execution')) {
-        chunks.addAll(_codeExecutionResult(block));
+      } else if (_serverResultBlockTypes.contains(kind)) {
+        chunks.addAll(_serverToolResult(block));
       }
     } else if (kind == 'text') {
       if (idx != null) {
@@ -287,7 +295,11 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         final serverId = _serverIndexToId[idx];
         if (serverId != null) {
           _serverArgs.putIfAbsent(serverId, StringBuffer.new).write(part);
-          chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          // A suppressed server tool has no card; its input deltas would
+          // create a nameless one.
+          if (_serverToolStarted.contains(serverId)) {
+            chunks.add(ToolCallDelta(id: serverId, inputDelta: part));
+          }
         }
       }
     }
@@ -335,7 +347,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
       _updateServerToolUseBlock(sid);
-      chunks.add(ToolCallEnd(sid));
+      if (_serverToolStarted.contains(sid)) chunks.add(ToolCallEnd(sid));
     }
     return chunks;
   }
@@ -372,32 +384,92 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     return chunks;
   }
 
-  /// Dynamic filtering runs web search inside code execution. Its successful
-  /// runs already surface as the nested web search card, so only failures are
-  /// worth a card of their own: without one, a throttled turn shows nothing at
-  /// all and reads like the search tool was never enabled.
-  List<StreamChunk> _codeExecutionResult(Map<String, dynamic> block) {
-    final content = block['content'];
-    if (content is! Map) return const <StreamChunk>[];
-    if (!(content['type'] ?? '').toString().endsWith('_error')) {
-      return const <StreamChunk>[];
+  /// Result block types handled by [_serverToolResult]; web search keeps its
+  /// own citation-aware mapping.
+  static const _serverResultBlockTypes = <String>{
+    'web_fetch_tool_result',
+    'code_execution_tool_result',
+    'bash_code_execution_tool_result',
+    'text_editor_code_execution_tool_result',
+  };
+
+  /// Tool name for the UI card, or null for a server tool we don't surface.
+  String? _serverToolCardName(String name) {
+    switch (name) {
+      case 'web_search':
+        return 'search_web';
+      case 'web_fetch':
+        return name;
+      case 'code_execution':
+      case 'bash_code_execution':
+      case 'text_editor_code_execution':
+        // Dynamic filtering runs web search inside code execution. A container
+        // the user never asked for is plumbing, and its successful runs
+        // already show up as the nested search card.
+        return codeExecutionDeclared ? name : null;
+      default:
+        return null;
     }
-    final errorCode = (content['error_code'] ?? '').toString();
+  }
+
+  /// Fetched pages and container output can be megabytes; the card and the
+  /// persisted message only need a readable excerpt.
+  static const _serverToolOutputLimit = 4000;
+
+  static Object? _clipServerToolValue(Object? value) {
+    if (value is String) {
+      if (value.length <= _serverToolOutputLimit) return value;
+      return '${truncateHeadUtf16Safe(value, _serverToolOutputLimit)}…';
+    }
+    if (value is List) {
+      return value.map(_clipServerToolValue).toList();
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key.toString(): _clipServerToolValue(entry.value),
+      };
+    }
+    return value;
+  }
+
+  List<StreamChunk> _serverToolResult(Map<String, dynamic> block) {
     final id = (block['tool_use_id'] ?? '').toString();
     if (id.isEmpty || !_serverToolEnded.add(id)) return const <StreamChunk>[];
+    final content = block['content'];
+    final errorCode =
+        content is Map && (content['type'] ?? '').toString().endsWith('_error')
+        ? (content['error_code'] ?? '').toString()
+        : '';
+    // A failure still gets a card even when the tool was never surfaced:
+    // without one, a throttled turn renders nothing at all and reads like the
+    // tool had not been enabled.
+    if (errorCode.isEmpty && !_serverToolStarted.contains(id)) {
+      return const <StreamChunk>[];
+    }
     final args = _serverArgsFor(id);
-    final name = _serverToolNames[id] ?? 'code_execution';
+    final clipped = _clipServerToolValue(content);
     return <StreamChunk>[
       if (_serverToolStarted.add(id))
-        ServerToolStart(id: id, toolName: name, input: args),
+        ServerToolStart(
+          id: id,
+          toolName: _serverToolNames[id] ?? 'server_tool',
+          input: args,
+        ),
       ServerToolEnd(
         id: id,
         input: args,
-        output: <String, dynamic>{
-          'items': const <Map<String, dynamic>>[],
-          if (errorCode.isNotEmpty) 'error': errorCode,
-        },
-        status: ServerToolStatus.failed,
+        output: errorCode.isNotEmpty
+            ? <String, dynamic>{
+                'items': const <Map<String, dynamic>>[],
+                'error': errorCode,
+              }
+            : (clipped is Map<String, dynamic>
+                  ? clipped
+                  : <String, dynamic>{'content': clipped}),
+        status: errorCode.isNotEmpty
+            ? ServerToolStatus.failed
+            : ServerToolStatus.completed,
         metadata: _anthropicMetadata,
       ),
     ];

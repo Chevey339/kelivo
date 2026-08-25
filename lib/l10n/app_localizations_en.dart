@@ -3446,11 +3446,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Requires OpenAI Responses API.';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => 'Web Fetch';
+  String get modelDetailSheetWebFetchTool => 'Web Fetch';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       'Enable OpenRouter web fetch server tool';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      'Let Claude fetch pages and PDFs from URLs in the conversation';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      'Let Claude run Python and Bash in Anthropic\'s sandbox';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';

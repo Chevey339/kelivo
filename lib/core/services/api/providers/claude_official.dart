@@ -427,7 +427,7 @@ Stream<StreamChunk> sendClaudeStream(
       'type': searchToolType,
       'name': 'web_search',
     };
-    if (BuiltInToolsHelper.claudeBuiltInSearchNeedsDirectCaller(
+    if (BuiltInToolsHelper.claudeServerToolNeedsDirectCaller(
       cfg: config,
       modelId: modelId,
     )) {
@@ -451,6 +451,41 @@ Stream<StreamChunk> sendClaudeStream(
           .cast<String, dynamic>();
     }
     allTools.add(entry);
+  }
+  if (builtIns.contains(BuiltInToolNames.webFetch) &&
+      BuiltInToolsHelper.supportsClaudeServerToolForModel(
+        cfg: config,
+        modelId: modelId,
+        toolName: BuiltInToolNames.webFetch,
+      )) {
+    final fetchEntry = <String, dynamic>{
+      'type': BuiltInToolsHelper.claudeWebFetchToolType(
+        cfg: config,
+        modelId: modelId,
+      ),
+      'name': 'web_fetch',
+      'max_content_tokens': BuiltInToolsHelper.claudeFetchMaxContentTokens,
+    };
+    if (BuiltInToolsHelper.claudeServerToolNeedsDirectCaller(
+      cfg: config,
+      modelId: modelId,
+    )) {
+      fetchEntry['allowed_callers'] = const <String>['direct'];
+    }
+    allTools.add(fetchEntry);
+  }
+  final declaresCodeExecution =
+      builtIns.contains(BuiltInToolNames.codeExecution) &&
+      BuiltInToolsHelper.supportsClaudeServerToolForModel(
+        cfg: config,
+        modelId: modelId,
+        toolName: BuiltInToolNames.codeExecution,
+      );
+  if (declaresCodeExecution) {
+    allTools.add(<String, dynamic>{
+      'type': BuiltInToolsHelper.claudeCodeExecutionToolType,
+      'name': 'code_execution',
+    });
   }
 
   // Headers (constant across rounds)
@@ -619,6 +654,7 @@ Stream<StreamChunk> sendClaudeStream(
       final sse = response.stream.transform(utf8.decoder);
       final decoder = ClaudeStreamDecoder(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
+        codeExecutionDeclared: declaresCodeExecution,
         initialUsage: totalUsage,
         sourceId: 'round-${streamRound++}',
       );

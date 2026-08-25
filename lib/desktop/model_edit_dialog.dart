@@ -771,7 +771,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
           ),
           const SizedBox(height: 8),
           _ToolTile(
-            title: l10n.modelDetailSheetOpenrouterWebFetchTool,
+            title: l10n.modelDetailSheetWebFetchTool,
             desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
             value: _builtInTools.contains(BuiltInToolNames.webFetch),
             onChanged: disableTools
@@ -817,6 +817,24 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 : (v) => _toggleBuiltIn(BuiltInToolNames.imageGeneration, v),
           ),
         ],
+      ] else if (_providerKind == ProviderKind.claude) ...[
+        _ToolTile(
+          title: l10n.modelDetailSheetWebFetchTool,
+          desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+          value: _builtInTools.contains(BuiltInToolNames.webFetch),
+          onChanged: disableTools
+              ? null
+              : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
+        ),
+        const SizedBox(height: 8),
+        _ToolTile(
+          title: l10n.modelDetailSheetCodeExecutionTool,
+          desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+          value: _builtInTools.contains(BuiltInToolNames.codeExecution),
+          onChanged: disableTools
+              ? null
+              : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
+        ),
       ],
     ];
   }

@@ -762,7 +762,7 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: _ToolTile(
-              title: l10n.modelDetailSheetOpenrouterWebFetchTool,
+              title: l10n.modelDetailSheetWebFetchTool,
               desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
               value: _builtInTools.contains(BuiltInToolNames.webFetch),
               onChanged: disableTools
@@ -818,6 +818,29 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
             ),
           ),
         ],
+      ] else if (_providerKind == ProviderKind.claude) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetWebFetchTool,
+            desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+            value: _builtInTools.contains(BuiltInToolNames.webFetch),
+            onChanged: disableTools
+                ? null
+                : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: _ToolTile(
+            title: l10n.modelDetailSheetCodeExecutionTool,
+            desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+            value: _builtInTools.contains(BuiltInToolNames.codeExecution),
+            onChanged: disableTools
+                ? null
+                : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
+          ),
+        ),
       ],
     ];
   }

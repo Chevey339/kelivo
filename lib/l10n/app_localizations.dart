@@ -6379,17 +6379,29 @@ abstract class AppLocalizations {
   /// **'Requires OpenAI Responses API.'**
   String get modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint;
 
-  /// No description provided for @modelDetailSheetOpenrouterWebFetchTool.
+  /// No description provided for @modelDetailSheetWebFetchTool.
   ///
   /// In en, this message translates to:
   /// **'Web Fetch'**
-  String get modelDetailSheetOpenrouterWebFetchTool;
+  String get modelDetailSheetWebFetchTool;
 
   /// No description provided for @modelDetailSheetOpenrouterWebFetchToolDescription.
   ///
   /// In en, this message translates to:
   /// **'Enable OpenRouter web fetch server tool'**
   String get modelDetailSheetOpenrouterWebFetchToolDescription;
+
+  /// No description provided for @modelDetailSheetClaudeWebFetchToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude fetch pages and PDFs from URLs in the conversation'**
+  String get modelDetailSheetClaudeWebFetchToolDescription;
+
+  /// No description provided for @modelDetailSheetClaudeCodeExecutionToolDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Let Claude run Python and Bash in Anthropic\'s sandbox'**
+  String get modelDetailSheetClaudeCodeExecutionToolDescription;
 
   /// No description provided for @modelDetailSheetOpenrouterShellTool.
   ///

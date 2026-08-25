@@ -3324,11 +3324,19 @@ class AppLocalizationsZh extends AppLocalizations {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -11067,11 +11075,19 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
       '需要启用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '网页抓取';
+  String get modelDetailSheetWebFetchTool => '网页抓取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '启用 OpenRouter 网页抓取服务端工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允许 Claude 抓取对话中出现的网页与 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允许 Claude 在 Anthropic 沙箱中运行 Python 与 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';
@@ -18735,11 +18751,19 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
       '需要啟用 OpenAI Responses API。';
 
   @override
-  String get modelDetailSheetOpenrouterWebFetchTool => '網頁擷取';
+  String get modelDetailSheetWebFetchTool => '網頁擷取';
 
   @override
   String get modelDetailSheetOpenrouterWebFetchToolDescription =>
       '啟用 OpenRouter 網頁擷取伺服器工具';
+
+  @override
+  String get modelDetailSheetClaudeWebFetchToolDescription =>
+      '允許 Claude 擷取對話中出現的網頁與 PDF';
+
+  @override
+  String get modelDetailSheetClaudeCodeExecutionToolDescription =>
+      '允許 Claude 在 Anthropic 沙箱中執行 Python 與 Bash';
 
   @override
   String get modelDetailSheetOpenrouterShellTool => 'Shell';

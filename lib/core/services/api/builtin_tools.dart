@@ -220,6 +220,21 @@ abstract class BuiltInToolsHelper {
     });
   }
 
+  static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
+    return _isClaudeModelIn(modelId, const <String>{
+      'claude-fable-5',
+      'claude-opus-5',
+      'claude-opus-4-8',
+      'claude-opus-4-7',
+      'claude-opus-4-6',
+      'claude-opus-4-5-20251101',
+      'claude-sonnet-5',
+      'claude-sonnet-4-6',
+      'claude-sonnet-4-5-20250929',
+      'claude-haiku-4-5-20251001',
+    });
+  }
+
   static bool isOpenAIResponsesBuiltInSearchSupportedModel(String? modelId) {
     final m = _normalizedModelId(modelId);
     return m.startsWith('gpt-4o') ||
@@ -734,6 +749,36 @@ abstract class BuiltInToolsHelper {
     claudeSearchToolTypeDynamic,
   };
 
+  static const claudeFetchToolTypeBasic = 'web_fetch_20250910';
+  static const claudeFetchToolTypeDynamic = 'web_fetch_20260318';
+
+  /// Unbounded by default, and one PDF is worth ~125k tokens. Bound it low
+  /// enough that a couple of fetches in one turn still leave room to answer.
+  static const claudeFetchMaxContentTokens = 30000;
+
+  /// Dynamic filtering runs inside code execution, which requires this version
+  /// or later; older types make the API inject a conflicting `code_execution`.
+  static const claudeCodeExecutionToolType = 'code_execution_20260521';
+
+  /// Anthropic-hosted server tools beyond search run on the official Claude
+  /// API only; Vertex and Claude-compatible vendors reject them.
+  static bool supportsClaudeServerToolForModel({
+    required ProviderConfig? cfg,
+    required String? modelId,
+    required String toolName,
+  }) {
+    final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
+    if (upstreamModelId == null) return false;
+    switch (BuiltInToolNames.normalize(toolName)) {
+      case BuiltInToolNames.webFetch:
+        return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
+      case BuiltInToolNames.codeExecution:
+        return isClaudeCodeExecutionSupportedModel(upstreamModelId);
+      default:
+        return false;
+    }
+  }
+
   static bool isClaudeDynamicWebSearchEnabled({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -764,10 +809,24 @@ abstract class BuiltInToolsHelper {
         : claudeSearchToolTypeBasic;
   }
 
+  /// Web fetch follows web search: the version tracks what the model can do,
+  /// not what the user turned on. Anthropic documents a slightly narrower
+  /// model list for fetch than for search, so a model rejecting the newer type
+  /// is where the two lists would have to split.
+  static String claudeWebFetchToolType({
+    required ProviderConfig? cfg,
+    required String? modelId,
+  }) {
+    return supportsClaudeDynamicWebSearchForModel(cfg: cfg, modelId: modelId)
+        ? claudeFetchToolTypeDynamic
+        : claudeFetchToolTypeBasic;
+  }
+
   /// `web_search_20260209` and later default to being called from code
-  /// execution, which is what performs the filtering. Opting out means saying
-  /// so explicitly; the basic type has no such default and takes no callers.
-  static bool claudeBuiltInSearchNeedsDirectCaller({
+  /// execution, which is what performs the filtering; web fetch's newer types
+  /// share that default. Opting out means saying so explicitly, and the basic
+  /// types have no such default and take no callers.
+  static bool claudeServerToolNeedsDirectCaller({
     required ProviderConfig? cfg,
     required String? modelId,
   }) {
@@ -835,6 +894,13 @@ abstract class BuiltInToolsHelper {
         BuiltInToolNames.urlContext,
         BuiltInToolNames.codeExecution,
         BuiltInToolNames.youtube,
+      };
+    }
+    if (kind == ProviderKind.claude) {
+      if (isDeepSeekProvider(cfg)) return const <String>{};
+      return const <String>{
+        BuiltInToolNames.webFetch,
+        BuiltInToolNames.codeExecution,
       };
     }
     if (kind != ProviderKind.openai) return const <String>{};
