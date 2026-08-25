@@ -87,7 +87,7 @@ class _SearchSettingsSheet extends StatelessWidget {
           : const <String, dynamic>{},
     );
     if (enabled) {
-      ws['toolVersion'] = 'web_search_20260209';
+      ws['toolVersion'] = BuiltInToolsHelper.claudeSearchToolVersionMarker;
     } else {
       ws.remove('toolVersion');
       ws.remove('tool_version');

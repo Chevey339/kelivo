@@ -705,6 +705,24 @@ abstract class BuiltInToolsHelper {
         isClaudeDynamicWebSearchSupportedModel(upstreamModelId);
   }
 
+  static const claudeSearchToolTypeBasic = 'web_search_20250305';
+
+  /// Newest search tool type. Dynamic filtering arrived in
+  /// `web_search_20260209`; later versions build on it, and the extra
+  /// `response_inclusion` control defaults to the same behaviour.
+  static const claudeSearchToolTypeDynamic = 'web_search_20260318';
+
+  /// Persisted marker for the dynamic-filtering opt-in. Kept at the version
+  /// that introduced the capability so settings written by older builds keep
+  /// working; [claudeSearchToolTypeDynamic] is what gets sent.
+  static const claudeSearchToolVersionMarker = 'web_search_20260209';
+
+  /// Every stored tool type that means the opt-in is on.
+  static const _claudeDynamicSearchMarkers = <String>{
+    claudeSearchToolVersionMarker,
+    claudeSearchToolTypeDynamic,
+  };
+
   static bool isClaudeDynamicWebSearchEnabled({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -720,8 +738,8 @@ abstract class BuiltInToolsHelper {
     final rawWs = ov?['webSearch'];
     if (rawWs is! Map) return false;
     final ws = rawWs.cast<String, dynamic>();
-    return ws['toolVersion'] == 'web_search_20260209' ||
-        ws['tool_version'] == 'web_search_20260209';
+    return _claudeDynamicSearchMarkers.contains(ws['toolVersion']) ||
+        _claudeDynamicSearchMarkers.contains(ws['tool_version']);
   }
 
   static String claudeBuiltInSearchToolType({
@@ -729,8 +747,8 @@ abstract class BuiltInToolsHelper {
     required String? modelId,
   }) {
     return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
-        ? 'web_search_20260209'
-        : 'web_search_20250305';
+        ? claudeSearchToolTypeDynamic
+        : claudeSearchToolTypeBasic;
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(

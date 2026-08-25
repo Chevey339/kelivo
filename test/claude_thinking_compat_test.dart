@@ -711,13 +711,47 @@ void main() {
       );
     });
 
-    test('official Claude built-in search can switch to 20260209', () async {
+    test(
+      'official Claude built-in search can switch to dynamic filtering',
+      () async {
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'claude-opus-4-7',
+          config: _claudeConfig(
+            'http://localhost',
+            modelOverrides: const <String, dynamic>{
+              'claude-opus-4-7': <String, dynamic>{
+                'builtInTools': <String>[BuiltInToolNames.search],
+                'webSearch': <String, dynamic>{
+                  'toolVersion': 'web_search_20260209',
+                },
+              },
+            },
+          ),
+        );
+
+        final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+        expect(
+          tools.any((tool) => tool['type'] == 'web_search_20260318'),
+          isTrue,
+        );
+        // Dynamic filtering runs inside code execution, which the API
+        // provisions itself; declaring it collides with that injected tool.
+        expect(
+          tools.any(
+            (tool) => (tool['type'] as String).startsWith('code_execution'),
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test('a stale dynamic flag on an unsupported model falls back', () async {
       final body = await _captureClaudeBuiltInSearchBody(
-        modelId: 'claude-opus-4-7',
+        modelId: 'claude-3-5-haiku-latest',
         config: _claudeConfig(
           'http://localhost',
           modelOverrides: const <String, dynamic>{
-            'claude-opus-4-7': <String, dynamic>{
+            'claude-3-5-haiku-latest': <String, dynamic>{
               'builtInTools': <String>[BuiltInToolNames.search],
               'webSearch': <String, dynamic>{
                 'toolVersion': 'web_search_20260209',
@@ -729,12 +763,8 @@ void main() {
 
       final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
       expect(
-        tools.any((tool) => tool['type'] == 'web_search_20260209'),
-        isTrue,
-      );
-      expect(
-        tools.any((tool) => tool['type'] == 'code_execution_20250825'),
-        isTrue,
+        tools.firstWhere((tool) => tool['name'] == 'web_search')['type'],
+        'web_search_20250305',
       );
     });
 
@@ -782,7 +812,9 @@ void main() {
           isFalse,
         );
         expect(
-          tools.any((tool) => tool['type'] == 'code_execution_20250825'),
+          tools.any(
+            (tool) => (tool['type'] as String).startsWith('code_execution'),
+          ),
           isFalse,
         );
       },

@@ -293,7 +293,7 @@ class _SearchContent extends StatelessWidget {
           : const <String, dynamic>{},
     );
     if (useClaudeDynamicWebSearch) {
-      ws['toolVersion'] = 'web_search_20260209';
+      ws['toolVersion'] = BuiltInToolsHelper.claudeSearchToolVersionMarker;
     } else {
       ws.remove('toolVersion');
       ws.remove('tool_version');
