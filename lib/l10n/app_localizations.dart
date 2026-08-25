@@ -13759,6 +13759,36 @@ abstract class AppLocalizations {
   /// **'Save Backup ZIP'**
   String get migrationSaveBackupButton;
 
+  /// No description provided for @migrationStartWithoutBackupButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Migrate Without Backing Up'**
+  String get migrationStartWithoutBackupButton;
+
+  /// No description provided for @migrationSkipChatsJsonOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip chats.json'**
+  String get migrationSkipChatsJsonOption;
+
+  /// No description provided for @migrationSkipChatsJsonDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Still backs up the original Hive files, settings, and local files. Recommended for very large histories.'**
+  String get migrationSkipChatsJsonDescription;
+
+  /// No description provided for @migrationSkipBackupOption.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip this backup'**
+  String get migrationSkipBackupOption;
+
+  /// No description provided for @migrationSkipBackupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Only select this if you already have a verified backup. Migration will start immediately.'**
+  String get migrationSkipBackupDescription;
+
   /// No description provided for @migrationBackingUpTitle.
   ///
   /// In en, this message translates to:
@@ -13936,7 +13966,7 @@ abstract class AppLocalizations {
   /// No description provided for @migrationFailedSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'The original Hive data and your backup are still intact. Review the reason below, then retry.'**
+  /// **'The original Hive data is still intact. Any backup that finished earlier is unchanged. Review the reason below, then retry.'**
   String get migrationFailedSubtitle;
 
   /// No description provided for @migrationUnknownError.

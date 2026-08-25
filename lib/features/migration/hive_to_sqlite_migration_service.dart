@@ -32,6 +32,8 @@ enum HiveToSqliteMigrationStage {
 
 enum HiveToSqliteBackupItemState { pending, active, done }
 
+typedef MigrationBackupChunkWriter = Future<void> Function(Uint8List bytes);
+
 class HiveToSqliteBackupItem {
   const HiveToSqliteBackupItem({
     required this.name,
@@ -165,7 +167,6 @@ class HiveToSqliteMigrationService {
     'instruction_injections_active_ids_v1',
   };
   static const _backupPreparationShare = 0.15;
-  static const _backupFileShare = 1 - _backupPreparationShare;
   static const _backupDirectories =
       <({String directoryName, String zipPrefix})>[
         (directoryName: 'upload', zipPrefix: 'upload'),
@@ -191,6 +192,8 @@ class HiveToSqliteMigrationService {
   Set<String> debugFailConversationKeysForTest = <String>{};
   @visibleForTesting
   Set<String> debugFailPrescanMessageIdsForTest = <String>{};
+  @visibleForTesting
+  int? debugZip64ThresholdForTest;
   final RestoreDurability _durability;
   final _controller = StreamController<HiveToSqliteMigrationStatus>.broadcast();
   final _log = <String>[];
@@ -272,55 +275,117 @@ class HiveToSqliteMigrationService {
     );
   }
 
-  Future<File> backupTo(Directory selectedDirectory) async {
+  Future<File> backupTo(
+    Directory selectedDirectory, {
+    bool includeChatsJson = true,
+  }) async {
     await selectedDirectory.create(recursive: true);
-    final backupFile = File(p.join(selectedDirectory.path, _backupFileName()));
-    return _backupToFile(backupFile);
-  }
-
-  Future<File> backupToTemporaryFile() async {
+    final backupFile = File(p.join(selectedDirectory.path, backupFileName()));
     return _backupToFile(
-      File(p.join(Directory.systemTemp.path, _backupFileName())),
+      backupFile,
+      includeChatsJson: includeChatsJson,
+      visibleBackupPath: backupFile.path,
     );
   }
 
-  Future<File> _backupToFile(File backupFile) async {
+  Future<File> backupToTemporaryFile({bool includeChatsJson = true}) async {
+    final backupFile = File(
+      p.join(Directory.systemTemp.path, backupFileName()),
+    );
+    return _backupToFile(
+      backupFile,
+      includeChatsJson: includeChatsJson,
+      visibleBackupPath: backupFile.path,
+    );
+  }
+
+  /// Streams a ZIP to a platform-owned destination with bounded memory.
+  /// The caller owns committing or discarding that destination.
+  Future<void> backupToWritableSink(
+    MigrationBackupChunkWriter writeChunk, {
+    bool includeChatsJson = true,
+  }) {
+    return _backupToDestination(
+      createOutput: () async => _MigrationZipOutput.toSink(writeChunk),
+      includeChatsJson: includeChatsJson,
+      managedOutputFile: null,
+      visibleBackupPath: null,
+    );
+  }
+
+  String backupFileName() {
+    final timestamp = DateTime.now()
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+    return 'kelivo_migration_backup_$timestamp.zip';
+  }
+
+  Future<File> _backupToFile(
+    File backupFile, {
+    required bool includeChatsJson,
+    required String? visibleBackupPath,
+  }) async {
+    await _backupToDestination(
+      createOutput: () => _MigrationZipOutput.openFile(backupFile.path),
+      includeChatsJson: includeChatsJson,
+      managedOutputFile: backupFile,
+      visibleBackupPath: visibleBackupPath,
+    );
+    return backupFile;
+  }
+
+  Future<void> _backupToDestination({
+    required Future<_MigrationZipOutput> Function() createOutput,
+    required bool includeChatsJson,
+    required File? managedOutputFile,
+    required String? visibleBackupPath,
+  }) async {
     Directory? workDir;
+    _chatsExportDegraded = false;
     final plannedItems = _updateBackupItem(
-      _backupItemsForDecision(),
+      _backupItemsForDecision(includeChatsJson: includeChatsJson),
       _settingsBackupName,
       state: HiveToSqliteBackupItemState.active,
     );
     _lastBackupItems = plannedItems;
     var copiedBytes = 0;
     var totalBytes = 0;
+    var lastProgress = 0.0;
     _emit(
       HiveToSqliteMigrationStage.backingUp,
       0,
       'backup',
       _settingsBackupName,
-      backupPath: backupFile.path,
+      backupPath: visibleBackupPath,
       backupItems: plannedItems,
     );
 
     _MigrationZipWriter? writer;
     try {
-      workDir = await Directory.systemTemp.createTemp(
-        'kelivo_migration_backup_',
+      await decision.appDataDir.create(recursive: true);
+      workDir = await decision.appDataDir.createTemp(
+        '.kelivo_migration_backup_',
       );
       final manifest = await _buildBackupManifest(
         workDir,
-        backupFile.path,
+        visibleBackupPath,
         plannedItems,
       );
       _lastBackupItems = manifest.items;
       totalBytes = manifest.totalBytes;
 
-      await backupFile.parent.create(recursive: true);
-      if (await backupFile.exists()) {
-        await backupFile.delete();
+      if (managedOutputFile != null) {
+        await managedOutputFile.parent.create(recursive: true);
+        if (await managedOutputFile.exists()) {
+          await managedOutputFile.delete();
+        }
       }
-      writer = _MigrationZipWriter(backupFile.path);
+      writer = _MigrationZipWriter(
+        await createOutput(),
+        zip64Threshold: debugZip64ThresholdForTest,
+      );
       for (final entry in manifest.entries) {
         final name = entry.itemName;
         _lastBackupItems = _updateBackupItem(
@@ -329,12 +394,17 @@ class HiveToSqliteMigrationService {
           bytes: entry.itemBytes,
           state: HiveToSqliteBackupItemState.active,
         );
+        lastProgress = _backupFileProgress(
+          copiedBytes,
+          totalBytes,
+          includeChatsJson: includeChatsJson,
+        );
         _emit(
           HiveToSqliteMigrationStage.backingUp,
-          _backupProgress(copiedBytes, totalBytes),
+          lastProgress,
           'backup',
           entry.entryName,
-          backupPath: backupFile.path,
+          backupPath: visibleBackupPath,
           backupItems: _lastBackupItems,
         );
         final written = await writer.addFile(
@@ -349,12 +419,17 @@ class HiveToSqliteMigrationService {
               writtenBytes: entry.itemStartBytes + fileWritten,
               state: HiveToSqliteBackupItemState.active,
             );
+            lastProgress = _backupFileProgress(
+              currentTotal,
+              totalBytes,
+              includeChatsJson: includeChatsJson,
+            );
             _emit(
               HiveToSqliteMigrationStage.backingUp,
-              _backupProgress(currentTotal, totalBytes),
+              lastProgress,
               'backup',
               entry.entryName,
-              backupPath: backupFile.path,
+              backupPath: visibleBackupPath,
               backupItems: _lastBackupItems,
             );
           },
@@ -372,20 +447,100 @@ class HiveToSqliteMigrationService {
               : HiveToSqliteBackupItemState.active,
         );
       }
-      writer.closeSync();
+
+      if (includeChatsJson) {
+        File? chatsFile;
+        try {
+          chatsFile = await _exportLegacyChatsToFile(
+            workDir,
+            onProgress: (progress) {
+              lastProgress = 0.78 + progress.clamp(0, 1) * 0.12;
+              _lastBackupItems = _updateBackupItem(
+                _lastBackupItems,
+                _chatsBackupName,
+                state: HiveToSqliteBackupItemState.active,
+              );
+              _emit(
+                HiveToSqliteMigrationStage.backingUp,
+                lastProgress,
+                'backup',
+                _chatsBackupName,
+                backupPath: visibleBackupPath,
+                backupItems: _lastBackupItems,
+              );
+            },
+          );
+        } catch (error, stackTrace) {
+          // Raw Hive entries are already complete, so this convenience export
+          // can degrade without weakening the disaster-recovery backup.
+          _chatsExportDegraded = true;
+          _logLine('chats.json export skipped: $error');
+          _logLine(stackTrace.toString());
+          _lastBackupItems = [
+            for (final item in _lastBackupItems)
+              if (item.name != _chatsBackupName) item,
+          ];
+        }
+        if (chatsFile != null) {
+          final chatsBytes = await chatsFile.length();
+          totalBytes += chatsBytes;
+          _lastBackupItems = _updateBackupItem(
+            _lastBackupItems,
+            _chatsBackupName,
+            bytes: chatsBytes,
+            writtenBytes: 0,
+            state: HiveToSqliteBackupItemState.active,
+          );
+          final written = await writer.addFile(
+            chatsFile,
+            _chatsBackupName,
+            onProgress: (fileWritten) {
+              lastProgress = chatsBytes == 0
+                  ? 1
+                  : 0.9 + (fileWritten / chatsBytes).clamp(0, 1) * 0.1;
+              _lastBackupItems = _updateBackupItem(
+                _lastBackupItems,
+                _chatsBackupName,
+                bytes: chatsBytes,
+                writtenBytes: fileWritten,
+                state: HiveToSqliteBackupItemState.active,
+              );
+              _emit(
+                HiveToSqliteMigrationStage.backingUp,
+                lastProgress,
+                'backup',
+                _chatsBackupName,
+                backupPath: visibleBackupPath,
+                backupItems: _lastBackupItems,
+              );
+            },
+          );
+          copiedBytes += written;
+          _lastBackupItems = _updateBackupItem(
+            _lastBackupItems,
+            _chatsBackupName,
+            bytes: chatsBytes,
+            writtenBytes: written,
+            state: HiveToSqliteBackupItemState.done,
+          );
+        }
+      }
+      await writer.close();
     } catch (error, stackTrace) {
       _logLine('$error');
       _logLine(stackTrace.toString());
-      writer?.closeIfNeededSync();
-      if (await backupFile.exists()) {
-        await backupFile.delete();
+      try {
+        await writer?.closeIfNeeded();
+      } catch (_) {
+        // Preserve the backup error; destination cleanup is best-effort.
+      }
+      if (managedOutputFile != null && await managedOutputFile.exists()) {
+        await managedOutputFile.delete();
       }
       _controller.add(
         HiveToSqliteMigrationStatus(
           stage: HiveToSqliteMigrationStage.failed,
-          progress: totalBytes == 0
-              ? 0
-              : _backupProgress(copiedBytes, totalBytes).clamp(0, 1).toDouble(),
+          progress: lastProgress.clamp(0, 1).toDouble(),
           title: 'failed',
           detail: 'backup',
           error: '$error',
@@ -399,7 +554,7 @@ class HiveToSqliteMigrationService {
       );
       rethrow;
     } finally {
-      writer?.closeIfNeededSync();
+      await writer?.closeIfNeeded();
       await _deleteDirectoryQuietly(workDir);
     }
 
@@ -408,19 +563,9 @@ class HiveToSqliteMigrationService {
       1,
       'backup',
       'done',
-      backupPath: backupFile.path,
+      backupPath: visibleBackupPath,
       backupItems: _lastBackupItems,
     );
-    return backupFile;
-  }
-
-  String _backupFileName() {
-    final timestamp = DateTime.now()
-        .toUtc()
-        .toIso8601String()
-        .replaceAll(':', '-')
-        .replaceAll('.', '-');
-    return 'kelivo_migration_backup_$timestamp.zip';
   }
 
   Future<void> migrate({String? backupPath}) async {
@@ -962,10 +1107,13 @@ class HiveToSqliteMigrationService {
     await _controller.close();
   }
 
-  List<HiveToSqliteBackupItem> _backupItemsForDecision() {
+  List<HiveToSqliteBackupItem> _backupItemsForDecision({
+    bool includeChatsJson = true,
+  }) {
     return [
       const HiveToSqliteBackupItem(name: _settingsBackupName, bytes: 0),
-      const HiveToSqliteBackupItem(name: _chatsBackupName, bytes: 0),
+      if (includeChatsJson)
+        const HiveToSqliteBackupItem(name: _chatsBackupName, bytes: 0),
       for (final file in decision.hiveFiles)
         HiveToSqliteBackupItem(name: p.basename(file.path), bytes: 0),
       for (final directory in _backupDirectories)
@@ -988,7 +1136,7 @@ class HiveToSqliteMigrationService {
 
   Future<_MigrationBackupManifest> _buildBackupManifest(
     Directory workDir,
-    String backupPath,
+    String? backupPath,
     List<HiveToSqliteBackupItem> plannedItems,
   ) async {
     final files = <_MigrationBackupFile>[];
@@ -1031,96 +1179,11 @@ class HiveToSqliteMigrationService {
       ),
     );
 
-    // Snapshot the raw .hive files before anything opens Hive: openLazyBox
-    // (used by the chats.json export below) runs crash recovery, which can
-    // truncate a damaged box in place. The archive must preserve the original
-    // bytes — they are the authoritative fallback the backup promises.
-    final hiveSnapshots = <String, File>{};
-    for (final hiveFile in decision.hiveFiles) {
-      final snapshot = File(
-        p.join(workDir.path, 'raw_${p.basename(hiveFile.path)}'),
-      );
-      await hiveFile.copy(snapshot.path);
-      hiveSnapshots[hiveFile.path] = snapshot;
-    }
-
-    items = _updateBackupItem(
-      items,
-      _chatsBackupName,
-      state: HiveToSqliteBackupItemState.active,
-    );
-    _lastBackupItems = items;
-    _emit(
-      HiveToSqliteMigrationStage.backingUp,
-      0.03,
-      'backup',
-      _chatsBackupName,
-      backupPath: backupPath,
-      backupItems: items,
-    );
-    File? chatsFile;
-    try {
-      chatsFile = await _exportLegacyChatsToFile(
-        workDir,
-        onProgress: (progress) {
-          _lastBackupItems = _updateBackupItem(
-            _lastBackupItems.isEmpty ? items : _lastBackupItems,
-            _chatsBackupName,
-            state: HiveToSqliteBackupItemState.active,
-          );
-          _emit(
-            HiveToSqliteMigrationStage.backingUp,
-            0.03 + progress.clamp(0, 1) * 0.1,
-            'backup',
-            _chatsBackupName,
-            backupPath: backupPath,
-            backupItems: _lastBackupItems,
-          );
-        },
-      );
-    } catch (error, stackTrace) {
-      // The raw .hive files below stay in the archive and remain the complete
-      // fallback, so a broken chats.json export degrades the backup instead of
-      // failing it.
-      _chatsExportDegraded = true;
-      _logLine('chats.json export skipped: $error');
-      _logLine(stackTrace.toString());
-    }
-    if (chatsFile != null) {
-      final chatsBytes = await chatsFile.length();
-      items = _updateBackupItem(
-        _lastBackupItems.isEmpty ? items : _lastBackupItems,
-        _chatsBackupName,
-        bytes: chatsBytes,
-        writtenBytes: chatsBytes,
-        state: HiveToSqliteBackupItemState.done,
-      );
-      _lastBackupItems = items;
-      files.add(
-        _MigrationBackupFile(
-          file: chatsFile,
-          entryName: _chatsBackupName,
-          itemName: _chatsBackupName,
-          bytes: chatsBytes,
-        ),
-      );
-    } else {
-      // Drop the checklist row entirely; the manifest reset below would
-      // otherwise leave it pending forever.
-      items = [
-        for (final item
-            in (_lastBackupItems.isEmpty ? items : _lastBackupItems))
-          if (item.name != _chatsBackupName) item,
-      ];
-      _lastBackupItems = items;
-    }
-
     for (final hiveFile in decision.hiveFiles) {
       final itemName = p.basename(hiveFile.path);
-      // Archive the pre-open snapshot, not the live file that Hive may have
-      // crash-recovered (truncated) in the meantime.
-      final source = hiveSnapshots[hiveFile.path] ?? hiveFile;
-      final bytes = await source.length();
+      // The writer consumes these entries before chats.json opens Hive. This
+      // preserves the original bytes without a second multi-gigabyte copy.
+      final bytes = await hiveFile.length();
       items = _updateBackupItem(items, itemName, bytes: bytes);
       _lastBackupItems = items;
       _emit(
@@ -1133,7 +1196,7 @@ class HiveToSqliteMigrationService {
       );
       files.add(
         _MigrationBackupFile(
-          file: source,
+          file: hiveFile,
           entryName: itemName,
           itemName: itemName,
           bytes: bytes,
@@ -1479,10 +1542,15 @@ class HiveToSqliteMigrationService {
     }
   }
 
-  double _backupProgress(int copiedBytes, int totalBytes) {
-    if (totalBytes <= 0) return 1;
+  double _backupFileProgress(
+    int copiedBytes,
+    int totalBytes, {
+    required bool includeChatsJson,
+  }) {
+    final end = includeChatsJson ? 0.78 : 1.0;
+    if (totalBytes <= 0) return end;
     return _backupPreparationShare +
-        (copiedBytes / totalBytes) * _backupFileShare;
+        (copiedBytes / totalBytes) * (end - _backupPreparationShare);
   }
 
   static Future<void> _deleteDirectoryQuietly(Directory? directory) async {
@@ -1979,21 +2047,25 @@ class _MigrationBackupFileEntry {
 }
 
 class _MigrationZipWriter {
-  _MigrationZipWriter(String outPath) : _output = OutputFileStream(outPath);
+  _MigrationZipWriter(this._output, {int? zip64Threshold})
+    : _zip64Threshold = zip64Threshold ?? _defaultZip64Threshold;
 
   static const int _localFileHeaderSignature = 0x04034b50;
   static const int _centralDirectoryHeaderSignature = 0x02014b50;
   static const int _endOfCentralDirectorySignature = 0x06054b50;
+  static const int _zip64EndOfCentralDirectorySignature = 0x06064b50;
+  static const int _zip64EndOfCentralDirectoryLocatorSignature = 0x07064b50;
   static const int _dataDescriptorSignature = 0x08074b50;
-  static const int _versionNeeded = 20;
+  static const int _versionNeeded = 45;
   static const int _utf8Flag = 1 << 11;
   static const int _dataDescriptorFlag = 1 << 3;
   static const int _deflateMethod = 8;
   static const int _maxZip32 = 0xffffffff;
-  static const int _maxZipEntries = 0xffff;
+  static const int _defaultZip64Threshold = _maxZip32 - (16 * 1024 * 1024);
   static const int _chunkSize = 1024 * 1024;
 
-  final OutputFileStream _output;
+  final _MigrationZipOutput _output;
+  final int _zip64Threshold;
   final List<_MigrationZipEntry> _entries = <_MigrationZipEntry>[];
   bool _closed = false;
 
@@ -2009,22 +2081,27 @@ class _MigrationZipWriter {
 
     final stat = await file.stat();
     final uncompressedSize = stat.size;
-    _checkZip32(uncompressedSize, 'file size');
-    _checkZip32(_output.length, 'local header offset');
+    final usesZip64Entry = uncompressedSize > _zip64Threshold;
 
     final modified = stat.modified;
     final modTime = _zipTime(modified);
     final modDate = _zipDate(modified);
     final nameBytes = utf8.encode(entryName.replaceAll('\\', '/'));
+    if (nameBytes.length > 0xffff) {
+      throw FileSystemException('ZIP entry name exceeds ZIP32 limit');
+    }
     final localHeaderOffset = _output.length;
 
-    _writeLocalHeader(nameBytes: nameBytes, modTime: modTime, modDate: modDate);
+    _writeLocalHeader(
+      nameBytes: nameBytes,
+      modTime: modTime,
+      modDate: modDate,
+      usesZip64: usesZip64Entry,
+    );
 
     final written = await _writeDeflatedFile(file, onProgress: onProgress);
-    _checkZip32(written.compressedSize, 'compressed size');
-    _checkZip32(written.uncompressedSize, 'uncompressed size');
-
-    _writeDataDescriptor(written);
+    _writeDataDescriptor(written, usesZip64: usesZip64Entry);
+    if (_output.shouldFlush) await _output.flush();
 
     _entries.add(
       _MigrationZipEntry(
@@ -2036,35 +2113,39 @@ class _MigrationZipWriter {
         uncompressedSize: written.uncompressedSize,
         localHeaderOffset: localHeaderOffset,
         mode: stat.mode,
+        usesZip64: usesZip64Entry,
       ),
     );
     return written.uncompressedSize;
   }
 
-  void closeSync() {
+  Future<void> close() async {
     if (_closed) return;
-    _checkEntryCount();
-
-    final centralDirectoryOffset = _output.length;
-    _checkZip32(centralDirectoryOffset, 'central directory offset');
-    for (final entry in _entries) {
-      _writeCentralDirectoryHeader(entry);
-    }
-    final centralDirectorySize = _output.length - centralDirectoryOffset;
-    _checkZip32(centralDirectorySize, 'central directory size');
-
-    _writeEndOfCentralDirectory(
-      centralDirectoryOffset: centralDirectoryOffset,
-      centralDirectorySize: centralDirectorySize,
-    );
-    _output.closeSync();
     _closed = true;
+
+    try {
+      final centralDirectoryOffset = _output.length;
+      for (final entry in _entries) {
+        _writeCentralDirectoryHeader(entry);
+        if (_output.shouldFlush) await _output.flush();
+      }
+      final centralDirectorySize = _output.length - centralDirectoryOffset;
+
+      _writeEndOfCentralDirectory(
+        centralDirectoryOffset: centralDirectoryOffset,
+        centralDirectorySize: centralDirectorySize,
+      );
+      await _output.close();
+    } catch (_) {
+      await _output.close(discardPending: true);
+      rethrow;
+    }
   }
 
-  void closeIfNeededSync() {
+  Future<void> closeIfNeeded() async {
     if (!_closed) {
-      _output.closeSync();
       _closed = true;
+      await _output.close(discardPending: true);
     }
   }
 
@@ -2072,6 +2153,7 @@ class _MigrationZipWriter {
     required List<int> nameBytes,
     required int modTime,
     required int modDate,
+    required bool usesZip64,
   }) {
     _output.writeUint32(_localFileHeaderSignature);
     _output.writeUint16(_versionNeeded);
@@ -2080,58 +2162,82 @@ class _MigrationZipWriter {
     _output.writeUint16(modTime);
     _output.writeUint16(modDate);
     _output.writeUint32(0);
-    _output.writeUint32(0);
-    _output.writeUint32(0);
+    _output.writeUint32(usesZip64 ? _maxZip32 : 0);
+    _output.writeUint32(usesZip64 ? _maxZip32 : 0);
     _output.writeUint16(nameBytes.length);
-    _output.writeUint16(0);
+    _output.writeUint16(usesZip64 ? 20 : 0);
     _output.writeBytes(nameBytes);
+    if (usesZip64) {
+      _output.writeUint16(0x0001);
+      _output.writeUint16(16);
+      _output.writeUint64(0);
+      _output.writeUint64(0);
+    }
   }
 
   Future<_MigrationZipWrittenFile> _writeDeflatedFile(
     File file, {
     required void Function(int writtenBytes) onProgress,
   }) async {
-    final compressedSink = _CountingOutputSink(_output);
-    final inputSink = ZLibCodec(
-      level: 1,
-      raw: true,
-    ).encoder.startChunkedConversion(compressedSink);
-
-    final raf = await file.open();
-    final buffer = Uint8List(_chunkSize);
     var crc32 = 0;
+    var compressedSize = 0;
     var uncompressedSize = 0;
-    try {
-      while (true) {
-        final read = await raf.readInto(buffer);
-        if (read == 0) break;
-        final chunk = Uint8List.sublistView(buffer, 0, read);
-        crc32 = getCrc32(chunk, crc32);
-        uncompressedSize += read;
-        inputSink.add(chunk);
-        onProgress(uncompressedSize);
-        await Future<void>.delayed(Duration.zero);
+
+    Stream<List<int>> sourceChunks() async* {
+      final raf = await file.open();
+      try {
+        while (true) {
+          final chunk = await raf.read(_chunkSize);
+          if (chunk.isEmpty) break;
+          crc32 = getCrc32(chunk, crc32);
+          uncompressedSize += chunk.length;
+          onProgress(uncompressedSize);
+          yield chunk;
+        }
+      } finally {
+        await raf.close();
       }
-      inputSink.close();
-    } finally {
-      await raf.close();
+    }
+
+    final compressed = sourceChunks().transform(
+      ZLibCodec(level: 1, raw: true).encoder,
+    );
+    await for (final chunk in compressed) {
+      if (chunk.isNotEmpty) {
+        compressedSize += chunk.length;
+        _output.writeBytes(chunk);
+        if (_output.shouldFlush) await _output.flush();
+      }
     }
 
     return _MigrationZipWrittenFile(
       crc32: crc32,
-      compressedSize: compressedSink.bytesWritten,
+      compressedSize: compressedSize,
       uncompressedSize: uncompressedSize,
     );
   }
 
-  void _writeDataDescriptor(_MigrationZipWrittenFile written) {
+  void _writeDataDescriptor(
+    _MigrationZipWrittenFile written, {
+    required bool usesZip64,
+  }) {
     _output.writeUint32(_dataDescriptorSignature);
     _output.writeUint32(written.crc32);
-    _output.writeUint32(written.compressedSize);
-    _output.writeUint32(written.uncompressedSize);
+    if (usesZip64) {
+      _output.writeUint64(written.compressedSize);
+      _output.writeUint64(written.uncompressedSize);
+    } else {
+      _output.writeUint32(written.compressedSize);
+      _output.writeUint32(written.uncompressedSize);
+    }
   }
 
   void _writeCentralDirectoryHeader(_MigrationZipEntry entry) {
+    final usesZip64 =
+        entry.usesZip64 ||
+        entry.compressedSize > _maxZip32 ||
+        entry.uncompressedSize > _maxZip32 ||
+        entry.localHeaderOffset > _maxZip32;
     _output.writeUint32(_centralDirectoryHeaderSignature);
     _output.writeUint16(_versionNeeded);
     _output.writeUint16(_versionNeeded);
@@ -2140,29 +2246,53 @@ class _MigrationZipWriter {
     _output.writeUint16(entry.modTime);
     _output.writeUint16(entry.modDate);
     _output.writeUint32(entry.crc32);
-    _output.writeUint32(entry.compressedSize);
-    _output.writeUint32(entry.uncompressedSize);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.compressedSize);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.uncompressedSize);
     _output.writeUint16(entry.nameBytes.length);
-    _output.writeUint16(0);
+    _output.writeUint16(usesZip64 ? 28 : 0);
     _output.writeUint16(0);
     _output.writeUint16(0);
     _output.writeUint16(0);
     _output.writeUint32(entry.mode << 16);
-    _output.writeUint32(entry.localHeaderOffset);
+    _output.writeUint32(usesZip64 ? _maxZip32 : entry.localHeaderOffset);
     _output.writeBytes(entry.nameBytes);
+    if (usesZip64) {
+      _output.writeUint16(0x0001);
+      _output.writeUint16(24);
+      _output.writeUint64(entry.uncompressedSize);
+      _output.writeUint64(entry.compressedSize);
+      _output.writeUint64(entry.localHeaderOffset);
+    }
   }
 
   void _writeEndOfCentralDirectory({
     required int centralDirectoryOffset,
     required int centralDirectorySize,
   }) {
+    final zip64EocdOffset = _output.length;
+    _output.writeUint32(_zip64EndOfCentralDirectorySignature);
+    _output.writeUint64(44);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint16(_versionNeeded);
+    _output.writeUint32(0);
+    _output.writeUint32(0);
+    _output.writeUint64(_entries.length);
+    _output.writeUint64(_entries.length);
+    _output.writeUint64(centralDirectorySize);
+    _output.writeUint64(centralDirectoryOffset);
+
+    _output.writeUint32(_zip64EndOfCentralDirectoryLocatorSignature);
+    _output.writeUint32(0);
+    _output.writeUint64(zip64EocdOffset);
+    _output.writeUint32(1);
+
     _output.writeUint32(_endOfCentralDirectorySignature);
     _output.writeUint16(0);
-    _output.writeUint16(0);
-    _output.writeUint16(_entries.length);
-    _output.writeUint16(_entries.length);
-    _output.writeUint32(centralDirectorySize);
-    _output.writeUint32(centralDirectoryOffset);
+    _output.writeUint16(0xffff);
+    _output.writeUint16(0xffff);
+    _output.writeUint16(0xffff);
+    _output.writeUint32(_maxZip32);
+    _output.writeUint32(_maxZip32);
     _output.writeUint16(0);
   }
 
@@ -2178,35 +2308,97 @@ class _MigrationZipWriter {
         ((value.month & 0x0f) << 5) |
         (value.day & 0x1f);
   }
-
-  static void _checkZip32(int value, String field) {
-    if (value > _maxZip32) {
-      throw FileSystemException('ZIP entry exceeds ZIP32 limit: $field');
-    }
-  }
-
-  void _checkEntryCount() {
-    if (_entries.length > _maxZipEntries) {
-      throw FileSystemException('ZIP entry count exceeds ZIP32 limit');
-    }
-  }
 }
 
-class _CountingOutputSink implements Sink<List<int>> {
-  _CountingOutputSink(this._output);
+/// Buffered sequential ZIP output. The sink is awaited every 1 MiB to preserve
+/// backpressure for multi-gigabyte backups.
+class _MigrationZipOutput {
+  _MigrationZipOutput.toSink(this._writeChunk) : _closeSink = null;
 
-  final OutputFileStream _output;
-  int bytesWritten = 0;
+  _MigrationZipOutput._(this._writeChunk, this._closeSink);
 
-  @override
-  void add(List<int> data) {
-    if (data.isEmpty) return;
-    _output.writeBytes(data);
-    bytesWritten += data.length;
+  static Future<_MigrationZipOutput> openFile(String path) async {
+    final file = await File(path).open(mode: FileMode.write);
+    return _MigrationZipOutput._(
+      (bytes) async {
+        await file.writeFrom(bytes);
+      },
+      () async {
+        await file.close();
+      },
+    );
   }
 
-  @override
-  void close() {}
+  static const _flushThreshold = 1024 * 1024;
+
+  final MigrationBackupChunkWriter _writeChunk;
+  final Future<void> Function()? _closeSink;
+  // Compression converters may reuse their output buffers. Copy into the
+  // bounded staging buffer so bytes cannot change before the async sink runs.
+  final BytesBuilder _pending = BytesBuilder(copy: true);
+  var length = 0;
+  var _closed = false;
+
+  bool get shouldFlush => _pending.length >= _flushThreshold;
+
+  void writeByte(int value) {
+    _pending.addByte(value);
+    length++;
+  }
+
+  void writeBytes(List<int> bytes) {
+    if (bytes.isEmpty) return;
+    _pending.add(bytes);
+    length += bytes.length;
+  }
+
+  void writeUint16(int value) {
+    writeByte(value & 0xff);
+    writeByte((value >> 8) & 0xff);
+  }
+
+  void writeUint32(int value) {
+    writeByte(value & 0xff);
+    writeByte((value >> 8) & 0xff);
+    writeByte((value >> 16) & 0xff);
+    writeByte((value >> 24) & 0xff);
+  }
+
+  void writeUint64(int value) {
+    writeUint32(value & 0xffffffff);
+    writeUint32((value >> 32) & 0xffffffff);
+  }
+
+  Future<void> flush() async {
+    if (_pending.isEmpty) return;
+    await _writeChunk(_pending.takeBytes());
+  }
+
+  Future<void> close({bool discardPending = false}) async {
+    if (_closed) return;
+    _closed = true;
+    Object? firstError;
+    StackTrace? firstStackTrace;
+    try {
+      if (discardPending) {
+        _pending.clear();
+      } else {
+        await flush();
+      }
+    } catch (error, stackTrace) {
+      firstError = error;
+      firstStackTrace = stackTrace;
+    }
+    try {
+      await _closeSink?.call();
+    } catch (error, stackTrace) {
+      firstError ??= error;
+      firstStackTrace ??= stackTrace;
+    }
+    if (firstError != null) {
+      Error.throwWithStackTrace(firstError, firstStackTrace!);
+    }
+  }
 }
 
 class _MigrationZipEntry {
@@ -2219,6 +2411,7 @@ class _MigrationZipEntry {
     required this.uncompressedSize,
     required this.localHeaderOffset,
     required this.mode,
+    required this.usesZip64,
   });
 
   final List<int> nameBytes;
@@ -2229,6 +2422,7 @@ class _MigrationZipEntry {
   final int uncompressedSize;
   final int localHeaderOffset;
   final int mode;
+  final bool usesZip64;
 }
 
 class _MigrationZipWrittenFile {

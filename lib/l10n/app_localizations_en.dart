@@ -7573,6 +7573,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get migrationSaveBackupButton => 'Save Backup ZIP';
 
   @override
+  String get migrationStartWithoutBackupButton => 'Migrate Without Backing Up';
+
+  @override
+  String get migrationSkipChatsJsonOption => 'Skip chats.json';
+
+  @override
+  String get migrationSkipChatsJsonDescription =>
+      'Still backs up the original Hive files, settings, and local files. Recommended for very large histories.';
+
+  @override
+  String get migrationSkipBackupOption => 'Skip this backup';
+
+  @override
+  String get migrationSkipBackupDescription =>
+      'Only select this if you already have a verified backup. Migration will start immediately.';
+
+  @override
   String get migrationBackingUpTitle => 'Backing Up';
 
   @override
@@ -7669,7 +7686,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get migrationFailedSubtitle =>
-      'The original Hive data and your backup are still intact. Review the reason below, then retry.';
+      'The original Hive data is still intact. Any backup that finished earlier is unchanged. Review the reason below, then retry.';
 
   @override
   String get migrationUnknownError => 'Unknown migration error.';

@@ -153,6 +153,11 @@ void main() {
     expect(entryNames, contains('images/prompt.png'));
     expect(entryNames, contains('avatars/user.png'));
     expect(entryNames, contains('fonts/custom.ttf'));
+    final orderedEntryNames = entryNames.toList(growable: false);
+    expect(
+      orderedEntryNames.indexOf('conversations.hive'),
+      lessThan(orderedEntryNames.indexOf('chats.json')),
+    );
     final settingsEntry = archive.findFile('settings.json');
     expect(settingsEntry, isNotNull);
     final settingsJson = String.fromCharCodes(settingsEntry!.readBytes()!);
@@ -303,6 +308,63 @@ void main() {
       0,
     );
   });
+
+  test(
+    'direct ZIP64 backup can omit chats.json without raw temp snapshots',
+    () async {
+      await _seedHiveChat(
+        tempDir: tempDir,
+        conversationId: 'conversation-direct-backup',
+        messageId: 'message-direct-backup',
+        content: 'large history fallback',
+      );
+      final decision = await HiveToSqliteMigrationService.check();
+      final sourceBytes = await File(
+        '${tempDir.path}/conversations.hive',
+      ).readAsBytes();
+      final service = HiveToSqliteMigrationService(decision)
+        ..debugZip64ThresholdForTest = 0;
+      addTearDown(service.dispose);
+      final statuses = <HiveToSqliteMigrationStatus>[];
+      final sub = service.statusStream.listen(statuses.add);
+      addTearDown(sub.cancel);
+      final output = File('${tempDir.path}/direct-migration-backup.zip');
+      final outputHandle = await output.open(mode: FileMode.write);
+      var streamedChunks = 0;
+
+      try {
+        await service.backupToWritableSink((bytes) async {
+          streamedChunks++;
+          expect(bytes.length, lessThanOrEqualTo(1024 * 1024));
+          await outputHandle.writeFrom(bytes);
+        }, includeChatsJson: false);
+      } finally {
+        await outputHandle.close();
+      }
+
+      final inputStream = InputFileStream(output.path);
+      final archive = ZipDecoder().decodeStream(inputStream);
+      addTearDown(inputStream.closeSync);
+      addTearDown(archive.clearSync);
+      expect(archive.findFile('chats.json'), isNull);
+      expect(archive.findFile('conversations.hive')!.readBytes(), sourceBytes);
+      expect(streamedChunks, greaterThan(0));
+      expect(statuses.every((status) => status.backupPath == null), isTrue);
+      expect(
+        statuses.last.backupItems.map((item) => item.name),
+        isNot(contains('chats.json')),
+      );
+      final leftoverWorkDirs = await tempDir
+          .list()
+          .where(
+            (entity) =>
+                entity is Directory &&
+                entity.path.contains('.kelivo_migration_backup_'),
+          )
+          .toList();
+      expect(leftoverWorkDirs, isEmpty);
+    },
+  );
 
   test(
     'validation fails when a text part payload is corrupted before validate',

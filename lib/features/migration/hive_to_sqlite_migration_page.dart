@@ -15,20 +15,29 @@ import '../../shared/widgets/restart_app_action.dart';
 import '../../theme/app_font_weights.dart';
 import '../../utils/platform_utils.dart';
 import 'hive_to_sqlite_migration_service.dart';
+import 'widgets/migration_backup_options.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 typedef MobileBackupSaver =
     Future<bool> Function({required String sourcePath, String? fileName});
+typedef MobileDirectBackupSaver =
+    Future<bool> Function({
+      required String fileName,
+      required Future<void> Function(MigrationBackupChunkWriter writeChunk)
+      write,
+    });
 
 class HiveToSqliteMigrationPage extends StatefulWidget {
   const HiveToSqliteMigrationPage({
     super.key,
     required this.service,
     this.mobileBackupSaver,
+    this.mobileDirectBackupSaver,
   });
 
   final HiveToSqliteMigrationService service;
   final MobileBackupSaver? mobileBackupSaver;
+  final MobileDirectBackupSaver? mobileDirectBackupSaver;
 
   @override
   State<HiveToSqliteMigrationPage> createState() =>
@@ -44,9 +53,18 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
   bool _mobileBackupSaved = false;
   bool _busy = false;
   bool _canOfferSkip = false;
+  bool _skipChatsJson = false;
+  bool _skipBackup = false;
 
   bool get _usesMobileBackupFlow =>
-      widget.mobileBackupSaver != null || Platform.isAndroid || Platform.isIOS;
+      widget.mobileBackupSaver != null ||
+      widget.mobileDirectBackupSaver != null ||
+      Platform.isAndroid ||
+      Platform.isIOS;
+
+  bool get _usesDirectMobileBackupFlow =>
+      widget.mobileDirectBackupSaver != null ||
+      (Platform.isAndroid && widget.mobileBackupSaver == null);
 
   @override
   void initState() {
@@ -80,6 +98,11 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
     setState(() => _busy = true);
     var backupPhaseComplete = false;
     try {
+      if (_skipBackup) {
+        backupPhaseComplete = true;
+        await widget.service.migrate();
+        return;
+      }
       File? backupFile;
       if (_usesMobileBackupFlow) {
         _mobileBackupSaved = false;
@@ -131,13 +154,32 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       dialogTitle: AppLocalizations.of(context)!.migrationChooseFolderButton,
     );
     if (path == null || path.trim().isEmpty) return null;
-    return widget.service.backupTo(Directory(path));
+    return widget.service.backupTo(
+      Directory(path),
+      includeChatsJson: !_skipChatsJson,
+    );
   }
 
   Future<bool> _createAndSaveMobileBackup() async {
+    if (_usesDirectMobileBackupFlow) {
+      final saveBackup =
+          widget.mobileDirectBackupSaver ?? NativeFileSave.saveFileWithWriter;
+      return saveBackup(
+        fileName: widget.service.backupFileName(),
+        write: (writeChunk) async {
+          await widget.service.backupToWritableSink(
+            writeChunk,
+            includeChatsJson: !_skipChatsJson,
+          );
+        },
+      );
+    }
+
     _savingTemporaryBackup = true;
     try {
-      final backupFile = await widget.service.backupToTemporaryFile();
+      final backupFile = await widget.service.backupToTemporaryFile(
+        includeChatsJson: !_skipChatsJson,
+      );
       _temporaryBackupFile = backupFile;
       if (mounted) {
         setState(() {
@@ -181,6 +223,17 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
 
   Future<void> _retry() async {
     if (_busy) return;
+    if (_skipBackup) {
+      setState(() => _busy = true);
+      try {
+        await widget.service.migrate();
+      } catch (_) {
+        await _refreshSkipAvailability();
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
+      return;
+    }
     final backupPath = _mobileBackupSaved ? null : _backupFile?.path;
     if (!_mobileBackupSaved && backupPath == null) {
       await _pickBackupAndStart();
@@ -310,6 +363,14 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
         key: key,
         status: _status,
         mobileBackupFlow: _usesMobileBackupFlow,
+        skipChatsJson: _skipChatsJson,
+        skipBackup: _skipBackup,
+        onSkipChatsJsonChanged: _busy
+            ? null
+            : (value) => setState(() => _skipChatsJson = value),
+        onSkipBackupChanged: _busy
+            ? null
+            : (value) => setState(() => _skipBackup = value),
         onStart: _busy ? null : _pickBackupAndStart,
         onSkip: onSkip,
       ),
@@ -329,6 +390,14 @@ class _HiveToSqliteMigrationPageState extends State<HiveToSqliteMigrationPage> {
       HiveToSqliteMigrationStage.failed => _FailedStep(
         key: key,
         status: _status,
+        skipChatsJson: _skipChatsJson,
+        skipBackup: _skipBackup,
+        onSkipChatsJsonChanged: _busy
+            ? null
+            : (value) => setState(() => _skipChatsJson = value),
+        onSkipBackupChanged: _busy
+            ? null
+            : (value) => setState(() => _skipBackup = value),
         onRetry: _busy ? null : _retry,
         onSkip: onSkip,
       ),
@@ -341,12 +410,20 @@ class _IntroStep extends StatelessWidget {
     super.key,
     required this.status,
     required this.mobileBackupFlow,
+    required this.skipChatsJson,
+    required this.skipBackup,
+    required this.onSkipChatsJsonChanged,
+    required this.onSkipBackupChanged,
     required this.onStart,
     this.onSkip,
   });
 
   final HiveToSqliteMigrationStatus status;
   final bool mobileBackupFlow;
+  final bool skipChatsJson;
+  final bool skipBackup;
+  final ValueChanged<bool>? onSkipChatsJsonChanged;
+  final ValueChanged<bool>? onSkipBackupChanged;
   final VoidCallback? onStart;
   final VoidCallback? onSkip;
 
@@ -359,28 +436,46 @@ class _IntroStep extends StatelessWidget {
       showStepper: false,
       activeStep: 0,
       children: [
-        _Header(
-          title: l10n.migrationIntroTitle,
-          subtitle: l10n.migrationIntroSubtitle,
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Header(
+                  title: l10n.migrationIntroTitle,
+                  subtitle: l10n.migrationIntroSubtitle,
+                ),
+                const SizedBox(height: 18),
+                _MigrationViz(active: false),
+                const SizedBox(height: 14),
+                _NoteCard(
+                  icon: Lucide.Shield,
+                  color: cs.primary,
+                  text: l10n.migrationBackupNote,
+                ),
+                const SizedBox(height: 10),
+                _NoteCard(
+                  icon: Lucide.Zap,
+                  color: cs.primary,
+                  text: l10n.migrationPerformanceNote,
+                ),
+                const SizedBox(height: 10),
+                MigrationBackupOptions(
+                  skipChatsJson: skipChatsJson,
+                  skipBackup: skipBackup,
+                  onSkipChatsJsonChanged: onSkipChatsJsonChanged,
+                  onSkipBackupChanged: onSkipBackupChanged,
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 18),
-        _MigrationViz(active: false),
-        const SizedBox(height: 14),
-        _NoteCard(
-          icon: Lucide.Shield,
-          color: cs.primary,
-          text: l10n.migrationBackupNote,
-        ),
-        const SizedBox(height: 10),
-        _NoteCard(
-          icon: Lucide.Zap,
-          color: cs.primary,
-          text: l10n.migrationPerformanceNote,
-        ),
-        const Spacer(),
+        const SizedBox(height: 12),
         _PrimaryButton(
-          icon: Lucide.FolderPlus,
-          label: mobileBackupFlow
+          icon: skipBackup ? Lucide.Database : Lucide.FolderPlus,
+          label: skipBackup
+              ? l10n.migrationStartWithoutBackupButton
+              : mobileBackupFlow
               ? l10n.migrationSaveBackupButton
               : l10n.migrationChooseFolderButton,
           onPressed: onStart,
@@ -603,11 +698,19 @@ class _FailedStep extends StatelessWidget {
   const _FailedStep({
     super.key,
     required this.status,
+    required this.skipChatsJson,
+    required this.skipBackup,
+    required this.onSkipChatsJsonChanged,
+    required this.onSkipBackupChanged,
     required this.onRetry,
     required this.onSkip,
   });
 
   final HiveToSqliteMigrationStatus status;
+  final bool skipChatsJson;
+  final bool skipBackup;
+  final ValueChanged<bool>? onSkipChatsJsonChanged;
+  final ValueChanged<bool>? onSkipBackupChanged;
   final VoidCallback? onRetry;
   final VoidCallback? onSkip;
 
@@ -619,31 +722,50 @@ class _FailedStep extends StatelessWidget {
       key: key,
       activeStep: 1,
       children: [
-        Icon(Lucide.TriangleAlert, color: cs.error, size: 58),
-        const SizedBox(height: 16),
-        _Header(
-          title: l10n.migrationFailedTitle,
-          subtitle: l10n.migrationFailedSubtitle,
-        ),
-        const SizedBox(height: 14),
-        _ErrorCard(error: status.error ?? l10n.migrationUnknownError),
-        const SizedBox(height: 12),
-        if (status.backupPath != null)
-          _BackupFileCard(path: status.backupPath!),
-        if (status.chatsExportDegraded) ...[
-          const SizedBox(height: 12),
-          _NoteCard(
-            icon: Lucide.TriangleAlert,
-            color: cs.error,
-            text: l10n.migrationChatsExportDegradedNote,
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Icon(Lucide.TriangleAlert, color: cs.error, size: 58),
+                const SizedBox(height: 16),
+                _Header(
+                  title: l10n.migrationFailedTitle,
+                  subtitle: l10n.migrationFailedSubtitle,
+                ),
+                const SizedBox(height: 14),
+                _ErrorCard(error: status.error ?? l10n.migrationUnknownError),
+                if (status.backupPath != null) ...[
+                  const SizedBox(height: 12),
+                  _BackupFileCard(path: status.backupPath!),
+                ],
+                if (status.chatsExportDegraded) ...[
+                  const SizedBox(height: 12),
+                  _NoteCard(
+                    icon: Lucide.TriangleAlert,
+                    color: cs.error,
+                    text: l10n.migrationChatsExportDegradedNote,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _LogCard(lines: status.log),
+                const SizedBox(height: 12),
+                MigrationBackupOptions(
+                  skipChatsJson: skipChatsJson,
+                  skipBackup: skipBackup,
+                  onSkipChatsJsonChanged: onSkipChatsJsonChanged,
+                  onSkipBackupChanged: onSkipBackupChanged,
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
         const SizedBox(height: 12),
-        _LogCard(lines: status.log),
-        const Spacer(),
         _PrimaryButton(
-          icon: Lucide.RotateCcw,
-          label: l10n.migrationRetryButton,
+          icon: skipBackup ? Lucide.Database : Lucide.RotateCcw,
+          label: skipBackup
+              ? l10n.migrationStartWithoutBackupButton
+              : l10n.migrationRetryButton,
           onPressed: onRetry,
         ),
         if (onSkip != null) ...[

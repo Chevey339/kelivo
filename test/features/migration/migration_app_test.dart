@@ -7,12 +7,143 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_page.dart';
 import 'package:Kelivo/features/migration/hive_to_sqlite_migration_service.dart';
+import 'package:Kelivo/features/migration/widgets/migration_backup_options.dart';
 import 'package:Kelivo/icons/lucide_adapter.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/main.dart' show MigrationApp;
+import 'package:Kelivo/shared/widgets/ios_checkbox.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 
 void main() {
+  testWidgets('can skip backup and start migration immediately', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final testDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_skip_backup_option_',
+    );
+    addTearDown(() {
+      if (testDirectory.existsSync()) {
+        testDirectory.deleteSync(recursive: true);
+      }
+    });
+    final service = _OptionMigrationService(
+      HiveToSqliteMigrationDecision(
+        needsMigration: true,
+        appDataDir: testDirectory,
+        sqliteFile: File('${testDirectory.path}/kelivo-test.sqlite'),
+        hiveFiles: const <File>[],
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HiveToSqliteMigrationPage(
+          service: service,
+          mobileBackupSaver: ({required sourcePath, fileName}) async => true,
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    final options = find.byType(MigrationBackupOptions);
+    expect(
+      find.descendant(of: options, matching: find.byType(IosCheckbox)),
+      findsNWidgets(2),
+    );
+    expect(
+      find.descendant(of: options, matching: find.byType(CheckboxListTile)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: options, matching: find.byType(Divider)),
+      findsNothing,
+    );
+    expect(
+      find.descendant(of: options, matching: find.byType(InkWell)),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const Key('migration_skip_backup')));
+    await tester.pump();
+    final skipBackupControl = find.descendant(
+      of: find.byKey(const Key('migration_skip_backup')),
+      matching: find.byType(IosCheckbox),
+    );
+    expect(tester.widget<IosCheckbox>(skipBackupControl).value, isTrue);
+
+    await tester.runAsync(() async {
+      _buttonForIcon(tester, Lucide.Database).onTap!();
+      await _waitUntil(() => service.migrationCalls == 1);
+    });
+
+    expect(service.temporaryBackupCalls, 0);
+    expect(service.directBackupIncludesChats, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
+  testWidgets('direct mobile backup can omit chats.json', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 1000);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final testDirectory = Directory.systemTemp.createTempSync(
+      'kelivo_skip_chats_option_',
+    );
+    addTearDown(() {
+      if (testDirectory.existsSync()) {
+        testDirectory.deleteSync(recursive: true);
+      }
+    });
+    final service = _OptionMigrationService(
+      HiveToSqliteMigrationDecision(
+        needsMigration: true,
+        appDataDir: testDirectory,
+        sqliteFile: File('${testDirectory.path}/kelivo-test.sqlite'),
+        hiveFiles: const <File>[],
+      ),
+    );
+    var destinationCalls = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: HiveToSqliteMigrationPage(
+          service: service,
+          mobileDirectBackupSaver: ({required fileName, required write}) async {
+            destinationCalls++;
+            expect(fileName, endsWith('.zip'));
+            await write((_) async {});
+            return true;
+          },
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 500));
+
+    await tester.tap(find.byKey(const Key('migration_skip_chats_json')));
+    await tester.pump();
+    await tester.runAsync(() async {
+      _buttonForIcon(tester, Lucide.FolderPlus).onTap!();
+      await _waitUntil(() => service.migrationCalls == 1);
+    });
+
+    expect(destinationCalls, 1);
+    expect(service.directBackupIncludesChats, <bool>[false]);
+    expect(service.temporaryBackupCalls, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+  });
+
   testWidgets('mobile retry does not export an already saved backup again', (
     tester,
   ) async {
@@ -183,6 +314,36 @@ final class _CompleteMigrationService extends HiveToSqliteMigrationService {
   }
 }
 
+final class _OptionMigrationService extends HiveToSqliteMigrationService {
+  _OptionMigrationService(super.decision);
+
+  int temporaryBackupCalls = 0;
+  int migrationCalls = 0;
+  final List<bool> directBackupIncludesChats = <bool>[];
+
+  @override
+  Future<File> backupToTemporaryFile({bool includeChatsJson = true}) async {
+    temporaryBackupCalls++;
+    final file = File('${decision.appDataDir.path}/temporary.zip');
+    await file.writeAsString('backup');
+    return file;
+  }
+
+  @override
+  Future<void> backupToWritableSink(
+    MigrationBackupChunkWriter writeChunk, {
+    bool includeChatsJson = true,
+  }) async {
+    directBackupIncludesChats.add(includeChatsJson);
+    await writeChunk(Uint8List.fromList(const <int>[1, 2, 3]));
+  }
+
+  @override
+  Future<void> migrate({String? backupPath}) async {
+    migrationCalls++;
+  }
+}
+
 final class _RetryMigrationService extends HiveToSqliteMigrationService {
   _RetryMigrationService(super.decision)
     : temporaryBackup = File('${decision.appDataDir.path}/migration.zip');
@@ -192,7 +353,7 @@ final class _RetryMigrationService extends HiveToSqliteMigrationService {
   int backupCalls = 0;
 
   @override
-  Future<File> backupToTemporaryFile() async {
+  Future<File> backupToTemporaryFile({bool includeChatsJson = true}) async {
     backupCalls++;
     temporaryBackup.writeAsStringSync('temporary migration backup');
     return temporaryBackup;

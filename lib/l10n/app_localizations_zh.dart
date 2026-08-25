@@ -7260,6 +7260,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationSaveBackupButton => '保存备份 ZIP';
 
   @override
+  String get migrationStartWithoutBackupButton => '不备份，直接迁移';
+
+  @override
+  String get migrationSkipChatsJsonOption => '跳过 chats.json';
+
+  @override
+  String get migrationSkipChatsJsonDescription =>
+      '仍会备份原始 Hive、设置和本地文件，超大聊天记录建议选择。';
+
+  @override
+  String get migrationSkipBackupOption => '跳过本次备份';
+
+  @override
+  String get migrationSkipBackupDescription => '仅在已有并确认备份可用时选择，之后将立即开始迁移。';
+
+  @override
   String get migrationBackingUpTitle => '正在备份';
 
   @override
@@ -7354,7 +7370,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get migrationFailedTitle => '迁移失败';
 
   @override
-  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+  String get migrationFailedSubtitle =>
+      '原始 Hive 数据仍然保留；如果备份已经完成，备份文件也不会被修改。查看下方原因后可以重试。';
 
   @override
   String get migrationUnknownError => '未知迁移错误。';
@@ -14932,6 +14949,22 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationSaveBackupButton => '保存备份 ZIP';
 
   @override
+  String get migrationStartWithoutBackupButton => '不备份，直接迁移';
+
+  @override
+  String get migrationSkipChatsJsonOption => '跳过 chats.json';
+
+  @override
+  String get migrationSkipChatsJsonDescription =>
+      '仍会备份原始 Hive、设置和本地文件，超大聊天记录建议选择。';
+
+  @override
+  String get migrationSkipBackupOption => '跳过本次备份';
+
+  @override
+  String get migrationSkipBackupDescription => '仅在已有并确认备份可用时选择，之后将立即开始迁移。';
+
+  @override
   String get migrationBackingUpTitle => '正在备份';
 
   @override
@@ -15026,7 +15059,8 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get migrationFailedTitle => '迁移失败';
 
   @override
-  String get migrationFailedSubtitle => '原始 Hive 数据和备份都仍然保留。查看下方原因后可以重试。';
+  String get migrationFailedSubtitle =>
+      '原始 Hive 数据仍然保留；如果备份已经完成，备份文件也不会被修改。查看下方原因后可以重试。';
 
   @override
   String get migrationUnknownError => '未知迁移错误。';
@@ -22678,6 +22712,22 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get migrationSaveBackupButton => '儲存備份 ZIP';
 
   @override
+  String get migrationStartWithoutBackupButton => '不備份，直接遷移';
+
+  @override
+  String get migrationSkipChatsJsonOption => '跳過 chats.json';
+
+  @override
+  String get migrationSkipChatsJsonDescription =>
+      '仍會備份原始 Hive、設定和本機檔案，超大聊天記錄建議選擇。';
+
+  @override
+  String get migrationSkipBackupOption => '跳過本次備份';
+
+  @override
+  String get migrationSkipBackupDescription => '僅在已有並確認備份可用時選擇，之後將立即開始遷移。';
+
+  @override
   String get migrationBackingUpTitle => '正在備份';
 
   @override
@@ -22772,7 +22822,8 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get migrationFailedTitle => '遷移失敗';
 
   @override
-  String get migrationFailedSubtitle => '原始 Hive 資料和備份都仍然保留。查看下方原因後可以重試。';
+  String get migrationFailedSubtitle =>
+      '原始 Hive 資料仍然保留；如果備份已經完成，備份檔案也不會被修改。查看下方原因後可以重試。';
 
   @override
   String get migrationUnknownError => '未知遷移錯誤。';
