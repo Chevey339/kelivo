@@ -612,10 +612,16 @@ void main() {
     test(
       'cancel during staging of a large file does not publish a candidate',
       () async {
-        final extracted = await _createExtractedBundle(root, includeFiles: true);
+        final extracted = await _createExtractedBundle(
+          root,
+          includeFiles: true,
+        );
         final blob = File(p.join(extracted.path, 'upload', 'large.bin'));
         await blob.parent.create(recursive: true);
-        await blob.writeAsBytes(List<int>.filled(4 * 1024 * 1024, 7), flush: true);
+        await blob.writeAsBytes(
+          List<int>.filled(4 * 1024 * 1024, 7),
+          flush: true,
+        );
         await _addDeclaredEntry(
           extracted,
           name: 'upload/large.bin',
@@ -728,11 +734,13 @@ void main() {
         RestoreBundleStaging.debugIsolateTimeout = const Duration(
           milliseconds: 150,
         );
+        debugSkipBackupIsolateKill = true;
         addTearDown(() {
           RestoreBundleStaging.debugCandidateDbHangSeconds = 0;
           RestoreBundleStaging.debugIsolateKillGrace = null;
           RestoreBundleStaging.debugIsolateExitDeadline = null;
           RestoreBundleStaging.debugIsolateTimeout = null;
+          debugSkipBackupIsolateKill = false;
         });
 
         final token = BackupCancelToken();
@@ -863,11 +871,13 @@ void main() {
         RestoreBundleStaging.debugIsolateTimeout = const Duration(
           milliseconds: 150,
         );
+        debugSkipBackupIsolateKill = true;
         addTearDown(() {
           RestoreBundleStaging.debugCandidateValidateHangSeconds = 0;
           RestoreBundleStaging.debugIsolateKillGrace = null;
           RestoreBundleStaging.debugIsolateExitDeadline = null;
           RestoreBundleStaging.debugIsolateTimeout = null;
+          debugSkipBackupIsolateKill = false;
         });
 
         final token = BackupCancelToken();
@@ -927,7 +937,10 @@ void main() {
 
     test('chunked hash observes cancel between chunks', () async {
       final file = File(p.join(root.path, 'large.bin'));
-      await file.writeAsBytes(List<int>.filled(2 * 1024 * 1024, 3), flush: true);
+      await file.writeAsBytes(
+        List<int>.filled(2 * 1024 * 1024, 3),
+        flush: true,
+      );
       final token = BackupCancelToken()..cancel();
       addTearDown(token.dispose);
 
@@ -943,11 +956,7 @@ Future<void> _rewriteSettingsDescriptor(
   Directory extracted,
   File settingsFile,
 ) async {
-  await _addDeclaredEntry(
-    extracted,
-    name: 'settings.json',
-    file: settingsFile,
-  );
+  await _addDeclaredEntry(extracted, name: 'settings.json', file: settingsFile);
 }
 
 Future<void> _addDeclaredEntry(

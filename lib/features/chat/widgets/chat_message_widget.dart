@@ -5527,7 +5527,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                             context,
                             widget.part.toolName,
                             widget.part.arguments,
-                            isResult: !widget.part.loading && !isPendingApproval,
+                            isResult:
+                                !widget.part.loading && !isPendingApproval,
                           ),
                           style: TextStyle(
                             fontSize: 13,
