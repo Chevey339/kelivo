@@ -492,18 +492,20 @@ Input:
     'Sun',
   ];
 
-  /// Wraps [timestamp] as `<current_time>EEE yy-MM-dd HH:mm:ss</current_time>`
+  /// Wraps [timestamp] as `<current_time>EEE yyyy-MM-dd HH:mm:ss</current_time>`
   /// in the local timezone, without a UTC offset (§9.1).
+  ///
+  /// Four-digit year avoids `yy-MM-dd` / `dd-MM-yy` ambiguity (e.g. 22–26).
   static String formatCurrentTimeTag(DateTime timestamp) {
     final local = timestamp.isUtc ? timestamp.toLocal() : timestamp;
     final eee = _weekdayAbbrev[local.weekday - 1];
-    final yy = (local.year % 100).toString().padLeft(2, '0');
+    final yyyy = local.year.toString();
     final mm = local.month.toString().padLeft(2, '0');
     final dd = local.day.toString().padLeft(2, '0');
     final hh = local.hour.toString().padLeft(2, '0');
     final min = local.minute.toString().padLeft(2, '0');
     final ss = local.second.toString().padLeft(2, '0');
-    return '<current_time>$eee $yy-$mm-$dd $hh:$min:$ss</current_time>';
+    return '<current_time>$eee $yyyy-$mm-$dd $hh:$min:$ss</current_time>';
   }
 
   /// Returns which of `{cur_date}`, `{cur_time}`, `{cur_datetime}` occur in

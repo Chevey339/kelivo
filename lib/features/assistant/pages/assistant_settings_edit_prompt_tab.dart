@@ -253,7 +253,7 @@ class _PromptTabState extends State<_PromptTab> {
 
   Future<void> _showAppendCurrentTimeInfoDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    const example = '<current_time>Mon 26-08-08 14:30:05</current_time>';
+    const example = '<current_time>Mon 2026-08-08 14:30:05</current_time>';
     return showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

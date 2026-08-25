@@ -12,7 +12,7 @@ void main() {
         expect(monday.weekday, DateTime.monday);
         expect(
           MemoryPrompts.formatCurrentTimeTag(monday),
-          '<current_time>Mon 26-08-03 14:03:22</current_time>',
+          '<current_time>Mon 2026-08-03 14:03:22</current_time>',
         );
 
         final samples = <DateTime, String>{
@@ -29,22 +29,22 @@ void main() {
           expect(formatted, contains('<current_time>${entry.value} '));
         }
 
-        // Year boundary: 2025-12-31 → yy=25; 2026-01-01 → yy=26
+        // Year boundary uses a four-digit year.
         expect(
           MemoryPrompts.formatCurrentTimeTag(
             DateTime(2025, 12, 31, 23, 59, 59),
           ),
-          '<current_time>Wed 25-12-31 23:59:59</current_time>',
+          '<current_time>Wed 2025-12-31 23:59:59</current_time>',
         );
         expect(
           MemoryPrompts.formatCurrentTimeTag(DateTime(2026, 1, 1, 0, 0, 1)),
-          '<current_time>Thu 26-01-01 00:00:01</current_time>',
+          '<current_time>Thu 2026-01-01 00:00:01</current_time>',
         );
 
         // Single-digit month and day are zero-padded.
         expect(
           MemoryPrompts.formatCurrentTimeTag(DateTime(2026, 3, 5, 9, 8, 7)),
-          '<current_time>Thu 26-03-05 09:08:07</current_time>',
+          '<current_time>Thu 2026-03-05 09:08:07</current_time>',
         );
       },
     );
