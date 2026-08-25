@@ -131,7 +131,10 @@ Stream<StreamChunk> sendClaudeStream(
 
   Set<String> toolUseIdsInBlocks(List<Map<String, dynamic>> blocks) {
     return blocks
-        .where((block) => block['type'] == 'tool_use')
+        .where(
+          (block) =>
+              block['type'] == 'tool_use' || block['type'] == 'server_tool_use',
+        )
         .map((block) => (block['id'] ?? '').toString())
         .where((id) => id.isNotEmpty)
         .toSet();
@@ -207,13 +210,17 @@ Stream<StreamChunk> sendClaudeStream(
     return completed;
   }
 
+  // Server tools replayed as their own blocks already carry their result; the
+  // synthesised `tool` message for the same id would be an orphan tool_result.
+  final replayedServerToolIds = <String>{};
+
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
     final isLast = i == nonSystemMessages.length - 1;
     final role = (m['role'] ?? 'user').toString();
     if (role == 'tool') {
       final id = (m['tool_call_id'] ?? '').toString();
-      if (id.isNotEmpty) {
+      if (id.isNotEmpty && !replayedServerToolIds.contains(id)) {
         pendingToolResults.add({
           'type': 'tool_result',
           'tool_use_id': id,
@@ -229,6 +236,11 @@ Stream<StreamChunk> sendClaudeStream(
       final blocks =
           anthropicBlocksFromToolCallMetadata(toolCalls) ??
           <Map<String, dynamic>>[];
+      for (final block in blocks) {
+        if (block['type'] != 'server_tool_use') continue;
+        final sid = (block['id'] ?? '').toString();
+        if (sid.isNotEmpty) replayedServerToolIds.add(sid);
+      }
       if (blocks.isEmpty) {
         final text = (m['content'] ?? '').toString();
         if (text.trim().isNotEmpty && text.trim() != '\n\n') {

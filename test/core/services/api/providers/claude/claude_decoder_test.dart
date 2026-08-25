@@ -498,4 +498,184 @@ void main() {
     expect(second.usage!.totalTokens, 120);
     expect(silent.chunks.whereType<Usage>(), isEmpty);
   });
+
+  test('web search blocks are replayable verbatim, encrypted content included', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_1',
+          'name': 'web_search',
+          'caller': {'type': 'code_execution_20260120', 'tool_id': 'srvtoolu_0'},
+        },
+      }),
+    );
+    decoder.accept(
+      _event('content_block_delta', {
+        'type': 'content_block_delta',
+        'index': 0,
+        'delta': {
+          'type': 'input_json_delta',
+          'partial_json': '{"query":"kyoto"}',
+        },
+      }),
+    );
+    decoder.accept(
+      _event('content_block_stop', {'type': 'content_block_stop', 'index': 0}),
+    );
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 1,
+        'content_block': {
+          'type': 'web_search_tool_result',
+          'tool_use_id': 'srvtoolu_1',
+          'caller': {'type': 'code_execution_20260120', 'tool_id': 'srvtoolu_0'},
+          'content': [
+            {
+              'type': 'web_search_result',
+              'url': 'https://example.com',
+              'title': 'Example',
+              'encrypted_content': 'EqgfCioIARgBIiQ3',
+            },
+          ],
+        },
+      }),
+    );
+
+    final call = decoder.assistantBlocks.firstWhere(
+      (block) => block['type'] == 'server_tool_use',
+    );
+    expect(call['id'], 'srvtoolu_1');
+    expect(call['name'], 'web_search');
+    expect(call['input'], {'query': 'kyoto'});
+    expect((call['caller'] as Map)['tool_id'], 'srvtoolu_0');
+
+    final result = decoder.assistantBlocks.firstWhere(
+      (block) => block['type'] == 'web_search_tool_result',
+    );
+    // The API only restores search results into context when this comes back
+    // untouched; dropping it is what makes follow-up turns lose the content.
+    expect(
+      ((result['content'] as List).first as Map)['encrypted_content'],
+      'EqgfCioIARgBIiQ3',
+    );
+    expect((result['caller'] as Map)['tool_id'], 'srvtoolu_0');
+  });
+
+  test('text before a server tool keeps its place in the replayed blocks', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {'type': 'text', 'text': ''},
+      }),
+    );
+    decoder.accept(
+      _event('content_block_delta', {
+        'type': 'content_block_delta',
+        'index': 0,
+        'delta': {'type': 'text_delta', 'text': 'Searching now.'},
+      }),
+    );
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 1,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_2',
+          'name': 'web_search',
+        },
+      }),
+    );
+
+    expect(
+      decoder.assistantBlocks.map((block) => block['type']).toList(),
+      ['text', 'server_tool_use'],
+    );
+  });
+
+  test('a throttled code execution surfaces as a failed tool card', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_3',
+          'name': 'code_execution',
+        },
+      }),
+    );
+    final chunks = decoder
+        .accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': 1,
+            'content_block': {
+              'type': 'code_execution_tool_result',
+              'tool_use_id': 'srvtoolu_3',
+              'content': {
+                'type': 'code_execution_tool_result_error',
+                'error_code': 'too_many_requests',
+              },
+            },
+          }),
+        )
+        .chunks;
+
+    final end = chunks.whereType<ServerToolEnd>().single;
+    expect(end.id, 'srvtoolu_3');
+    expect(end.status, ServerToolStatus.failed);
+    expect((end.output as Map)['error'], 'too_many_requests');
+    expect(chunks.whereType<ServerToolStart>().single.toolName, 'code_execution');
+  });
+
+  test('a successful code execution stays out of the tool cards', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('content_block_start', {
+        'type': 'content_block_start',
+        'index': 0,
+        'content_block': {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_4',
+          'name': 'bash_code_execution',
+        },
+      }),
+    );
+    final chunks = decoder
+        .accept(
+          _event('content_block_start', {
+            'type': 'content_block_start',
+            'index': 1,
+            'content_block': {
+              'type': 'bash_code_execution_tool_result',
+              'tool_use_id': 'srvtoolu_4',
+              'content': {
+                'type': 'bash_code_execution_result',
+                'stdout': 'ok',
+                'stderr': '',
+                'return_code': 0,
+              },
+            },
+          }),
+        )
+        .chunks;
+
+    expect(chunks.whereType<ServerToolEnd>(), isEmpty);
+    // Still replayable: the caller chain breaks without it.
+    expect(
+      decoder.assistantBlocks.any(
+        (block) => block['type'] == 'bash_code_execution_tool_result',
+      ),
+      isTrue,
+    );
+  });
 }

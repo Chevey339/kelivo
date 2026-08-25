@@ -1403,6 +1403,82 @@ data: {"type":"message_stop"}
       },
     );
 
+    test('replayed web search keeps its native blocks and encrypted content', () async {
+      const searchBlocks = [
+        {'type': 'text', 'text': '我先搜索一下。'},
+        {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_1',
+          'name': 'web_search',
+          'input': {'query': 'kyoto'},
+        },
+        {
+          'type': 'web_search_tool_result',
+          'tool_use_id': 'srvtoolu_1',
+          'content': [
+            {
+              'type': 'web_search_result',
+              'url': 'https://example.com',
+              'title': 'Example',
+              'encrypted_content': 'EqgfCioIARgBIiQ3',
+            },
+          ],
+        },
+      ];
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': '京都有什么好玩的'},
+          {
+            'role': 'assistant',
+            'content': '\n\n',
+            'tool_calls': [
+              {
+                'id': 'srvtoolu_1',
+                'type': 'function',
+                'function': {'name': 'search_web', 'arguments': '{"query":"kyoto"}'},
+                'metadata': {
+                  'anthropic': {'assistant_blocks': searchBlocks},
+                },
+              },
+            ],
+          },
+          {
+            'role': 'tool',
+            'tool_call_id': 'srvtoolu_1',
+            'name': 'search_web',
+            'content': '{"items":[{"title":"Example","url":"https://example.com"}]}',
+          },
+          {'role': 'user', 'content': '第一条具体怎么说的'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      final assistantContent = (messages[1]['content'] as List).cast<Map>();
+      expect(
+        assistantContent.map((block) => block['type']).toList(),
+        ['text', 'server_tool_use', 'web_search_tool_result'],
+      );
+      final result = assistantContent.firstWhere(
+        (block) => block['type'] == 'web_search_tool_result',
+      );
+      expect(
+        ((result['content'] as List).first as Map)['encrypted_content'],
+        'EqgfCioIARgBIiQ3',
+      );
+      // The server tool carries its own result, so the synthesised tool
+      // message must not become a second, orphaned tool_result.
+      for (final message in messages) {
+        final content = message['content'];
+        if (content is! List) continue;
+        expect(
+          content.whereType<Map>().any((block) => block['type'] == 'tool_result'),
+          isFalse,
+        );
+      }
+      expect(messages.last['content'], '第一条具体怎么说的');
+    });
+
     test('live tool continuation keeps initial user image blocks', () async {
       final dir = await Directory.systemTemp.createTemp(
         'kelivo_claude_tool_img_',

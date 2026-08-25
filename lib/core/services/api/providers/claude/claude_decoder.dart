@@ -36,6 +36,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _clientIndexToId = <int, String>{};
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
+  /// Position of each `server_tool_use` block inside [assistantBlocks], so its
+  /// streamed input can be filled in once the block closes.
+  final Map<String, int> _serverBlockIndex = <String, int>{};
+  final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
   final Set<String> _clientToolEnded = <String>{};
@@ -170,11 +174,26 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         );
       }
     } else if (kind == 'server_tool_use') {
+      _flushTextBlock();
       final id = (block['id'] ?? '').toString();
       final name = (block['name'] ?? '').toString();
       if (id.isNotEmpty && idx != null) {
         _serverIndexToId[idx] = id;
         _serverArgs[id] = StringBuffer();
+      }
+      if (id.isNotEmpty) {
+        _serverToolNames[id] = name;
+        // Server tools must be replayed as the blocks the API sent, not as
+        // client tool calls: web search results only decrypt when their
+        // original block comes back intact.
+        assistantBlocks.add(<String, dynamic>{
+          'type': 'server_tool_use',
+          'id': id,
+          'name': name,
+          'input': <String, dynamic>{},
+          if (block['caller'] != null) 'caller': block['caller'],
+        });
+        _serverBlockIndex[id] = assistantBlocks.length - 1;
       }
       if (id.isNotEmpty && name == 'web_search') {
         _serverToolStarted.add(id);
@@ -187,8 +206,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
           ),
         );
       }
-    } else if (kind == 'web_search_tool_result') {
-      chunks.addAll(_webSearchResult(block));
+    } else if (kind.endsWith('_tool_result')) {
+      _flushTextBlock();
+      assistantBlocks.add(Map<String, dynamic>.from(block));
+      if (kind == 'web_search_tool_result') {
+        chunks.addAll(_webSearchResult(block));
+      } else if (kind.contains('code_execution')) {
+        chunks.addAll(_codeExecutionResult(block));
+      }
     } else if (kind == 'text') {
       if (idx != null) {
         chunks.add(TextStart(_ids.indexed('text', idx)));
@@ -309,9 +334,20 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
+      _updateServerToolUseBlock(sid);
       chunks.add(ToolCallEnd(sid));
     }
     return chunks;
+  }
+
+  void _updateServerToolUseBlock(String id) {
+    final pos = _serverBlockIndex[id];
+    if (pos == null || pos >= assistantBlocks.length) return;
+    final existing = assistantBlocks[pos];
+    assistantBlocks[pos] = <String, dynamic>{
+      ...existing,
+      'input': _serverArgsFor(id),
+    };
   }
 
   List<StreamChunk> _onMessageDelta(Map<String, dynamic> obj) {
@@ -334,6 +370,37 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       }
     } catch (_) {}
     return chunks;
+  }
+
+  /// Dynamic filtering runs web search inside code execution. Its successful
+  /// runs already surface as the nested web search card, so only failures are
+  /// worth a card of their own: without one, a throttled turn shows nothing at
+  /// all and reads like the search tool was never enabled.
+  List<StreamChunk> _codeExecutionResult(Map<String, dynamic> block) {
+    final content = block['content'];
+    if (content is! Map) return const <StreamChunk>[];
+    if (!(content['type'] ?? '').toString().endsWith('_error')) {
+      return const <StreamChunk>[];
+    }
+    final errorCode = (content['error_code'] ?? '').toString();
+    final id = (block['tool_use_id'] ?? '').toString();
+    if (id.isEmpty || !_serverToolEnded.add(id)) return const <StreamChunk>[];
+    final args = _serverArgsFor(id);
+    final name = _serverToolNames[id] ?? 'code_execution';
+    return <StreamChunk>[
+      if (_serverToolStarted.add(id))
+        ServerToolStart(id: id, toolName: name, input: args),
+      ServerToolEnd(
+        id: id,
+        input: args,
+        output: <String, dynamic>{
+          'items': const <Map<String, dynamic>>[],
+          if (errorCode.isNotEmpty) 'error': errorCode,
+        },
+        status: ServerToolStatus.failed,
+        metadata: _anthropicMetadata,
+      ),
+    ];
   }
 
   List<StreamChunk> _webSearchResult(Map<String, dynamic> block) {
