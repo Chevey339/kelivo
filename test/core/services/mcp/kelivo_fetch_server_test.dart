@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -15,7 +16,29 @@ void main() {
       baseUri = Uri.parse('http://127.0.0.1:${httpServer.port}');
       engine = KelivoFetchMcpServerEngine();
       httpServer.listen((request) async {
-        if (request.uri.path == '/json') {
+        if (request.uri.path == '/echo') {
+          final body = await utf8.decoder.bind(request).join();
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode({
+              'method': request.method,
+              'content_type':
+                  request.headers.value(HttpHeaders.contentTypeHeader) ?? '',
+              'body': body,
+            }),
+          );
+        } else if (request.uri.path == '/latin1') {
+          // No charset in the header, and bytes that are not valid UTF-8.
+          request.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'text/plain',
+          );
+          request.response.add(const [0xE9, 0x61]);
+        } else if (request.uri.path == '/fail') {
+          request.response.statusCode = 400;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write('{"error":"bad request"}');
+        } else if (request.uri.path == '/json') {
           request.response.headers.contentType = ContentType.json;
           request.response.write('''
 {
@@ -88,6 +111,9 @@ void main() {
       });
       expect(properties['start_index'], containsPair('default', 0));
       expect(properties['raw'], containsPair('default', false));
+      expect(properties['method'], containsPair('default', 'GET'));
+      expect(properties['method'], containsPair('enum', ['GET', 'POST']));
+      expect(properties['body'], containsPair('type', 'string'));
     });
 
     test(
@@ -152,6 +178,126 @@ void main() {
       expect(_resultText(first), startsWith('😀'));
       expect(_resultText(first), contains('start_index=2'));
       expect(_resultText(continued), 'abc');
+    });
+
+    test('posts a string body and defaults Content-Type to JSON', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'POST', 'body': '{"key":"value"}'},
+      );
+      final echo = jsonDecode(_resultText(result)) as Map<String, dynamic>;
+
+      expect(result['isError'], isFalse);
+      expect(echo['method'], 'POST');
+      expect(echo['body'], '{"key":"value"}');
+      expect(echo['content_type'], contains('application/json'));
+    });
+
+    test('encodes an object body as JSON', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {
+          'method': 'post',
+          'body': {'key': '值'},
+        },
+      );
+      final echo = jsonDecode(_resultText(result)) as Map<String, dynamic>;
+
+      expect(echo['method'], 'POST');
+      expect(echo['body'], '{"key":"值"}');
+    });
+
+    test('keeps a caller-supplied Content-Type', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {
+          'method': 'POST',
+          'body': 'a=1',
+          'headers': {'content-type': 'application/x-www-form-urlencoded'},
+        },
+      );
+      final echo = jsonDecode(_resultText(result)) as Map<String, dynamic>;
+
+      expect(echo['content_type'], 'application/x-www-form-urlencoded');
+      expect(echo['body'], 'a=1');
+    });
+
+    test('rejects methods beyond GET and POST', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'DELETE'},
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('expected GET or POST'));
+    });
+
+    test('rejects a body on a GET request', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'body': '{}'},
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('only POST requests'));
+    });
+
+    test('reports the status code together with the error body', () async {
+      final result = await _callFetch(engine, baseUri.resolve('/fail'));
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('HTTP 400'));
+      expect(_resultText(result), contains('bad request'));
+    });
+
+    test('refuses to continue a POST response with start_index', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'POST', 'body': '{}', 'start_index': 10},
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('cannot be continued'));
+    });
+
+    test('tells the model to raise max_length on a truncated POST', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {'method': 'POST', 'body': '{}', 'max_length': 10},
+      );
+      final text = _resultText(result);
+
+      expect(text, contains('Content truncated'));
+      expect(text, contains('Raise max_length'));
+      expect(text, isNot(contains('start_index=')));
+    });
+
+    test('rejects a request body whose charset is not UTF-8', () async {
+      final result = await _callFetch(
+        engine,
+        baseUri.resolve('/echo'),
+        arguments: const {
+          'method': 'POST',
+          'body': 'café',
+          'headers': {'Content-Type': 'text/plain; charset=iso-8859-1'},
+        },
+      );
+
+      expect(result['isError'], isTrue);
+      expect(_resultText(result), contains('sent as UTF-8'));
+    });
+
+    test('falls back to latin1 for a charset-less non-UTF-8 page', () async {
+      final result = await _callFetch(engine, baseUri.resolve('/latin1'));
+
+      expect(_resultText(result), 'éa');
     });
 
     test('rejects attempts to exceed the hard output limit', () async {
