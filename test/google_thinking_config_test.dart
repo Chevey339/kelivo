@@ -337,15 +337,73 @@ void main() {
       },
     );
 
-    // Image ids fall through to the raw-budget branch; the off case is the only
-    // one that distinguishes that from the old dedicated image branch.
-    test('image ids hide thoughts when thinking is off', () async {
+    test(
+      'Flash Image maps a positive budget to high, never a budget',
+      () async {
+        final body = await _capture(
+          modelId: 'gemini-3.1-flash-image',
+          thinkingBudget: 16000,
+        );
+
+        expect(_thinkingConfig(body), {
+          'includeThoughts': true,
+          'thinkingLevel': 'high',
+        });
+      },
+    );
+
+    test('Flash-Lite Image keeps the light preset at minimal', () async {
       final body = await _capture(
-        modelId: 'gemini-3.1-flash-image',
-        thinkingBudget: 0,
+        modelId: 'gemini-3.1-flash-lite-image',
+        thinkingBudget: 1024,
       );
 
-      expect(_thinkingConfig(body), {'includeThoughts': false});
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'minimal',
+      });
+    });
+
+    test('Flash Image defaults to minimal without a budget', () async {
+      final body = await _capture(modelId: 'gemini-3.1-flash-image-preview');
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingLevel': 'minimal',
+      });
+      expect(
+        (body['generationConfig'] as Map).containsKey('maxOutputTokens'),
+        isFalse,
+      );
+    });
+
+    test(
+      'Flash Image floors at minimal with thoughts hidden when off',
+      () async {
+        final body = await _capture(
+          modelId: 'gemini-3.1-flash-image',
+          thinkingBudget: 0,
+        );
+
+        expect(_thinkingConfig(body), {
+          'includeThoughts': false,
+          'thinkingLevel': 'minimal',
+        });
+      },
+    );
+
+    // The legacy Pro Image model is absent from the thinking-level docs, so it
+    // stays on the raw-budget branch.
+    test('Gemini 3 Pro Image stays on thinkingBudget', () async {
+      final body = await _capture(
+        modelId: 'gemini-3-pro-image-preview',
+        thinkingBudget: 16000,
+      );
+
+      expect(_thinkingConfig(body), {
+        'includeThoughts': true,
+        'thinkingBudget': 16000,
+      });
     });
 
     test('TTS ids never get a thinkingLevel', () async {

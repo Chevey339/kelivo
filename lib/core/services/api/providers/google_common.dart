@@ -73,12 +73,21 @@ bool _isGemma4Model(String modelId) {
   ).hasMatch(modelId);
 }
 
-// Non-text Gemini variants: they take a raw budget, not a thinking level, so
-// they fall through to the Gemini 2.x branch. Holding them out here also stops
-// the `-` terminator in the family patterns below from swallowing the suffix and
-// reading `gemini-3.1-flash-image` as plain `gemini-3.1-flash`.
+// Non-text Gemini variants: they do not share the text families' thinking
+// contract, so they never reach the pro/flash branches. Holding them out here
+// also stops the `-` terminator in the family patterns below from swallowing
+// the suffix and reading `gemini-3.1-flash-image` as plain `gemini-3.1-flash`.
 final _gemini3NonTextSuffix = RegExp(
   r'(^|[-_/])(image|tts|live)([-._:@/]|$)',
+  caseSensitive: false,
+);
+
+// Gemini 3.x Flash Image and Flash-Lite Image do take a thinking level, but
+// only 'minimal' (the default) and 'high'. Every other image id -- the legacy
+// gemini-3-pro-image included -- stays on the raw-budget branch.
+// https://ai.google.dev/gemini-api/docs/generate-content/image-generation#controlling-thinking-levels
+final _gemini3FlashImageId = RegExp(
+  r'gemini-3(?:\.\d+)?-flash(-lite)?-image([._:@/-]|$)',
   caseSensitive: false,
 );
 
@@ -88,6 +97,11 @@ const _gemini3ProMediumMinor = 1; // pro gained 'medium' in 3.1
 const _gemini3FlashModernMinor =
     5; // flash defaults to 'medium' and 64K from 3.5
 const _gemini3FlashNoMinimalMinor = 7; // flash dropped 'minimal' in 3.7
+
+// Budget presets the sheet offers: 1024 (light), 16000 (medium), 32000 (heavy).
+// These split them into the named thinking levels.
+const _gemini3LowBudgetCeiling = 8000;
+const _gemini3MediumBudgetCeiling = 24000;
 
 final _gemini3FlashId = RegExp(
   r'gemini-3(?:\.(?<minor>\d+))?-flash([._:@/-]|$)',
@@ -140,6 +154,16 @@ Map<String, dynamic> _googleThinkingConfig(
     };
   }
 
+  if (_gemini3FlashImageId.hasMatch(upstreamModelId)) {
+    // Only 'minimal' and 'high' exist here, so the light preset shares the
+    // 'minimal' floor with "off"; minimal still thinks, so "off" only hides
+    // the thoughts.
+    final level = !off && budget != null && budget >= _gemini3LowBudgetCeiling
+        ? 'high'
+        : 'minimal';
+    return {'includeThoughts': !off, 'thinkingLevel': level};
+  }
+
   final proMinor = _gemini3ProMinor(upstreamModelId);
   if (proMinor != null) {
     // gemini-3-pro has only 'low' and 'high'; 3.1 added 'medium'.
@@ -148,9 +172,9 @@ Map<String, dynamic> _googleThinkingConfig(
     if (off) {
       level = 'low';
     } else if (budget != null && budget > 0) {
-      if (budget < 8000) {
+      if (budget < _gemini3LowBudgetCeiling) {
         level = 'low';
-      } else if (budget < 24000 && hasMedium) {
+      } else if (budget < _gemini3MediumBudgetCeiling && hasMedium) {
         level = 'medium';
       }
     }
@@ -171,9 +195,9 @@ Map<String, dynamic> _googleThinkingConfig(
       level = lowest;
     } else if (budget != null && budget > 0) {
       // Light (1024) -> low, Medium (16000) -> medium, Heavy (32000) -> high
-      if (budget < 8000) {
+      if (budget < _gemini3LowBudgetCeiling) {
         level = 'low';
-      } else if (budget < 24000) {
+      } else if (budget < _gemini3MediumBudgetCeiling) {
         level = 'medium';
       } else {
         level = 'high';
