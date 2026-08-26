@@ -57,6 +57,7 @@ void main() {
   late SettingsProvider settings;
   late AssistantProvider assistantProvider;
   var streamRequestCount = 0;
+  Completer<void>? streamHold;
 
   Future<void> handleApiRequest(HttpRequest request) async {
     final body =
@@ -64,6 +65,8 @@ void main() {
             as Map<String, dynamic>;
     if (body['stream'] == true) {
       streamRequestCount++;
+      final hold = streamHold;
+      if (hold != null) await hold.future;
       request.response.statusCode = HttpStatus.ok;
       request.response.headers.contentType = ContentType(
         'text',
@@ -117,6 +120,7 @@ void main() {
     service = ChatService(existingRepository: repository);
     await service.init();
     streamRequestCount = 0;
+    streamHold = null;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen(handleApiRequest);
   });
@@ -522,6 +526,58 @@ void main() {
     });
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'a second conversation can send while the first is still streaming',
+    (tester) async {
+      final controller = await pumpHarness(tester);
+      await tester.runAsync(() async {
+        streamHold = Completer<void>();
+        final first = await openConversation(controller);
+        await controller.sendMessage(ChatInputData(text: 'from a'));
+        await waitFor(
+          () => controller.chatController.isConversationLoading(first.id),
+          'first conversation to start streaming',
+        );
+
+        final second = await service.createConversation(title: 'Second');
+        await controller.chatController.setCurrentConversationAndLoad(second);
+        final result = await controller.sendMessage(
+          ChatInputData(text: 'from b'),
+        );
+
+        expect(result, ChatInputSubmissionResult.sent);
+        expect(
+          controller.chatController.isConversationLoading(first.id),
+          isTrue,
+        );
+        expect(
+          controller.chatController.isConversationLoading(second.id),
+          isTrue,
+        );
+
+        streamHold!.complete();
+        await waitFor(
+          () =>
+              !controller.chatController.isConversationLoading(first.id) &&
+              !controller.chatController.isConversationLoading(second.id),
+          'both streams to finish',
+        );
+
+        final firstMessages = await service.loadMessages(first.id);
+        final secondMessages = await service.loadMessages(second.id);
+        expect(
+          firstMessages.where((m) => m.role == 'user').single.content,
+          'from a',
+        );
+        expect(
+          secondMessages.where((m) => m.role == 'user').single.content,
+          'from b',
+        );
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
 
 class _ControllerHarness extends StatefulWidget {
