@@ -70,6 +70,35 @@ void main() {
     },
   );
 
+  test('a generated file becomes an image part only when it is one', () {
+    final handler = StreamChunkHandler();
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/chart.png',
+        name: 'chart.png',
+        mime: 'image/png',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(
+        uri: 'kelivo-file:///upload/data.csv',
+        name: 'data.csv',
+        mime: 'text/csv',
+      ),
+    );
+    handler.handle(
+      const GeneratedFile(uri: '', name: 'nothing.txt', mime: 'text/plain'),
+    );
+
+    expect(handler.parts, hasLength(2));
+    final image = handler.parts[0] as ImagePart;
+    expect(image.uri, 'kelivo-file:///upload/chart.png');
+    expect(image.mime, 'image/png');
+    final file = handler.parts[1] as FilePart;
+    expect(file.uri, 'kelivo-file:///upload/data.csv');
+    expect(file.name, 'data.csv');
+  });
+
   test('creates a text part on Delta when Start was omitted', () {
     final handler = StreamChunkHandler();
     handler.handle(const TextDelta(id: 't', text: 'Hello'));

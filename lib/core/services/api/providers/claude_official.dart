@@ -24,6 +24,7 @@ export 'claude/claude_history.dart'
         normalizeClaudeImageMime,
         isClaudeSupportedImageMime,
         claudeToolResultContent;
+import 'claude/claude_files.dart';
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
@@ -233,6 +234,7 @@ Stream<StreamChunk> sendClaudeStream(
   // Every response of this turn so far, recorded on each card so the turn
   // replays as the responses it was.
   final turnResponses = <List<Map<String, dynamic>>>[];
+  final downloadedFileIds = <String>{};
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
@@ -413,6 +415,21 @@ Stream<StreamChunk> sendClaudeStream(
         final decoded = decoder.accept(event);
         for (final chunk in decoded.chunks) {
           yield chunk;
+          if (chunk is ServerToolEnd) {
+            // Code execution reports what it wrote as ids the card cannot do
+            // anything with, so the bytes are fetched here and the message
+            // carries the file itself.
+            for (final fileId in claudeGeneratedFileIds(chunk.output)) {
+              if (!downloadedFileIds.add(fileId)) continue;
+              final file = await downloadClaudeGeneratedFile(
+                client: client,
+                base: base,
+                headers: baseHeaders,
+                fileId: fileId,
+              );
+              if (file != null) yield file;
+            }
+          }
           if (chunk is ToolCallEnd &&
               decoder.isClientTool(chunk.id) &&
               onToolCall != null &&

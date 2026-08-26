@@ -211,6 +211,15 @@ class StreamChunkHandler {
         }
         _imageIndex.remove(id);
         _imageMime.remove(id);
+      case GeneratedFile(:final uri, :final name, :final mime):
+        if (uri.isEmpty) return;
+        // An image belongs in an image part so the viewer, the export sheet,
+        // and the next request treat it as a picture rather than a download.
+        _parts.add(
+          (mime ?? '').startsWith('image/')
+              ? ImagePart(uri: uri, mime: mime)
+              : FilePart(uri: uri, name: name, mime: mime),
+        );
       case Annotations(:final id, :final annotations):
         final items = [
           for (final citation in annotations.whereType<UrlCitationAnnotation>())

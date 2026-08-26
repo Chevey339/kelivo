@@ -2146,7 +2146,11 @@ class ChatActions {
         _applyUsage(state, usage);
       case Finish():
         await _handleStreamFinish(state);
-      case ImageStart() || ImageDelta() || ImageSnapshot() || ImageEnd():
+      case ImageStart() ||
+          ImageDelta() ||
+          ImageSnapshot() ||
+          ImageEnd() ||
+          GeneratedFile():
         _publishAssistantParts(state);
         _scheduleStreamingCheckpoint(state);
       case TextStart() ||
