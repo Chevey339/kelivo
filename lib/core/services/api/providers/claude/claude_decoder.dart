@@ -13,11 +13,15 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   ClaudeStreamDecoder({
     this.skipRedactedThinkingBlocks = false,
     this.initialUsage,
+    this.serverToolNames = const <String>{},
     String sourceId = 'stream',
   }) : _ids = StreamChunkIds(sourceId);
 
   final bool skipRedactedThinkingBlocks;
   final TokenUsage? initialUsage;
+
+  /// Tool names this request declared as Anthropic-hosted server tools.
+  final Set<String> serverToolNames;
   final StreamChunkIds _ids;
 
   final List<Map<String, dynamic>> assistantBlocks = <Map<String, dynamic>>[];
@@ -135,7 +139,14 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     final cb = obj['content_block'];
     if (cb is! Map) return const <StreamChunk>[];
     final block = cb.cast<String, dynamic>();
-    final kind = (block['type'] ?? '').toString();
+    var kind = (block['type'] ?? '').toString();
+    // Some Claude-compatible relays run a declared server tool upstream but
+    // label its block `tool_use`. Executing that as a client tool answers with
+    // an empty result, so keep it on the server-tool path.
+    if (kind == 'tool_use' &&
+        serverToolNames.contains((block['name'] ?? '').toString())) {
+      kind = 'server_tool_use';
+    }
     final idx = _parseIndex(obj['index']);
     final chunks = <StreamChunk>[];
 

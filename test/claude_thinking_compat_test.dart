@@ -73,6 +73,49 @@ class _ProxyHttpOverrides extends HttpOverrides {
   }
 }
 
+/// A relay that ran `web_search` upstream but labelled the block `tool_use`.
+const _downgradedRound = '''
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_1","type":"message","role":"assistant","model":"claude-sonnet-4-6","content":[],"stop_reason":null,"usage":{"input_tokens":1,"output_tokens":0}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"web_search","input":{}}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"kelivo\\"}"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: content_block_start
+data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"found it"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":1}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":10,"output_tokens":5}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''';
+
+const _plainRound = '''
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"second round"}}
+
+event: message_stop
+data: {"type":"message_stop"}
+
+''';
+
 Future<Map<String, dynamic>> _captureClaudeRequestBody({
   required String modelId,
   int? thinkingBudget,
@@ -1555,6 +1598,90 @@ data: {"type":"message_stop"}
         expect(types, isNot(contains('tool_result')));
       }
       expect(messages.last['content'], '算了，直接说吧');
+    });
+
+    test(
+      'a downgraded web_search tool_use never asks for a client round',
+      () async {
+        // Relays have been seen running the declared server tool upstream but
+        // labelling its block `tool_use`. Answering that as a client tool sends
+        // back an empty result, which the model reports as an empty search.
+        final requestBodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+
+        server.listen((request) async {
+          final round = requestBodies.length;
+          requestBodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType(
+            'text',
+            'event-stream',
+          );
+          request.response.write(round > 0 ? _plainRound : _downgradedRound);
+          await request.response.close();
+        });
+
+        final chunks = await ChatApiService.sendMessageStream(
+          config: _claudeConfig(
+            'http://${server.address.address}:${server.port}',
+            modelOverrides: const <String, dynamic>{
+              'claude-sonnet-4-6': <String, dynamic>{
+                'builtInTools': <String>[BuiltInToolNames.search],
+              },
+            },
+          ),
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '搜索一下kelivo'},
+          ],
+          stream: true,
+        ).toList();
+
+        expect(requestBodies, hasLength(1));
+        expect(chunks.whereType<ServerToolStart>(), hasLength(1));
+        expect(
+          chunks.whereType<TextDelta>().map((chunk) => chunk.text).join(),
+          'found it',
+        );
+      },
+    );
+
+    test('an empty tool result still carries an explicit content', () async {
+      // Omitting `content` leaves the call unanswered and Anthropic rejects an
+      // empty text block, so a tool that produced nothing needs a placeholder.
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': '几点了'},
+          {
+            'role': 'assistant',
+            'content': '',
+            'tool_calls': [
+              {
+                'id': 'toolu_empty',
+                'type': 'function',
+                'function': {'name': 'get_time', 'arguments': '{}'},
+              },
+            ],
+          },
+          {'role': 'tool', 'tool_call_id': 'toolu_empty', 'content': ''},
+          {'role': 'user', 'content': '那算了'},
+        ],
+      );
+
+      final results = [
+        for (final message in (body['messages'] as List).cast<Map>())
+          if (message['content'] is List)
+            for (final block in (message['content'] as List).whereType<Map>())
+              if (block['type'] == 'tool_result') block,
+      ];
+      expect(results.single['content'], '(no output)');
     });
 
     test('every turn shape replays as one assistant message', () async {

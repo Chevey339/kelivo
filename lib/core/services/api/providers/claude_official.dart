@@ -35,6 +35,12 @@ String normalizeClaudeImageMime(String mime) {
   return normalized;
 }
 
+/// Anthropic rejects an empty text block, and dropping `content` altogether
+/// leaves the tool call unanswered, which reads to the model as a malformed
+/// turn. A tool that produced nothing gets an explicit placeholder instead.
+String claudeToolResultContent(String result) =>
+    result.trim().isEmpty ? '(no output)' : result;
+
 bool isClaudeSupportedImageMime(String mime) {
   switch (normalizeClaudeImageMime(mime)) {
     case 'image/jpeg':
@@ -230,7 +236,7 @@ Stream<StreamChunk> sendClaudeStream(
         pendingToolResults.add({
           'type': 'tool_result',
           'tool_use_id': id,
-          'content': (m['content'] ?? '').toString(),
+          'content': claudeToolResultContent((m['content'] ?? '').toString()),
         });
       }
       continue;
@@ -516,6 +522,14 @@ Stream<StreamChunk> sendClaudeStream(
     ),
   );
 
+  // Client tools are declared by `input_schema`, the Anthropic-hosted ones by
+  // `type`. The decoder needs the latter to recognise a downgraded block.
+  final declaredServerToolNames = <String>{
+    for (final t in allTools)
+      if (t['input_schema'] == null && (t['type'] ?? '').toString().isNotEmpty)
+        (t['name'] ?? '').toString(),
+  }..remove('');
+
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(
     config,
@@ -683,6 +697,7 @@ Stream<StreamChunk> sendClaudeStream(
       final decoder = ClaudeStreamDecoder(
         skipRedactedThinkingBlocks: skipRedactedThinkingBlocks,
         initialUsage: totalUsage,
+        serverToolNames: declaredServerToolNames,
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
@@ -764,7 +779,7 @@ Stream<StreamChunk> sendClaudeStream(
         lastStreamResults.add({
           'type': 'tool_result',
           'tool_use_id': tool.id,
-          if (res.isNotEmpty) 'content': res,
+          'content': claudeToolResultContent(res),
         });
       }
     },
@@ -788,7 +803,7 @@ Stream<StreamChunk> sendClaudeStream(
                 <String, dynamic>{
                   'type': 'tool_result',
                   'tool_use_id': item.call.id,
-                  'content': item.content,
+                  'content': claudeToolResultContent(item.content),
                 },
             ];
       convo = [

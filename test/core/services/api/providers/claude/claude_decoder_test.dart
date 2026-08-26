@@ -793,4 +793,70 @@ void main() {
     expect(block['name'], 'memory');
     expect(block['input'], {'command': 'view'});
   });
+
+  group('a relay downgrading a server tool to tool_use', () {
+    List<StreamChunk> run(ClaudeStreamDecoder decoder) => <StreamChunk>[
+      ...decoder
+          .accept(
+            _event('content_block_start', {
+              'type': 'content_block_start',
+              'index': 0,
+              'content_block': {
+                'type': 'tool_use',
+                'id': 'toolu_1',
+                'name': 'web_search',
+              },
+            }),
+          )
+          .chunks,
+      ...decoder
+          .accept(
+            _event('content_block_delta', {
+              'type': 'content_block_delta',
+              'index': 0,
+              'delta': {
+                'type': 'input_json_delta',
+                'partial_json': '{"query":"kelivo"}',
+              },
+            }),
+          )
+          .chunks,
+      ...decoder
+          .accept(
+            _event('content_block_stop', {
+              'type': 'content_block_stop',
+              'index': 0,
+            }),
+          )
+          .chunks,
+    ];
+
+    test('is routed to the server tool path when the request declared it', () {
+      final decoder = ClaudeStreamDecoder(
+        serverToolNames: const {'web_search'},
+      );
+      final chunks = run(decoder);
+
+      // Nothing to execute locally, so no empty tool_result is ever produced.
+      expect(decoder.clientTools, isEmpty);
+      expect(decoder.isClientTool('toolu_1'), isFalse);
+      expect(chunks.whereType<ServerToolStart>().single.toolName, 'search_web');
+      expect(chunks.whereType<ToolCallEnd>().single.id, 'toolu_1');
+      expect(decoder.assistantBlocks.single, {
+        'type': 'server_tool_use',
+        'id': 'toolu_1',
+        'name': 'web_search',
+        'input': {'query': 'kelivo'},
+      });
+    });
+
+    test('stays a client tool when the request declared no server tool', () {
+      final decoder = ClaudeStreamDecoder();
+      final chunks = run(decoder);
+
+      expect(decoder.isClientTool('toolu_1'), isTrue);
+      expect(chunks.whereType<ServerToolStart>(), isEmpty);
+      expect(decoder.assistantBlocks.single['type'], 'tool_use');
+    });
+  });
 }
