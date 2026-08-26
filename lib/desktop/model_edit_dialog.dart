@@ -730,110 +730,18 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
         ),
       ),
       const SizedBox(height: 10),
-      if (_providerKind == ProviderKind.google) ...[
+      for (final (index, tool) in ModelBuiltInToolTiles.forConfig(
+        cfg: cfg,
+        l10n: l10n,
+      ).indexed) ...[
+        if (index > 0) const SizedBox(height: 8),
         _ToolTile(
-          title: l10n.modelDetailSheetUrlContextTool,
-          desc: l10n.modelDetailSheetUrlContextToolDescription,
-          value: _builtInTools.contains(BuiltInToolNames.urlContext),
-          onChanged: disableTools
+          title: tool.title,
+          desc: tool.desc,
+          value: tool.available && _builtInTools.contains(tool.name),
+          onChanged: disableTools || !tool.available
               ? null
-              : (v) => _toggleBuiltIn(BuiltInToolNames.urlContext, v),
-        ),
-        const SizedBox(height: 8),
-        _ToolTile(
-          title: l10n.modelDetailSheetCodeExecutionTool,
-          desc: l10n.modelDetailSheetCodeExecutionToolDescription,
-          value: _builtInTools.contains(BuiltInToolNames.codeExecution),
-          onChanged: disableTools
-              ? null
-              : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
-        ),
-        const SizedBox(height: 8),
-        _ToolTile(
-          title: l10n.modelDetailSheetYoutubeTool,
-          desc: l10n.modelDetailSheetYoutubeToolDescription,
-          value: _builtInTools.contains(BuiltInToolNames.youtube),
-          onChanged: disableTools
-              ? null
-              : (v) => _toggleBuiltIn(BuiltInToolNames.youtube, v),
-        ),
-      ] else if (_providerKind == ProviderKind.openai) ...[
-        if (isOpenRouter) ...[
-          _ToolTile(
-            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-            value:
-                cfg.useResponseApi == true &&
-                _builtInTools.contains(BuiltInToolNames.codeInterpreter),
-            onChanged: disableTools || cfg.useResponseApi != true
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.codeInterpreter, v),
-          ),
-          const SizedBox(height: 8),
-          _ToolTile(
-            title: l10n.modelDetailSheetWebFetchTool,
-            desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.webFetch),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
-          ),
-          const SizedBox(height: 8),
-          _ToolTile(
-            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.imageGeneration),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.imageGeneration, v),
-          ),
-          const SizedBox(height: 8),
-          _ToolTile(
-            title: l10n.modelDetailSheetOpenrouterShellTool,
-            desc: l10n.modelDetailSheetOpenrouterShellToolDescription,
-            value:
-                cfg.useResponseApi == true &&
-                _builtInTools.contains(BuiltInToolNames.shell),
-            onChanged: disableTools || cfg.useResponseApi != true
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.shell, v),
-          ),
-        ] else ...[
-          _ToolTile(
-            title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-            desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.codeInterpreter),
-            onChanged: disableTools || cfg.useResponseApi != true
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.codeInterpreter, v),
-          ),
-          const SizedBox(height: 8),
-          _ToolTile(
-            title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-            desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.imageGeneration),
-            onChanged: disableTools || cfg.useResponseApi != true
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.imageGeneration, v),
-          ),
-        ],
-      ] else if (_providerKind == ProviderKind.claude) ...[
-        _ToolTile(
-          title: l10n.modelDetailSheetWebFetchTool,
-          desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
-          value: _builtInTools.contains(BuiltInToolNames.webFetch),
-          onChanged: disableTools
-              ? null
-              : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
-        ),
-        const SizedBox(height: 8),
-        _ToolTile(
-          title: l10n.modelDetailSheetCodeExecutionTool,
-          desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
-          value: _builtInTools.contains(BuiltInToolNames.codeExecution),
-          onChanged: disableTools
-              ? null
-              : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
+              : (v) => _toggleBuiltIn(tool.name, v),
         ),
       ],
     ];
@@ -895,7 +803,9 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
         : const <String, dynamic>{};
     final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(
       cfg: old,
-      current: BuiltInToolNames.parseAndNormalize(prev['builtInTools']),
+      // Same reader as the load path: the legacy `tools` / `built_in_tools`
+      // keys count too, or saving drops what they hold.
+      current: BuiltInToolNames.parseFromOverride(prev),
       selected: _builtInTools,
     );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);

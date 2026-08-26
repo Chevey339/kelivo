@@ -498,6 +498,43 @@ void main() {
     },
   );
 
+  test('Finish re-encodes tool payloads so late blocks reach the metadata', () {
+    final handler = StreamChunkHandler();
+    // Providers hand out a live reference to the block list they keep
+    // appending to, so a payload encoded mid-turn misses everything that
+    // arrives after the tool chunk.
+    final blocks = <Map<String, dynamic>>[
+      {'type': 'server_tool_use', 'id': 's1', 'name': 'web_search'},
+    ];
+    final metadata = <String, dynamic>{
+      'anthropic': <String, dynamic>{'assistant_blocks': blocks},
+    };
+    handler.handle(
+      ToolCallStart(id: 's1', toolName: 'search_web', metadata: metadata),
+    );
+
+    List<String> replayedBlocks() {
+      final payload =
+          jsonDecode(handler.parts.whereType<ToolCallPart>().single.payloadJson)
+              as Map;
+      final list = ((payload['metadata'] as Map)['anthropic']
+          as Map)['assistant_blocks'] as List;
+      return [for (final b in list) (b as Map)['type'].toString()];
+    }
+
+    expect(replayedBlocks(), ['server_tool_use']);
+
+    blocks.add({'type': 'web_search_tool_result', 'tool_use_id': 's1'});
+    blocks.add({'type': 'text', 'text': 'Kyoto has many temples.'});
+    handler.handle(const Finish(finishReason: 'end_turn'));
+
+    expect(replayedBlocks(), [
+      'server_tool_use',
+      'web_search_tool_result',
+      'text',
+    ]);
+  });
+
   test('handleResult keeps image URIs as-is and does not add data:', () {
     final handler = StreamChunkHandler();
     handler.handleResult(

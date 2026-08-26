@@ -276,33 +276,13 @@ class _SearchContent extends StatelessWidget {
     if (providerKey == null || (modelId ?? '').isEmpty) return;
     final cfg = sp.getProviderConfig(providerKey);
     final overrides = Map<String, dynamic>.from(cfg.modelOverrides);
-    final rawMo = overrides[modelId!];
-    final existingMo = rawMo is Map ? rawMo : null;
-    final mo = Map<String, dynamic>.from(
-      existingMo?.map((k, v) => MapEntry(k.toString(), v)) ??
-          const <String, dynamic>{},
+    final mo = BuiltInToolsHelper.withClaudeDynamicWebSearch(
+      overrides[modelId!],
+      useClaudeDynamicWebSearch,
     );
-
     final tools = BuiltInToolNames.parseAndNormalize(mo['builtInTools'])
       ..add(BuiltInToolNames.search);
     mo['builtInTools'] = BuiltInToolNames.orderedForStorage(tools);
-    final rawWs = mo['webSearch'];
-    final ws = Map<String, dynamic>.from(
-      rawWs is Map
-          ? rawWs.map((k, v) => MapEntry(k.toString(), v))
-          : const <String, dynamic>{},
-    );
-    if (useClaudeDynamicWebSearch) {
-      ws['toolVersion'] = BuiltInToolsHelper.claudeSearchToolVersionMarker;
-    } else {
-      ws.remove('toolVersion');
-      ws.remove('tool_version');
-    }
-    if (ws.isEmpty) {
-      mo.remove('webSearch');
-    } else {
-      mo['webSearch'] = ws;
-    }
     overrides[modelId] = mo;
     await sp.setProviderConfig(
       providerKey,

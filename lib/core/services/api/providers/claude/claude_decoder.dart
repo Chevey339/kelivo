@@ -39,9 +39,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   final Map<int, String> _serverIndexToId = <int, String>{};
   final Map<String, StringBuffer> _serverArgs = <String, StringBuffer>{};
 
-  /// Position of each `server_tool_use` block inside [assistantBlocks], so its
+  /// Each `server_tool_use` block already appended to [assistantBlocks], so its
   /// streamed input can be filled in once the block closes.
-  final Map<String, int> _serverBlockIndex = <String, int>{};
+  final Map<String, Map<String, dynamic>> _serverBlocks =
+      <String, Map<String, dynamic>>{};
   final Map<String, String> _serverToolNames = <String, String>{};
   final Set<String> _serverToolStarted = <String>{};
   final Set<String> _serverToolEnded = <String>{};
@@ -188,14 +189,15 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         // Server tools have to be replayed as the blocks the API sent, not as
         // client tool calls: search results only decrypt when their original
         // block comes back intact.
-        assistantBlocks.add(<String, dynamic>{
+        final serverBlock = <String, dynamic>{
           'type': 'server_tool_use',
           'id': id,
           'name': name,
           'input': <String, dynamic>{},
           if (block['caller'] != null) 'caller': block['caller'],
-        });
-        _serverBlockIndex[id] = assistantBlocks.length - 1;
+        };
+        assistantBlocks.add(serverBlock);
+        _serverBlocks[id] = serverBlock;
       }
       final display = _serverToolDisplayName(name);
       if (id.isNotEmpty && display != null) {
@@ -213,9 +215,13 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     } else if (kind.endsWith('_tool_result')) {
       _flushTextBlock();
       assistantBlocks.add(Map<String, dynamic>.from(block));
-      if (kind == 'web_search_tool_result') {
+      // Result blocks are named `<tool>_tool_result`, so the display-name
+      // allowlist decides which ones we surface; web search keeps its own
+      // citation-aware mapping.
+      final name = kind.substring(0, kind.length - '_tool_result'.length);
+      if (name == 'web_search') {
         chunks.addAll(_webSearchResult(block));
-      } else if (_serverResultBlockTypes.contains(kind)) {
+      } else if (_serverToolDisplayName(name) != null) {
         chunks.addAll(_serverToolResult(block));
       }
     } else if (kind == 'text') {
@@ -343,19 +349,10 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
 
     if (idx != null && _serverIndexToId.containsKey(idx)) {
       final sid = _serverIndexToId[idx]!;
-      _updateServerToolUseBlock(sid);
+      _serverBlocks[sid]?['input'] = _serverArgsFor(sid);
       if (_serverToolStarted.contains(sid)) chunks.add(ToolCallEnd(sid));
     }
     return chunks;
-  }
-
-  void _updateServerToolUseBlock(String id) {
-    final pos = _serverBlockIndex[id];
-    if (pos == null || pos >= assistantBlocks.length) return;
-    assistantBlocks[pos] = <String, dynamic>{
-      ...assistantBlocks[pos],
-      'input': _serverArgsFor(id),
-    };
   }
 
   List<StreamChunk> _onMessageDelta(Map<String, dynamic> obj) {
@@ -379,15 +376,6 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     } catch (_) {}
     return chunks;
   }
-
-  /// Result block types of the Anthropic server tools handled by
-  /// [_serverToolResult]; web search keeps its own citation-aware mapping.
-  static const _serverResultBlockTypes = <String>{
-    'web_fetch_tool_result',
-    'code_execution_tool_result',
-    'bash_code_execution_tool_result',
-    'text_editor_code_execution_tool_result',
-  };
 
   /// Tool name shown in the UI, or null for a server tool we don't surface.
   static String? _serverToolDisplayName(String name) {

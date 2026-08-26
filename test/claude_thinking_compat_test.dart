@@ -758,8 +758,9 @@ void main() {
         final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
         final fetch = tools.firstWhere((tool) => tool['name'] == 'web_fetch');
         expect(fetch['type'], 'web_fetch_20250910');
-        // Unbounded by default, and one PDF is worth ~125k tokens.
-        expect(fetch['max_content_tokens'], isA<int>());
+        // Unbounded by default, and one PDF is worth ~125k tokens: the cap
+        // has to leave room to answer after a couple of fetches.
+        expect(fetch['max_content_tokens'], lessThan(50000));
         expect(
           tools.firstWhere((tool) => tool['name'] == 'code_execution')['type'],
           'code_execution_20260521',
@@ -794,11 +795,13 @@ void main() {
     });
 
     test('Claude-compatible vendors get no Anthropic server tools', () async {
+      // An official Claude model id, so only the vendor check can reject the
+      // tools — `deepseek-chat` would be filtered by the model lists instead.
       final body = await _captureClaudeBuiltInSearchBody(
-        modelId: 'deepseek-chat',
+        modelId: 'claude-opus-4-7',
         config: _deepSeekClaudeConfig(
           modelOverrides: const <String, dynamic>{
-            'deepseek-chat': <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
               'builtInTools': <String>[
                 BuiltInToolNames.webFetch,
                 BuiltInToolNames.codeExecution,
@@ -858,7 +861,6 @@ void main() {
           tools.any((tool) => tool['type'] == 'web_search_20260209'),
           isFalse,
         );
-        expect(tools.any((tool) => tool['name'] == 'code_execution'), isFalse);
       },
     );
 
@@ -1495,6 +1497,211 @@ data: {"type":"message_stop"}
         expect(messages.last['content'], '第一条具体怎么说的');
       },
     );
+
+    test('interrupted server tool is dropped instead of replayed orphaned', () async {
+      // Stopping the stream between `server_tool_use` and its result block
+      // persists the call without an output.
+      const interruptedBlocks = [
+        {'type': 'text', 'text': '我先查一下。'},
+        {
+          'type': 'server_tool_use',
+          'id': 'srvtoolu_stopped',
+          'name': 'web_fetch',
+          'input': {'url': 'https://example.com'},
+        },
+      ];
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': '看看这个页面'},
+          {
+            'role': 'assistant',
+            'content': '\n\n',
+            'tool_calls': [
+              {
+                'id': 'srvtoolu_stopped',
+                'type': 'function',
+                'function': {
+                  'name': 'web_fetch',
+                  'arguments': '{"url":"https://example.com"}',
+                },
+                'metadata': {
+                  'anthropic': {'assistant_blocks': interruptedBlocks},
+                },
+              },
+            ],
+          },
+          {
+            'role': 'tool',
+            'tool_call_id': 'srvtoolu_stopped',
+            'name': 'web_fetch',
+            'content': '{"items":[]}',
+          },
+          {'role': 'user', 'content': '算了，直接说吧'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      for (final message in messages) {
+        final content = message['content'];
+        if (content is! List) continue;
+        final types = content
+            .whereType<Map>()
+            .map((block) => block['type'])
+            .toList();
+        // Neither half of the pair may survive: a `server_tool_use` with no
+        // result block, nor a `tool_result` pointing at a call that is gone.
+        expect(types, isNot(contains('server_tool_use')));
+        expect(types, isNot(contains('tool_result')));
+      }
+      expect(messages.last['content'], '算了，直接说吧');
+    });
+
+    test('every turn shape replays as one assistant message', () async {
+      // How the persisted assistant text can relate to the turn's own text
+      // blocks, and what the replayed turn has to end up saying.
+      const search = {'type': 'server_tool_use', 'id': 's', 'name': 'web_search'};
+      const result = {'type': 'web_search_tool_result', 'tool_use_id': 's'};
+      final shapes = <String, (List<Map<String, dynamic>>, String, String)>{
+        'message repeats the text after the tool': (
+          [search, result, {'type': 'text', 'text': 'A'}],
+          'A',
+          'A',
+        ),
+        'message joins the text from before and after': (
+          [
+            {'type': 'thinking', 'thinking': '...', 'signature': 'sig'},
+            {'type': 'text', 'text': 'A'},
+            search,
+            result,
+            {'type': 'text', 'text': 'B'},
+          ],
+          'AB',
+          'AB',
+        ),
+        'blocks stopped mid-text': (
+          [search, result, {'type': 'text', 'text': 'A'}],
+          'AB',
+          'AB',
+        ),
+        'turn said nothing around the tool': ([search, result], 'A', 'A'),
+        'the two disagree, blocks win': (
+          [search, result, {'type': 'text', 'text': 'A'}],
+          'totally different',
+          'A',
+        ),
+        'message is the empty placeholder': (
+          [search, result, {'type': 'text', 'text': 'A'}],
+          '\n\n',
+          'A',
+        ),
+      };
+
+      for (final entry in shapes.entries) {
+        final (blocks, persistedText, expectedText) = entry.value;
+        final body = await _captureClaudeRequestBody(
+          modelId: 'claude-sonnet-4-6',
+          messages: [
+            {'role': 'user', 'content': 'q'},
+            {
+              'role': 'assistant',
+              'content': '\n\n',
+              'tool_calls': [
+                {
+                  'id': 's',
+                  'type': 'function',
+                  'function': {'name': 'search_web', 'arguments': '{}'},
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': blocks},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 's',
+              'name': 'search_web',
+              'content': '{"items":[]}',
+            },
+            {'role': 'assistant', 'content': persistedText},
+            {'role': 'user', 'content': 'next'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        // Anthropic requires the roles to alternate; two assistant messages in
+        // a row is what made it reject the replayed encrypted_content.
+        expect(
+          messages.map((m) => m['role']).toList(),
+          ['user', 'assistant', 'user'],
+          reason: entry.key,
+        );
+        final content = (messages[1]['content'] as List).cast<Map>();
+        expect(
+          content.where((b) => b['type'] == 'text').map((b) => b['text']).join(),
+          expectedText,
+          reason: entry.key,
+        );
+        // The tool blocks stay put whatever happens to the text around them.
+        expect(
+          content.map((b) => b['type']).where((t) => t != 'text').toList(),
+          blocks.map((b) => b['type']).where((t) => t != 'text').toList(),
+          reason: entry.key,
+        );
+      }
+    });
+
+    test('a client tool turn still separates the two assistant messages', () async {
+      final body = await _captureClaudeRequestBody(
+        modelId: 'claude-sonnet-4-6',
+        messages: const [
+          {'role': 'user', 'content': 'q'},
+          {
+            'role': 'assistant',
+            'content': '\n\n',
+            'tool_calls': [
+              {
+                'id': 'call_1',
+                'type': 'function',
+                'function': {'name': 'memory_read', 'arguments': '{}'},
+                'metadata': {
+                  'anthropic': {
+                    'assistant_blocks': [
+                      {
+                        'type': 'tool_use',
+                        'id': 'call_1',
+                        'name': 'memory_read',
+                        'input': {},
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+          },
+          {
+            'role': 'tool',
+            'tool_call_id': 'call_1',
+            'name': 'memory_read',
+            'content': 'remembered',
+          },
+          {'role': 'assistant', 'content': 'Here is what I recall.'},
+          {'role': 'user', 'content': 'next'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      // The client tool result is a user message, so it keeps the two apart
+      // and the assistant text must survive on its own.
+      expect(messages.map((m) => m['role']).toList(), [
+        'user',
+        'assistant',
+        'user',
+        'assistant',
+        'user',
+      ]);
+      expect(messages[3]['content'], 'Here is what I recall.');
+    });
 
     test('live tool continuation keeps initial user image blocks', () async {
       final dir = await Directory.systemTemp.createTemp(

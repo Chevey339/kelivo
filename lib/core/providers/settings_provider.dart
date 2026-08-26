@@ -5772,6 +5772,16 @@ class ProviderConfig {
   final bool? claudePromptCachingEnabled;
   final String? claudePromptCachingTtl;
 
+  /// Whether this config points at DeepSeek, by endpoint host or by the user's
+  /// own naming of the provider.
+  static bool isDeepSeekConfig(ProviderConfig? config) {
+    if (config == null) return false;
+    final host = Uri.tryParse(config.baseUrl.trim())?.host.toLowerCase() ?? '';
+    return host.contains('deepseek.com') ||
+        config.id.trim().toLowerCase().contains('deepseek') ||
+        config.name.trim().toLowerCase().contains('deepseek');
+  }
+
   /// Whether this config talks to DeepSeek's Claude-compatible endpoint,
   /// which diverges from Anthropic on thinking/effort handling.
   static bool isDeepSeekClaudeCompatible(
@@ -5779,10 +5789,7 @@ class ProviderConfig {
     ProviderConfig? config,
   }) {
     if (modelId.trim().toLowerCase().contains('deepseek')) return true;
-    if (config == null) return false;
-    return config.baseUrl.trim().toLowerCase().contains('api.deepseek.com') ||
-        config.id.trim().toLowerCase().contains('deepseek') ||
-        config.name.trim().toLowerCase().contains('deepseek');
+    return isDeepSeekConfig(config);
   }
 
   static const String claudePromptCachingTtl5m = '5m';

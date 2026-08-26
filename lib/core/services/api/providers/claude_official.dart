@@ -214,6 +214,12 @@ Stream<StreamChunk> sendClaudeStream(
   // synthesised `tool` message for the same id would be an orphan tool_result.
   final replayedServerToolIds = <String>{};
 
+  // The assistant message just replayed from its own blocks, if any. Those
+  // blocks cover the whole turn, the text written after the tool included, so
+  // the plain assistant message that follows repeats it — and with the `tool`
+  // message suppressed above there is nothing left to separate the two.
+  Map<String, dynamic>? replayedTurn;
+
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
     final isLast = i == nonSystemMessages.length - 1;
@@ -229,19 +235,73 @@ Stream<StreamChunk> sendClaudeStream(
       }
       continue;
     }
+    // Client tool results land between the two as a user message, so only a
+    // turn left adjacent can be folded. Media keeps the structured path below,
+    // so only a plain-text message folds.
+    final foldsIntoReplayedTurn =
+        pendingToolResults.isEmpty &&
+        role == 'assistant' &&
+        m['tool_calls'] is! List &&
+        parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isEmpty &&
+        !shouldParseMarkdownImages(
+          (m['content'] ?? '').toString(),
+          skipImageParsing: skipImageParsing,
+        );
+    final turn = replayedTurn;
+    replayedTurn = null;
     flushPendingToolResults();
+
+    if (turn != null && foldsIntoReplayedTurn) {
+      final blocks = (turn['content'] as List).cast<Map<String, dynamic>>();
+      // The persisted message is every text block of the turn joined together,
+      // so compare against the join, not just the last block.
+      final joined = blocks
+          .where((b) => b['type'] == 'text')
+          .map((b) => (b['text'] ?? '').toString())
+          .join()
+          .trim();
+      final text = (m['content'] ?? '').toString().trim();
+      if (joined.isEmpty) {
+        // The turn wrote nothing around its tools, so the message carries all
+        // of its text.
+        if (text.isNotEmpty) blocks.add({'type': 'text', 'text': text});
+      } else if (text.startsWith(joined)) {
+        // A snapshot taken mid-stream can stop short of the finished text.
+        final rest = text.substring(joined.length).trim();
+        if (rest.isNotEmpty) blocks.add({'type': 'text', 'text': rest});
+      }
+      // Any other disagreement leaves the blocks as they are: they are what
+      // the API itself produced, and appending the message on top would send
+      // the same turn twice — which is what the roles had to alternate for.
+      continue;
+    }
 
     if (role == 'assistant' && m['tool_calls'] is List) {
       final toolCalls = m['tool_calls'] as List;
       final blocks =
           anthropicBlocksFromToolCallMetadata(toolCalls) ??
           <Map<String, dynamic>>[];
+      final hadReplayBlocks = blocks.isNotEmpty;
+      final resolvedServerToolIds = <String>{};
       for (final block in blocks) {
-        if (block['type'] != 'server_tool_use') continue;
-        final sid = (block['id'] ?? '').toString();
-        if (sid.isNotEmpty) replayedServerToolIds.add(sid);
+        final type = (block['type'] ?? '').toString();
+        if (type == 'server_tool_use') {
+          final sid = (block['id'] ?? '').toString();
+          if (sid.isNotEmpty) replayedServerToolIds.add(sid);
+        } else if (type.endsWith('_tool_result')) {
+          resolvedServerToolIds.add((block['tool_use_id'] ?? '').toString());
+        }
       }
-      if (blocks.isEmpty) {
+      // A `server_tool_use` whose result block never arrived — the stream was
+      // stopped or dropped between the two — would replay as a call with no
+      // output, which the API rejects. Drop the call; its `tool` message is
+      // already suppressed by [replayedServerToolIds].
+      blocks.removeWhere(
+        (block) =>
+            block['type'] == 'server_tool_use' &&
+            !resolvedServerToolIds.contains((block['id'] ?? '').toString()),
+      );
+      if (!hadReplayBlocks) {
         final text = (m['content'] ?? '').toString();
         if (text.trim().isNotEmpty && text.trim() != '\n\n') {
           blocks.add({'type': 'text', 'text': text});
@@ -253,7 +313,9 @@ Stream<StreamChunk> sendClaudeStream(
         }
       }
       if (blocks.isNotEmpty) {
-        initialMessages.add({'role': 'assistant', 'content': blocks});
+        final message = <String, dynamic>{'role': 'assistant', 'content': blocks};
+        initialMessages.add(message);
+        if (hadReplayBlocks) replayedTurn = message;
       }
       continue;
     }
@@ -446,32 +508,13 @@ Stream<StreamChunk> sendClaudeStream(
     }
     allTools.add(entry);
   }
-  if (builtIns.contains(BuiltInToolNames.webFetch) &&
-      BuiltInToolsHelper.supportsClaudeServerToolForModel(
-        cfg: config,
-        modelId: modelId,
-        toolName: BuiltInToolNames.webFetch,
-      )) {
-    allTools.add(<String, dynamic>{
-      'type': BuiltInToolsHelper.claudeWebFetchToolType(
-        cfg: config,
-        modelId: modelId,
-      ),
-      'name': 'web_fetch',
-      'max_content_tokens': BuiltInToolsHelper.claudeFetchMaxContentTokens,
-    });
-  }
-  if (builtIns.contains(BuiltInToolNames.codeExecution) &&
-      BuiltInToolsHelper.supportsClaudeServerToolForModel(
-        cfg: config,
-        modelId: modelId,
-        toolName: BuiltInToolNames.codeExecution,
-      )) {
-    allTools.add(<String, dynamic>{
-      'type': BuiltInToolsHelper.claudeCodeExecutionToolType,
-      'name': 'code_execution',
-    });
-  }
+  allTools.addAll(
+    BuiltInToolsHelper.claudeServerToolEntries(
+      cfg: config,
+      modelId: modelId,
+      enabled: builtIns,
+    ),
+  );
 
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(

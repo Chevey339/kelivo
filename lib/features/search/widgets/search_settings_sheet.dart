@@ -74,30 +74,10 @@ class _SearchSettingsSheet extends StatelessWidget {
     required bool enabled,
   }) async {
     final overrides = Map<String, dynamic>.from(providerCfg.modelOverrides);
-    final rawMo = overrides[modelId];
-    final baseMo = rawMo is Map ? rawMo : null;
-    final mo = Map<String, dynamic>.from(
-      baseMo?.map((k, val) => MapEntry(k.toString(), val)) ??
-          const <String, dynamic>{},
+    overrides[modelId] = BuiltInToolsHelper.withClaudeDynamicWebSearch(
+      overrides[modelId],
+      enabled,
     );
-    final rawWs = mo['webSearch'];
-    final ws = Map<String, dynamic>.from(
-      rawWs is Map
-          ? rawWs.map((k, val) => MapEntry(k.toString(), val))
-          : const <String, dynamic>{},
-    );
-    if (enabled) {
-      ws['toolVersion'] = BuiltInToolsHelper.claudeSearchToolVersionMarker;
-    } else {
-      ws.remove('toolVersion');
-      ws.remove('tool_version');
-    }
-    if (ws.isEmpty) {
-      mo.remove('webSearch');
-    } else {
-      mo['webSearch'] = ws;
-    }
-    overrides[modelId] = mo;
     await settings.setProviderConfig(
       providerKey,
       providerCfg.copyWith(modelOverrides: overrides),

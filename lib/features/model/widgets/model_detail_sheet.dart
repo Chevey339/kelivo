@@ -92,7 +92,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     with SingleTickerProviderStateMixin {
   _TabKind _tab = _TabKind.basic;
   late final TabController _tabCtrl;
-  late final ProviderKind _providerKind;
   late final bool _showBuiltinToolsTab;
 
   late TextEditingController _idCtrl;
@@ -119,10 +118,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     super.initState();
     final settings = context.read<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
-    _providerKind = ProviderConfig.classify(
-      cfg.id,
-      explicitType: cfg.providerType,
-    );
     // Determine tab count: 3 when the provider exposes editable built-in
     // tools, 2 for others
     _showBuiltinToolsTab = BuiltInToolsHelper.modelSettingsToolNames(
@@ -687,7 +682,6 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
     final settings = context.watch<SettingsProvider>();
     final cfg = settings.getProviderConfig(widget.providerKey);
     final bool disableTools = _type == ModelType.embedding;
-    final bool isOpenRouter = BuiltInToolsHelper.isOpenRouterProvider(cfg);
     return [
       Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -699,149 +693,21 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
           ),
         ),
       ),
-      if (_providerKind == ProviderKind.google) ...[
+      for (final (index, tool) in ModelBuiltInToolTiles.forConfig(
+        cfg: cfg,
+        l10n: l10n,
+      ).indexed)
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          padding: EdgeInsets.fromLTRB(16, index == 0 ? 10 : 8, 16, 0),
           child: _ToolTile(
-            title: l10n.modelDetailSheetUrlContextTool,
-            desc: l10n.modelDetailSheetUrlContextToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.urlContext),
-            onChanged: disableTools
+            title: tool.title,
+            desc: tool.desc,
+            value: tool.available && _builtInTools.contains(tool.name),
+            onChanged: disableTools || !tool.available
                 ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.urlContext, v),
+                : (v) => _toggleBuiltIn(tool.name, v),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetCodeExecutionTool,
-            desc: l10n.modelDetailSheetCodeExecutionToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.codeExecution),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetYoutubeTool,
-            desc: l10n.modelDetailSheetYoutubeToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.youtube),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.youtube, v),
-          ),
-        ),
-      ] else if (_providerKind == ProviderKind.openai) ...[
-        if (!isOpenRouter && cfg.useResponseApi != true)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Text(
-              l10n.modelDetailSheetOpenaiBuiltinToolsResponsesOnlyHint,
-              style: TextStyle(
-                color: cs.onSurface.withValues(alpha: 0.65),
-                fontSize: 12,
-              ),
-            ),
-          ),
-        if (isOpenRouter) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-              desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-              value:
-                  cfg.useResponseApi == true &&
-                  _builtInTools.contains(BuiltInToolNames.codeInterpreter),
-              onChanged: disableTools || cfg.useResponseApi != true
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.codeInterpreter, v),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetWebFetchTool,
-              desc: l10n.modelDetailSheetOpenrouterWebFetchToolDescription,
-              value: _builtInTools.contains(BuiltInToolNames.webFetch),
-              onChanged: disableTools
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-              desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-              value: _builtInTools.contains(BuiltInToolNames.imageGeneration),
-              onChanged: disableTools
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.imageGeneration, v),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetOpenrouterShellTool,
-              desc: l10n.modelDetailSheetOpenrouterShellToolDescription,
-              value:
-                  cfg.useResponseApi == true &&
-                  _builtInTools.contains(BuiltInToolNames.shell),
-              onChanged: disableTools || cfg.useResponseApi != true
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.shell, v),
-            ),
-          ),
-        ] else ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetOpenaiCodeInterpreterTool,
-              desc: l10n.modelDetailSheetOpenaiCodeInterpreterToolDescription,
-              value: _builtInTools.contains(BuiltInToolNames.codeInterpreter),
-              onChanged: disableTools || cfg.useResponseApi != true
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.codeInterpreter, v),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: _ToolTile(
-              title: l10n.modelDetailSheetOpenaiImageGenerationTool,
-              desc: l10n.modelDetailSheetOpenaiImageGenerationToolDescription,
-              value: _builtInTools.contains(BuiltInToolNames.imageGeneration),
-              onChanged: disableTools || cfg.useResponseApi != true
-                  ? null
-                  : (v) => _toggleBuiltIn(BuiltInToolNames.imageGeneration, v),
-            ),
-          ),
-        ],
-      ] else if (_providerKind == ProviderKind.claude) ...[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetWebFetchTool,
-            desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.webFetch),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.webFetch, v),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: _ToolTile(
-            title: l10n.modelDetailSheetCodeExecutionTool,
-            desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
-            value: _builtInTools.contains(BuiltInToolNames.codeExecution),
-            onChanged: disableTools
-                ? null
-                : (v) => _toggleBuiltIn(BuiltInToolNames.codeExecution, v),
-          ),
-        ),
-      ],
     ];
   }
 
@@ -923,7 +789,9 @@ class _ModelDetailSheetState extends State<_ModelDetailSheet>
         : const <String, dynamic>{};
     final builtInSet = BuiltInToolsHelper.replaceModelSettingsTools(
       cfg: old,
-      current: BuiltInToolNames.parseAndNormalize(prev['builtInTools']),
+      // Same reader as the load path: the legacy `tools` / `built_in_tools`
+      // keys count too, or saving drops what they hold.
+      current: BuiltInToolNames.parseFromOverride(prev),
       selected: _builtInTools,
     );
     final builtInTools = BuiltInToolNames.orderedForStorage(builtInSet);

@@ -189,47 +189,38 @@ abstract class BuiltInToolsHelper {
     return normalized.contains('mythos') || supported.contains(normalized);
   }
 
+  /// Current-generation Claude ids, which support every server tool below.
+  static const _claudeCurrentModels = <String>{
+    'claude-fable-5',
+    'claude-opus-5',
+    'claude-opus-4-8',
+    'claude-opus-4-7',
+    'claude-opus-4-6',
+    'claude-sonnet-5',
+    'claude-sonnet-4-6',
+  };
+
   static bool isClaudeBuiltInSearchSupportedModel(String? modelId) {
     return _isClaudeModelIn(modelId, const <String>{
-      'claude-fable-5',
-      'claude-opus-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
-      'claude-opus-4-6',
-      'claude-sonnet-5',
+      ..._claudeCurrentModels,
       'claude-sonnet-4-5-20250929',
       'claude-sonnet-4-20250514',
       'claude-3-7-sonnet-20250219',
       'claude-haiku-4-5-20251001',
       'claude-3-5-haiku-latest',
-      'claude-sonnet-4-6',
       'claude-opus-4-1-20250805',
       'claude-opus-4-20250514',
     });
   }
 
   static bool isClaudeDynamicWebSearchSupportedModel(String? modelId) {
-    return _isClaudeModelIn(modelId, const <String>{
-      'claude-fable-5',
-      'claude-opus-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
-      'claude-opus-4-6',
-      'claude-sonnet-5',
-      'claude-sonnet-4-6',
-    });
+    return _isClaudeModelIn(modelId, _claudeCurrentModels);
   }
 
   static bool isClaudeCodeExecutionSupportedModel(String? modelId) {
     return _isClaudeModelIn(modelId, const <String>{
-      'claude-fable-5',
-      'claude-opus-5',
-      'claude-opus-4-8',
-      'claude-opus-4-7',
-      'claude-opus-4-6',
+      ..._claudeCurrentModels,
       'claude-opus-4-5-20251101',
-      'claude-sonnet-5',
-      'claude-sonnet-4-6',
       'claude-sonnet-4-5-20250929',
       'claude-haiku-4-5-20251001',
     });
@@ -270,15 +261,8 @@ abstract class BuiltInToolsHelper {
     }
   }
 
-  static bool isDeepSeekProvider(ProviderConfig? cfg) {
-    if (cfg == null) return false;
-    final host = Uri.tryParse(cfg.baseUrl)?.host.toLowerCase() ?? '';
-    final providerId = cfg.id.toLowerCase();
-    final providerName = cfg.name.toLowerCase();
-    return host.contains('deepseek.com') ||
-        providerId.contains('deepseek') ||
-        providerName.contains('deepseek');
-  }
+  static bool isDeepSeekProvider(ProviderConfig? cfg) =>
+      ProviderConfig.isDeepSeekConfig(cfg);
 
   static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
     return _normalizedModelId(modelId).startsWith('deepseek-v4-');
@@ -749,12 +733,6 @@ abstract class BuiltInToolsHelper {
   /// or later; older types make the API inject a conflicting `code_execution`.
   static const claudeCodeExecutionToolType = 'code_execution_20260521';
 
-  /// Every tool type that marks the dynamic-filtering opt-in as enabled.
-  static const _claudeDynamicSearchMarkers = <String>{
-    claudeSearchToolVersionMarker,
-    claudeSearchToolTypeDynamic,
-  };
-
   static bool isClaudeDynamicWebSearchEnabled({
     required ProviderConfig? cfg,
     required String? modelId,
@@ -770,8 +748,37 @@ abstract class BuiltInToolsHelper {
     final rawWs = ov?['webSearch'];
     if (rawWs is! Map) return false;
     final ws = rawWs.cast<String, dynamic>();
-    return _claudeDynamicSearchMarkers.contains(ws['toolVersion']) ||
-        _claudeDynamicSearchMarkers.contains(ws['tool_version']);
+    return ws['toolVersion'] == claudeSearchToolVersionMarker ||
+        ws['tool_version'] == claudeSearchToolVersionMarker;
+  }
+
+  /// [rawOverride] with the dynamic-filtering opt-in set to [enabled] — the
+  /// write side of [isClaudeDynamicWebSearchEnabled].
+  static Map<String, dynamic> withClaudeDynamicWebSearch(
+    Object? rawOverride,
+    bool enabled,
+  ) {
+    final mo = <String, dynamic>{
+      if (rawOverride is Map)
+        for (final e in rawOverride.entries) e.key.toString(): e.value,
+    };
+    final rawWs = mo['webSearch'];
+    final ws = <String, dynamic>{
+      if (rawWs is Map)
+        for (final e in rawWs.entries) e.key.toString(): e.value,
+    };
+    if (enabled) {
+      ws['toolVersion'] = claudeSearchToolVersionMarker;
+    } else {
+      ws.remove('toolVersion');
+      ws.remove('tool_version');
+    }
+    if (ws.isEmpty) {
+      mo.remove('webSearch');
+    } else {
+      mo['webSearch'] = ws;
+    }
+    return mo;
   }
 
   static String claudeBuiltInSearchToolType({
@@ -783,32 +790,42 @@ abstract class BuiltInToolsHelper {
         : claudeSearchToolTypeBasic;
   }
 
-  static String claudeWebFetchToolType({
-    required ProviderConfig? cfg,
-    required String? modelId,
-  }) {
-    return isClaudeDynamicWebSearchEnabled(cfg: cfg, modelId: modelId)
-        ? claudeFetchToolTypeDynamic
-        : claudeFetchToolTypeBasic;
-  }
+  /// Anthropic ships web fetch on the same models as built-in search.
+  static bool isClaudeWebFetchSupportedModel(String? modelId) =>
+      isClaudeBuiltInSearchSupportedModel(modelId);
 
-  /// Anthropic-hosted server tools beyond search run on the official Claude API
-  /// only; Claude-compatible vendors and Vertex reject them.
-  static bool supportsClaudeServerToolForModel({
+  /// Request entries for the Anthropic-hosted server tools beyond search, whose
+  /// entry is shaped by the per-model web search options instead. These run on
+  /// the official Claude API only; Claude-compatible vendors and Vertex reject
+  /// them.
+  static List<Map<String, dynamic>> claudeServerToolEntries({
     required ProviderConfig? cfg,
     required String? modelId,
-    required String toolName,
+    required Set<String> enabled,
   }) {
     final upstreamModelId = _claudeUpstreamModelId(cfg: cfg, modelId: modelId);
-    if (upstreamModelId == null) return false;
-    switch (BuiltInToolNames.normalize(toolName)) {
-      case BuiltInToolNames.webFetch:
-        return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
-      case BuiltInToolNames.codeExecution:
-        return isClaudeCodeExecutionSupportedModel(upstreamModelId);
-      default:
-        return false;
-    }
+    if (upstreamModelId == null) return const <Map<String, dynamic>>[];
+    final dynamicFiltering = isClaudeDynamicWebSearchEnabled(
+      cfg: cfg,
+      modelId: modelId,
+    );
+    return <Map<String, dynamic>>[
+      if (enabled.contains(BuiltInToolNames.webFetch) &&
+          isClaudeWebFetchSupportedModel(upstreamModelId))
+        <String, dynamic>{
+          'type': dynamicFiltering
+              ? claudeFetchToolTypeDynamic
+              : claudeFetchToolTypeBasic,
+          'name': 'web_fetch',
+          'max_content_tokens': claudeFetchMaxContentTokens,
+        },
+      if (enabled.contains(BuiltInToolNames.codeExecution) &&
+          isClaudeCodeExecutionSupportedModel(upstreamModelId))
+        <String, dynamic>{
+          'type': claudeCodeExecutionToolType,
+          'name': 'code_execution',
+        },
+    ];
   }
 
   static Map<String, dynamic> dashScopeSearchOptionsFromOverride(
