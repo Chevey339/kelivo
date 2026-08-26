@@ -420,6 +420,7 @@ Future<Map<String, dynamic>> _captureClaudeGenerateTextBody({
 Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   required String modelId,
   required ProviderConfig config,
+  List<Map<String, dynamic>>? tools,
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -457,6 +458,10 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
       messages: const [
         {'role': 'user', 'content': 'hello'},
       ],
+      tools: tools,
+      onToolCall: tools == null
+          ? null
+          : (name, args, {toolCallId}) async => '{}',
       stream: false,
     ).toList();
     expect(chunks.isGenerationDone, isTrue);
@@ -1011,8 +1016,8 @@ void main() {
         final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
         final fetch = tools.firstWhere((tool) => tool['name'] == 'web_fetch');
         expect(fetch['type'], 'web_fetch_20250910');
-        // Unbounded by default, and one PDF is worth ~125k tokens: the cap
-        // has to leave room to answer after a couple of fetches.
+        // Unbounded by default, so the cap has to leave room to answer after
+        // a couple of fetches. It bounds text only, never a fetched PDF.
         expect(fetch['max_content_tokens'], lessThan(50000));
         expect(
           tools.firstWhere((tool) => tool['name'] == 'code_execution')['type'],
@@ -1020,6 +1025,65 @@ void main() {
         );
       },
     );
+
+    test('Opus 5 gets code execution but not the web fetch it lacks', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'claude-opus-5',
+        config: _claudeConfig(
+          'http://api.anthropic.com',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-5': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.webFetch,
+                BuiltInToolNames.codeExecution,
+              ],
+            },
+          },
+        ),
+      );
+
+      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+      expect(tools.any((tool) => tool['name'] == 'web_fetch'), isFalse);
+      expect(tools.any((tool) => tool['name'] == 'code_execution'), isTrue);
+    });
+
+    test('a client tool owning the name keeps the hosted one out', () async {
+      final body = await _captureClaudeBuiltInSearchBody(
+        modelId: 'claude-opus-4-7',
+        config: _claudeConfig(
+          'http://api.anthropic.com',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[
+                BuiltInToolNames.search,
+                BuiltInToolNames.webFetch,
+                BuiltInToolNames.codeExecution,
+              ],
+            },
+          },
+        ),
+        tools: const <Map<String, dynamic>>[
+          {
+            'type': 'function',
+            'function': {
+              'name': 'web_fetch',
+              'parameters': {'type': 'object'},
+            },
+          },
+        ],
+      );
+
+      final tools = (body['tools'] as List).cast<Map<String, dynamic>>();
+      expect(tools.where((tool) => tool['name'] == 'web_fetch'), hasLength(1));
+      expect(
+        tools.singleWhere(
+          (tool) => tool['name'] == 'web_fetch',
+        )['input_schema'],
+        isNotNull,
+      );
+      expect(tools.any((tool) => tool['name'] == 'code_execution'), isTrue);
+      expect(tools.any((tool) => tool['name'] == 'web_search'), isTrue);
+    });
 
     test('anywhere else gets no hosted tools and plain search', () async {
       final body = await _captureClaudeBuiltInSearchBody(

@@ -739,8 +739,10 @@ abstract class BuiltInToolsHelper {
   static const claudeFetchToolTypeBasic = 'web_fetch_20250910';
   static const claudeFetchToolTypeDynamic = 'web_fetch_20260318';
 
-  /// Unbounded by default, and one PDF is worth ~125k tokens. Bound it low
-  /// enough that a couple of fetches in one turn still leave room to answer.
+  /// Unbounded by default, and a large documentation page is worth ~25k
+  /// tokens. Bound it low enough that a couple of fetches in one turn still
+  /// leave room to answer. Text only: the API does not apply this to binary
+  /// content, so a fetched PDF still arrives whole.
   static const claudeFetchMaxContentTokens = 30000;
 
   /// Dynamic filtering runs inside code execution, which requires this version
@@ -804,8 +806,11 @@ abstract class BuiltInToolsHelper {
         : claudeSearchToolTypeBasic;
   }
 
-  /// Anthropic ships web fetch on the same models as built-in search.
+  /// Anthropic ships web fetch on the same models as built-in search, with one
+  /// documented hole: Opus 5 runs every other server tool but not this one, so
+  /// declaring it there is an error rather than an unused tool.
   static bool isClaudeWebFetchSupportedModel(String? modelId) =>
+      _normalizedModelId(modelId) != 'claude-opus-5' &&
       isClaudeBuiltInSearchSupportedModel(modelId);
 
   /// Request entries for the Anthropic-hosted server tools beyond search, whose

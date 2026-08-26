@@ -483,11 +483,25 @@ Stream<StreamChunk> sendClaudeStream(
   if (anthropicTools != null && anthropicTools.isNotEmpty) {
     allTools.addAll(anthropicTools);
   }
+  // Anthropic rejects a `tools` array holding two entries of the same name, and
+  // an MCP server is free to expose one called `web_search`, `web_fetch`, or
+  // `code_execution`. The client tools are the ones the caller asked for by
+  // name, so a hosted entry that collides with one is dropped instead of sent
+  // alongside it.
+  final claimedToolNames = <String>{
+    for (final t in allTools) (t['name'] ?? '').toString(),
+  };
+  void addHostedTool(Map<String, dynamic> tool) {
+    if (claimedToolNames.add((tool['name'] ?? '').toString())) {
+      allTools.add(tool);
+    }
+  }
+
   if (tools != null && tools.isNotEmpty) {
     for (final t in tools) {
       final type = (t['type'] ?? '').toString();
       if (type.startsWith('web_search_')) {
-        allTools.add(t);
+        addHostedTool(t);
       }
     }
   }
@@ -525,15 +539,15 @@ Stream<StreamChunk> sendClaudeStream(
       entry['user_location'] = (ws['user_location'] as Map)
           .cast<String, dynamic>();
     }
-    allTools.add(entry);
+    addHostedTool(entry);
   }
-  allTools.addAll(
-    BuiltInToolsHelper.claudeServerToolEntries(
-      cfg: config,
-      modelId: modelId,
-      enabled: builtIns,
-    ),
-  );
+  for (final entry in BuiltInToolsHelper.claudeServerToolEntries(
+    cfg: config,
+    modelId: modelId,
+    enabled: builtIns,
+  )) {
+    addHostedTool(entry);
+  }
 
   // Client tools are declared by `input_schema`, the Anthropic-hosted ones by
   // `type`. The decoder needs the latter to recognise a downgraded block.
