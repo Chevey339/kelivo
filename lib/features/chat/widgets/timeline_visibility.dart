@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import '../../../shared/widgets/markdown_line_lexer.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../home/services/ask_user_interaction_service.dart';
 import '../../home/services/local_tools_service.dart';
 import 'screen_time_tool_ui.dart';
@@ -37,44 +40,222 @@ class PendingApprovalKey {
   int get hashCode => Object.hash(conversationId, toolCallId);
 }
 
-/// Extract markdown images from a tool result. Matches `![alt](url)` only.
-(String, List<String>) parseToolResultImages(String? content) {
-  if (content == null || content.isEmpty) return ('', const []);
+/// Extract markdown images from a tool result.
+///
+/// Only `![alt](url)` lines that occupy an entire line are treated as
+/// attachments. Images inside JSON strings, fenced code, or body paragraphs
+/// stay in the text. Destinations may contain spaces and parentheses.
+(String, List<String>) parseToolResultImages(
+  String? content, {
+  Map<String, dynamic>? metadata,
+}) {
+  if (content == null || content.isEmpty) {
+    final typed = readMcpResultMetadata(metadata);
+    if (typed != null) {
+      return (
+        '',
+        dedupeImageUrisFirstSeen(mcpResultImageUris(typed)),
+      );
+    }
+    return ('', const []);
+  }
+
+  final typed = readMcpResultMetadata(metadata);
+  if (typed != null) {
+    final images = dedupeImageUrisFirstSeen(mcpResultImageUris(typed));
+    return (_stripStandaloneToolImages(content), images);
+  }
+
+  final envelope = tryDecodeLegacyMcpToolResultEnvelope(content);
+  if (envelope != null) {
+    return (
+      (envelope.legacyBody ?? envelope.markdown).trim(),
+      dedupeImageUrisFirstSeen(envelope.imageUris),
+    );
+  }
 
   final images = <String>[];
-  final buffer = StringBuffer();
-  var i = 0;
-  while (i < content.length) {
-    if (content.startsWith('![', i)) {
-      final altClose = content.indexOf('](', i + 2);
-      if (altClose != -1) {
-        final destStart = altClose + 2;
-        var depth = 1;
-        var j = destStart;
-        while (j < content.length && depth > 0) {
-          final ch = content.codeUnitAt(j);
-          if (ch == 0x28) {
-            depth += 1;
-          } else if (ch == 0x29) {
-            depth -= 1;
-            if (depth == 0) break;
-          }
-          j += 1;
-        }
-        if (depth == 0 && j < content.length) {
-          final path = content.substring(destStart, j).trim();
-          if (path.isNotEmpty && path != 'generated') {
-            images.add(path);
-          }
-          i = j + 1;
-          continue;
-        }
-      }
+  final seen = <String>{};
+  final kept = <String>[];
+  final lexer = MarkdownLineLexer();
+
+  for (final line in _toolResultLogicalLines(content)) {
+    // Old saved rows only. Typed ImageContent is never a private marker now.
+    final structured = decodeMcpStructuredImageLine(line);
+    if (structured != null) {
+      if (seen.add(structured)) images.add(structured);
+      continue;
     }
-    buffer.writeCharCode(content.codeUnitAt(i));
-    i += 1;
+    if (_isIndentedCodeLine(line)) {
+      kept.add(line);
+      continue;
+    }
+    if (lexer.consumeFence(line)) {
+      kept.add(line);
+      continue;
+    }
+    final classified = _classifyStandaloneMarkdownImageLine(line.trim());
+    switch (classified.kind) {
+      case _ImageLineKind.image:
+        final path = classified.path;
+        if (path != null && seen.add(path)) images.add(path);
+        continue;
+      case _ImageLineKind.placeholder:
+        continue;
+      case _ImageLineKind.notImage:
+        kept.add(line);
+    }
   }
-  return (buffer.toString().trim(), images);
+  return (kept.join('\n').trim(), images);
+}
+
+String _stripStandaloneToolImages(String content) {
+  final kept = <String>[];
+  final lexer = MarkdownLineLexer();
+  for (final line in _toolResultLogicalLines(content)) {
+    if (_isIndentedCodeLine(line) || lexer.consumeFence(line)) {
+      kept.add(line);
+      continue;
+    }
+    final classified = _classifyStandaloneMarkdownImageLine(line.trim());
+    if (classified.kind == _ImageLineKind.notImage) {
+      kept.add(line);
+    }
+  }
+  return kept.join('\n').trim();
+}
+
+enum _ImageLineKind { notImage, placeholder, image }
+
+class _ClassifiedImageLine {
+  const _ClassifiedImageLine(this.kind, [this.path]);
+
+  final _ImageLineKind kind;
+  final String? path;
+}
+
+bool _isIndentedCodeLine(String line) => _leadingIndentColumns(line) >= 4;
+
+int _leadingIndentColumns(String line) {
+  var columns = 0;
+  for (var i = 0; i < line.length; i++) {
+    final unit = line.codeUnitAt(i);
+    if (unit == 0x20) {
+      columns += 1;
+    } else if (unit == 0x09) {
+      columns += 4 - (columns % 4);
+    } else {
+      break;
+    }
+  }
+  return columns;
+}
+
+Iterable<String> _toolResultLogicalLines(String content) sync* {
+  var i = 0;
+  final end = content.length;
+  while (i < end) {
+    var lineEnd = i;
+    while (lineEnd < end &&
+        !markdownIsLogicalLineBreak(content.codeUnitAt(lineEnd))) {
+      lineEnd++;
+    }
+    yield content.substring(i, lineEnd);
+    if (lineEnd >= end) return;
+    if (content.codeUnitAt(lineEnd) == 0x0D &&
+        lineEnd + 1 < end &&
+        content.codeUnitAt(lineEnd + 1) == 0x0A) {
+      i = lineEnd + 2;
+    } else {
+      i = lineEnd + 1;
+    }
+  }
+}
+
+@visibleForTesting
+({String? path, bool placeholder}) debugClassifyStandaloneImageLine(
+  String trimmedLine,
+) {
+  final classified = _classifyStandaloneMarkdownImageLine(trimmedLine);
+  return (
+    path: classified.path,
+    placeholder: classified.kind == _ImageLineKind.placeholder,
+  );
+}
+
+_ClassifiedImageLine _classifyStandaloneMarkdownImageLine(String trimmedLine) {
+  if (!trimmedLine.startsWith('![')) {
+    return const _ClassifiedImageLine(_ImageLineKind.notImage);
+  }
+  final altClose = trimmedLine.indexOf('](');
+  if (altClose == -1) {
+    return const _ClassifiedImageLine(_ImageLineKind.notImage);
+  }
+  final destStart = altClose + 2;
+  final parsed = _readMarkdownImageDestination(trimmedLine, destStart);
+  if (parsed == null) {
+    return const _ClassifiedImageLine(_ImageLineKind.notImage);
+  }
+  final raw = parsed.trim();
+  if (raw.isEmpty || raw == 'generated') {
+    return const _ClassifiedImageLine(_ImageLineKind.placeholder);
+  }
+  return _ClassifiedImageLine(
+    _ImageLineKind.image,
+    decodeMarkdownImageDestination(raw),
+  );
+}
+
+/// Returns the raw destination (including `<>` if used) when the destination
+/// occupies the rest of the line and closes at the final `)`.
+String? _readMarkdownImageDestination(String line, int destStart) {
+  if (destStart >= line.length) return null;
+  if (line.codeUnitAt(destStart) == 0x3C) {
+    var j = destStart + 1;
+    while (j < line.length) {
+      final ch = line.codeUnitAt(j);
+      if (ch == 0x5C && j + 1 < line.length) {
+        j += 2;
+        continue;
+      }
+      if (ch == 0x3E) {
+        if (j + 1 == line.length - 1 && line.codeUnitAt(j + 1) == 0x29) {
+          return line.substring(destStart, j + 1);
+        }
+        return null;
+      }
+      j += 1;
+    }
+    return null;
+  }
+  var depth = 1;
+  var j = destStart;
+  while (j < line.length && depth > 0) {
+    final ch = line.codeUnitAt(j);
+    if (ch == 0x28 && !_isEscapedByOddBackslashes(line, j)) {
+      depth += 1;
+    } else if (ch == 0x29 && !_isEscapedByOddBackslashes(line, j)) {
+      depth -= 1;
+      if (depth == 0) break;
+    }
+    j += 1;
+  }
+  if (depth != 0 || j != line.length - 1) return null;
+  return line.substring(destStart, j);
+}
+
+bool _isEscapedByOddBackslashes(String text, int index) {
+  var slashes = 0;
+  for (var i = index - 1; i >= 0 && text.codeUnitAt(i) == 0x5C; i--) {
+    slashes += 1;
+  }
+  return slashes.isOdd;
+}
+
+/// Unescape destinations using the shared Markdown / Windows path codec.
+@visibleForTesting
+String unescapeMarkdownDestination(String raw) {
+  return decodeMarkdownImageDestination(raw);
 }
 
 /// Whether [toolName] is allowed to occupy a chain-of-thought step.
@@ -162,6 +343,7 @@ double estimateToolExtraHeight({
   required String toolName,
   required Map<String, dynamic> arguments,
   required String? content,
+  Map<String, dynamic>? metadata,
   required bool showToolResultSummary,
   required bool hideToolResultImages,
   required bool pendingApproval,
@@ -193,7 +375,10 @@ double estimateToolExtraHeight({
     return _estimateTtsReplayRowHeight * fontScale.clamp(0.85, 1.4);
   }
 
-  final (cleanText, imagePaths) = parseToolResultImages(content);
+  final (cleanText, imagePaths) = parseToolResultImages(
+    content,
+    metadata: metadata,
+  );
   if (toolName == LocalToolNames.screenTime) {
     final screenTime = ScreenTimeResult.tryParse(cleanText);
     if (screenTime != null &&

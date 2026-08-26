@@ -3,6 +3,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_handler.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk_ids.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -249,4 +250,77 @@ void main() {
     expect(result.usage!.completionTokens, 30);
     expect(result.usage!.totalTokens, 630);
   });
+
+  test(
+    'streaming and non-streaming send Markdown to the model with mcpResult',
+    () async {
+      const markdown =
+          'caption A\n![](https://cdn.example.com/a.png)\n'
+          'caption B\n![](https://cdn.example.com/b.png)';
+      final typed = const McpToolResult(
+        markdown: markdown,
+        imageUris: [
+          'https://cdn.example.com/a.png',
+          'https://cdn.example.com/b.png',
+        ],
+      );
+
+      Future<Object?> onToolCall(
+        String name,
+        Map<String, dynamic> args, {
+        String? toolCallId,
+      }) async => typed;
+
+      final streamed = await executeClientTools(
+        calls: [
+          emitToolCall(
+            id: 'call_s',
+            name: 'shot',
+            arguments: const <String, dynamic>{},
+            metadata: const {'anthropic': 'keep'},
+          ),
+        ],
+        onToolCall: onToolCall,
+      ).toList();
+
+      ExecutedClientTool? appended;
+      await runProviderToolRounds(
+        sendRound: () async* {
+          yield const TextDelta(id: 't', text: 'round');
+        },
+        takeCalls: () => appended == null
+            ? [
+                emitToolCall(
+                  id: 'call_n',
+                  name: 'shot',
+                  arguments: const <String, dynamic>{},
+                ),
+              ]
+            : const <EmitToolCall>[],
+        continueWithoutCalls: () => false,
+        executeAfterRound: true,
+        onToolCall: onToolCall,
+        append: (executed) {
+          if (executed.isNotEmpty) appended = executed.single;
+        },
+        finish: () => emitFinish(ids: StreamChunkIds('finish')),
+      ).toList();
+
+      final streamResult = streamed.whereType<ToolCallResult>().single;
+      expect(streamResult.output, markdown);
+      expect(streamResult.output, isNot(contains('"kelivo"')));
+      expect(
+        mcpResultImageUris(readMcpResultMetadata(streamResult.metadata)),
+        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
+      );
+      expect(streamResult.metadata!['anthropic'], 'keep');
+
+      expect(appended, isNotNull);
+      expect(appended!.content, markdown);
+      expect(
+        mcpResultImageUris(readMcpResultMetadata(appended!.metadata)),
+        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
+      );
+    },
+  );
 }

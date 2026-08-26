@@ -170,7 +170,7 @@ Stream<StreamChunk> sendOpenAIStream(
       kimiFormulaTools = const <Map<String, dynamic>>[];
     }
   }
-  Future<String> resolveToolCall(
+  Future<Object?> resolveToolCall(
     String name,
     Map<String, dynamic> args, {
     String? toolCallId,

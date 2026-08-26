@@ -5,6 +5,7 @@ import '../../providers/mcp_provider.dart';
 import '../chat/chat_service.dart';
 import '../../providers/assistant_provider.dart';
 import '../../../utils/app_directories.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 
 class _McpToolRoute {
@@ -79,15 +80,13 @@ class McpToolService extends ChangeNotifier {
     return mcpProvider.callTool(route.server.id, route.tool.name, arguments);
   }
 
-  // Convenience: call tool and flatten result contents to plain text
-  Future<String> callToolTextForConversation(
+  Future<McpToolResult> callFlattenedToolForConversation(
     McpProvider mcpProvider,
     ChatService chat, {
     required String conversationId,
     required String toolName,
     Map<String, dynamic> arguments = const {},
   }) async {
-    // Attempt call via selected server
     final selected = chat.getConversationMcpServers(conversationId).toSet();
     final route = _findRoute(mcpProvider, selected, toolName);
     final res = route == null
@@ -102,85 +101,36 @@ class McpToolService extends ChangeNotifier {
         final errMsg =
             mcpProvider.errorFor(route.server.id) ??
             'MCP server is unavailable.';
-        return _renderToolErrorForModel(
-          serverName: route.server.name,
-          toolName: toolName,
-          errorMessage: errMsg,
+        return McpToolResult(
+          markdown: _renderToolErrorForModel(
+            serverName: route.server.name,
+            toolName: toolName,
+            errorMessage: errMsg,
+          ),
         );
       }
-      return '';
+      return const McpToolResult();
     }
-    final buf = StringBuffer();
-    // Be liberal in what we accept: many servers return different content variants.
-    for (final c in res.content) {
-      try {
-        // Known types from mcp_client
-        if (c is mcp.TextContent) {
-          if ((c.text).trim().isNotEmpty) buf.writeln(c.text);
-          continue;
-        }
-        if (c is mcp.ResourceContent) {
-          final t = (c.text ?? '').toString();
-          if (t.trim().isNotEmpty) {
-            buf.writeln(t);
-          } else {
-            final uri = (c.uri).toString();
-            if (uri.isNotEmpty) buf.writeln('resource: $uri');
-          }
-          continue;
-        }
-        if (c is mcp.ImageContent) {
-          final data = c.data.toString();
-          final mime = c.mimeType.toString();
-          if (data.isNotEmpty) {
-            final savedPath = await AppDirectories.saveBase64Image(
-              mime,
-              data,
-              prefix: 'mcp_img',
-            );
-            if (savedPath != null) {
-              final uri = SandboxPathResolver.canonicalize(savedPath);
-              buf.writeln('![]($uri)');
-            }
-          } else {
-            final url = (c.url ?? '').toString();
-            if (url.isNotEmpty) buf.writeln('![]($url)');
-          }
-          continue;
-        }
-        // Try dynamic accessors that some adapters may expose
-        final dyn = c as dynamic;
-        try {
-          final txt = (dyn.text as String?);
-          if (txt != null && txt.trim().isNotEmpty) {
-            buf.writeln(txt);
-            continue;
-          }
-        } catch (_) {}
-        try {
-          final uri = (dyn.uri as String?);
-          if (uri != null && uri.isNotEmpty) {
-            buf.writeln('resource: $uri');
-            continue;
-          }
-        } catch (_) {}
-        // As a last resort, serialize to JSON if available
-        try {
-          final json = (dyn.toJson as dynamic).call();
-          buf.writeln(const JsonEncoder.withIndent('  ').convert(json));
-          continue;
-        } catch (_) {}
-        // Fallback to a readable string (avoid Instance of ... when possible)
-        final s = c.toString();
-        if (!s.startsWith('Instance of')) buf.writeln(s);
-      } catch (_) {
-        // ignore single content parse errors and continue
-      }
-    }
-    return buf.toString().trim();
+    return _flattenToolResult(res);
   }
 
-  Future<String> callToolTextForAssistant(
+  Future<String> callToolTextForConversation(
+    McpProvider mcpProvider,
+    ChatService chat, {
+    required String conversationId,
+    required String toolName,
+    Map<String, dynamic> arguments = const {},
+  }) async {
+    return (await callFlattenedToolForConversation(
+      mcpProvider,
+      chat,
+      conversationId: conversationId,
+      toolName: toolName,
+      arguments: arguments,
+    )).markdown;
+  }
+
+  Future<McpToolResult> callToolForAssistant(
     McpProvider mcpProvider,
     AssistantProvider assistants, {
     required String? assistantId,
@@ -195,7 +145,7 @@ class McpToolService extends ChangeNotifier {
         : assistants.currentAssistant;
     final selected = (a?.mcpServerIds ?? const <String>[]).toSet();
     // debugPrint('[MCP/Call/Select] assistant=${assistantId ?? a?.id ?? '(current)'} tool=$toolName selectedServers=${selected.join(',')}');
-    if (selected.isEmpty) return '';
+    if (selected.isEmpty) return const McpToolResult();
     final routes =
         routeSnapshot?._routes ??
         _toolRoutes(mcpProvider, selected, reservedNames: reservedNames);
@@ -207,9 +157,8 @@ class McpToolService extends ChangeNotifier {
           selected,
           publishedRoute,
         );
-        if (route == null) return '';
+        if (route == null) return const McpToolResult();
         final s = route.server;
-        // debugPrint('[MCP/Call/Select] using server=${s.id} name=${s.name} transport=${s.transport.name}');
         final res = await mcpProvider.callTool(
           s.id,
           route.tool.name,
@@ -218,78 +167,38 @@ class McpToolService extends ChangeNotifier {
         if (res == null) {
           final errMsg =
               mcpProvider.errorFor(s.id) ?? 'MCP server is unavailable.';
-          return _renderToolErrorForModel(
-            serverName: s.name,
-            toolName: toolName,
-            errorMessage: errMsg,
+          return McpToolResult(
+            markdown: _renderToolErrorForModel(
+              serverName: s.name,
+              toolName: toolName,
+              errorMessage: errMsg,
+            ),
           );
         }
-        final buf = StringBuffer();
-        for (final c in res.content) {
-          try {
-            if (c is mcp.TextContent) {
-              if ((c.text).trim().isNotEmpty) buf.writeln(c.text);
-              continue;
-            }
-            if (c is mcp.ResourceContent) {
-              final t = (c.text ?? '').toString();
-              if (t.trim().isNotEmpty) {
-                buf.writeln(t);
-              } else {
-                final uri = (c.uri).toString();
-                if (uri.isNotEmpty) buf.writeln('resource: $uri');
-              }
-              continue;
-            }
-            if (c is mcp.ImageContent) {
-              final data = c.data.toString();
-              final mime = c.mimeType.toString();
-              if (data.isNotEmpty) {
-                final savedPath = await AppDirectories.saveBase64Image(
-                  mime,
-                  data,
-                  prefix: 'mcp_img',
-                );
-                if (savedPath != null) {
-                  final uri = SandboxPathResolver.canonicalize(savedPath);
-                  buf.writeln('![]($uri)');
-                }
-              } else {
-                final url = (c.url ?? '').toString();
-                if (url.isNotEmpty) buf.writeln('![]($url)');
-              }
-              continue;
-            }
-            final dyn = c as dynamic;
-            try {
-              final txt = (dyn.text as String?);
-              if (txt != null && txt.trim().isNotEmpty) {
-                buf.writeln(txt);
-                continue;
-              }
-            } catch (_) {}
-            try {
-              final uri = (dyn.uri as String?);
-              if (uri != null && uri.isNotEmpty) {
-                buf.writeln('resource: $uri');
-                continue;
-              }
-            } catch (_) {}
-            try {
-              final json = (dyn.toJson as dynamic).call();
-              buf.writeln(const JsonEncoder.withIndent('  ').convert(json));
-              continue;
-            } catch (_) {}
-            final s = c.toString();
-            if (!s.startsWith('Instance of')) buf.writeln(s);
-          } catch (_) {
-            // ignore single content parse errors and continue
-          }
-        }
-        return buf.toString().trim();
+        return _flattenToolResult(res);
       }
     }
-    return '';
+    return const McpToolResult();
+  }
+
+  Future<String> callToolTextForAssistant(
+    McpProvider mcpProvider,
+    AssistantProvider assistants, {
+    required String? assistantId,
+    required String toolName,
+    Map<String, dynamic> arguments = const {},
+    McpToolRouteSnapshot? routeSnapshot,
+    Set<String> reservedNames = const {},
+  }) async {
+    return (await callToolForAssistant(
+      mcpProvider,
+      assistants,
+      assistantId: assistantId,
+      toolName: toolName,
+      arguments: arguments,
+      routeSnapshot: routeSnapshot,
+      reservedNames: reservedNames,
+    )).markdown;
   }
 
   bool toolNeedsApprovalForAssistant(
@@ -334,6 +243,99 @@ class McpToolService extends ChangeNotifier {
     return McpToolRouteSnapshot._(
       _toolRoutes(mcpProvider, selected, reservedNames: reservedNames),
     );
+  }
+
+  Future<McpToolResult> _flattenToolResult(mcp.CallToolResult res) async {
+    final buf = StringBuffer();
+    final imageUris = <String>[];
+    final seen = <String>{};
+    for (final c in res.content) {
+      try {
+        if (c is mcp.TextContent) {
+          _writeEscapedToolText(buf, c.text);
+          continue;
+        }
+        if (c is mcp.ResourceContent) {
+          final t = (c.text ?? '').toString();
+          if (t.trim().isNotEmpty) {
+            _writeEscapedToolText(buf, t);
+          } else {
+            final uri = (c.uri).toString();
+            if (uri.isNotEmpty) {
+              _writeEscapedToolText(buf, 'resource: $uri');
+            }
+          }
+          continue;
+        }
+        if (c is mcp.ImageContent) {
+          final data = (c.data ?? '').toString();
+          final mime = c.mimeType.toString();
+          String? uri;
+          if (data.isNotEmpty) {
+            final savedPath = await AppDirectories.saveBase64Image(
+              mime,
+              data,
+              prefix: 'mcp_img',
+            );
+            if (savedPath != null) {
+              uri = SandboxPathResolver.canonicalize(savedPath);
+            }
+          } else {
+            final url = (c.url ?? '').toString();
+            if (url.isNotEmpty) uri = url;
+          }
+          if (uri != null && uri.isNotEmpty) {
+            if (seen.add(uri)) imageUris.add(uri);
+            if (buf.isNotEmpty && !_endsWithLineBreak(buf)) buf.writeln();
+            buf.writeln('![](${encodeMarkdownImageDestination(uri)})');
+          }
+          continue;
+        }
+        final dyn = c as dynamic;
+        try {
+          final txt = (dyn.text as String?);
+          if (txt != null && txt.trim().isNotEmpty) {
+            _writeEscapedToolText(buf, txt);
+            continue;
+          }
+        } catch (_) {}
+        try {
+          final uri = (dyn.uri as String?);
+          if (uri != null && uri.isNotEmpty) {
+            _writeEscapedToolText(buf, 'resource: $uri');
+            continue;
+          }
+        } catch (_) {}
+        try {
+          final json = (dyn.toJson as dynamic).call();
+          _writeEscapedToolText(
+            buf,
+            const JsonEncoder.withIndent('  ').convert(json),
+          );
+          continue;
+        } catch (_) {}
+        final s = c.toString();
+        if (!s.startsWith('Instance of')) {
+          _writeEscapedToolText(buf, s);
+        }
+      } catch (_) {}
+    }
+    return McpToolResult(
+      markdown: buf.toString().trim(),
+      imageUris: imageUris,
+    );
+  }
+
+  void _writeEscapedToolText(StringBuffer buf, String text) {
+    final escaped = escapeMcpStructuredImageText(text);
+    if (escaped.trim().isNotEmpty) buf.writeln(escaped);
+  }
+
+  bool _endsWithLineBreak(StringBuffer buf) {
+    if (buf.isEmpty) return false;
+    final s = buf.toString();
+    final last = s.codeUnitAt(s.length - 1);
+    return last == 0x0A || last == 0x0D;
   }
 
   List<McpToolConfig> _exposedTools(

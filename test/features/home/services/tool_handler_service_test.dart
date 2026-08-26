@@ -7,6 +7,7 @@ import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 import 'package:Kelivo/features/home/services/tool_approval_service.dart';
 import 'package:Kelivo/features/home/services/tool_handler_service.dart';
 
@@ -408,7 +409,9 @@ void main() {
       expect(mcpProvider.calls, isEmpty);
 
       approval.approve('provider-call-99', conversationId: 'conv-1');
-      expect(await future, 'srv-id:echo');
+      final result = await future;
+      expect(result, isA<McpToolResult>());
+      expect((result as McpToolResult).markdown, 'srv-id:echo');
       expect(mcpProvider.calls, [(serverId: 'srv-id', toolName: 'echo')]);
     });
   });

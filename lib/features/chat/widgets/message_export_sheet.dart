@@ -26,6 +26,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
@@ -202,10 +203,12 @@ Future<void> _writeExportBlocks(
           final decoded = jsonDecode(payloadJson);
           if (decoded is! Map) continue;
           final name = (decoded['name'] ?? '').toString();
-          final content = decoded['content'];
+          final content = toolResultContentForModel(
+            decoded['content']?.toString(),
+          );
           buf.writeln(name.isEmpty ? '[tool]' : '[$name]');
-          if (content != null && content.toString().trim().isNotEmpty) {
-            buf.writeln(content.toString());
+          if (content.trim().isNotEmpty) {
+            buf.writeln(content);
           }
           buf.writeln('');
         } catch (_) {}
@@ -514,6 +517,9 @@ List<ToolUIPart> _exportToolPartsForMessage(
                 const <String, dynamic>{},
             content: (e['content']?.toString().isNotEmpty == true)
                 ? e['content'].toString()
+                : null,
+            metadata: e['metadata'] is Map
+                ? Map<String, dynamic>.from(e['metadata'] as Map)
                 : null,
             loading: !(e['content']?.toString().isNotEmpty == true),
           ),

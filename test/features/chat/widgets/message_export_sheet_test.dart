@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -7,6 +8,7 @@ import 'package:image/image.dart' as image_lib;
 import 'package:Kelivo/core/models/chat_message.dart';
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/features/chat/widgets/message_export_sheet.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 Uint8List _solidPng({
   required int width,
@@ -1041,5 +1043,34 @@ void main() {
       exported,
       contains('我查一下\n\n[search]\nhits\n\n结果是 X\n\n\n[Thinking]\n\nplan\n\n'),
     );
+  });
+
+  test('tool export uses Markdown, never the JSON envelope', () async {
+    final envelope = encodeLegacyMcpToolResultEnvelope(
+      text: 'caption',
+      imageUris: ['/tmp/shot.png'],
+    );
+    final message = ChatMessage(
+      role: 'assistant',
+      conversationId: 'c1',
+      parts: [
+        ToolCallPart(
+          jsonEncode({
+            'id': 'shot',
+            'name': 'shot',
+            'content': envelope,
+          }),
+        ),
+      ],
+    );
+
+    final exported = await exportMessageBlocksForTesting(
+      message,
+      showThinkingAndToolCards: true,
+    );
+    expect(exported, isNot(contains('"kelivo"')));
+    expect(exported, contains('[shot]'));
+    expect(exported, contains('caption'));
+    expect(exported, contains('![]('));
   });
 }

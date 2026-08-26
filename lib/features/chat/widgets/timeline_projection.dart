@@ -14,6 +14,7 @@ class TimelineToolRef {
     required this.toolName,
     required this.arguments,
     this.content,
+    this.metadata,
     this.loading = false,
     this.memoToken,
   });
@@ -27,6 +28,7 @@ class TimelineToolRef {
   final String toolName;
   final Map<String, dynamic> arguments;
   final String? content;
+  final Map<String, dynamic>? metadata;
   final bool loading;
 
   /// Identity of the original [ToolUIPart] (or a stable field hash).
@@ -43,6 +45,7 @@ class TimelineToolRef {
     String? toolName,
     Map<String, dynamic>? arguments,
     String? content,
+    Map<String, dynamic>? metadata,
     bool? loading,
     int? memoToken,
   }) {
@@ -52,6 +55,7 @@ class TimelineToolRef {
       toolName: toolName ?? this.toolName,
       arguments: arguments ?? this.arguments,
       content: content ?? this.content,
+      metadata: metadata ?? this.metadata,
       loading: loading ?? this.loading,
       memoToken: memoToken ?? this.memoToken,
     );
@@ -257,6 +261,10 @@ TimelineToolRef? parseTimelineToolPayload(
     final name = (decoded['name'] ?? '').toString();
     final args = decoded['arguments'];
     final content = decoded['content']?.toString();
+    final rawMeta = decoded['metadata'];
+    final metadata = rawMeta is Map
+        ? Map<String, dynamic>.from(rawMeta)
+        : null;
     final arguments = args is Map
         ? args.cast<String, dynamic>()
         : const <String, dynamic>{};
@@ -267,6 +275,7 @@ TimelineToolRef? parseTimelineToolPayload(
       toolName: name,
       arguments: arguments,
       content: content,
+      metadata: metadata,
       loading: loading,
       memoToken: Object.hash(
         providerId,

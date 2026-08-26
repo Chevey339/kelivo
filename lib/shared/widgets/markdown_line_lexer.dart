@@ -66,6 +66,7 @@ final class MarkdownLineLexer {
     final mark = _fenceMarkOf(line, 0);
     if (mark == null) return;
     if (_fenceMarker == null) {
+      if (!mark.canOpen) return;
       _fenceMarker = mark.marker;
       _fenceLength = mark.length;
       return;
@@ -717,27 +718,24 @@ final class _FenceMark {
     required this.marker,
     required this.length,
     required this.canClose,
+    required this.canOpen,
   });
 
   final int start;
   final int marker;
   final int length;
   final bool canClose;
-}
-
-int _skipHorizontalIndent(String line, [int start = 0]) {
-  var i = start;
-  while (i < line.length) {
-    final unit = line.codeUnitAt(i);
-    if (unit != 0x20 && unit != 0x09) break;
-    _noteScanVisit();
-    i++;
-  }
-  return i;
+  final bool canOpen;
 }
 
 _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
-  final indent = _skipHorizontalIndent(rawLine);
+  var indent = 0;
+  while (indent < rawLine.length) {
+    final unit = rawLine.codeUnitAt(indent);
+    if (unit != 0x20 && unit != 0x09) break;
+    _noteScanVisit();
+    indent++;
+  }
   if (indent >= rawLine.length) return null;
   final marker = rawLine.codeUnitAt(indent);
   if (marker != 0x60 && marker != 0x7E) return null;
@@ -749,12 +747,17 @@ _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
   final length = n - indent;
   if (length < 3) return null;
   var canClose = true;
+  var canOpen = true;
   for (var i = n; i < rawLine.length; i++) {
     _noteScanVisit();
     final unit = rawLine.codeUnitAt(i);
     if (unit != 0x20 && unit != 0x09) {
       canClose = false;
-      break;
+    }
+    // CommonMark: a backtick fence info string cannot contain a backtick.
+    // Tilde fences allow backticks in the info string.
+    if (marker == 0x60 && unit == 0x60) {
+      canOpen = false;
     }
   }
   return _FenceMark(
@@ -762,6 +765,7 @@ _FenceMark? _fenceMarkOf(String rawLine, int lineStart) {
     marker: marker,
     length: length,
     canClose: canClose,
+    canOpen: canOpen,
   );
 }
 
@@ -964,7 +968,7 @@ final class MarkdownDisplayMathScanner {
     final rawLine = _text.substring(start, end);
     final fence = _fenceMarkOf(rawLine, start);
     if (fence != null) {
-      _fenceOpens.add(fence);
+      if (fence.canOpen) _fenceOpens.add(fence);
       if (fence.canClose) _fenceCloses.add(fence);
     }
     final ticks = _LineBackticks.of(rawLine);

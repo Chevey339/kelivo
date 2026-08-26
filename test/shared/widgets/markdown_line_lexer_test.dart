@@ -88,6 +88,23 @@ void main() {
     expect(markdownEndsWithDisplayMath(content, content.length), isFalse);
   });
 
+  test('a backtick fence info string with a backtick does not open', () {
+    const content = '```lang`sample\n\$\$b\$\$';
+    expect(markdownEndsWithDisplayMath(content, content.length), isTrue);
+    final lexer = MarkdownLineLexer();
+    expect(lexer.consumeFence('```lang`sample'), isFalse);
+    expect(lexer.fenced, isFalse);
+  });
+
+  test('a tilde fence info string may contain backticks', () {
+    final lexer = MarkdownLineLexer();
+    expect(lexer.consumeFence('~~~lang`sample'), isTrue);
+    expect(lexer.fenced, isTrue);
+    expect(lexer.consumeFence('~~~'), isTrue);
+    expect(lexer.fenced, isFalse);
+  });
+
+
   test(
     'display-math walk visits stay linear on many short inline-code spans',
     () {
