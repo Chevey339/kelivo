@@ -264,6 +264,18 @@ abstract class BuiltInToolsHelper {
   static bool isDeepSeekProvider(ProviderConfig? cfg) =>
       ProviderConfig.isDeepSeekConfig(cfg);
 
+  /// Whether [cfg] talks to Anthropic itself. The Anthropic-hosted server tools
+  /// only work there: a Claude-compatible relay either rejects the tool types
+  /// outright or answers from an account pool, and results from a pool cannot
+  /// be replayed because the next request decrypts them against a different
+  /// organisation. An empty base url is the official endpoint by default.
+  static bool isOfficialAnthropicEndpoint(ProviderConfig? cfg) {
+    if (cfg == null) return false;
+    final raw = cfg.baseUrl.trim();
+    if (raw.isEmpty) return true;
+    return (Uri.tryParse(raw)?.host.toLowerCase() ?? '') == 'api.anthropic.com';
+  }
+
   static bool isDeepSeekResponsesBuiltInSearchSupportedModel(String? modelId) {
     return _normalizedModelId(modelId).startsWith('deepseek-v4-');
   }
@@ -702,7 +714,9 @@ abstract class BuiltInToolsHelper {
       cfg.id,
       explicitType: cfg.providerType,
     );
-    if (kind != ProviderKind.claude || isDeepSeekProvider(cfg)) return null;
+    if (kind != ProviderKind.claude || !isOfficialAnthropicEndpoint(cfg)) {
+      return null;
+    }
     return BuiltInToolNames.effectiveModelId(cfg: cfg, modelId: modelId);
   }
 

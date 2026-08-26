@@ -84,6 +84,9 @@ Stream<StreamChunk> sendClaudeStream(
   final skipRedactedThinkingBlocks = BuiltInToolsHelper.isOpenRouterProvider(
     config,
   );
+  final replayServerToolBlocks = BuiltInToolsHelper.isOfficialAnthropicEndpoint(
+    config,
+  );
 
   // Extract system prompt (Anthropic uses top-level `system`)
   String systemPrompt = '';
@@ -149,6 +152,13 @@ Stream<StreamChunk> sendClaudeStream(
   Map<String, dynamic>? assistantBlockForClaudeRequest(Map block) {
     final type = (block['type'] ?? '').toString();
     if (skipRedactedThinkingBlocks && type == 'redacted_thinking') {
+      return null;
+    }
+    // Only Anthropic runs a server tool or decrypts what one returned, so
+    // everywhere else its blocks are dropped and the call replays as the
+    // synthesised client pair, exactly as it did before these tools existed.
+    if (!replayServerToolBlocks &&
+        (type == 'server_tool_use' || type.endsWith('_tool_result'))) {
       return null;
     }
     return block.map((key, value) => MapEntry(key.toString(), value));
@@ -319,7 +329,10 @@ Stream<StreamChunk> sendClaudeStream(
         }
       }
       if (blocks.isNotEmpty) {
-        final message = <String, dynamic>{'role': 'assistant', 'content': blocks};
+        final message = <String, dynamic>{
+          'role': 'assistant',
+          'content': blocks,
+        };
         initialMessages.add(message);
         if (hadReplayBlocks) replayedTurn = message;
       }
@@ -750,7 +763,10 @@ Stream<StreamChunk> sendClaudeStream(
 
       totalUsage = usage ?? totalUsage;
 
-      lastAssistantBlocks = assistantBlocks;
+      // The continuation round sends these as they are, so they go through the
+      // same sanitising as replayed history — the persisted copy below stays
+      // whole either way.
+      lastAssistantBlocks = assistantBlocksForClaudeRequest(assistantBlocks);
       if (decoder.clientTools.isEmpty) {
         pauseTurn = (lastStopReason ?? '') == 'pause_turn';
         return;

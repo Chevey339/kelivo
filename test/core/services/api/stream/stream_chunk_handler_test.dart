@@ -534,7 +534,6 @@ void main() {
       'text',
     ]);
   });
-
   test('handleResult keeps image URIs as-is and does not add data:', () {
     final handler = StreamChunkHandler();
     handler.handleResult(

@@ -198,8 +198,9 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       }
       if (id.isNotEmpty) {
         // Server tools have to be replayed as the blocks the API sent, not as
-        // client tool calls: search results only decrypt when their original
-        // block comes back intact.
+        // client tool calls: results only decrypt when their original block
+        // comes back intact, and an unrun one only runs if it comes back at
+        // all. Whether they may be sent is the request side's call.
         final serverBlock = <String, dynamic>{
           'type': 'server_tool_use',
           'id': id,
@@ -233,7 +234,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
       if (name == 'web_search') {
         chunks.addAll(_webSearchResult(block));
       } else if (_serverToolDisplayName(name) != null) {
-        chunks.addAll(_serverToolResult(block));
+        chunks.addAll(_serverToolResult(block, name));
       }
     } else if (kind == 'text') {
       if (idx != null) {
@@ -424,11 +425,20 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     return value;
   }
 
-  List<StreamChunk> _serverToolResult(Map<String, dynamic> block) {
+  /// [blockToolName] is the tool the result block itself names, which is the
+  /// only name a turn that runs a server tool left over from an earlier one
+  /// carries: the API sends the result without repeating the request block.
+  List<StreamChunk> _serverToolResult(
+    Map<String, dynamic> block,
+    String blockToolName,
+  ) {
     final toolUseId = (block['tool_use_id'] ?? '').toString();
     final id = toolUseId.isEmpty ? _ids.next('server_tool') : toolUseId;
     if (!_serverToolEnded.add(id)) return const <StreamChunk>[];
-    final toolName = _serverToolNames[id] ?? 'server_tool';
+    final toolName =
+        _serverToolNames[id] ??
+        _serverToolDisplayName(blockToolName) ??
+        'server_tool';
     final args = _serverArgsFor(id);
     final content = block['content'];
     // Anthropic reports a server tool failure as a `*_tool_result_error`

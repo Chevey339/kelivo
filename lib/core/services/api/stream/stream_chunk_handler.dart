@@ -397,7 +397,6 @@ class StreamChunkHandler {
     }
     return null;
   }
-
 }
 
 class _ToolBuffer {

@@ -174,16 +174,21 @@ class ModelBuiltInToolTiles {
           ),
         ];
       case ProviderKind.claude:
+        // Anthropic hosts these tools itself, so only its own endpoint can run
+        // them; a Claude-compatible relay is offered the switch but locked out.
+        final official = BuiltInToolsHelper.isOfficialAnthropicEndpoint(cfg);
         return <ModelBuiltInToolTile>[
           ModelBuiltInToolTile(
             name: BuiltInToolNames.webFetch,
             title: l10n.modelDetailSheetWebFetchTool,
             desc: l10n.modelDetailSheetClaudeWebFetchToolDescription,
+            available: official,
           ),
           ModelBuiltInToolTile(
             name: BuiltInToolNames.codeExecution,
             title: l10n.modelDetailSheetCodeExecutionTool,
             desc: l10n.modelDetailSheetClaudeCodeExecutionToolDescription,
+            available: official,
           ),
         ];
       case ProviderKind.openai:
