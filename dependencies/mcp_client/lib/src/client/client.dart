@@ -339,6 +339,15 @@ class Client {
   Future<void> waitForPendingRequests() =>
       _pendingRequestsDrained?.future ?? Future<void>.value();
 
+  /// Completes after Streamable HTTP's first background GET gets a response.
+  /// Other transports complete immediately.
+  Future<void> waitForBackgroundStream() {
+    final transport = _transport;
+    return transport is StreamableHttpClientTransport
+        ? transport.waitForInitialGetAttempt()
+        : Future<void>.value();
+  }
+
   /// Validate protocol version compatibility
   void _validateProtocolVersion(String serverProtoVersion) {
     _logger.warning(

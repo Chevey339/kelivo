@@ -51,6 +51,8 @@ class _ServerConnection {
   final Map<String, int> scopeEscalationAttempts = <String, int>{};
   bool reRegisterDynamicClient = false;
   bool refreshDirty = false;
+  DateTime? lastBackgroundSessionRecoveryAt;
+  Future<mcp.Client?>? sessionRecoveryFuture;
 }
 
 enum _ToolRefreshOutcome { success, sessionExpired, oauthRecovered, failed }
@@ -325,6 +327,9 @@ class McpServerConfig {
 class McpProvider extends ChangeNotifier {
   static const String _prefsKey = 'mcp_servers_v1';
   static const String _prefsTimeoutKey = 'mcp_request_timeout_ms_v1';
+  static const Duration _backgroundSessionRecoveryWindow = Duration(
+    seconds: 30,
+  );
 
   final BusinessPreferences preferences;
   final McpOAuthService _oauthService;
@@ -1680,7 +1685,12 @@ class McpProvider extends ChangeNotifier {
           error.isBackgroundRequest &&
           error.statusCode == 404 &&
           error.sessionIdPresent) {
-        unawaited(_recoverExpiredSession(id, state, client));
+        if (_isRapidBackgroundSessionExpiry(state)) {
+          _stopBackgroundSessionRecovery(state, client, error);
+        } else {
+          state.lastBackgroundSessionRecoveryAt = DateTime.now();
+          _startBackgroundSessionRecovery(id, state, client);
+        }
       } else if (error is mcp.McpHttpError && _requiresCooldown(error)) {
         _enterCooldown(state, error.retryAfter);
         _notify();
@@ -1778,6 +1788,8 @@ class McpProvider extends ChangeNotifier {
     state.error = null;
     state.cooldown = null;
     state.refreshDirty = false;
+    state.lastBackgroundSessionRecoveryAt = null;
+    state.sessionRecoveryFuture = null;
     _notify();
 
     return _DetachedConnection(activeConnect: active, client: client);
@@ -1806,7 +1818,71 @@ class McpProvider extends ChangeNotifier {
   Future<bool> reconnect(String id) async {
     if (_activeCooldown(_connections[id]) != null) return false;
     await disconnect(id, terminateSession: true);
-    return _connect(id);
+    if (!await _connect(id)) return false;
+    await _awaitHttpSessionSettlement(id);
+    return isConnected(id);
+  }
+
+  Future<void> _awaitHttpSessionSettlement(String id) async {
+    for (var attempt = 0; attempt < 4; attempt++) {
+      if (_disposed) return;
+      final state = _connections[id];
+      if (state == null) return;
+
+      final connecting = state.connectFuture;
+      if (connecting != null) {
+        try {
+          await connecting;
+        } catch (_) {}
+        continue;
+      }
+
+      final client = state.client;
+      if (client != null) {
+        try {
+          await client.waitForBackgroundStream().timeout(_requestTimeout);
+        } catch (_) {}
+        await _yieldBackgroundSessionHandlers(state);
+      }
+
+      final recovery = state.sessionRecoveryFuture ?? state.connectFuture;
+      if (recovery != null) {
+        try {
+          await recovery;
+        } catch (_) {}
+        continue;
+      }
+      if (state.status == McpStatus.connecting) continue;
+      return;
+    }
+  }
+
+  Future<void> _yieldBackgroundSessionHandlers(_ServerConnection state) async {
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(Duration.zero);
+      if (state.sessionRecoveryFuture != null ||
+          state.connectFuture != null ||
+          state.status == McpStatus.connecting ||
+          state.status == McpStatus.error) {
+        return;
+      }
+    }
+  }
+
+  void _startBackgroundSessionRecovery(
+    String id,
+    _ServerConnection state,
+    mcp.Client client,
+  ) {
+    final recovery = _recoverExpiredSession(id, state, client);
+    state.sessionRecoveryFuture = recovery;
+    unawaited(
+      recovery.whenComplete(() {
+        if (identical(state.sessionRecoveryFuture, recovery)) {
+          state.sessionRecoveryFuture = null;
+        }
+      }),
+    );
   }
 
   McpToolConfig? _toolConfig(String serverId, String toolName) {
@@ -2524,6 +2600,28 @@ class McpProvider extends ChangeNotifier {
   bool _requiresCooldown(mcp.McpHttpError error) =>
       error.statusCode == 429 ||
       (error.statusCode >= 500 && error.retryAfter != null);
+
+  bool _isRapidBackgroundSessionExpiry(_ServerConnection state) {
+    final last = state.lastBackgroundSessionRecoveryAt;
+    return last != null &&
+        DateTime.now().difference(last) < _backgroundSessionRecoveryWindow;
+  }
+
+  void _stopBackgroundSessionRecovery(
+    _ServerConnection state,
+    mcp.Client client,
+    Object error,
+  ) {
+    if (_disposed || !identical(state.client, client)) return;
+    state.generation++;
+    state.client = null;
+    state.status = McpStatus.error;
+    state.error =
+        'MCP session stream failed again immediately after reconnect '
+        '($error). Reconnect manually.';
+    _notify();
+    client.dispose();
+  }
 
   bool _isRejectedSession(Object error) =>
       error is mcp.McpHttpError &&

@@ -942,6 +942,47 @@ void main() {
   );
 
   test(
+    'repeated GET 404 recovers the session once then stops',
+    () async {
+      final server = await _MockMcpServer.start(expireAllGets: true);
+      final harness = await BusinessTestHarness.create();
+      final provider = McpProvider(preferences: harness.preferences);
+
+      try {
+        await _waitUntil(
+          () => provider.servers.isNotEmpty,
+          label: 'provider load',
+        );
+        final id = await provider.addServer(
+          enabled: true,
+          name: 'Remote',
+          transport: McpTransportType.http,
+          url: server.url,
+        );
+        await _waitUntil(
+          () => provider.statusFor(id) == McpStatus.error,
+          label: 'circuit open after repeated GET 404',
+        );
+
+        expect(server.count('initialize'), 2);
+        expect(provider.errorFor(id), contains('Reconnect manually'));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        expect(server.count('initialize'), 2);
+
+        expect(await provider.reconnect(id), isFalse);
+        expect(provider.isConnected(id), isFalse);
+        expect(provider.statusFor(id), McpStatus.error);
+        expect(server.count('initialize'), 4);
+      } finally {
+        provider.dispose();
+        await harness.close();
+        await server.close();
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 8)),
+  );
+
+  test(
     'GET 404 replaces the expired session once',
     () async {
       final server = await _MockMcpServer.start(expireFirstGet: true);
@@ -1375,6 +1416,7 @@ class _MockMcpServer {
   final bool sendToolsChangedBurst;
   final bool dropFirstToolResponse;
   final bool expireFirstGet;
+  final bool expireAllGets;
   final bool rejectFirstSessionToolCalls;
   final bool supportsTools;
   final String? expectedAuthorization;
@@ -1408,6 +1450,7 @@ class _MockMcpServer {
     required this.sendToolsChangedBurst,
     required this.dropFirstToolResponse,
     required this.expireFirstGet,
+    required this.expireAllGets,
     required this.rejectFirstSessionToolCalls,
     required this.supportsTools,
     required this.expectedAuthorization,
@@ -1425,6 +1468,7 @@ class _MockMcpServer {
     bool sendToolsChangedBurst = false,
     bool dropFirstToolResponse = false,
     bool expireFirstGet = false,
+    bool expireAllGets = false,
     bool rejectFirstSessionToolCalls = false,
     bool supportsTools = true,
     String? expectedAuthorization,
@@ -1441,6 +1485,7 @@ class _MockMcpServer {
       sendToolsChangedBurst: sendToolsChangedBurst,
       dropFirstToolResponse: dropFirstToolResponse,
       expireFirstGet: expireFirstGet,
+      expireAllGets: expireAllGets,
       rejectFirstSessionToolCalls: rejectFirstSessionToolCalls,
       supportsTools: supportsTools,
       expectedAuthorization: expectedAuthorization,
@@ -1474,7 +1519,7 @@ class _MockMcpServer {
       }
       if (request.method == 'GET') {
         _getCount++;
-        if (expireFirstGet && _getCount == 1) {
+        if (expireAllGets || (expireFirstGet && _getCount == 1)) {
           request.response.statusCode = HttpStatus.notFound;
           await request.response.close();
           continue;
