@@ -6061,7 +6061,9 @@ class ProviderConfig {
     if (k.contains('gemini') || k.contains('google')) {
       return ProviderKind.google;
     }
-    if (k.contains('claude') || k.contains('anthropic')) {
+    if (k.contains('zenmux') ||
+        k.contains('claude') ||
+        k.contains('anthropic')) {
       return ProviderKind.claude;
     }
     return ProviderKind.openai;
@@ -6070,7 +6072,7 @@ class ProviderConfig {
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
-    if (k.contains('zenmux')) return 'https://zenmux.ai/api/v1';
+    if (k.contains('zenmux')) return 'https://zenmux.ai/api/anthropic/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';

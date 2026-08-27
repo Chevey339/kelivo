@@ -36,13 +36,13 @@ void main() {
       expect(moonshot.modelOverrides, isEmpty);
     });
 
-    test('default ZenMux preset uses the OpenAI-compatible API', () {
+    test('default ZenMux preset uses the Anthropic-compatible API', () {
       final zenmux = ProviderConfig.defaultsFor('ZenMux');
 
-      expect(zenmux.baseUrl, 'https://zenmux.ai/api/v1');
-      expect(zenmux.providerType, ProviderKind.openai);
-      expect(zenmux.chatPath, '/chat/completions');
-      expect(zenmux.useResponseApi, isFalse);
+      expect(zenmux.baseUrl, 'https://zenmux.ai/api/anthropic/v1');
+      expect(zenmux.providerType, ProviderKind.claude);
+      expect(zenmux.chatPath, isNull);
+      expect(zenmux.useResponseApi, isNull);
       expect(zenmux.enabled, isFalse);
     });
 
