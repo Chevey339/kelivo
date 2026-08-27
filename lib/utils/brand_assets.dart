@@ -30,6 +30,7 @@ class BrandAssets {
   static final List<MapEntry<RegExp, String>> _mapping =
       <MapEntry<RegExp, String>>[
         MapEntry(RegExp(r'openai|gpt|o\d'), 'openai.svg'),
+        MapEntry(RegExp(r'zenmux'), 'zenmux.svg'),
         MapEntry(RegExp(r'gemini'), 'gemini-color.svg'),
         MapEntry(
           RegExp(r'^azure(?: (?:tts|speech(?: services?)?))?$'),
@@ -369,6 +370,7 @@ class BrandAssets {
 
   static const Set<String> _darkAdaptiveAssets = <String>{
     'openai.svg',
+    'zenmux.svg',
     'anthropic.svg',
     'grok.svg',
     'xai.svg',
