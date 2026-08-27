@@ -465,6 +465,10 @@ Stream<StreamChunk> sendClaudeStream(
         sourceId: 'round-${streamRound++}',
       );
       final executedToolIds = <String>{};
+      // Downloads run alongside the stream: awaiting one here would leave the
+      // SSE events unread, and the text after the tool frozen, for as long as
+      // the file takes.
+      final downloads = <Future<GeneratedFile?>>[];
 
       await for (final event in parseSseEventStrings(sse)) {
         throwIfInBandStreamError(event.data);
@@ -477,13 +481,14 @@ Stream<StreamChunk> sendClaudeStream(
             // carries the file itself.
             for (final fileId in claudeGeneratedFileIds(chunk.output)) {
               if (!downloadedFileIds.add(fileId)) continue;
-              final file = await downloadClaudeGeneratedFile(
-                client: client,
-                base: base,
-                headers: baseHeaders,
-                fileId: fileId,
+              downloads.add(
+                downloadClaudeGeneratedFile(
+                  client: client,
+                  base: base,
+                  headers: baseHeaders,
+                  fileId: fileId,
+                ),
               );
-              if (file != null) yield file;
             }
           }
           if (chunk is ToolCallEnd &&
@@ -518,6 +523,10 @@ Stream<StreamChunk> sendClaudeStream(
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;
+      }
+      for (final download in downloads) {
+        final file = await download;
+        if (file != null) yield file;
       }
 
       final usage = decoder.usage;

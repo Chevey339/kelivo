@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+// ignore: depend_on_referenced_packages
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
@@ -10,6 +12,7 @@ import 'package:Kelivo/core/services/api/chat_api_service.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
+import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 import 'support/collect_generation.dart';
 
 ProviderConfig _claudeConfig(
@@ -60,6 +63,24 @@ ProviderConfig _deepSeekClaudeConfig({
     providerType: ProviderKind.claude,
     modelOverrides: modelOverrides,
   );
+}
+
+class _FakePathProviderPlatform extends PathProviderPlatform {
+  _FakePathProviderPlatform(this.path);
+
+  final String path;
+
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+
+  @override
+  Future<String?> getApplicationSupportPath() async => path;
+
+  @override
+  Future<String?> getApplicationCachePath() async => '$path/cache';
+
+  @override
+  Future<String?> getTemporaryPath() async => '$path/tmp';
 }
 
 class _ProxyHttpOverrides extends HttpOverrides {
@@ -1376,6 +1397,161 @@ void main() {
         ]);
       },
     );
+
+    test('a slow file download does not hold up the text after it', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_claude_dl_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      SandboxPathResolver.debugSetDirs(docsDir: tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        SandboxPathResolver.debugSetDirs();
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
+      });
+
+      const events = [
+        {
+          'type': 'content_block_start',
+          'index': 0,
+          'content_block': {'type': 'text', 'text': ''},
+        },
+        {
+          'type': 'content_block_delta',
+          'index': 0,
+          'delta': {'type': 'text_delta', 'text': 'before '},
+        },
+        {'type': 'content_block_stop', 'index': 0},
+        {
+          'type': 'content_block_start',
+          'index': 1,
+          'content_block': {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_run',
+            'name': 'bash_code_execution',
+            'input': {'command': 'python plot.py'},
+          },
+        },
+        {'type': 'content_block_stop', 'index': 1},
+        {
+          'type': 'content_block_start',
+          'index': 2,
+          'content_block': {
+            'type': 'bash_code_execution_tool_result',
+            'tool_use_id': 'srvtoolu_run',
+            'content': {
+              'type': 'bash_code_execution_result',
+              'stdout': '',
+              'stderr': '',
+              'return_code': 0,
+              'content': [
+                {'type': 'code_execution_output', 'file_id': 'file_chart'},
+              ],
+            },
+          },
+        },
+        {'type': 'content_block_stop', 'index': 2},
+        {
+          'type': 'content_block_start',
+          'index': 3,
+          'content_block': {'type': 'text', 'text': ''},
+        },
+        {
+          'type': 'content_block_delta',
+          'index': 3,
+          'delta': {'type': 'text_delta', 'text': 'after'},
+        },
+        {'type': 'content_block_stop', 'index': 3},
+        {
+          'type': 'message_delta',
+          'delta': {'stop_reason': 'end_turn'},
+        },
+        {'type': 'message_stop'},
+      ];
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        if (request.method == 'GET') {
+          if (request.uri.path.endsWith('/content')) {
+            // The file takes longer than the rest of the stream does.
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+            request.response.statusCode = HttpStatus.ok;
+            request.response.add(const <int>[1, 2, 3, 4]);
+          } else {
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({
+                'id': 'file_chart',
+                'filename': 'chart.png',
+                'mime_type': 'image/png',
+                'size_bytes': 4,
+                'downloadable': true,
+              }),
+            );
+          }
+          await request.response.close();
+          return;
+        }
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.write(
+          'event: message_start\n'
+          'data: ${jsonEncode({
+            'type': 'message_start',
+            'message': {
+              'id': 'msg_1',
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            },
+          })}\n\n',
+        );
+        for (final event in events) {
+          request.response.write(
+            'event: ${event['type']}\ndata: ${jsonEncode(event)}\n\n',
+          );
+        }
+        await request.response.close();
+      });
+
+      final config = _claudeConfig(
+        'http://api.anthropic.com',
+        modelOverrides: const <String, dynamic>{
+          'claude-opus-4-7': <String, dynamic>{
+            'builtInTools': <String>[BuiltInToolNames.codeExecution],
+          },
+        },
+      );
+      late List<StreamChunk> chunks;
+      await HttpOverrides.runZoned(
+        () async {
+          chunks = await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: 'claude-opus-4-7',
+            messages: const [
+              {'role': 'user', 'content': 'plot'},
+            ],
+          ).toList();
+        },
+        createHttpClient: (context) =>
+            _ProxyHttpOverrides(server.port).createHttpClient(context),
+      );
+
+      expect(chunks.joinedContent, 'before after');
+      final lastText = chunks.lastIndexWhere((chunk) => chunk is TextDelta);
+      final file = chunks.indexWhere((chunk) => chunk is GeneratedFile);
+      expect(file, greaterThan(lastText), reason: 'the text must not wait');
+      expect((chunks[file] as GeneratedFile).name, 'chart.png');
+    });
 
     test(
       'a conversation keeps its container across turns until it expires',
