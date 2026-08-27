@@ -44,6 +44,14 @@ void main() {
       expect(zenmux.chatPath, isNull);
       expect(zenmux.useResponseApi, isNull);
       expect(zenmux.enabled, isFalse);
+      expect(
+        ProviderConfig.zenMuxBaseUrlFor(ProviderKind.openai),
+        'https://zenmux.ai/api/v1',
+      );
+      expect(
+        ProviderConfig.zenMuxBaseUrlFor(ProviderKind.google),
+        'https://zenmux.ai/api/vertex-ai/v1/publishers/google',
+      );
     });
 
     test('built-in provider order does not add Kimi preset', () async {

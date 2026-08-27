@@ -5810,6 +5810,29 @@ class ProviderConfig {
     }
   }
 
+  static bool isZenMux({
+    required String id,
+    String? name,
+    String? baseUrl,
+  }) {
+    final host = Uri.tryParse(baseUrl ?? '')?.host.toLowerCase() ?? '';
+    return id.toLowerCase().contains('zenmux') ||
+        (name ?? '').toLowerCase().contains('zenmux') ||
+        host == 'zenmux.ai' ||
+        host.endsWith('.zenmux.ai');
+  }
+
+  static String zenMuxBaseUrlFor(ProviderKind kind) {
+    switch (kind) {
+      case ProviderKind.openai:
+        return 'https://zenmux.ai/api/v1';
+      case ProviderKind.claude:
+        return 'https://zenmux.ai/api/anthropic/v1';
+      case ProviderKind.google:
+        return 'https://zenmux.ai/api/vertex-ai/v1/publishers/google';
+    }
+  }
+
   ProviderConfig({
     required this.id,
     required this.enabled,

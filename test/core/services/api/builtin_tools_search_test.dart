@@ -175,5 +175,59 @@ void main() {
         ],
       );
     });
+
+    test('ZenMux only enables native web search for advertised models', () {
+      const supportedId = 'anthropic/claude-sonnet-4.6';
+      const unsupportedId = 'deepseek/deepseek-v4-pro';
+      final cfg = ProviderConfig.defaultsFor('ZenMux').copyWith(
+        providerType: ProviderKind.openai,
+        baseUrl: ProviderConfig.zenMuxBaseUrlFor(ProviderKind.openai),
+        modelOverrides: const <String, dynamic>{
+          supportedId: <String, dynamic>{
+            'supportsWebSearch': true,
+            'builtInTools': <String>[BuiltInToolNames.search],
+          },
+          unsupportedId: <String, dynamic>{
+            'supportsWebSearch': false,
+            'builtInTools': <String>[BuiltInToolNames.search],
+          },
+        },
+      );
+
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: cfg,
+          modelId: supportedId,
+        ),
+        isTrue,
+      );
+      expect(
+        BuiltInToolsHelper.supportsBuiltInSearchForModel(
+          cfg: cfg,
+          modelId: unsupportedId,
+        ),
+        isFalse,
+      );
+      expect(
+        BuiltInToolsHelper.buildChatCompletionsTools(
+          cfg: cfg,
+          modelId: supportedId,
+          upstreamModelId: supportedId,
+        ).body,
+        <String, dynamic>{
+          'web_search_options': <String, dynamic>{},
+        },
+      );
+
+      final responses = cfg.copyWith(useResponseApi: true);
+      expect(
+        BuiltInToolsHelper.buildResponsesTools(
+          cfg: responses,
+          modelId: supportedId,
+          upstreamModelId: supportedId,
+        ).tools,
+        contains(<String, dynamic>{'type': 'web_search'}),
+      );
+    });
   });
 }

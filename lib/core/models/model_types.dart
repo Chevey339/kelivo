@@ -14,6 +14,7 @@ class ModelInfo {
   final List<Modality> input;
   final List<Modality> output;
   final List<ModelAbility> abilities;
+  final bool supportsWebSearch;
 
   static List<Modality> _normalizeModalities(Iterable<Modality> mods) {
     final set = <Modality>{...mods};
@@ -34,6 +35,7 @@ class ModelInfo {
     List<Modality> input = const [Modality.text],
     List<Modality> output = const [Modality.text],
     List<ModelAbility> abilities = const [],
+    this.supportsWebSearch = false,
   }) : input = _normalizeModalities(input),
        output = _normalizeModalities(output),
        abilities = _normalizeAbilities(abilities);
@@ -45,6 +47,7 @@ class ModelInfo {
     List<Modality>? input,
     List<Modality>? output,
     List<ModelAbility>? abilities,
+    bool? supportsWebSearch,
   }) {
     return ModelInfo(
       id: id ?? this.id,
@@ -53,6 +56,7 @@ class ModelInfo {
       input: input ?? this.input,
       output: output ?? this.output,
       abilities: abilities ?? this.abilities,
+      supportsWebSearch: supportsWebSearch ?? this.supportsWebSearch,
     );
   }
 
@@ -66,7 +70,8 @@ class ModelInfo {
             type == other.type &&
             listEquals(input, other.input) &&
             listEquals(output, other.output) &&
-            listEquals(abilities, other.abilities));
+            listEquals(abilities, other.abilities) &&
+            supportsWebSearch == other.supportsWebSearch);
   }
 
   @override
@@ -77,5 +82,6 @@ class ModelInfo {
     Object.hashAll(input),
     Object.hashAll(output),
     Object.hashAll(abilities),
+    supportsWebSearch,
   );
 }

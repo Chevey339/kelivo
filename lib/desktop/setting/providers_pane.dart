@@ -2783,9 +2783,23 @@ class _DesktopProviderDetailPaneState
                                     widget.providerKey,
                                     defaultName: widget.displayName,
                                   );
+                                  final isZenMux = ProviderConfig.isZenMux(
+                                    id: old.id,
+                                    name: old.name,
+                                    baseUrl: old.baseUrl,
+                                  );
                                   await spWatch.setProviderConfig(
                                     widget.providerKey,
-                                    old.copyWith(providerType: k),
+                                    old.copyWith(
+                                      providerType: k,
+                                      baseUrl: isZenMux
+                                          ? ProviderConfig.zenMuxBaseUrlFor(k)
+                                          : old.baseUrl,
+                                      vertexAI: k == ProviderKind.google &&
+                                              isZenMux
+                                          ? false
+                                          : old.vertexAI,
+                                    ),
                                   );
                                 },
                               ),
