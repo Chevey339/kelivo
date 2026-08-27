@@ -346,7 +346,7 @@ Future<void> _showLegacyMemoryMigration(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => Dialog(
-        backgroundColor: Theme.of(dialogContext).colorScheme.surface,
+        backgroundColor: dialogContext.overlaySurface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
@@ -363,7 +363,6 @@ Future<void> _showLegacyMemoryMigration(
     enableDrag: false,
     backgroundColor: Colors.transparent,
     builder: (sheetContext) {
-      final cs = Theme.of(sheetContext).colorScheme;
       return SafeArea(
         top: false,
         child: Align(
@@ -374,7 +373,7 @@ Future<void> _showLegacyMemoryMigration(
               maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.9,
             ),
             child: Material(
-              color: cs.surface,
+              color: sheetContext.appColors.surfaceCard,
               elevation: 0,
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),

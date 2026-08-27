@@ -18,6 +18,7 @@ import '../../backup/pages/backup_page.dart';
 import '../../quick_phrase/pages/quick_phrases_page.dart';
 import '../../instruction_injection/pages/instruction_injection_page.dart';
 import '../../world_book/pages/world_book_page.dart';
+import '../../../shared/widgets/section_card.dart';
 import 'network_proxy_page.dart';
 import 'storage_space_page.dart';
 import '../../stats/pages/stats_page.dart';
@@ -51,7 +52,7 @@ class SettingsPage extends StatelessWidget {
       final settingsProvider = context.read<SettingsProvider>();
       final selected = await showModalBottomSheet<ThemeMode>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -152,7 +153,7 @@ class SettingsPage extends StatelessWidget {
 
           // 通用设置：使用iOS风格分组卡片，黑色（中性）图标与标题，无描述
           header(l10n.settingsPageGeneralSection, first: true),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -192,7 +193,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageModelsServicesSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -314,7 +315,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageDataSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -343,7 +344,7 @@ class SettingsPage extends StatelessWidget {
 
           const SizedBox(height: 12),
           header(l10n.settingsPageAboutSection),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -441,33 +442,6 @@ class SettingsPage extends StatelessWidget {
 }
 
 // --- iOS-style widgets for Settings page ---
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      // Light: white with slight transparency; Dark: subtle translucent dark
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

@@ -506,7 +506,7 @@ Future<AsrServiceOptions?> _showAsrEditor(
       context: context,
       builder: (dialogContext) => Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        backgroundColor: Theme.of(dialogContext).colorScheme.surface,
+        backgroundColor: dialogContext.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),

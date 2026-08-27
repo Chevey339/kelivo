@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class MultiKeyManagerPage extends StatefulWidget {
   const MultiKeyManagerPage({
@@ -108,7 +109,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         children: [
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosRow(
                 context,
@@ -228,7 +229,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     if (keys.isEmpty) {
-      return _iosSectionCard(
+      return SectionCard(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
@@ -269,7 +270,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
       }
     }
 
-    return _iosSectionCard(
+    return SectionCard(
       children: [
         for (int i = 0; i < keys.length; i++)
           _keyRow(
@@ -382,25 +383,6 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
   }
 
   // iOS-style section container
-  Widget _iosSectionCard({required List<Widget> children}) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    // Blend with surface to better match page background while retaining a card feel
-    final Color bg = context.appColors.surfaceCard;
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
-    );
-  }
 
   // Single row with label-left and custom trailing
   Widget _iosRow(
@@ -725,7 +707,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
 
     final selected = await showModalBottomSheet<LoadBalanceStrategy>(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -811,7 +793,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     final result = await showModalBottomSheet<List<String>?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -927,7 +909,7 @@ class _MultiKeyManagerPageState extends State<MultiKeyManagerPage> {
     final updated = await showModalBottomSheet<ApiKeyConfig?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),

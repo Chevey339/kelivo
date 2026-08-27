@@ -219,11 +219,10 @@ Future<ModelSelection?> showModelSelector(
         initialModelId: initialModelId,
       );
     }
-    final cs = Theme.of(context).colorScheme;
     return await showModalBottomSheet<ModelSelection>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -802,7 +801,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 // Fixed header section with rounded corners
                 Container(
                   decoration: BoxDecoration(
-                    color: cs.surface,
+                    color: context.appColors.surfaceCard,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
@@ -930,7 +929,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 // Scrollable content
                 Expanded(
                   child: Container(
-                    color: cs.surface, // Ensure background color continuity
+                    color: context.appColors.surfaceCard, // Ensure background color continuity
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _buildContent(context),
@@ -938,7 +937,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 ),
                 // Fixed bottom tabs
                 Container(
-                  color: cs.surface, // Ensure background color continuity
+                  color: context.appColors.surfaceCard, // Ensure background color continuity
                   child: _buildBottomTabs(context),
                 ),
               ],
@@ -1135,7 +1134,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
       right: 0,
       child: DecoratedBox(
         key: const ValueKey('model-selector-sticky-provider'),
-        decoration: BoxDecoration(color: cs.surface),
+        decoration: BoxDecoration(color: context.appColors.surfaceCard),
         child: SizedBox(
           height: _stickyProviderHeaderHeight + 1,
           child: ClipRect(
@@ -1256,7 +1255,7 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : cs.surface;
+        : context.appColors.surfaceCard;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: RepaintBoundary(
@@ -1477,7 +1476,7 @@ class _ProviderChipState extends State<_ProviderChip> {
         ? (isDark
               ? cs.primary.withValues(alpha: 0.08)
               : cs.primary.withValues(alpha: 0.05))
-        : cs.surface;
+        : context.appColors.surfaceCard;
     final Color overlay = cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.05);
     final Color bg = _pressed ? Color.alphaBlend(overlay, baseBg) : baseBg;
     // Slightly stronger border when selected; keep label color unchanged for subtlety
@@ -1936,7 +1935,7 @@ class _DesktopModelSelectDialogBodyState
           maxHeight: 560,
         ),
         child: Material(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -1955,7 +1954,7 @@ class _DesktopModelSelectDialogBodyState
                 // Body
                 Expanded(
                   child: Container(
-                    color: cs.surface,
+                    color: context.appColors.surfaceCard,
                     child: Column(
                       children: [
                         Padding(
@@ -2155,7 +2154,7 @@ class _DesktopModelSelectDialogBodyState
         ? (isDark
               ? cs.primary.withValues(alpha: 0.12)
               : cs.primary.withValues(alpha: 0.08))
-        : cs.surface;
+        : context.appColors.surfaceCard;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),

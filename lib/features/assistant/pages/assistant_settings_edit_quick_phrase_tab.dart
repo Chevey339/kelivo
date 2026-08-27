@@ -27,7 +27,7 @@ class _QuickPhraseTab extends StatelessWidget {
             text: phrase?.content ?? '',
           );
           return Dialog(
-            backgroundColor: cs.surface,
+            backgroundColor: context.overlaySurface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -182,7 +182,7 @@ class _QuickPhraseTab extends StatelessWidget {
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),

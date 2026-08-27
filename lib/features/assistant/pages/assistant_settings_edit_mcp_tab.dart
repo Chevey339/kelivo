@@ -45,7 +45,7 @@ class _McpTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
-        _iosSectionCard(
+        SectionCard(
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

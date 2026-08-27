@@ -134,32 +134,23 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
         // Identity card (avatar + name) - iOS style
-        Container(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-              width: 0.6,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                avatarWidget(size: 64),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _InputRow(
-                    label: l10n.assistantEditAssistantNameLabel,
-                    controller: _nameCtrl,
-                    onChanged: (v) => context
-                        .read<AssistantProvider>()
-                        .updateAssistant(a.copyWith(name: v)),
-                  ),
+        SectionCard(
+          radius: 16,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              avatarWidget(size: 64),
+              const SizedBox(width: 14),
+              Expanded(
+                child: _InputRow(
+                  label: l10n.assistantEditAssistantNameLabel,
+                  controller: _nameCtrl,
+                  onChanged: (v) => context
+                      .read<AssistantProvider>()
+                      .updateAssistant(a.copyWith(name: v)),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -167,7 +158,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         // iOS section card with all settings (without Use Assistant Avatar and Stream Output)
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
-          child: _iosSectionCard(
+          child: SectionCard(
             children: [
               // Temperature
               _iosNavRow(
@@ -275,18 +266,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
         const SizedBox(height: 16),
 
         // Chat model card (moved down, styled like DefaultModelPage)
-        Container(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceCard,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-              width: 0.6,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
+        SectionCard(
+          radius: 16,
+          padding: const EdgeInsets.all(14),
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
@@ -406,28 +389,18 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                 ),
               ],
             ),
-          ),
         ),
         const SizedBox(height: 16),
 
         // Chat background (separate iOS card)
-        Container(
-          decoration: BoxDecoration(
-            color: context.appColors.surfaceCard,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-              width: 0.6,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Lucide.Image, size: 18, color: cs.onSurface),
+        SectionCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Lucide.Image, size: 18, color: cs.onSurface),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -528,15 +501,14 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
                     ],
                   ),
                 ],
-                if ((a.background ?? '').isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: _BackgroundPreview(path: a.background!),
-                  ),
-                ],
+              if ((a.background ?? '').isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: _BackgroundPreview(path: a.background!),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       ],
@@ -548,7 +520,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -562,7 +534,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               height: 48,
               child: IosCardPress(
                 borderRadius: BorderRadius.circular(14),
-                baseColor: cs.surface,
+                baseColor: sheetTileColor(ctx),
                 duration: const Duration(milliseconds: 260),
                 onTap: () async {
                   Haptics.light();
@@ -662,11 +634,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   }
 
   Future<void> _showTemperatureSheet(BuildContext context, Assistant a) async {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -777,11 +748,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
   }
 
   Future<void> _showTopPSheet(BuildContext context, Assistant a) async {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -893,11 +863,10 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     BuildContext context,
     Assistant a,
   ) async {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -1038,7 +1007,7 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -1608,7 +1577,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.assistantEditEmojiDialogTitle),
               content: SizedBox(
                 width: 360,
@@ -1749,7 +1718,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.assistantEditImageUrlDialogTitle),
               content: TextField(
                 controller: controller,
@@ -1870,7 +1839,7 @@ extension _AssistantAvatarActions on _BasicSettingsTabState {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.assistantEditQQAvatarDialogTitle),
               content: TextField(
                 controller: controller,

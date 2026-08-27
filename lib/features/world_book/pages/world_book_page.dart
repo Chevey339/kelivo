@@ -16,6 +16,7 @@ import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/snackbar.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
@@ -37,11 +38,10 @@ class _WorldBookPageState extends State<WorldBookPage> {
   }
 
   Future<WorldBook?> _showBookConfigSheet({WorldBook? book}) async {
-    final cs = Theme.of(context).colorScheme;
     return showModalBottomSheet<WorldBook>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -56,11 +56,10 @@ class _WorldBookPageState extends State<WorldBookPage> {
   }
 
   Future<WorldBookEntry?> _showEntryEditSheet({WorldBookEntry? entry}) async {
-    final cs = Theme.of(context).colorScheme;
     return showModalBottomSheet<WorldBookEntry>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -554,7 +553,7 @@ class _WorldBookSection extends StatelessWidget {
     Future<void> showEntryActions(WorldBookEntry entry) async {
       final result = await showModalBottomSheet<_EntryAction>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -965,25 +964,7 @@ class _IosSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final bg = context.appColors.surfaceCard;
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(children: children),
-      ),
-    );
+    return SectionCard(children: children);
   }
 }
 
@@ -1516,7 +1497,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     Future<void> pickPosition() async {
       final selected = await showModalBottomSheet<WorldBookInjectionPosition>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -1611,7 +1592,7 @@ class _WorldBookEntryEditSheetState extends State<_WorldBookEntryEditSheet> {
     Future<void> pickRole() async {
       final selected = await showModalBottomSheet<WorldBookInjectionRole>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),

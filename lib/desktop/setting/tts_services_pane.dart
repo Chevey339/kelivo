@@ -306,7 +306,7 @@ void _showErrorDialog(BuildContext context, String message) {
   showDialog<void>(
     context: context,
     builder: (ctx) => Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       child: ConstrainedBox(
@@ -366,12 +366,11 @@ void _showErrorDialog(BuildContext context, String message) {
 }
 
 void _showTtsSettingsDialog(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   showDialog<void>(
     context: context,
     builder: (ctx) => Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: ConstrainedBox(
@@ -579,7 +578,7 @@ class _SystemTtsCardState extends State<_SystemTtsCard> {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -867,7 +866,6 @@ Future<TtsServiceOptions?> _showNetworkDialog(
   BuildContext context,
   TtsServiceOptions? initial,
 ) async {
-  final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   NetworkTtsKind kind = initial?.kind ?? NetworkTtsKind.openai;
   final nameCtl = TextEditingController(text: initial?.name ?? '');
@@ -1084,7 +1082,7 @@ Future<TtsServiceOptions?> _showNetworkDialog(
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         child: ConstrainedBox(

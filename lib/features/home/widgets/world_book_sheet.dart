@@ -7,6 +7,8 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 class WorldBookSheet extends StatelessWidget {
   const WorldBookSheet({super.key, required this.assistantId});
@@ -183,7 +185,7 @@ class _SelectableRow extends StatelessWidget {
       height: subtitle == null ? 52 : 66,
       child: IosCardPress(
         borderRadius: BorderRadius.circular(14),
-        baseColor: cs.surface,
+        baseColor: sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -243,11 +245,10 @@ Future<void> showWorldBookSheet(
   final provider = context.read<WorldBookProvider>();
   await provider.initialize();
   if (!context.mounted) return;
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

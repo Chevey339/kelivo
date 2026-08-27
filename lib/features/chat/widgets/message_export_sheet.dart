@@ -38,6 +38,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
 
@@ -1851,7 +1852,6 @@ Future<void> showMessageExportSheet(
   BuildContext context,
   ChatMessage message,
 ) async {
-  final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       // Desktop: show centered dialog
@@ -1879,7 +1879,7 @@ Future<void> showMessageExportSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1897,7 +1897,6 @@ Future<void> showChatExportSheet(
   required Conversation conversation,
   required List<ChatMessage> selectedMessages,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       // Desktop: show centered dialog
@@ -1928,7 +1927,7 @@ Future<void> showChatExportSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -2064,7 +2063,7 @@ class _ExportDialogState extends State<_ExportDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2294,7 +2293,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2996,7 +2995,7 @@ class _ExportedMessageCard extends StatelessWidget {
         margin: EdgeInsets.all(containerMargin),
         padding: EdgeInsets.all(containerPadding),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           borderRadius: BorderRadius.circular(16),
           // removed outer border per UX
         ),
@@ -3109,7 +3108,7 @@ class _ExportedChatImage extends StatelessWidget {
           margin: EdgeInsets.all(containerMargin),
           padding: EdgeInsets.all(containerPadding),
           decoration: BoxDecoration(
-            color: cs.surface,
+            color: context.appColors.surfaceCard,
             borderRadius: BorderRadius.circular(isDesktop ? 12.0 : 16.0),
             // removed outer border per UX
           ),
@@ -3319,7 +3318,7 @@ Future<void> _runWithExportingOverlay(
     barrierDismissible: false,
     builder: (ctx) => Center(
       child: Material(
-        color: cs.surface,
+        color: context.appColors.surfaceCard,
         elevation: 6,
         shadowColor: cs.shadow.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(14),

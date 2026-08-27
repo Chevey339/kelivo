@@ -17,6 +17,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_checkbox.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../utils/platform_utils.dart';
 
@@ -450,24 +451,7 @@ class MemorySectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: padding,
-        child: Column(children: children),
-      ),
-    );
+    return SectionCard(padding: padding, children: children);
   }
 }
 
@@ -804,7 +788,6 @@ Future<T?> showMemoryOptionPicker<T>(
   required List<MemoryPickerOption<T>> options,
   required T selected,
 }) {
-  final cs = Theme.of(context).colorScheme;
 
   Widget optionsCard(BuildContext ctx) {
     final localCs = Theme.of(ctx).colorScheme;
@@ -838,7 +821,7 @@ Future<T?> showMemoryOptionPicker<T>(
         final localCs = Theme.of(ctx).colorScheme;
         final maxHeight = MediaQuery.sizeOf(ctx).height * 0.7;
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -903,7 +886,7 @@ Future<T?> showMemoryOptionPicker<T>(
 
   return showModalBottomSheet<T>(
     context: context,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -1082,7 +1065,6 @@ Future<void> showMemoryEntryEditor(
   bool allowAssistantPicker = false,
 }) {
   final l10n = AppLocalizations.of(context)!;
-  final cs = Theme.of(context).colorScheme;
   final title = existing == null
       ? l10n.memoryEntryCreateTitle
       : l10n.memoryEntryEditTitle;
@@ -1103,7 +1085,7 @@ Future<void> showMemoryEntryEditor(
       builder: (ctx) {
         final maxHeight = MediaQuery.sizeOf(ctx).height * 0.85;
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           insetPadding: const EdgeInsets.symmetric(
             horizontal: 24,
             vertical: 24,
@@ -1123,7 +1105,7 @@ Future<void> showMemoryEntryEditor(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1582,7 +1564,6 @@ class MemoryEntryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final typeColor = memoryTypeColor(cs, entry.type);
     final scopeColor = entry.scope == MemoryScope.global
         ? cs.primary
@@ -1600,7 +1581,7 @@ class MemoryEntryCard extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? cs.primary.withValues(alpha: 0.45)
-                : cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+                : context.appColors.hairline,
             width: 0.6,
           ),
         ),

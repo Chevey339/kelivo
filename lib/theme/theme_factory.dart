@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/theme/surface_ladder.dart';
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 
@@ -38,27 +39,57 @@ List<String> getPlatformFontFallback() {
 // Internal helper for theme building
 List<String> _getPlatformFontFallback() => getPlatformFontFallback();
 
-/// Derive neutral `surfaceContainer*` roles from the scheme's surface.
+/// Derive page `surface` and `surfaceContainer*` from the palette.
 ///
-/// Palettes in this app only define the classic ColorScheme roles, leaving the
-/// M3 surface containers at their static (purple-tinted) defaults, which clash
-/// with non-purple palettes. Deriving them here keeps dialogs, menus, cards
-/// and other Material surfaces consistent with the active palette.
-ColorScheme _withDerivedSurfaceContainers(ColorScheme s) {
-  final dark = s.brightness == Brightness.dark;
-  const white = Color(0xFFFFFFFF);
-  const black = Color(0xFF000000);
-  Color over(Color c, double a) =>
-      Color.alphaBlend(c.withValues(alpha: a), s.surface);
+/// Palette-declared `surface` is the card. Light page is that color sunk
+/// 4 tones (skipped for pure-white background). Dark page is unchanged.
+/// Container roles reuse [SurfaceLadder] so they stay on the same HCT ladder.
+ColorScheme _applyPageSurface(
+  ColorScheme scheme, {
+  required bool pureBackground,
+  bool layered = false,
+}) {
+  if (scheme.brightness == Brightness.dark) return scheme;
+  if (pureBackground) {
+    return scheme.copyWith(surface: const Color(0xFFFFFFFF));
+  }
+  if (!layered) return scheme;
+  return scheme.copyWith(surface: shiftTone(scheme.surface, -4.0));
+}
+
+ColorScheme _withDerivedSurfaceContainers(
+  ColorScheme s, {
+  bool layered = false,
+}) {
+  final ladder = SurfaceLadder.fromScheme(s, layered: layered);
   return s.copyWith(
-    surfaceContainerLowest: dark ? over(black, 0.28) : over(white, 0.72),
-    surfaceContainerLow: dark ? over(white, 0.03) : over(white, 0.55),
-    surfaceContainer: dark ? over(white, 0.045) : over(white, 0.35),
-    // Light "high" containers must stay ≈ white: chat bubbles, cards, menus
-    // and dialogs historically used plain Colors.white in light mode.
-    surfaceContainerHigh: dark ? over(white, 0.06) : over(white, 0.85),
-    surfaceContainerHighest: dark ? over(white, 0.09) : over(s.onSurface, 0.05),
+    surfaceContainerLowest: ladder.surfaceContainerLowest,
+    surfaceContainerLow: ladder.surfaceContainerLow,
+    surfaceContainer: ladder.surfaceContainer,
+    surfaceContainerHigh: ladder.surfaceContainerHigh,
+    surfaceContainerHighest: ladder.surfaceContainerHighest,
   );
+}
+
+DialogThemeData _dialogTheme(AppSemanticColors colors, ColorScheme scheme) {
+  return DialogThemeData(backgroundColor: colors.overlaySurface(scheme));
+}
+
+BottomSheetThemeData _bottomSheetTheme(
+  AppSemanticColors colors,
+  ColorScheme scheme,
+) {
+  return BottomSheetThemeData(
+    backgroundColor: colors.overlaySurface(scheme),
+    surfaceTintColor: Colors.transparent,
+  );
+}
+
+PopupMenuThemeData _popupMenuTheme(
+  AppSemanticColors colors,
+  ColorScheme scheme,
+) {
+  return PopupMenuThemeData(color: colors.overlaySurface(scheme));
 }
 
 TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
@@ -149,7 +180,8 @@ TextTheme _withFontFallback(TextTheme base, List<String> fallback) {
 ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
   final fontFallback = _getPlatformFontFallback();
   final scheme = _withDerivedSurfaceContainers(
-    (dynamicScheme?.harmonized()) ??
+    _applyPageSurface(
+      (dynamicScheme?.harmonized()) ??
         const ColorScheme(
           brightness: Brightness.light,
           primary: Color(0xFF4D5C92),
@@ -183,14 +215,20 @@ ThemeData buildLightTheme(ColorScheme? dynamicScheme) {
           inversePrimary: Color(0xFFB6C4FF),
           surfaceTint: Color(0xFF4D5C92),
         ),
+      pureBackground: false,
+    ),
   );
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final colors = AppSemanticColors.light(scheme, layered: false);
 
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light(scheme)],
+    extensions: <ThemeExtension<dynamic>>[colors],
+    dialogTheme: _dialogTheme(colors, scheme),
+    bottomSheetTheme: _bottomSheetTheme(colors, scheme),
+    popupMenuTheme: _popupMenuTheme(colors, scheme),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -239,24 +277,32 @@ ThemeData buildLightThemeForScheme(
   ColorScheme staticScheme, {
   ColorScheme? dynamicScheme,
   bool pureBackground = false,
+  bool layeredSurfaces = false,
 }) {
   final fontFallback = _getPlatformFontFallback();
   var scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
   if (pureBackground) {
     scheme = scheme.copyWith(
-      surface: const Color(0xFFFFFFFF),
       inverseSurface: const Color(0xFF000000),
       onInverseSurface: const Color(0xFFFFFFFF),
     );
   }
-  scheme = _withDerivedSurfaceContainers(scheme);
+  scheme = _withDerivedSurfaceContainers(
+    _applyPageSurface(
+      scheme,
+      pureBackground: pureBackground,
+      layered: layeredSurfaces,
+    ),
+    layered: layeredSurfaces,
+  );
   // Align logging behavior with buildLightTheme so diagnostics are consistent.
   // _logColorScheme('Light ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final colors = AppSemanticColors.light(scheme, layered: layeredSurfaces);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.light(scheme)],
+    extensions: <ThemeExtension<dynamic>>[colors],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -271,7 +317,9 @@ ThemeData buildLightThemeForScheme(
       actionTextColor: scheme.primary,
       disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.5),
     ),
-    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
+    dialogTheme: _dialogTheme(colors, scheme),
+    bottomSheetTheme: _bottomSheetTheme(colors, scheme),
+    popupMenuTheme: _popupMenuTheme(colors, scheme),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,
@@ -339,12 +387,16 @@ ThemeData buildDarkTheme(ColorScheme? dynamicScheme) {
         ),
   );
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final colors = AppSemanticColors.dark(scheme, layered: false);
 
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark(scheme)],
+    extensions: <ThemeExtension<dynamic>>[colors],
+    dialogTheme: _dialogTheme(colors, scheme),
+    bottomSheetTheme: _bottomSheetTheme(colors, scheme),
+    popupMenuTheme: _popupMenuTheme(colors, scheme),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -392,6 +444,7 @@ ThemeData buildDarkThemeForScheme(
   ColorScheme staticScheme, {
   ColorScheme? dynamicScheme,
   bool pureBackground = false,
+  bool layeredSurfaces = false,
 }) {
   final fontFallback = _getPlatformFontFallback();
   var scheme = (dynamicScheme?.harmonized()) ?? staticScheme;
@@ -402,14 +455,15 @@ ThemeData buildDarkThemeForScheme(
       onInverseSurface: const Color(0xFF000000),
     );
   }
-  scheme = _withDerivedSurfaceContainers(scheme);
+  scheme = _withDerivedSurfaceContainers(scheme, layered: layeredSurfaces);
   // Align logging behavior with buildDarkTheme so diagnostics are consistent.
   // _logColorScheme('Dark ${dynamicScheme != null ? 'Dynamic' : 'Static'}', scheme);
+  final colors = AppSemanticColors.dark(scheme, layered: layeredSurfaces);
   final theme = ThemeData(
     useMaterial3: true,
     colorScheme: scheme,
     scaffoldBackgroundColor: scheme.surface,
-    extensions: <ThemeExtension<dynamic>>[AppSemanticColors.dark(scheme)],
+    extensions: <ThemeExtension<dynamic>>[colors],
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       backgroundColor: scheme.inverseSurface,
@@ -424,7 +478,9 @@ ThemeData buildDarkThemeForScheme(
       actionTextColor: scheme.primary,
       disabledActionTextColor: scheme.onInverseSurface.withValues(alpha: 0.6),
     ),
-    dialogTheme: DialogThemeData(backgroundColor: scheme.surface),
+    dialogTheme: _dialogTheme(colors, scheme),
+    bottomSheetTheme: _bottomSheetTheme(colors, scheme),
+    popupMenuTheme: _popupMenuTheme(colors, scheme),
     appBarTheme: AppBarTheme(
       backgroundColor: scheme.surface,
       surfaceTintColor: scheme.surface,

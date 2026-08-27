@@ -34,6 +34,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../theme/chat_bubble_style.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'frosted/frosted_surface.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -795,7 +796,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1287,7 +1288,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
-        backgroundColor: Theme.of(dctx).colorScheme.surface,
+        backgroundColor: dctx.overlaySurface,
         title: Text(l10n.chatMessageWidgetRegenerateConfirmTitle),
         content: Text(content),
         actions: [

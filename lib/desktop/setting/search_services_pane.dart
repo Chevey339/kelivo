@@ -11,6 +11,7 @@ import 'package:uuid/uuid.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class DesktopSearchServicesPane extends StatefulWidget {
   const DesktopSearchServicesPane({super.key});
@@ -163,7 +164,7 @@ class _DesktopSearchServicesPaneState extends State<DesktopSearchServicesPane> {
 
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               SliverToBoxAdapter(
-                child: _sectionCard(
+                child: SectionCard(
                   children: [
                     _ToggleRow(
                       icon: lucide.Lucide.HeartPulse,
@@ -703,30 +704,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
   }
 }
 
-Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _divider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
@@ -814,10 +791,9 @@ class _AddServiceDialogState extends State<_AddServiceDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
@@ -1376,11 +1352,10 @@ class _EditServiceDialogState extends State<_EditServiceDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final name = SearchService.getService(widget.service).name;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
@@ -2014,7 +1989,7 @@ class _MultiKeyManageDialogState extends State<_MultiKeyManageDialog> {
     final l10n = AppLocalizations.of(context)!;
     final feedback = _batchFeedback;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(

@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/app_directories.dart';
@@ -148,11 +149,10 @@ class _LogViewerPageState extends State<LogViewerPage>
   }
 
   void _showLogSettings(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -950,20 +950,12 @@ class _ContextSummaryBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
     final totalTokens = snapshots.fold<int>(0, (sum, s) => sum + s.totalTokens);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
+    return SectionCard(
+      radius: 14,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1169,7 +1161,7 @@ class _ContextCompositionBar extends StatelessWidget {
               Expanded(
                 flex: math.max(entries[i].value, 1),
                 child: ColoredBox(
-                  color: _contextSourceColor(entries[i].key, isDark: isDark),
+                  color: _contextSourceColor(context, entries[i].key),
                 ),
               ),
             ],
@@ -1189,7 +1181,6 @@ class _ContextCompositionLegend extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
     final entries = _compositionOf(snapshot);
@@ -1209,7 +1200,7 @@ class _ContextCompositionLegend extends StatelessWidget {
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: _contextSourceColor(entry.key, isDark: isDark),
+                  color: _contextSourceColor(context, entry.key),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -1334,19 +1325,8 @@ class _ContextInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
+    return SectionCard(
+      radius: 14,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1464,7 +1444,7 @@ class _ContextSegmentBlockState extends State<_ContextSegmentBlock> {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
-    final color = _contextSourceColor(widget.segment.source, isDark: isDark);
+    final color = _contextSourceColor(context, widget.segment.source);
 
     final Color tileBg = context.appColors.surfaceCard;
     final Color border = cs.outlineVariant.withValues(
@@ -2023,31 +2003,27 @@ String _trimSurroundingBlankLines(String text) {
       .replaceFirst(RegExp(r'(\n\s*)+$'), '');
 }
 
-Color _contextSourceColor(ContextSource source, {required bool isDark}) {
-  // Muted palette tuned to sit quietly on surfaceCard in both themes.
-  final Color base;
+Color _contextSourceColor(BuildContext context, ContextSource source) {
+  final cs = Theme.of(context).colorScheme;
+  final colors = context.appColors;
   switch (source) {
     case ContextSource.systemPrompt:
-      base = const Color(0xFF5B8DEF);
+      return cs.primary;
     case ContextSource.memoryRules:
     case ContextSource.memorySnapshot:
-      base = const Color(0xFF9B7EDE);
+      return cs.tertiary;
     case ContextSource.worldBook:
-      base = const Color(0xFF55B685);
+      return colors.success;
     case ContextSource.instructionInjection:
-      base = const Color(0xFFE0975C);
+      return colors.warning;
     case ContextSource.searchPrompt:
-      base = const Color(0xFF56AEBF);
+      return cs.secondary;
     case ContextSource.chatHistory:
-      base = const Color(0xFFA3A9B3);
+      return cs.onSurfaceVariant;
     case ContextSource.toolCall:
     case ContextSource.toolResult:
-      base = const Color(0xFFC08A62);
+      return cs.outline;
   }
-  if (!isDark) {
-    return base;
-  }
-  return Color.lerp(base, Colors.white, 0.18) ?? base;
 }
 
 String _contextSourceLabel(AppLocalizations l10n, ContextSource source) {
@@ -2456,21 +2432,10 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final cs = Theme.of(context).colorScheme;
 
-    final Color bg = context.appColors.surfaceCard;
-    final Color border = cs.outlineVariant.withValues(
-      alpha: isDark ? 0.26 : 0.38,
-    );
-
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: border),
-      ),
+    return SectionCard(
+      variant: SectionCardVariant.emphasized,
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2514,7 +2479,7 @@ class _CodeBlock extends StatelessWidget {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final Color neutralBg = context.appColors.surfaceFill;
+    final Color neutralBg = context.appColors.surfaceCardFill;
     final Color bg = () {
       if (tone == _CodeTone.error) {
         return Color.alphaBlend(
@@ -2593,7 +2558,7 @@ class _CollapsibleCodeBlockState extends State<_CollapsibleCodeBlock> {
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
 
-    final Color neutralBg = context.appColors.surfaceFill;
+    final Color neutralBg = context.appColors.surfaceCardFill;
     final bool isError = widget.tone == _CodeTone.error;
     final Color bg = isError
         ? Color.alphaBlend(

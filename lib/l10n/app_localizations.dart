@@ -8773,6 +8773,36 @@ abstract class AppLocalizations {
   /// **'Bubbles and accents follow theme.'**
   String get themeSettingsPageUsePureBackgroundSubtitle;
 
+  /// No description provided for @themeAdvancedSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Advanced'**
+  String get themeAdvancedSettingsPageTitle;
+
+  /// No description provided for @themeAdvancedSettingsPageUseLayeredSurfacesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Layered surfaces (experimental)'**
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle;
+
+  /// No description provided for @themeAdvancedSettingsPageUseLayeredSurfacesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Darker page, brighter cards; both keep theme hue. Turn off to restore the previous look.'**
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle;
+
+  /// No description provided for @themeAdvancedSettingsPageUseLayeredSheetTilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Layered sheet tiles'**
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle;
+
+  /// No description provided for @themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'By default, tiles match the sheet background.'**
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle;
+
   /// No description provided for @themeSettingsPageColorPalettesSection.
   ///
   /// In en, this message translates to:

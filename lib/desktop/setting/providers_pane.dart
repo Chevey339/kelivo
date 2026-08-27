@@ -1056,14 +1056,13 @@ class _DesktopProviderDetailPaneState
     required String title,
     required String hint,
   }) async {
-    final cs = Theme.of(context).colorScheme;
     final ctrl = TextEditingController();
     String? result;
     await showDialog<String>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -2343,7 +2342,7 @@ class _DesktopProviderDetailPaneState
         final GlobalKey avatarKey = GlobalKey();
         return Dialog(
           key: const ValueKey('desktop-provider-settings-dialog'),
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -3556,7 +3555,7 @@ class _DesktopProviderDetailPaneState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.sideDrawerImageUrlDialogTitle),
               content: TextField(
                 controller: controller,
@@ -3643,7 +3642,7 @@ class _DesktopProviderDetailPaneState
                 horizontal: 24,
                 vertical: 24,
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(
@@ -3747,7 +3746,7 @@ class _DesktopProviderDetailPaneState
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           title: Text(l10n.providerAvatarIconDialogTitle),
           content: SizedBox(
             width: 360,
@@ -4279,7 +4278,7 @@ class _DesktopProviderDetailPaneState
         }
 
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
@@ -4633,7 +4632,7 @@ class _DesktopProviderDetailPaneState
         return StatefulBuilder(
           builder: (ctx, setState) {
             return Dialog(
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -4860,7 +4859,7 @@ class _DesktopProviderDetailPaneState
       context: context,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -4979,7 +4978,7 @@ class _DesktopProviderDetailPaneState
       context: context,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -5173,13 +5172,7 @@ class _ProviderTypeDropdownState extends State<_ProviderTypeDropdown> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color:
-                  (Provider.of<SettingsProvider>(
-                    ctx,
-                    listen: false,
-                  ).usePureBackground)
-                  ? cs.surface
-                  : (Theme.of(context).colorScheme.surfaceContainerHigh),
+              color: ctx.appColors.surfaceCard,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -5326,13 +5319,7 @@ class _StrategyDropdownState extends State<_StrategyDropdown> {
                     maxWidth: triggerW,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        (Provider.of<SettingsProvider>(
-                          ctx,
-                          listen: false,
-                        ).usePureBackground)
-                        ? cs.surface
-                        : (Theme.of(context).colorScheme.surfaceContainerHigh),
+                    color: ctx.appColors.surfaceCard,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: cs.outlineVariant.withValues(alpha: 0.12),
@@ -5698,7 +5685,7 @@ class _DesktopProviderGroupsDialogState
     ];
 
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
@@ -6046,7 +6033,7 @@ class _DesktopProviderShareDialogState
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(
@@ -6523,7 +6510,7 @@ class _DesktopIosSectionCard extends StatelessWidget {
         color: bg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+          color: context.appColors.hairline,
           width: 0.6,
         ),
       ),

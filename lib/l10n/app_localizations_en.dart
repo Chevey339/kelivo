@@ -4774,6 +4774,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'Bubbles and accents follow theme.';
 
   @override
+  String get themeAdvancedSettingsPageTitle => 'Theme Advanced';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle =>
+      'Layered surfaces (experimental)';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      'Darker page, brighter cards; both keep theme hue. Turn off to restore the previous look.';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle =>
+      'Layered sheet tiles';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      'By default, tiles match the sheet background.';
+
+  @override
   String get themeSettingsPageColorPalettesSection => 'Color Palettes';
 
   @override

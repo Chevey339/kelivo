@@ -11,6 +11,7 @@ import '../icons/lucide_adapter.dart';
 import '../icons/reasoning_icons.dart';
 import '../l10n/app_localizations.dart';
 import '../shared/dialogs/reasoning_budget_custom_dialog.dart';
+import '../theme/design_tokens.dart';
 
 Future<void> showDesktopReasoningBudgetPopover(
   BuildContext context, {
@@ -203,7 +204,7 @@ class _GlassPanel extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             // Match the preferred grey smudge style
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),

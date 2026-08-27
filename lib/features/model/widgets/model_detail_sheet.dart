@@ -21,11 +21,10 @@ Future<bool?> showModelDetailSheet(
   required String providerKey,
   required String modelId,
 }) {
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -49,11 +48,10 @@ Future<bool?> showCreateModelSheet(
   BuildContext context, {
   required String providerKey,
 }) {
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

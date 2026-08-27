@@ -16,7 +16,7 @@ Future<void> showOcrPromptSheet(BuildContext context) async {
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

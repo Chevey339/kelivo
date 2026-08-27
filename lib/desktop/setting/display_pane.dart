@@ -25,6 +25,10 @@ class _DisplaySettingsBody extends StatelessWidget {
                   _RowDivider(),
                   _ToggleRowPureBackground(),
                   _RowDivider(),
+                  _ToggleRowLayeredSurfaces(),
+                  _RowDivider(),
+                  _ToggleRowLayeredSheetTiles(),
+                  _RowDivider(),
                   _MessageStyleRow(),
                   _RowDivider(),
                   _TopicPositionRow(),
@@ -349,11 +353,8 @@ class _SettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sp = context.watch<SettingsProvider>();
     return Material(
-      color: sp.usePureBackground
-          ? cs.surface
-          : (Theme.of(context).colorScheme.surfaceContainerHigh),
+      color: context.appColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
         side: BorderSide(
@@ -812,6 +813,38 @@ class _ToggleRowPureBackground extends StatelessWidget {
       value: sp.usePureBackground,
       onChanged: (v) =>
           context.read<SettingsProvider>().setUsePureBackground(v),
+    );
+  }
+}
+
+class _ToggleRowLayeredSurfaces extends StatelessWidget {
+  const _ToggleRowLayeredSurfaces();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.themeAdvancedSettingsPageUseLayeredSurfacesTitle,
+      tip: l10n.themeAdvancedSettingsPageUseLayeredSurfacesSubtitle,
+      value: sp.useLayeredSurfaces,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setUseLayeredSurfaces(v),
+    );
+  }
+}
+
+class _ToggleRowLayeredSheetTiles extends StatelessWidget {
+  const _ToggleRowLayeredSheetTiles();
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final sp = context.watch<SettingsProvider>();
+    return _ToggleRow(
+      label: l10n.themeAdvancedSettingsPageUseLayeredSheetTilesTitle,
+      tip: l10n.themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle,
+      value: sp.useLayeredSheetTiles,
+      onChanged: (v) =>
+          context.read<SettingsProvider>().setUseLayeredSheetTiles(v),
     );
   }
 }
@@ -1905,7 +1938,6 @@ Future<String?> _showDesktopFontChooserDialog(
   bool showSystemDefault = false,
   bool showMonospaceDefault = false,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   final l10n = AppLocalizations.of(context)!;
   final rootNavigator = Navigator.of(context, rootNavigator: true);
   final ctrl = TextEditingController();
@@ -2001,7 +2033,7 @@ Future<String?> _showDesktopFontChooserDialog(
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -3428,13 +3460,7 @@ class _SendShortcutDropdownState extends State<_SendShortcutDropdown> {
 
     _entry = OverlayEntry(
       builder: (ctx) {
-        final usePure = Provider.of<SettingsProvider>(
-          ctx,
-          listen: false,
-        ).usePureBackground;
-        final bgColor = usePure
-            ? Theme.of(ctx).colorScheme.surface
-            : (Theme.of(context).colorScheme.surfaceContainerHigh);
+        final bgColor = ctx.appColors.surfaceCard;
         final sp = Provider.of<SettingsProvider>(ctx, listen: false);
 
         return Stack(

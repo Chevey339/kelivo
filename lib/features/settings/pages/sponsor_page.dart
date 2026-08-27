@@ -8,7 +8,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class SponsorPage extends StatefulWidget {
   const SponsorPage({super.key});
@@ -95,7 +95,7 @@ class _SponsorPageState extends State<SponsorPage> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         children: [
           _header(context, l10n.sponsorPageMethodsSectionTitle, first: true),
-          _iosSectionCard(
+          SectionCard(
             children: [
               _iosNavRow(
                 context,
@@ -269,31 +269,6 @@ class _SponsorTile extends StatelessWidget {
 
 // --- iOS-style helpers (mirroring Settings/Display/About) ---
 
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

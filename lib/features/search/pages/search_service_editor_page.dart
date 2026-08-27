@@ -15,6 +15,7 @@ import '../../../theme/theme_factory.dart';
 import '../../../utils/brand_assets.dart';
 import 'search_api_keys_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class SearchServiceEditorResult {
   const SearchServiceEditorResult.saved(this.service) : deleted = false;
@@ -178,8 +179,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
                         l10n.searchServiceEditorProviderTypeTitle,
                         first: true,
                       ),
-                      _sectionCard(
-                        context,
+                      SectionCard(
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Wrap(
@@ -229,8 +229,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
   ) {
     final fields = _configurationFields(context, service);
     final cs = Theme.of(context).colorScheme;
-    return _sectionCard(
-      context,
+    return SectionCard(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
         child: Column(
@@ -687,8 +686,7 @@ class _SearchServiceEditorPageState extends State<SearchServiceEditorPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final canRun = !_testing && _queryController.text.trim().isNotEmpty;
-    return _sectionCard(
-      context,
+    return SectionCard(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
         child: Column(
@@ -1310,8 +1308,7 @@ class _SearchServiceUsageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    return _sectionCard(
-      context,
+    return SectionCard(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -2018,7 +2015,7 @@ InputDecoration _inputDecoration(
   Widget? suffix,
 }) {
   final cs = Theme.of(context).colorScheme;
-  final fieldBg = context.appColors.surfaceFill;
+  final fieldBg = context.appColors.surfaceCardFill;
   return InputDecoration(
     hintText: hint,
     isDense: true,
@@ -2054,24 +2051,6 @@ InputDecoration _inputDecoration(
   );
 }
 
-Widget _sectionCard(BuildContext context, {required Widget child}) {
-  final theme = Theme.of(context);
-  final cs = theme.colorScheme;
-  final isDark = theme.brightness == Brightness.dark;
-  final bg = context.appColors.surfaceCard;
-  return Container(
-    decoration: BoxDecoration(
-      color: bg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-        width: 0.6,
-      ),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: child,
-  );
-}
 
 Widget _sectionHeader(BuildContext context, String text, {bool first = false}) {
   final cs = Theme.of(context).colorScheme;

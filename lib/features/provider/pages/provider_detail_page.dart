@@ -36,6 +36,7 @@ import '../../provider/widgets/provider_avatar.dart';
 import '../../../utils/model_grouping.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class ProviderDetailPage extends StatefulWidget {
   const ProviderDetailPage({
@@ -340,7 +341,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -460,7 +461,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.sideDrawerImageUrlDialogTitle),
               content: TextField(
                 controller: controller,
@@ -538,7 +539,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.providerAvatarLobehubDialogTitle),
               content: SizedBox(
                 width: double.maxFinite,
@@ -650,7 +651,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                       )
                       .toList();
             return AlertDialog(
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.providerAvatarIconDialogTitle),
               content: SizedBox(
                 width: MediaQuery.of(ctx).size.width * 0.8,
@@ -1029,7 +1030,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
         ),
         const SizedBox(height: 6),
         // Top iOS-style section card for key settings
-        _iosSectionCard(
+        SectionCard(
           children: [
             if (widget.keyName.toLowerCase() != 'kelivoin')
               _providerKindRow(context),
@@ -1530,7 +1531,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
-                                backgroundColor: cs.surface,
+                                backgroundColor: context.overlaySurface,
                                 title: Text(
                                   l10n.providerDetailPageConfirmDeleteTitle,
                                 ),
@@ -1834,24 +1835,6 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
 
   // --- iOS style helpers (consistent with MultiKeyManagerPage) ---
 
-  Widget _iosSectionCard({required List<Widget> children}) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    final Color bg = context.appColors.surfaceCard;
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(children: children),
-    );
-  }
 
   Widget _iosRow(
     BuildContext context, {
@@ -2083,7 +2066,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final cs = Theme.of(context).colorScheme;
     final selected = await showModalBottomSheet<ProviderKind>(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -3092,7 +3075,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         title: Text(l10n.providerDetailPageConfirmDeleteTitle),
         content: Text(confirmMessage),
         actions: [
@@ -3217,7 +3200,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         title: Text(l10n.providerDetailPageConfirmDeleteTitle),
         content: Text(l10n.providerDetailPageDeleteAllModelsWarning),
         actions: [
@@ -3287,7 +3270,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -4151,7 +4134,7 @@ class _ConnectionTestDialogState extends State<_ConnectionTestDialog> {
     final title = l10n.providerDetailPageTestConnectionTitle;
     final canTest = _selectedModelId != null && _state != _TestState.loading;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: ConstrainedBox(

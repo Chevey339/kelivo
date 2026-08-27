@@ -20,6 +20,7 @@ import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/frosted/frosted_surface.dart';
 import '../../home/pages/home_mobile_layout.dart';
 import '../widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class MessageStyleSettingsPage extends StatelessWidget {
   const MessageStyleSettingsPage({super.key});
@@ -139,7 +140,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       overrides,
     );
 
-    final stylePicker = _iosSectionCard(
+    final stylePicker = SectionCard(
       children: [
         _StyleRow(
           style: ChatMessageBackgroundStyle.defaultStyle,
@@ -182,7 +183,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       assistantOverrides: settings.assistantChatBubbleStyleOverrides,
     );
 
-    final params = _iosSectionCard(
+    final params = SectionCard(
       children: [
         if (style == ChatMessageBackgroundStyle.frosted) ...[
           _SliderRow(
@@ -416,7 +417,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
     final settings = context.read<SettingsProvider>();
     final custom = settings.selectedCustomTheme;
     final key =
-        '${current.brightness.name}|${settings.themePaletteId}|${custom?.id}|${settings.usePureBackground}';
+        '${current.brightness.name}|${settings.themePaletteId}|${custom?.id}|${settings.usePureBackground}|${settings.useLayeredSurfaces}';
     if (_cachedLightTheme != null &&
         _cachedDarkTheme != null &&
         _previewThemeKey == key) {
@@ -433,12 +434,14 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
         : buildLightThemeForScheme(
             palette.light,
             pureBackground: settings.usePureBackground,
+            layeredSurfaces: settings.useLayeredSurfaces,
           );
     final dark = current.brightness == Brightness.dark
         ? current
         : buildDarkThemeForScheme(
             palette.dark,
             pureBackground: settings.usePureBackground,
+            layeredSurfaces: settings.useLayeredSurfaces,
           );
     _cachedLightTheme = light;
     _cachedDarkTheme = dark;
@@ -679,7 +682,7 @@ class _SegmentedToggle extends StatelessWidget {
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+          color: context.appColors.hairline,
           width: 0.6,
         ),
       ),
@@ -700,7 +703,7 @@ class _SegmentedToggle extends StatelessWidget {
                   heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white12 : Colors.white,
+                      color: context.appColors.surfaceCard,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: isDark
                           ? const []
@@ -1237,30 +1240,6 @@ class _PreviewSurface extends StatelessWidget {
   }
 }
 
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      return Container(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context, {double indent = 14}) {
   final cs = Theme.of(context).colorScheme;

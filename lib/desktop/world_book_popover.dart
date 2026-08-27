@@ -8,6 +8,7 @@ import '../core/providers/world_book_provider.dart';
 import '../icons/lucide_adapter.dart';
 import '../l10n/app_localizations.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import '../theme/design_tokens.dart';
 
 Future<void> showDesktopWorldBookPopover(
   BuildContext context, {
@@ -179,7 +180,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),

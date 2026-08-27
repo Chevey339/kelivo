@@ -165,7 +165,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
           maxHeight: 720,
         ),
         child: Material(
-          color: cs.surface,
+          color: context.overlaySurface,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -184,7 +184,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 // Title bar with inset divider
                 Container(
                   height: 48,
-                  decoration: BoxDecoration(color: cs.surface),
+                  decoration: BoxDecoration(color: context.overlaySurface),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
                     child: Row(
@@ -216,7 +216,7 @@ class _ModelFetchDialogBodyState extends State<_ModelFetchDialogBody> {
                 // Body area uses desktop surface background
                 Expanded(
                   child: Container(
-                    color: cs.surface,
+                    color: context.overlaySurface,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

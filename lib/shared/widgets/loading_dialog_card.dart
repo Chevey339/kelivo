@@ -1,5 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import '../animations/widgets.dart';
 
@@ -31,11 +32,9 @@ class LoadingDialogCard extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 96, maxWidth: 240),
             child: Container(
               decoration: BoxDecoration(
-                color: cs.surface,
+                color: context.overlaySurface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: cs.outlineVariant.withValues(alpha: 0.2),
-                ),
+                border: Border.all(color: context.appColors.hairline),
               ),
               child: Padding(
                 padding: EdgeInsets.fromLTRB(

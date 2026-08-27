@@ -12,13 +12,13 @@ import '../../../core/services/haptics.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 Future<String?> showAddProviderSheet(BuildContext context) async {
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<String?>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -164,42 +164,14 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     );
   }
 
-  Widget _iosCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 10,
-                  thickness: 0.6,
-                  color: cs.outlineVariant.withValues(alpha: 0.18),
-                ),
-              children[i],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _openaiForm(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,
@@ -237,7 +209,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,
@@ -296,7 +270,9 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.addProviderSheetEnabledLabel,

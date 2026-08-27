@@ -149,7 +149,7 @@ Future<String?> showEmojiPickerDialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            backgroundColor: cs.surface,
+            backgroundColor: context.overlaySurface,
             title: Text(title ?? l10n.assistantEditEmojiDialogTitle),
             content: SizedBox(
               width: 360,

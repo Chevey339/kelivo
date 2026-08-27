@@ -695,7 +695,7 @@ Future<_RegexFormData?> _showRegexBottomSheet(
   final result = await showModalBottomSheet<_RegexFormData>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -931,7 +931,7 @@ Future<_RegexFormData?> _showRegexDialog(
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: StatefulBuilder(

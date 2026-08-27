@@ -14,6 +14,8 @@ import '../../../shared/widgets/emoji_text.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 // Show an assistant picker for moving a topic.
 // - Mobile: bottom sheet
@@ -38,7 +40,7 @@ Future<String?> showAssistantMoveSelector(
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -117,7 +119,7 @@ Future<String?> showAssistantMoveSelector(
                 ),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
-                    color: cs.surface,
+                    color: ctx.overlaySurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(
@@ -280,14 +282,13 @@ Widget _assistantInitial(ColorScheme cs, String name, double size) {
 }
 
 Widget _assistantRow(BuildContext context, Assistant a) {
-  final cs = Theme.of(context).colorScheme;
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: SizedBox(
       height: 48,
       child: IosCardPress(
         borderRadius: BorderRadius.circular(14),
-        baseColor: cs.surface,
+        baseColor: sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: () {
           Haptics.light();

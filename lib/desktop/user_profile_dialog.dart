@@ -333,7 +333,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.sideDrawerImageUrlDialogTitle),
               content: TextField(
                 controller: controller,
@@ -454,7 +454,7 @@ class _UserProfileDialogBodyState extends State<_UserProfileDialogBody> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.sideDrawerQQAvatarDialogTitle),
               content: TextField(
                 controller: controller,

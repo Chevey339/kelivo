@@ -170,7 +170,6 @@ class _MemoryTabState extends State<_MemoryTab> {
 
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final ap = context.watch<AssistantProvider>();
     final a = ap.getById(widget.assistantId)!;
     final mp = context.watch<MemoryProviderV2>();
@@ -194,18 +193,7 @@ class _MemoryTabState extends State<_MemoryTab> {
       EdgeInsets padding = const EdgeInsets.symmetric(vertical: 6),
     }) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(padding: padding, child: child),
-      ),
+      child: SectionCard(padding: padding, child: child),
     );
 
     return ListView(
@@ -525,20 +513,10 @@ class _MemoryTabState extends State<_MemoryTab> {
                 children: summaries.map((conv) {
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: context.appColors.surfaceCard,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: cs.outlineVariant.withValues(
-                            alpha: isDark ? 0.08 : 0.06,
-                          ),
-                          width: 0.6,
-                        ),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
+                    child: SectionCard(
+                      radius: 14,
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -586,7 +564,6 @@ class _MemoryTabState extends State<_MemoryTab> {
                             ),
                           ],
                         ),
-                      ),
                     ),
                   );
                 }).toList(),
@@ -685,11 +662,10 @@ Future<String?> _showMemoryTextSheet(
       allowEmpty: allowEmpty,
     );
   }
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -873,7 +849,7 @@ Future<T?> _showMemoryChoiceSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

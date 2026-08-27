@@ -57,13 +57,12 @@ class _InstructionInjectionPageState extends State<InstructionInjectionPage> {
   }
 
   Future<void> _showAddEditSheet({InstructionInjection? item}) async {
-    final cs = Theme.of(context).colorScheme;
     final provider = context.read<InstructionInjectionProvider>();
 
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),

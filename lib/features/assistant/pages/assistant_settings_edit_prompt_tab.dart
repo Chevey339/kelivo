@@ -152,7 +152,7 @@ class _PromptTabState extends State<_PromptTab> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
@@ -456,7 +456,7 @@ class _PromptTabState extends State<_PromptTab> {
       ),
     );
 
-    final appendTimeCard = _iosSectionCard(
+    final appendTimeCard = SectionCard(
       children: [
         _AppendCurrentTimeRow(
           value: a.appendCurrentTimeToUserMessage,
@@ -1304,7 +1304,7 @@ class _SystemPromptDesktopDialogState
           constraints: const BoxConstraints(maxWidth: 860, maxHeight: 660),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: cs.surface,
+              color: context.overlaySurface,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: cs.outlineVariant.withValues(
@@ -1498,7 +1498,7 @@ Future<void> _showEditPresetDialog(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -1583,7 +1583,7 @@ Future<void> _showEditPresetDialog(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

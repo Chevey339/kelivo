@@ -13,6 +13,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class NetworkProxyPage extends StatefulWidget {
   const NetworkProxyPage({super.key});
@@ -107,7 +108,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         children: [
-          _sectionCard(
+          SectionCard(
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -234,7 +235,7 @@ class _NetworkProxyPageState extends State<NetworkProxyPage> {
               ),
             ),
           ),
-          _sectionCard(
+          SectionCard(
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -374,10 +375,9 @@ class _ProxyTypeSheetField extends StatelessWidget {
     }
 
     Future<void> openSheet() async {
-      final cs = Theme.of(context).colorScheme;
       final selected = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -537,31 +537,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _labeledField(
   BuildContext context, {
@@ -596,7 +571,7 @@ InputDecoration _deskInputDecoration(BuildContext context) {
   return InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: context.appColors.surfaceFill,
+    fillColor: context.appColors.surfaceCardFill,
     hintStyle: TextStyle(
       fontSize: 14,
       color: cs.onSurface.withValues(alpha: 0.5),

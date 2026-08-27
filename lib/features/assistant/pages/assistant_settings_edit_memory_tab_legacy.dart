@@ -25,7 +25,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
         barrierDismissible: true,
         builder: (ctx) {
           return Dialog(
-            backgroundColor: cs.surface,
+            backgroundColor: context.overlaySurface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -157,7 +157,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -292,19 +292,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
       EdgeInsets padding = const EdgeInsets.symmetric(vertical: 6),
     }) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Container(
-        decoration: BoxDecoration(
-          // Match Settings page: Light uses translucent white; Dark uses subtle white10
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(padding: padding, child: child),
-      ),
+      child: SectionCard(padding: padding, child: child),
     );
 
     return ListView(
@@ -618,7 +606,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
         barrierDismissible: true,
         builder: (ctx) {
           return Dialog(
-            backgroundColor: cs.surface,
+            backgroundColor: context.overlaySurface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
@@ -751,7 +739,7 @@ class _LegacyMemoryTabBody extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -997,7 +985,7 @@ class _LegacyRecentChatsSummaryFrequencySection extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),

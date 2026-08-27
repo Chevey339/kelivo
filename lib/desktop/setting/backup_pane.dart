@@ -26,6 +26,7 @@ import '../../features/backup/widgets/backup_reminder_helpers.dart';
 import '../widgets/desktop_select_dropdown.dart';
 import '../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class DesktopBackupPane extends StatefulWidget {
   const DesktopBackupPane({super.key});
@@ -284,7 +285,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               // Backup management (applies to WebDAV and local import/export)
               SliverToBoxAdapter(
-                child: _sectionCard(
+                child: SectionCard(
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -348,7 +349,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               // WebDAV settings card with left label right input, realtime save
               SliverToBoxAdapter(
-                child: _sectionCard(
+                child: SectionCard(
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -572,7 +573,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
 
               // S3 settings card with left label right input, realtime save
               SliverToBoxAdapter(
-                child: _sectionCard(
+                child: SectionCard(
                   children: [
                     Padding(
                       padding: const EdgeInsets.only(bottom: 6),
@@ -865,7 +866,7 @@ class _DesktopBackupPaneState extends State<DesktopBackupPane> {
     ColorScheme cs,
   ) {
     return SliverToBoxAdapter(
-      child: _sectionCard(
+      child: SectionCard(
         children: [
           Row(
             children: [
@@ -1094,7 +1095,7 @@ class _BackupReminderDesktopSection extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final reminder = context.watch<BackupReminderProvider>();
 
-    return _sectionCard(
+    return SectionCard(
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 6),
@@ -1463,7 +1464,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
@@ -1538,7 +1539,7 @@ class _RemoteBackupsDialogState extends State<_RemoteBackupsDialog> {
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (dctx) => AlertDialog(
-                                    backgroundColor: cs.surface,
+                                    backgroundColor: context.overlaySurface,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -1636,11 +1637,9 @@ void _showRemoteBackupsDialog(
 }
 
 Widget _rowDivider(BuildContext context) {
-  final cs = Theme.of(context).colorScheme;
-  final isDark = Theme.of(context).brightness == Brightness.dark;
   return Container(
     height: 1,
-    color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
+    color: context.appColors.hairline,
   );
 }
 
@@ -1679,7 +1678,7 @@ class _RestoreModeDialog extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
@@ -1913,30 +1912,6 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
   }
 }
 
-Widget _sectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final cs = Theme.of(context).colorScheme;
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final baseBg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: baseBg,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-            width: 0.8,
-          ),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: children,
-        ),
-      );
-    },
-  );
-}
 
 InputDecoration _deskInputDecoration(BuildContext context) {
   // Match provider dialog style (compact), but slightly shorter height and 14px font hint
@@ -1944,7 +1919,7 @@ InputDecoration _deskInputDecoration(BuildContext context) {
   return InputDecoration(
     isDense: true,
     filled: true,
-    fillColor: context.appColors.surfaceFill,
+    fillColor: context.appColors.surfaceCardFill,
     hintStyle: TextStyle(
       fontSize: 14,
       color: cs.onSurface.withValues(alpha: 0.5),

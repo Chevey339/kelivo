@@ -12,6 +12,7 @@ import '../core/services/search/search_service.dart';
 import '../utils/brand_assets.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_font_weights.dart';
+import '../theme/design_tokens.dart';
 
 /// Show a desktop-only floating popover for search provider selection.
 /// It appears above the chat input bar with blurred background, top rounded corners,
@@ -181,7 +182,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),

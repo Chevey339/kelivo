@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 /// Bottom sheet for mobile: compress context or clear context.
 class ContextManagementSheet extends StatelessWidget {
@@ -23,7 +24,7 @@ class ContextManagementSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final bg = Theme.of(context).colorScheme.surface;
+    final bg = context.overlaySurface;
     final cs = Theme.of(context).colorScheme;
 
     return Container(
@@ -97,7 +98,7 @@ class _OptionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final cardColor = context.appColors.surfaceFill;
+    final cardColor = sheetTileColor(context);
     final radius = BorderRadius.circular(14);
 
     return IosCardPress(

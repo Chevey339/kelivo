@@ -135,12 +135,11 @@ Future<void> showLearningPromptSheet(BuildContext context) async {
   final items = provider.items;
   if (items.isEmpty) return;
   final target = provider.active ?? items.first;
-  final cs = Theme.of(context).colorScheme;
 
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

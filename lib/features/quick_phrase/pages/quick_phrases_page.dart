@@ -28,13 +28,12 @@ class _QuickPhrasesPageState extends State<QuickPhrasesPage> {
   }
 
   Future<void> _showAddEditSheet({QuickPhrase? phrase}) async {
-    final cs = Theme.of(context).colorScheme;
     final quickPhraseProvider = context.read<QuickPhraseProvider>();
 
     final result = await showModalBottomSheet<Map<String, String>?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),

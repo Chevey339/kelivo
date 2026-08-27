@@ -12,6 +12,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../theme/app_font_weights.dart';
 import 'search_service_editor_page.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class SearchServicesPage extends StatefulWidget {
   const SearchServicesPage({super.key});
@@ -178,7 +179,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
             cs,
             first: true,
           ),
-          _iosSectionCard(
+          SectionCard(
             children: [
               for (int i = 0; i < _services.length; i++) ...[
                 _iosProviderRow(context, index: i),
@@ -238,7 +239,7 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
       );
     }
 
-    return _iosSectionCard(
+    return SectionCard(
       children: [
         _TactileRow(
           onTap: () => context
@@ -522,11 +523,10 @@ class _SearchServicesPageState extends State<SearchServicesPage> {
   }
 
   Future<void> _showServiceActions(BuildContext context, int index) async {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     await showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -771,31 +771,6 @@ class _AnimatedPressColor extends StatelessWidget {
   }
 }
 
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

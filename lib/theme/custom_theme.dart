@@ -115,8 +115,8 @@ ColorScheme customThemeColorScheme(CustomTheme theme, {required bool dark}) {
             MathUtils.sanitizeDegreesDouble(sourceHct.hue + 60.0),
             24.0,
           ),
-    neutralPalette: TonalPalette.of(sourceHct.hue, 6.0),
-    neutralVariantPalette: TonalPalette.of(sourceHct.hue, 8.0),
+    neutralPalette: TonalPalette.of(sourceHct.hue, 3.5),
+    neutralVariantPalette: TonalPalette.of(sourceHct.hue, 5.0),
   );
 
   Color pick(DynamicColor c) => Color(c.getArgb(scheme));

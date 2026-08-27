@@ -4582,6 +4582,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
 
   @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
+
+  @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
@@ -12346,6 +12363,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
 
   @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
+
+  @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
@@ -20032,6 +20066,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get themeSettingsPageUsePureBackgroundSubtitle => '僅氣泡與強調色隨主題變化';
+
+  @override
+  String get themeAdvancedSettingsPageTitle => '主題進階設定';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分層配色（實驗）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '頁面更深、卡片更亮，兩者都保留主題色相；關閉可恢復舊外觀';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '彈窗內瓦片分層';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '預設瓦片與彈窗同色';
 
   @override
   String get themeSettingsPageColorPalettesSection => '配色方案';

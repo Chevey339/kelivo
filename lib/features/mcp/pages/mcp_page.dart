@@ -48,7 +48,7 @@ class McpPage extends StatelessWidget {
       final l10n = AppLocalizations.of(context)!;
       await showModalBottomSheet<void>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -267,9 +267,7 @@ class McpPage extends StatelessWidget {
                             // Soften the list card corners a bit
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
-                              color: cs.outlineVariant.withValues(
-                                alpha: isDark ? 0.1 : 0.08,
-                              ),
+                              color: context.appColors.hairline,
                               width: 0.6,
                             ),
                           ),
@@ -536,7 +534,7 @@ class McpPage extends StatelessWidget {
                             final ok = await showDialog<bool>(
                               context: context,
                               builder: (dctx) => AlertDialog(
-                                backgroundColor: cs.surface,
+                                backgroundColor: context.overlaySurface,
                                 title: Text(l10n.mcpPageConfirmDeleteTitle),
                                 content: Text(l10n.mcpPageConfirmDeleteContent),
                                 actions: [

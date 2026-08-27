@@ -14,6 +14,7 @@ import '../../world_book/pages/world_book_page.dart';
 import '../../model/widgets/ocr_prompt_sheet.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 class BottomToolsSheet extends StatelessWidget {
   const BottomToolsSheet({
@@ -36,7 +37,7 @@ class BottomToolsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final bg = Theme.of(context).colorScheme.surface;
+    final bg = context.overlaySurface;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.8;
 
     Widget roundedAction({
@@ -44,7 +45,7 @@ class BottomToolsSheet extends StatelessWidget {
       required String label,
       VoidCallback? onTap,
     }) {
-      final cardColor = context.appColors.surfaceFill;
+      final cardColor = sheetTileColor(context);
       return Expanded(
         child: SizedBox(
           height: 72,
@@ -195,7 +196,7 @@ class _LearningAndClearSectionState extends State<_LearningAndClearSection> {
       height: 48,
       child: IosCardPress(
         borderRadius: radius,
-        baseColor: Theme.of(context).colorScheme.surface,
+        baseColor: sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
         onLongPress: onLongPress,

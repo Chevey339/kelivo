@@ -14,6 +14,7 @@ import '../../features/settings/pages/debug_page.dart';
 import '../../shared/widgets/qq_group_join_sheet.dart';
 import '../../shared/widgets/snackbar.dart';
 import '../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class DesktopAboutPane extends StatefulWidget {
   const DesktopAboutPane({super.key});
@@ -634,7 +635,7 @@ Future<void> _showSponsorDesktopDialog(BuildContext context) async {
     builder: (ctx) {
       final isDark = Theme.of(ctx).brightness == Brightness.dark;
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(

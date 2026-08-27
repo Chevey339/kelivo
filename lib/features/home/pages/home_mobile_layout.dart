@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, TargetPlatform;
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import '../../../l10n/app_localizations.dart';
@@ -17,8 +16,8 @@ import '../../../core/providers/assistant_provider.dart';
 import '../../../core/services/haptics.dart';
 import '../../../shared/animations/widgets.dart';
 import '../../../shared/widgets/ios_tactile.dart';
-import '../../../utils/sandbox_path_resolver.dart';
 import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
+import '../../chat/widgets/chat_assistant_background.dart';
 import '../widgets/assistant_avatar.dart';
 import '../widgets/assistant_entry_actions.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
@@ -337,59 +336,7 @@ class MobileBackgroundLayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final bg = context.watch<AssistantProvider>().currentAssistant?.background;
-    final maskStrength = context
-        .watch<SettingsProvider>()
-        .chatBackgroundMaskStrength;
-
-    if (bg == null || bg.trim().isEmpty) return const SizedBox.expand();
-
-    ImageProvider provider;
-    if (bg.startsWith('http')) {
-      provider = NetworkImage(bg);
-    } else {
-      final localPath = SandboxPathResolver.fix(bg);
-      final file = File(localPath);
-      if (!file.existsSync()) return const SizedBox.expand();
-      provider = FileImage(file);
-    }
-
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: provider,
-              fit: BoxFit.cover,
-              colorFilter: ColorFilter.mode(
-                cs.shadow.withValues(alpha: 0.04),
-                BlendMode.srcATop,
-              ),
-            ),
-          ),
-        ),
-        IgnorePointer(
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  cs.surface.withValues(
-                    alpha: (0.20 * maskStrength).clamp(0.0, 1.0),
-                  ),
-                  cs.surface.withValues(
-                    alpha: (0.50 * maskStrength).clamp(0.0, 1.0),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    return const ChatAssistantBackground();
   }
 }
 

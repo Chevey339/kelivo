@@ -2,10 +2,9 @@ import 'dart:async';
 import 'package:Kelivo/theme/app_font_weights.dart';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../core/providers/settings_provider.dart';
 import '../../icons/lucide_adapter.dart' as lucide;
+import '../../theme/app_semantic_colors.dart';
 
 class DesktopSelectOption<T> {
   const DesktopSelectOption({
@@ -95,15 +94,7 @@ class _DesktopSelectDropdownState<T> extends State<DesktopSelectDropdown<T>> {
   }
 
   Color _defaultMenuBackground(BuildContext context) {
-    SettingsProvider? sp;
-    try {
-      sp = Provider.of<SettingsProvider>(context, listen: false);
-    } catch (_) {
-      sp = null;
-    }
-    final usePure = sp?.usePureBackground ?? false;
-    if (usePure) return Theme.of(context).colorScheme.surface;
-    return Theme.of(context).colorScheme.surfaceContainerHigh;
+    return context.overlaySurface;
   }
 
   void _openMenu() {

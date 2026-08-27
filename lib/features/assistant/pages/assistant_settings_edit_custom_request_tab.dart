@@ -19,14 +19,10 @@ class _CustomRequestTab extends StatelessWidget {
         20,
         8,
       ), // Increased right padding
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.25)),
-          boxShadow: isDark ? [] : AppShadows.soft,
-        ),
-        child: Padding(padding: const EdgeInsets.all(12), child: child),
+      child: SectionCard(
+        padding: const EdgeInsets.all(12),
+        shadow: isDark ? null : AppShadows.soft,
+        child: child,
       ),
     );
 
@@ -292,7 +288,7 @@ class _HeaderRowState extends State<_HeaderRow> {
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: context.appColors.surfaceFill,
+      fillColor: context.appColors.surfaceCardFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -405,7 +401,7 @@ class _BodyRowState extends State<_BodyRow> {
     return InputDecoration(
       labelText: label,
       filled: true,
-      fillColor: context.appColors.surfaceFill,
+      fillColor: context.appColors.surfaceCardFill,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,

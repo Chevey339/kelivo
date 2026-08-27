@@ -16,6 +16,7 @@ import '../../../shared/widgets/snackbar.dart';
 import '../../../core/services/haptics.dart';
 import 'debug_page.dart';
 import 'log_viewer_page.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 class AboutPage extends StatefulWidget {
@@ -123,7 +124,7 @@ class _AboutPageState extends State<AboutPage> {
         minWidth: MediaQuery.of(context).size.width,
         maxWidth: MediaQuery.of(context).size.width,
       ),
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -413,7 +414,7 @@ class _AboutPageState extends State<AboutPage> {
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
         children: [
           // Header card: left icon + right title/description
-          _iosSectionCard(
+          SectionCard(
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -479,7 +480,7 @@ class _AboutPageState extends State<AboutPage> {
           const SizedBox(height: 12),
 
           // iOS-style list card
-          _iosSectionCard(
+          SectionCard(
             children: [
               // Version (tap 7x to unlock easter egg) — logic unchanged
               _iosNavRow(
@@ -554,31 +555,6 @@ class _AboutPageState extends State<AboutPage> {
 
 // --- iOS-style helpers (mirroring Settings/Display pages) ---
 
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

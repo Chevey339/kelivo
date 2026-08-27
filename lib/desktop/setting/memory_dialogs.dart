@@ -15,6 +15,7 @@ import '../../shared/widgets/ios_form_text_field.dart';
 import '../../shared/widgets/ios_tactile.dart';
 import '../../shared/widgets/ios_tile_button.dart';
 import '../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 /// Shared chrome for memory-related desktop dialogs (matches MCP / assistant
 /// dialog shells: surface Dialog + title row + close).
@@ -36,7 +37,7 @@ Future<T?> showDesktopMemoryDialog<T>(
     builder: (ctx) {
       final actions = headerActionsBuilder?.call(ctx) ?? const <Widget>[];
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
@@ -111,7 +112,7 @@ Future<T?> showDesktopMemoryFormDialog<T>(
       final maxHeight = MediaQuery.sizeOf(ctx).height * maxHeightFactor;
       final maxBodyHeight = maxHeight - 44 - 1 - (footer != null ? 72 : 16);
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ConstrainedBox(
@@ -407,7 +408,7 @@ class _DesktopMemoryTextInputDialogState
 
     final maxBodyHeight = maxHeight - 44 - 1 - 72;
     return Dialog(
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(

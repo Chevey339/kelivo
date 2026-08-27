@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 import '../../../core/models/memory_entry.dart';
 import '../../../core/models/user_profile_field.dart';
@@ -9,11 +8,13 @@ import '../../../core/providers/memory_provider_v2.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/widgets/ios_form_text_field.dart';
+import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../shared/widgets/snackbar.dart';
 import '../../../utils/platform_utils.dart';
 import '../widgets/memory_ui.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 /// Structured user profile fields (§14.4 / §5.7).
 class UserProfilePage extends StatelessWidget {
@@ -90,7 +91,6 @@ class _UserProfileContentState extends State<UserProfileContent> {
     bool isCustom = false,
   }) async {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     final isNewCustom = isCustom && current == null;
     final title = isNewCustom
         ? l10n.userProfileAddCustom
@@ -112,7 +112,7 @@ class _UserProfileContentState extends State<UserProfileContent> {
         builder: (ctx) {
           final maxHeight = MediaQuery.sizeOf(ctx).height * 0.85;
           return Dialog(
-            backgroundColor: cs.surface,
+            backgroundColor: context.overlaySurface,
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 24,
               vertical: 24,
@@ -131,7 +131,7 @@ class _UserProfileContentState extends State<UserProfileContent> {
       resultFuture = showModalBottomSheet<_ProfileFieldResult>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
@@ -166,7 +166,6 @@ class _UserProfileContentState extends State<UserProfileContent> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final fields = context.watch<MemoryProviderV2>().profileFields;
     final byKey = {for (final f in fields) f.key: f};
     final customKeys = fields
@@ -174,16 +173,8 @@ class _UserProfileContentState extends State<UserProfileContent> {
         .where((k) => k.startsWith('custom.'))
         .toList();
 
-    Widget sectionCard(List<Widget> children) => Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
+    Widget sectionCard(List<Widget> children) => SectionCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           for (var i = 0; i < children.length; i++) ...[

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../theme/app_font_weights.dart';
-import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class StatsSectionCard extends StatelessWidget {
   const StatsSectionCard({
@@ -16,42 +16,30 @@ class StatsSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: cs.onSurface.withValues(alpha: 0.9),
-                      fontSize: 15,
-                      fontWeight: AppFontWeights.emphasis,
-                    ),
+    final cs = Theme.of(context).colorScheme;
+    return SectionCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                    fontSize: 15,
+                    fontWeight: AppFontWeights.emphasis,
                   ),
                 ),
-                if (trailing != null) trailing!,
-              ],
-            ),
-            const SizedBox(height: 12),
-            child,
-          ],
-        ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }

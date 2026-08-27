@@ -13,12 +13,14 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 Future<void> showSearchSettingsSheet(BuildContext context) async {
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -195,7 +197,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                       final mid = modelId!;
                       return IosCardPress(
                         borderRadius: BorderRadius.circular(14),
-                        baseColor: cs.surface,
+                        baseColor: sheetTileColor(context),
                         duration: const Duration(milliseconds: 260),
                         onTap: () async {
                           Haptics.light();
@@ -272,7 +274,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 14),
                           child: IosCardPress(
                             borderRadius: BorderRadius.circular(14),
-                            baseColor: cs.surface,
+                            baseColor: sheetTileColor(context),
                             duration: const Duration(milliseconds: 260),
                             onTap: () async {
                               Haptics.light();
@@ -350,7 +352,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                 if (!builtInMode) ...[
                   IosCardPress(
                     borderRadius: BorderRadius.circular(14),
-                    baseColor: cs.surface,
+                    baseColor: sheetTileColor(context),
                     duration: const Duration(milliseconds: 260),
                     onTap: () {
                       Haptics.light();
@@ -421,7 +423,7 @@ class _SearchSettingsSheet extends StatelessWidget {
                         height: 48,
                         child: IosCardPress(
                           borderRadius: BorderRadius.circular(14),
-                          baseColor: cs.surface,
+                          baseColor: sheetTileColor(context),
                           duration: const Duration(milliseconds: 260),
                           onTap: () {
                             Haptics.light();
