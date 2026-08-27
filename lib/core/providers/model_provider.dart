@@ -227,7 +227,7 @@ class ZenMuxProvider extends BaseProvider {
           if (entry is Map && entry['id'] is String)
             ModelRegistry.infer(
               ModelInfo(
-                id: entry['id'] as String,
+                id: ProviderConfig.zenMuxModelSlug(entry['id'] as String),
                 displayName:
                     (entry['display_name'] as String?) ??
                     (entry['id'] as String),

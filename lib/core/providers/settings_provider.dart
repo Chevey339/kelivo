@@ -5833,6 +5833,12 @@ class ProviderConfig {
     }
   }
 
+  static String zenMuxModelSlug(String modelId) {
+    final normalized = modelId.trim();
+    final slash = normalized.lastIndexOf('/');
+    return slash >= 0 ? normalized.substring(slash + 1) : normalized;
+  }
+
   ProviderConfig({
     required this.id,
     required this.enabled,

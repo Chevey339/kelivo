@@ -177,8 +177,8 @@ void main() {
     });
 
     test('ZenMux only enables native web search for advertised models', () {
-      const supportedId = 'anthropic/claude-sonnet-4.6';
-      const unsupportedId = 'deepseek/deepseek-v4-pro';
+      const supportedId = 'claude-sonnet-4.6';
+      const unsupportedId = 'deepseek-v4-pro';
       final cfg = ProviderConfig.defaultsFor('ZenMux').copyWith(
         providerType: ProviderKind.openai,
         baseUrl: ProviderConfig.zenMuxBaseUrlFor(ProviderKind.openai),
