@@ -231,6 +231,14 @@ class ZenMuxProvider extends BaseProvider {
                 displayName:
                     (entry['display_name'] as String?) ??
                     (entry['id'] as String),
+                input: _modalitiesFromZenMux(
+                  entry['input_modalities'],
+                  fallback: const <Modality>[Modality.text],
+                ),
+                output: _modalitiesFromZenMux(
+                  entry['output_modalities'],
+                  fallback: const <Modality>[Modality.text],
+                ),
                 supportsWebSearch:
                     entry['capabilities'] is Map &&
                         (entry['capabilities'] as Map)['web_search'] == true ||
@@ -242,6 +250,25 @@ class ZenMuxProvider extends BaseProvider {
     } finally {
       client.close();
     }
+  }
+
+  static List<Modality> _modalitiesFromZenMux(
+    Object? raw, {
+    required List<Modality> fallback,
+  }) {
+    if (raw is! List) return fallback;
+    final modalities = <Modality>[];
+    for (final value in raw) {
+      switch (value.toString().toLowerCase()) {
+        case 'text':
+          modalities.add(Modality.text);
+          break;
+        case 'image':
+          modalities.add(Modality.image);
+          break;
+      }
+    }
+    return modalities.isEmpty ? fallback : modalities;
   }
 }
 

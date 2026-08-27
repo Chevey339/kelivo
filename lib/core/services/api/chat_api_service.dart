@@ -54,7 +54,12 @@ class ChatApiService {
       config.id,
       explicitType: config.providerType,
     );
-    return kind == ProviderKind.openai &&
+    return (kind == ProviderKind.openai ||
+            ProviderConfig.isZenMux(
+              id: config.id,
+              name: config.name,
+              baseUrl: config.baseUrl,
+            )) &&
         shouldUseOpenAIImagesApi(config, modelId);
   }
 
@@ -159,6 +164,17 @@ class ChatApiService {
       config.id,
       explicitType: config.providerType,
     );
+    final isZenMux = ProviderConfig.isZenMux(
+      id: config.id,
+      name: config.name,
+      baseUrl: config.baseUrl,
+    );
+    final imageRequestConfig = isZenMux
+        ? config.copyWith(
+            providerType: ProviderKind.openai,
+            baseUrl: ProviderConfig.zenMuxBaseUrlFor(ProviderKind.openai),
+          )
+        : config;
     final cancelToken = CancelToken();
     final rid = (requestId ?? '').trim();
     if (rid.isNotEmpty) {
@@ -169,9 +185,9 @@ class ChatApiService {
       _activeCancelTokens[rid] = cancelToken;
     }
     final useOpenAIImagesApi =
-        kind == ProviderKind.openai &&
+        (kind == ProviderKind.openai || isZenMux) &&
         allowImagesApiRouting &&
-        shouldUseOpenAIImagesApi(config, modelId);
+        shouldUseOpenAIImagesApi(imageRequestConfig, modelId);
     final useZhipuLayoutParsing = shouldUseZhipuLayoutParsing(config, modelId);
     final unicodeSafeMessages = _sanitizeMessages(messages);
     final stripUnsupportedImageInputs =
@@ -189,7 +205,17 @@ class ChatApiService {
     final client = _clientFor(config, cancelToken);
 
     try {
-      if (useZhipuLayoutParsing) {
+      if (useOpenAIImagesApi) {
+        yield* sendOpenAIImagesStream(
+          client,
+          imageRequestConfig,
+          modelId,
+          safeMessages,
+          userImagePaths: safeUserImagePaths,
+          extraHeaders: extraHeaders,
+          extraBody: extraBody,
+        );
+      } else if (useZhipuLayoutParsing) {
         yield* sendZhipuLayoutParsingStream(
           client,
           config,
@@ -199,17 +225,7 @@ class ChatApiService {
           extraHeaders: extraHeaders,
         );
       } else if (kind == ProviderKind.openai) {
-        if (useOpenAIImagesApi) {
-          yield* sendOpenAIImagesStream(
-            client,
-            config,
-            modelId,
-            safeMessages,
-            userImagePaths: safeUserImagePaths,
-            extraHeaders: extraHeaders,
-            extraBody: extraBody,
-          );
-        } else if (config.useResponseApi == true) {
+        if (config.useResponseApi == true) {
           yield* sendOpenAIResponsesStream(
             client,
             config,
