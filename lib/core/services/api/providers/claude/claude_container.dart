@@ -55,6 +55,16 @@ class ClaudeContainerRef {
   }
 }
 
+/// Whether a failed request that named a container failed because of it.
+///
+/// The API has no dedicated error code for an expired or unknown container,
+/// so this reads the message. The caller only asks when the request carried
+/// a `container`, which makes an error that mentions one about that one.
+bool isClaudeStaleContainerError(int statusCode, String errorBody) =>
+    statusCode >= 400 &&
+    statusCode < 500 &&
+    errorBody.toLowerCase().contains('container');
+
 /// Removes the container key from a message about to be sent by a provider
 /// that copies messages whole.
 void stripClaudeContainerKey(Map<String, dynamic> message) {

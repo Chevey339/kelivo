@@ -305,14 +305,11 @@ Stream<StreamChunk> sendClaudeStream(
       var response = await client.send(buildRequest());
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        // A remembered container can have expired since the last turn. The
-        // request named it, so an error about a container is about that one:
-        // forget it and let this round start a fresh one.
+        // A stored container can have expired since the last turn; forget
+        // it and let this round start a fresh one.
         final staleContainer =
-            response.statusCode >= 400 &&
-            response.statusCode < 500 &&
             body.containsKey('container') &&
-            errorBody.toLowerCase().contains('container');
+            isClaudeStaleContainerError(response.statusCode, errorBody);
         if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
