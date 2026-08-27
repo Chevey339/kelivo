@@ -483,18 +483,18 @@ abstract class BuiltInToolsHelper {
     switch (kind) {
       case ProviderKind.google:
         if (isZenMuxProvider(cfg)) {
-          return _zenMuxModelSupportsWebSearch(cfg, modelId);
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
         }
         return true;
       case ProviderKind.claude:
         if (isDeepSeekProvider(cfg)) return true;
         if (isZenMuxProvider(cfg)) {
-          return _zenMuxModelSupportsWebSearch(cfg, modelId);
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
         }
         return isClaudeBuiltInSearchSupportedModel(upstreamModelId);
       case ProviderKind.openai:
         if (isZenMuxProvider(cfg)) {
-          return _zenMuxModelSupportsWebSearch(cfg, modelId);
+          return _zenMuxModelSupportsWebSearch(cfg, modelId!);
         }
         if (isOpenRouterProvider(cfg)) {
           return true;
