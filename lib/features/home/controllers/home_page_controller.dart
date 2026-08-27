@@ -448,7 +448,6 @@ class HomePageController extends ChangeNotifier {
             revisionIds: revisionIds,
             imagePaths: imagePaths,
           ),
-      geminiThoughtSignatureHandler: _appendGeminiThoughtSignatureForApi,
       providerArtifactLookup: (message, kind) =>
           _chatService.getProviderArtifact(message.id, kind),
     );
@@ -801,7 +800,6 @@ class HomePageController extends ChangeNotifier {
           // the skeleton instead of a blank list.
           notifyListeners();
           await Future.wait([restoreAssistant, loadWindow]);
-          _streamController.clearGeminiThoughtSigs();
           _restoreMessageUiState();
           _scrollCtrl.positionAtBottomOnNextLayout();
           notifyListeners();
@@ -2750,8 +2748,6 @@ class HomePageController extends ChangeNotifier {
     _streamController.restoreMessageUiState(
       message,
       getToolEventsFromDb: (id) => _chatService.getToolEvents(id),
-      getGeminiThoughtSigFromDb: (id) =>
-          _chatService.getGeminiThoughtSignature(id),
     );
   }
 
@@ -2797,16 +2793,6 @@ class HomePageController extends ChangeNotifier {
         messages[i] = messages[i].copyWith(parts: nextParts);
         notifyListeners();
       },
-    );
-  }
-
-  String _appendGeminiThoughtSignatureForApi(
-    ChatMessage message,
-    String content,
-  ) {
-    return _streamController.appendGeminiThoughtSignatureForApi(
-      message,
-      content,
     );
   }
 

@@ -69,7 +69,6 @@ void main() {
           'content': 'result body',
         },
       ],
-      getGeminiThoughtSigFromDb: (id) => 'stored-sig',
     );
   }
 
@@ -108,8 +107,6 @@ void main() {
     );
 
     restore(controller, message);
-
-    expect(controller.geminiThoughtSigs[message.id], 'stored-sig');
 
     final reasoning = controller.getReasoningData(message.id);
     expect(reasoning, isNotNull);

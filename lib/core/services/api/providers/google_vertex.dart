@@ -12,6 +12,8 @@ import '../../../../utils/mcp_structured_image.dart';
 import '../../../../utils/sandbox_path_resolver.dart';
 import '../builtin_tools.dart';
 import 'claude/claude_container.dart';
+import 'google/gemini_thought_signature.dart';
+import 'google_gemini.dart';
 import '../chat_api_helpers.dart';
 import '../generation/tool_loop_runner.dart';
 import '../google_service_account_auth.dart';
@@ -244,6 +246,7 @@ Stream<StreamChunk> sendGoogleVertexClaudeStream({
         ..remove(multimodalInternalRevisionIdKey)
         ..remove(multimodalInternalClaudeContainerKey)
         ..remove(multimodalInternalClaudeTurnKey)
+        ..remove(multimodalInternalGeminiThoughtSignatureKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }

@@ -597,7 +597,6 @@ void main() {
       reader.restoreMessageUiState(
         message,
         getToolEventsFromDb: (_) => const [],
-        getGeminiThoughtSigFromDb: (_) => null,
       );
       expect(reader.getContentSplitData(message.id), isNull);
 

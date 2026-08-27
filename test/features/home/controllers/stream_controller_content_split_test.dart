@@ -308,7 +308,6 @@ void main() {
           'content': null,
         },
       ],
-      getGeminiThoughtSigFromDb: (_) => null,
     );
 
     expect(controller.getContentSplitData(message.id), isNull);
@@ -353,7 +352,6 @@ void main() {
       reader.restoreMessageUiState(
         message,
         getToolEventsFromDb: (_) => const [],
-        getGeminiThoughtSigFromDb: (_) => null,
       );
 
       expect(reader.getContentSplitData(message.id), isNull);

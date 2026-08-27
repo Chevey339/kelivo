@@ -214,7 +214,6 @@ class ChatDatabaseRepository {
     required GenerationRunState terminalState,
     int? checkpointSeq,
     String? errorCode,
-    String? geminiThoughtSignature,
   }) {
     if (!terminalState.isTerminal) {
       throw ArgumentError.value(terminalState, 'terminalState');
@@ -228,10 +227,6 @@ class ChatDatabaseRepository {
           generationRunId: checkpointSeq == null ? null : generationRunId,
           checkpointSeq: checkpointSeq,
         );
-        final signature = geminiThoughtSignature?.trim();
-        if (signature != null && signature.isNotEmpty) {
-          await _upsertGeminiThoughtSignature(message.id, signature);
-        }
         return GenerationRunCommands(_db).transition(
           id: generationRunId,
           expectedState: expectedState,
@@ -6098,14 +6093,11 @@ class ChatDatabaseRepository {
   }
 
   Future<String?> getGeminiThoughtSignature(String messageId) async {
-    return (await getGeminiThoughtSignaturesForMessages([
+    final artifacts = await getProviderArtifactsForMessages([
       messageId,
-    ]))[messageId];
+    ], 'gemini_thought_signature');
+    return artifacts[messageId];
   }
-
-  Future<Map<String, String>> getGeminiThoughtSignaturesForMessages(
-    Iterable<String> messageIds,
-  ) => getProviderArtifactsForMessages(messageIds, 'gemini_thought_signature');
 
   /// revisionId → payload for every message among [messageIds] that carries
   /// a provider artifact of [kind].
@@ -6131,15 +6123,6 @@ class ChatDatabaseRepository {
   ) async {
     await _db.transaction(() async {
       await _upsertProviderArtifact(messageId, kind, payload);
-    });
-  }
-
-  Future<void> setGeminiThoughtSignature(
-    String messageId,
-    String signature,
-  ) async {
-    await _db.transaction(() async {
-      await _upsertGeminiThoughtSignature(messageId, signature);
     });
   }
 
@@ -6364,15 +6347,6 @@ class ChatDatabaseRepository {
                 : now,
           ),
         );
-  }
-
-  Future<void> deleteGeminiThoughtSignature(String messageId) async {
-    await (_db.delete(_db.providerArtifactRows)..where(
-          (row) =>
-              row.revisionId.equals(messageId) &
-              row.kind.equals('gemini_thought_signature'),
-        ))
-        .go();
   }
 
   Future<List<String>> getActiveStreamingIds() async {

@@ -8,6 +8,7 @@ import '../../../../models/token_usage.dart';
 import '../../../../providers/settings_provider.dart';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../claude/claude_history.dart';
+import '../google/gemini_thought_signature.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
 import '../../generation/tool_loop_runner.dart';
@@ -297,6 +298,7 @@ Future<List<Map<String, dynamic>>> buildOpenAIChatCompletionMessages(
     outMsg.remove(multimodalInternalDocumentPathsKey);
     outMsg.remove(multimodalInternalRevisionIdKey);
     stripClaudeKeys(outMsg);
+    outMsg.remove(multimodalInternalGeminiThoughtSignatureKey);
     outMsg.remove('metadata');
     outMsg['role'] = role;
 

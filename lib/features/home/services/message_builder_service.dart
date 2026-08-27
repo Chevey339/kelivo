@@ -29,6 +29,7 @@ import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
 import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/services/api/providers/claude/claude_history.dart';
+import '../../../core/services/api/providers/google/gemini_thought_signature.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -87,7 +88,6 @@ class MessageBuilderService {
     this.chatRepository,
     this.ocrHandler,
     this.ocrPrefetch,
-    this.geminiThoughtSignatureHandler,
     this.providerArtifactLookup,
   });
 
@@ -121,12 +121,9 @@ class MessageBuilderService {
   /// OCR text wrapper function
   String Function(String ocrText)? ocrTextWrapper;
 
-  /// Handler to append Gemini thought signatures for API calls
-  final String Function(ChatMessage message, String content)?
-  geminiThoughtSignatureHandler;
-
-  /// Provider state stored against an assistant message (a container id), by
-  /// kind. It rides along under an internal key the provider strips.
+  /// Provider state stored against an assistant message (a container id, a
+  /// Gemini thought signature), by kind. It rides along under an internal key
+  /// the provider strips.
   final String? Function(ChatMessage message, String kind)?
   providerArtifactLookup;
 
@@ -308,10 +305,7 @@ class MessageBuilderService {
         }
       }
 
-      var content = m.content;
-      if (m.role == 'assistant' && geminiThoughtSignatureHandler != null) {
-        content = geminiThoughtSignatureHandler!(m, content);
-      }
+      final content = m.content;
       final mediaRefs = mediaRefsFromParts(m);
       // Pure-attachment turns have empty text content but still must be sent.
       // Document FileParts are omitted from mediaRefs (they travel via
@@ -333,6 +327,13 @@ class MessageBuilderService {
         );
         if (container != null && container.isNotEmpty) {
           message[multimodalInternalClaudeContainerKey] = container;
+        }
+        final signature = providerArtifactLookup?.call(
+          m,
+          geminiThoughtSignatureArtifactKind,
+        );
+        if (signature != null && signature.isNotEmpty) {
+          message[multimodalInternalGeminiThoughtSignatureKey] = signature;
         }
       }
       if (mediaRefs.isNotEmpty) {

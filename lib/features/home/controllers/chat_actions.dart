@@ -2107,13 +2107,7 @@ class ChatActions {
     state.partsHandler.handle(chunk);
     switch (chunk) {
       case TextDelta(:final text):
-        final cleaned = text.isNotEmpty
-            ? streamController.captureGeminiThoughtSignature(
-                text,
-                state.messageId,
-              )
-            : '';
-        await _handleContentChunk(state, cleaned);
+        await _handleContentChunk(state, text);
         _scheduleStreamingCheckpoint(state);
       case ReasoningDelta(:final text, :final details):
         if (details != null) {

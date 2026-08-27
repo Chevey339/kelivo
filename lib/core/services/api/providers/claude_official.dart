@@ -18,6 +18,7 @@ import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
+import 'google/gemini_thought_signature.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
 
@@ -91,6 +92,7 @@ Stream<StreamChunk> sendClaudeStream(
     nonSystemMessages.add(
       Map<String, dynamic>.from(m)
         ..remove(multimodalInternalRevisionIdKey)
+        ..remove(multimodalInternalGeminiThoughtSignatureKey)
         ..['role'] = role.isEmpty ? 'user' : role,
     );
   }

@@ -7,6 +7,7 @@ import '../../../core/models/message_part.dart';
 import '../../../core/models/token_usage.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../core/services/api/chat_api_service.dart';
+import '../../../core/services/api/providers/google_gemini.dart';
 import '../../../core/services/api/stream/stream_chunk.dart';
 import '../../../core/services/api/stream/stream_chunk_handler.dart';
 import '../../../core/services/chat/chat_service.dart';
@@ -109,10 +110,6 @@ class StreamController {
   final Map<String, List<ToolUIPart>> _toolParts = <String, List<ToolUIPart>>{};
   Map<String, List<ToolUIPart>> get toolParts => _toolParts;
 
-  /// Gemini thought signatures per assistant message.
-  final Map<String, String> _geminiThoughtSigs = <String, String>{};
-  Map<String, String> get geminiThoughtSigs => _geminiThoughtSigs;
-
   /// Vendor reasoning details (OpenRouter-style `reasoning_details`, may carry
   /// thinking signatures) per assistant message. Persisted inside the
   /// reasoningSegmentsJson payload so they can be echoed back on later turns.
@@ -168,12 +165,6 @@ class StreamController {
 
   /// Set of message IDs currently being sanitized.
   final Set<String> _inlineImageSanitizing = <String>{};
-
-  /// Regex to capture Gemini thought signature comments.
-  static final RegExp _geminiThoughtSigRe = RegExp(
-    r'<!--\s*gemini_thought_signatures:.*?-->',
-    dotAll: true,
-  );
 
   // ============================================================================
   // Public Methods - State Access
@@ -247,7 +238,6 @@ class StreamController {
     _reasoningSegments.remove(messageId);
     _contentSplits.remove(messageId);
     _toolParts.remove(messageId);
-    _geminiThoughtSigs.remove(messageId);
     _reasoningDetails.remove(messageId);
     _decodedReasoningPayloads.remove(messageId);
     _restoredUiMessageIds.remove(messageId);
@@ -260,7 +250,6 @@ class StreamController {
     _reasoningSegments.clear();
     _contentSplits.clear();
     _toolParts.clear();
-    _geminiThoughtSigs.clear();
     _reasoningDetails.clear();
     _decodedReasoningPayloads.clear();
     _restoredUiMessageIds.clear();
@@ -272,42 +261,26 @@ class StreamController {
   // Gemini Thought Signature Handling
   // ============================================================================
 
-  /// Capture and strip Gemini thought signature from content.
+  /// Moves a legacy signature comment out of a message's text into the
+  /// provider artifact store, returning the text without it.
   String captureGeminiThoughtSignature(String content, String messageId) {
     if (content.isEmpty) return content;
-    final m = _geminiThoughtSigRe.firstMatch(content);
-    if (m != null) {
-      final sig = m.group(0) ?? '';
-      if (sig.isNotEmpty) {
-        if (_geminiThoughtSigs[messageId] != sig) {
-          _geminiThoughtSigs[messageId] = sig;
-          unawaited(_chatService.setGeminiThoughtSignature(messageId, sig));
-        }
-      }
-      content = content.replaceAll(_geminiThoughtSigRe, '').trimRight();
+    final meta = extractGeminiThoughtMeta(content);
+    if (meta.cleanedText == content) return content;
+    if (meta.hasAny &&
+        _chatService.getGeminiThoughtSignature(messageId) == null) {
+      unawaited(
+        _chatService.setGeminiThoughtSignature(
+          messageId,
+          encodeGeminiThoughtSignature(
+            textKey: meta.textKey,
+            textValue: meta.textValue,
+            imageSigs: meta.images,
+          ),
+        ),
+      );
     }
-    return content;
-  }
-
-  /// Append Gemini thought signature for API calls (when sending history).
-  String appendGeminiThoughtSignatureForApi(
-    ChatMessage message,
-    String content,
-  ) {
-    String? sig = _geminiThoughtSigs[message.id];
-    sig ??= _chatService.getGeminiThoughtSignature(message.id);
-    if (sig != null &&
-        sig.isNotEmpty &&
-        !content.contains('gemini_thought_signatures:')) {
-      if (content.isEmpty) return sig;
-      return '$content\n$sig';
-    }
-    return content;
-  }
-
-  /// Clear Gemini thought signatures map.
-  void clearGeminiThoughtSigs() {
-    _geminiThoughtSigs.clear();
+    return meta.cleanedText;
   }
 
   // ============================================================================
@@ -1471,18 +1444,11 @@ class StreamController {
     ChatMessage message, {
     required List<Map<String, dynamic>> Function(String messageId)
     getToolEventsFromDb,
-    required String? Function(String messageId) getGeminiThoughtSigFromDb,
   }) {
     if (message.role != 'assistant') return;
     if (!_restoredUiMessageIds.add(message.id)) return;
 
     final messageId = message.id;
-
-    // Restore Gemini thought signature
-    final storedSig = getGeminiThoughtSigFromDb(messageId);
-    if (storedSig != null && storedSig.isNotEmpty) {
-      _geminiThoughtSigs[messageId] = storedSig;
-    }
 
     // Restore reasoning state
     final txt = message.reasoningText ?? '';
