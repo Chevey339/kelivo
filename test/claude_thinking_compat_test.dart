@@ -1981,6 +1981,99 @@ data: {"type":"message_stop"}
       },
     );
 
+    test(
+      'a hosted result deferred past a client tool replays with its call',
+      () async {
+        // A turn that starts both kinds of tool at once is cut in two: the
+        // first response ends with the hosted call still running so the client
+        // one can be answered, and the second opens with the hosted result.
+        // Each card kept the blocks of its own response.
+        const firstResponse = [
+          {'type': 'text', 'text': '我查一下。'},
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_deferred',
+            'name': 'web_fetch',
+            'input': {'url': 'https://example.com'},
+          },
+          {
+            'type': 'tool_use',
+            'id': 'toolu_client',
+            'name': 'create_memory',
+            'input': {'content': 'test'},
+          },
+        ];
+        const secondResponse = [
+          {
+            'type': 'web_fetch_tool_result',
+            'tool_use_id': 'srvtoolu_deferred',
+            'content': {'type': 'web_fetch_result', 'url': 'https://e.com'},
+          },
+          {'type': 'text', 'text': '查到了。'},
+        ];
+        final body = await _captureClaudeRequestBody(
+          officialEndpoint: true,
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '看看这个页面'},
+            {
+              'role': 'assistant',
+              'content': '我查一下。查到了。',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_deferred',
+                  'type': 'function',
+                  'function': {
+                    'name': 'web_fetch',
+                    'arguments': '{"url":"https://example.com"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': secondResponse},
+                  },
+                },
+                {
+                  'id': 'toolu_client',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': firstResponse},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_client',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+            {'role': 'user', 'content': '再说说'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        final assistant = (messages[1]['content'] as List).cast<Map>();
+        expect(assistant.map((block) => block['type']).toList(), [
+          'text',
+          'server_tool_use',
+          'tool_use',
+          'web_fetch_tool_result',
+          'text',
+        ]);
+        expect(
+          assistant[3]['tool_use_id'],
+          assistant[1]['id'],
+          reason: 'the hosted call and its result have to travel together',
+        );
+        // The client half still gets its own answer as the next user message.
+        final clientResult = (messages[2]['content'] as List).cast<Map>();
+        expect(clientResult.single['tool_use_id'], 'toolu_client');
+      },
+    );
+
     test('every turn shape replays as one assistant message', () async {
       // How the persisted assistant text can relate to the turn's own text
       // blocks, and what the replayed turn has to end up saying.

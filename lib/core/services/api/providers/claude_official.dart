@@ -174,6 +174,68 @@ Stream<StreamChunk> sendClaudeStream(
     ];
   }
 
+  /// Two cards of one response carry identical copies of its block list, and
+  /// only a call or a result identifies itself; everything else is compared
+  /// whole.
+  String replayBlockKey(Map<String, dynamic> block) {
+    final type = (block['type'] ?? '').toString();
+    if (type == 'tool_use' || type == 'server_tool_use') {
+      final id = (block['id'] ?? '').toString();
+      if (id.isNotEmpty) return 'call:$id';
+    } else if (type.endsWith('_tool_result')) {
+      final id = (block['tool_use_id'] ?? '').toString();
+      if (id.isNotEmpty) return 'result:$id';
+    }
+    return 'block:${jsonEncode(block)}';
+  }
+
+  /// Order the responses of one turn by their hand-off: a response opening
+  /// with the result of a `server_tool_use` it does not hold itself continues
+  /// the response that does.
+  List<List<Map<String, dynamic>>> responsesInHandOffOrder(
+    List<List<Map<String, dynamic>>> responses,
+  ) {
+    if (responses.length < 2) return responses;
+    final callOwner = <String, int>{};
+    for (var i = 0; i < responses.length; i++) {
+      for (final block in responses[i]) {
+        if (block['type'] != 'server_tool_use') continue;
+        final id = (block['id'] ?? '').toString();
+        if (id.isNotEmpty) callOwner.putIfAbsent(id, () => i);
+      }
+    }
+    // A turn spans a couple of responses at most, so relaxing the ranks in
+    // place is cheaper than building the graph they describe.
+    final rank = List<int>.filled(responses.length, 0);
+    for (var pass = 0; pass < responses.length; pass++) {
+      var moved = false;
+      for (var i = 0; i < responses.length; i++) {
+        for (final block in responses[i]) {
+          if (!(block['type'] ?? '').toString().endsWith('_tool_result')) {
+            continue;
+          }
+          final owner = callOwner[(block['tool_use_id'] ?? '').toString()];
+          if (owner == null || owner == i || rank[i] > rank[owner]) continue;
+          rank[i] = rank[owner] + 1;
+          moved = true;
+        }
+      }
+      if (!moved) break;
+    }
+    final order = [for (var i = 0; i < responses.length; i++) i]
+      ..sort(
+        (a, b) =>
+            rank[a] == rank[b] ? a.compareTo(b) : rank[a].compareTo(rank[b]),
+      );
+    return [for (final i in order) responses[i]];
+  }
+
+  /// A turn that starts a hosted tool and a client tool at once is split in
+  /// two: the client result has to be answered before the hosted one arrives,
+  /// so the API closes the first response with the call still open and opens
+  /// the next with its result. Each card kept the blocks of the response it
+  /// appeared in, so the turn is only whole again once they are stitched back
+  /// together in that order.
   List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
     List toolCalls,
   ) {
@@ -182,9 +244,9 @@ Stream<StreamChunk> sendClaudeStream(
         .map((tc) => (tc['id'] ?? '').toString())
         .where((id) => id.isNotEmpty)
         .toSet();
-    List<Map<String, dynamic>>? bestBlocks;
-    var bestMatchCount = -1;
 
+    final responses = <List<Map<String, dynamic>>>[];
+    final seenResponses = <String>{};
     for (final tc in toolCalls) {
       if (tc is! Map) continue;
       final meta = tc['metadata'];
@@ -196,34 +258,33 @@ Stream<StreamChunk> sendClaudeStream(
       final candidate = assistantBlocksForClaudeRequest(
         blocks.whereType<Map>(),
       );
-      final matchCount = toolUseIdsInBlocks(
-        candidate,
-      ).where(expectedIds.contains).length;
-      if (matchCount > bestMatchCount ||
-          (matchCount == bestMatchCount &&
-              candidate.length > (bestBlocks?.length ?? 0))) {
-        bestBlocks = candidate;
-        bestMatchCount = matchCount;
+      if (candidate.isEmpty) continue;
+      if (!seenResponses.add(jsonEncode(candidate))) continue;
+      responses.add(candidate);
+    }
+    if (responses.isEmpty) return null;
+
+    final merged = <Map<String, dynamic>>[];
+    final mergedKeys = <String>{};
+    for (final response in responsesInHandOffOrder(responses)) {
+      for (final block in response) {
+        if (mergedKeys.add(replayBlockKey(block))) merged.add(block);
       }
     }
-    if (bestBlocks == null) return null;
-    if (expectedIds.isEmpty) return bestBlocks;
+    if (expectedIds.isEmpty) return merged;
 
-    final presentIds = toolUseIdsInBlocks(bestBlocks);
-    if (presentIds.containsAll(expectedIds)) return bestBlocks;
+    final presentIds = toolUseIdsInBlocks(merged);
+    if (presentIds.containsAll(expectedIds)) return merged;
 
-    final completed = <Map<String, dynamic>>[
-      for (final block in bestBlocks) Map<String, dynamic>.from(block),
-    ];
     for (final tc in toolCalls.whereType<Map>()) {
       final block = toolUseBlockFromToolCall(tc);
       if (block == null) continue;
       final id = (block['id'] ?? '').toString();
       if (presentIds.contains(id)) continue;
-      completed.add(block);
+      merged.add(block);
       presentIds.add(id);
     }
-    return completed;
+    return merged;
   }
 
   // Server tools replayed as their own blocks already carry their result; the
