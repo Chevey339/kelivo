@@ -36,6 +36,16 @@ void main() {
       expect(moonshot.modelOverrides, isEmpty);
     });
 
+    test('default ZenMux preset uses the OpenAI-compatible API', () {
+      final zenmux = ProviderConfig.defaultsFor('ZenMux');
+
+      expect(zenmux.baseUrl, 'https://zenmux.ai/api/v1');
+      expect(zenmux.providerType, ProviderKind.openai);
+      expect(zenmux.chatPath, '/chat/completions');
+      expect(zenmux.useResponseApi, isFalse);
+      expect(zenmux.enabled, isFalse);
+    });
+
     test('built-in provider order does not add Kimi preset', () async {
       final harness = await createBusinessTestHarness(
         initial: {

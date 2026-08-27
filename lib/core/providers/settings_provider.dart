@@ -70,6 +70,7 @@ class SettingsProvider extends ChangeNotifier {
   static const String providerUngroupedGroupKey = '__ungrouped__';
   static const List<String> _builtInProviderKeysInOrder = [
     'OpenAI',
+    'ZenMux',
     'SiliconFlow',
     'Gemini',
     'OpenRouter',
@@ -1490,6 +1491,7 @@ class SettingsProvider extends ChangeNotifier {
       // Seed a couple of sensible defaults on first launch, but do not recreate
       // providers implicitly during later reads (e.g., when switching chats).
       ensureProviderConfig('KelivoIN', defaultName: 'KelivoIN');
+      ensureProviderConfig('ZenMux', defaultName: 'ZenMux');
       ensureProviderConfig('Tensdaq', defaultName: 'Tensdaq');
       ensureProviderConfig('SiliconFlow', defaultName: 'SiliconFlow');
       ensureProviderConfig('AIhubmix', defaultName: 'AIhubmix');
@@ -6068,6 +6070,7 @@ class ProviderConfig {
   static String _defaultBase(String key) {
     final k = key.toLowerCase();
     if (k.contains('tensdaq')) return 'https://tensdaq-api.x-aio.com/v1';
+    if (k.contains('zenmux')) return 'https://zenmux.ai/api/v1';
     if (k.contains('kelivoin')) return 'https://text.pollinations.ai/openai';
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
@@ -6103,6 +6106,7 @@ class ProviderConfig {
       final s = k.toLowerCase();
       if (s.contains('tensdaq')) return true;
       if (s.contains('openai')) return true;
+      if (s.contains('zenmux')) return false;
       if (s.contains('gemini') || s.contains('google')) return true;
       if (s.contains('silicon')) return true;
       if (s.contains('openrouter')) return true;

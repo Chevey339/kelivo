@@ -133,6 +133,7 @@ class _ProviderDetailPageState extends State<ProviderDetailPage> {
       const fixed = {
         'KelivoIN',
         'OpenAI',
+        'ZenMux',
         'Gemini',
         'SiliconFlow',
         'OpenRouter',
