@@ -746,10 +746,7 @@ class _SegmentedToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.appColors.hairline,
-          width: 0.6,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
       ),
       child: SizedBox(
         height: 40,
@@ -1304,7 +1301,6 @@ class _PreviewSurface extends StatelessWidget {
     }
   }
 }
-
 
 Widget _iosDivider(BuildContext context, {double indent = 14}) {
   final cs = Theme.of(context).colorScheme;

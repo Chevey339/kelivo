@@ -126,38 +126,40 @@ void main() {
     },
   );
 
-  test('Chatbox parse progress is monotonic and does not regress phases', () async {
-    final backup = await File('${root.path}/chatbox.json').writeAsString(
-      jsonEncode(_largeChatboxFixture(sessions: 3, messagesPerSession: 4)),
-      flush: true,
-    );
-    final events = <BackupProgress>[];
+  test(
+    'Chatbox parse progress is monotonic and does not regress phases',
+    () async {
+      final backup = await File('${root.path}/chatbox.json').writeAsString(
+        jsonEncode(_largeChatboxFixture(sessions: 3, messagesPerSession: 4)),
+        flush: true,
+      );
+      final events = <BackupProgress>[];
 
-    await ChatboxImporter.importFromChatbox(
-      file: backup,
-      mode: RestoreMode.overwrite,
-      businessRepository: businessRepository,
-      chatService: chatService,
-      onProgress: events.add,
-    );
+      await ChatboxImporter.importFromChatbox(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+        onProgress: events.add,
+      );
 
-    _expectMonotonicProgress(events);
-    expect(
-      events.map((event) => event.phase),
-      containsAllInOrder([
-        BackupPhase.importingSessions,
-        BackupPhase.importingMessages,
-      ]),
-    );
-  });
+      _expectMonotonicProgress(events);
+      expect(
+        events.map((event) => event.phase),
+        containsAllInOrder([
+          BackupPhase.importingSessions,
+          BackupPhase.importingMessages,
+        ]),
+      );
+    },
+  );
 
   test(
     'cancels Chatbox session parse from the calling isolate while work continues',
     () async {
-      final backup = await File('${root.path}/chatbox.json').writeAsString(
-        jsonEncode(_largeChatboxFixture()),
-        flush: true,
-      );
+      final backup = await File(
+        '${root.path}/chatbox.json',
+      ).writeAsString(jsonEncode(_largeChatboxFixture()), flush: true);
       final token = BackupCancelToken();
       addTearDown(token.dispose);
       final phases = <BackupPhase>[];

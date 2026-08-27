@@ -1055,11 +1055,7 @@ void main() {
       conversationId: 'c1',
       parts: [
         ToolCallPart(
-          jsonEncode({
-            'id': 'shot',
-            'name': 'shot',
-            'content': envelope,
-          }),
+          jsonEncode({'id': 'shot', 'name': 'shot', 'content': envelope}),
         ),
       ],
     );

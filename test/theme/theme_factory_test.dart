@@ -31,9 +31,7 @@ void main() {
 
   group('overlay surface themes', () {
     test('legacy dark overlays use page surface', () {
-      final theme = buildDarkThemeForScheme(
-        ThemePalettes.defaultPalette.dark,
-      );
+      final theme = buildDarkThemeForScheme(ThemePalettes.defaultPalette.dark);
       final scheme = theme.colorScheme;
       final colors = theme.extension<AppSemanticColors>()!;
       expect(colors.layered, isFalse);

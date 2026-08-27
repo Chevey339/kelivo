@@ -603,7 +603,10 @@ void main() {
     tester,
   ) async {
     tester.view.devicePixelRatio = 2;
-    tester.view.physicalSize = Size(_mobileSize.width * 2, _mobileSize.height * 2);
+    tester.view.physicalSize = Size(
+      _mobileSize.width * 2,
+      _mobileSize.height * 2,
+    );
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
@@ -612,7 +615,8 @@ void main() {
     );
     await tester.pump();
 
-    final first = tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+    final first =
+        tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
 
     tester.view.physicalSize = Size(
       _desktopSize.width * 2,
@@ -623,8 +627,12 @@ void main() {
     );
     await tester.pump();
 
-    final second = tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-    expect(second.width != first.width || second.height != first.height, isTrue);
+    final second =
+        tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+    expect(
+      second.width != first.width || second.height != first.height,
+      isTrue,
+    );
     expect(second.width, lessThanOrEqualTo(kMaxViewerDecodeEdge));
     expect(second.height, lessThanOrEqualTo(kMaxViewerDecodeEdge));
     expect(
@@ -664,7 +672,10 @@ void main() {
     );
     expect(decode.width, lessThanOrEqualTo(kMaxViewerDecodeEdge));
     expect(decode.height, lessThanOrEqualTo(kMaxViewerDecodeEdge));
-    expect(decode.width * decode.height, lessThanOrEqualTo(kMaxViewerDecodePixels));
+    expect(
+      decode.width * decode.height,
+      lessThanOrEqualTo(kMaxViewerDecodePixels),
+    );
     expect(decode.width * decode.height * 4, lessThanOrEqualTo(48 << 20));
   });
 
@@ -688,40 +699,24 @@ void main() {
       detectClipboardImageFormat(bytes: const [0x89, 0x50, 0x4E, 0x47]),
       isEmpty,
     );
-    expect(
-      detectClipboardImageFormat(bytes: _transparentPngBytes),
-      'png',
-    );
+    expect(detectClipboardImageFormat(bytes: _transparentPngBytes), 'png');
   });
 
   test('clipboard GIF and WebP require full signatures', () {
     expect(
-      detectClipboardImageFormat(
-        bytes: const [0x47, 0x49, 0x46, 0x38, 0x39],
-      ),
+      detectClipboardImageFormat(bytes: const [0x47, 0x49, 0x46, 0x38, 0x39]),
       isEmpty,
     );
-    expect(
-      detectClipboardImageFormat(bytes: 'GIF89a'.codeUnits),
-      'gif',
-    );
+    expect(detectClipboardImageFormat(bytes: 'GIF89a'.codeUnits), 'gif');
     expect(
       detectClipboardImageFormat(
-        bytes: [
-          0x52, 0x49, 0x46, 0x46,
-          0, 0, 0, 0,
-          0x57, 0x45, 0x42, 0x50,
-        ],
+        bytes: [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
       ),
       'webp',
     );
     expect(
       detectClipboardImageFormat(
-        bytes: [
-          0x52, 0x49, 0x46, 0x46,
-          0, 0, 0, 0,
-          0x57, 0x45, 0x42, 0x00,
-        ],
+        bytes: [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x00],
       ),
       isEmpty,
     );
@@ -738,40 +733,43 @@ void main() {
       detectClipboardImageFormat(bytes: const [0x00, 0x01, 0x02]),
       isEmpty,
     );
-    expect(
-      detectClipboardImageFormat(bytes: _bmpRgb(2, 2)),
-      isEmpty,
-    );
+    expect(detectClipboardImageFormat(bytes: _bmpRgb(2, 2)), isEmpty);
   });
 
-  test('BMP named like PNG is transcoded with both decode axes capped', () async {
-    debugClipboardImageCodecCalls = 0;
-    debugLastClipboardDecodeTarget = null;
-    addTearDown(() {
+  test(
+    'BMP named like PNG is transcoded with both decode axes capped',
+    () async {
       debugClipboardImageCodecCalls = 0;
       debugLastClipboardDecodeTarget = null;
-    });
+      addTearDown(() {
+        debugClipboardImageCodecCalls = 0;
+        debugLastClipboardDecodeTarget = null;
+      });
 
-    final tall = _bmpRgb(40, 800);
-    final prepared = await prepareClipboardImageBytes(bytes: tall);
-    expect(prepared, isNotNull);
-    expect(prepared!.converted, isTrue);
-    expect(prepared.format, 'png');
-    expect(detectClipboardImageFormat(bytes: tall), isEmpty);
-    expect(detectClipboardImageFormat(bytes: prepared.bytes), 'png');
-    expect(debugClipboardImageCodecCalls, 1);
-    final target = debugLastClipboardDecodeTarget!;
-    expect(target.width, lessThanOrEqualTo(kMaxViewerDecodeEdge));
-    expect(target.height, lessThanOrEqualTo(kMaxViewerDecodeEdge));
-    expect(target.width * target.height, lessThanOrEqualTo(kMaxViewerDecodePixels));
-    expect(
-      resolveClipboardFallbackSourcePath(
-        sourcePath: '/tmp/photo.png',
-        converted: prepared.converted,
-      ),
-      isNull,
-    );
-  });
+      final tall = _bmpRgb(40, 800);
+      final prepared = await prepareClipboardImageBytes(bytes: tall);
+      expect(prepared, isNotNull);
+      expect(prepared!.converted, isTrue);
+      expect(prepared.format, 'png');
+      expect(detectClipboardImageFormat(bytes: tall), isEmpty);
+      expect(detectClipboardImageFormat(bytes: prepared.bytes), 'png');
+      expect(debugClipboardImageCodecCalls, 1);
+      final target = debugLastClipboardDecodeTarget!;
+      expect(target.width, lessThanOrEqualTo(kMaxViewerDecodeEdge));
+      expect(target.height, lessThanOrEqualTo(kMaxViewerDecodeEdge));
+      expect(
+        target.width * target.height,
+        lessThanOrEqualTo(kMaxViewerDecodePixels),
+      );
+      expect(
+        resolveClipboardFallbackSourcePath(
+          sourcePath: '/tmp/photo.png',
+          converted: prepared.converted,
+        ),
+        isNull,
+      );
+    },
+  );
 
   test('unknown-format copy budgets a very tall image and a large square', () {
     final tall = computeViewerDecodePixels(
@@ -868,7 +866,11 @@ void main() {
       };
 
       await tester.pumpWidget(
-        _viewerApp(images: images, imageProviders: providers, size: _desktopSize),
+        _viewerApp(
+          images: images,
+          imageProviders: providers,
+          size: _desktopSize,
+        ),
       );
       await tester.pump();
       await tester.pumpAndSettle();
@@ -1019,57 +1021,56 @@ void main() {
     );
   });
 
-  testWidgets(
-    'rotate swaps decode axes and restores them after a full turn',
-    (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(1024, 720);
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
-      try {
-        await tester.pumpWidget(
-          _viewerApp(
-            images: const [_widePngDataUrl],
-            size: const Size(1024, 720),
-          ),
-        );
-        await tester.pumpAndSettle();
+  testWidgets('rotate swaps decode axes and restores them after a full turn', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1024, 720);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    try {
+      await tester.pumpWidget(
+        _viewerApp(
+          images: const [_widePngDataUrl],
+          size: const Size(1024, 720),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-        final initial =
-            tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-        expect(initial.width, greaterThan(initial.height));
+      final initial =
+          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+      expect(initial.width, greaterThan(initial.height));
 
-        await tester.tap(find.byTooltip('Rotate Right'));
-        await tester.pumpAndSettle();
-        final right =
-            tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-        expect(right.height, greaterThan(right.width));
+      await tester.tap(find.byTooltip('Rotate Right'));
+      await tester.pumpAndSettle();
+      final right =
+          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+      expect(right.height, greaterThan(right.width));
 
-        await tester.tap(find.byTooltip('Rotate Left'));
-        await tester.pumpAndSettle();
-        final leftBack =
-            tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-        expect(leftBack.width, initial.width);
-        expect(leftBack.height, initial.height);
+      await tester.tap(find.byTooltip('Rotate Left'));
+      await tester.pumpAndSettle();
+      final leftBack =
+          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+      expect(leftBack.width, initial.width);
+      expect(leftBack.height, initial.height);
 
-        await tester.tap(find.byTooltip('Rotate Left'));
-        await tester.pumpAndSettle();
-        final left =
-            tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-        expect(left.height, greaterThan(left.width));
+      await tester.tap(find.byTooltip('Rotate Left'));
+      await tester.pumpAndSettle();
+      final left =
+          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+      expect(left.height, greaterThan(left.width));
 
-        await tester.tap(find.byTooltip('Rotate Right'));
-        await tester.pumpAndSettle();
-        final restored =
-            tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
-        expect(restored.width, initial.width);
-        expect(restored.height, initial.height);
-      } finally {
-        debugDefaultTargetPlatformOverride = null;
-      }
-    },
-  );
+      await tester.tap(find.byTooltip('Rotate Right'));
+      await tester.pumpAndSettle();
+      final restored =
+          tester.widget<Image>(find.byType(Image)).image as SafeResizeImage;
+      expect(restored.width, initial.width);
+      expect(restored.height, initial.height);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 
   testWidgets(
     'ImageViewerPage does not reuse a landscape decode after a portrait rotate',
@@ -1169,13 +1170,17 @@ class _CountingImageProvider extends ImageProvider<_CountingImageProvider> {
   ) {
     counts.loads += 1;
     counts.liveImageCount += 1;
-    final completer = MemoryImage(
-      Uint8List.fromList(_transparentPngBytes),
-      scale: 1.0 + id,
-    ).loadImage(
-      MemoryImage(Uint8List.fromList(_transparentPngBytes), scale: 1.0 + id),
-      decode,
-    );
+    final completer =
+        MemoryImage(
+          Uint8List.fromList(_transparentPngBytes),
+          scale: 1.0 + id,
+        ).loadImage(
+          MemoryImage(
+            Uint8List.fromList(_transparentPngBytes),
+            scale: 1.0 + id,
+          ),
+          decode,
+        );
     completer.addOnLastListenerRemovedCallback(() {
       counts.liveImageCount -= 1;
     });

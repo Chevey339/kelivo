@@ -141,7 +141,8 @@ class InstructionInjectionSheet extends StatelessWidget {
                                                 >(
                                                   context: ctx,
                                                   isScrollControlled: true,
-                                                  backgroundColor: ctx.overlaySurface,
+                                                  backgroundColor:
+                                                      ctx.overlaySurface,
                                                   shape: const RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.vertical(

@@ -302,7 +302,9 @@ void main() {
 
     final image = tester.widget<Image>(find.byType(Image));
     final provider = image.image;
-    final inner = provider is SafeResizeImage ? provider.imageProvider : provider;
+    final inner = provider is SafeResizeImage
+        ? provider.imageProvider
+        : provider;
     expect(inner, isA<NetworkImage>());
     expect(inner, isNot(isA<FileImage>()));
   });

@@ -641,7 +641,10 @@ void main() {
       assistantId: assistantId,
       toolName: 'shot',
     );
-    expect(result.markdown, isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))));
+    expect(
+      result.markdown,
+      isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))),
+    );
     expect(result.imageUris, ['https://cdn.example.com/shot.png']);
     expect(result.markdown.contains('forged.png'), isTrue);
     expect(

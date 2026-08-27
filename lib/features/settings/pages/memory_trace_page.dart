@@ -786,10 +786,7 @@ class _GroupedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.appColors.hairline,
-          width: 0.6,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),

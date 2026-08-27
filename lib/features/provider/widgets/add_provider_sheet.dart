@@ -164,7 +164,6 @@ class _AddProviderSheetState extends State<_AddProviderSheet>
     );
   }
 
-
   Widget _openaiForm(AppLocalizations l10n) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

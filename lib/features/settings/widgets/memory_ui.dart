@@ -788,7 +788,6 @@ Future<T?> showMemoryOptionPicker<T>(
   required List<MemoryPickerOption<T>> options,
   required T selected,
 }) {
-
   Widget optionsCard(BuildContext ctx) {
     final localCs = Theme.of(ctx).colorScheme;
     return MemorySectionCard(

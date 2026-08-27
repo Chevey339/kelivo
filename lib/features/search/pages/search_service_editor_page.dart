@@ -2051,7 +2051,6 @@ InputDecoration _inputDecoration(
   );
 }
 
-
 Widget _sectionHeader(BuildContext context, String text, {bool first = false}) {
   final cs = Theme.of(context).colorScheme;
   return Padding(

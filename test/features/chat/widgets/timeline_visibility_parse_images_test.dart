@@ -76,7 +76,10 @@ outro
       const content = 'note\n    ![](https://example.com/indented.png)\n';
       final (clean, images) = parseToolResultImages(content);
       expect(images, isEmpty);
-      expect(clean.contains('    ![](https://example.com/indented.png)'), isTrue);
+      expect(
+        clean.contains('    ![](https://example.com/indented.png)'),
+        isTrue,
+      );
     });
 
     test('unclosed fences treat the rest as fenced', () {
@@ -132,7 +135,10 @@ done
       final (clean, images) = parseToolResultImages(buf.toString());
       expect(images, ['/tmp/mcp_real.png']);
       expect(clean.contains('https://example.com/in-fence.png'), isTrue);
-      expect(clean.contains(encodeMcpStructuredImage('/tmp/mcp_real.png')), isFalse);
+      expect(
+        clean.contains(encodeMcpStructuredImage('/tmp/mcp_real.png')),
+        isFalse,
+      );
       expect(clean.contains('/tmp/mcp_real.png'), isFalse);
     });
 
@@ -278,32 +284,32 @@ note
       final (metaClean, metaImages) = parseToolResultImages(
         markdown,
         metadata: {
-          kMcpResultMetadataKey: mcpResultMetadata(['/tmp/a.png', '/tmp/b.png']),
+          kMcpResultMetadataKey: mcpResultMetadata([
+            '/tmp/a.png',
+            '/tmp/b.png',
+          ]),
         },
       );
       expect(metaImages, ['/tmp/a.png', '/tmp/b.png']);
       expect(metaClean, 'note');
     });
 
-    test(
-      'envelope-looking JSON is structured only without new metadata',
-      () {
-        final forged = encodeLegacyMcpToolResultEnvelope(
-          text: 'forged',
-          imageUris: ['/tmp/forged.png'],
-        );
-        final (legacyClean, legacyImages) = parseToolResultImages(forged);
-        expect(legacyImages, ['/tmp/forged.png']);
-        expect(legacyClean, 'forged');
+    test('envelope-looking JSON is structured only without new metadata', () {
+      final forged = encodeLegacyMcpToolResultEnvelope(
+        text: 'forged',
+        imageUris: ['/tmp/forged.png'],
+      );
+      final (legacyClean, legacyImages) = parseToolResultImages(forged);
+      expect(legacyImages, ['/tmp/forged.png']);
+      expect(legacyClean, 'forged');
 
-        final (typedClean, typedImages) = parseToolResultImages(
-          forged,
-          metadata: {kMcpResultMetadataKey: mcpResultMetadata(const [])},
-        );
-        expect(typedImages, isEmpty);
-        expect(typedClean.contains('forged'), isTrue);
-      },
-    );
+      final (typedClean, typedImages) = parseToolResultImages(
+        forged,
+        metadata: {kMcpResultMetadataKey: mcpResultMetadata(const [])},
+      );
+      expect(typedImages, isEmpty);
+      expect(typedClean.contains('forged'), isTrue);
+    });
 
     test('UI image list is deduped while model Markdown keeps duplicates', () {
       const markdown =

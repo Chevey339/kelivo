@@ -320,10 +320,7 @@ class McpToolService extends ChangeNotifier {
         }
       } catch (_) {}
     }
-    return McpToolResult(
-      markdown: buf.toString().trim(),
-      imageUris: imageUris,
-    );
+    return McpToolResult(markdown: buf.toString().trim(), imageUris: imageUris);
   }
 
   void _writeEscapedToolText(StringBuffer buf, String text) {

@@ -52,10 +52,7 @@ class PendingApprovalKey {
   if (content == null || content.isEmpty) {
     final typed = readMcpResultMetadata(metadata);
     if (typed != null) {
-      return (
-        '',
-        dedupeImageUrisFirstSeen(mcpResultImageUris(typed)),
-      );
+      return ('', dedupeImageUrisFirstSeen(mcpResultImageUris(typed)));
     }
     return ('', const []);
   }

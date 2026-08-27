@@ -704,7 +704,6 @@ class _SmallIconBtnState extends State<_SmallIconBtn> {
   }
 }
 
-
 Widget _divider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

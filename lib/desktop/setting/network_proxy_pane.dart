@@ -400,10 +400,7 @@ class _DesktopNetworkProxyPaneState extends State<DesktopNetworkProxyPane> {
 
 // --- Helpers (matched with backup pane style) ---
 Widget _rowDivider(BuildContext context) {
-  return Container(
-    height: 1,
-    color: context.appColors.hairline,
-  );
+  return Container(height: 1, color: context.appColors.hairline);
 }
 
 class _ItemRow extends StatelessWidget {
@@ -507,7 +504,6 @@ class _DeskIosButtonState extends State<_DeskIosButton> {
     );
   }
 }
-
 
 InputDecoration _deskInputDecoration(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

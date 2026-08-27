@@ -725,12 +725,25 @@ class DataSync {
     if (includeChats != (databasePath != null && snapshotInfo != null)) {
       throw StateError('backup_database_component');
     }
-    final uploadFiles = includeFiles ? _listFilesSync(uploadDirPath) : const <File>[];
-    final avatarFiles = includeFiles ? _listFilesSync(avatarsDirPath) : const <File>[];
-    final imageFiles = includeFiles ? _listFilesSync(imagesDirPath) : const <File>[];
-    final fontFiles = includeFiles ? _listFilesSync(fontsDirPath) : const <File>[];
+    final uploadFiles = includeFiles
+        ? _listFilesSync(uploadDirPath)
+        : const <File>[];
+    final avatarFiles = includeFiles
+        ? _listFilesSync(avatarsDirPath)
+        : const <File>[];
+    final imageFiles = includeFiles
+        ? _listFilesSync(imagesDirPath)
+        : const <File>[];
+    final fontFiles = includeFiles
+        ? _listFilesSync(fontsDirPath)
+        : const <File>[];
     var totalBytes = _fileSizeSync(settingsPath) + _fileSizeSync(databasePath);
-    for (final file in [...uploadFiles, ...avatarFiles, ...imageFiles, ...fontFiles]) {
+    for (final file in [
+      ...uploadFiles,
+      ...avatarFiles,
+      ...imageFiles,
+      ...fontFiles,
+    ]) {
       totalBytes += file.lengthSync();
     }
     final meter = _BackupByteMeter(
@@ -916,9 +929,12 @@ class DataSync {
     final fileSystemEntries =
         files ??
         [
-          for (final entity in Directory(srcDirPath).existsSync()
-              ? Directory(srcDirPath).listSync(recursive: true, followLinks: false)
-              : const <FileSystemEntity>[])
+          for (final entity
+              in Directory(srcDirPath).existsSync()
+                  ? Directory(
+                      srcDirPath,
+                    ).listSync(recursive: true, followLinks: false)
+                  : const <FileSystemEntity>[])
             if (entity is File) entity,
         ];
     for (final ent in fileSystemEntries) {
@@ -1484,17 +1500,15 @@ class DataSync {
     WebDavConfig cfg, {
     BackupProgressSink? onProgress,
     BackupCancelToken? cancelToken,
-  }) => prepareBackupFile(cfg, onProgress: onProgress, cancelToken: cancelToken);
+  }) =>
+      prepareBackupFile(cfg, onProgress: onProgress, cancelToken: cancelToken);
 
   @visibleForTesting
   static void verifyPackedBackupSync({
     required String zipPath,
     required Map<String, ({int bytes, String sha256})> expectedEntries,
   }) {
-    _verifyPackedBackupSync(
-      zipPath: zipPath,
-      expectedEntries: expectedEntries,
-    );
+    _verifyPackedBackupSync(zipPath: zipPath, expectedEntries: expectedEntries);
   }
 
   @visibleForTesting
@@ -1542,7 +1556,9 @@ class DataSync {
         phase: phase,
         processed: 0,
         total: total,
-        unit: total == null ? BackupProgressUnit.none : BackupProgressUnit.bytes,
+        unit: total == null
+            ? BackupProgressUnit.none
+            : BackupProgressUnit.bytes,
         cancellable: true,
       ),
     );
@@ -2505,15 +2521,16 @@ class DataSync {
         if (cancelToken?.isCancelled == true) {
           throw const BackupCancelledException();
         }
-        versionedBackup = await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
-          body: _preflightVersionedBackupInIsolate,
-          payload: _BackupPreflightArgs(
-            manifestPath: manifestFile.path,
-            extractDirPath: extractDir.path,
-          ),
-          cancelToken: cancelToken,
-          onProgress: onProgress,
-        );
+        versionedBackup =
+            await runBackupIsolate<_VersionedBackupInfo, _BackupPreflightArgs>(
+              body: _preflightVersionedBackupInIsolate,
+              payload: _BackupPreflightArgs(
+                manifestPath: manifestFile.path,
+                extractDirPath: extractDir.path,
+              ),
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            );
       } else {
         versionedBackup = null;
       }
@@ -2639,16 +2656,17 @@ class DataSync {
       var toolEvents = const <String, List<Map<String, dynamic>>>{};
       var geminiThoughtSigs = const <String, String>{};
       if (restoreChats) {
-        final parsed = await runBackupIsolate<_ParsedChatBackup, _LegacyChatParseArgs>(
-          body: _parseLegacyChatsInIsolate,
-          payload: _LegacyChatParseArgs(
-            chatsPath: chatsFile.path,
-            stagingPath: extractDir.path,
-            buildOverwriteCandidate: mode == RestoreMode.overwrite,
-          ),
-          cancelToken: cancelToken,
-          onProgress: onProgress,
-        );
+        final parsed =
+            await runBackupIsolate<_ParsedChatBackup, _LegacyChatParseArgs>(
+              body: _parseLegacyChatsInIsolate,
+              payload: _LegacyChatParseArgs(
+                chatsPath: chatsFile.path,
+                stagingPath: extractDir.path,
+                buildOverwriteCandidate: mode == RestoreMode.overwrite,
+              ),
+              cancelToken: cancelToken,
+              onProgress: onProgress,
+            );
         conversations = parsed.conversations;
         // Worker isolate has no SandboxPathResolver docsDir. Encode managed
         // attachments against the live root here (URI rewrite only, not a
@@ -3448,9 +3466,7 @@ class _NullDigestOutputStream extends OutputStream {
   @override
   Uint8List subset(int start, [int? end]) {
     if (start < 0) start = _length + start;
-    final resolvedEnd = end == null
-        ? _length
-        : (end < 0 ? _length + end : end);
+    final resolvedEnd = end == null ? _length : (end < 0 ? _length + end : end);
     final n = resolvedEnd - start;
     if (n < 0 || start < 0 || resolvedEnd > _length) {
       throw RangeError('subset');

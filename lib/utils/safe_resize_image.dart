@@ -235,29 +235,32 @@ class SafeResizeImage extends ImageProvider<SafeResizeImageKey> {
     SynchronousFuture<SafeResizeImageKey>? result;
     imageProvider
         .obtainKey(configuration)
-        .then((Object key) {
-          final wrapped = SafeResizeImageKey(
-            providerCacheKey: key,
-            width: width,
-            height: height,
-            fit: fit,
-            allowUpscaling: allowUpscaling,
-            maxEdge: maxEdge,
-            maxPixels: maxPixels,
-          );
-          if (completer == null) {
-            result = SynchronousFuture<SafeResizeImageKey>(wrapped);
-          } else if (!completer!.isCompleted) {
-            completer!.complete(wrapped);
-          }
-        }, onError: (Object error, StackTrace stack) {
-          if (completer == null) {
-            completer = Completer<SafeResizeImageKey>()
-              ..completeError(error, stack);
-          } else if (!completer!.isCompleted) {
-            completer!.completeError(error, stack);
-          }
-        });
+        .then(
+          (Object key) {
+            final wrapped = SafeResizeImageKey(
+              providerCacheKey: key,
+              width: width,
+              height: height,
+              fit: fit,
+              allowUpscaling: allowUpscaling,
+              maxEdge: maxEdge,
+              maxPixels: maxPixels,
+            );
+            if (completer == null) {
+              result = SynchronousFuture<SafeResizeImageKey>(wrapped);
+            } else if (!completer!.isCompleted) {
+              completer!.complete(wrapped);
+            }
+          },
+          onError: (Object error, StackTrace stack) {
+            if (completer == null) {
+              completer = Completer<SafeResizeImageKey>()
+                ..completeError(error, stack);
+            } else if (!completer!.isCompleted) {
+              completer!.completeError(error, stack);
+            }
+          },
+        );
     if (result != null) {
       return result!;
     }

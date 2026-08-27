@@ -224,30 +224,27 @@ void main() {
   });
 
   test('wrapping ResizeImage is rejected in debug', () {
-    expect(
-      () {
-        final wrapped = SafeResizeImage(
-          ResizeImage(MemoryImage(Uint8List.fromList([1, 2, 3])), width: 8),
+    expect(() {
+      final wrapped = SafeResizeImage(
+        ResizeImage(MemoryImage(Uint8List.fromList([1, 2, 3])), width: 8),
+        width: 16,
+        height: 16,
+      );
+      wrapped.loadImage(
+        const SafeResizeImageKey(
+          providerCacheKey: 'k',
           width: 16,
           height: 16,
-        );
-        wrapped.loadImage(
-          const SafeResizeImageKey(
-            providerCacheKey: 'k',
-            width: 16,
-            height: 16,
-            fit: SafeResizeFit.contain,
-            allowUpscaling: false,
-            maxEdge: null,
-            maxPixels: null,
-          ),
-          (buffer, {getTargetSize}) {
-            throw StateError('unused');
-          },
-        );
-      },
-      throwsA(isA<FlutterError>()),
-    );
+          fit: SafeResizeFit.contain,
+          allowUpscaling: false,
+          maxEdge: null,
+          maxPixels: null,
+        ),
+        (buffer, {getTargetSize}) {
+          throw StateError('unused');
+        },
+      );
+    }, throwsA(isA<FlutterError>()));
   });
 }
 

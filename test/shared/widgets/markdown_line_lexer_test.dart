@@ -104,7 +104,6 @@ void main() {
     expect(lexer.fenced, isFalse);
   });
 
-
   test(
     'display-math walk visits stay linear on many short inline-code spans',
     () {

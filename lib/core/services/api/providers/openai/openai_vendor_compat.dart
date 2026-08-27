@@ -457,6 +457,7 @@ class OpenAIProviderInfo {
     final id = upstreamModelId.toLowerCase();
     return id.startsWith('laguna-') || id.contains('/laguna-');
   }
+
   bool get isSiliconFlow =>
       providerId.contains('siliconflow') || host.contains('siliconflow');
   bool get isAzureOpenAI => host.contains('openai.azure.com');
@@ -528,9 +529,7 @@ void applyVendorReasoningKnobs(
     }
   } else if (info.isLaguna) {
     if (isReasoning) {
-      body['chat_template_kwargs'] = {
-        'enable_thinking': !off,
-      };
+      body['chat_template_kwargs'] = {'enable_thinking': !off};
     } else {
       body.remove('chat_template_kwargs');
     }

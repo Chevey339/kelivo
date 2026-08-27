@@ -270,125 +270,125 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
           radius: 16,
           padding: const EdgeInsets.all(14),
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Lucide.MessageCircle, size: 18, color: cs.onSurface),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.assistantEditChatModelTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: AppFontWeights.semibold,
-                        ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Lucide.MessageCircle, size: 18, color: cs.onSurface),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.assistantEditChatModelTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
                       ),
                     ),
-                    if (a.chatModelProvider != null && a.chatModelId != null)
-                      Tooltip(
-                        message: l10n.defaultModelPageResetDefault,
-                        child: _TactileIconButton(
-                          icon: Lucide.RotateCcw,
-                          color: cs.onSurface,
-                          size: 20,
-                          onTap: () async {
-                            await context
-                                .read<AssistantProvider>()
-                                .updateAssistant(
-                                  a.copyWith(clearChatModel: true),
-                                );
-                          },
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.assistantEditChatModelSubtitle,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.onSurface.withValues(alpha: 0.7),
                   ),
+                  if (a.chatModelProvider != null && a.chatModelId != null)
+                    Tooltip(
+                      message: l10n.defaultModelPageResetDefault,
+                      child: _TactileIconButton(
+                        icon: Lucide.RotateCcw,
+                        color: cs.onSurface,
+                        size: 20,
+                        onTap: () async {
+                          await context
+                              .read<AssistantProvider>()
+                              .updateAssistant(
+                                a.copyWith(clearChatModel: true),
+                              );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.assistantEditChatModelSubtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.7),
                 ),
-                const SizedBox(height: 8),
-                _TactileRow(
-                  onTap: () async {
-                    final assistantProvider = context.read<AssistantProvider>();
-                    final sel = await showModelSelector(
-                      context,
-                      initialProviderKey: a.chatModelProvider,
-                      initialModelId: a.chatModelId,
-                    );
-                    if (!context.mounted || sel == null) return;
-                    await assistantProvider.updateAssistant(
-                      a.copyWith(
-                        chatModelProvider: sel.providerKey,
-                        chatModelId: sel.modelId,
-                      ),
-                    );
-                  },
-                  pressedScale: 0.98,
-                  builder: (pressed) {
-                    final bg = context.appColors.surfaceFill;
-                    final overlay = cs.onSurface.withValues(
-                      alpha: isDark ? 0.06 : 0.05,
-                    );
-                    final pressedBg = Color.alphaBlend(overlay, bg);
-                    final l10n = AppLocalizations.of(context)!;
-                    final settings = context.read<SettingsProvider>();
-                    String display = l10n.assistantEditModelUseGlobalDefault;
-                    if (a.chatModelProvider != null && a.chatModelId != null) {
-                      try {
-                        final cfg = settings.getProviderConfig(
-                          a.chatModelProvider!,
-                        );
-                        final ov = cfg.modelOverrides[a.chatModelId] as Map?;
-                        final mdl =
-                            (ov != null &&
-                                (ov['name'] as String?)?.isNotEmpty == true)
-                            ? (ov['name'] as String)
-                            : a.chatModelId!;
-                        display = mdl;
-                      } catch (_) {
-                        display = a.chatModelId ?? '';
-                      }
+              ),
+              const SizedBox(height: 8),
+              _TactileRow(
+                onTap: () async {
+                  final assistantProvider = context.read<AssistantProvider>();
+                  final sel = await showModelSelector(
+                    context,
+                    initialProviderKey: a.chatModelProvider,
+                    initialModelId: a.chatModelId,
+                  );
+                  if (!context.mounted || sel == null) return;
+                  await assistantProvider.updateAssistant(
+                    a.copyWith(
+                      chatModelProvider: sel.providerKey,
+                      chatModelId: sel.modelId,
+                    ),
+                  );
+                },
+                pressedScale: 0.98,
+                builder: (pressed) {
+                  final bg = context.appColors.surfaceFill;
+                  final overlay = cs.onSurface.withValues(
+                    alpha: isDark ? 0.06 : 0.05,
+                  );
+                  final pressedBg = Color.alphaBlend(overlay, bg);
+                  final l10n = AppLocalizations.of(context)!;
+                  final settings = context.read<SettingsProvider>();
+                  String display = l10n.assistantEditModelUseGlobalDefault;
+                  if (a.chatModelProvider != null && a.chatModelId != null) {
+                    try {
+                      final cfg = settings.getProviderConfig(
+                        a.chatModelProvider!,
+                      );
+                      final ov = cfg.modelOverrides[a.chatModelId] as Map?;
+                      final mdl =
+                          (ov != null &&
+                              (ov['name'] as String?)?.isNotEmpty == true)
+                          ? (ov['name'] as String)
+                          : a.chatModelId!;
+                      display = mdl;
+                    } catch (_) {
+                      display = a.chatModelId ?? '';
                     }
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: pressed ? pressedBg : bg,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          _BrandAvatarLike(name: display, size: 24),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              display,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: AppFontWeights.semibold,
-                              ),
+                  }
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOutCubic,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: pressed ? pressedBg : bg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        _BrandAvatarLike(name: display, size: 24),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            display,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.semibold,
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -401,106 +401,105 @@ class _BasicSettingsTabState extends State<_BasicSettingsTab> {
               Row(
                 children: [
                   Icon(Lucide.Image, size: 18, color: cs.onSurface),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.assistantEditChatBackgroundTitle,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: AppFontWeights.semibold,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.assistantEditChatBackgroundTitle,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: AppFontWeights.semibold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                l10n.assistantEditChatBackgroundDescription,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 8),
+              if ((a.background ?? '').isEmpty) ...[
+                // Single button when no background (full width)
+                _TactileRow(
+                  onTap: () => _pickBackground(context, a),
+                  pressedScale: 0.98,
+                  builder: (pressed) {
+                    final bg = context.appColors.surfaceFill;
+                    final overlay = cs.onSurface.withValues(
+                      alpha: isDark ? 0.06 : 0.05,
+                    );
+                    final pressedBg = Color.alphaBlend(overlay, bg);
+                    final iconColor = cs.onSurface.withValues(alpha: 0.75);
+                    final textColor = cs.onSurface.withValues(alpha: 0.9);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOutCubic,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: pressed ? pressedBg : bg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: cs.outlineVariant.withValues(alpha: 0.35),
                         ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              left: 2.0,
+                            ), // Material icon spacing
+                            child: Icon(
+                              Icons.image,
+                              size: 18,
+                              color: iconColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            l10n.assistantEditChooseImageButton,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: AppFontWeights.semibold,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ] else ...[
+                // Two buttons when background exists
+                Row(
+                  children: [
+                    Expanded(
+                      child: _IosButton(
+                        label: l10n.assistantEditChooseImageButton,
+                        icon: Icons.image,
+                        onTap: () => _pickBackground(context, a),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _IosButton(
+                        label: l10n.assistantEditClearButton,
+                        icon: Lucide.X,
+                        onTap: () => context
+                            .read<AssistantProvider>()
+                            .updateAssistant(a.copyWith(clearBackground: true)),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.assistantEditChatBackgroundDescription,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: cs.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                if ((a.background ?? '').isEmpty) ...[
-                  // Single button when no background (full width)
-                  _TactileRow(
-                    onTap: () => _pickBackground(context, a),
-                    pressedScale: 0.98,
-                    builder: (pressed) {
-                      final bg = context.appColors.surfaceFill;
-                      final overlay = cs.onSurface.withValues(
-                        alpha: isDark ? 0.06 : 0.05,
-                      );
-                      final pressedBg = Color.alphaBlend(overlay, bg);
-                      final iconColor = cs.onSurface.withValues(alpha: 0.75);
-                      final textColor = cs.onSurface.withValues(alpha: 0.9);
-                      return AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: pressed ? pressedBg : bg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: cs.outlineVariant.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 2.0,
-                              ), // Material icon spacing
-                              child: Icon(
-                                Icons.image,
-                                size: 18,
-                                color: iconColor,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              l10n.assistantEditChooseImageButton,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: AppFontWeights.semibold,
-                                color: textColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                ] else ...[
-                  // Two buttons when background exists
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _IosButton(
-                          label: l10n.assistantEditChooseImageButton,
-                          icon: Icons.image,
-                          onTap: () => _pickBackground(context, a),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _IosButton(
-                          label: l10n.assistantEditClearButton,
-                          icon: Lucide.X,
-                          onTap: () =>
-                              context.read<AssistantProvider>().updateAssistant(
-                                a.copyWith(clearBackground: true),
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              ],
               if ((a.background ?? '').isNotEmpty) ...[
                 const SizedBox(height: 12),
                 ClipRRect(

@@ -463,7 +463,8 @@ more text
       final provider = image.image;
       final network = provider is NetworkImage
           ? provider
-          : provider is SafeResizeImage && provider.imageProvider is NetworkImage
+          : provider is SafeResizeImage &&
+                provider.imageProvider is NetworkImage
           ? provider.imageProvider as NetworkImage
           : provider is ResizeImage && provider.imageProvider is NetworkImage
           ? provider.imageProvider as NetworkImage
@@ -802,7 +803,9 @@ more text
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      final detailImages = tester.widgetList<Image>(find.byType(Image)).toList();
+      final detailImages = tester
+          .widgetList<Image>(find.byType(Image))
+          .toList();
       expect(
         detailImages.any(
           (image) =>
@@ -811,10 +814,7 @@ more text
         ),
         isTrue,
       );
-      expect(
-        detailImages.any((image) => _resizeOf(image) != null),
-        isTrue,
-      );
+      expect(detailImages.any((image) => _resizeOf(image) != null), isTrue);
     },
   );
 

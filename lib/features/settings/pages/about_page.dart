@@ -555,7 +555,6 @@ class _AboutPageState extends State<AboutPage> {
 
 // --- iOS-style helpers (mirroring Settings/Display pages) ---
 
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

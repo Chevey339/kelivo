@@ -284,7 +284,10 @@ void main() {
           throwsA(isA<BackupCancelledException>()),
         );
 
-        expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
+        expect(
+          await RestoreStartupGate.inspect(appDataDirectory: root),
+          isNull,
+        );
         final workspaceRoot = Directory(
           p.join(root.path, RestoreWorkspaceLock.workspaceRootName),
         );

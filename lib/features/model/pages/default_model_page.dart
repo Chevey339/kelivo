@@ -886,10 +886,7 @@ class _ModelCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: baseBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.appColors.hairline,
-          width: 0.6,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
       ),
       child: Padding(
         padding: const EdgeInsets.all(14),

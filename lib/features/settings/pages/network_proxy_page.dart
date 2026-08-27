@@ -537,7 +537,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-
 Widget _labeledField(
   BuildContext context, {
   required String label,

@@ -487,78 +487,78 @@ void main() {
       await expectLater(future, throwsA(isA<BackupCancelledException>()));
     });
 
-    test('listObjects cancel closes the client and reports listingRemote', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
-      server.listen((_) {});
-
-      final token = BackupCancelToken();
-      addTearDown(token.dispose);
-      final phases = <BackupPhase>[];
-      final future = const S3BackupClient().listObjects(
-        _config(server),
-        onProgress: (progress) => phases.add(progress.phase),
-        cancelToken: token,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 40));
-      token.cancel();
-
-      await expectLater(future, throwsA(isA<BackupCancelledException>()));
-      expect(phases, contains(BackupPhase.listingRemote));
-    });
-
     test(
-      'uploadFile marks manifest upsert as non-cancellable',
+      'listObjects cancel closes the client and reports listingRemote',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() async {
           await server.close(force: true);
         });
-        server.listen((request) async {
-          if (request.method == 'GET' &&
-              request.uri.path ==
-                  '/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json') {
-            request.response.statusCode = HttpStatus.notFound;
-            request.response.headers.contentType = ContentType(
-              'application',
-              'xml',
-              charset: 'utf-8',
-            );
-            request.response.write(_noSuchKeyXml());
-          } else if (request.method == 'PUT') {
-            await request.drain<void>();
-            request.response.statusCode = HttpStatus.ok;
-          } else {
-            request.response.statusCode = HttpStatus.notFound;
-          }
-          await request.response.close();
-        });
+        server.listen((_) {});
 
-        final tmpDir = await Directory.systemTemp.createTemp(
-          'kelivo_s3_manifest_progress_',
-        );
-        addTearDown(() async {
-          if (await tmpDir.exists()) {
-            await tmpDir.delete(recursive: true);
-          }
-        });
-        final file = File('${tmpDir.path}/demo.zip');
-        await file.writeAsBytes([1, 2, 3]);
-        final events = <BackupProgress>[];
-
-        await const S3BackupClient().uploadFile(
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        final phases = <BackupPhase>[];
+        final future = const S3BackupClient().listObjects(
           _config(server),
-          key: 'kelivo_backups/demo.zip',
-          file: file,
-          onProgress: events.add,
+          onProgress: (progress) => phases.add(progress.phase),
+          cancelToken: token,
         );
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+        token.cancel();
 
-        expect(events.where((event) => !event.cancellable), isNotEmpty);
-        expect(events.last.cancellable, isFalse);
+        await expectLater(future, throwsA(isA<BackupCancelledException>()));
+        expect(phases, contains(BackupPhase.listingRemote));
       },
     );
+
+    test('uploadFile marks manifest upsert as non-cancellable', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        if (request.method == 'GET' &&
+            request.uri.path ==
+                '/backup-bucket/kelivo_backups/.kelivo_backups_manifest.json') {
+          request.response.statusCode = HttpStatus.notFound;
+          request.response.headers.contentType = ContentType(
+            'application',
+            'xml',
+            charset: 'utf-8',
+          );
+          request.response.write(_noSuchKeyXml());
+        } else if (request.method == 'PUT') {
+          await request.drain<void>();
+          request.response.statusCode = HttpStatus.ok;
+        } else {
+          request.response.statusCode = HttpStatus.notFound;
+        }
+        await request.response.close();
+      });
+
+      final tmpDir = await Directory.systemTemp.createTemp(
+        'kelivo_s3_manifest_progress_',
+      );
+      addTearDown(() async {
+        if (await tmpDir.exists()) {
+          await tmpDir.delete(recursive: true);
+        }
+      });
+      final file = File('${tmpDir.path}/demo.zip');
+      await file.writeAsBytes([1, 2, 3]);
+      final events = <BackupProgress>[];
+
+      await const S3BackupClient().uploadFile(
+        _config(server),
+        key: 'kelivo_backups/demo.zip',
+        file: file,
+        onProgress: events.add,
+      );
+
+      expect(events.where((event) => !event.cancellable), isNotEmpty);
+      expect(events.last.cancellable, isFalse);
+    });
 
     test('uploadFile writes manifest object after upload', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -927,51 +927,54 @@ void main() {
       );
     });
 
-    test('cancels streamed upload while the response body is stalled', () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      addTearDown(() async {
-        await server.close(force: true);
-      });
-      final putStarted = Completer<void>();
-      server.listen((request) async {
-        if (request.method == 'PUT' &&
-            request.uri.path.endsWith('/stall.zip')) {
-          await request.drain<void>();
-          request.response.statusCode = HttpStatus.ok;
-          request.response.contentLength = 1024 * 1024;
-          putStarted.complete();
-          return;
-        }
-        if (request.method == 'DELETE') {
-          request.response.statusCode = HttpStatus.noContent;
+    test(
+      'cancels streamed upload while the response body is stalled',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+        final putStarted = Completer<void>();
+        server.listen((request) async {
+          if (request.method == 'PUT' &&
+              request.uri.path.endsWith('/stall.zip')) {
+            await request.drain<void>();
+            request.response.statusCode = HttpStatus.ok;
+            request.response.contentLength = 1024 * 1024;
+            putStarted.complete();
+            return;
+          }
+          if (request.method == 'DELETE') {
+            request.response.statusCode = HttpStatus.noContent;
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.notFound;
           await request.response.close();
-          return;
-        }
-        request.response.statusCode = HttpStatus.notFound;
-        await request.response.close();
-      });
+        });
 
-      final tmpDir = await Directory.systemTemp.createTemp(
-        'kelivo_s3_stall_upload_',
-      );
-      addTearDown(() async {
-        if (await tmpDir.exists()) await tmpDir.delete(recursive: true);
-      });
-      final file = File('${tmpDir.path}/stall.zip');
-      await file.writeAsBytes(List<int>.filled(64 * 1024, 9));
-      final token = BackupCancelToken();
-      addTearDown(token.dispose);
+        final tmpDir = await Directory.systemTemp.createTemp(
+          'kelivo_s3_stall_upload_',
+        );
+        addTearDown(() async {
+          if (await tmpDir.exists()) await tmpDir.delete(recursive: true);
+        });
+        final file = File('${tmpDir.path}/stall.zip');
+        await file.writeAsBytes(List<int>.filled(64 * 1024, 9));
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
 
-      final future = const S3BackupClient().uploadFile(
-        _config(server),
-        key: 'kelivo_backups/stall.zip',
-        file: file,
-        cancelToken: token,
-      );
-      await putStarted.future.timeout(const Duration(seconds: 5));
-      token.cancel();
+        final future = const S3BackupClient().uploadFile(
+          _config(server),
+          key: 'kelivo_backups/stall.zip',
+          file: file,
+          cancelToken: token,
+        );
+        await putStarted.future.timeout(const Duration(seconds: 5));
+        token.cancel();
 
-      await expectLater(future, throwsA(isA<BackupCancelledException>()));
-    });
+        await expectLater(future, throwsA(isA<BackupCancelledException>()));
+      },
+    );
   });
 }

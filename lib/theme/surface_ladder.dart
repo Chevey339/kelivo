@@ -20,7 +20,10 @@ Color atTone(Color base, double tone) {
 
 /// Interpolate HCT tone from [from] toward [to], keeping [from]'s hue+chroma.
 Color lerpTone(Color from, Color to, double t) {
-  return atTone(from, surfaceTone(from) + (surfaceTone(to) - surfaceTone(from)) * t);
+  return atTone(
+    from,
+    surfaceTone(from) + (surfaceTone(to) - surfaceTone(from)) * t,
+  );
 }
 
 /// Palette-declared `surface` is the card. The page is that color sunk 4 tones
@@ -91,9 +94,7 @@ class SurfaceLadder {
       card = shiftTone(page, 11.0);
     } else {
       final headroom = 100.0 - surfaceTone(page);
-      card = headroom >= 4.5
-          ? shiftTone(page, 4.0)
-          : shiftTone(page, -3.5);
+      card = headroom >= 4.5 ? shiftTone(page, 4.0) : shiftTone(page, -3.5);
     }
 
     final surfaceCardFill = shiftTone(card, dark ? 9.0 : -3.2);

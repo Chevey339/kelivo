@@ -1170,7 +1170,6 @@ class _DisplaySettingsPageState extends State<DisplaySettingsPage> {
 
 // --- iOS-style helpers ---
 
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

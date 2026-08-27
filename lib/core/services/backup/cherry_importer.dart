@@ -66,19 +66,20 @@ class CherryImporter {
     }
     late final _CherryParsedBackup parsed;
     try {
-      parsed = await runBackupIsolate<_CherryParsedBackup, _CherryParseIsolateArgs>(
-        body: _parseCherryBackupInIsolate,
-        payload: _CherryParseIsolateArgs(
-          path: file.path,
-          merge: mode == RestoreMode.merge,
-          existingConvIds: existingConvIds,
-          existingMsgIds: existingMsgIds,
-          debugSpeculativeJsonProbeBytes: debugSpeculativeJsonProbeBytes,
-          debugIdentifiedArchiveJsonBytes: debugIdentifiedArchiveJsonBytes,
-        ),
-        onProgress: onProgress,
-        cancelToken: cancelToken,
-      );
+      parsed =
+          await runBackupIsolate<_CherryParsedBackup, _CherryParseIsolateArgs>(
+            body: _parseCherryBackupInIsolate,
+            payload: _CherryParseIsolateArgs(
+              path: file.path,
+              merge: mode == RestoreMode.merge,
+              existingConvIds: existingConvIds,
+              existingMsgIds: existingMsgIds,
+              debugSpeculativeJsonProbeBytes: debugSpeculativeJsonProbeBytes,
+              debugIdentifiedArchiveJsonBytes: debugIdentifiedArchiveJsonBytes,
+            ),
+            onProgress: onProgress,
+            cancelToken: cancelToken,
+          );
       debugZipJsonProbeDecodeCount = parsed.debugZipJsonProbeDecodeCount;
     } on CherryUnsupportedBackupVersionException catch (error) {
       debugZipJsonProbeDecodeCount = error.debugZipJsonProbeDecodeCount;
@@ -493,8 +494,7 @@ class CherryImporter {
       }
     }
 
-    final pendingAttachmentsByMessage =
-        <String, List<_PendingAttachmentRef>>{};
+    final pendingAttachmentsByMessage = <String, List<_PendingAttachmentRef>>{};
     for (final b in cherryMessageBlocks) {
       ctx.throwIfCancelled();
       if (b is! Map) continue;
@@ -1429,7 +1429,9 @@ class CherryImporter {
             final s = (item ?? '').toString();
             if (s.isEmpty) continue;
             if (s.startsWith('data:image')) {
-              pendingWrites.add(_PendingAttachmentRef(dataUrl: s, isImage: true));
+              pendingWrites.add(
+                _PendingAttachmentRef(dataUrl: s, isImage: true),
+              );
             } else if (s.startsWith('http://') || s.startsWith('https://')) {
               pendingWrites.add(
                 _PendingAttachmentRef(url: s, name: 'image', mime: 'image/png'),
@@ -1545,8 +1547,7 @@ class CherryImporter {
   ) async {
     final fileName = ref.name ?? (ref.isImage ? 'image' : 'file');
     final fileMime =
-        ref.mime ??
-        (ref.isImage ? 'image/png' : 'application/octet-stream');
+        ref.mime ?? (ref.isImage ? 'image/png' : 'application/octet-stream');
 
     if (ref.dataUrl != null) {
       final savedPath = await _saveDataUrlToUpload(ref.dataUrl!);

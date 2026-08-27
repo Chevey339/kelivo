@@ -81,7 +81,6 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
     );
   }
 
-
   Widget _rowDivider(BuildContext context) => Divider(
     height: 1,
     thickness: 0.5,

@@ -76,9 +76,7 @@ class ChatboxImporter {
           await ChatboxBackupArchive.looksLikeZipFile(file);
       String? resourceDestDir;
       if (treatAsZip) {
-        staging = await Directory.systemTemp.createTemp(
-          'kelivo_chatbox_res_',
-        );
+        staging = await Directory.systemTemp.createTemp('kelivo_chatbox_res_');
         DataSync.registerLiveTempPath(staging.path);
         final upload = await AppDirectories.getUploadDirectory();
         resourceDestDir = p.join(upload.path, 'chatbox');
@@ -93,21 +91,25 @@ class ChatboxImporter {
         }
       }
 
-      final prepared = await runBackupIsolate<_ChatboxPreparedImport, _ChatboxImportIsolateArgs>(
-        body: _prepareChatboxImportInIsolate,
-        payload: _ChatboxImportIsolateArgs(
-          path: file.path,
-          isZip: treatAsZip,
-          stagingPath: staging?.path,
-          resourceDestDir: resourceDestDir,
-          overwrite: mode == RestoreMode.overwrite,
-          merge: mode == RestoreMode.merge,
-          existingConvIds: existingConvIds,
-          existingMsgIds: existingMsgIds,
-        ),
-        onProgress: onProgress,
-        cancelToken: cancelToken,
-      );
+      final prepared =
+          await runBackupIsolate<
+            _ChatboxPreparedImport,
+            _ChatboxImportIsolateArgs
+          >(
+            body: _prepareChatboxImportInIsolate,
+            payload: _ChatboxImportIsolateArgs(
+              path: file.path,
+              isZip: treatAsZip,
+              stagingPath: staging?.path,
+              resourceDestDir: resourceDestDir,
+              overwrite: mode == RestoreMode.overwrite,
+              merge: mode == RestoreMode.merge,
+              existingConvIds: existingConvIds,
+              existingMsgIds: existingMsgIds,
+            ),
+            onProgress: onProgress,
+            cancelToken: cancelToken,
+          );
       archive = prepared.archive;
       final assistantConvRes = prepared.plan;
       final importedProviders = assistantConvRes.providers;
@@ -573,132 +575,130 @@ class ChatboxImporter {
             cancellable: true,
           ),
         );
-          if (rawMsg is! Map) continue;
-          final msg = rawMsg.map((k, v) => MapEntry(k.toString(), v));
-          final msgId = (msg['id'] ?? '').toString();
-          if (msgId.isEmpty) continue;
-          if (args.merge && existingMsgIds.contains(msgId)) {
+        if (rawMsg is! Map) continue;
+        final msg = rawMsg.map((k, v) => MapEntry(k.toString(), v));
+        final msgId = (msg['id'] ?? '').toString();
+        if (msgId.isEmpty) continue;
+        if (args.merge && existingMsgIds.contains(msgId)) {
+          continue;
+        }
+
+        final roleRaw = (msg['role'] ?? '').toString();
+        final parts = _extractMessageParts(msg, roleHint: roleRaw);
+        final content = _textFromParts(parts);
+
+        // System message: first one becomes assistant prompt, others become assistant-visible note.
+        if (roleRaw == 'system') {
+          if (!consumedSystem && content.trim().isNotEmpty) {
+            consumedSystem = true;
             continue;
           }
-
-          final roleRaw = (msg['role'] ?? '').toString();
-          final parts = _extractMessageParts(msg, roleHint: roleRaw);
-          final content = _textFromParts(parts);
-
-          // System message: first one becomes assistant prompt, others become assistant-visible note.
-          if (roleRaw == 'system') {
-            if (!consumedSystem && content.trim().isNotEmpty) {
-              consumedSystem = true;
-              continue;
-            }
-          }
-
-          final role = switch (roleRaw) {
-            'user' => 'user',
-            'tool' => 'tool',
-            _ => 'assistant',
-          };
-
-          final ts =
-              _parseMessageTimestamp(msg['timestamp']) ??
-              exportedAt.add(Duration(milliseconds: fallbackIndex++));
-
-          if (role == 'tool') {
-            // Keep tool-result JSON in a TextPart for tool semantics, but do not
-            // drop ImagePart/FilePart attachments extracted from contentParts.
-            final toolPayload = _buildToolMessagePayload(
-              msg,
-              fallbackText: content,
-            );
-            final attachmentParts = parts
-                .where((part) => part is ImagePart || part is FilePart)
-                .toList(growable: false);
-            messages.add(
-              ChatMessage(
-                id: msgId,
-                role: 'tool',
-                parts: <MessagePart>[TextPart(toolPayload), ...attachmentParts],
-                timestamp: ts,
-                modelId: null,
-                providerId: null,
-                totalTokens: null,
-                conversationId: tid,
-              ),
-            );
-          } else {
-            final inferredModel = _inferModelIdFromChatboxMessage(msg);
-            final providerId = (msg['aiProvider'] ?? '').toString().trim();
-            final totalTokens =
-                (msg['tokenCount'] as num?)?.toInt() ??
-                (msg['tokensUsed'] as num?)?.toInt();
-            final messageParts = roleRaw == 'system'
-                ? <MessagePart>[
-                    TextPart(
-                      content.isEmpty ? '[System]' : '[System]\n$content',
-                    ),
-                    ...parts.where((part) => part is! TextPart),
-                  ]
-                : parts;
-            final reasoningTexts = messageParts
-                .whereType<ReasoningPart>()
-                .map((part) => part.text)
-                .where((text) => text.trim().isNotEmpty)
-                .toList(growable: false);
-            final reasoningText = reasoningTexts.isEmpty
-                ? null
-                : reasoningTexts.join('\n');
-            messages.add(
-              ChatMessage(
-                id: msgId,
-                role: roleRaw == 'system' ? 'assistant' : role,
-                parts: messageParts.isEmpty
-                    ? const <MessagePart>[TextPart('')]
-                    : messageParts,
-                timestamp: ts,
-                modelId: inferredModel.isNotEmpty ? inferredModel : null,
-                providerId: providerId.isNotEmpty ? providerId : null,
-                totalTokens: totalTokens,
-                conversationId: tid,
-                reasoningText: reasoningText,
-              ),
-            );
-          }
         }
 
-        // Determine timestamps
-        DateTime createdAt = exportedAt;
-        DateTime updatedAt = exportedAt;
-        if (messages.isNotEmpty) {
-          final times = messages.map((m) => m.timestamp).toList()..sort();
-          createdAt = times.first;
-          updatedAt = times.last;
+        final role = switch (roleRaw) {
+          'user' => 'user',
+          'tool' => 'tool',
+          _ => 'assistant',
+        };
+
+        final ts =
+            _parseMessageTimestamp(msg['timestamp']) ??
+            exportedAt.add(Duration(milliseconds: fallbackIndex++));
+
+        if (role == 'tool') {
+          // Keep tool-result JSON in a TextPart for tool semantics, but do not
+          // drop ImagePart/FilePart attachments extracted from contentParts.
+          final toolPayload = _buildToolMessagePayload(
+            msg,
+            fallbackText: content,
+          );
+          final attachmentParts = parts
+              .where((part) => part is ImagePart || part is FilePart)
+              .toList(growable: false);
+          messages.add(
+            ChatMessage(
+              id: msgId,
+              role: 'tool',
+              parts: <MessagePart>[TextPart(toolPayload), ...attachmentParts],
+              timestamp: ts,
+              modelId: null,
+              providerId: null,
+              totalTokens: null,
+              conversationId: tid,
+            ),
+          );
         } else {
-          // Thread createdAt can be a number (ms)
-          final createdRaw = t['createdAt'];
-          final created = _parseEpochMillis(createdRaw);
-          if (created != null) {
-            createdAt = created;
-            updatedAt = created;
-          }
+          final inferredModel = _inferModelIdFromChatboxMessage(msg);
+          final providerId = (msg['aiProvider'] ?? '').toString().trim();
+          final totalTokens =
+              (msg['tokenCount'] as num?)?.toInt() ??
+              (msg['tokensUsed'] as num?)?.toInt();
+          final messageParts = roleRaw == 'system'
+              ? <MessagePart>[
+                  TextPart(content.isEmpty ? '[System]' : '[System]\n$content'),
+                  ...parts.where((part) => part is! TextPart),
+                ]
+              : parts;
+          final reasoningTexts = messageParts
+              .whereType<ReasoningPart>()
+              .map((part) => part.text)
+              .where((text) => text.trim().isNotEmpty)
+              .toList(growable: false);
+          final reasoningText = reasoningTexts.isEmpty
+              ? null
+              : reasoningTexts.join('\n');
+          messages.add(
+            ChatMessage(
+              id: msgId,
+              role: roleRaw == 'system' ? 'assistant' : role,
+              parts: messageParts.isEmpty
+                  ? const <MessagePart>[TextPart('')]
+                  : messageParts,
+              timestamp: ts,
+              modelId: inferredModel.isNotEmpty ? inferredModel : null,
+              providerId: providerId.isNotEmpty ? providerId : null,
+              totalTokens: totalTokens,
+              conversationId: tid,
+              reasoningText: reasoningText,
+            ),
+          );
         }
+      }
 
-        final conv = Conversation(
-          id: tid,
-          title: title,
-          createdAt: createdAt,
-          updatedAt: updatedAt,
-          isPinned: starred,
-          assistantId: id,
-        );
-
-        if (args.merge && existingConvIds.contains(tid)) {
-          messagesToAppend.putIfAbsent(tid, () => []).addAll(messages);
-          msgCount += messages.length;
-        } else {
-          conversationBatches.add((conversation: conv, messages: messages));
-          convCount += 1;
-          msgCount += messages.length;
+      // Determine timestamps
+      DateTime createdAt = exportedAt;
+      DateTime updatedAt = exportedAt;
+      if (messages.isNotEmpty) {
+        final times = messages.map((m) => m.timestamp).toList()..sort();
+        createdAt = times.first;
+        updatedAt = times.last;
+      } else {
+        // Thread createdAt can be a number (ms)
+        final createdRaw = t['createdAt'];
+        final created = _parseEpochMillis(createdRaw);
+        if (created != null) {
+          createdAt = created;
+          updatedAt = created;
         }
+      }
+
+      final conv = Conversation(
+        id: tid,
+        title: title,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+        isPinned: starred,
+        assistantId: id,
+      );
+
+      if (args.merge && existingConvIds.contains(tid)) {
+        messagesToAppend.putIfAbsent(tid, () => []).addAll(messages);
+        msgCount += messages.length;
+      } else {
+        conversationBatches.add((conversation: conv, messages: messages));
+        convCount += 1;
+        msgCount += messages.length;
+      }
     }
 
     _addCopilotAssistants(

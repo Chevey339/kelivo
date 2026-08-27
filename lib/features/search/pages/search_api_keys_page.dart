@@ -330,7 +330,6 @@ class _SearchApiKeysPageState extends State<SearchApiKeysPage> {
   }
 }
 
-
 class _PageIconButton extends StatefulWidget {
   const _PageIconButton({
     required this.icon,

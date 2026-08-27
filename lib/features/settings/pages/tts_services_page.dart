@@ -354,7 +354,6 @@ class _AnimatedPressColor extends StatelessWidget {
   }
 }
 
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

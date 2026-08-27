@@ -856,7 +856,6 @@ class _DesktopMcpEditDialogState extends State<_DesktopMcpEditDialog>
       ],
     );
   }
-
 }
 
 class _HeaderEntry {

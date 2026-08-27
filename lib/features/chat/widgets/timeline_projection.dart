@@ -262,9 +262,7 @@ TimelineToolRef? parseTimelineToolPayload(
     final args = decoded['arguments'];
     final content = decoded['content']?.toString();
     final rawMeta = decoded['metadata'];
-    final metadata = rawMeta is Map
-        ? Map<String, dynamic>.from(rawMeta)
-        : null;
+    final metadata = rawMeta is Map ? Map<String, dynamic>.from(rawMeta) : null;
     final arguments = args is Map
         ? args.cast<String, dynamic>()
         : const <String, dynamic>{};

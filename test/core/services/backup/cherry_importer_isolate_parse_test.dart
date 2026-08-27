@@ -96,7 +96,10 @@ Map<String, dynamic> _largeCherryRoot({
                 'contextCount': 5,
                 'streamOutput': true,
               },
-              'model': <String, dynamic>{'provider': 'openai', 'id': 'gpt-test'},
+              'model': <String, dynamic>{
+                'provider': 'openai',
+                'id': 'gpt-test',
+              },
             },
           ],
         }),
@@ -160,9 +163,7 @@ void main() {
     () async {
       final backup = await File('${root.path}/cherry_msg_progress.bak')
           .writeAsString(
-            jsonEncode(
-              _largeCherryRoot(topics: 1, messagesPerTopic: 5),
-            ),
+            jsonEncode(_largeCherryRoot(topics: 1, messagesPerTopic: 5)),
             flush: true,
           );
       final events = <BackupProgress>[];
@@ -193,38 +194,40 @@ void main() {
     },
   );
 
-  test('Cherry parse progress is monotonic and does not regress phases', () async {
-    final backup = await File('${root.path}/cherry.bak').writeAsString(
-      jsonEncode(_largeCherryRoot(topics: 3, messagesPerTopic: 3)),
-      flush: true,
-    );
-    final events = <BackupProgress>[];
+  test(
+    'Cherry parse progress is monotonic and does not regress phases',
+    () async {
+      final backup = await File('${root.path}/cherry.bak').writeAsString(
+        jsonEncode(_largeCherryRoot(topics: 3, messagesPerTopic: 3)),
+        flush: true,
+      );
+      final events = <BackupProgress>[];
 
-    await CherryImporter.importFromCherryStudio(
-      file: backup,
-      mode: RestoreMode.overwrite,
-      businessRepository: businessRepository,
-      chatService: chatService,
-      onProgress: events.add,
-    );
+      await CherryImporter.importFromCherryStudio(
+        file: backup,
+        mode: RestoreMode.overwrite,
+        businessRepository: businessRepository,
+        chatService: chatService,
+        onProgress: events.add,
+      );
 
-    _expectMonotonicProgress(events);
-    expect(
-      events.map((event) => event.phase),
-      containsAllInOrder([
-        BackupPhase.importingSessions,
-        BackupPhase.importingMessages,
-      ]),
-    );
-  });
+      _expectMonotonicProgress(events);
+      expect(
+        events.map((event) => event.phase),
+        containsAllInOrder([
+          BackupPhase.importingSessions,
+          BackupPhase.importingMessages,
+        ]),
+      );
+    },
+  );
 
   test(
     'cancels Cherry body parse from the calling isolate while work continues',
     () async {
-      final backup = await File('${root.path}/cherry.bak').writeAsString(
-        jsonEncode(_largeCherryRoot()),
-        flush: true,
-      );
+      final backup = await File(
+        '${root.path}/cherry.bak',
+      ).writeAsString(jsonEncode(_largeCherryRoot()), flush: true);
       final token = BackupCancelToken();
       addTearDown(token.dispose);
       final phases = <BackupPhase>[];

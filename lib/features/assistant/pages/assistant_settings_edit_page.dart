@@ -460,10 +460,7 @@ class _AssistantOutlineHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: context.appColors.hairline,
-          width: 0.7,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.7),
       ),
       child: Column(
         children: [
@@ -1162,7 +1159,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
     );
   }
 }
-
 
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;

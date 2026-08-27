@@ -45,7 +45,9 @@ class TaskProgressDialogCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final showCancel =
-        outcome == TaskProgressOutcome.running && cancellable && onCancel != null;
+        outcome == TaskProgressOutcome.running &&
+        cancellable &&
+        onCancel != null;
     final showAck = outcome == TaskProgressOutcome.failure;
     final resolvedFraction = switch (outcome) {
       TaskProgressOutcome.success => 1.0,
@@ -82,8 +84,7 @@ class TaskProgressDialogCard extends StatelessWidget {
                     leadingIcon,
                     size: 18,
                     color: switch (outcome) {
-                      TaskProgressOutcome.success =>
-                        context.appColors.success,
+                      TaskProgressOutcome.success => context.appColors.success,
                       TaskProgressOutcome.failure => cs.error,
                       TaskProgressOutcome.running => cs.onSurface,
                     },
@@ -110,17 +111,15 @@ class TaskProgressDialogCard extends StatelessWidget {
                 Expanded(
                   child: AnimatedTextSwap(
                     text: phaseLabel,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurfaceVariant,
-                    ),
+                    style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
                   ),
                 ),
                 if (resolvedFraction == null)
                   const CupertinoActivityIndicator(radius: 8)
                 else
                   ThrottledProgressLabel(
-                    text: '${((resolvedFraction.clamp(0.0, 1.0)) * 100).round()}%',
+                    text:
+                        '${((resolvedFraction.clamp(0.0, 1.0)) * 100).round()}%',
                     forceImmediate: resolvedFraction >= 1,
                     builder: (context, displayText) {
                       return ReelText(

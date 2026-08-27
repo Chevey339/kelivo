@@ -74,9 +74,7 @@ Future<double> _bubbleWidth(
         .width;
   }
   await tester.pumpAndSettle();
-  return tester
-      .getSize(find.byKey(ValueKey('assistant_${message.id}')))
-      .width;
+  return tester.getSize(find.byKey(ValueKey('assistant_${message.id}'))).width;
 }
 
 void main() {
@@ -94,11 +92,7 @@ void main() {
       fitContent: false,
       waiting: true,
     );
-    final hugging = await _bubbleWidth(
-      tester,
-      fitContent: true,
-      waiting: true,
-    );
+    final hugging = await _bubbleWidth(tester, fitContent: true, waiting: true);
     expect(hugging, lessThan(spanning));
   });
 }

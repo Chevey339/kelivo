@@ -279,7 +279,6 @@ int imageViewerDebugSizeListenerCount(State<ImageViewerPage> state) {
   return (state as _ImageViewerPageState).debugLiveImageSizeListenerCount;
 }
 
-
 class ImageViewerPage extends StatefulWidget {
   const ImageViewerPage({
     super.key,
@@ -554,7 +553,8 @@ class _ImageViewerPageState extends State<ImageViewerPage>
     }
   }
 
-  Size? _readImageSizeFromBytes(Uint8List bytes) => _readPngSizeFromBytes(bytes);
+  Size? _readImageSizeFromBytes(Uint8List bytes) =>
+      _readPngSizeFromBytes(bytes);
 
   void _removeImageSizeListener(String src, ImageStreamListener listener) {
     if (!identical(_imageSizeListeners[src], listener)) return;
@@ -1173,7 +1173,9 @@ class _ImageViewerPageState extends State<ImageViewerPage>
         if (idx != -1) {
           bytes = base64Decode(src.substring(idx + marker.length));
         }
-        final format = detectClipboardImageFormat(bytes: bytes ?? const <int>[]);
+        final format = detectClipboardImageFormat(
+          bytes: bytes ?? const <int>[],
+        );
         if (format.isNotEmpty) {
           suggestedName = 'image.${format == 'jpeg' ? 'jpg' : format}';
         }

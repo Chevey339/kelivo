@@ -144,11 +144,7 @@ Future<ExecutedClientTool> _executeClientTool(
   EmitToolCall call,
   ToolCallHandler onToolCall,
 ) async {
-  final raw = await onToolCall(
-    call.name,
-    call.arguments,
-    toolCallId: call.id,
-  );
+  final raw = await onToolCall(call.name, call.arguments, toolCallId: call.id);
   final parsed = ClientToolResult.fromHandler(raw);
   return ExecutedClientTool(
     call: call,

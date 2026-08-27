@@ -706,10 +706,7 @@ void main() {
         throwsA(isA<CherryUnsupportedBackupVersionException>()),
       );
       expect(CherryImporter.debugZipJsonProbeDecodeCount, 0);
-      expect(
-        CherryImporter.debugIdentifiedArchiveJsonBytes,
-        tinyIdentifiedCap,
-      );
+      expect(CherryImporter.debugIdentifiedArchiveJsonBytes, tinyIdentifiedCap);
     });
 
     test(
@@ -1461,7 +1458,10 @@ void main() {
       );
 
       expect(CherryImporter.debugPendingWriteAccessCount, messageCount);
-      expect(await chatService.loadMessages('topic-many'), hasLength(messageCount));
+      expect(
+        await chatService.loadMessages('topic-many'),
+        hasLength(messageCount),
+      );
     });
 
     test('extensionless image URL with image MIME becomes ImagePart', () async {

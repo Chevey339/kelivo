@@ -309,18 +309,18 @@ void main() {
       final streamResult = streamed.whereType<ToolCallResult>().single;
       expect(streamResult.output, markdown);
       expect(streamResult.output, isNot(contains('"kelivo"')));
-      expect(
-        mcpResultImageUris(readMcpResultMetadata(streamResult.metadata)),
-        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
-      );
+      expect(mcpResultImageUris(readMcpResultMetadata(streamResult.metadata)), [
+        'https://cdn.example.com/a.png',
+        'https://cdn.example.com/b.png',
+      ]);
       expect(streamResult.metadata!['anthropic'], 'keep');
 
       expect(appended, isNotNull);
       expect(appended!.content, markdown);
-      expect(
-        mcpResultImageUris(readMcpResultMetadata(appended!.metadata)),
-        ['https://cdn.example.com/a.png', 'https://cdn.example.com/b.png'],
-      );
+      expect(mcpResultImageUris(readMcpResultMetadata(appended!.metadata)), [
+        'https://cdn.example.com/a.png',
+        'https://cdn.example.com/b.png',
+      ]);
     },
   );
 }

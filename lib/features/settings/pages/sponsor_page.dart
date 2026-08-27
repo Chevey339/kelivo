@@ -269,7 +269,6 @@ class _SponsorTile extends StatelessWidget {
 
 // --- iOS-style helpers (mirroring Settings/Display/About) ---
 
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

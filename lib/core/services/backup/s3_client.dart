@@ -432,8 +432,7 @@ class S3BackupClient {
       final streamed = await client.send(req);
       return await http.Response.fromStream(streamed);
     } catch (e) {
-      if (e is BackupCancelledException ||
-          cancelToken?.isCancelled == true) {
+      if (e is BackupCancelledException || cancelToken?.isCancelled == true) {
         throw const BackupCancelledException();
       }
       rethrow;

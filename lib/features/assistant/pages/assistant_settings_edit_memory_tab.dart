@@ -517,53 +517,53 @@ class _MemoryTabState extends State<_MemoryTab> {
                       radius: 14,
                       padding: const EdgeInsets.all(12),
                       child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              conv.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withValues(alpha: 0.6),
-                                fontWeight: AppFontWeights.medium,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            conv.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: cs.onSurface.withValues(alpha: 0.6),
+                              fontWeight: AppFontWeights.medium,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  conv.summary ?? '',
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 14),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    conv.summary ?? '',
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 14),
-                                  ),
+                              _TactileIconButton(
+                                icon: Lucide.Pencil,
+                                size: 18,
+                                color: cs.primary,
+                                onTap: () => _showEditSummarySheet(
+                                  context,
+                                  conv,
+                                  chatService,
                                 ),
-                                _TactileIconButton(
-                                  icon: Lucide.Pencil,
-                                  size: 18,
-                                  color: cs.primary,
-                                  onTap: () => _showEditSummarySheet(
-                                    context,
-                                    conv,
-                                    chatService,
-                                  ),
+                              ),
+                              _TactileIconButton(
+                                icon: Lucide.Trash2,
+                                size: 18,
+                                color: cs.error,
+                                onTap: () => _confirmDeleteSummary(
+                                  context,
+                                  conv.id,
+                                  chatService,
                                 ),
-                                _TactileIconButton(
-                                  icon: Lucide.Trash2,
-                                  size: 18,
-                                  color: cs.error,
-                                  onTap: () => _confirmDeleteSummary(
-                                    context,
-                                    conv.id,
-                                    chatService,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }).toList(),

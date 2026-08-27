@@ -2381,7 +2381,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(

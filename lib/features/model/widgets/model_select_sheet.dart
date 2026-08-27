@@ -929,7 +929,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 // Scrollable content
                 Expanded(
                   child: Container(
-                    color: context.appColors.surfaceCard, // Ensure background color continuity
+                    color: context
+                        .appColors
+                        .surfaceCard, // Ensure background color continuity
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _buildContent(context),
@@ -937,7 +939,9 @@ class _ModelSelectSheetState extends State<_ModelSelectSheet> {
                 ),
                 // Fixed bottom tabs
                 Container(
-                  color: context.appColors.surfaceCard, // Ensure background color continuity
+                  color: context
+                      .appColors
+                      .surfaceCard, // Ensure background color continuity
                   child: _buildBottomTabs(context),
                 ),
               ],
