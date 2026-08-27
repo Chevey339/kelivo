@@ -235,9 +235,10 @@ Stream<StreamChunk> sendClaudeStream(
   /// two: the client result has to be answered before the hosted one arrives,
   /// so the API closes the first response with the call still open and opens
   /// the next with its result. Each card kept the blocks of the response it
-  /// appeared in, so the turn is only whole again once they are stitched back
-  /// together in that order.
-  List<Map<String, dynamic>>? anthropicBlocksFromToolCallMetadata(
+  /// appeared in. The responses come back in hand-off order but stay apart:
+  /// the protocol replays each as its own assistant message, with the client
+  /// `tool_result` between them, so they must not be flattened into one.
+  List<List<Map<String, dynamic>>>? anthropicResponsesFromToolCallMetadata(
     List toolCalls,
   ) {
     final expectedIds = toolCalls
@@ -265,27 +266,46 @@ Stream<StreamChunk> sendClaudeStream(
     }
     if (responses.isEmpty) return null;
 
-    final merged = <Map<String, dynamic>>[];
-    final mergedKeys = <String>{};
+    final ordered = <List<Map<String, dynamic>>>[];
+    final seenBlocks = <String>{};
+    final callsSoFar = <String>{};
     for (final response in responsesInHandOffOrder(responses)) {
-      for (final block in response) {
-        if (mergedKeys.add(replayBlockKey(block))) merged.add(block);
+      // Only a response opening with the result of a call an earlier one left
+      // running is the far side of a hand-off. Anything else — a snapshot cut
+      // mid-stream, a card of the same response — is more of the same one.
+      final opener = response.first;
+      final continues =
+          (opener['type'] ?? '').toString().endsWith('_tool_result') &&
+          callsSoFar.contains((opener['tool_use_id'] ?? '').toString());
+      final blocks = [
+        for (final block in response)
+          if (seenBlocks.add(replayBlockKey(block))) block,
+      ];
+      callsSoFar.addAll(toolUseIdsInBlocks(blocks));
+      if (blocks.isEmpty) continue;
+      if (continues || ordered.isEmpty) {
+        ordered.add(blocks);
+      } else {
+        ordered.last.addAll(blocks);
       }
     }
-    if (expectedIds.isEmpty) return merged;
+    if (expectedIds.isEmpty) return ordered;
 
-    final presentIds = toolUseIdsInBlocks(merged);
-    if (presentIds.containsAll(expectedIds)) return merged;
+    final presentIds = toolUseIdsInBlocks([
+      for (final response in ordered) ...response,
+    ]);
+    if (presentIds.containsAll(expectedIds)) return ordered;
 
+    // A call the cards lost belongs to the response that opened the turn.
     for (final tc in toolCalls.whereType<Map>()) {
       final block = toolUseBlockFromToolCall(tc);
       if (block == null) continue;
       final id = (block['id'] ?? '').toString();
       if (presentIds.contains(id)) continue;
-      merged.add(block);
+      ordered.first.add(block);
       presentIds.add(id);
     }
-    return merged;
+    return ordered;
   }
 
   // Server tools replayed as their own blocks already carry their result; the
@@ -297,6 +317,11 @@ Stream<StreamChunk> sendClaudeStream(
   // the plain assistant message that follows repeats it — and with the `tool`
   // message suppressed above there is nothing left to separate the two.
   Map<String, dynamic>? replayedTurn;
+
+  // The later responses of a replayed turn. They open with the result of a
+  // hosted call the first response left running, which the API only produced
+  // after the client `tool_result`, so they are emitted once that has been.
+  final deferredResponses = <List<Map<String, dynamic>>>[];
 
   for (int i = 0; i < nonSystemMessages.length; i++) {
     final m = nonSystemMessages[i];
@@ -325,9 +350,23 @@ Stream<StreamChunk> sendClaudeStream(
           (m['content'] ?? '').toString(),
           skipImageParsing: skipImageParsing,
         );
-    final turn = replayedTurn;
+    var turn = replayedTurn;
     replayedTurn = null;
+    final answeredClientTools = pendingToolResults.isNotEmpty;
     flushPendingToolResults();
+    if (deferredResponses.isNotEmpty) {
+      final blocks = [for (final response in deferredResponses) ...response];
+      deferredResponses.clear();
+      if (answeredClientTools || turn == null) {
+        // Roles alternate, so the responses after the client result form one
+        // assistant message between it and whatever comes next.
+        turn = <String, dynamic>{'role': 'assistant', 'content': blocks};
+        initialMessages.add(turn);
+      } else {
+        // No client result in between: the split was only ever in the cards.
+        (turn['content'] as List).addAll(blocks);
+      }
+    }
 
     if (turn != null && foldsIntoReplayedTurn) {
       final blocks = (turn['content'] as List).cast<Map<String, dynamic>>();
@@ -356,12 +395,12 @@ Stream<StreamChunk> sendClaudeStream(
 
     if (role == 'assistant' && m['tool_calls'] is List) {
       final toolCalls = m['tool_calls'] as List;
-      final blocks =
-          anthropicBlocksFromToolCallMetadata(toolCalls) ??
-          <Map<String, dynamic>>[];
-      final hadReplayBlocks = blocks.isNotEmpty;
+      final responses =
+          anthropicResponsesFromToolCallMetadata(toolCalls) ??
+          <List<Map<String, dynamic>>>[];
+      final hadReplayBlocks = responses.isNotEmpty;
       final resolvedServerToolIds = <String>{};
-      for (final block in blocks) {
+      for (final block in responses.expand((response) => response)) {
         final type = (block['type'] ?? '').toString();
         if (type == 'server_tool_use') {
           final sid = (block['id'] ?? '').toString();
@@ -374,11 +413,18 @@ Stream<StreamChunk> sendClaudeStream(
       // stopped or dropped between the two — would replay as a call with no
       // output, which the API rejects. Drop the call; its `tool` message is
       // already suppressed by [replayedServerToolIds].
-      blocks.removeWhere(
-        (block) =>
-            block['type'] == 'server_tool_use' &&
-            !resolvedServerToolIds.contains((block['id'] ?? '').toString()),
-      );
+      for (final response in responses) {
+        response.removeWhere(
+          (block) =>
+              block['type'] == 'server_tool_use' &&
+              !resolvedServerToolIds.contains((block['id'] ?? '').toString()),
+        );
+      }
+      responses.removeWhere((response) => response.isEmpty);
+      final blocks = responses.isEmpty
+          ? <Map<String, dynamic>>[]
+          : responses.removeAt(0);
+      deferredResponses.addAll(responses);
       if (!hadReplayBlocks) {
         final text = (m['content'] ?? '').toString();
         if (text.trim().isNotEmpty && text.trim() != '\n\n') {
@@ -515,6 +561,28 @@ Stream<StreamChunk> sendClaudeStream(
       });
     } else {
       initialMessages.add({'role': role, 'content': raw});
+    }
+  }
+  // History cut off at the client result leaves the later responses with no
+  // place to go: replayed here they would prefill the answer, and a hosted
+  // call whose result is only in them would be an open call. Drop both and let
+  // the model run the tool again.
+  if (deferredResponses.isNotEmpty) {
+    final deferredResults = <String>{
+      for (final block in deferredResponses.expand((response) => response))
+        if ((block['type'] ?? '').toString().endsWith('_tool_result'))
+          (block['tool_use_id'] ?? '').toString(),
+    };
+    deferredResponses.clear();
+    final turn = replayedTurn;
+    if (turn != null) {
+      final blocks = (turn['content'] as List).cast<Map<String, dynamic>>();
+      blocks.removeWhere(
+        (block) =>
+            block['type'] == 'server_tool_use' &&
+            deferredResults.contains((block['id'] ?? '').toString()),
+      );
+      if (blocks.isEmpty) initialMessages.remove(turn);
     }
   }
   flushPendingToolResults();

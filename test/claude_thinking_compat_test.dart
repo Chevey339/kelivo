@@ -2177,20 +2177,112 @@ data: {"type":"message_stop"}
         );
 
         final messages = (body['messages'] as List).cast<Map>();
-        final assistant = (messages[1]['content'] as List).cast<Map>();
-        expect(assistant.map((block) => block['type']).toList(), [
+        // The protocol keeps the hand-off as three messages: the first
+        // response, the client result alone, then the response that opens
+        // with the hosted result.
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        final first = (messages[1]['content'] as List).cast<Map>();
+        expect(first.map((block) => block['type']).toList(), [
           'text',
           'server_tool_use',
           'tool_use',
+        ]);
+        final clientResult = (messages[2]['content'] as List).cast<Map>();
+        expect(clientResult.single['tool_use_id'], 'toolu_client');
+        final second = (messages[3]['content'] as List).cast<Map>();
+        expect(second.map((block) => block['type']).toList(), [
           'web_fetch_tool_result',
           'text',
         ]);
-        expect(
-          assistant[3]['tool_use_id'],
-          assistant[1]['id'],
-          reason: 'the hosted call and its result have to travel together',
+        expect(second.first['tool_use_id'], first[1]['id']);
+        expect(messages[4]['content'], '再说说');
+      },
+    );
+
+    test(
+      'a hand-off cut off at the client result drops the open hosted call',
+      () async {
+        // History truncated right after the client result: the second
+        // response can neither follow it (that would prefill the answer) nor
+        // be skipped while the first still holds the call it resolves.
+        const firstResponse = [
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_deferred',
+            'name': 'web_fetch',
+            'input': {'url': 'https://example.com'},
+          },
+          {
+            'type': 'tool_use',
+            'id': 'toolu_client',
+            'name': 'create_memory',
+            'input': {'content': 'test'},
+          },
+        ];
+        const secondResponse = [
+          {
+            'type': 'web_fetch_tool_result',
+            'tool_use_id': 'srvtoolu_deferred',
+            'content': {'type': 'web_fetch_result', 'url': 'https://e.com'},
+          },
+          {'type': 'text', 'text': '查到了。'},
+        ];
+        final body = await _captureClaudeRequestBody(
+          officialEndpoint: true,
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '看看这个页面'},
+            {
+              'role': 'assistant',
+              'content': '查到了。',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_deferred',
+                  'type': 'function',
+                  'function': {
+                    'name': 'web_fetch',
+                    'arguments': '{"url":"https://example.com"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': secondResponse},
+                  },
+                },
+                {
+                  'id': 'toolu_client',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': firstResponse},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_client',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+          ],
         );
-        // The client half still gets its own answer as the next user message.
+
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+        ]);
+        final assistant = (messages[1]['content'] as List).cast<Map>();
+        expect(assistant.map((block) => block['type']).toList(), ['tool_use']);
         final clientResult = (messages[2]['content'] as List).cast<Map>();
         expect(clientResult.single['tool_use_id'], 'toolu_client');
       },
