@@ -68,6 +68,7 @@ Stream<StreamChunk> sendClaudeStream(
   Map<String, String>? extraHeaders,
   Map<String, dynamic>? extraBody,
   bool stream = true,
+  bool builtInSearchOnly = false,
   bool skipImageParsing = false,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
@@ -566,7 +567,15 @@ Stream<StreamChunk> sendClaudeStream(
       }
     }
   }
-  final builtIns = builtInTools(config, modelId);
+  // Utility calls (title / summary generation) only want search injected; a
+  // hosted fetch or container run on one of those is both off-contract and
+  // billed.
+  final builtIns = builtInSearchOnly
+      ? builtInTools(
+          config,
+          modelId,
+        ).where((name) => name == BuiltInToolNames.search).toSet()
+      : builtInTools(config, modelId);
   if (builtIns.contains(BuiltInToolNames.search)) {
     Map<String, dynamic> ws = const <String, dynamic>{};
     try {
@@ -761,10 +770,26 @@ Stream<StreamChunk> sendClaudeStream(
                 'input': args,
               });
             }
+          } else if (type == 'server_tool_use' ||
+              type.endsWith('_tool_result')) {
+            // The hosted call and its result are the model's own turn: a
+            // continuation round that drops either is rejected.
+            try {
+              assistantBlocks.add(
+                Map<String, dynamic>.from(it.cast<String, dynamic>()),
+              );
+            } catch (_) {}
           }
         }
-        lastAssistantBlocks = assistantBlocks;
+        // The continuation round sends these, so they go through the same
+        // sanitising as replayed history; the metadata below stays whole.
+        lastAssistantBlocks = assistantBlocksForClaudeRequest(assistantBlocks);
         lastText = buf.toString();
+        if (toolUses.isEmpty) {
+          // A hosted tool that ran past the turn limit asks to be resumed,
+          // with no client tool to answer first.
+          pauseTurn = (obj['stop_reason'] ?? '').toString() == 'pause_turn';
+        }
         if (toolUses.isNotEmpty && onToolCall != null) {
           pendingCalls = [
             for (final e in toolUses.entries)

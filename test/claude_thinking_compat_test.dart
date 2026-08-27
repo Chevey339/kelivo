@@ -421,6 +421,7 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
   required String modelId,
   required ProviderConfig config,
   List<Map<String, dynamic>>? tools,
+  bool utilityCall = false,
 }) async {
   late Map<String, dynamic> requestBody;
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -452,6 +453,18 @@ Future<Map<String, dynamic>> _captureClaudeBuiltInSearchBody({
       (Uri.tryParse(config.baseUrl)?.host ?? '') == 'api.anthropic.com';
 
   Future<void> send(ProviderConfig cfg) async {
+    if (utilityCall) {
+      // Title / summary generation, which asks for search and nothing else.
+      expect(
+        await ChatApiService.generateText(
+          config: cfg,
+          modelId: modelId,
+          prompt: 'hello',
+        ),
+        'ok',
+      );
+      return;
+    }
     final chunks = await ChatApiService.sendMessageStream(
       config: cfg,
       modelId: modelId,
@@ -1046,6 +1059,115 @@ void main() {
       expect(tools.any((tool) => tool['name'] == 'web_fetch'), isFalse);
       expect(tools.any((tool) => tool['name'] == 'code_execution'), isTrue);
     });
+
+    test(
+      'a non-streaming pause_turn resumes with the hosted exchange intact',
+      () async {
+        final bodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+        server.listen((request) async {
+          bodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          // A hosted tool that outran the turn limit asks to be resumed, with
+          // no client tool to answer first.
+          final paused = bodies.length == 1;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode(<String, dynamic>{
+              'id': 'msg_${bodies.length}',
+              'stop_reason': paused ? 'pause_turn' : 'end_turn',
+              'content': paused
+                  ? const [
+                      {
+                        'type': 'server_tool_use',
+                        'id': 'srvtoolu_paused',
+                        'name': 'web_search',
+                        'input': {'query': '京都'},
+                      },
+                      {
+                        'type': 'web_search_tool_result',
+                        'tool_use_id': 'srvtoolu_paused',
+                        'content': [],
+                      },
+                    ]
+                  : const [
+                      {'type': 'text', 'text': 'ok'},
+                    ],
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            }),
+          );
+          await request.response.close();
+        });
+
+        final config = _claudeConfig(
+          'http://api.anthropic.com',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.search],
+            },
+          },
+        );
+        await HttpOverrides.runZoned(
+          () async {
+            expect(
+              await ChatApiService.generateText(
+                config: config,
+                modelId: 'claude-opus-4-7',
+                prompt: 'hello',
+              ),
+              'ok',
+            );
+          },
+          createHttpClient: (context) =>
+              _ProxyHttpOverrides(server.port).createHttpClient(context),
+        );
+
+        expect(bodies, hasLength(2), reason: 'the paused turn has to resume');
+        final resumed = (bodies[1]['messages'] as List).cast<Map>();
+        final assistant = (resumed.last['content'] as List).cast<Map>();
+        // Dropping either half of the exchange makes the API reject the round.
+        expect(assistant.map((block) => block['type']).toList(), [
+          'server_tool_use',
+          'web_search_tool_result',
+        ]);
+      },
+    );
+
+    test(
+      'a utility call gets search only, never fetch or a container',
+      () async {
+        final body = await _captureClaudeBuiltInSearchBody(
+          modelId: 'claude-opus-4-7',
+          utilityCall: true,
+          config: _claudeConfig(
+            'http://api.anthropic.com',
+            modelOverrides: const <String, dynamic>{
+              'claude-opus-4-7': <String, dynamic>{
+                'builtInTools': <String>[
+                  BuiltInToolNames.search,
+                  BuiltInToolNames.webFetch,
+                  BuiltInToolNames.codeExecution,
+                ],
+              },
+            },
+          ),
+        );
+
+        final names = (body['tools'] as List)
+            .cast<Map<String, dynamic>>()
+            .map((tool) => tool['name'])
+            .toList();
+        // A fetch or a container run on a title request is both off-contract
+        // and billed.
+        expect(names, ['web_search']);
+      },
+    );
 
     test('a client tool owning the name keeps the hosted one out', () async {
       final body = await _captureClaudeBuiltInSearchBody(
