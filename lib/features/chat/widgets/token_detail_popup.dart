@@ -42,6 +42,10 @@ class TokenDetailPopup extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
+    // Text inside the rows scales with the ambient text scaler (UI font
+    // scale), so the popup's fixed width budget must scale with it too —
+    // otherwise large scales truncate the "(N cached)" suffix.
+    final maxWidth = MediaQuery.textScalerOf(context).scale(280.0);
     final rows = <Widget>[];
 
     if (promptTokens != null && promptTokens! > 0) {
@@ -140,7 +144,7 @@ class TokenDetailPopup extends StatelessWidget {
     if (rows.isEmpty) return const SizedBox.shrink();
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 280),
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: context.overlaySurface,
