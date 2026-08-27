@@ -2943,6 +2943,8 @@
   "messageStyleSettingsPageDark": "深色",
   "messageStyleSettingsPageDefaultHint": "默认样式跟随当前主题，没有可调参数。",
   "messageStyleSettingsPageStyleDefaultSubtitle": "跟随主题，不可调节",
+  "messageStyleSettingsPageAssistantFitContent": "助手气泡贴合内容",
+  "messageStyleSettingsPageAssistantFitContentSubtitle": "助手气泡按文字宽度收缩，不再占满整行",
   "messageStyleSettingsPageStyleFrostedSubtitle": "半透明毛玻璃",
   "messageStyleSettingsPageStyleSolidSubtitle": "不透明纯色底",
   "messageStyleSettingsPageBlur": "模糊强度",

@@ -14653,6 +14653,18 @@ abstract class AppLocalizations {
   /// **'Follows the theme; not customizable'**
   String get messageStyleSettingsPageStyleDefaultSubtitle;
 
+  /// No description provided for @messageStyleSettingsPageAssistantFitContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Fit assistant bubble to content'**
+  String get messageStyleSettingsPageAssistantFitContent;
+
+  /// No description provided for @messageStyleSettingsPageAssistantFitContentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant bubbles hug their text instead of filling the row'**
+  String get messageStyleSettingsPageAssistantFitContentSubtitle;
+
   /// No description provided for @messageStyleSettingsPageStyleFrostedSubtitle.
   ///
   /// In en, this message translates to:

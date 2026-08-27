@@ -8063,6 +8063,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Follows the theme; not customizable';
 
   @override
+  String get messageStyleSettingsPageAssistantFitContent =>
+      'Fit assistant bubble to content';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      'Assistant bubbles hug their text instead of filling the row';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle =>
       'Translucent frosted glass';
 

@@ -290,6 +290,8 @@ class SettingsProvider extends ChangeNotifier {
       'display_use_layered_surfaces_v1';
   static const String _displayUseLayeredSheetTilesKey =
       'display_use_layered_sheet_tiles_v1';
+  static const String _displayAssistantBubbleFitContentKey =
+      'display_assistant_bubble_fit_content_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
@@ -502,6 +504,10 @@ class SettingsProvider extends ChangeNotifier {
   // When off, action tiles inside sheets stay the same color as the sheet.
   bool _useLayeredSheetTiles = false;
   bool get useLayeredSheetTiles => _useLayeredSheetTiles;
+
+  // When on, assistant bubbles hug their text instead of spanning the row.
+  bool _assistantBubbleFitContent = false;
+  bool get assistantBubbleFitContent => _assistantBubbleFitContent;
 
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
@@ -1182,6 +1188,8 @@ class SettingsProvider extends ChangeNotifier {
         prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
     _useLayeredSheetTiles =
         prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
+    _assistantBubbleFitContent =
+        prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -2609,6 +2617,13 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayUseLayeredSurfacesKey, v);
+  }
+
+  Future<void> setAssistantBubbleFitContent(bool v) async {
+    if (_assistantBubbleFitContent == v) return;
+    _assistantBubbleFitContent = v;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
   }
 
   Future<void> setUseLayeredSheetTiles(bool v) async {
@@ -5532,6 +5547,7 @@ Requirements:
     copy._usePureBackground = _usePureBackground;
     copy._useLayeredSurfaces = _useLayeredSurfaces;
     copy._useLayeredSheetTiles = _useLayeredSheetTiles;
+    copy._assistantBubbleFitContent = _assistantBubbleFitContent;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;

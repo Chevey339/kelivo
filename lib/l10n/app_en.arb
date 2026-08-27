@@ -3471,6 +3471,8 @@
   "messageStyleSettingsPageDark": "Dark",
   "messageStyleSettingsPageDefaultHint": "Default style follows the current theme and has no extra controls.",
   "messageStyleSettingsPageStyleDefaultSubtitle": "Follows the theme; not customizable",
+  "messageStyleSettingsPageAssistantFitContent": "Fit assistant bubble to content",
+  "messageStyleSettingsPageAssistantFitContentSubtitle": "Assistant bubbles hug their text instead of filling the row",
   "messageStyleSettingsPageStyleFrostedSubtitle": "Translucent frosted glass",
   "messageStyleSettingsPageStyleSolidSubtitle": "Opaque solid fill",
   "messageStyleSettingsPageBlur": "Blur",

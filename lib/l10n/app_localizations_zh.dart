@@ -7733,6 +7733,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
 
   @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
+
+  @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
 
   @override
@@ -15438,6 +15445,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
@@ -23219,6 +23233,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟隨主題，不可調節';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手氣泡貼合內容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手氣泡按文字寬度收縮，不再佔滿整行';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';

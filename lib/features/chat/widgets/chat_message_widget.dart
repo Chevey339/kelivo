@@ -2416,14 +2416,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
+  /// Assistant blocks span the row by default. With the fit-content option
+  /// on, [Align] hands the bubble loose constraints so it hugs its text;
+  /// long text still wraps at the same max width.
+  Widget _assistantBlockWidth(BuildContext context, {required Widget child}) {
+    final fitContent = context.select<SettingsProvider, bool>(
+      (s) => s.assistantBubbleFitContent,
+    );
+    if (!fitContent) return SizedBox(width: double.infinity, child: child);
+    return Align(alignment: Alignment.centerLeft, child: child);
+  }
+
   Widget _buildAssistantTextBlock(
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
     Map<String, String> citationIndexLookup,
   ) {
-    return SizedBox(
-      width: double.infinity,
+    return _assistantBlockWidth(
+      context,
       child: _buildAssistantBubbleContainer(
         context: context,
         child: _buildAssistantTextContent(
@@ -2780,12 +2791,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   widget.message.isStreaming &&
                   visualContent.isEmpty) {
                 return <Widget>[
-                  SizedBox(
-                    width: double.infinity,
+                  _assistantBlockWidth(
+                    context,
                     child: _buildAssistantBubbleContainer(
                       context: context,
                       child: Align(
                         alignment: Alignment.centerLeft,
+                        // widthFactor keeps the waiting bubble from filling a
+                        // loose row under the fit-content option; with tight
+                        // constraints (option off) Align ignores it.
+                        widthFactor: 1,
                         child: Semantics(
                           label: l10n.chatMessageWidgetThinking,
                           child: widget.hideStreamingIndicator
