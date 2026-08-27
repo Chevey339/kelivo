@@ -2,6 +2,12 @@ import 'dart:convert';
 
 /// Provider artifact kind under which a turn's code execution container is
 /// stored against the assistant message that ran in it.
+///
+/// Only a request that declares the code execution tool stores or sends one.
+/// Dynamic search filtering runs code execution too, but the API provisions
+/// that itself and documents no `container` contract for it — so a turn that
+/// only searched is treated as having no container, whatever the response
+/// carried.
 const String claudeContainerArtifactKind = 'claude_container';
 
 /// Internal message key carrying the stored container into the next request.
