@@ -2206,6 +2206,95 @@ data: {"type":"message_stop"}
     );
 
     test(
+      'the persisted text of a deferred response folds into it, not after it',
+      () async {
+        // The store keeps the turn's final text as its own assistant message
+        // after the client result; replayed, it belongs to the response that
+        // opens with the hosted result and must not form a third message.
+        const firstResponse = [
+          {
+            'type': 'server_tool_use',
+            'id': 'srvtoolu_deferred',
+            'name': 'web_fetch',
+            'input': {'url': 'https://example.com'},
+          },
+          {
+            'type': 'tool_use',
+            'id': 'toolu_client',
+            'name': 'create_memory',
+            'input': {'content': 'test'},
+          },
+        ];
+        const secondResponse = [
+          {
+            'type': 'web_fetch_tool_result',
+            'tool_use_id': 'srvtoolu_deferred',
+            'content': {'type': 'web_fetch_result', 'url': 'https://e.com'},
+          },
+          {'type': 'text', 'text': '查到了。'},
+        ];
+        final body = await _captureClaudeRequestBody(
+          officialEndpoint: true,
+          modelId: 'claude-sonnet-4-6',
+          messages: const [
+            {'role': 'user', 'content': '看看这个页面'},
+            {
+              'role': 'assistant',
+              'content': '',
+              'tool_calls': [
+                {
+                  'id': 'srvtoolu_deferred',
+                  'type': 'function',
+                  'function': {
+                    'name': 'web_fetch',
+                    'arguments': '{"url":"https://example.com"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': secondResponse},
+                  },
+                },
+                {
+                  'id': 'toolu_client',
+                  'type': 'function',
+                  'function': {
+                    'name': 'create_memory',
+                    'arguments': '{"content":"test"}',
+                  },
+                  'metadata': {
+                    'anthropic': {'assistant_blocks': firstResponse},
+                  },
+                },
+              ],
+            },
+            {
+              'role': 'tool',
+              'tool_call_id': 'toolu_client',
+              'name': 'create_memory',
+              'content': 'test',
+            },
+            {'role': 'assistant', 'content': '查到了。'},
+            {'role': 'user', 'content': '再说说'},
+          ],
+        );
+
+        final messages = (body['messages'] as List).cast<Map>();
+        expect(messages.map((message) => message['role']).toList(), [
+          'user',
+          'assistant',
+          'user',
+          'assistant',
+          'user',
+        ]);
+        final second = (messages[3]['content'] as List).cast<Map>();
+        expect(second.map((block) => block['type']).toList(), [
+          'web_fetch_tool_result',
+          'text',
+        ]);
+        expect(second.last['text'], '查到了。');
+      },
+    );
+
+    test(
       'a hand-off cut off at the client result drops the open hosted call',
       () async {
         // History truncated right after the client result: the second

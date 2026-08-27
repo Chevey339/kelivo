@@ -339,10 +339,11 @@ Stream<StreamChunk> sendClaudeStream(
       continue;
     }
     // Client tool results land between the two as a user message, so only a
-    // turn left adjacent can be folded. Media keeps the structured path below,
-    // so only a plain-text message folds.
+    // turn left adjacent can be folded — or the text of the responses those
+    // results deferred, which become the adjacent turn below. Media keeps the
+    // structured path below, so only a plain-text message folds.
     final foldsIntoReplayedTurn =
-        pendingToolResults.isEmpty &&
+        (pendingToolResults.isEmpty || deferredResponses.isNotEmpty) &&
         role == 'assistant' &&
         m['tool_calls'] is! List &&
         parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isEmpty &&
