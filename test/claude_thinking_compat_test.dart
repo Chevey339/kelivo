@@ -2278,6 +2278,73 @@ data: {"type":"message_stop"}
       expect(imagePart['source']['data'], 'AQIDBA==');
       expect(jsonEncode(requestBodies[1]), isNot(contains('[image:')));
     });
+    test('an image the assistant produced opens the next user turn', () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'kelivo_claude_assistant_img_',
+      );
+      addTearDown(() async {
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/chart.png');
+      await file.writeAsBytes(const [1, 2, 3, 4]);
+
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: [
+          {'role': 'user', 'content': '画个图'},
+          {
+            'role': 'assistant',
+            'content': '画好了',
+            multimodalInternalMediaPathsKey: [file.path],
+          },
+          {'role': 'user', 'content': '哪根柱子最高'},
+        ],
+      );
+
+      final messages = (body['messages'] as List).cast<Map>();
+      // The API rejects an image block in an assistant turn outright.
+      expect(messages[1]['content'], '画好了');
+      final followUp = (messages[2]['content'] as List).cast<Map>();
+      expect(followUp.map((part) => part['type']).toList(), [
+        'text',
+        'image',
+        'text',
+      ]);
+      expect(followUp[1]['source']['data'], 'AQIDBA==');
+      expect(followUp.last['text'], '哪根柱子最高');
+    });
+
+    test('an image on the last assistant turn has nowhere to go', () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'kelivo_claude_assistant_img_',
+      );
+      addTearDown(() async {
+        if (await dir.exists()) {
+          await dir.delete(recursive: true);
+        }
+      });
+      final file = File('${dir.path}/chart.png');
+      await file.writeAsBytes(const [1, 2, 3, 4]);
+
+      final body = await _captureClaudeRequestBody(
+        officialEndpoint: true,
+        modelId: 'claude-sonnet-4-6',
+        messages: [
+          {'role': 'user', 'content': '画个图'},
+          {
+            'role': 'assistant',
+            'content': '画好了',
+            multimodalInternalMediaPathsKey: [file.path],
+          },
+        ],
+      );
+
+      expect(jsonEncode(body), isNot(contains('"image"')));
+    });
+
     test(
       'interrupted server tool is dropped instead of replayed orphaned',
       () async {

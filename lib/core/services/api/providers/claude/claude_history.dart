@@ -98,6 +98,10 @@ class ClaudeHistory {
     final out = <Map<String, dynamic>>[];
     final pendingResults = <Map<String, dynamic>>[];
     final replayedClientCalls = <String>{};
+    // The API refuses `image` blocks in an assistant turn, yet a chart the
+    // model drew is what the user's next question is about. Such images wait
+    // here and open the following user message, so the model still sees them.
+    final carriedImages = <Map<String, dynamic>>[];
     _ReplayedTurn? turn;
 
     /// A result is sent only once the call it answers has been: the API
@@ -181,11 +185,17 @@ class ClaudeHistory {
         continue;
       }
 
+      if (role == 'assistant' && m['tool_calls'] is! List && _hasMedia(m)) {
+        final split = await _splitParts(m, includeUserPaths: false);
+        carriedImages.addAll(split.images);
+      }
+
       if (turn != null) {
         while (turn.emitted < turn.responses.length) {
           emitResponse(turn);
         }
-        if (role == 'assistant' && _isPlainText(m)) {
+        // With its images carried forward, an assistant message is plain text.
+        if (role == 'assistant' && m['tool_calls'] is! List) {
           foldTurnText(turn, m);
           turn = null;
           continue;
@@ -218,7 +228,14 @@ class ClaudeHistory {
         continue;
       }
 
-      out.add(await _plainMessage(m, role, isLast: i == messages.length - 1));
+      out.add(
+        await _plainMessage(
+          m,
+          role,
+          isLast: i == messages.length - 1,
+          carriedImages: carriedImages,
+        ),
+      );
     }
 
     if (turn != null && turn.emitted < turn.responses.length) {
@@ -241,14 +258,6 @@ class ClaudeHistory {
     flushResults();
     return out;
   }
-
-  bool _isPlainText(Map<String, dynamic> m) =>
-      m['tool_calls'] is! List &&
-      parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isEmpty &&
-      !shouldParseMarkdownImages(
-        (m['content'] ?? '').toString(),
-        skipImageParsing: skipImageParsing,
-      );
 
   /// The turn a persisted tool message records, read off the fullest of its
   /// cards: each card holds the responses up to the one that last wrote it,
@@ -351,33 +360,52 @@ class ClaudeHistory {
     };
   }
 
+  /// Semantic media detection only - custom attachment markers are not
+  /// recognized. Attachments arrive via structured media-path keys /
+  /// userImagePaths, plus Markdown ![](...).
+  bool _hasMedia(Map<String, dynamic> m) =>
+      shouldParseMarkdownImages(
+        (m['content'] ?? '').toString(),
+        skipImageParsing: skipImageParsing,
+      ) ||
+      parseInternalMediaRefs(m[multimodalInternalMediaPathsKey]).isNotEmpty;
+
   Future<Map<String, dynamic>> _plainMessage(
     Map<String, dynamic> m,
     String role, {
     required bool isLast,
+    required List<Map<String, dynamic>> carriedImages,
   }) async {
     final raw = (m['content'] ?? '').toString();
-    // Semantic media detection only - custom attachment markers are not
-    // recognized. Attachments arrive via structured media-path keys /
-    // userImagePaths, plus Markdown ![](...).
-    final hasMarkdownImages = shouldParseMarkdownImages(
-      raw,
-      skipImageParsing: skipImageParsing,
-    );
-    final internalMediaRefs = parseInternalMediaRefs(
-      m[multimodalInternalMediaPathsKey],
-    );
-    // Consume injected media refs for user and assistant history turns.
-    final hasInternalMedia = internalMediaRefs.isNotEmpty;
     final hasAttachedImages =
         isLast && role == 'user' && (userImagePaths?.isNotEmpty == true);
-
-    if ((role != 'user' && role != 'assistant') ||
-        !(hasMarkdownImages || hasInternalMedia || hasAttachedImages)) {
+    if (role != 'user' ||
+        !(_hasMedia(m) || hasAttachedImages || carriedImages.isNotEmpty)) {
       return {'role': role, 'content': raw};
     }
 
-    final parts = <Map<String, dynamic>>[];
+    final split = await _splitParts(m, includeUserPaths: hasAttachedImages);
+    final parts = <Map<String, dynamic>>[
+      if (carriedImages.isNotEmpty) ...[
+        // Without the label the model takes its own chart for an upload.
+        {'type': 'text', 'text': 'Images from your previous reply:'},
+        ...carriedImages,
+      ],
+      ...split.text,
+      ...split.images,
+    ];
+    carriedImages.clear();
+    return {'role': role, 'content': parts.isEmpty ? raw : parts};
+  }
+
+  /// Splits a message into the text and image blocks Claude accepts: Markdown
+  /// images and internal media refs become image blocks, remote URLs and
+  /// unsupported media stay as text.
+  Future<({List<Map<String, dynamic>> text, List<Map<String, dynamic>> images})>
+  _splitParts(Map<String, dynamic> m, {required bool includeUserPaths}) async {
+    final raw = (m['content'] ?? '').toString();
+    final text = <Map<String, dynamic>>[];
+    final images = <Map<String, dynamic>>[];
     final seenSources = <String>{};
     String normalizeSrc(String src) {
       if (src.startsWith('http') || src.startsWith('data:')) return src;
@@ -393,7 +421,7 @@ class ClaudeHistory {
       if (!seenSources.add(normalized)) return;
       if (source.startsWith('http://') || source.startsWith('https://')) {
         // Preserve prior official-Claude behavior for remote URLs.
-        parts.add({'type': 'text', 'text': source});
+        text.add({'type': 'text', 'text': source});
         return;
       }
       if (source.startsWith('data:')) {
@@ -404,7 +432,7 @@ class ClaudeHistory {
         );
         final idx = source.indexOf('base64,');
         if (idx > 0) {
-          parts.add({
+          images.add({
             'type': 'image',
             'source': {
               'type': 'base64',
@@ -422,7 +450,7 @@ class ClaudeHistory {
       );
       final b64 = await tryEncodeBase64File(source, withPrefix: false);
       if (b64 == null) return;
-      parts.add({
+      images.add({
         'type': 'image',
         'source': {'type': 'base64', 'media_type': mime, 'data': b64},
       });
@@ -436,7 +464,7 @@ class ClaudeHistory {
       skipImageParsing: skipImageParsing,
     );
     if (parsed.text.isNotEmpty) {
-      parts.add({'type': 'text', 'text': parsed.text});
+      text.add({'type': 'text', 'text': parsed.text});
     }
     for (final ref in parsed.images) {
       if (ref.kind == 'data' || ref.kind == 'path' || ref.kind == 'url') {
@@ -446,7 +474,7 @@ class ClaudeHistory {
     final supplementalRefs = supplementalMediaRefs(
       internalRaw: m[multimodalInternalMediaPathsKey],
       userPaths: userImagePaths,
-      includeUserPaths: hasAttachedImages,
+      includeUserPaths: includeUserPaths,
     );
     for (final mediaRef in supplementalRefs) {
       final mime = mimeForInternalMediaRef(mediaRef);
@@ -461,14 +489,14 @@ class ClaudeHistory {
         if (isRemote) {
           final normalized = normalizeSrc(uri);
           if (seenSources.add(normalized)) {
-            parts.add({'type': 'text', 'text': uri});
+            text.add({'type': 'text', 'text': uri});
           }
         }
         continue;
       }
       await addClaudeImage(mediaRef.uri, explicitMime: mediaRef.mime);
     }
-    return {'role': role, 'content': parts.isEmpty ? raw : parts};
+    return (text: text, images: images);
   }
 }
 

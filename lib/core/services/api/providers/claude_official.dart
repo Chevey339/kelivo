@@ -17,6 +17,7 @@ import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
 import 'claude/claude_decoder.dart';
+import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
 
 export 'claude/claude_history.dart'
@@ -24,7 +25,6 @@ export 'claude/claude_history.dart'
         normalizeClaudeImageMime,
         isClaudeSupportedImageMime,
         claudeToolResultContent;
-import 'claude/claude_files.dart';
 
 int _defaultClaudeMaxOutputTokens(String modelId) {
   final lower = modelId.trim().toLowerCase();
