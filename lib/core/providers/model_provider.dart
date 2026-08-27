@@ -225,31 +225,39 @@ class ZenMuxProvider extends BaseProvider {
       return [
         for (final entry in data)
           if (entry is Map && entry['id'] is String)
-            ModelRegistry.infer(
-              ModelInfo(
-                id: ProviderConfig.zenMuxModelSlug(entry['id'] as String),
-                displayName:
-                    (entry['display_name'] as String?) ??
-                    (entry['id'] as String),
-                input: _modalitiesFromZenMux(
-                  entry['input_modalities'],
-                  fallback: const <Modality>[Modality.text],
-                ),
-                output: _modalitiesFromZenMux(
-                  entry['output_modalities'],
-                  fallback: const <Modality>[Modality.text],
-                ),
-                supportsWebSearch:
-                    entry['capabilities'] is Map &&
-                        (entry['capabilities'] as Map)['web_search'] == true ||
-                    entry['pricings'] is Map &&
-                        (entry['pricings'] as Map).containsKey('web_search'),
-              ),
-            ),
+            _modelFromZenMuxEntry(entry),
       ];
     } finally {
       client.close();
     }
+  }
+
+  static ModelInfo _modelFromZenMuxEntry(Map entry) {
+    final upstreamId = entry['id'] as String;
+    final input = _modalitiesFromZenMux(
+      entry['input_modalities'],
+      fallback: const <Modality>[Modality.text],
+    );
+    final output = _modalitiesFromZenMux(
+      entry['output_modalities'],
+      fallback: const <Modality>[Modality.text],
+    );
+    final id = output.contains(Modality.image)
+        ? ProviderConfig.zenMuxImageModelSlug(upstreamId)
+        : upstreamId;
+    return ModelRegistry.infer(
+      ModelInfo(
+        id: id,
+        displayName: (entry['display_name'] as String?) ?? upstreamId,
+        input: input,
+        output: output,
+        supportsWebSearch:
+            entry['capabilities'] is Map &&
+                (entry['capabilities'] as Map)['web_search'] == true ||
+            entry['pricings'] is Map &&
+                (entry['pricings'] as Map).containsKey('web_search'),
+      ),
+    );
   }
 
   static List<Modality> _modalitiesFromZenMux(

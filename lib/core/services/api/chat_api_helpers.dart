@@ -48,13 +48,6 @@ String apiModelId(ProviderConfig cfg, String modelId) {
   try {
     final ov = _modelOverride(cfg, modelId);
     final resolved = resolveApiModelIdOverride(ov, modelId);
-    if (ProviderConfig.isZenMux(
-          id: cfg.id,
-          name: cfg.name,
-          baseUrl: cfg.baseUrl,
-        )) {
-      return ProviderConfig.zenMuxModelSlug(resolved);
-    }
     return resolved;
   } catch (_) {}
   return modelId;
