@@ -209,6 +209,8 @@ Stream<StreamChunk> sendClaudeStream(
       if (t['input_schema'] == null && (t['type'] ?? '').toString().isNotEmpty)
         (t['name'] ?? '').toString(),
   }..remove('');
+  // The `container` parameter is only accepted alongside the tool that uses it.
+  final hasCodeExecution = declaredServerToolNames.contains('code_execution');
 
   // Headers (constant across rounds)
   final baseHeaders = customHeaders(
@@ -238,6 +240,10 @@ Stream<StreamChunk> sendClaudeStream(
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
+  // Each round would otherwise get a fresh container, losing the files and
+  // REPL state the previous one built up — even mid-turn, after a client tool
+  // or a pause.
+  String? containerId;
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -282,6 +288,7 @@ Stream<StreamChunk> sendClaudeStream(
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
+        if (hasCodeExecution && containerId != null) 'container': containerId,
       };
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
@@ -316,6 +323,10 @@ Stream<StreamChunk> sendClaudeStream(
             );
           }
         } catch (_) {}
+        final container = obj['container'];
+        if (container is Map && (container['id'] ?? '').toString().isNotEmpty) {
+          containerId = container['id'].toString();
+        }
         final content = (obj['content'] as List?) ?? const <dynamic>[];
         final List<Map<String, dynamic>> assistantBlocks =
             <Map<String, dynamic>>[];
@@ -363,6 +374,16 @@ Stream<StreamChunk> sendClaudeStream(
                 Map<String, dynamic>.from(it.cast<String, dynamic>()),
               );
             } catch (_) {}
+            for (final fileId in claudeGeneratedFileIds(it['content'])) {
+              if (!downloadedFileIds.add(fileId)) continue;
+              final file = await downloadClaudeGeneratedFile(
+                client: client,
+                base: base,
+                headers: baseHeaders,
+                fileId: fileId,
+              );
+              if (file != null) yield file;
+            }
           }
         }
         // The continuation round sends these, so they go through the same
@@ -470,6 +491,7 @@ Stream<StreamChunk> sendClaudeStream(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
+      containerId = decoder.containerId ?? containerId;
 
       // The continuation round sends these as they are, so they go through the
       // same sanitising as replayed history — the persisted copy below stays

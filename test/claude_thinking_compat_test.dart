@@ -1279,6 +1279,105 @@ void main() {
     });
 
     test(
+      'a non-streaming container run resumes in the same container and fetches its files',
+      () async {
+        final bodies = <Map<String, dynamic>>[];
+        final paths = <String>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+        server.listen((request) async {
+          paths.add(request.uri.path);
+          if (request.method == 'GET') {
+            // A failed download costs a file, never the turn.
+            request.response.statusCode = HttpStatus.notFound;
+            await request.response.close();
+            return;
+          }
+          bodies.add(
+            (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                .cast<String, dynamic>(),
+          );
+          final paused = bodies.length == 1;
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode(<String, dynamic>{
+              'id': 'msg_${bodies.length}',
+              'stop_reason': paused ? 'pause_turn' : 'end_turn',
+              'container': {'id': 'container_abc'},
+              'content': paused
+                  ? const [
+                      {
+                        'type': 'server_tool_use',
+                        'id': 'srvtoolu_run',
+                        'name': 'bash_code_execution',
+                        'input': {'command': 'python plot.py'},
+                      },
+                      {
+                        'type': 'bash_code_execution_tool_result',
+                        'tool_use_id': 'srvtoolu_run',
+                        'content': {
+                          'type': 'bash_code_execution_result',
+                          'stdout': '',
+                          'stderr': '',
+                          'return_code': 0,
+                          'content': [
+                            {
+                              'type': 'code_execution_output',
+                              'file_id': 'file_chart',
+                            },
+                          ],
+                        },
+                      },
+                    ]
+                  : const [
+                      {'type': 'text', 'text': 'ok'},
+                    ],
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            }),
+          );
+          await request.response.close();
+        });
+
+        final config = _claudeConfig(
+          'http://api.anthropic.com',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.codeExecution],
+            },
+          },
+        );
+        await HttpOverrides.runZoned(
+          () async {
+            // A utility call would leave the container tool out entirely.
+            final chunks = await ChatApiService.sendMessageStream(
+              config: config,
+              modelId: 'claude-opus-4-7',
+              messages: const [
+                {'role': 'user', 'content': 'hello'},
+              ],
+              stream: false,
+            ).toList();
+            expect(chunks.joinedContent, 'ok');
+          },
+          createHttpClient: (context) =>
+              _ProxyHttpOverrides(server.port).createHttpClient(context),
+        );
+
+        expect(bodies, hasLength(2));
+        // The first round cannot know a container; every later one must name
+        // the same container or the files it wrote are gone.
+        expect(bodies[0].containsKey('container'), isFalse);
+        expect(bodies[1]['container'], 'container_abc');
+        expect(paths.where((path) => path.endsWith('/files/file_chart')), [
+          '/files/file_chart',
+        ]);
+      },
+    );
+
+    test(
       'a utility call gets search only, never fetch or a container',
       () async {
         final body = await _captureClaudeBuiltInSearchBody(

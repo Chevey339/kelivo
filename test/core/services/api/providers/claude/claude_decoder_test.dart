@@ -380,6 +380,24 @@ void main() {
     expect(decoder.clientTools['call_1']!.input.toString(), '{"q":');
   });
 
+  test('remembers the container the message ran in', () {
+    final decoder = ClaudeStreamDecoder();
+    decoder.accept(
+      _event('message_start', {
+        'type': 'message_start',
+        'message': {
+          'id': 'msg_1',
+          'type': 'message',
+          'role': 'assistant',
+          'content': <dynamic>[],
+          'container': {'id': 'container_abc', 'expires_at': '2026-09-26'},
+          'usage': {'input_tokens': 1, 'output_tokens': 1},
+        },
+      }),
+    );
+    expect(decoder.containerId, 'container_abc');
+  });
+
   test(
     'official stream folds message_start input into usage with message_delta output',
     () {

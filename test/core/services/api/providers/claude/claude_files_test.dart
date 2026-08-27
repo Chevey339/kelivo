@@ -7,8 +7,6 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/services/api/providers/claude/claude_files.dart';
-import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
-import 'package:Kelivo/utils/app_directories.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 

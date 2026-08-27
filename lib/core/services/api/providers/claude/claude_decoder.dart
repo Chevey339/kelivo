@@ -42,6 +42,12 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   }
 
   String? lastStopReason;
+
+  /// The container this response ran in, once the API names it.
+  ///
+  /// Files and REPL state live in the container, so a follow-up round that
+  /// does not send this id back starts from an empty one.
+  String? containerId;
   bool messageStopped = false;
 
   final Map<int, String> _clientIndexToId = <int, String>{};
@@ -433,6 +439,17 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
         lastStopReason = reason;
       }
     } catch (_) {}
+    // The message object opens the stream, so the container normally arrives
+    // there; the delta is checked as well in case it is only settled at the
+    // end.
+    for (final holder in [obj['message'], obj['delta'], obj]) {
+      final container = holder is Map ? holder['container'] : null;
+      final id = container is Map ? (container['id'] ?? '').toString() : '';
+      if (id.isNotEmpty) {
+        containerId = id;
+        break;
+      }
+    }
     return chunks;
   }
 
