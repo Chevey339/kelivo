@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show compute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -84,7 +85,7 @@ class _LogViewerPageState extends State<LogViewerPage>
         final app = <File>[];
         final contextFiles = <File>[];
         for (final f in all) {
-          final name = f.path.split('/').last.toLowerCase();
+          final name = p.basename(f.path).toLowerCase();
           if (name.startsWith('context_logs')) {
             contextFiles.add(f);
           } else if (name.startsWith('flutter_logs')) {
@@ -331,7 +332,7 @@ class _LogFilesList extends StatelessWidget {
       itemBuilder: (context, index) {
         final file = files[index];
         final stat = file.statSync();
-        final fileName = file.path.split('/').last;
+        final fileName = p.basename(file.path);
         final isCurrentLog =
             fileName.toLowerCase() == activeFileName.toLowerCase();
 
@@ -474,7 +475,7 @@ class _PlainLogContentPageState extends State<_PlainLogContentPage> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(widget.file.path)],
-          subject: widget.file.path.split('/').last,
+          subject: p.basename(widget.file.path),
         ),
       );
     } catch (e) {
@@ -595,7 +596,7 @@ class _RequestLogFilePageState extends State<_RequestLogFilePage> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(widget.file.path)],
-          subject: widget.file.path.split('/').last,
+          subject: p.basename(widget.file.path),
         ),
       );
     } catch (e) {
@@ -772,7 +773,7 @@ class _ContextLogFilePageState extends State<_ContextLogFilePage> {
       await SharePlus.instance.share(
         ShareParams(
           files: [XFile(widget.file.path)],
-          subject: widget.file.path.split('/').last,
+          subject: p.basename(widget.file.path),
         ),
       );
     } catch (e) {
