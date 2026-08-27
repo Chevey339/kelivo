@@ -72,7 +72,7 @@ dependencies:
   path: ^1.9.1
   path_provider: ^2.1.4
   file_picker: ^10.3.10
-  archive: ^4.0.9
+  archive: ^4.2.0
   xml: ^6.5.0
   open_filex: ^4.5.0
   easy_image_viewer: ^1.4.6
