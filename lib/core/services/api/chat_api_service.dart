@@ -266,6 +266,9 @@ class ChatApiService {
           stream: stream,
           builtInSearchOnly: builtInSearchOnly,
           skipImageParsing: skipImageParsing,
+          // The chat passes its conversation id here; utility callers pass
+          // nothing and get a container of their own each time.
+          sessionKey: rid.isEmpty ? null : rid,
         );
       } else if (kind == ProviderKind.google) {
         final isVertex = config.vertexAI == true;

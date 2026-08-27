@@ -1378,6 +1378,93 @@ void main() {
     );
 
     test(
+      'a conversation keeps its container across turns until it expires',
+      () async {
+        final bodies = <Map<String, dynamic>>[];
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() async {
+          await server.close(force: true);
+        });
+        server.listen((request) async {
+          final body =
+              (jsonDecode(await utf8.decoder.bind(request).join()) as Map)
+                  .cast<String, dynamic>();
+          bodies.add(body);
+          // The second turn names a container that has since expired.
+          if (bodies.length == 2) {
+            request.response.statusCode = HttpStatus.badRequest;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({
+                'type': 'error',
+                'error': {
+                  'type': 'invalid_request_error',
+                  'message': 'Container ${body['container']} not found',
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.ok;
+          request.response.headers.contentType = ContentType.json;
+          request.response.write(
+            jsonEncode(<String, dynamic>{
+              'id': 'msg_${bodies.length}',
+              'stop_reason': 'end_turn',
+              'container': {
+                'id': bodies.length < 3 ? 'container_1' : 'container_2',
+              },
+              'content': const [
+                {'type': 'text', 'text': 'ok'},
+              ],
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            }),
+          );
+          await request.response.close();
+        });
+
+        final config = _claudeConfig(
+          'http://api.anthropic.com',
+          modelOverrides: const <String, dynamic>{
+            'claude-opus-4-7': <String, dynamic>{
+              'builtInTools': <String>[BuiltInToolNames.codeExecution],
+            },
+          },
+        );
+        Future<void> turn() async {
+          final chunks = await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: 'claude-opus-4-7',
+            messages: const [
+              {'role': 'user', 'content': 'hello'},
+            ],
+            requestId: 'conversation-container-test',
+            stream: false,
+          ).toList();
+          expect(chunks.joinedContent, 'ok');
+        }
+
+        await HttpOverrides.runZoned(
+          () async {
+            await turn();
+            await turn();
+            await turn();
+          },
+          createHttpClient: (context) =>
+              _ProxyHttpOverrides(server.port).createHttpClient(context),
+        );
+
+        expect(bodies.map((body) => body['container']).toList(), [
+          null, // first turn: nothing to reuse yet
+          'container_1', // second turn reuses, and is told it expired
+          null, // ...so it retries fresh
+          'container_2', // third turn reuses the replacement
+        ]);
+      },
+    );
+
+    test(
       'a utility call gets search only, never fetch or a container',
       () async {
         final body = await _captureClaudeBuiltInSearchBody(

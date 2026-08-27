@@ -37,6 +37,13 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
+// Containers are per turn as far as the API is concerned, so this carries the
+// id across a conversation's turns for as long as the app runs — the files
+// and REPL state from the last question are still there for the next one.
+// The API tells us when a remembered container has expired; nothing here is
+// persisted, so a restart only means starting from an empty container again.
+final _containerBySession = <String, String>{};
+
 Stream<StreamChunk> sendClaudeStream(
   http.Client client,
   ProviderConfig config,
@@ -54,6 +61,7 @@ Stream<StreamChunk> sendClaudeStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
+  String? sessionKey,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   // Endpoint and headers (constant across rounds)
@@ -243,7 +251,13 @@ Stream<StreamChunk> sendClaudeStream(
   // Each round would otherwise get a fresh container, losing the files and
   // REPL state the previous one built up — even mid-turn, after a client tool
   // or a pause.
-  String? containerId;
+  String? containerId = sessionKey == null
+      ? null
+      : _containerBySession[sessionKey];
+  void rememberContainer(String id) {
+    containerId = id;
+    if (sessionKey != null) _containerBySession[sessionKey] = id;
+  }
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -295,14 +309,35 @@ Stream<StreamChunk> sendClaudeStream(
         body.addAll(extraClaude);
       }
 
-      final request = http.Request('POST', url);
-      request.headers.addAll(baseHeaders);
-      request.body = jsonEncode(body);
+      http.Request buildRequest() {
+        final request = http.Request('POST', url);
+        request.headers.addAll(baseHeaders);
+        request.body = jsonEncode(body);
+        return request;
+      }
 
-      final response = await client.send(request);
+      var response = await client.send(buildRequest());
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final errorBody = await response.stream.bytesToString();
-        throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        // A remembered container can have expired since the last turn. The
+        // request named it, so an error about a container is about that one:
+        // forget it and let this round start a fresh one.
+        final staleContainer =
+            response.statusCode >= 400 &&
+            response.statusCode < 500 &&
+            body.containsKey('container') &&
+            errorBody.toLowerCase().contains('container');
+        if (!staleContainer) {
+          throw HttpException('HTTP ${response.statusCode}: $errorBody');
+        }
+        containerId = null;
+        if (sessionKey != null) _containerBySession.remove(sessionKey);
+        body.remove('container');
+        response = await client.send(buildRequest());
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          final retryBody = await response.stream.bytesToString();
+          throw HttpException('HTTP ${response.statusCode}: $retryBody');
+        }
       }
 
       pendingCalls = [];
@@ -325,7 +360,7 @@ Stream<StreamChunk> sendClaudeStream(
         } catch (_) {}
         final container = obj['container'];
         if (container is Map && (container['id'] ?? '').toString().isNotEmpty) {
-          containerId = container['id'].toString();
+          rememberContainer(container['id'].toString());
         }
         final content = (obj['content'] as List?) ?? const <dynamic>[];
         final List<Map<String, dynamic>> assistantBlocks =
@@ -491,7 +526,7 @@ Stream<StreamChunk> sendClaudeStream(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
-      containerId = decoder.containerId ?? containerId;
+      if (decoder.containerId != null) rememberContainer(decoder.containerId!);
 
       // The continuation round sends these as they are, so they go through the
       // same sanitising as replayed history — the persisted copy below stays
