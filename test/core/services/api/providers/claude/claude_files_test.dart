@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 
 import 'package:Kelivo/core/services/api/providers/claude/claude_files.dart';
+import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/utils/kelivo_file_uri.dart';
 import 'package:Kelivo/utils/sandbox_path_resolver.dart';
 
@@ -139,6 +140,40 @@ void main() {
       ]);
     });
 
+    test('a copy already stored is reused and the download dropped', () async {
+      final server = await _filesServer(
+        meta: <String, dynamic>{
+          'id': 'file_1',
+          'filename': 'chart.png',
+          'mime_type': 'image/png',
+          'size_bytes': 4,
+          'downloadable': true,
+        },
+        bytes: const <int>[1, 2, 3, 4],
+      );
+      addTearDown(() => server.close(force: true));
+
+      final client = http.Client();
+      addTearDown(client.close);
+      Future<GeneratedFile?> download() => downloadClaudeGeneratedFile(
+        client: client,
+        base: 'http://${server.address.address}:${server.port}/v1',
+        headers: const <String, String>{'x-api-key': 'sk-test'},
+        fileId: 'file_1',
+      );
+
+      final first = await download();
+      final second = await download();
+
+      expect(second!.uri, first!.uri);
+      final stored = Directory(
+        '${tempDir.path}/upload',
+      ).listSync().map((entity) => entity.path.split('/').last).toList();
+      // The streamed copy took a numbered name while it was being written and
+      // must not survive next to the original.
+      expect(stored, ['chart.png']);
+    });
+
     test('a chart the API cannot type is still a chart', () async {
       final server = await _filesServer(
         meta: <String, dynamic>{
@@ -218,7 +253,7 @@ void main() {
           'id': 'file_1',
           'filename': 'huge.bin',
           'mime_type': 'application/octet-stream',
-          'size_bytes': 500 * 1024 * 1024,
+          'size_bytes': 501 * 1024 * 1024,
           'downloadable': true,
         },
         bytes: const <int>[1],

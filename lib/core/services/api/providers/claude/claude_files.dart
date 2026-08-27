@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../utils/multimodal_input_utils.dart';
@@ -8,9 +10,12 @@ import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../../../../utils/upload_dedupe.dart';
 import '../../stream/stream_chunk.dart';
 
-/// The API allows 500 MB per file and this has to hold the whole thing in
-/// memory to write it, which is well past what a chat attachment can be.
-const _generatedFileSizeLimit = 32 * 1024 * 1024;
+/// The download streams to disk, so memory is not the constraint: on desktop
+/// this is the API's own per-file limit, and on a phone it is what a chat is
+/// willing to spend of the device's storage on one file.
+final _generatedFileSizeLimit = (Platform.isIOS || Platform.isAndroid)
+    ? 200 * 1024 * 1024
+    : 500 * 1024 * 1024;
 
 /// The `file_id`s a code execution result reported, in arrival order.
 ///
@@ -77,32 +82,35 @@ Future<GeneratedFile?> downloadClaudeGeneratedFile({
         ? reported
         : inferMediaMimeFromSource(name, fallbackMime: reported);
 
-    final contentResponse = await client.get(
-      Uri.parse('$base/files/$fileId/content'),
-      headers: getHeaders,
-    );
-    if (contentResponse.statusCode < 200 || contentResponse.statusCode >= 300) {
-      return null;
-    }
-    final bytes = contentResponse.bodyBytes;
-    if (bytes.isEmpty || bytes.length > _generatedFileSizeLimit) return null;
-
     final dir = await AppDirectories.getUploadDirectory();
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
-    var path = await UploadDedupe.findIdentical(dir, bytes, name);
-    if (path == null) {
-      final destination = await UploadDedupe.reserveUniqueFile(dir, name);
-      try {
-        await destination.writeAsBytes(bytes, flush: true);
-      } catch (_) {
-        try {
-          await destination.delete();
-        } catch (_) {}
-        rethrow;
-      }
-      path = destination.path;
+    // Written under its final name straight away and hashed on the way, so a
+    // file of any size costs a bounded amount of memory. Should an identical
+    // copy already be stored, this one is dropped again in its favour.
+    final destination = await UploadDedupe.reserveUniqueFile(dir, name);
+    final digest = await _streamToFile(
+      client: client,
+      uri: Uri.parse('$base/files/$fileId/content'),
+      headers: getHeaders,
+      destination: destination,
+    );
+    if (digest == null) {
+      await _discard(destination);
+      return null;
+    }
+    var path = destination.path;
+    final identical = await UploadDedupe.findIdenticalDigest(
+      dir,
+      digest.size,
+      digest.bytes,
+      name,
+      exclude: path,
+    );
+    if (identical != null) {
+      await _discard(destination);
+      path = identical;
     }
     return GeneratedFile(
       uri: SandboxPathResolver.canonicalize(path),
@@ -112,6 +120,56 @@ Future<GeneratedFile?> downloadClaudeGeneratedFile({
   } catch (_) {
     return null;
   }
+}
+
+/// Streams the body at [uri] into [destination], returning its size and
+/// SHA-256, or null when the body cannot be used (a failed request, an empty
+/// body, or one past [_generatedFileSizeLimit]).
+Future<({int size, List<int> bytes})?> _streamToFile({
+  required http.Client client,
+  required Uri uri,
+  required Map<String, String> headers,
+  required File destination,
+}) async {
+  final request = http.Request('GET', uri)..headers.addAll(headers);
+  final response = await client.send(request);
+  if (response.statusCode < 200 || response.statusCode >= 300) return null;
+
+  final sink = destination.openWrite();
+  final hash = _DigestSink();
+  final hasher = sha256.startChunkedConversion(hash);
+  var size = 0;
+  try {
+    await for (final chunk in response.stream) {
+      size += chunk.length;
+      if (size > _generatedFileSizeLimit) return null;
+      sink.add(chunk);
+      hasher.add(chunk);
+    }
+    await sink.flush();
+  } finally {
+    await sink.close();
+  }
+  if (size == 0) return null;
+  hasher.close();
+  return (size: size, bytes: hash.digest!.bytes);
+}
+
+/// Receives the one digest a chunked SHA-256 conversion emits on close.
+class _DigestSink implements Sink<Digest> {
+  Digest? digest;
+
+  @override
+  void add(Digest data) => digest = data;
+
+  @override
+  void close() {}
+}
+
+Future<void> _discard(File file) async {
+  try {
+    await file.delete();
+  } catch (_) {}
 }
 
 /// The container names the file, so it can name a path or nothing at all.
