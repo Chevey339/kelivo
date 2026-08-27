@@ -78,6 +78,7 @@ class SettingsProvider extends ChangeNotifier {
     'DeepSeek',
     'AIhubmix',
     '随想AI中转站',
+    'MaruCode',
     'Aliyun',
     'Zhipu AI',
     'Claude',
@@ -1184,8 +1185,7 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _usePureBackground = pureBgPref;
     }
-    _useLayeredSurfaces =
-        prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
+    _useLayeredSurfaces = prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
     _useLayeredSheetTiles =
         prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
     _assistantBubbleFitContent =
@@ -6122,6 +6122,9 @@ class ProviderConfig {
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
+    if (k.contains('marucode') || k.contains('muteki')) {
+      return 'https://api.muteki.site/v1';
+    }
     if (RegExp(r'qwen|aliyun|dashscope').hasMatch(k)) {
       return 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     }

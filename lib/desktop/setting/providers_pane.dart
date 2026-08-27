@@ -297,6 +297,7 @@ class _DesktopProvidersBodyState extends State<_DesktopProvidersBody> {
       (name: 'DeepSeek', key: 'DeepSeek'),
       (name: 'AIhubmix', key: 'AIhubmix'),
       (name: '随想AI中转站', key: '随想AI中转站'),
+      (name: 'MaruCode', key: 'MaruCode'),
       (name: l10n.providersPageAliyunName, key: 'Aliyun'),
       (name: l10n.providersPageZhipuName, key: 'Zhipu AI'),
       (name: 'Claude', key: 'Claude'),
@@ -1404,6 +1405,69 @@ class _DesktopProviderDetailPaneState
                                 ..onTap = () async {
                                   final uri = Uri.parse(
                                     'https://sui-xiang.com',
+                                  );
+                                  try {
+                                    final ok = await launchUrl(
+                                      uri,
+                                      mode: LaunchMode.externalApplication,
+                                    );
+                                    if (!ok) {
+                                      await launchUrl(uri);
+                                    }
+                                  } catch (_) {
+                                    await launchUrl(uri);
+                                  }
+                                },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+
+              if (widget.providerKey.toLowerCase() == 'marucode') ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: cs.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: cs.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '偶尔做做慈善的小破站 API，自营号池，主要提供 Codex、Claude Code、GPT Image 等主流模型。支持 Websocket 协议，明码标价(Codex 0.25x, CC 1.5x)，透明汇率(1:1)，新用户注册送 2 刀。',
+                        style: TextStyle(
+                          color: cs.onSurface.withValues(alpha: 0.8),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text.rich(
+                        TextSpan(
+                          text: '官网：',
+                          style: TextStyle(
+                            color: cs.onSurface.withValues(alpha: 0.8),
+                          ),
+                          children: [
+                            TextSpan(
+                              text: 'https://api.muteki.site',
+                              style: TextStyle(
+                                color: cs.primary,
+                                fontWeight: AppFontWeights.emphasis,
+                              ),
+                              recognizer: TapGestureRecognizer()
+                                ..onTap = () async {
+                                  final uri = Uri.parse(
+                                    'https://api.muteki.site/register?aff=kelivo&promo=kelivo',
                                   );
                                   try {
                                     final ok = await launchUrl(
@@ -6509,10 +6573,7 @@ class _DesktopIosSectionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: context.appColors.hairline,
-          width: 0.6,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(children: children),
