@@ -4,6 +4,9 @@ env:
   FLUTTER_VERSION: '3.41.2'
 
 on:
+  push:
+    branches:
+      - release/zenmux-android
   workflow_dispatch:
     inputs:
       release_tag:
@@ -52,7 +55,7 @@ jobs:
 
       - name: Rename APKs
         env:
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag || 'v1.2.4-zenmux-android' }}
         run: |
           set -euo pipefail
           cd build/app/outputs/flutter-apk
@@ -64,9 +67,9 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag }}
-          name: ${{ inputs.release_tag }}
-          prerelease: ${{ inputs.prerelease }}
+          tag_name: ${{ inputs.release_tag || 'v1.2.4-zenmux-android' }}
+          name: ${{ inputs.release_tag || 'v1.2.4-zenmux-android' }}
+          prerelease: ${{ inputs.prerelease || true }}
           generate_release_notes: true
           files: build/app/outputs/flutter-apk/Kelivo_android_*.apk
 
