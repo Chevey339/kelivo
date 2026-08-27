@@ -267,9 +267,10 @@ GeminiSignatureMeta _geminiHistoryMeta(Map<String, dynamic> msg) {
 String _geminiHistoryText(Map<String, dynamic> msg) =>
     extractGeminiThoughtMeta((msg['content'] ?? '').toString()).cleanedText;
 
-/// Gemini 3 validates that the first functionCall part of a replayed model
-/// turn carries a thought signature; a missing one fails the whole request
-/// with "Function call is missing a thought_signature in functionCall parts".
+/// Gemini 3 requires at least one functionCall part of a replayed model turn
+/// to carry a thought signature (it signs only the first call of a parallel
+/// batch); none at all fails the whole request with "Function call is missing
+/// a thought_signature in functionCall parts".
 /// When the original signature was not persisted (legacy history, non-streaming
 /// responses), fall back to the documented placeholder so old conversations
 /// keep working.
@@ -282,7 +283,7 @@ void _ensureGeminiFunctionCallThoughtSig(List<Map<String, dynamic>> parts) {
     if (!hasSig) {
       part['thoughtSignature'] = geminiDummyThoughtSignature;
     }
-    return; // Only the first functionCall part is validated.
+    return; // One signed functionCall satisfies the check.
   }
 }
 

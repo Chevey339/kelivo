@@ -66,6 +66,21 @@ void main() {
       expect(decodeGeminiThoughtSignature(migrated)?.textValue, 'sig-legacy');
     });
 
+    test('collects the signature from a trailing empty part', () {
+      final payload = collectGeminiThoughtSignatureFromParts([
+        {
+          'text': 'Thinking',
+          'thought': true,
+          'thoughtSignature': 'sig-thought',
+        },
+        {'text': 'Answer.'},
+        {'text': '', 'thoughtSignature': 'sig-trailing'},
+      ]);
+      expect(jsonDecode(payload), {
+        'text': {'k': 'thoughtSignature', 'v': 'sig-trailing'},
+      });
+    });
+
     test('decodes bare JSON and the legacy comment alike', () {
       final fresh = decodeGeminiThoughtSignature(
         '{"text":{"k":"thoughtSignature","v":"sig-new"}}',
@@ -85,10 +100,14 @@ void main() {
   group('Gemini thought signature artifact', () {
     late HttpServer server;
     late List<Map<String, dynamic>> requestBodies;
+    late List<Map<String, dynamic>> responseParts;
 
     setUp(() async {
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       requestBodies = [];
+      responseParts = [
+        {'text': 'Answer.', 'thoughtSignature': 'sig-answer'},
+      ];
       server.listen((request) async {
         final body = await utf8.decoder.bind(request).join();
         requestBodies.add(jsonDecode(body) as Map<String, dynamic>);
@@ -97,11 +116,7 @@ void main() {
           'text',
           'event-stream',
         );
-        request.response.write(
-          _streamChunk([
-            {'text': 'Answer.', 'thoughtSignature': 'sig-answer'},
-          ]),
-        );
+        request.response.write(_streamChunk(responseParts));
         request.response.write('data: [DONE]');
         await request.response.close();
       });
@@ -137,6 +152,31 @@ void main() {
         'text': {'k': 'thoughtSignature', 'v': 'sig-answer'},
       });
     });
+
+    test(
+      'keeps the signature Gemini 3 hangs on a trailing empty part',
+      () async {
+        responseParts = [
+          {
+            'text': 'Thinking',
+            'thought': true,
+            'thoughtSignature': 'sig-thought',
+          },
+          {'text': 'Answer.'},
+          {'text': '', 'thoughtSignature': 'sig-trailing'},
+        ];
+
+        final chunks = await send(const [
+          {'role': 'user', 'content': 'Hello'},
+        ]);
+
+        expect(chunks.joinedContent, 'Answer.');
+        final artifact = chunks.whereType<ProviderArtifact>().single;
+        expect(jsonDecode(artifact.payload), {
+          'text': {'k': 'thoughtSignature', 'v': 'sig-trailing'},
+        });
+      },
+    );
 
     test('replays a stored signature from the internal key', () async {
       await send([

@@ -207,13 +207,14 @@ String collectGeminiThoughtSignatureFromParts(List<dynamic> parts) {
       sigKey = 'thought_signature';
       sigVal = p['thought_signature'];
     }
-    final hasText = ((p['text'] ?? '') as String? ?? '').isNotEmpty;
     final hasInline =
         p['inlineData'] is Map ||
         p['inline_data'] is Map ||
         p['fileData'] is Map ||
         p['file_data'] is Map;
-    if (hasText && sigKey != null && textKey == null) {
+    final isText =
+        !hasInline && p['thought'] != true && p['functionCall'] is! Map;
+    if (isText && sigKey != null && sigVal != null && textKey == null) {
       textKey = sigKey;
       textVal = sigVal;
     }

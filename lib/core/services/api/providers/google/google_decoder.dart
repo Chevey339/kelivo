@@ -338,14 +338,18 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       roundModelParts.add(rawPart);
     }
 
+    final inline = p['inlineData'] ?? p['inline_data'];
+    // Gemini 3 hangs the turn's signature on a trailing part whose text is
+    // empty, so the text guard must not require a body.
     if (persistThoughtSigs &&
         !thought &&
+        fc == null &&
+        inline is! Map &&
         partThoughtSigKey != null &&
-        partThoughtSigVal != null) {
-      if (t.isNotEmpty && textThoughtSigKey == null) {
-        textThoughtSigKey = partThoughtSigKey;
-        textThoughtSigVal = partThoughtSigVal;
-      }
+        partThoughtSigVal != null &&
+        textThoughtSigKey == null) {
+      textThoughtSigKey = partThoughtSigKey;
+      textThoughtSigVal = partThoughtSigVal;
     }
 
     if (t.isNotEmpty) {
@@ -358,7 +362,6 @@ class GoogleStreamDecoder implements StreamChunkDecoder {
       }
     }
 
-    final inline = p['inlineData'] ?? p['inline_data'];
     if (inline is Map) {
       final mime = (inline['mimeType'] ?? inline['mime_type'] ?? 'image/png')
           .toString();
