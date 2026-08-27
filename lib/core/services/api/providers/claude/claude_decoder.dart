@@ -5,6 +5,7 @@ import '../../../../../utils/utf16_safe_cut.dart';
 import '../../../../models/token_usage.dart';
 import '../../stream/sse_event.dart';
 import '../../stream/stream_chunk.dart';
+import 'claude_container.dart';
 import '../../stream/stream_chunk_decoder.dart';
 import '../../stream/stream_chunk_ids.dart';
 import 'claude_history.dart';
@@ -47,7 +48,7 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
   ///
   /// Files and REPL state live in the container, so a follow-up round that
   /// does not send this id back starts from an empty one.
-  String? containerId;
+  ClaudeContainerRef? container;
   bool messageStopped = false;
 
   final Map<int, String> _clientIndexToId = <int, String>{};
@@ -443,10 +444,11 @@ class ClaudeStreamDecoder implements StreamChunkDecoder {
     // there; the delta is checked as well in case it is only settled at the
     // end.
     for (final holder in [obj['message'], obj['delta'], obj]) {
-      final container = holder is Map ? holder['container'] : null;
-      final id = container is Map ? (container['id'] ?? '').toString() : '';
-      if (id.isNotEmpty) {
-        containerId = id;
+      final found = ClaudeContainerRef.fromResponse(
+        holder is Map ? holder['container'] : null,
+      );
+      if (found != null) {
+        container = found;
         break;
       }
     }

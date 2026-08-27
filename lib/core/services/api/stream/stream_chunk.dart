@@ -224,6 +224,16 @@ final class GeneratedFile extends StreamChunk {
   final String? mime;
 }
 
+/// A piece of provider-side state the next turn has to send back — a
+/// container id, a session token — stored against the assistant message it
+/// belongs to and never shown.
+final class ProviderArtifact extends StreamChunk {
+  const ProviderArtifact({required this.kind, required this.payload});
+
+  final String kind;
+  final String payload;
+}
+
 final class Annotations extends StreamChunk {
   const Annotations(this.annotations, {this.id = ''});
 

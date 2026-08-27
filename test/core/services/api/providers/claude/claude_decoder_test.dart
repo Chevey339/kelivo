@@ -390,12 +390,16 @@ void main() {
           'type': 'message',
           'role': 'assistant',
           'content': <dynamic>[],
-          'container': {'id': 'container_abc', 'expires_at': '2026-09-26'},
+          'container': {
+            'id': 'container_abc',
+            'expires_at': '2026-09-26T00:00:00Z',
+          },
           'usage': {'input_tokens': 1, 'output_tokens': 1},
         },
       }),
     );
-    expect(decoder.containerId, 'container_abc');
+    expect(decoder.container!.id, 'container_abc');
+    expect(decoder.container!.expiresAt, DateTime.utc(2026, 9, 26));
   });
 
   test(

@@ -9,6 +9,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/services/api/builtin_tools.dart';
 import 'package:Kelivo/core/services/api/chat_api_service.dart';
+import 'package:Kelivo/core/services/api/providers/claude/claude_container.dart';
 import 'package:Kelivo/core/services/api/providers/claude/claude_history.dart';
 import 'package:Kelivo/core/services/api/stream/stream_chunk.dart';
 import 'package:Kelivo/core/utils/multimodal_input_utils.dart';
@@ -1554,7 +1555,7 @@ void main() {
     });
 
     test(
-      'a conversation keeps its container across turns until it expires',
+      'a conversation resumes in the container its last turn stored',
       () async {
         final bodies = <Map<String, dynamic>>[];
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -1589,7 +1590,8 @@ void main() {
               'id': 'msg_${bodies.length}',
               'stop_reason': 'end_turn',
               'container': {
-                'id': bodies.length < 3 ? 'container_1' : 'container_2',
+                'id': 'container_${bodies.length}',
+                'expires_at': '2099-01-01T00:00:00Z',
               },
               'content': const [
                 {'type': 'text', 'text': 'ok'},
@@ -1608,35 +1610,58 @@ void main() {
             },
           },
         );
-        Future<void> turn() async {
+        Future<String?> turn({String? storedContainer}) async {
           final chunks = await ChatApiService.sendMessageStream(
             config: config,
             modelId: 'claude-opus-4-7',
-            messages: const [
+            messages: [
               {'role': 'user', 'content': 'hello'},
+              if (storedContainer != null) ...[
+                {
+                  'role': 'assistant',
+                  'content': 'ran some code',
+                  multimodalInternalClaudeContainerKey: storedContainer,
+                },
+                {'role': 'user', 'content': 'and again'},
+              ],
             ],
-            requestId: 'conversation-container-test',
             stream: false,
           ).toList();
           expect(chunks.joinedContent, 'ok');
+          final artifacts = chunks.whereType<ProviderArtifact>().toList();
+          expect(artifacts.map((a) => a.kind).toList(), [
+            claudeContainerArtifactKind,
+          ]);
+          return artifacts.single.payload;
         }
 
         await HttpOverrides.runZoned(
           () async {
-            await turn();
-            await turn();
-            await turn();
+            // The turn hands its container over; the chat stores it against
+            // the assistant message and sends it back with the history.
+            final first = await turn();
+            expect(ClaudeContainerRef.decode(first)!.id, 'container_1');
+            final second = await turn(storedContainer: first);
+            expect(ClaudeContainerRef.decode(second)!.id, 'container_3');
+            // An expired container is never offered.
+            await turn(
+              storedContainer: const ClaudeContainerRef(
+                id: 'container_old',
+              ).encode().replaceFirst('}', ',"expires_at":"2000-01-01"}'),
+            );
           },
           createHttpClient: (context) =>
               _ProxyHttpOverrides(server.port).createHttpClient(context),
         );
 
         expect(bodies.map((body) => body['container']).toList(), [
-          null, // first turn: nothing to reuse yet
-          'container_1', // second turn reuses, and is told it expired
-          null, // ...so it retries fresh
-          'container_2', // third turn reuses the replacement
+          null, // nothing stored yet
+          'container_1', // stored by the first turn, and told it expired
+          null, // ...so the round retries fresh
+          null, // the stored one had expired on its own
         ]);
+        // The internal key never reaches the wire.
+        expect(jsonEncode(bodies), isNot(contains('_kelivo_')));
       },
     );
 

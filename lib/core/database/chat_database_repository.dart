@@ -6102,21 +6102,33 @@ class ChatDatabaseRepository {
 
   Future<Map<String, String>> getGeminiThoughtSignaturesForMessages(
     Iterable<String> messageIds,
+  ) => getProviderArtifactsForMessages(messageIds, 'gemini_thought_signature');
+
+  /// revisionId → payload for every message among [messageIds] that carries
+  /// a provider artifact of [kind].
+  Future<Map<String, String>> getProviderArtifactsForMessages(
+    Iterable<String> messageIds,
+    String kind,
   ) async {
     final ids = messageIds.toSet();
     if (ids.isEmpty) return const {};
-    final rows =
-        await (_db.select(_db.providerArtifactRows)..where(
-              (row) =>
-                  row.revisionId.isIn(ids) &
-                  row.kind.equals('gemini_thought_signature'),
-            ))
-            .get();
-    final result = <String, String>{
+    final rows = await (_db.select(
+      _db.providerArtifactRows,
+    )..where((row) => row.revisionId.isIn(ids) & row.kind.equals(kind))).get();
+    return <String, String>{
       for (final row in rows)
         if (row.payload.trim().isNotEmpty) row.revisionId: row.payload.trim(),
     };
-    return result;
+  }
+
+  Future<void> setProviderArtifact(
+    String messageId,
+    String kind,
+    String payload,
+  ) async {
+    await _db.transaction(() async {
+      await _upsertProviderArtifact(messageId, kind, payload);
+    });
   }
 
   Future<void> setGeminiThoughtSignature(
@@ -6320,6 +6332,13 @@ class ChatDatabaseRepository {
   Future<void> _upsertGeminiThoughtSignature(
     String messageId,
     String signature,
+  ) =>
+      _upsertProviderArtifact(messageId, 'gemini_thought_signature', signature);
+
+  Future<void> _upsertProviderArtifact(
+    String messageId,
+    String kind,
+    String payload,
   ) async {
     final message = await (_db.select(
       _db.messageRows,
@@ -6334,8 +6353,8 @@ class ChatDatabaseRepository {
           ProviderArtifactRowsCompanion.insert(
             conversationId: message.conversationId,
             revisionId: messageId,
-            kind: 'gemini_thought_signature',
-            payload: signature,
+            kind: kind,
+            payload: payload,
             createdAt: message.timestamp,
             updatedAt: now.isBefore(message.timestamp)
                 ? message.timestamp

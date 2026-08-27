@@ -109,6 +109,12 @@ void main() {
         geminiSignaturesByMessageId: const {'a1v1': 'signature'},
       );
 
+      await repository.setProviderArtifact(
+        'a1v1',
+        'claude_container',
+        '{"id":"container_1"}',
+      );
+
       final fork = await repository.forkConversationWithVersions(
         sourceId: 'source',
         targetRevisionId: 'a1v1',
@@ -162,6 +168,14 @@ void main() {
       expect(
         await repository.getGeminiThoughtSignature(messages.last.id),
         'signature',
+      );
+      // Any provider artifact rides along with its revision, not just the
+      // Gemini signature.
+      expect(
+        await repository.getProviderArtifactsForMessages([
+          messages.last.id,
+        ], 'claude_container'),
+        {messages.last.id: '{"id":"container_1"}'},
       );
 
       final raw = sqlite.sqlite3.open('${directory.path}/chat.sqlite');

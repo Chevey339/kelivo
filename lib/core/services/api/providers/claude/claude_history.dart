@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../../utils/multimodal_input_utils.dart';
 import '../../../../../utils/sandbox_path_resolver.dart';
 import '../../chat_api_helpers.dart';
+import 'claude_container.dart';
 
 /// The replay metadata a tool card of a Claude turn carries: every response
 /// the API produced for the turn so far, the current one last. A turn that
@@ -72,6 +73,11 @@ class ClaudeHistory {
   final bool skipRedactedThinkingBlocks;
   final bool skipImageParsing;
   final List<String>? userImagePaths;
+
+  /// The container the conversation's last code execution ran in, stored
+  /// against that assistant message. The latest one wins; an expired one is
+  /// no better than none. Set by [build].
+  ClaudeContainerRef? storedContainer;
 
   /// The blocks of one response as this endpoint may be sent them.
   List<Map<String, dynamic>> sanitize(Iterable<Map> blocks) {
@@ -172,6 +178,12 @@ class ClaudeHistory {
     for (var i = 0; i < messages.length; i++) {
       final m = messages[i];
       final role = (m['role'] ?? 'user').toString();
+      if (role == 'assistant') {
+        final ref = ClaudeContainerRef.decode(
+          m[multimodalInternalClaudeContainerKey],
+        );
+        if (ref != null) storedContainer = ref.isExpired ? null : ref;
+      }
       if (role == 'tool') {
         final id = (m['tool_call_id'] ?? '').toString();
         // A server tool replayed as its own blocks already carries its result.

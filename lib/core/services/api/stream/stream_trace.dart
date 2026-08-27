@@ -196,6 +196,11 @@ Map<String, dynamic> _chunkSnapshot(StreamChunk chunk) {
       phase: 'snapshot',
     )..['type'] = 'image_snapshot',
     ImageEnd(:final id) => <String, dynamic>{'type': 'image_end', 'id': id},
+    ProviderArtifact(:final kind, :final payload) => <String, dynamic>{
+      'type': 'provider_artifact',
+      'kind': kind,
+      'payload': payload,
+    },
     GeneratedFile(:final uri, :final name, :final mime) => <String, dynamic>{
       'type': 'generated_file',
       'uri': uri,

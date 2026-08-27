@@ -211,6 +211,9 @@ class StreamChunkHandler {
         }
         _imageIndex.remove(id);
         _imageMime.remove(id);
+      case ProviderArtifact():
+        // Provider state, not message content; the chat stores it separately.
+        break;
       case GeneratedFile(:final uri, :final name, :final mime):
         if (uri.isEmpty) return;
         // An image belongs in an image part so the viewer, the export sheet,

@@ -2144,6 +2144,8 @@ class ChatActions {
         _scheduleStreamingCheckpoint(state);
       case Usage(:final usage):
         _applyUsage(state, usage);
+      case ProviderArtifact(:final kind, :final payload):
+        await chatService.setProviderArtifact(state.messageId, kind, payload);
       case Finish():
         await _handleStreamFinish(state);
       case ImageStart() ||

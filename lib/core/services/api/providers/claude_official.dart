@@ -16,6 +16,7 @@ import '../stream/sse_framing.dart';
 import '../stream/stream_chunk.dart';
 import '../stream/stream_chunk_emit.dart';
 import '../stream/stream_chunk_ids.dart';
+import 'claude/claude_container.dart';
 import 'claude/claude_decoder.dart';
 import 'claude/claude_files.dart';
 import 'claude/claude_history.dart';
@@ -37,13 +38,6 @@ int _defaultClaudeMaxOutputTokens(String modelId) {
   return 64000;
 }
 
-// Containers are per turn as far as the API is concerned, so this carries the
-// id across a conversation's turns for as long as the app runs — the files
-// and REPL state from the last question are still there for the next one.
-// The API tells us when a remembered container has expired; nothing here is
-// persisted, so a restart only means starting from an empty container again.
-final _containerBySession = <String, String>{};
-
 Stream<StreamChunk> sendClaudeStream(
   http.Client client,
   ProviderConfig config,
@@ -61,7 +55,6 @@ Stream<StreamChunk> sendClaudeStream(
   bool stream = true,
   bool builtInSearchOnly = false,
   bool skipImageParsing = false,
-  String? sessionKey,
 }) async* {
   final upstreamModelId = apiModelId(config, modelId);
   // Endpoint and headers (constant across rounds)
@@ -248,16 +241,9 @@ Stream<StreamChunk> sendClaudeStream(
   var lastStreamResults = <Map<String, dynamic>>[];
   final nonStreamText = StringBuffer();
   var pauseTurn = false;
-  // Each round would otherwise get a fresh container, losing the files and
-  // REPL state the previous one built up — even mid-turn, after a client tool
-  // or a pause.
-  String? containerId = sessionKey == null
-      ? null
-      : _containerBySession[sessionKey];
-  void rememberContainer(String id) {
-    containerId = id;
-    if (sessionKey != null) _containerBySession[sessionKey] = id;
-  }
+  // Carried through every round of this turn — after a client tool, after a
+  // pause — and handed back at the end so the next turn resumes in it too.
+  ClaudeContainerRef? container = history.storedContainer;
 
   yield* runProviderToolRounds(
     sendRound: () async* {
@@ -302,7 +288,7 @@ Stream<StreamChunk> sendClaudeStream(
         if (allTools.isNotEmpty) 'tool_choice': {'type': 'auto'},
         if (thinking != null) 'thinking': thinking,
         if (outputConfig != null) 'output_config': outputConfig,
-        if (hasCodeExecution && containerId != null) 'container': containerId,
+        if (hasCodeExecution && container != null) 'container': container!.id,
       };
       final extraClaude = customBody(config, modelId, assistantBody: extraBody);
       if (extraClaude.isNotEmpty) {
@@ -330,8 +316,7 @@ Stream<StreamChunk> sendClaudeStream(
         if (!staleContainer) {
           throw HttpException('HTTP ${response.statusCode}: $errorBody');
         }
-        containerId = null;
-        if (sessionKey != null) _containerBySession.remove(sessionKey);
+        container = null;
         body.remove('container');
         response = await client.send(buildRequest());
         if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -358,10 +343,8 @@ Stream<StreamChunk> sendClaudeStream(
             );
           }
         } catch (_) {}
-        final container = obj['container'];
-        if (container is Map && (container['id'] ?? '').toString().isNotEmpty) {
-          rememberContainer(container['id'].toString());
-        }
+        container =
+            ClaudeContainerRef.fromResponse(obj['container']) ?? container;
         final content = (obj['content'] as List?) ?? const <dynamic>[];
         final List<Map<String, dynamic>> assistantBlocks =
             <Map<String, dynamic>>[];
@@ -535,7 +518,7 @@ Stream<StreamChunk> sendClaudeStream(
       final toolResultsContent = decoder.toolResults;
 
       totalUsage = usage ?? totalUsage;
-      if (decoder.containerId != null) rememberContainer(decoder.containerId!);
+      container = decoder.container ?? container;
 
       // The continuation round sends these as they are, so they go through the
       // same sanitising as replayed history — the persisted copy below stays
@@ -603,12 +586,22 @@ Stream<StreamChunk> sendClaudeStream(
         {'role': 'user', 'content': results},
       ];
     },
-    finish: () => emitDone(
-      ids: StreamChunkIds('finish'),
-      content: nonStreamText.toString(),
-      usage: totalUsage,
-      totalTokens: totalUsage?.totalTokens ?? 0,
-    ),
+    finish: () async* {
+      // Stored against this turn's message so the next turn can resume in
+      // the same container.
+      if (hasCodeExecution && container != null) {
+        yield ProviderArtifact(
+          kind: claudeContainerArtifactKind,
+          payload: container!.encode(),
+        );
+      }
+      yield* emitDone(
+        ids: StreamChunkIds('finish'),
+        content: nonStreamText.toString(),
+        usage: totalUsage,
+        totalTokens: totalUsage?.totalTokens ?? 0,
+      );
+    },
     usageOf: () => totalUsage,
   );
 }

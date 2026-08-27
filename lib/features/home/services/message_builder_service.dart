@@ -27,6 +27,7 @@ import '../../../core/services/search/search_tool_service.dart';
 import '../../../core/providers/instruction_injection_provider.dart';
 import '../../../core/providers/world_book_provider.dart';
 import '../../../core/services/api/builtin_tools.dart';
+import '../../../core/services/api/providers/claude/claude_container.dart';
 import '../../../core/models/assistant_regex.dart';
 import '../../../core/utils/multimodal_input_utils.dart';
 import '../../../utils/assistant_regex.dart';
@@ -86,6 +87,7 @@ class MessageBuilderService {
     this.ocrHandler,
     this.ocrPrefetch,
     this.geminiThoughtSignatureHandler,
+    this.providerArtifactLookup,
   });
 
   final ChatService chatService;
@@ -121,6 +123,11 @@ class MessageBuilderService {
   /// Handler to append Gemini thought signatures for API calls
   final String Function(ChatMessage message, String content)?
   geminiThoughtSignatureHandler;
+
+  /// Provider state stored against an assistant message (a container id), by
+  /// kind. It rides along under an internal key the provider strips.
+  final String? Function(ChatMessage message, String kind)?
+  providerArtifactLookup;
 
   /// Cache for document text extraction to avoid re-reading files on every message
   /// Keyed by path, validated with (modified + size) to avoid stale reuse.
@@ -301,6 +308,14 @@ class MessageBuilderService {
       final message = <String, dynamic>{'role': role, 'content': content};
       if (role == 'user') {
         message[internalRevisionIdKey] = m.id;
+      } else {
+        final container = providerArtifactLookup?.call(
+          m,
+          claudeContainerArtifactKind,
+        );
+        if (container != null && container.isNotEmpty) {
+          message[multimodalInternalClaudeContainerKey] = container;
+        }
       }
       if (mediaRefs.isNotEmpty) {
         message[internalMediaPathsKey] = mediaRefs;
