@@ -5,6 +5,8 @@
  import UserNotifications
  import ActivityKit
  import EventKit
+ import SwiftUI
+ import Translation
 
 private let backgroundRefreshIdentifier = "psyche.kelivo.background-generation.refresh"
 private let backgroundProcessingIdentifier = "psyche.kelivo.background-generation.processing"
@@ -15,6 +17,7 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
    private let backgroundGenerationHandler = IosBackgroundGenerationHandler()
    private let mcpOAuthHandler = IosMcpOAuthHandler()
    private let deviceLocalToolsHandler = DeviceLocalToolsHandler()
+   private let iosTranslationHandler = IosTranslationHandler()
 
   override func application(
     _ application: UIApplication,
@@ -66,6 +69,12 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
       mcpOAuthChannel.setMethodCallHandler { [weak self] call, result in
         self?.mcpOAuthHandler.handle(call: call, result: result)
       }
+
+      let iosTranslationChannel = FlutterMethodChannel(name: "app.ios_translation", binaryMessenger: controller.binaryMessenger)
+      iosTranslationHandler.presentingViewController = controller
+      iosTranslationChannel.setMethodCallHandler { [weak self] call, result in
+        self?.iosTranslationHandler.handle(call: call, result: result)
+      }
  
        let deviceToolsChannel = FlutterMethodChannel(name: "app.device_tools", binaryMessenger: controller.binaryMessenger)
        deviceToolsChannel.setMethodCallHandler { [weak self] call, result in
@@ -89,6 +98,104 @@ private let backgroundProcessingIdentifier = "psyche.kelivo.background-generatio
       return true
     }
     return super.application(app, open: url, options: options)
+  }
+}
+
+private final class IosTranslationHandler {
+  weak var presentingViewController: UIViewController?
+  private var hostingController: UIViewController?
+
+  func handle(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    switch call.method {
+    case "isAvailable":
+      if #available(iOS 17.4, *) {
+        result(true)
+      } else {
+        result(false)
+      }
+    case "present":
+      guard #available(iOS 17.4, *) else {
+        result(false)
+        return
+      }
+      let arguments = call.arguments as? [String: Any]
+      guard
+        let text = arguments?["text"] as? String,
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+        let anchorX = arguments?["anchorX"] as? Double,
+        let anchorY = arguments?["anchorY"] as? Double,
+        let presenter = presentingViewController,
+        presenter.viewIfLoaded?.window != nil
+      else {
+        result(false)
+        return
+      }
+      present(
+        text: text,
+        anchor: CGPoint(x: anchorX, y: anchorY),
+        in: presenter
+      )
+      result(true)
+    default:
+      result(FlutterMethodNotImplemented)
+    }
+  }
+
+  @available(iOS 17.4, *)
+  private func present(text: String, anchor: CGPoint, in presenter: UIViewController) {
+    removeHostingController()
+
+    let bounds = presenter.view.bounds
+    let point = CGPoint(
+      x: min(max(anchor.x, bounds.minX + 1), bounds.maxX - 1),
+      y: min(max(anchor.y, bounds.minY + 1), bounds.maxY - 1)
+    )
+    let hostingController = UIHostingController(
+      rootView: NativeTranslationPresenter(text: text) { [weak self] in
+        self?.removeHostingController()
+      }
+    )
+    hostingController.view.backgroundColor = .clear
+    hostingController.view.frame = CGRect(
+      x: point.x - 1,
+      y: point.y - 1,
+      width: 2,
+      height: 2
+    )
+    presenter.addChild(hostingController)
+    presenter.view.addSubview(hostingController.view)
+    hostingController.didMove(toParent: presenter)
+    self.hostingController = hostingController
+  }
+
+  private func removeHostingController() {
+    guard let hostingController else { return }
+    hostingController.willMove(toParent: nil)
+    hostingController.view.removeFromSuperview()
+    hostingController.removeFromParent()
+    self.hostingController = nil
+  }
+}
+
+@available(iOS 17.4, *)
+private struct NativeTranslationPresenter: View {
+  let text: String
+  let onDismiss: () -> Void
+  @State private var isPresented = false
+
+  var body: some View {
+    Color.clear
+      .translationPresentation(isPresented: $isPresented, text: text)
+      .onAppear {
+        DispatchQueue.main.async {
+          isPresented = true
+        }
+      }
+      .onChange(of: isPresented) { visible in
+        if !visible {
+          onDismiss()
+        }
+      }
   }
 }
 

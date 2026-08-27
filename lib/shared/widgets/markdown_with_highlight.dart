@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
@@ -6090,12 +6091,20 @@ class SelectableHighlightView extends StatefulWidget {
 }
 
 class _SelectableHighlightViewState extends State<SelectableHighlightView> {
+  static const MethodChannel _iosTranslationChannel = MethodChannel(
+    'app.ios_translation',
+  );
+
   late List<TextSpan> _codeTextSpans;
+  bool _iosTranslationAvailable = false;
 
   @override
   void initState() {
     super.initState();
     _codeTextSpans = _highlightSource();
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      unawaited(_loadIosTranslationAvailability());
+    }
   }
 
   @override
@@ -6126,6 +6135,75 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
       return _convertNodes(nodes);
     } catch (_) {
       return const [];
+    }
+  }
+
+  Future<void> _loadIosTranslationAvailability() async {
+    try {
+      final available =
+          await _iosTranslationChannel.invokeMethod<bool>('isAvailable') ??
+          false;
+      if (mounted && available != _iosTranslationAvailable) {
+        setState(() => _iosTranslationAvailable = available);
+      }
+    } on MissingPluginException {
+      // Keep the stock selection menu when the native bridge is unavailable.
+    } on PlatformException {
+      // Keep the stock selection menu when the availability check fails.
+    }
+  }
+
+  Widget _buildSelectionContextMenu(
+    BuildContext context,
+    EditableTextState editableTextState,
+  ) {
+    final value = editableTextState.textEditingValue;
+    final selection = value.selection;
+    if (!_iosTranslationAvailable ||
+        !selection.isValid ||
+        selection.isCollapsed) {
+      return AdaptiveTextSelectionToolbar.editableText(
+        editableTextState: editableTextState,
+      );
+    }
+
+    final selectedText = selection.textInside(value.text);
+    if (selectedText.trim().isEmpty) {
+      return AdaptiveTextSelectionToolbar.editableText(
+        editableTextState: editableTextState,
+      );
+    }
+
+    final anchors = editableTextState.contextMenuAnchors;
+    final buttonItems = <ContextMenuButtonItem>[
+      ...editableTextState.contextMenuButtonItems,
+      ContextMenuButtonItem(
+        label: AppLocalizations.of(context)!.chatMessageWidgetTranslateTooltip,
+        onPressed: () {
+          editableTextState.hideToolbar();
+          unawaited(
+            _presentIosTranslation(selectedText, anchors.primaryAnchor),
+          );
+        },
+      ),
+    ];
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: anchors,
+      buttonItems: buttonItems,
+    );
+  }
+
+  Future<void> _presentIosTranslation(String text, Offset anchor) async {
+    try {
+      await _iosTranslationChannel.invokeMethod<void>('present', {
+        'text': text,
+        'anchorX': anchor.dx,
+        'anchorY': anchor.dy,
+      });
+    } on MissingPluginException {
+      // The toolbar has already closed; there is no native UI to present.
+    } on PlatformException {
+      // Do not let a native presentation failure affect text selection.
     }
   }
 
@@ -6162,6 +6240,7 @@ class _SelectableHighlightViewState extends State<SelectableHighlightView> {
             ? [TextSpan(text: widget.source)]
             : _codeTextSpans,
       ),
+      contextMenuBuilder: _buildSelectionContextMenu,
     );
   }
 }
