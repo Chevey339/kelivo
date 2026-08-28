@@ -10,6 +10,8 @@ import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../features/instruction_injection/pages/instruction_injection_page.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 /// Bottom sheet for displaying instruction injection items on mobile/tablet.
 ///
@@ -139,7 +141,8 @@ class InstructionInjectionSheet extends StatelessWidget {
                                                 >(
                                                   context: ctx,
                                                   isScrollControlled: true,
-                                                  backgroundColor: cs.surface,
+                                                  backgroundColor:
+                                                      ctx.overlaySurface,
                                                   shape: const RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadius.vertical(
@@ -341,7 +344,7 @@ class _InstructionInjectionRow extends StatelessWidget {
       height: 48,
       child: IosCardPress(
         borderRadius: radius,
-        baseColor: Theme.of(context).colorScheme.surface,
+        baseColor: sheetTileColor(context),
         duration: const Duration(milliseconds: 260),
         onTap: onTap,
         onLongPress: onLongPress,
@@ -380,11 +383,10 @@ Future<void> showInstructionInjectionSheet(
   BuildContext context, {
   required String? assistantId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

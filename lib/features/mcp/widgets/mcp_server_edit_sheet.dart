@@ -11,6 +11,7 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class _HeaderEntry {
   final TextEditingController key;
@@ -26,11 +27,10 @@ Future<void> showMcpServerEditSheet(
   BuildContext context, {
   String? serverId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     // Match provider sheet corner radius
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -116,36 +116,6 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
   }
 
   // Simple iOS-style card wrapper, same as provider sheet
-  Widget _iosCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: context.appColors.surfaceCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          children: [
-            for (int i = 0; i < children.length; i++) ...[
-              if (i > 0)
-                Divider(
-                  height: 10,
-                  thickness: 0.6,
-                  color: cs.outlineVariant.withValues(alpha: 0.18),
-                ),
-              children[i],
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _inputRow({
     required String label,
@@ -219,7 +189,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _iosCard(
+        SectionCard(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          dividers: true,
           children: [
             _switchRow(
               label: l10n.mcpServerEditSheetEnabledLabel,
@@ -230,7 +202,9 @@ class _McpServerEditSheetState extends State<_McpServerEditSheet>
         ),
         const SizedBox(height: 10),
         if (isBuiltin)
-          _iosCard(
+          SectionCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            dividers: true,
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),

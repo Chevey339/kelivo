@@ -164,7 +164,8 @@ _expectedPackedEntriesFromManifest(File zipFile) async {
     final manifestEntry = archive.findFile('manifest.json');
     expect(manifestEntry, isNotNull);
     final manifestBytes = manifestEntry!.readBytes()!;
-    final manifest = jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
+    final manifest =
+        jsonDecode(utf8.decode(manifestBytes)) as Map<String, dynamic>;
     final rawEntries = manifest['entries'] as Map;
     return {
       for (final entry in rawEntries.entries)
@@ -582,7 +583,9 @@ void main() {
           expectedEntries: expected,
         );
 
-        final mutated = Map<String, ({int bytes, String sha256})>.from(expected);
+        final mutated = Map<String, ({int bytes, String sha256})>.from(
+          expected,
+        );
         mutated['manifest.json'] = (
           bytes: expected['manifest.json']?.bytes ?? 1,
           sha256: '0' * 64,
@@ -607,10 +610,9 @@ void main() {
     test('export does not create a sibling extract directory', () async {
       final uploadDir = Directory('${root.path}/upload');
       await uploadDir.create(recursive: true);
-      await File('${uploadDir.path}/payload.bin').writeAsBytes(
-        List<int>.filled(32 * 1024, 5),
-        flush: true,
-      );
+      await File(
+        '${uploadDir.path}/payload.bin',
+      ).writeAsBytes(List<int>.filled(32 * 1024, 5), flush: true);
       final tmpDir = Directory('${root.path}/tmp');
       await tmpDir.create(recursive: true);
       final createdVerify = <String>[];
@@ -691,9 +693,9 @@ void main() {
     test('cancelling packing deletes the work directory', () async {
       final uploadDir = Directory('${root.path}/upload');
       await uploadDir.create(recursive: true);
-      await File('${uploadDir.path}/payload.bin').writeAsBytes(
-        List<int>.filled(2 * 1024 * 1024, 3),
-      );
+      await File(
+        '${uploadDir.path}/payload.bin',
+      ).writeAsBytes(List<int>.filled(2 * 1024 * 1024, 3));
 
       final token = BackupCancelToken();
       addTearDown(token.dispose);
@@ -765,7 +767,10 @@ void main() {
         ),
         throwsA(isA<BackupCancelledException>()),
       );
-      expect(events.map((event) => event.phase), contains(BackupPhase.verifying));
+      expect(
+        events.map((event) => event.phase),
+        contains(BackupPhase.verifying),
+      );
       final tmp = Directory('${root.path}/tmp');
       if (await tmp.exists()) {
         final leftovers = tmp
@@ -928,10 +933,7 @@ void main() {
             .listSync(followLinks: false)
             .map((entity) => p.basename(entity.path))
             .toList();
-        expect(
-          leftovers.where((name) => name.startsWith('restore_')),
-          isEmpty,
-        );
+        expect(leftovers.where((name) => name.startsWith('restore_')), isEmpty);
       }
     });
 
@@ -1009,64 +1011,56 @@ void main() {
         final token = BackupCancelToken();
         addTearDown(token.dispose);
         final phases = <BackupPhase>[];
-        final future = DataSync(
-          businessRepository: businessRepository,
-          chatService: ChatService(),
-        ).listBackupFiles(
-          WebDavConfig(
-            url: 'http://${server.address.address}:${server.port}',
-            path: 'kelivo_backups',
-          ),
-          onProgress: (progress) => phases.add(progress.phase),
-          cancelToken: token,
-        );
+        final future =
+            DataSync(
+              businessRepository: businessRepository,
+              chatService: ChatService(),
+            ).listBackupFiles(
+              WebDavConfig(
+                url: 'http://${server.address.address}:${server.port}',
+                path: 'kelivo_backups',
+              ),
+              onProgress: (progress) => phases.add(progress.phase),
+              cancelToken: token,
+            );
         await Future<void>.delayed(const Duration(milliseconds: 40));
         token.cancel();
 
-        await expectLater(
-          future,
-          throwsA(isA<BackupCancelledException>()),
-        );
+        await expectLater(future, throwsA(isA<BackupCancelledException>()));
         expect(phases, contains(BackupPhase.listingRemote));
       },
     );
 
-    test(
-      'cancelling staging leaves no published restore receipt',
-      () async {
-        final zipFile = await _createSqliteBackupFixture(
-          root: root,
-          prefix: 'staging_cancel',
-          settings: const {},
-        );
-        final token = BackupCancelToken();
-        addTearDown(token.dispose);
-        final chatService = ChatService();
-        addTearDown(chatService.close);
+    test('cancelling staging leaves no published restore receipt', () async {
+      final zipFile = await _createSqliteBackupFixture(
+        root: root,
+        prefix: 'staging_cancel',
+        settings: const {},
+      );
+      final token = BackupCancelToken();
+      addTearDown(token.dispose);
+      final chatService = ChatService();
+      addTearDown(chatService.close);
 
-        await expectLater(
-          DataSync(
-            businessRepository: businessRepository,
-            chatService: chatService,
-          ).restoreFromLocalFile(
-            zipFile,
-            const WebDavConfig(includeChats: true, includeFiles: false),
-            onProgress: (progress) {
-              if (progress.phase == BackupPhase.stagingCandidate) {
-                token.cancel();
-              }
-            },
-            cancelToken: token,
-          ),
-          throwsA(isA<BackupCancelledException>()),
-        );
+      await expectLater(
+        DataSync(
+          businessRepository: businessRepository,
+          chatService: chatService,
+        ).restoreFromLocalFile(
+          zipFile,
+          const WebDavConfig(includeChats: true, includeFiles: false),
+          onProgress: (progress) {
+            if (progress.phase == BackupPhase.stagingCandidate) {
+              token.cancel();
+            }
+          },
+          cancelToken: token,
+        ),
+        throwsA(isA<BackupCancelledException>()),
+      );
 
-        expect(
-          await RestoreStartupGate.inspect(appDataDirectory: root),
-          isNull,
-        );
-      },
-    );
+      expect(await RestoreStartupGate.inspect(appDataDirectory: root), isNull);
+    });
 
     test(
       'normal backup includes credentials and declares that in manifest',

@@ -810,6 +810,7 @@ class _MessageListViewState extends State<MessageListView> {
           toolName: toolParts[i].toolName,
           arguments: toolParts[i].arguments,
           content: toolParts[i].content,
+          metadata: toolParts[i].metadata,
           loading: toolParts[i].loading,
           memoToken: identityHashCode(toolParts[i]),
         ),
@@ -943,6 +944,7 @@ class _MessageListViewState extends State<MessageListView> {
           toolName: tool.toolName,
           arguments: tool.arguments,
           content: tool.content,
+          metadata: tool.metadata,
           showToolResultSummary: settings.showToolResultSummary,
           hideToolResultImages: settings.hideToolResultImages,
           pendingApproval: _isPendingApproval(

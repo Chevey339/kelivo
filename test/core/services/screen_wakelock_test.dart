@@ -65,28 +65,31 @@ void main() {
     });
   });
 
-  test('setEnabled(false) releases immediately; true with holders acquires', () {
-    final calls = <bool>[];
-    ScreenWakelock.debugReset(platformApply: calls.add);
+  test(
+    'setEnabled(false) releases immediately; true with holders acquires',
+    () {
+      final calls = <bool>[];
+      ScreenWakelock.debugReset(platformApply: calls.add);
 
-    ScreenWakelock.acquire();
-    expect(ScreenWakelock.debugHolders, 1);
-    expect(calls, isEmpty);
-    expect(ScreenWakelock.debugHeld, isFalse);
+      ScreenWakelock.acquire();
+      expect(ScreenWakelock.debugHolders, 1);
+      expect(calls, isEmpty);
+      expect(ScreenWakelock.debugHeld, isFalse);
 
-    ScreenWakelock.setEnabled(true);
-    expect(calls, <bool>[true]);
-    expect(ScreenWakelock.debugHeld, isTrue);
+      ScreenWakelock.setEnabled(true);
+      expect(calls, <bool>[true]);
+      expect(ScreenWakelock.debugHeld, isTrue);
 
-    ScreenWakelock.setEnabled(false);
-    expect(calls, <bool>[true, false]);
-    expect(ScreenWakelock.debugHeld, isFalse);
-    expect(ScreenWakelock.debugHolders, 1);
+      ScreenWakelock.setEnabled(false);
+      expect(calls, <bool>[true, false]);
+      expect(ScreenWakelock.debugHeld, isFalse);
+      expect(ScreenWakelock.debugHolders, 1);
 
-    ScreenWakelock.setEnabled(true);
-    expect(calls, <bool>[true, false, true]);
-    expect(ScreenWakelock.debugHeld, isTrue);
-  });
+      ScreenWakelock.setEnabled(true);
+      expect(calls, <bool>[true, false, true]);
+      expect(ScreenWakelock.debugHeld, isTrue);
+    },
+  );
 
   test('releaseNow zeros holders, held flag, and pending timer', () {
     fakeAsync((async) {
@@ -110,32 +113,35 @@ void main() {
     });
   });
 
-  test('failed async platform apply rolls back held so the next apply retries', () {
-    fakeAsync((async) {
-      var shouldFail = true;
-      final calls = <bool>[];
-      ScreenWakelock.debugReset();
-      ScreenWakelock.debugPlatformApply = (enable) async {
-        calls.add(enable);
-        if (shouldFail) {
-          throw Exception('platform apply failed');
-        }
-      };
-      ScreenWakelock.setEnabled(true);
+  test(
+    'failed async platform apply rolls back held so the next apply retries',
+    () {
+      fakeAsync((async) {
+        var shouldFail = true;
+        final calls = <bool>[];
+        ScreenWakelock.debugReset();
+        ScreenWakelock.debugPlatformApply = (enable) async {
+          calls.add(enable);
+          if (shouldFail) {
+            throw Exception('platform apply failed');
+          }
+        };
+        ScreenWakelock.setEnabled(true);
 
-      ScreenWakelock.acquire();
-      async.flushMicrotasks();
-      expect(calls, <bool>[true]);
-      expect(ScreenWakelock.debugHeld, isFalse);
+        ScreenWakelock.acquire();
+        async.flushMicrotasks();
+        expect(calls, <bool>[true]);
+        expect(ScreenWakelock.debugHeld, isFalse);
 
-      shouldFail = false;
-      ScreenWakelock.acquire();
-      async.flushMicrotasks();
-      expect(calls, <bool>[true, true]);
-      expect(ScreenWakelock.debugHeld, isTrue);
-      expect(ScreenWakelock.debugHolders, 2);
-    });
-  });
+        shouldFail = false;
+        ScreenWakelock.acquire();
+        async.flushMicrotasks();
+        expect(calls, <bool>[true, true]);
+        expect(ScreenWakelock.debugHeld, isTrue);
+        expect(ScreenWakelock.debugHolders, 2);
+      });
+    },
+  );
 
   test('reassert force-enables even when already held', () {
     final calls = <bool>[];

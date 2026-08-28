@@ -11,6 +11,7 @@ import '../shared/widgets/snackbar.dart';
 import '../shared/widgets/ios_tactile.dart';
 import 'dart:convert';
 import '../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 Future<void> showHtmlPreviewDesktopDialog(
   BuildContext context, {
@@ -175,7 +176,6 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     // Keep content updated with theme changes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadWithTheme();
@@ -193,7 +193,7 @@ class _HtmlPreviewDialogState extends State<_HtmlPreviewDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -321,7 +321,7 @@ class _ConsoleDialog extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

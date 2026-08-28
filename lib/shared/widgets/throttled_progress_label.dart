@@ -39,7 +39,8 @@ class _ThrottledProgressLabelState extends State<ThrottledProgressLabel> {
       return;
     }
     final elapsed = DateTime.now().difference(_lastDisplayUpdate);
-    if (widget.forceImmediate || elapsed >= ThrottledProgressLabel.displayInterval) {
+    if (widget.forceImmediate ||
+        elapsed >= ThrottledProgressLabel.displayInterval) {
       _applyDisplay(widget.text);
       return;
     }

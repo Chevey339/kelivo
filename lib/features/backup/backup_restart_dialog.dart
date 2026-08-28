@@ -28,10 +28,7 @@ Future<void> showBackupRestartRequiredDialog(
         children: [
           Text(
             l10n.backupPageRestartRequired,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: AppFontWeights.emphasis,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: AppFontWeights.emphasis),
           ),
           const SizedBox(height: 10),
           Text(
@@ -43,10 +40,7 @@ Future<void> showBackupRestartRequiredDialog(
             icon: Lucide.Check,
             label: l10n.backupPageOK,
             onTap: () async {
-              if (await requestAppRestart(
-                    context,
-                    PlatformUtils.restartApp,
-                  ) &&
+              if (await requestAppRestart(context, PlatformUtils.restartApp) &&
                   context.mounted) {
                 Navigator.of(context).pop();
               }

@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../shared/widgets/ios_switch.dart';
 import '../../core/providers/hotkey_provider.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class DesktopHotkeysPane extends StatefulWidget {
   const DesktopHotkeysPane({super.key});
@@ -64,7 +65,7 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 6)),
               SliverToBoxAdapter(
-                child: _sectionCard(
+                child: SectionCard(
                   children: [
                     for (int i = 0; i < hk.items.length; i++) ...[
                       _HotkeyRow(item: hk.items[i]),
@@ -76,26 +77,6 @@ class _DesktopHotkeysPaneState extends State<DesktopHotkeysPane> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _sectionCard({required List<Widget> children}) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(16),
-        // Match TTS card's lighter border when unselected
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.12 : 0.08),
-          width: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-        child: Column(children: children),
       ),
     );
   }

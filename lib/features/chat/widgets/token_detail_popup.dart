@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 
@@ -88,7 +89,7 @@ class TokenDetailPopup extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 280),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: context.overlaySurface,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
             BoxShadow(

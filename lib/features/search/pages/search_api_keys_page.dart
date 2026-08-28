@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 /// Full-page manager for a search service's API key rotation pool.
 ///
@@ -139,8 +140,7 @@ class _SearchApiKeysPageState extends State<SearchApiKeysPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     if (_keys.isEmpty) {
-      return _card(
-        context,
+      return SectionCard(
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Text(
@@ -153,8 +153,7 @@ class _SearchApiKeysPageState extends State<SearchApiKeysPage> {
         ),
       );
     }
-    return _card(
-      context,
+    return SectionCard(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         child: Column(
@@ -254,8 +253,7 @@ class _SearchApiKeysPageState extends State<SearchApiKeysPage> {
     final l10n = AppLocalizations.of(context)!;
     final cs = Theme.of(context).colorScheme;
     final feedback = _batchFeedback;
-    return _card(
-      context,
+    return SectionCard(
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -330,25 +328,6 @@ class _SearchApiKeysPageState extends State<SearchApiKeysPage> {
       ),
     );
   }
-}
-
-Widget _card(BuildContext context, {required Widget child}) {
-  final theme = Theme.of(context);
-  final cs = theme.colorScheme;
-  final isDark = theme.brightness == Brightness.dark;
-  final bg = context.appColors.surfaceCard;
-  return Container(
-    decoration: BoxDecoration(
-      color: bg,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(
-        color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-        width: 0.6,
-      ),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: child,
-  );
 }
 
 class _PageIconButton extends StatefulWidget {

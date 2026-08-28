@@ -8,6 +8,8 @@ import '../../../core/services/haptics.dart';
 import '../../../desktop/desktop_context_menu.dart';
 import '../../../desktop/menu_anchor.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 class LanguageOption {
   final String code;
@@ -117,11 +119,10 @@ Future<LanguageOption?> showLanguageSelector(BuildContext context) async {
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
   if (!isDesktop) {
-    final cs = Theme.of(context).colorScheme;
     return showModalBottomSheet<LanguageOption>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -218,7 +219,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
                         height: 48,
                         child: IosCardPress(
                           borderRadius: BorderRadius.circular(14),
-                          baseColor: cs.surface,
+                          baseColor: sheetTileColor(context),
                           duration: const Duration(milliseconds: 260),
                           onTap: () {
                             Haptics.light();
@@ -266,7 +267,6 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
 
   Widget _languageOption(BuildContext context, LanguageOption lang) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -274,7 +274,7 @@ class _LanguageSelectSheetState extends State<_LanguageSelectSheet> {
         height: 48,
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
-          baseColor: cs.surface,
+          baseColor: sheetTileColor(context),
           duration: const Duration(milliseconds: 260),
           onTap: () {
             Haptics.light();

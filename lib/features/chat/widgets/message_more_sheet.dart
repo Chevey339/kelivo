@@ -18,6 +18,8 @@ import '../../../shared/pages/webview_page.dart';
 import '../../../desktop/html_preview_dialog.dart';
 import 'dart:convert';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 enum MessageMoreAction {
   edit,
@@ -39,11 +41,10 @@ Future<MessageMoreAction?> showMessageMoreSheet(
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux;
   if (!isDesktop) {
-    final cs = Theme.of(context).colorScheme;
     return showModalBottomSheet<MessageMoreAction?>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -192,7 +193,7 @@ class _MessageMoreSheetState extends State<_MessageMoreSheet> {
         height: 48,
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
-          baseColor: cs.surface,
+          baseColor: sheetTileColor(context),
           duration: const Duration(milliseconds: 260),
           onTap: () {
             Haptics.light();

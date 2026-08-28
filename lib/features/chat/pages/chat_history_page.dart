@@ -312,7 +312,7 @@ class _ConversationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = context.appColors.surfaceFill;
+    final bg = context.appColors.surfaceCard;
     final border = cs.outlineVariant.withValues(alpha: 0.16);
 
     return Padding(

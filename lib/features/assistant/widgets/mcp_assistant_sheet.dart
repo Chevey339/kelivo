@@ -8,16 +8,17 @@ import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 Future<void> showAssistantMcpSheet(
   BuildContext context, {
   required String assistantId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -167,7 +168,7 @@ class _AssistantMcpSheet extends StatelessWidget {
                           final isSelected = selected.contains(s.id);
                           return IosCardPress(
                             borderRadius: BorderRadius.circular(14),
-                            baseColor: cs.surface,
+                            baseColor: sheetTileColor(context),
                             duration: const Duration(milliseconds: 260),
                             onTap: () async {
                               Haptics.light();

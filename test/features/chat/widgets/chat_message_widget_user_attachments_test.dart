@@ -4,6 +4,7 @@ import 'package:Kelivo/core/models/message_part.dart';
 import 'package:Kelivo/core/providers/settings_provider.dart';
 import 'package:Kelivo/core/providers/user_provider.dart';
 import 'package:Kelivo/features/chat/widgets/chat_message_widget.dart';
+import 'package:Kelivo/utils/safe_resize_image.dart';
 import 'package:Kelivo/l10n/app_localizations.dart';
 import 'package:Kelivo/shared/widgets/snackbar.dart';
 import 'package:flutter/material.dart';
@@ -269,8 +270,14 @@ void main() {
     final image = tester.widget<Image>(
       find.descendant(of: imageFinder, matching: find.byType(Image)),
     );
-    expect(image.image, isA<NetworkImage>());
-    expect((image.image as NetworkImage).url, 'https://example.com/second.png');
+    final provider = image.image;
+    final network = provider is NetworkImage
+        ? provider
+        : provider is SafeResizeImage && provider.imageProvider is NetworkImage
+        ? provider.imageProvider as NetworkImage
+        : null;
+    expect(network, isA<NetworkImage>());
+    expect(network!.url, 'https://example.com/second.png');
   });
 
   testWidgets('http ImagePart 使用 Image.network 而不是 Image.file', (tester) async {
@@ -294,8 +301,12 @@ void main() {
     );
 
     final image = tester.widget<Image>(find.byType(Image));
-    expect(image.image, isA<NetworkImage>());
-    expect(image.image, isNot(isA<FileImage>()));
+    final provider = image.image;
+    final inner = provider is SafeResizeImage
+        ? provider.imageProvider
+        : provider;
+    expect(inner, isA<NetworkImage>());
+    expect(inner, isNot(isA<FileImage>()));
   });
 
   testWidgets('tapping https FilePart launches external URL', (tester) async {
@@ -386,5 +397,42 @@ void main() {
     // Drain snackbar auto-dismiss timer so the test binding stays clean.
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('user attachment thumbs decode with cover and no upscaling', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _harness(
+        ChatMessageWidget(
+          showUserAvatar: false,
+          message: ChatMessage(
+            id: 'user-cover-thumb',
+            role: 'user',
+            conversationId: 'conversation-cover-thumb',
+            parts: const [
+              TextPart('图'),
+              ImagePart(uri: 'https://example.com/wide.png'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect(image.fit, BoxFit.cover);
+    expect(image.image, isA<SafeResizeImage>());
+    final resized = image.image as SafeResizeImage;
+    expect(resized.fit, SafeResizeFit.cover);
+    expect(resized.allowUpscaling, isFalse);
+    expect(resized.width, 336);
+    expect(resized.height, 336);
+    expect(
+      resized.width * resized.height,
+      lessThanOrEqualTo(kToolImageMaxDecodePixels),
+    );
   });
 }

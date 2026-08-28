@@ -31,6 +31,7 @@ import '../backup_restore_error_message.dart';
 import '../backup_restart_dialog.dart';
 import '../widgets/backup_reminder_helpers.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 // File size formatter (B, KB, MB, GB)
 String _fmtBytes(int bytes) {
@@ -75,7 +76,7 @@ class _BackupPageState extends State<BackupPage> {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: cs.surface,
+      backgroundColor: context.overlaySurface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -297,7 +298,7 @@ class _BackupPageState extends State<BackupPage> {
               children: [
                 // Section 1: 备份管理
                 header(l10n.backupPageBackupManagement, first: true),
-                _iosSectionCard(
+                SectionCard(
                   children: [
                     _iosSwitchRow(
                       context,
@@ -341,7 +342,7 @@ class _BackupPageState extends State<BackupPage> {
 
                 // Section 3: WebDAV备份
                 header(l10n.backupPageWebDavBackup),
-                _iosSectionCard(
+                SectionCard(
                   children: [
                     _iosNavRow(
                       context,
@@ -419,7 +420,7 @@ class _BackupPageState extends State<BackupPage> {
                               await showModalBottomSheet(
                                 context: context,
                                 isScrollControlled: true,
-                                backgroundColor: cs.surface,
+                                backgroundColor: context.overlaySurface,
                                 shape: const RoundedRectangleBorder(
                                   borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(16),
@@ -518,7 +519,7 @@ class _BackupPageState extends State<BackupPage> {
                                       await showModalBottomSheet(
                                         context: context,
                                         isScrollControlled: true,
-                                        backgroundColor: cs.surface,
+                                        backgroundColor: context.overlaySurface,
                                         shape: const RoundedRectangleBorder(
                                           borderRadius: BorderRadius.vertical(
                                             top: Radius.circular(16),
@@ -637,11 +638,13 @@ class _BackupPageState extends State<BackupPage> {
                                                   item,
                                                   mode: mode,
                                                   onProgress: handle.report,
-                                                  cancelToken: handle.cancelToken,
+                                                  cancelToken:
+                                                      handle.cancelToken,
                                                 ),
                                               );
                                             } catch (e) {
-                                              if (e is BackupCancelledException) {
+                                              if (e
+                                                  is BackupCancelledException) {
                                                 return;
                                               }
                                               if (!context.mounted) return;
@@ -783,7 +786,7 @@ class _BackupPageState extends State<BackupPage> {
 
                 // Section 3: S3 备份
                 header(l10n.backupPageS3Backup),
-                _iosSectionCard(
+                SectionCard(
                   children: [
                     _iosNavRow(
                       context,
@@ -857,7 +860,7 @@ class _BackupPageState extends State<BackupPage> {
                               await showModalBottomSheet(
                                 context: context,
                                 isScrollControlled: true,
-                                backgroundColor: cs.surface,
+                                backgroundColor: context.overlaySurface,
                                 shape: const RoundedRectangleBorder(
                                   borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(16),
@@ -945,7 +948,7 @@ class _BackupPageState extends State<BackupPage> {
                                       await showModalBottomSheet(
                                         context: context,
                                         isScrollControlled: true,
-                                        backgroundColor: cs.surface,
+                                        backgroundColor: context.overlaySurface,
                                         shape: const RoundedRectangleBorder(
                                           borderRadius: BorderRadius.vertical(
                                             top: Radius.circular(16),
@@ -1059,15 +1062,18 @@ class _BackupPageState extends State<BackupPage> {
                                             try {
                                               await _runWithImportingOverlay(
                                                 context,
-                                                (handle) => s3Vm.restoreFromItem(
-                                                  item,
-                                                  mode: mode,
-                                                  onProgress: handle.report,
-                                                  cancelToken: handle.cancelToken,
-                                                ),
+                                                (handle) =>
+                                                    s3Vm.restoreFromItem(
+                                                      item,
+                                                      mode: mode,
+                                                      onProgress: handle.report,
+                                                      cancelToken:
+                                                          handle.cancelToken,
+                                                    ),
                                               );
                                             } catch (e) {
-                                              if (e is BackupCancelledException) {
+                                              if (e
+                                                  is BackupCancelledException) {
                                                 return;
                                               }
                                               if (!context.mounted) return;
@@ -1222,7 +1228,7 @@ class _BackupPageState extends State<BackupPage> {
   ) {
     return [
       header(l10n.backupPageLocalBackup),
-      _iosSectionCard(
+      SectionCard(
         children: [
           _iosNavRow(
             context,
@@ -1510,7 +1516,7 @@ class _BackupReminderMobileSection extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final reminder = context.watch<BackupReminderProvider>();
 
-    return _iosSectionCard(
+    return SectionCard(
       children: [
         _iosSwitchRow(
           context,
@@ -1601,7 +1607,7 @@ Future<void> _showBackupReminderFrequencySheet(BuildContext context) async {
   final provider = context.read<BackupReminderProvider>();
   final selected = await showModalBottomSheet<int>(
     context: context,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1908,32 +1914,6 @@ class _SmallTactileIconState extends State<_SmallTactileIcon> {
       ),
     );
   }
-}
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context) {
@@ -2470,7 +2450,7 @@ class _WebDavSettingsPageState extends State<_WebDavSettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
-                  _iosSectionCard(
+                  SectionCard(
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -2648,7 +2628,7 @@ class _S3SettingsPageState extends State<_S3SettingsPage> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                 children: [
-                  _iosSectionCard(
+                  SectionCard(
                     children: [
                       Padding(
                         padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),

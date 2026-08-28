@@ -34,7 +34,7 @@ Future<void> showAssistantTagsManagerDialog(
                 ),
                 child: DecoratedBox(
                   decoration: ShapeDecoration(
-                    color: Theme.of(ctx).colorScheme.surface,
+                    color: ctx.overlaySurface,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                       side: BorderSide(

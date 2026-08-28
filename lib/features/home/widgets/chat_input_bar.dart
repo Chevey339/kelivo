@@ -243,6 +243,7 @@ class _ChatInputBarState extends State<ChatInputBar>
   // Suppress context menu briefly after app resume to avoid flickering
   bool _suppressContextMenu = false;
   bool _isSubmitting = false;
+  int _submitSerial = 0;
   String? _imageModeModelKey;
   String? _lastImageModeModelKey;
   String? _dismissedImageModeModelKey;
@@ -585,6 +586,17 @@ class _ChatInputBarState extends State<ChatInputBar>
   @override
   void didUpdateWidget(covariant ChatInputBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final previousConversationId = oldWidget.conversationId;
+    final nextConversationId = widget.conversationId;
+    if (previousConversationId != null &&
+        nextConversationId != null &&
+        previousConversationId != nextConversationId) {
+      // The composer is reused across conversations (stable GlobalKey). A
+      // submit that is still awaiting onSend must not lock the next chat.
+      _submitSerial++;
+      _isSubmitting = false;
+      _draftReplacementRevision++;
+    }
     if (!identical(oldWidget.asrProvider, widget.asrProvider)) {
       _stopVoiceLevelSampling();
       oldWidget.asrProvider?.removeListener(_handleAsrChanged);
@@ -929,6 +941,7 @@ class _ChatInputBarState extends State<ChatInputBar>
     final submittedImageIds = submittedImages.map((image) => image.id).toSet();
     final submittedDocuments = List<DocumentAttachment>.of(_docs);
     final submittedDraftRevision = _draftReplacementRevision;
+    final submitSerial = ++_submitSerial;
     _isSubmitting = true;
     // Attachments leave the composer with the text, not when the send future
     // completes: that future now resolves at send time, but the draft must not
@@ -951,7 +964,7 @@ class _ChatInputBarState extends State<ChatInputBar>
             ),
           ) ??
           ChatInputSubmissionResult.rejected;
-      if (!mounted) return;
+      if (!mounted || submitSerial != _submitSerial) return;
       if (result == ChatInputSubmissionResult.sent ||
           result == ChatInputSubmissionResult.queued) {
         if (_draftReplacementRevision != submittedDraftRevision) return;
@@ -973,7 +986,9 @@ class _ChatInputBarState extends State<ChatInputBar>
         );
       }
     } catch (_) {
-      if (mounted && _draftReplacementRevision == submittedDraftRevision) {
+      if (mounted &&
+          submitSerial == _submitSerial &&
+          _draftReplacementRevision == submittedDraftRevision) {
         setState(
           () => _restoreSubmittedDraft(
             submittedValue,
@@ -984,7 +999,9 @@ class _ChatInputBarState extends State<ChatInputBar>
       }
       rethrow;
     } finally {
-      _isSubmitting = false;
+      if (submitSerial == _submitSerial) {
+        _isSubmitting = false;
+      }
     }
   }
 

@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 import '../animations/widgets.dart';
 
 class AnimatedProgressBar extends StatelessWidget {
-  const AnimatedProgressBar({
-    super.key,
-    this.fraction,
-    this.height = 6,
-  });
+  const AnimatedProgressBar({super.key, this.fraction, this.height = 6});
 
   static const fillKey = Key('animated_progress_bar_fill');
   static const indeterminateKey = Key('animated_progress_bar_indeterminate');

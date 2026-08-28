@@ -46,6 +46,7 @@ class FrostedSurface extends StatelessWidget {
           }
           if (mode == FrostedRenderMode.liveBackdropFilter) {
             return Stack(
+              fit: StackFit.passthrough,
               children: [
                 _FrostedSnapshotLease(
                   controller: scope.controller,
@@ -55,7 +56,11 @@ class FrostedSurface extends StatelessWidget {
               ],
             );
           }
+          // passthrough: a loose Stack would shrink-wrap the tint while the
+          // Positioned.fill crop still spans the incoming (often tight-width)
+          // constraints, so the glass would overflow the bubble border.
           return Stack(
+            fit: StackFit.passthrough,
             children: [
               Positioned.fill(
                 child: IgnorePointer(

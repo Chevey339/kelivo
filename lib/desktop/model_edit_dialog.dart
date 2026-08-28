@@ -324,7 +324,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
           maxHeight: 650,
         ),
         child: Material(
-          color: cs.surface,
+          color: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(
@@ -341,7 +341,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 // Header
                 Container(
                   height: 52,
-                  color: cs.surface,
+                  color: context.overlaySurface,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 10, 0),
                     child: Row(
@@ -376,7 +376,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 // Body
                 Expanded(
                   child: Container(
-                    color: cs.surface,
+                    color: context.overlaySurface,
                     child: Column(
                       children: [
                         Padding(
@@ -426,7 +426,7 @@ class _ModelEditDialogBodyState extends State<_ModelEditDialogBody>
                 ),
                 // Footer: right aligned confirm/add
                 Container(
-                  color: cs.surface,
+                  color: context.overlaySurface,
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                   child: Row(
                     children: [

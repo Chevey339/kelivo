@@ -91,7 +91,7 @@ class _LocalToolsTab extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       children: [
-        _iosSectionCard(
+        SectionCard(
           children: [
             _LocalToolRow(
               icon: Lucide.clock,

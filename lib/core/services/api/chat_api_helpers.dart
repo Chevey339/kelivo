@@ -19,7 +19,7 @@ import 'builtin_tools.dart';
 import 'provider_request_headers.dart';
 
 typedef ToolCallHandler =
-    Future<String> Function(
+    Future<Object?> Function(
       String name,
       Map<String, dynamic> args, {
       String? toolCallId,

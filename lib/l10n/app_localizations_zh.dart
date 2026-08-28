@@ -4587,6 +4587,23 @@ class AppLocalizationsZh extends AppLocalizations {
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
 
   @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
+
+  @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
@@ -7719,6 +7736,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
@@ -12356,6 +12380,23 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
   String get themeSettingsPageUsePureBackgroundSubtitle => '仅气泡与强调色随主题变化';
 
   @override
+  String get themeAdvancedSettingsPageTitle => '主题高级设置';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分层配色（实验）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '页面更深、卡片更亮，两者都保留主题色相；关闭可恢复旧外观';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '弹窗内瓦片分层';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '默认瓦片与弹窗同色';
+
+  @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
@@ -15414,6 +15455,13 @@ class AppLocalizationsZhHans extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟随主题，不可调节';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手气泡贴合内容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手气泡按文字宽度收缩，不再占满整行';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';
@@ -20049,6 +20097,23 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get themeSettingsPageUsePureBackgroundSubtitle => '僅氣泡與強調色隨主題變化';
 
   @override
+  String get themeAdvancedSettingsPageTitle => '主題進階設定';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesTitle => '新版分層配色（實驗）';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSurfacesSubtitle =>
+      '頁面更深、卡片更亮，兩者都保留主題色相；關閉可恢復舊外觀';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesTitle => '彈窗內瓦片分層';
+
+  @override
+  String get themeAdvancedSettingsPageUseLayeredSheetTilesSubtitle =>
+      '預設瓦片與彈窗同色';
+
+  @override
   String get themeSettingsPageColorPalettesSection => '配色方案';
 
   @override
@@ -23183,6 +23248,13 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
 
   @override
   String get messageStyleSettingsPageStyleDefaultSubtitle => '跟隨主題，不可調節';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContent => '助手氣泡貼合內容';
+
+  @override
+  String get messageStyleSettingsPageAssistantFitContentSubtitle =>
+      '助手氣泡按文字寬度收縮，不再佔滿整行';
 
   @override
   String get messageStyleSettingsPageStyleFrostedSubtitle => '半透明毛玻璃';

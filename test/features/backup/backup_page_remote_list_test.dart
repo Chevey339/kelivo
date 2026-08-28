@@ -26,7 +26,8 @@ class _HangingBackupProvider extends BackupProvider {
     required super.businessPreferences,
   });
 
-  final Completer<List<BackupFileItem>> pending = Completer<List<BackupFileItem>>();
+  final Completer<List<BackupFileItem>> pending =
+      Completer<List<BackupFileItem>>();
   var started = false;
 
   @override
@@ -46,7 +47,8 @@ class _HangingS3BackupProvider extends S3BackupProvider {
     required super.businessPreferences,
   });
 
-  final Completer<List<BackupFileItem>> pending = Completer<List<BackupFileItem>>();
+  final Completer<List<BackupFileItem>> pending =
+      Completer<List<BackupFileItem>>();
   var started = false;
 
   @override
@@ -59,7 +61,9 @@ class _HangingS3BackupProvider extends S3BackupProvider {
   }
 }
 
-Future<BackupReminderProvider> _reminder(BusinessPreferences preferences) async {
+Future<BackupReminderProvider> _reminder(
+  BusinessPreferences preferences,
+) async {
   final provider = BackupReminderProvider(
     preferences: preferences,
     autoLoad: false,
@@ -138,10 +142,7 @@ Future<void> _expectNoSetStateAfterDispose(
         ChangeNotifierProvider<ChatService>.value(value: chatService),
         ChangeNotifierProvider<BackupReminderProvider>.value(value: reminder),
       ],
-      child: BackupPage(
-        debugBackupProvider: webDav,
-        debugS3BackupProvider: s3,
-      ),
+      child: BackupPage(debugBackupProvider: webDav, debugS3BackupProvider: s3),
     ),
   );
 
@@ -186,8 +187,5 @@ Future<void> _expectNoSetStateAfterDispose(
   await tester.pump(const Duration(milliseconds: 700));
 
   expect(tester.takeException(), isNull);
-  expect(
-    flutterErrors.whereType<FlutterError>(),
-    isEmpty,
-  );
+  expect(flutterErrors.whereType<FlutterError>(), isEmpty);
 }

@@ -6,6 +6,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../shared/widgets/custom_bottom_sheet.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../../theme/app_semantic_colors.dart';
 
 class CitationSourceItem {
   const CitationSourceItem({
@@ -167,7 +168,6 @@ class _CitationSourcesDialogState extends State<CitationSourcesDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Dialog(
       key: CitationSourcesDialog.dialogKey,
       elevation: 12,
@@ -182,7 +182,7 @@ class _CitationSourcesDialogState extends State<CitationSourcesDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

@@ -3591,12 +3591,15 @@ class ChatService extends ChangeNotifier {
         providerId: temporaryOriginal.providerId,
         totalTokens: null,
         isStreaming: false,
-        reasoningText:
-            preserveReasoning ? temporaryOriginal.reasoningText : null,
-        reasoningStartAt:
-            preserveReasoning ? temporaryOriginal.reasoningStartAt : null,
-        reasoningFinishedAt:
-            preserveReasoning ? temporaryOriginal.reasoningFinishedAt : null,
+        reasoningText: preserveReasoning
+            ? temporaryOriginal.reasoningText
+            : null,
+        reasoningStartAt: preserveReasoning
+            ? temporaryOriginal.reasoningStartAt
+            : null,
+        reasoningFinishedAt: preserveReasoning
+            ? temporaryOriginal.reasoningFinishedAt
+            : null,
         reasoningSegmentsJson: preserveReasoning
             ? temporaryOriginal.reasoningSegmentsJson
             : null,

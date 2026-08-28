@@ -99,7 +99,10 @@ void main() {
           .toList();
       expect(packing, isNotEmpty);
       for (var i = 1; i < packing.length; i++) {
-        expect(packing[i].processed, greaterThanOrEqualTo(packing[i - 1].processed));
+        expect(
+          packing[i].processed,
+          greaterThanOrEqualTo(packing[i - 1].processed),
+        );
       }
     });
 
@@ -147,7 +150,10 @@ void main() {
       );
       expect(await future, 'committed');
       expect(token.isCancelled, isFalse);
-      expect(DateTime.now().difference(started) < const Duration(seconds: 2), isTrue);
+      expect(
+        DateTime.now().difference(started) < const Duration(seconds: 2),
+        isTrue,
+      );
     });
 
     test(
@@ -286,32 +292,35 @@ void main() {
       expect(interrupted, [handle]);
     });
 
-    test('cancel before handle registration still interrupts when it arrives', () async {
-      final interrupted = <int>[];
-      debugOnInterruptSqliteHandle = (address) {
-        expect(address, isNot(0));
-        interrupted.add(address);
-      };
-      addTearDown(() => debugOnInterruptSqliteHandle = null);
+    test(
+      'cancel before handle registration still interrupts when it arrives',
+      () async {
+        final interrupted = <int>[];
+        debugOnInterruptSqliteHandle = (address) {
+          expect(address, isNot(0));
+          interrupted.add(address);
+        };
+        addTearDown(() => debugOnInterruptSqliteHandle = null);
 
-      final token = BackupCancelToken();
-      addTearDown(token.dispose);
-      const handle = 0x1111aaaa;
-      final future = runBackupIsolate<void, int>(
-        body: _delayThenRegisterThenHang,
-        payload: handle,
-        cancelToken: token,
-        onProgress: (event) {
-          if (event.phase == BackupPhase.preparing) {
-            token.cancel();
-          }
-        },
-        killGrace: const Duration(milliseconds: 400),
-      );
+        final token = BackupCancelToken();
+        addTearDown(token.dispose);
+        const handle = 0x1111aaaa;
+        final future = runBackupIsolate<void, int>(
+          body: _delayThenRegisterThenHang,
+          payload: handle,
+          cancelToken: token,
+          onProgress: (event) {
+            if (event.phase == BackupPhase.preparing) {
+              token.cancel();
+            }
+          },
+          killGrace: const Duration(milliseconds: 400),
+        );
 
-      await expectLater(future, throwsA(isA<BackupCancelledException>()));
-      expect(interrupted, [handle]);
-    });
+        await expectLater(future, throwsA(isA<BackupCancelledException>()));
+        expect(interrupted, [handle]);
+      },
+    );
 
     test('cancel during VACUUM interrupts the open handle', () async {
       final interrupted = <int>[];
@@ -504,7 +513,9 @@ Future<void> _nativeSleepThenCloseHandshake(
   try {
     _nativeSleepIgnoringKill(context, 2);
   } finally {
-    File('${args.closedMarkerPath}.resumed').writeAsStringSync('resumed', flush: true);
+    File(
+      '${args.closedMarkerPath}.resumed',
+    ).writeAsStringSync('resumed', flush: true);
     await context.waitForSqliteCloseAck();
     File(args.closedMarkerPath).writeAsStringSync('closed', flush: true);
   }
@@ -550,11 +561,7 @@ void _phaseOrderWork(BackupIsolateContext context, int payload) {
     BackupPhase.finalizing,
   ]) {
     context.reportProgress(
-      BackupProgress(
-        phase: phase,
-        processed: 0,
-        unit: BackupProgressUnit.none,
-      ),
+      BackupProgress(phase: phase, processed: 0, unit: BackupProgressUnit.none),
     );
   }
 }

@@ -4417,9 +4417,9 @@ class ChatDatabaseRepository {
       // Assistant body-only edits also inherit reasoning metadata so the
       // collapsed card stays toggleable on the new version.
       final original = await _messageFromRowWithParts(originalRow);
-      final preserveReasoning =
-          parts == null && original.role == 'assistant';
-      final resolvedParts = parts ??
+      final preserveReasoning = parts == null && original.role == 'assistant';
+      final resolvedParts =
+          parts ??
           ChatMessage.partsWithRedistributedText(original.parts, content);
       final message = ChatMessage(
         role: original.role,

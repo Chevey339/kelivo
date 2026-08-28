@@ -378,8 +378,7 @@ final class _ThrottledProgressReporter {
     final reachedEnd =
         progress.total != null && progress.processed >= progress.total!;
     final isFinal = reachedEnd && !_emittedPhaseFinal;
-    final due =
-        _lastEmitMs == null || nowMs - _lastEmitMs! >= _minIntervalMs;
+    final due = _lastEmitMs == null || nowMs - _lastEmitMs! >= _minIntervalMs;
     if (phaseChanged || isFinal || due || becameIndeterminate) {
       if (reachedEnd) {
         _emittedPhaseFinal = true;

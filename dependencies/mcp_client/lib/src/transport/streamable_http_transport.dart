@@ -71,6 +71,7 @@ class StreamableHttpClientTransport implements ClientTransport {
   String? _protocolVersion;
   EventSource? _getEventSource;
   Future<void>? _getTask;
+  Completer<void>? _initialGetAttempt;
   String? _getLastEventId;
   Duration _getSseRetry = _defaultReconnectDelay;
 
@@ -131,6 +132,15 @@ class StreamableHttpClientTransport implements ClientTransport {
   bool get useHttp2 => config.useHttp2;
   OAuthConfig? get oauthConfig => config.oauthConfig;
   String? get sessionId => _sessionId;
+
+  /// Completes after the first background GET receives headers or fails.
+  Future<void> waitForInitialGetAttempt() {
+    if (_isClosed && _initialGetAttempt == null) {
+      return Future<void>.value();
+    }
+    _initialGetAttempt ??= Completer<void>();
+    return _initialGetAttempt!.future;
+  }
 
   void setRequestTimeout(Duration timeout) {
     if (timeout > Duration.zero) _requestTimeout = timeout;
@@ -347,12 +357,18 @@ class StreamableHttpClientTransport implements ClientTransport {
   }
 
   void _startGetStream() {
-    if (_isClosed || _sessionId == null || _getTask != null) return;
+    if (_isClosed || _sessionId == null) {
+      _completeInitialGetAttempt();
+      return;
+    }
+    if (_getTask != null) return;
+    _initialGetAttempt ??= Completer<void>();
     final task = _runGetStream();
     _getTask = task;
     unawaited(
       task.whenComplete(() {
         if (identical(_getTask, task)) _getTask = null;
+        _completeInitialGetAttempt();
       }),
     );
   }
@@ -391,6 +407,7 @@ class StreamableHttpClientTransport implements ClientTransport {
             if (!done.isCompleted) done.complete();
           },
         );
+        _completeInitialGetAttempt();
         await Future.any<void>([done.future, _closedSignal.future]);
       } catch (error) {
         streamError = error;
@@ -417,6 +434,7 @@ class StreamableHttpClientTransport implements ClientTransport {
         if (!_messageController.isClosed) {
           _messageController.addError(backgroundError);
         }
+        _completeInitialGetAttempt();
         if (backgroundError.statusCode == 404 &&
             backgroundError.sessionIdPresent) {
           _failTransport(backgroundError);
@@ -553,9 +571,15 @@ class StreamableHttpClientTransport implements ClientTransport {
     }
   }
 
+  void _completeInitialGetAttempt() {
+    final pending = _initialGetAttempt ??= Completer<void>();
+    if (!pending.isCompleted) pending.complete();
+  }
+
   void _failTransport(Object error) {
     if (_isClosed) return;
     _isClosed = true;
+    _completeInitialGetAttempt();
     if (!_closedSignal.isCompleted) _closedSignal.complete();
     for (final task in _postTasks.toList()) {
       task.cancel();
@@ -593,6 +617,7 @@ class StreamableHttpClientTransport implements ClientTransport {
   @override
   void close() {
     if (_isClosed) return;
+    _completeInitialGetAttempt();
     final termination =
         config.terminateOnClose && _sessionId != null
             ? terminateSession()

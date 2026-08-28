@@ -460,7 +460,7 @@ class ToolHandlerService {
       return '${name}_${DateTime.now().microsecondsSinceEpoch}';
     }
 
-    Future<String> approveAndExecuteMcp(
+    Future<Object?> approveAndExecuteMcp(
       String name,
       Map<String, dynamic> args, {
       String? toolCallId,
@@ -489,7 +489,7 @@ class ToolHandlerService {
         }
       }
 
-      final text = await toolSvc.callToolTextForAssistant(
+      return toolSvc.callToolForAssistant(
         mcp,
         assistantProvider,
         assistantId: assistant?.id,
@@ -498,7 +498,6 @@ class ToolHandlerService {
         routeSnapshot: routes,
         reservedNames: BuiltInToolNames.all,
       );
-      return text;
     }
 
     return (name, args, {toolCallId}) async {

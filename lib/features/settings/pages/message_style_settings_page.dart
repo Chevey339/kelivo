@@ -8,6 +8,7 @@ import '../../../icons/lucide_adapter.dart';
 import '../../../icons/reasoning_icons.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/services/haptics.dart';
+import '../../../shared/widgets/ios_switch.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../shared/widgets/ios_tile_button.dart';
 import '../../../theme/app_font_weights.dart';
@@ -20,6 +21,7 @@ import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../../chat/widgets/frosted/frosted_surface.dart';
 import '../../home/pages/home_mobile_layout.dart';
 import '../widgets/custom_theme_widgets.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class MessageStyleSettingsPage extends StatelessWidget {
   const MessageStyleSettingsPage({super.key});
@@ -139,7 +141,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       overrides,
     );
 
-    final stylePicker = _iosSectionCard(
+    final stylePicker = SectionCard(
       children: [
         _StyleRow(
           style: ChatMessageBackgroundStyle.defaultStyle,
@@ -173,6 +175,17 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       ],
     );
 
+    final layoutCard = SectionCard(
+      children: [
+        _SwitchRow(
+          label: l10n.messageStyleSettingsPageAssistantFitContent,
+          subtitle: l10n.messageStyleSettingsPageAssistantFitContentSubtitle,
+          value: settings.assistantBubbleFitContent,
+          onChanged: settings.setAssistantBubbleFitContent,
+        ),
+      ],
+    );
+
     final preview = _PreviewPanel(
       theme: previewTheme,
       editingDark: editingDark,
@@ -182,7 +195,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
       assistantOverrides: settings.assistantChatBubbleStyleOverrides,
     );
 
-    final params = _iosSectionCard(
+    final params = SectionCard(
       children: [
         if (style == ChatMessageBackgroundStyle.frosted) ...[
           _SliderRow(
@@ -346,6 +359,8 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
           children: [
             stylePicker,
             const SizedBox(height: 12),
+            layoutCard,
+            const SizedBox(height: 12),
             _SegmentedToggle(
               leftLabel: l10n.messageStyleSettingsPageLight,
               leftIcon: Lucide.Sun,
@@ -416,7 +431,7 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
     final settings = context.read<SettingsProvider>();
     final custom = settings.selectedCustomTheme;
     final key =
-        '${current.brightness.name}|${settings.themePaletteId}|${custom?.id}|${settings.usePureBackground}';
+        '${current.brightness.name}|${settings.themePaletteId}|${custom?.id}|${settings.usePureBackground}|${settings.useLayeredSurfaces}';
     if (_cachedLightTheme != null &&
         _cachedDarkTheme != null &&
         _previewThemeKey == key) {
@@ -433,12 +448,14 @@ class _MessageStyleSettingsBodyState extends State<MessageStyleSettingsBody> {
         : buildLightThemeForScheme(
             palette.light,
             pureBackground: settings.usePureBackground,
+            layeredSurfaces: settings.useLayeredSurfaces,
           );
     final dark = current.brightness == Brightness.dark
         ? current
         : buildDarkThemeForScheme(
             palette.dark,
             pureBackground: settings.usePureBackground,
+            layeredSurfaces: settings.useLayeredSurfaces,
           );
     _cachedLightTheme = light;
     _cachedDarkTheme = dark;
@@ -619,6 +636,57 @@ class _StyleRow extends StatelessWidget {
   }
 }
 
+class _SwitchRow extends StatelessWidget {
+  const _SwitchRow({
+    required this.label,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: cs.onSurface.withValues(alpha: 0.9),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.25,
+                    color: cs.onSurface.withValues(alpha: 0.52),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          IosSwitch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
 class _StyleSwatch extends StatelessWidget {
   const _StyleSwatch({required this.style});
 
@@ -678,10 +746,7 @@ class _SegmentedToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-          width: 0.6,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.6),
       ),
       child: SizedBox(
         height: 40,
@@ -700,7 +765,7 @@ class _SegmentedToggle extends StatelessWidget {
                   heightFactor: 1,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: isDark ? Colors.white12 : Colors.white,
+                      color: context.appColors.surfaceCard,
                       borderRadius: BorderRadius.circular(8),
                       boxShadow: isDark
                           ? const []
@@ -1235,31 +1300,6 @@ class _PreviewSurface extends StatelessWidget {
         );
     }
   }
-}
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      return Container(
-        decoration: BoxDecoration(
-          color: context.appColors.surfaceCard,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context, {double indent = 14}) {

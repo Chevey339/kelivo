@@ -23,6 +23,7 @@ import '../../../core/services/chat/chat_service.dart';
 import '../../../core/providers/assistant_provider.dart';
 import 'package:intl/intl.dart';
 import '../../../utils/sandbox_path_resolver.dart';
+import '../../../utils/safe_resize_image.dart';
 import '../../../utils/avatar_cache.dart';
 import '../../../utils/assistant_regex.dart';
 import '../../../core/models/assistant.dart';
@@ -33,6 +34,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/providers/settings_provider.dart';
 import '../../../theme/chat_bubble_style.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'frosted/frosted_surface.dart';
 import '../../../core/providers/model_provider.dart';
 import '../../../core/models/assistant_regex.dart';
@@ -88,58 +90,44 @@ Uri? _tryNormalizeExternalUri(String raw) {
   return uri;
 }
 
-/// Extract markdown images from MCP/tool result content.
-///
-/// Returns `(cleanText, imagePaths)`. Matches `![alt](url)` only — custom
-/// attachment marker strings are left as plain text.
-///
-/// Destinations may contain parentheses (e.g. `/tmp/run (1)/image.png`); the
-/// parser finds `![...](` then scans balanced parentheses to the matching `)`.
-(String, List<String>) _parseMcpImagePaths(String? content) {
-  if (content == null || content.isEmpty) return ('', const []);
-
-  final images = <String>[];
-  final buffer = StringBuffer();
-  var i = 0;
-  while (i < content.length) {
-    if (content.startsWith('![', i)) {
-      final altClose = content.indexOf('](', i + 2);
-      if (altClose != -1) {
-        final destStart = altClose + 2;
-        var depth = 1;
-        var j = destStart;
-        while (j < content.length && depth > 0) {
-          final ch = content.codeUnitAt(j);
-          if (ch == 0x28) {
-            // (
-            depth += 1;
-          } else if (ch == 0x29) {
-            // )
-            depth -= 1;
-            if (depth == 0) break;
-          }
-          j += 1;
-        }
-        if (depth == 0 && j < content.length) {
-          final path = content.substring(destStart, j).trim();
-          if (path.isNotEmpty && path != 'generated') {
-            images.add(path);
-          }
-          i = j + 1;
-          continue;
-        }
-      }
-    }
-    buffer.writeCharCode(content.codeUnitAt(i));
-    i += 1;
-  }
-
-  return (buffer.toString().trim(), images);
-}
+@visibleForTesting
+(String, List<String>) parseMcpImagePathsForTesting(
+  String? content, {
+  Map<String, dynamic>? metadata,
+}) => parseToolResultImages(content, metadata: metadata);
 
 @visibleForTesting
-(String, List<String>) parseMcpImagePathsForTesting(String? content) =>
-    _parseMcpImagePaths(content);
+const double kToolImageTimelineHeight = 120;
+@visibleForTesting
+const double kToolImageTimelineMaxWidth = 240;
+@visibleForTesting
+const double kToolImageCardHeight = 180;
+@visibleForTesting
+const double kToolImageCardMaxWidth = 320;
+@visibleForTesting
+const double kToolImageDetailHeight = 220;
+@visibleForTesting
+const double kToolImageDetailMaxWidth = 420;
+
+@visibleForTesting
+const int kToolImageMaxDecodePixels = 2097152; // 8 MiB of RGBA
+@visibleForTesting
+const int kToolImageMaxDecodeEdge = 2048;
+
+@visibleForTesting
+({int width, int height}) toolImageDecodePixels({
+  required double logicalWidth,
+  required double logicalHeight,
+  required double devicePixelRatio,
+}) {
+  final dpr = devicePixelRatio <= 0 ? 1.0 : devicePixelRatio;
+  return clampDecodedPixelSize(
+    width: math.max(1.0, logicalWidth * dpr),
+    height: math.max(1.0, logicalHeight * dpr),
+    maxEdge: kToolImageMaxDecodeEdge,
+    maxPixels: kToolImageMaxDecodePixels,
+  );
+}
 
 /// Incremented when a memoized tool-step builder actually runs.
 @visibleForTesting
@@ -199,13 +187,14 @@ Uint8List? _decodeDataUriBytes(String path) {
 
 /// Shared image widget for tool thumbnails and message attachment previews.
 ///
-/// `http(s)` → [Image.network], `data:` → [Image.memory], otherwise local
-/// [Image.file]. Unavailable/empty/decode failures use [placeholder].
+/// Decodes through [SafeResizeImage] at the display area × device pixel ratio so
+/// 17K tool outputs are not materialized at full resolution.
 Widget _buildResolvedImage(
   BuildContext context,
   String rawPath, {
   double? width,
   double? height,
+  double? maxLogicalWidth,
   BoxFit fit = BoxFit.contain,
   Widget Function()? placeholder,
 }) {
@@ -227,36 +216,54 @@ Widget _buildResolvedImage(
   final path = rawPath.trim();
   if (path.isEmpty) return errorWidget();
 
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return Image.network(
-      path,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => errorWidget(),
-    );
-  }
+  final provider = _toolImageProvider(path);
+  if (provider == null) return errorWidget();
 
-  if (path.startsWith('data:')) {
-    final bytes = _decodeDataUriBytes(path);
-    if (bytes == null) return errorWidget();
-    return Image.memory(
-      bytes,
-      width: width,
-      height: height,
-      fit: fit,
-      errorBuilder: (_, __, ___) => errorWidget(),
-    );
-  }
-
-  final fixed = SandboxPathResolver.fix(path);
-  return Image.file(
-    File(fixed),
+  final logicalHeight = height ?? width ?? kToolImageCardHeight;
+  final logicalWidth =
+      maxLogicalWidth ??
+      width ??
+      (height != null ? height * 2 : kToolImageTimelineMaxWidth);
+  final decode = toolImageDecodePixels(
+    logicalWidth: logicalWidth,
+    logicalHeight: logicalHeight,
+    devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+  );
+  Widget image = Image(
+    image: SafeResizeImage.display(
+      provider,
+      width: decode.width,
+      height: decode.height,
+      fit: fit == BoxFit.cover ? SafeResizeFit.cover : SafeResizeFit.contain,
+      allowUpscaling: false,
+      maxEdge: kToolImageMaxDecodeEdge,
+      maxPixels: kToolImageMaxDecodePixels,
+    ),
     width: width,
     height: height,
     fit: fit,
+    gaplessPlayback: true,
     errorBuilder: (_, __, ___) => errorWidget(),
   );
+  if (maxLogicalWidth != null) {
+    image = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxLogicalWidth),
+      child: image,
+    );
+  }
+  return image;
+}
+
+ImageProvider<Object>? _toolImageProvider(String path) {
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return NetworkImage(path);
+  }
+  if (path.startsWith('data:')) {
+    final bytes = _decodeDataUriBytes(path);
+    if (bytes == null) return null;
+    return MemoryImage(bytes);
+  }
+  return FileImage(File(SandboxPathResolver.fix(path)));
 }
 
 ImageProvider? _assistantInlineImageProvider(String src) {
@@ -627,9 +634,16 @@ Widget _buildToolImageFromPath(
   BuildContext context,
   String path, {
   double? height,
+  double? maxLogicalWidth,
   BoxFit fit = BoxFit.contain,
 }) {
-  return _buildResolvedImage(context, path, height: height, fit: fit);
+  return _buildResolvedImage(
+    context,
+    path,
+    height: height,
+    maxLogicalWidth: maxLogicalWidth,
+    fit: fit,
+  );
 }
 
 void _showToolFullImage(BuildContext context, String path) {
@@ -663,7 +677,10 @@ void _showToolFullImage(BuildContext context, String path) {
 void _showToolDetail(BuildContext context, ToolUIPart part) {
   final l10n = AppLocalizations.of(context)!;
   final argsPretty = const JsonEncoder.withIndent('  ').convert(part.arguments);
-  final (cleanText, images) = _parseMcpImagePaths(part.content);
+  final (cleanText, images) = parseToolResultImages(
+    part.content,
+    metadata: part.metadata,
+  );
   final resultText = cleanText.isNotEmpty
       ? _prettyToolJson(cleanText)
       : l10n.chatMessageWidgetNoResultYet;
@@ -789,7 +806,7 @@ class _ToolDetailDesktopDialogState extends State<_ToolDetailDesktopDialog> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -905,7 +922,7 @@ class _ToolDetailBody extends StatelessWidget {
                   const SliverToBoxAdapter(child: SizedBox(height: 6)),
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 220,
+                      height: kToolImageDetailHeight,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: images.length,
@@ -919,7 +936,8 @@ class _ToolDetailBody extends StatelessWidget {
                               child: _buildToolImageFromPath(
                                 context,
                                 path,
-                                height: 220,
+                                height: kToolImageDetailHeight,
+                                maxLogicalWidth: kToolImageDetailMaxWidth,
                               ),
                             ),
                           );
@@ -1280,7 +1298,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dctx) => AlertDialog(
-        backgroundColor: Theme.of(dctx).colorScheme.surface,
+        backgroundColor: dctx.overlaySurface,
         title: Text(l10n.chatMessageWidgetRegenerateConfirmTitle),
         content: Text(content),
         actions: [
@@ -1605,12 +1623,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     String toolName = 'tool';
     Map<String, dynamic> args = const {};
     String result = '';
+    Map<String, dynamic>? metadata;
     try {
       final obj = jsonDecode(widget.message.content) as Map<String, dynamic>;
       toolName = (obj['tool'] ?? 'tool').toString();
       final a = obj['arguments'];
       if (a is Map<String, dynamic>) args = a;
       result = (obj['result'] ?? '').toString();
+      if (obj['metadata'] is Map) {
+        metadata = Map<String, dynamic>.from(obj['metadata'] as Map);
+      }
     } catch (_) {}
 
     final part = ToolUIPart(
@@ -1618,6 +1640,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
       toolName: toolName,
       arguments: args,
       content: result,
+      metadata: metadata,
       loading: false,
     );
     if (!_shouldShowToolCard(
@@ -2403,14 +2426,25 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
     );
   }
 
+  /// Assistant blocks span the row by default. With the fit-content option
+  /// on, [Align] hands the bubble loose constraints so it hugs its text;
+  /// long text still wraps at the same max width.
+  Widget _assistantBlockWidth(BuildContext context, {required Widget child}) {
+    final fitContent = context.select<SettingsProvider, bool>(
+      (s) => s.assistantBubbleFitContent,
+    );
+    if (!fitContent) return SizedBox(width: double.infinity, child: child);
+    return Align(alignment: Alignment.centerLeft, child: child);
+  }
+
   Widget _buildAssistantTextBlock(
     BuildContext context,
     String visualContent,
     bool enableAssistantMarkdown,
     Map<String, String> citationIndexLookup,
   ) {
-    return SizedBox(
-      width: double.infinity,
+    return _assistantBlockWidth(
+      context,
       child: _buildAssistantBubbleContainer(
         context: context,
         child: _buildAssistantTextContent(
@@ -2461,6 +2495,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
             toolName: widget.toolParts![i].toolName,
             arguments: widget.toolParts![i].arguments,
             content: widget.toolParts![i].content,
+            metadata: widget.toolParts![i].metadata,
             loading: widget.toolParts![i].loading,
             memoToken: identityHashCode(widget.toolParts![i]),
           ),
@@ -2533,6 +2568,7 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
               toolName: step.tool!.toolName,
               arguments: step.tool!.arguments,
               content: step.tool!.content,
+              metadata: step.tool!.metadata,
               loading: step.tool!.loading,
               memoToken: step.tool!.memoToken,
             ),
@@ -2765,12 +2801,16 @@ class _ChatMessageWidgetState extends State<ChatMessageWidget> {
                   widget.message.isStreaming &&
                   visualContent.isEmpty) {
                 return <Widget>[
-                  SizedBox(
-                    width: double.infinity,
+                  _assistantBlockWidth(
+                    context,
                     child: _buildAssistantBubbleContainer(
                       context: context,
                       child: Align(
                         alignment: Alignment.centerLeft,
+                        // widthFactor keeps the waiting bubble from filling a
+                        // loose row under the fit-content option; with tight
+                        // constraints (option off) Align ignores it.
+                        widthFactor: 1,
                         child: Semantics(
                           label: l10n.chatMessageWidgetThinking,
                           child: widget.hideStreamingIndicator
@@ -4040,6 +4080,7 @@ ToolUIPart? toolUiFromPayload(String payloadJson, {int fallbackOrdinal = 0}) {
     }
     final args = decoded['arguments'];
     final content = decoded['content']?.toString();
+    final rawMeta = decoded['metadata'];
     return ToolUIPart(
       id: id,
       toolName: name,
@@ -4047,6 +4088,7 @@ ToolUIPart? toolUiFromPayload(String payloadJson, {int fallbackOrdinal = 0}) {
           ? args.cast<String, dynamic>()
           : const <String, dynamic>{},
       content: content,
+      metadata: rawMeta is Map ? Map<String, dynamic>.from(rawMeta) : null,
       loading: content == null || content.isEmpty,
     );
   } catch (_) {
@@ -4060,6 +4102,7 @@ class ToolUIPart {
   final String toolName;
   final Map<String, dynamic> arguments;
   final String? content; // null means still loading/result not yet available
+  final Map<String, dynamic>? metadata;
   final bool loading;
 
   /// Stable memo identity from the original live tool, if any.
@@ -4070,6 +4113,7 @@ class ToolUIPart {
     required this.toolName,
     required this.arguments,
     this.content,
+    this.metadata,
     this.loading = false,
     this.memoToken,
   });
@@ -5063,6 +5107,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
   bool? _askUserExpanded;
 
   String? _cachedContent;
+  Map<String, dynamic>? _cachedMetadata;
   String _cleanText = '';
   List<String> _imagePaths = const [];
 
@@ -5084,16 +5129,22 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
     if (_isAskUser && !wasAnswered && _askUserAnswered) {
       _askUserExpanded = true;
     }
-    if (oldWidget.part.content != widget.part.content) {
+    if (oldWidget.part.content != widget.part.content ||
+        oldWidget.part.metadata != widget.part.metadata) {
       _updateContentCache();
     }
   }
 
   void _updateContentCache() {
     final content = widget.part.content;
-    if (content == _cachedContent) return;
+    final metadata = widget.part.metadata;
+    if (content == _cachedContent && metadata == _cachedMetadata) return;
     _cachedContent = content;
-    final (cleanText, paths) = _parseMcpImagePaths(content);
+    _cachedMetadata = metadata;
+    final (cleanText, paths) = parseToolResultImages(
+      content,
+      metadata: metadata,
+    );
     _cleanText = cleanText;
     _imagePaths = paths;
   }
@@ -5279,7 +5330,7 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
         (!_isAskUser && !hideToolResultImages && imagePaths.isNotEmpty)
         ? SizedBox(
             key: ValueKey('tool-image-thumbnails:${widget.part.id}'),
-            height: 120,
+            height: kToolImageTimelineHeight,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: imagePaths.length,
@@ -5290,7 +5341,12 @@ class _ChainOfThoughtToolStepState extends State<_ChainOfThoughtToolStep> {
                   onTap: () => _showToolFullImage(context, path),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: _buildToolImageFromPath(context, path, height: 120),
+                    child: _buildToolImageFromPath(
+                      context,
+                      path,
+                      height: kToolImageTimelineHeight,
+                      maxLogicalWidth: kToolImageTimelineMaxWidth,
+                    ),
                   ),
                 );
               },
@@ -5384,13 +5440,16 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   // Cache image paths (local file or URL)
   List<String> _imagePaths = const [];
   String? _lastContent;
+  Map<String, dynamic>? _lastMetadata;
 
   void _updateImageCache() {
     final content = widget.part.content;
-    if (content == _lastContent) return;
+    final metadata = widget.part.metadata;
+    if (content == _lastContent && metadata == _lastMetadata) return;
     _lastContent = content;
+    _lastMetadata = metadata;
 
-    final (_, paths) = _parseMcpImagePaths(content);
+    final (_, paths) = parseToolResultImages(content, metadata: metadata);
     _imagePaths = paths;
   }
 
@@ -5400,7 +5459,13 @@ class _ToolCallItemState extends State<_ToolCallItem> {
     double? height,
     BoxFit fit = BoxFit.contain,
   }) {
-    return _buildResolvedImage(context, path, height: height, fit: fit);
+    return _buildResolvedImage(
+      context,
+      path,
+      height: height,
+      maxLogicalWidth: kToolImageCardMaxWidth,
+      fit: fit,
+    );
   }
 
   @override
@@ -5412,7 +5477,8 @@ class _ToolCallItemState extends State<_ToolCallItem> {
   @override
   void didUpdateWidget(covariant _ToolCallItem oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.part.content != widget.part.content) {
+    if (oldWidget.part.content != widget.part.content ||
+        oldWidget.part.metadata != widget.part.metadata) {
       _updateImageCache();
     }
   }
@@ -5659,7 +5725,7 @@ class _ToolCallItemState extends State<_ToolCallItem> {
             if (hasImages) ...[
               const SizedBox(height: 10),
               SizedBox(
-                height: 180,
+                height: kToolImageCardHeight,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _imagePaths.length,
@@ -5670,7 +5736,10 @@ class _ToolCallItemState extends State<_ToolCallItem> {
                       onTap: () => _showFullImage(context, path),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: _buildImageFromPath(path, height: 180),
+                        child: _buildImageFromPath(
+                          path,
+                          height: kToolImageCardHeight,
+                        ),
                       ),
                     );
                   },

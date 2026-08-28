@@ -26,6 +26,7 @@ import '../../../core/providers/user_provider.dart';
 import '../../../core/providers/assistant_provider.dart';
 import '../../../core/models/assistant.dart';
 import '../../../core/services/chat/chat_service.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../shared/widgets/markdown_with_highlight.dart';
 import '../../../shared/widgets/export_capture_scope.dart';
@@ -37,6 +38,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../theme/app_font_weights.dart';
 import '../../home/widgets/model_icon.dart';
 import '../utils/thinking_tag_parser.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 import 'chat_message_widget.dart'
     show ChatMessageWidget, ToolUIPart, ReasoningSegment;
 
@@ -202,10 +204,12 @@ Future<void> _writeExportBlocks(
           final decoded = jsonDecode(payloadJson);
           if (decoded is! Map) continue;
           final name = (decoded['name'] ?? '').toString();
-          final content = decoded['content'];
+          final content = toolResultContentForModel(
+            decoded['content']?.toString(),
+          );
           buf.writeln(name.isEmpty ? '[tool]' : '[$name]');
-          if (content != null && content.toString().trim().isNotEmpty) {
-            buf.writeln(content.toString());
+          if (content.trim().isNotEmpty) {
+            buf.writeln(content);
           }
           buf.writeln('');
         } catch (_) {}
@@ -514,6 +518,9 @@ List<ToolUIPart> _exportToolPartsForMessage(
                 const <String, dynamic>{},
             content: (e['content']?.toString().isNotEmpty == true)
                 ? e['content'].toString()
+                : null,
+            metadata: e['metadata'] is Map
+                ? Map<String, dynamic>.from(e['metadata'] as Map)
                 : null,
             loading: !(e['content']?.toString().isNotEmpty == true),
           ),
@@ -1845,7 +1852,6 @@ Future<void> showMessageExportSheet(
   BuildContext context,
   ChatMessage message,
 ) async {
-  final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       // Desktop: show centered dialog
@@ -1873,7 +1879,7 @@ Future<void> showMessageExportSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1891,7 +1897,6 @@ Future<void> showChatExportSheet(
   required Conversation conversation,
   required List<ChatMessage> selectedMessages,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   try {
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
       // Desktop: show centered dialog
@@ -1922,7 +1927,7 @@ Future<void> showChatExportSheet(
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -2058,7 +2063,7 @@ class _ExportDialogState extends State<_ExportDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2288,7 +2293,7 @@ class _BatchExportDialogState extends State<_BatchExportDialog> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Material(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2990,7 +2995,7 @@ class _ExportedMessageCard extends StatelessWidget {
         margin: EdgeInsets.all(containerMargin),
         padding: EdgeInsets.all(containerPadding),
         decoration: BoxDecoration(
-          color: cs.surface,
+          color: context.appColors.surfaceCard,
           borderRadius: BorderRadius.circular(16),
           // removed outer border per UX
         ),
@@ -3103,7 +3108,7 @@ class _ExportedChatImage extends StatelessWidget {
           margin: EdgeInsets.all(containerMargin),
           padding: EdgeInsets.all(containerPadding),
           decoration: BoxDecoration(
-            color: cs.surface,
+            color: context.appColors.surfaceCard,
             borderRadius: BorderRadius.circular(isDesktop ? 12.0 : 16.0),
             // removed outer border per UX
           ),
@@ -3313,7 +3318,7 @@ Future<void> _runWithExportingOverlay(
     barrierDismissible: false,
     builder: (ctx) => Center(
       child: Material(
-        color: cs.surface,
+        color: context.appColors.surfaceCard,
         elevation: 6,
         shadowColor: cs.shadow.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(14),

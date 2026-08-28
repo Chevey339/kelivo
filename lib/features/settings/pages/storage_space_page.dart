@@ -18,6 +18,7 @@ import '../../chat/pages/image_viewer_page.dart';
 import 'log_viewer_page.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class StorageSpacePage extends StatefulWidget {
   const StorageSpacePage({super.key, this.embedded = false});
@@ -647,7 +648,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _iosSectionCard(
+        SectionCard(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             child: Column(
@@ -698,7 +699,7 @@ class _StorageSpacePageState extends State<StorageSpacePage> {
           ),
         ),
         const SizedBox(height: 12),
-        _iosSectionCard(
+        SectionCard(
           child: Column(
             children: [
               for (int i = 0; i < report.categories.length; i++) ...[
@@ -2378,29 +2379,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
       ),
     );
   }
-}
-
-Widget _iosSectionCard({required Widget child}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: child,
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context) {

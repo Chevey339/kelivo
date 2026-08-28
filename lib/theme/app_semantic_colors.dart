@@ -1,5 +1,6 @@
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
+import 'package:Kelivo/theme/surface_ladder.dart';
 
 /// Semantic colors that have no dedicated role in [ColorScheme].
 ///
@@ -8,6 +9,9 @@ import 'package:flutter/material.dart';
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color surfaceFill;
   final Color surfaceCard;
+  final Color surfaceCardFill;
+  final Color hairline;
+  final Color hairlineStrong;
   final Color success;
   final Color successContainer;
   final Color onSuccessContainer;
@@ -16,10 +20,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color onWarningContainer;
   final Color searchHighlight;
   final List<Color> chartSeries;
+  final bool layered;
 
   const AppSemanticColors({
     required this.surfaceFill,
     required this.surfaceCard,
+    required this.surfaceCardFill,
+    required this.hairline,
+    required this.hairlineStrong,
     required this.success,
     required this.successContainer,
     required this.onSuccessContainer,
@@ -28,40 +36,26 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     required this.onWarningContainer,
     required this.searchHighlight,
     required this.chartSeries,
+    this.layered = false,
   });
 
-  /// Subtle fill for text fields, chips, small cards and tag containers.
-  /// Replaces the old `isDark ? Colors.white10 : Color(0xFFF2F3F5/F7F7F9)` idiom.
+  /// Dialog / sheet / menu panel fill.
   ///
-  /// Dark mode uses a stronger alpha (0.14) than the historical white10/white12
-  /// because these fills most often sit on [surfaceCard] (white@0.10 over
-  /// surface) — at 0.10 the two were indistinguishable (e.g. input fields in
-  /// section cards became invisible).
-  static Color _deriveSurfaceFill(ColorScheme cs) {
-    final alpha = cs.brightness == Brightness.dark ? 0.16 : 0.05;
-    return Color.alphaBlend(cs.onSurface.withValues(alpha: alpha), cs.surface);
-  }
+  /// Layered mode sits on the bright card layer. Legacy uses page
+  /// [ColorScheme.surface] so overlays match the old look.
+  Color overlaySurface(ColorScheme scheme) =>
+      layered ? surfaceCard : scheme.surface;
 
-  /// iOS-style section card background.
-  /// Replaces the old `isDark ? Colors.white10 : Colors.white.withValues(alpha: 0.96)` idiom.
-  static Color _deriveSurfaceCard(ColorScheme cs) {
-    return cs.brightness == Brightness.dark
-        ? Color.alphaBlend(
-            const Color(0xFFFFFFFF).withValues(alpha: 0.10),
-            cs.surface,
-          )
-        : Color.alphaBlend(
-            const Color(0xFFFFFFFF).withValues(alpha: 0.96),
-            cs.surface,
-          );
-  }
-
-  factory AppSemanticColors.light(ColorScheme cs) {
+  factory AppSemanticColors.light(ColorScheme cs, {bool layered = false}) {
     const successBase = Color(0xFF2E7D32);
     const warningBase = Color(0xFFF57C00);
+    final ladder = SurfaceLadder.fromScheme(cs, layered: layered);
     return AppSemanticColors(
-      surfaceFill: _deriveSurfaceFill(cs),
-      surfaceCard: _deriveSurfaceCard(cs),
+      surfaceFill: ladder.surfaceFill,
+      surfaceCard: ladder.card,
+      surfaceCardFill: ladder.surfaceCardFill,
+      hairline: ladder.hairline,
+      hairlineStrong: ladder.hairlineStrong,
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFFA5D6A7).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFF1B5E20),
@@ -69,6 +63,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       warningContainer: const Color(0xFFFFE0B2).harmonizeWith(cs.primary),
       onWarningContainer: const Color(0xFF4E2600),
       searchHighlight: const Color(0xFFFFD700).withValues(alpha: 0.55),
+      layered: layered,
       chartSeries: const [
         Color(0xFF2563EB),
         Color(0xFF0F8F83),
@@ -82,12 +77,16 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     );
   }
 
-  factory AppSemanticColors.dark(ColorScheme cs) {
+  factory AppSemanticColors.dark(ColorScheme cs, {bool layered = false}) {
     const successBase = Color(0xFF81C784);
     const warningBase = Color(0xFFFFB74D);
+    final ladder = SurfaceLadder.fromScheme(cs, layered: layered);
     return AppSemanticColors(
-      surfaceFill: _deriveSurfaceFill(cs),
-      surfaceCard: _deriveSurfaceCard(cs),
+      surfaceFill: ladder.surfaceFill,
+      surfaceCard: ladder.card,
+      surfaceCardFill: ladder.surfaceCardFill,
+      hairline: ladder.hairline,
+      hairlineStrong: ladder.hairlineStrong,
       success: successBase.harmonizeWith(cs.primary),
       successContainer: const Color(0xFF1B5E20).harmonizeWith(cs.primary),
       onSuccessContainer: const Color(0xFFC8E6C9),
@@ -95,6 +94,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       warningContainer: const Color(0xFF8D4E00).harmonizeWith(cs.primary),
       onWarningContainer: const Color(0xFFFFE8CC),
       searchHighlight: const Color(0xFFB8860B).withValues(alpha: 0.55),
+      layered: layered,
       chartSeries: const [
         Color(0xFF60A5FA),
         Color(0xFF5EEAD4),
@@ -112,6 +112,9 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   AppSemanticColors copyWith({
     Color? surfaceFill,
     Color? surfaceCard,
+    Color? surfaceCardFill,
+    Color? hairline,
+    Color? hairlineStrong,
     Color? success,
     Color? successContainer,
     Color? onSuccessContainer,
@@ -120,10 +123,14 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     Color? onWarningContainer,
     Color? searchHighlight,
     List<Color>? chartSeries,
+    bool? layered,
   }) {
     return AppSemanticColors(
       surfaceFill: surfaceFill ?? this.surfaceFill,
       surfaceCard: surfaceCard ?? this.surfaceCard,
+      surfaceCardFill: surfaceCardFill ?? this.surfaceCardFill,
+      hairline: hairline ?? this.hairline,
+      hairlineStrong: hairlineStrong ?? this.hairlineStrong,
       success: success ?? this.success,
       successContainer: successContainer ?? this.successContainer,
       onSuccessContainer: onSuccessContainer ?? this.onSuccessContainer,
@@ -132,6 +139,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
       onWarningContainer: onWarningContainer ?? this.onWarningContainer,
       searchHighlight: searchHighlight ?? this.searchHighlight,
       chartSeries: chartSeries ?? this.chartSeries,
+      layered: layered ?? this.layered,
     );
   }
 
@@ -144,6 +152,9 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
     return AppSemanticColors(
       surfaceFill: Color.lerp(surfaceFill, other.surfaceFill, t)!,
       surfaceCard: Color.lerp(surfaceCard, other.surfaceCard, t)!,
+      surfaceCardFill: Color.lerp(surfaceCardFill, other.surfaceCardFill, t)!,
+      hairline: Color.lerp(hairline, other.hairline, t)!,
+      hairlineStrong: Color.lerp(hairlineStrong, other.hairlineStrong, t)!,
       success: Color.lerp(success, other.success, t)!,
       successContainer: Color.lerp(
         successContainer,
@@ -171,6 +182,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
         len,
         (i) => Color.lerp(chartSeries[i], other.chartSeries[i], t)!,
       ),
+      layered: t < 0.5 ? layered : other.layered,
     );
   }
 }
@@ -187,4 +199,8 @@ extension AppSemanticColorsX on BuildContext {
         ? AppSemanticColors.dark(theme.colorScheme)
         : AppSemanticColors.light(theme.colorScheme);
   }
+
+  /// Dialog / sheet / menu panel. See [AppSemanticColors.overlaySurface].
+  Color get overlaySurface =>
+      appColors.overlaySurface(Theme.of(this).colorScheme);
 }

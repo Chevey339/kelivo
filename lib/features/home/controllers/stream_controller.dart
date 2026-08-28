@@ -917,6 +917,7 @@ class StreamController {
         id: call.id,
         toolName: call.name,
         arguments: call.arguments,
+        metadata: call.metadata,
         loading: true,
       ),
     );
@@ -994,6 +995,7 @@ class StreamController {
             ? Map<String, dynamic>.from(result.arguments)
             : parts[idx].arguments,
         content: result.content,
+        metadata: result.metadata ?? parts[idx].metadata,
         loading: false,
       );
     } else if (result.id == 'builtin_search' &&
@@ -1008,6 +1010,7 @@ class StreamController {
           toolName: result.name,
           arguments: result.arguments,
           content: result.content,
+          metadata: result.metadata,
           loading: false,
         ),
       );
@@ -1511,6 +1514,9 @@ class StreamController {
                     const <String, dynamic>{},
                 content: (e['content']?.toString().isNotEmpty == true)
                     ? e['content'].toString()
+                    : null,
+                metadata: e['metadata'] is Map
+                    ? Map<String, dynamic>.from(e['metadata'] as Map)
                     : null,
                 loading: !(e['content']?.toString().isNotEmpty == true),
               ),

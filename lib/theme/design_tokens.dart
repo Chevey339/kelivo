@@ -10,6 +10,20 @@ class AppShadows {
   ];
 }
 
+/// Shared desktop popover wash. Alpha is unchanged from the previous
+/// per-popover literals (`surface` @ 0.28 dark / 0.56 light).
+class AppOverlayColors {
+  static const double desktopPopoverAlphaDark = 0.28;
+  static const double desktopPopoverAlphaLight = 0.56;
+
+  static Color desktopPopoverSurface(ColorScheme cs) {
+    final isDark = cs.brightness == Brightness.dark;
+    return cs.surface.withValues(
+      alpha: isDark ? desktopPopoverAlphaDark : desktopPopoverAlphaLight,
+    );
+  }
+}
+
 class AppRadii {
   static const double capsule = 28;
 }

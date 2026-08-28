@@ -16,6 +16,7 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/providers/user_provider.dart';
 import '../../../core/services/chat/chat_service.dart';
 import '../../../core/services/chat/document_text_extractor.dart';
+import '../../../utils/mcp_structured_image.dart';
 import '../../../utils/sandbox_path_resolver.dart';
 import '../../../core/services/chat/prompt_transformer.dart';
 import '../../../core/services/logging/context_log_models.dart';
@@ -238,7 +239,7 @@ class MessageBuilderService {
                 'role': 'tool',
                 'name': name,
                 'tool_call_id': id,
-                'content': c.toString(),
+                'content': toolResultContentForModel(c?.toString()),
                 if (e['metadata'] is Map)
                   'metadata': (e['metadata'] as Map).cast<String, dynamic>(),
               });

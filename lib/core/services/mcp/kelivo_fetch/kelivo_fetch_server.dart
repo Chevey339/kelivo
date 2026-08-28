@@ -23,7 +23,13 @@ class KelivoFetchRequestPayload {
   static const defaultMaxLength = 5000;
   static const maximumMaxLength = 20000;
 
+  /// Write verbs beyond POST stay unsupported: the tool is meant for reading,
+  /// and PUT/PATCH/DELETE hand the model destructive semantics for free.
+  static const supportedMethods = <String>{'GET', 'POST'};
+
   final Uri url;
+  final String method;
+  final String? body;
   final Map<String, String> headers;
   final int maxLength;
   final int startIndex;
@@ -31,6 +37,8 @@ class KelivoFetchRequestPayload {
 
   KelivoFetchRequestPayload({
     required this.url,
+    this.method = 'GET',
+    this.body,
     Map<String, String>? headers,
     this.maxLength = defaultMaxLength,
     this.startIndex = 0,
@@ -57,6 +65,50 @@ class KelivoFetchRequestPayload {
         headers[k.toString()] = v.toString();
       });
     }
+    final methodAny = map['method'];
+    if (methodAny != null && methodAny is! String) {
+      throw ArgumentError('Invalid method: expected a string');
+    }
+    final method = ((methodAny as String?) ?? 'GET').trim().toUpperCase();
+    if (!supportedMethods.contains(method)) {
+      throw ArgumentError(
+        'Invalid method: $method is not supported; expected GET or POST',
+      );
+    }
+
+    final bodyAny = map['body'];
+    String? body;
+    if (bodyAny is String) {
+      body = bodyAny;
+    } else if (bodyAny is Map || bodyAny is List) {
+      // Models often pass the body as a JSON object rather than a string.
+      body = jsonEncode(bodyAny);
+    } else if (bodyAny != null) {
+      throw ArgumentError('Invalid body: expected a string or a JSON value');
+    }
+    if (body != null && method != 'POST') {
+      throw ArgumentError('Invalid body: only POST requests can carry a body');
+    }
+    if (body != null) {
+      final contentTypeKey = headers.keys.firstWhere(
+        (k) => k.toLowerCase() == 'content-type',
+        orElse: () => '',
+      );
+      if (contentTypeKey.isEmpty) {
+        headers['Content-Type'] = 'application/json; charset=utf-8';
+      } else {
+        // The body goes out as UTF-8, so a conflicting charset would silently
+        // mis-declare the bytes rather than transcode them.
+        final declared = _charsetOf(headers[contentTypeKey]!);
+        if (declared != null && declared != 'utf-8' && declared != 'utf8') {
+          throw ArgumentError(
+            'Invalid headers: request bodies are sent as UTF-8, so '
+            'Content-Type cannot declare charset=$declared',
+          );
+        }
+      }
+    }
+
     final maxLength = _parseInteger(
       map['max_length'],
       name: 'max_length',
@@ -75,6 +127,14 @@ class KelivoFetchRequestPayload {
     if (startIndex < 0) {
       throw ArgumentError('Invalid start_index: expected a non-negative value');
     }
+    if (startIndex > 0 && method != 'GET') {
+      // Continuing would replay the whole request, and a POST may create a
+      // resource or charge the caller a second time.
+      throw ArgumentError(
+        'Invalid start_index: a $method response cannot be continued because '
+        'that would repeat the request; raise max_length instead',
+      );
+    }
     final rawAny = map['raw'];
     if (rawAny != null && rawAny is! bool) {
       throw ArgumentError('Invalid raw: expected a boolean');
@@ -82,12 +142,20 @@ class KelivoFetchRequestPayload {
 
     return KelivoFetchRequestPayload(
       url: uri,
+      method: method,
+      body: body,
       headers: headers,
       maxLength: maxLength,
       startIndex: startIndex,
       raw: rawAny as bool? ?? false,
     );
   }
+
+  /// Extracts the `charset` parameter of a Content-Type header, if any.
+  static String? _charsetOf(String contentType) => RegExp(
+    r'charset\s*=\s*"?([\w-]+)',
+    caseSensitive: false,
+  ).firstMatch(contentType)?.group(1)?.toLowerCase();
 
   static int _parseInteger(
     Object? value, {
@@ -113,11 +181,16 @@ class KelivoFetcher {
         'User-Agent': _defaultUA,
         ...payload.headers,
       };
-      final resp = await http.get(payload.url, headers: merged);
-      if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        throw Exception('HTTP ${resp.statusCode}');
+      if (payload.method == 'POST') {
+        // Send bytes so the caller's Content-Type header is passed through
+        // untouched instead of having its charset rewritten by `encoding`.
+        return await http.post(
+          payload.url,
+          headers: merged,
+          body: utf8.encode(payload.body ?? ''),
+        );
       }
-      return resp;
+      return await http.get(payload.url, headers: merged);
     } catch (e) {
       throw Exception(
         'Failed to fetch ${payload.url}: ${e is Exception ? e.toString() : 'Unknown error'}',
@@ -131,13 +204,41 @@ class KelivoFetcher {
     try {
       final resp = await _fetch(payload);
       final contentType = (resp.headers['content-type'] ?? '').toLowerCase();
-      final body = resp.body;
+      final body = _decodeBody(resp, contentType: contentType);
       final text = payload.raw
           ? body
           : _contentForModel(body, contentType: contentType);
+      if (resp.statusCode < 200 || resp.statusCode >= 300) {
+        // Custom APIs carry their error details in the 4xx/5xx body, so hand
+        // both the status and the response back instead of a bare failure.
+        final detail = text.trim().isEmpty
+            ? ''
+            : _bounded(text, payload).trim();
+        return _err(
+          detail.isEmpty
+              ? 'HTTP ${resp.statusCode}'
+              : 'HTTP ${resp.statusCode}\n\n$detail',
+        );
+      }
       return _ok(_bounded(text, payload));
     } catch (e) {
       return _err(e.toString());
+    }
+  }
+
+  /// Without a declared charset `http` decodes as latin1 (bar
+  /// `application/json`), which mangles the UTF-8 most pages and APIs actually
+  /// serve — HTML in particular declares its charset in a meta tag, not the
+  /// header. Try strict UTF-8 first so genuinely latin1 bytes fail the decode
+  /// and fall back to `http`'s own handling.
+  static String _decodeBody(http.Response resp, {required String contentType}) {
+    if (KelivoFetchRequestPayload._charsetOf(contentType) != null) {
+      return resp.body;
+    }
+    try {
+      return utf8.decode(resp.bodyBytes);
+    } catch (_) {
+      return resp.body;
     }
   }
 
@@ -207,8 +308,15 @@ class KelivoFetcher {
 
     final content = text.substring(start, end);
     if (end >= text.length) return content;
-    return '$content\n\n[Content truncated: showing characters $start-${end - 1} '
-        'of ${text.length}. Call kelivo_fetch with start_index=$end to continue.]';
+    final shown =
+        '[Content truncated: showing characters $start-${end - 1} '
+        'of ${text.length}.';
+    if (payload.method != 'GET') {
+      return '$content\n\n$shown Raise max_length to see more; a '
+          '${payload.method} cannot be continued with start_index.]';
+    }
+    return '$content\n\n$shown Call kelivo_fetch with start_index=$end to '
+        'continue.]';
   }
 
   static bool _isHighSurrogate(int codeUnit) =>
@@ -344,9 +452,24 @@ class KelivoFetchMcpServerEngine {
               'http:// or https://: https://example.com is valid, while '
               'example.com is invalid.',
         },
+        'method': {
+          'type': 'string',
+          'description':
+              'HTTP method. Use POST only for an API endpoint the user asked '
+              'you to call; GET for reading web pages.',
+          'enum': ['GET', 'POST'],
+          'default': 'GET',
+        },
         'headers': {
           'type': 'object',
           'description': 'Optional headers to include in the request',
+        },
+        'body': {
+          'type': 'string',
+          'description':
+              'Request body for POST, as a string; send a JSON string for JSON '
+              'APIs. Sent as UTF-8; Content-Type defaults to application/json '
+              'when omitted.',
         },
         'max_length': {
           'type': 'integer',
@@ -357,7 +480,8 @@ class KelivoFetchMcpServerEngine {
         },
         'start_index': {
           'type': 'integer',
-          'description': 'Character index used to continue truncated content',
+          'description':
+              'Character index used to continue truncated content; GET only',
           'default': 0,
           'minimum': 0,
         },
@@ -381,7 +505,10 @@ class KelivoFetchMcpServerEngine {
             'Cannot access content that requires authentication, including private '
             'documents or pages behind login walls. HTML is simplified to compact '
             'Markdown with bounded output by default. Continue truncated content with '
-            'start_index; use raw=true only when exact source is required.',
+            'start_index; use raw=true only when exact source is required. '
+            'method=POST with a body calls an API endpoint the user has asked for; '
+            'a POST response cannot be continued with start_index, so raise '
+            'max_length when it is truncated.',
         'inputSchema': schema(),
       },
     ];

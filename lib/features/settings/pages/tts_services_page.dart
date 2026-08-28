@@ -17,6 +17,7 @@ import '../widgets/voice_service_widgets.dart';
 import '../widgets/mimo_reference_audio_picker.dart';
 import '../../../theme/app_font_weights.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 class TtsServicesPage extends StatelessWidget {
   const TtsServicesPage({super.key});
@@ -81,7 +82,7 @@ class TtsServicesPage extends StatelessWidget {
                 onAdd: () => _handleAddNetworkTts(context),
                 first: true,
               ),
-              _iosSectionCard(
+              SectionCard(
                 children: [
                   // System TTS as first row
                   _TactileRow(
@@ -351,32 +352,6 @@ class _AnimatedPressColor extends StatelessWidget {
       builder: (context, color, _) => builder(color ?? base),
     );
   }
-}
-
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
 }
 
 Widget _iosDivider(BuildContext context) {
@@ -708,7 +683,7 @@ void _showMobileErrorDetails(BuildContext context, String message) {
   final l10n = AppLocalizations.of(context)!;
   showModalBottomSheet<void>(
     context: context,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -1025,7 +1000,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                       l10n.ttsServicesDialogProviderType,
                       first: true,
                     ),
-                    _iosSectionCard(
+                    SectionCard(
                       children: [
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
@@ -1037,7 +1012,7 @@ class _NetworkTtsEditorPageState extends State<_NetworkTtsEditorPage> {
                       ],
                     ),
                     _header(context, l10n.ttsServicesPageTitle),
-                    _iosSectionCard(
+                    SectionCard(
                       children: [
                         _TtsEditorTextField(
                           label: l10n.ttsServicesFieldNameLabel,
@@ -1890,7 +1865,7 @@ Future<void> _showSystemTtsConfig(BuildContext context) async {
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: false,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -2041,14 +2016,13 @@ Widget _sheetSelectRow(
   required List<String> options,
   required Future<void> Function(String picked) onSelected,
 }) {
-  final cs = Theme.of(context).colorScheme;
   return _TactileRow(
     onTap: options.isEmpty
         ? null
         : () async {
             final picked = await showModalBottomSheet<String>(
               context: context,
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               shape: const RoundedRectangleBorder(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),

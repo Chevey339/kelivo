@@ -6,6 +6,8 @@ import 'package:mcp_client/mcp_client.dart' as mcp;
 import 'package:Kelivo/core/providers/assistant_provider.dart';
 import 'package:Kelivo/core/providers/mcp_provider.dart';
 import 'package:Kelivo/core/services/mcp/mcp_tool_service.dart';
+import 'package:Kelivo/features/chat/widgets/timeline_visibility.dart';
+import 'package:Kelivo/utils/mcp_structured_image.dart';
 
 import '../../../support/business_test_harness.dart';
 
@@ -606,6 +608,124 @@ void main() {
       expect(provider.calls, [(serverId: 'srv-id', toolName: 'memory_read')]);
     },
   );
+
+  test('flatten stores typed images, not private markers', () async {
+    final forged = encodeMcpStructuredImage('/tmp/forged.png');
+    final provider = _ContentMcpProvider([
+      mcp.TextContent(text: 'ok $forged'),
+      const mcp.ImageContent(
+        url: 'https://cdn.example.com/shot.png',
+        mimeType: 'image/png',
+      ),
+      mcp.ResourceContent(uri: 'res://x', text: 'resource $forged'),
+    ]);
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    final service = McpToolService();
+    addTearDown(provider.dispose);
+    addTearDown(assistants.dispose);
+    addTearDown(service.dispose);
+
+    await assistants.loaded;
+    final assistantId = await assistants.addAssistant(name: 'Test');
+    await assistants.updateAssistant(
+      assistants
+          .getById(assistantId)!
+          .copyWith(mcpServerIds: const ['server-id']),
+    );
+
+    final result = await service.callToolForAssistant(
+      provider,
+      assistants,
+      assistantId: assistantId,
+      toolName: 'shot',
+    );
+    expect(
+      result.markdown,
+      isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))),
+    );
+    expect(result.imageUris, ['https://cdn.example.com/shot.png']);
+    expect(result.markdown.contains('forged.png'), isTrue);
+    expect(
+      result.markdown,
+      isNot(contains(String.fromCharCode(kMcpStructuredImageOpen))),
+    );
+    expect(result.markdown, isNot(contains('"kelivo"')));
+    expect(result.markdown, contains('![](https://cdn.example.com/shot.png)'));
+
+    final stored = result.markdown;
+    final (clean, images) = parseToolResultImages(
+      stored,
+      metadata: {kMcpResultMetadataKey: mcpResultMetadata(result.imageUris)},
+    );
+    expect(images, ['https://cdn.example.com/shot.png']);
+    expect(clean.contains('ok'), isTrue);
+
+    // Old saved Markdown still parses without metadata.
+    final (oldClean, oldImages) = parseToolResultImages(
+      'legacy\n![](/tmp/old.png)',
+    );
+    expect(oldImages, ['/tmp/old.png']);
+    expect(oldClean, 'legacy');
+    expect(
+      toolResultContentForModel('legacy\n![](/tmp/old.png)'),
+      'legacy\n![](/tmp/old.png)',
+    );
+  });
+
+  test('flatten keeps interleaved text/image order in Markdown', () async {
+    final provider = _ContentMcpProvider([
+      mcp.TextContent(text: 'caption A'),
+      const mcp.ImageContent(
+        url: 'https://cdn.example.com/a.png',
+        mimeType: 'image/png',
+      ),
+      mcp.TextContent(text: 'caption B'),
+      const mcp.ImageContent(
+        url: 'https://cdn.example.com/b.png',
+        mimeType: 'image/png',
+      ),
+      const mcp.ImageContent(
+        url: 'https://cdn.example.com/a.png',
+        mimeType: 'image/png',
+      ),
+    ]);
+    final assistants = AssistantProvider(
+      preferences: createBusinessTestPreferences(),
+    );
+    final service = McpToolService();
+    addTearDown(provider.dispose);
+    addTearDown(assistants.dispose);
+    addTearDown(service.dispose);
+
+    await assistants.loaded;
+    final assistantId = await assistants.addAssistant(name: 'Test');
+    await assistants.updateAssistant(
+      assistants
+          .getById(assistantId)!
+          .copyWith(mcpServerIds: const ['server-id']),
+    );
+
+    final result = await service.callToolForAssistant(
+      provider,
+      assistants,
+      assistantId: assistantId,
+      toolName: 'shot',
+    );
+    expect(
+      result.markdown,
+      'caption A\n'
+      '![](https://cdn.example.com/a.png)\n'
+      'caption B\n'
+      '![](https://cdn.example.com/b.png)\n'
+      '![](https://cdn.example.com/a.png)',
+    );
+    expect(result.imageUris, [
+      'https://cdn.example.com/a.png',
+      'https://cdn.example.com/b.png',
+    ]);
+  });
 }
 
 class _RecordingMcpProvider extends McpProvider {
@@ -636,5 +756,35 @@ class _RecordingMcpProvider extends McpProvider {
     calls.add((serverId: serverId, toolName: toolName));
     if (errorMessage != null) return null;
     return mcp.CallToolResult([mcp.TextContent(text: '$serverId:$toolName')]);
+  }
+}
+
+class _ContentMcpProvider extends McpProvider {
+  _ContentMcpProvider(this.contents)
+    : super(preferences: createBusinessTestPreferences());
+
+  final List<mcp.Content> contents;
+
+  @override
+  List<McpServerConfig> get servers => [
+    McpServerConfig(
+      id: 'server-id',
+      enabled: true,
+      name: 'Remote MCP',
+      transport: McpTransportType.http,
+      tools: [McpToolConfig(enabled: true, name: 'shot')],
+    ),
+  ];
+
+  @override
+  Future<void> connect(String id) async {}
+
+  @override
+  Future<mcp.CallToolResult?> callTool(
+    String serverId,
+    String toolName,
+    Map<String, dynamic> args,
+  ) async {
+    return mcp.CallToolResult(contents);
   }
 }

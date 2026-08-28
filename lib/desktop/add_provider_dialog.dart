@@ -331,7 +331,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
           maxHeight: 640,
         ),
         child: Material(
-          color: cs.surface,
+          color: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.25)),
@@ -344,7 +344,7 @@ class _AddProviderDialogBodyState extends State<_AddProviderDialogBody>
                 // Header
                 Container(
                   height: 52,
-                  color: cs.surface,
+                  color: context.overlaySurface,
                   padding: const EdgeInsets.fromLTRB(16, 10, 8, 0),
                   child: Row(
                     children: [

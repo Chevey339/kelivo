@@ -78,6 +78,7 @@ class SettingsProvider extends ChangeNotifier {
     'DeepSeek',
     'AIhubmix',
     '随想AI中转站',
+    'MaruCode',
     'Aliyun',
     'Zhipu AI',
     'Claude',
@@ -286,6 +287,12 @@ class SettingsProvider extends ChangeNotifier {
       'display_desktop_minimize_to_tray_on_close_v1';
   static const String _displayUsePureBackgroundKey =
       'display_use_pure_background_v1';
+  static const String _displayUseLayeredSurfacesKey =
+      'display_use_layered_surfaces_v1';
+  static const String _displayUseLayeredSheetTilesKey =
+      'display_use_layered_sheet_tiles_v1';
+  static const String _displayAssistantBubbleFitContentKey =
+      'display_assistant_bubble_fit_content_v1';
   static const String _displayChatMessageBackgroundStyleKey =
       'display_chat_message_background_style_v1';
   static const String _chatBubbleStyleOverridesKey =
@@ -490,6 +497,18 @@ class SettingsProvider extends ChangeNotifier {
   // When enabled, force pure white/black backgrounds regardless of theme color
   bool _usePureBackground = false;
   bool get usePureBackground => _usePureBackground;
+
+  // Experimental HCT surface ladder. Default off = HEAD formulas.
+  bool _useLayeredSurfaces = false;
+  bool get useLayeredSurfaces => _useLayeredSurfaces;
+
+  // When off, action tiles inside sheets stay the same color as the sheet.
+  bool _useLayeredSheetTiles = false;
+  bool get useLayeredSheetTiles => _useLayeredSheetTiles;
+
+  // When on, assistant bubbles hug their text instead of spanning the row.
+  bool _assistantBubbleFitContent = false;
+  bool get assistantBubbleFitContent => _assistantBubbleFitContent;
 
   // Desktop UI persisted state
   double _desktopSidebarWidth = 240;
@@ -1161,6 +1180,11 @@ class SettingsProvider extends ChangeNotifier {
     } else {
       _usePureBackground = pureBgPref;
     }
+    _useLayeredSurfaces = prefs.getBool(_displayUseLayeredSurfacesKey) ?? false;
+    _useLayeredSheetTiles =
+        prefs.getBool(_displayUseLayeredSheetTilesKey) ?? false;
+    _assistantBubbleFitContent =
+        prefs.getBool(_displayAssistantBubbleFitContentKey) ?? false;
     // display: markdown/math rendering
     _enableDollarLatex = prefs.getBool(_displayEnableDollarLatexKey) ?? true;
     _enableMathRendering =
@@ -2580,6 +2604,29 @@ class SettingsProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = _preferences;
     await prefs.setBool(_displayUsePureBackgroundKey, v);
+  }
+
+  Future<void> setUseLayeredSurfaces(bool v) async {
+    if (_useLayeredSurfaces == v) return;
+    _useLayeredSurfaces = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayUseLayeredSurfacesKey, v);
+  }
+
+  Future<void> setAssistantBubbleFitContent(bool v) async {
+    if (_assistantBubbleFitContent == v) return;
+    _assistantBubbleFitContent = v;
+    notifyListeners();
+    await _preferences.setBool(_displayAssistantBubbleFitContentKey, v);
+  }
+
+  Future<void> setUseLayeredSheetTiles(bool v) async {
+    if (_useLayeredSheetTiles == v) return;
+    _useLayeredSheetTiles = v;
+    notifyListeners();
+    final prefs = _preferences;
+    await prefs.setBool(_displayUseLayeredSheetTilesKey, v);
   }
 
   void _loadCustomThemes(BusinessPreferences prefs) {
@@ -5493,6 +5540,9 @@ Requirements:
     copy._desktopShowTray = _desktopShowTray;
     copy._desktopMinimizeToTrayOnClose = _desktopMinimizeToTrayOnClose;
     copy._usePureBackground = _usePureBackground;
+    copy._useLayeredSurfaces = _useLayeredSurfaces;
+    copy._useLayeredSheetTiles = _useLayeredSheetTiles;
+    copy._assistantBubbleFitContent = _assistantBubbleFitContent;
     copy._chatMessageBackgroundStyle = _chatMessageBackgroundStyle;
     copy._chatBubbleStyleOverrides = _chatBubbleStyleOverrides;
     copy._userChatBubbleStyleOverrides = _userChatBubbleStyleOverrides;
@@ -6087,6 +6137,9 @@ class ProviderConfig {
     if (k.contains('openrouter')) return 'https://openrouter.ai/api/v1';
     if (k.contains('aihubmix')) return 'https://aihubmix.com/v1';
     if (k.contains('随想')) return 'https://sui-xiang.com/v1';
+    if (k.contains('marucode') || k.contains('muteki')) {
+      return 'https://api.muteki.site/v1';
+    }
     if (RegExp(r'qwen|aliyun|dashscope').hasMatch(k)) {
       return 'https://dashscope.aliyuncs.com/compatible-mode/v1';
     }

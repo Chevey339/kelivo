@@ -9,6 +9,7 @@ import '../icons/lucide_adapter.dart' as lucide;
 import '../l10n/app_localizations.dart';
 import '../utils/brand_assets.dart';
 import '../core/providers/settings_provider.dart';
+import '../theme/app_semantic_colors.dart';
 import '../core/providers/assistant_provider.dart';
 import '../core/services/api/chat_api_service.dart';
 import '../core/services/api/stream/stream_chunk.dart';
@@ -440,13 +441,7 @@ class _LanguageDropdownState extends State<_LanguageDropdown> {
 
     _entry = OverlayEntry(
       builder: (ctx) {
-        final usePure = Provider.of<SettingsProvider>(
-          ctx,
-          listen: false,
-        ).usePureBackground;
-        final bgColor = usePure
-            ? Theme.of(ctx).colorScheme.surface
-            : (Theme.of(context).colorScheme.surfaceContainerHigh);
+        final bgColor = ctx.appColors.surfaceCard;
 
         return Stack(
           children: [

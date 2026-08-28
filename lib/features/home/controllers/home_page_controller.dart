@@ -1043,6 +1043,7 @@ class HomePageController extends ChangeNotifier {
       toolName: part.toolName,
       arguments: part.arguments,
       content: content,
+      metadata: part.metadata,
       loading: false,
     );
     if (idx >= 0) {

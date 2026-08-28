@@ -67,7 +67,7 @@ Future<T?> showAppDialog<T>(
                     ),
                     child: DecoratedBox(
                       decoration: ShapeDecoration(
-                        color: cs.surface,
+                        color: ctx.overlaySurface,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                           side: BorderSide(
@@ -114,7 +114,7 @@ Future<T?> _showAppSheet<T>(
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),

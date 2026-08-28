@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../icons/lucide_adapter.dart';
 import '../../theme/app_font_weights.dart';
+import '../../theme/app_semantic_colors.dart';
 import 'ios_tactile.dart';
 
 typedef CustomBottomSheetBuilder =
@@ -179,7 +180,7 @@ class _CustomBottomSheetState extends State<CustomBottomSheet>
                   child: RepaintBoundary(
                     child: _buildPanel(
                       context,
-                      surface: cs.surface,
+                      surface: context.overlaySurface,
                       handleColor: cs.onSurface,
                       expandedTop: expandedTop,
                       partialTop: partialTop,

@@ -257,7 +257,7 @@ class _ProxyTypeSheetField extends StatelessWidget {
     Future<void> openSheet() async {
       final selected = await showModalBottomSheet<String>(
         context: context,
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),

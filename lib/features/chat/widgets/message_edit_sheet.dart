@@ -11,11 +11,10 @@ Future<MessageEditResult?> showMessageEditSheet(
   BuildContext context, {
   required ChatMessage message,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   return showModalBottomSheet<MessageEditResult?>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),

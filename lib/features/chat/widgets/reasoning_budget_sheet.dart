@@ -9,6 +9,8 @@ import '../../../shared/dialogs/reasoning_budget_custom_dialog.dart';
 import '../../../shared/widgets/ios_tactile.dart';
 import '../../../core/services/haptics.dart';
 import 'package:Kelivo/theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
+import '../../../shared/widgets/section_card.dart';
 
 Future<void> showReasoningBudgetSheet(
   BuildContext context, {
@@ -18,7 +20,7 @@ Future<void> showReasoningBudgetSheet(
   await showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
     ),
@@ -103,7 +105,7 @@ class _ReasoningBudgetSheetState extends State<_ReasoningBudgetSheet> {
         height: 48,
         child: IosCardPress(
           borderRadius: BorderRadius.circular(14),
-          baseColor: cs.surface,
+          baseColor: sheetTileColor(context),
           duration: const Duration(milliseconds: 260),
           onTap: () async {
             if (onTap != null) {

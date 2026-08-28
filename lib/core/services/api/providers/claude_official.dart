@@ -8,6 +8,7 @@ import '../../../models/token_usage.dart';
 import '../../../providers/model_provider.dart';
 import '../../../providers/settings_provider.dart';
 import '../../../utils/multimodal_input_utils.dart';
+import '../../../../utils/mcp_structured_image.dart';
 import '../builtin_tools.dart';
 import '../chat_api_helpers.dart';
 import '../generation/tool_loop_runner.dart';
@@ -465,11 +466,13 @@ Stream<StreamChunk> sendClaudeStream(
       for (final tool in decoder.clientTools.values) {
         var res = toolResultsContent[tool.id] ?? '';
         if (res.isEmpty && onToolCall != null) {
-          res = await onToolCall(
-            tool.name,
-            tool.decodedArguments,
-            toolCallId: tool.id,
-          );
+          res = ClientToolResult.fromHandler(
+            await onToolCall(
+              tool.name,
+              tool.decodedArguments,
+              toolCallId: tool.id,
+            ),
+          ).content;
         }
         lastStreamResults.add({
           'type': 'tool_result',

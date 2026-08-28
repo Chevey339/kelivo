@@ -776,11 +776,13 @@ class MyApp extends StatelessWidget {
                 palette.light,
                 dynamicScheme: useDyn ? lightDynamic : null,
                 pureBackground: settings.usePureBackground,
+                layeredSurfaces: settings.useLayeredSurfaces,
               );
               final dark = buildDarkThemeForScheme(
                 palette.dark,
                 dynamicScheme: useDyn ? darkDynamic : null,
                 pureBackground: settings.usePureBackground,
+                layeredSurfaces: settings.useLayeredSurfaces,
               );
               // Resolve effective app font family (system/local alias)
               String? effectiveAppFontFamily() {

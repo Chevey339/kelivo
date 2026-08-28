@@ -301,7 +301,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
         return Consumer<SettingsProvider>(
           builder: (context, sp, _) {
             return Dialog(
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -392,7 +392,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -482,7 +482,6 @@ class DesktopDefaultModelPane extends StatelessWidget {
   }
 
   Future<void> _showOcrPromptDialog(BuildContext context) async {
-    final cs = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final sp = context.read<SettingsProvider>();
     final ctrl = TextEditingController(text: sp.ocrPrompt);
@@ -491,7 +490,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -579,7 +578,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -678,7 +677,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -774,7 +773,7 @@ class DesktopDefaultModelPane extends StatelessWidget {
       barrierDismissible: true,
       builder: (ctx) {
         return Dialog(
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

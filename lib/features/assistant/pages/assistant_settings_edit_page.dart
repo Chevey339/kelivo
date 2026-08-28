@@ -62,6 +62,7 @@ import '../../../utils/sandbox_path_resolver.dart';
 import '../utils/assistant_edit_tab_layout.dart';
 import 'assistant_regex_tab.dart';
 import 'package:Kelivo/theme/app_semantic_colors.dart';
+import 'package:Kelivo/shared/widgets/section_card.dart';
 
 part 'assistant_settings_edit_basic_tab.dart';
 part 'assistant_settings_edit_prompt_tab.dart';
@@ -423,7 +424,7 @@ class _AssistantDetailOutlinePage extends StatelessWidget {
       children: [
         _AssistantOutlineHeader(assistant: assistant, prompt: prompt),
         const SizedBox(height: 18),
-        _iosSectionCard(
+        SectionCard(
           children: [
             for (var i = 0; i < tabs.length; i++) ...[
               _AssistantOutlineItem(tab: tabs[i], assistantId: assistant.id),
@@ -450,7 +451,6 @@ class _AssistantOutlineHeader extends StatelessWidget {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
     final name = assistant.name.trim().isNotEmpty
         ? assistant.name.trim()
         : l10n.assistantEditPageTitle;
@@ -460,10 +460,7 @@ class _AssistantOutlineHeader extends StatelessWidget {
       decoration: BoxDecoration(
         color: context.appColors.surfaceCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.08),
-          width: 0.7,
-        ),
+        border: Border.all(color: context.appColors.hairline, width: 0.7),
       ),
       child: Column(
         children: [
@@ -740,7 +737,7 @@ class _AssistantOutlineModeSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return _iosSectionCard(
+    return SectionCard(
       children: [
         _iosSwitchRow(
           context,
@@ -1163,32 +1160,6 @@ class _TactileIconButtonState extends State<_TactileIconButton> {
   }
 }
 
-Widget _iosSectionCard({required List<Widget> children}) {
-  return Builder(
-    builder: (context) {
-      final theme = Theme.of(context);
-      final cs = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
-      final Color bg = context.appColors.surfaceCard;
-      return Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: cs.outlineVariant.withValues(alpha: isDark ? 0.08 : 0.06),
-            width: 0.6,
-          ),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Column(children: children),
-        ),
-      );
-    },
-  );
-}
-
 Widget _iosDivider(BuildContext context) {
   final cs = Theme.of(context).colorScheme;
   return Divider(
@@ -1571,13 +1542,12 @@ Future<void> showAssistantDesktopDialog(
   BuildContext context, {
   required String assistantId,
 }) async {
-  final cs = Theme.of(context).colorScheme;
   await showDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -2698,7 +2668,7 @@ class _DesktopAssistantBasicPaneState
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          backgroundColor: cs.surface,
+          backgroundColor: context.overlaySurface,
           title: Text(l10n.assistantEditImageUrlDialogTitle),
           content: TextField(
             controller: controller,
@@ -2802,7 +2772,7 @@ class _DesktopAssistantBasicPaneState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              backgroundColor: cs.surface,
+              backgroundColor: context.overlaySurface,
               title: Text(l10n.assistantEditQQAvatarDialogTitle),
               content: TextField(
                 controller: controller,

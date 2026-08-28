@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/models/chat_message.dart';
 import '../core/models/message_part.dart';
+import '../theme/design_tokens.dart';
 
 Future<String?> showDesktopMiniMapPopover(
   BuildContext context, {
@@ -221,7 +222,7 @@ class _GlassPanel extends StatelessWidget {
         filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: cs.surface.withValues(alpha: isDark ? 0.28 : 0.56),
+            color: AppOverlayColors.desktopPopoverSurface(cs),
             border: Border(
               top: BorderSide(
                 color: cs.onSurface.withValues(alpha: isDark ? 0.06 : 0.18),

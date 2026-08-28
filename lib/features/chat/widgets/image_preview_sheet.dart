@@ -18,6 +18,7 @@ import '../../../utils/clipboard_images.dart';
 import 'package:super_clipboard/super_clipboard.dart';
 import 'dart:ui' as ui;
 import '../../../theme/app_font_weights.dart';
+import 'package:Kelivo/theme/app_semantic_colors.dart';
 
 const int _previewBlankTrimPreservePadding = 48;
 const int _previewBlankAlphaTolerance = 8;
@@ -42,11 +43,10 @@ Future<void> showImagePreviewSheet(
     return;
   }
 
-  final cs = Theme.of(context).colorScheme;
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: cs.surface,
+    backgroundColor: context.overlaySurface,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -279,7 +279,6 @@ class _ImagePreviewDesktopDialogState
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final cs = Theme.of(context).colorScheme;
     return Dialog(
       elevation: 12,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -293,7 +292,7 @@ class _ImagePreviewDesktopDialogState
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Material(
-            color: cs.surface,
+            color: context.overlaySurface,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -409,7 +408,7 @@ class _ImagePreviewCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
-      color: cs.surface,
+      color: context.appColors.surfaceCard,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: cs.outline.withValues(alpha: 0.08)),
@@ -1142,7 +1141,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                 top: false,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: cs.surface,
+                    color: context.appColors.surfaceCard,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
@@ -1163,7 +1162,7 @@ class _ImagePreviewSheetState extends State<_ImagePreviewSheet> {
                           child: IosCardPress(
                             onTap: () => _onShare(btnCtx),
                             borderRadius: BorderRadius.circular(12),
-                            baseColor: cs.surface,
+                            baseColor: context.appColors.surfaceCard,
                             pressedBlendStrength:
                                 Theme.of(context).brightness == Brightness.dark
                                 ? 0.14

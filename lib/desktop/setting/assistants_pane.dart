@@ -157,7 +157,7 @@ Future<String?> _showAddAssistantDesktopDialog(BuildContext context) async {
     barrierDismissible: true,
     builder: (ctx) {
       return Dialog(
-        backgroundColor: cs.surface,
+        backgroundColor: context.overlaySurface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: ConstrainedBox(
@@ -346,7 +346,7 @@ Future<bool?> _confirmDeleteDesktop(BuildContext context) async {
             constraints: const BoxConstraints(maxWidth: 380),
             child: DecoratedBox(
               decoration: ShapeDecoration(
-                color: cs.surface,
+                color: ctx.overlaySurface,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                   side: BorderSide(
