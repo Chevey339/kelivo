@@ -90,16 +90,20 @@ Future<GeneratedFile?> downloadClaudeGeneratedFile({
     // file of any size costs a bounded amount of memory. Should an identical
     // copy already be stored, this one is dropped again in its favour.
     final destination = await UploadDedupe.reserveUniqueFile(dir, name);
-    final digest = await _streamToFile(
-      client: client,
-      uri: Uri.parse('$base/files/$fileId/content'),
-      headers: getHeaders,
-      destination: destination,
-    );
-    if (digest == null) {
-      await _discard(destination);
-      return null;
+    ({int size, List<int> bytes})? digest;
+    try {
+      digest = await _streamToFile(
+        client: client,
+        uri: Uri.parse('$base/files/$fileId/content'),
+        headers: getHeaders,
+        destination: destination,
+      );
+    } finally {
+      // A download cut off — the client closed under it, say — must not
+      // leave its half in the upload directory.
+      if (digest == null) await _discard(destination);
     }
+    if (digest == null) return null;
     var path = destination.path;
     final identical = await UploadDedupe.findIdenticalDigest(
       dir,

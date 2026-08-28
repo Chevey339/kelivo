@@ -467,55 +467,61 @@ Stream<StreamChunk> sendClaudeStream(
       // the file takes.
       final downloads = <Future<GeneratedFile?>>[];
 
-      await for (final event in parseSseEventStrings(sse)) {
-        throwIfInBandStreamError(event.data);
-        final decoded = decoder.accept(event);
-        for (final chunk in decoded.chunks) {
-          yield chunk;
-          if (chunk is ServerToolEnd) {
-            // Code execution reports what it wrote as ids the card cannot do
-            // anything with, so the bytes are fetched here and the message
-            // carries the file itself.
-            for (final fileId in claudeGeneratedFileIds(chunk.output)) {
-              if (!downloadedFileIds.add(fileId)) continue;
-              downloads.add(
-                downloadClaudeGeneratedFile(
-                  client: client,
-                  base: base,
-                  headers: baseHeaders,
-                  fileId: fileId,
-                ),
-              );
-            }
-          }
-          if (chunk is ToolCallEnd &&
-              decoder.isClientTool(chunk.id) &&
-              onToolCall != null &&
-              executedToolIds.add(chunk.id)) {
-            final tool = decoder.clientTools[chunk.id]!;
-            final args = tool.decodedArguments;
-            final call = emitToolCall(
-              id: tool.id,
-              name: tool.name,
-              arguments: args,
-            );
-            await for (final resultChunk in executeClientTools(
-              calls: [call],
-              onToolCall: onToolCall,
-              usage: decoder.usage,
-              totalTokens: decoder.usage?.totalTokens ?? 0,
-            )) {
-              if (resultChunk is ToolCallResult) {
-                decoder.recordToolResult(
-                  tool.id,
-                  (resultChunk.output ?? '').toString(),
+      try {
+        await for (final event in parseSseEventStrings(sse)) {
+          throwIfInBandStreamError(event.data);
+          final decoded = decoder.accept(event);
+          for (final chunk in decoded.chunks) {
+            yield chunk;
+            if (chunk is ServerToolEnd) {
+              // Code execution reports what it wrote as ids the card cannot do
+              // anything with, so the bytes are fetched here and the message
+              // carries the file itself.
+              for (final fileId in claudeGeneratedFileIds(chunk.output)) {
+                if (!downloadedFileIds.add(fileId)) continue;
+                downloads.add(
+                  downloadClaudeGeneratedFile(
+                    client: client,
+                    base: base,
+                    headers: baseHeaders,
+                    fileId: fileId,
+                  ),
                 );
               }
-              yield resultChunk;
+            }
+            if (chunk is ToolCallEnd &&
+                decoder.isClientTool(chunk.id) &&
+                onToolCall != null &&
+                executedToolIds.add(chunk.id)) {
+              final tool = decoder.clientTools[chunk.id]!;
+              final args = tool.decodedArguments;
+              final call = emitToolCall(
+                id: tool.id,
+                name: tool.name,
+                arguments: args,
+              );
+              await for (final resultChunk in executeClientTools(
+                calls: [call],
+                onToolCall: onToolCall,
+                usage: decoder.usage,
+                totalTokens: decoder.usage?.totalTokens ?? 0,
+              )) {
+                if (resultChunk is ToolCallResult) {
+                  decoder.recordToolResult(
+                    tool.id,
+                    (resultChunk.output ?? '').toString(),
+                  );
+                }
+                yield resultChunk;
+              }
             }
           }
+          if (decoded.completed) break;
         }
-        if (decoded.completed) break;
+      } finally {
+        // A turn that stops here — cancelled, or on an in-band error — still
+        // sees its downloads out rather than closing the client under them.
+        await Future.wait(downloads);
       }
       for (final chunk in decoder.onClosed()) {
         yield chunk;

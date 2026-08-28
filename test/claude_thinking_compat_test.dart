@@ -278,6 +278,67 @@ const _webSearchHistory = <Map<String, dynamic>>[
   {'role': 'user', 'content': '第一条具体怎么说的'},
 ];
 
+/// One streamed response whose code run hands back a file, with text on
+/// either side of it.
+const _fileRunEvents = [
+  {
+    'type': 'content_block_start',
+    'index': 0,
+    'content_block': {'type': 'text', 'text': ''},
+  },
+  {
+    'type': 'content_block_delta',
+    'index': 0,
+    'delta': {'type': 'text_delta', 'text': 'before '},
+  },
+  {'type': 'content_block_stop', 'index': 0},
+  {
+    'type': 'content_block_start',
+    'index': 1,
+    'content_block': {
+      'type': 'server_tool_use',
+      'id': 'srvtoolu_run',
+      'name': 'bash_code_execution',
+      'input': {'command': 'python plot.py'},
+    },
+  },
+  {'type': 'content_block_stop', 'index': 1},
+  {
+    'type': 'content_block_start',
+    'index': 2,
+    'content_block': {
+      'type': 'bash_code_execution_tool_result',
+      'tool_use_id': 'srvtoolu_run',
+      'content': {
+        'type': 'bash_code_execution_result',
+        'stdout': '',
+        'stderr': '',
+        'return_code': 0,
+        'content': [
+          {'type': 'code_execution_output', 'file_id': 'file_chart'},
+        ],
+      },
+    },
+  },
+  {'type': 'content_block_stop', 'index': 2},
+  {
+    'type': 'content_block_start',
+    'index': 3,
+    'content_block': {'type': 'text', 'text': ''},
+  },
+  {
+    'type': 'content_block_delta',
+    'index': 3,
+    'delta': {'type': 'text_delta', 'text': 'after'},
+  },
+  {'type': 'content_block_stop', 'index': 3},
+  {
+    'type': 'message_delta',
+    'delta': {'stop_reason': 'end_turn'},
+  },
+  {'type': 'message_stop'},
+];
+
 /// Both request bodies of a turn where Claude calls a server tool and a client
 /// tool at once, and every chunk it produced: the API leaves the server tool's
 /// result in the first response, and the continuation round decides whether
@@ -1447,65 +1508,6 @@ void main() {
         } catch (_) {}
       });
 
-      const events = [
-        {
-          'type': 'content_block_start',
-          'index': 0,
-          'content_block': {'type': 'text', 'text': ''},
-        },
-        {
-          'type': 'content_block_delta',
-          'index': 0,
-          'delta': {'type': 'text_delta', 'text': 'before '},
-        },
-        {'type': 'content_block_stop', 'index': 0},
-        {
-          'type': 'content_block_start',
-          'index': 1,
-          'content_block': {
-            'type': 'server_tool_use',
-            'id': 'srvtoolu_run',
-            'name': 'bash_code_execution',
-            'input': {'command': 'python plot.py'},
-          },
-        },
-        {'type': 'content_block_stop', 'index': 1},
-        {
-          'type': 'content_block_start',
-          'index': 2,
-          'content_block': {
-            'type': 'bash_code_execution_tool_result',
-            'tool_use_id': 'srvtoolu_run',
-            'content': {
-              'type': 'bash_code_execution_result',
-              'stdout': '',
-              'stderr': '',
-              'return_code': 0,
-              'content': [
-                {'type': 'code_execution_output', 'file_id': 'file_chart'},
-              ],
-            },
-          },
-        },
-        {'type': 'content_block_stop', 'index': 2},
-        {
-          'type': 'content_block_start',
-          'index': 3,
-          'content_block': {'type': 'text', 'text': ''},
-        },
-        {
-          'type': 'content_block_delta',
-          'index': 3,
-          'delta': {'type': 'text_delta', 'text': 'after'},
-        },
-        {'type': 'content_block_stop', 'index': 3},
-        {
-          'type': 'message_delta',
-          'delta': {'stop_reason': 'end_turn'},
-        },
-        {'type': 'message_stop'},
-      ];
-
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
@@ -1549,7 +1551,7 @@ void main() {
             },
           })}\n\n',
         );
-        for (final event in events) {
+        for (final event in _fileRunEvents) {
           request.response.write(
             'event: ${event['type']}\ndata: ${jsonEncode(event)}\n\n',
           );
@@ -1585,6 +1587,109 @@ void main() {
       final file = chunks.indexWhere((chunk) => chunk is GeneratedFile);
       expect(file, greaterThan(lastText), reason: 'the text must not wait');
       expect((chunks[file] as GeneratedFile).name, 'chart.png');
+    });
+
+    test('a download that breaks off leaves no file behind', () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'kelivo_claude_dl_',
+      );
+      final previousPathProvider = PathProviderPlatform.instance;
+      PathProviderPlatform.instance = _FakePathProviderPlatform(tempDir.path);
+      SandboxPathResolver.debugSetDirs(docsDir: tempDir.path);
+      addTearDown(() async {
+        PathProviderPlatform.instance = previousPathProvider;
+        SandboxPathResolver.debugSetDirs();
+        try {
+          await tempDir.delete(recursive: true);
+        } catch (_) {}
+      });
+
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() async {
+        await server.close(force: true);
+      });
+      server.listen((request) async {
+        if (request.method == 'GET') {
+          if (request.uri.path.endsWith('/content')) {
+            // Half the body, then the connection drops.
+            final socket = await request.response.detachSocket(
+              writeHeaders: false,
+            );
+            socket.write('HTTP/1.1 200 OK\r\nContent-Length: 8\r\n\r\n');
+            socket.add(const <int>[1, 2, 3, 4]);
+            await socket.flush();
+            socket.destroy();
+          } else {
+            request.response.statusCode = HttpStatus.ok;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode({
+                'id': 'file_chart',
+                'filename': 'chart.png',
+                'mime_type': 'image/png',
+                'size_bytes': 8,
+                'downloadable': true,
+              }),
+            );
+            await request.response.close();
+          }
+          return;
+        }
+        await utf8.decoder.bind(request).join();
+        request.response.statusCode = HttpStatus.ok;
+        request.response.headers.contentType = ContentType(
+          'text',
+          'event-stream',
+        );
+        request.response.write(
+          'event: message_start\n'
+          'data: ${jsonEncode({
+            'type': 'message_start',
+            'message': {
+              'id': 'msg_1',
+              'usage': {'input_tokens': 1, 'output_tokens': 1},
+            },
+          })}\n\n',
+        );
+        for (final event in _fileRunEvents) {
+          request.response.write(
+            'event: ${event['type']}\ndata: ${jsonEncode(event)}\n\n',
+          );
+        }
+        await request.response.close();
+      });
+
+      final config = _claudeConfig(
+        'http://api.anthropic.com',
+        modelOverrides: const <String, dynamic>{
+          'claude-opus-4-7': <String, dynamic>{
+            'builtInTools': <String>[BuiltInToolNames.codeExecution],
+          },
+        },
+      );
+      late List<StreamChunk> chunks;
+      await HttpOverrides.runZoned(
+        () async {
+          chunks = await ChatApiService.sendMessageStream(
+            config: config,
+            modelId: 'claude-opus-4-7',
+            messages: const [
+              {'role': 'user', 'content': 'plot'},
+            ],
+          ).toList();
+        },
+        createHttpClient: (context) =>
+            _ProxyHttpOverrides(server.port).createHttpClient(context),
+      );
+
+      // The turn survives the lost file; the half of it written is gone.
+      expect(chunks.joinedContent, 'before after');
+      expect(chunks.whereType<GeneratedFile>(), isEmpty);
+      final leftovers = await tempDir
+          .list(recursive: true)
+          .where((entry) => entry is File)
+          .toList();
+      expect(leftovers, isEmpty);
     });
 
     test(
